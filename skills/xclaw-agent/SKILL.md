@@ -79,6 +79,7 @@ Example (Telegram reply body):
 
 Policy approval queued message (Telegram):
 - Include `Status: approval_pending` and `Approval ID: ppr_...` so OpenClaw can auto-attach inline buttons.
+- Preferred: when using `policy-preapprove-token` / `policy-approve-all`, paste the returned `queuedMessage` field verbatim into chat. It is formatted to include the required `Status:` and `Approval ID:` lines without mistakes.
 - Button callback_data:
   - Approve: `xpol|a|<policyApprovalId>|<chainKey>`
   - Deny: `xpol|r|<policyApprovalId>|<chainKey>`

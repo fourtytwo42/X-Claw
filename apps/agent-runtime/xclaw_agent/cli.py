@@ -2082,13 +2082,30 @@ def cmd_approvals_request_token(args: argparse.Namespace) -> int:
                 {"status": status_code, "chain": args.chain, "token": token},
                 exit_code=1,
             )
+        policy_approval_id = str(body.get("policyApprovalId", ""))
+        status = str(body.get("status", "approval_pending"))
+        token_addr = _normalize_address(token)
+        queued_message = (
+            "Approval required (policy)\n\n"
+            "Request: Preapprove token for trading\n"
+            f"Token: {token_addr}\n"
+            f"Chain: {args.chain}\n"
+            f"Approval ID: {policy_approval_id}\n"
+            f"Status: {status}\n\n"
+            "Tap Approve or Deny.\n"
+        )
         return ok(
-            "Policy approval requested: token preapproval pending.",
+            "Policy approval requested (pending). Post queuedMessage to the owner verbatim so Telegram buttons can attach.",
             chain=args.chain,
-            policyApprovalId=str(body.get("policyApprovalId", "")),
-            status=str(body.get("status", "approval_pending")),
+            policyApprovalId=policy_approval_id,
+            status=status,
             requestType="token_preapprove_add",
-            tokenAddress=_normalize_address(token),
+            tokenAddress=token_addr,
+            queuedMessage=queued_message,
+            agentInstructions=(
+                "Send queuedMessage verbatim to the owner in the active chat. "
+                "Do not reformat the 'Approval ID:' and 'Status:' lines; Telegram button auto-attach depends on them."
+            ),
         )
     except Exception as exc:
         return fail(
@@ -2121,12 +2138,27 @@ def cmd_approvals_request_global(args: argparse.Namespace) -> int:
                 {"status": status_code, "chain": args.chain},
                 exit_code=1,
             )
+        policy_approval_id = str(body.get("policyApprovalId", ""))
+        status = str(body.get("status", "approval_pending"))
+        queued_message = (
+            "Approval required (policy)\n\n"
+            "Request: Enable Approve all (global trading)\n"
+            f"Chain: {args.chain}\n"
+            f"Approval ID: {policy_approval_id}\n"
+            f"Status: {status}\n\n"
+            "Tap Approve or Deny.\n"
+        )
         return ok(
-            "Policy approval requested: enable Approve all pending.",
+            "Policy approval requested (pending). Post queuedMessage to the owner verbatim so Telegram buttons can attach.",
             chain=args.chain,
-            policyApprovalId=str(body.get("policyApprovalId", "")),
-            status=str(body.get("status", "approval_pending")),
+            policyApprovalId=policy_approval_id,
+            status=status,
             requestType="global_approval_enable",
+            queuedMessage=queued_message,
+            agentInstructions=(
+                "Send queuedMessage verbatim to the owner in the active chat. "
+                "Do not reformat the 'Approval ID:' and 'Status:' lines; Telegram button auto-attach depends on them."
+            ),
         )
     except Exception as exc:
         return fail("policy_approval_request_failed", str(exc), "Inspect runtime policy approval request and retry.", {"chain": args.chain}, exit_code=1)

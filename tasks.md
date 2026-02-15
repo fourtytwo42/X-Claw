@@ -239,12 +239,40 @@ Active slice: `Slice 33: MetaMask-Like Agent Wallet UX + Simplified Approvals (G
   - [ ] Owner-only approvals panel supports reject reason message
   - [ ] Owner-only policy panel has Global Approval toggle + per-token preapproval toggles
 - [ ] Gates:
-  - [ ] `npm run db:parity`
-  - [ ] `npm run seed:reset`
-  - [ ] `npm run seed:load`
-  - [ ] `npm run seed:verify`
-  - [ ] `npm run build`
-  - [ ] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+# Slice 52 Tasks: Policy Approval Prompts (Agent-Ready queuedMessage + Instructions)
+
+Active slice: `Slice 52: Policy Approval Prompts (Agent-Ready queuedMessage + Instructions)`
+Issue mapping: `#42` (umbrella)
+
+## Checklist
+- [x] Docs sync:
+  - [x] `docs/XCLAW_SLICE_TRACKER.md`
+  - [x] `docs/XCLAW_BUILD_ROADMAP.md`
+  - [x] `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - [x] `docs/CONTEXT_PACK.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+- [x] Runtime:
+  - [x] policy approval request commands return `queuedMessage` + `agentInstructions`
+- [x] Tests:
+  - [x] assert `queuedMessage` contains `Status: approval_pending` + `Approval ID: ppr_...` and includes returned `policyApprovalId`
+- [x] Gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
 
 ---
 

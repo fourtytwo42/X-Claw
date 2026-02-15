@@ -915,3 +915,22 @@ DoD:
 - [x] OpenClaw patch: auto-attach Approve/Deny buttons to the queued approval message and route decisions into agent pipeline (like trade approvals).
 - [x] Runtime/skill: add CLI surface to create policy approval requests so the agent can trigger them.
 - [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.
+
+---
+
+## Slice 52: Policy Approval Prompts (Agent-Ready queuedMessage + Instructions)
+Status: [x]
+Issue: #42 (umbrella)
+
+Goal:
+- When the agent requests a policy approval (preapprove token / approve-all), the runtime must return an agent-ready `queuedMessage` template containing the exact `Status: approval_pending` + `Approval ID: ppr_...` lines so:
+  - the agent can paste it verbatim to the user, and
+  - Telegram queued-message button auto-attach is reliable.
+
+DoD:
+- [x] docs sync first: source-of-truth + roadmap + tracker + context/spec/tasks/acceptance aligned to Slice 52.
+- [x] Runtime: policy approval request commands return:
+  - `queuedMessage` (includes `Status: approval_pending` and `Approval ID: ppr_...` verbatim),
+  - `agentInstructions` (explicitly tells agent to paste the message verbatim).
+- [x] Tests: runtime unit tests assert `queuedMessage` includes the required lines + policyApprovalId.
+- [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.

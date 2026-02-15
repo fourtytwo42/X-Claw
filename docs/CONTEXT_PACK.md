@@ -226,7 +226,31 @@ Issue mapping: `#42` (umbrella)
   - `skills/xclaw-agent/scripts/xclaw_agent_skill.py`
   - `skills/xclaw-agent/SKILL.md`
 - OpenClaw patcher:
-  - `skills/xclaw-agent/scripts/openclaw_gateway_patch.py`
+- `skills/xclaw-agent/scripts/openclaw_gateway_patch.py`
+
+---
+
+## Slice 52 Context: Policy Approval Prompts (Agent-Ready queuedMessage + Instructions)
+
+### Objective
+- Make policy approval request tool outputs “agent-ready” so the agent reliably tells the human what to do and Telegram button auto-attach works every time.
+
+### Scope lock
+- In scope: runtime output fields for policy approval request commands + unit tests + docs/process evidence.
+- Out of scope: server endpoints, DB schema, web UI changes (already delivered in Slice 51).
+
+### Expected touched files (Slice 52 allowlist)
+- Runtime:
+  - `apps/agent-runtime/xclaw_agent/cli.py`
+  - `apps/agent-runtime/tests/test_trade_path.py`
+- Docs/process:
+  - `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - `docs/XCLAW_SLICE_TRACKER.md`
+  - `docs/XCLAW_BUILD_ROADMAP.md`
+  - `docs/CONTEXT_PACK.md`
+  - `spec.md`
+  - `tasks.md`
+  - `acceptance.md`
 - Contracts/docs:
   - `docs/api/openapi.v1.yaml`
   - `packages/shared-schemas/json/*`

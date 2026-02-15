@@ -2975,3 +2975,24 @@ Issue mapping: `#42` (umbrella)
   - applies the policy change server-side,
   - deletes the Telegram message,
   - routes a decision into the agent pipeline so the agent informs the user.
+
+---
+
+## Slice 52 Acceptance Evidence
+
+Date (UTC): 2026-02-15
+Active slice: `Slice 52: Policy Approval Prompts (Agent-Ready queuedMessage + Instructions)`
+Issue mapping: `#42` (umbrella)
+
+### Required gate evidence
+- `npm run db:parity` -> PASS (exit 0, checkedAt: 2026-02-15T22:19:25.294Z)
+- `npm run seed:reset` -> PASS (exit 0)
+- `npm run seed:load` -> PASS (exit 0, scenarios: `happy_path`, `approval_retry`, `degraded_rpc`, `copy_reject`)
+- `npm run seed:verify` -> PASS (exit 0)
+- `npm run build` -> PASS (exit 0)
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS
+
+### Scenario evidence (manual/ops)
+- Policy approval request tool output includes:
+  - `queuedMessage` with `Status: approval_pending` and `Approval ID: ppr_...`
+  - `agentInstructions` telling the agent to paste the queued message verbatim into chat

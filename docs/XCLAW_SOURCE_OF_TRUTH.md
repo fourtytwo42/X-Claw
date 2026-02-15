@@ -2604,8 +2604,10 @@ Limitations / notes:
    - OpenClaw gateway auto-attaches policy approval buttons when a queued message contains:
      - `Status: approval_pending`
      - `Approval ID: ppr_...`
+   - Runtime must return a `queuedMessage` template that includes these lines verbatim so the agent can paste it without formatting mistakes.
 6. Decision feedback:
    - After Telegram approve/deny, decision feedback must be routed into the agent message pipeline (synthetic inbound message + instructions) so the agent informs the user.
+   - For proposed policy approvals, the agent must echo the `queuedMessage` verbatim to the user so Telegram buttons can attach reliably.
 7. Canonical endpoints:
    - `POST /api/v1/agent/policy-approvals/proposed` (agent-auth) creates a pending request.
    - `POST /api/v1/policy-approvals/:policyApprovalId/decision` (agent-auth) applies approve/deny for Telegram callbacks.

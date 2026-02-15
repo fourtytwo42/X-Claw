@@ -769,6 +769,27 @@ Allow the agent to request owner approval for policy changes (token preapproval 
 
 ---
 
+# Slice 52 Spec: Policy Approval Prompts (Agent-Ready queuedMessage + Instructions)
+
+## Goal
+Make policy approval request tool outputs “agent-ready” so the agent reliably tells the owner what to do and Telegram queued-message button auto-attach works without brittle formatting.
+
+## Success Criteria
+1. Runtime policy approval request commands return:
+   - `queuedMessage` including `Status: approval_pending` and `Approval ID: ppr_...` verbatim.
+   - `agentInstructions` telling the agent to paste the queued message verbatim into the active chat.
+2. Unit tests assert `queuedMessage` contains required lines.
+
+## Acceptance Checks
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
 # Slice 31 Spec: Agents + Agent Management UX Refinement (Operational Clean)
 
 ## Goal

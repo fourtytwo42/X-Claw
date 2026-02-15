@@ -787,6 +787,11 @@ class TradePathRuntimeTests(unittest.TestCase):
             payload = self._run_and_parse_stdout(lambda: cli.cmd_approvals_request_token(args))
 
         self.assertTrue(payload.get("ok"))
+        queued = str(payload.get("queuedMessage") or "")
+        self.assertIn("Approval ID: ppr_1", queued)
+        self.assertIn("Status: approval_pending", queued)
+        self.assertIn("Chain: base_sepolia", queued)
+        self.assertTrue(str(payload.get("agentInstructions") or "").strip() != "")
         self.assertEqual(captured.get("method"), "POST")
         self.assertEqual(captured.get("path"), "/agent/policy-approvals/proposed")
         sent = captured.get("payload") or {}
