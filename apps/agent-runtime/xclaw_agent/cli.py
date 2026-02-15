@@ -28,7 +28,7 @@ import urllib.parse
 import urllib.request
 from contextlib import redirect_stdout
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_DOWN
 from typing import Any
 
 from cryptography.hazmat.primitives.asymmetric import ec
@@ -53,6 +53,7 @@ LIMIT_ORDER_STORE_FILE = APP_DIR / "limit_orders.json"
 LIMIT_ORDER_OUTBOX_FILE = APP_DIR / "limit_orders_outbox.json"
 TRADE_USAGE_OUTBOX_FILE = APP_DIR / "trade_usage_outbox.json"
 APPROVAL_PROMPTS_FILE = APP_DIR / "approval_prompts.json"
+PENDING_TRADE_INTENTS_FILE = APP_DIR / "pending-trade-intents.json"
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
 CHAIN_CONFIG_DIR = REPO_ROOT / "config" / "chains"
 
@@ -67,7 +68,7 @@ CHALLENGE_REQUIRED_KEYS = {"domain", "chain", "nonce", "timestamp", "action"}
 CHALLENGE_ALLOWED_DOMAINS = {"xclaw.trade", "localhost", "127.0.0.1", "::1", "staging.xclaw.trade"}
 RETRY_WINDOW_SEC = 600
 MAX_TRADE_RETRIES = 3
-APPROVAL_WAIT_TIMEOUT_SEC = 900
+APPROVAL_WAIT_TIMEOUT_SEC = 1800
 APPROVAL_WAIT_POLL_SEC = 3
 DEFAULT_TX_GAS_PRICE_GWEI = 5
 DEFAULT_TX_SEND_MAX_ATTEMPTS = 5
@@ -1474,10 +1475,104 @@ def _post_trade_proposed(
     return body
 
 
-def _wait_for_trade_approval(trade_id: str, chain: str) -> dict[str, Any]:
+def _normalize_amount_human_text(value: str) -> str:
+    raw = (value or "").strip()
+    if not raw:
+        return "0"
+    try:
+        dec = Decimal(raw)
+    except (InvalidOperation, ValueError):
+        # Preserve raw for hashing determinism (still stable string input).
+        return raw
+    if dec.is_nan() or dec.is_infinite():
+        return raw
+    if dec < 0:
+        dec = abs(dec)
+    # Bound precision to 18 decimals, then strip trailing zeros for canonical text.
+    quantum = Decimal(1) / (Decimal(10) ** 18)
+    try:
+        dec = dec.quantize(quantum, rounding=ROUND_DOWN)
+    except Exception:
+        pass
+    text = format(dec, "f")
+    if "." in text:
+        text = text.rstrip("0").rstrip(".")
+    return text or "0"
+
+
+def _trade_intent_key(chain: str, token_in: str, token_out: str, amount_in_human: str, slippage_bps: int) -> str:
+    canonical_amount = _normalize_amount_human_text(amount_in_human)
+    payload = f"{chain}|{token_in.lower()}|{token_out.lower()}|{canonical_amount}|{int(slippage_bps)}"
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _load_pending_trade_intents() -> dict[str, Any]:
+    try:
+        ensure_app_dir()
+        if not PENDING_TRADE_INTENTS_FILE.exists():
+            return {"version": 1, "intents": {}}
+        raw = PENDING_TRADE_INTENTS_FILE.read_text(encoding="utf-8")
+        payload = json.loads(raw or "{}")
+        if not isinstance(payload, dict):
+            return {"version": 1, "intents": {}}
+        intents = payload.get("intents")
+        if not isinstance(intents, dict):
+            payload["intents"] = {}
+        if payload.get("version") != 1:
+            return {"version": 1, "intents": {}}
+        return payload
+    except Exception:
+        return {"version": 1, "intents": {}}
+
+
+def _save_pending_trade_intents(payload: dict[str, Any]) -> None:
+    ensure_app_dir()
+    if payload.get("version") != 1:
+        payload["version"] = 1
+    if not isinstance(payload.get("intents"), dict):
+        payload["intents"] = {}
+    tmp = f"{PENDING_TRADE_INTENTS_FILE}.{os.getpid()}.tmp"
+    pathlib.Path(tmp).write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+    if os.name != "nt":
+        os.chmod(tmp, 0o600)
+    pathlib.Path(tmp).replace(PENDING_TRADE_INTENTS_FILE)
+    if os.name != "nt":
+        os.chmod(PENDING_TRADE_INTENTS_FILE, 0o600)
+
+
+def _get_pending_trade_intent(intent_key: str) -> dict[str, Any] | None:
+    state = _load_pending_trade_intents()
+    intents = state.get("intents")
+    if not isinstance(intents, dict):
+        return None
+    entry = intents.get(intent_key)
+    return entry if isinstance(entry, dict) else None
+
+
+def _record_pending_trade_intent(intent_key: str, entry: dict[str, Any]) -> None:
+    state = _load_pending_trade_intents()
+    intents = state.get("intents")
+    if not isinstance(intents, dict):
+        intents = {}
+        state["intents"] = intents
+    intents[intent_key] = {**entry, "updatedAt": utc_now()}
+    _save_pending_trade_intents(state)
+
+
+def _remove_pending_trade_intent(intent_key: str) -> None:
+    state = _load_pending_trade_intents()
+    intents = state.get("intents")
+    if not isinstance(intents, dict):
+        return
+    if intent_key in intents:
+        intents.pop(intent_key, None)
+        _save_pending_trade_intents(state)
+
+
+def _wait_for_trade_approval(trade_id: str, chain: str, summary: dict[str, Any] | None = None) -> dict[str, Any]:
     # Slice 34: Telegram approvals (optional). Best-effort prompt delivery + cleanup tracking.
     try:
-        _maybe_send_telegram_approval_prompt(trade_id, chain)
+        _maybe_send_telegram_approval_prompt(trade_id, chain, summary or {})
     except Exception:
         pass
     deadline_ms = int(time.time() * 1000) + (APPROVAL_WAIT_TIMEOUT_SEC * 1000)
@@ -1491,6 +1586,7 @@ def _wait_for_trade_approval(trade_id: str, chain: str) -> dict[str, Any]:
                 _maybe_delete_telegram_approval_prompt(trade_id)
             except Exception:
                 pass
+            _remove_approval_prompt(trade_id)
             return trade
         if status == "approval_pending":
             time.sleep(APPROVAL_WAIT_POLL_SEC)
@@ -1500,6 +1596,7 @@ def _wait_for_trade_approval(trade_id: str, chain: str) -> dict[str, Any]:
                 _maybe_delete_telegram_approval_prompt(trade_id)
             except Exception:
                 pass
+            _remove_approval_prompt(trade_id)
             reason_code = trade.get("reasonCode")
             reason_message = trade.get("reasonMessage")
             raise WalletPolicyError(
@@ -1513,6 +1610,7 @@ def _wait_for_trade_approval(trade_id: str, chain: str) -> dict[str, Any]:
                 _maybe_delete_telegram_approval_prompt(trade_id)
             except Exception:
                 pass
+            _remove_approval_prompt(trade_id)
             raise WalletPolicyError(
                 "approval_expired",
                 "Trade approval has expired.",
@@ -1524,6 +1622,7 @@ def _wait_for_trade_approval(trade_id: str, chain: str) -> dict[str, Any]:
             _maybe_delete_telegram_approval_prompt(trade_id)
         except Exception:
             pass
+        _remove_approval_prompt(trade_id)
         raise WalletPolicyError(
             "policy_denied",
             f"Trade is not executable from status '{status}'.",
@@ -1534,7 +1633,7 @@ def _wait_for_trade_approval(trade_id: str, chain: str) -> dict[str, Any]:
     raise WalletPolicyError(
         "approval_required",
         "Trade is waiting for management approval.",
-        "Approve trade from authorized management view, then retry.",
+        "Approve the pending trade (Telegram or web), then re-run the same trade command to resume without creating a new approval.",
         {"tradeId": trade_id, "chain": chain, "lastStatus": last_status},
     )
 
@@ -1711,8 +1810,7 @@ def _post_approval_prompt_metadata(trade_id: str, chain: str, to_addr: str, thre
         message = str(body.get("message", f"prompt report failed ({status_code})"))
         raise WalletStoreError(f"{code}: {message}")
 
-
-def _maybe_send_telegram_approval_prompt(trade_id: str, chain: str) -> None:
+def _maybe_send_telegram_approval_prompt(trade_id: str, chain: str, summary: dict[str, Any] | None = None) -> None:
     # Avoid duplicate sends.
     existing = _get_approval_prompt(trade_id)
     if existing and str(existing.get("channel") or "") == "telegram":
@@ -1742,7 +1840,17 @@ def _maybe_send_telegram_approval_prompt(trade_id: str, chain: str) -> None:
         # Fail closed: do not send a prompt we can't action safely.
         return
 
-    text = f"Approval required: trade {trade_id} ({chain}).\\n\\nTap Approve to continue."
+    summary = summary or {}
+    amount = str(summary.get("amountInHuman") or "").strip() or "?"
+    token_in_symbol = str(summary.get("tokenInSymbol") or "").strip() or "TOKEN_IN"
+    token_out_symbol = str(summary.get("tokenOutSymbol") or "").strip() or "TOKEN_OUT"
+    text = (
+        "Approve swap\n"
+        f"{amount} {token_in_symbol} -> {token_out_symbol}\n"
+        f"Chain: {chain}\n"
+        f"Trade: {trade_id}\n\n"
+        "Tap Approve to continue. This will submit an on-chain transaction from the agent wallet."
+    )
     buttons = json.dumps([[{"text": "Approve", "callback_data": callback_data}]], separators=(",", ":"))
     openclaw = _require_openclaw_bin()
     cmd = [openclaw, "message", "send", "--channel", "telegram", "--target", chat_id, "--message", text, "--buttons", buttons, "--json"]
@@ -2257,21 +2365,80 @@ def cmd_trade_spot(args: argparse.Namespace) -> int:
         amount_in_for_server = str(args.amount_in).strip()
         if amount_in_mode == "base_units":
             amount_in_for_server = _format_units(int(amount_in_units), token_in_decimals)
-        proposed = _post_trade_proposed(
-            chain,
-            str(token_in_meta.get("symbol") or token_in),
-            str(token_out_meta.get("symbol") or token_out),
-            amount_in_for_server,
-            slippage_bps,
-            amount_out_human=_decimal_text(expected_out_human),
-            reason="trade_spot",
-        )
-        trade_id = str(proposed.get("tradeId") or "")
+
+        summary = {
+            "tradeId": None,
+            "chainKey": chain,
+            "tokenInSymbol": str(token_in_meta.get("symbol") or "").strip() or str(token_in),
+            "tokenOutSymbol": str(token_out_meta.get("symbol") or "").strip() or str(token_out),
+            "amountInHuman": _normalize_amount_human_text(amount_in_for_server),
+            "slippageBps": slippage_bps,
+        }
+
+        intent_key = _trade_intent_key(chain, token_in, token_out, amount_in_for_server, slippage_bps)
+        existing_intent = _get_pending_trade_intent(intent_key)
+        if existing_intent:
+            existing_trade_id = str(existing_intent.get("tradeId") or "").strip()
+            if existing_trade_id:
+                try:
+                    existing_trade = _read_trade_details(existing_trade_id)
+                except Exception:
+                    existing_trade = None
+                status = str((existing_trade or {}).get("status") or "")
+                if status == "approval_pending":
+                    trade_id = existing_trade_id
+                    summary["tradeId"] = trade_id
+                    _wait_for_trade_approval(trade_id, chain, summary)
+                    _remove_pending_trade_intent(intent_key)
+                elif status == "approved":
+                    trade_id = existing_trade_id
+                    summary["tradeId"] = trade_id
+                    _remove_pending_trade_intent(intent_key)
+                    try:
+                        _maybe_delete_telegram_approval_prompt(trade_id)
+                    except Exception:
+                        pass
+                    _remove_approval_prompt(trade_id)
+                elif status in {"rejected", "expired", "failed", "filled", "verification_timeout"}:
+                    _remove_pending_trade_intent(intent_key)
+                else:
+                    # Unknown/non-pending status; do not keep reusing.
+                    _remove_pending_trade_intent(intent_key)
+
         if not trade_id:
-            raise WalletStoreError("Trade proposal did not return a tradeId.")
-        proposed_status = str(proposed.get("status") or "")
-        if proposed_status != "approved":
-            _wait_for_trade_approval(trade_id, chain)
+            proposed = _post_trade_proposed(
+                chain,
+                str(token_in_meta.get("symbol") or token_in),
+                str(token_out_meta.get("symbol") or token_out),
+                amount_in_for_server,
+                slippage_bps,
+                amount_out_human=_decimal_text(expected_out_human),
+                reason="trade_spot",
+            )
+            trade_id = str(proposed.get("tradeId") or "")
+            if not trade_id:
+                raise WalletStoreError("Trade proposal did not return a tradeId.")
+            summary["tradeId"] = trade_id
+            proposed_status = str(proposed.get("status") or "")
+            if proposed_status != "approved":
+                _record_pending_trade_intent(
+                    intent_key,
+                    {
+                        "tradeId": trade_id,
+                        "chainKey": chain,
+                        "tokenIn": token_in.lower(),
+                        "tokenOut": token_out.lower(),
+                        "amountInHuman": _normalize_amount_human_text(amount_in_for_server),
+                        "slippageBps": slippage_bps,
+                        "createdAt": utc_now(),
+                        "lastSeenStatus": proposed_status,
+                    },
+                )
+                _wait_for_trade_approval(trade_id, chain, summary)
+                _remove_pending_trade_intent(intent_key)
+            else:
+                # Ensure we don't keep stale pending intents for already-approved trades.
+                _remove_pending_trade_intent(intent_key)
 
         deadline_sec = int(args.deadline_sec)
         if deadline_sec < 30 or deadline_sec > 3600:

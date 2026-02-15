@@ -442,6 +442,31 @@ Allow Telegram inline-button approvals without requiring any additional secret/c
 - `npm run build`
 - `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
 
+---
+
+# Slice 38 Spec: Telegram Approval Prompt Details + Pending Approval De-Dupe (No Spam)
+
+## Goal
+Make Telegram approval prompts self-describing (swap details) and stop repeated identical trade requests from creating multiple `approval_pending` trades/prompt spam. Identical pending approvals must reuse the same `tradeId` until resolved.
+
+## Success Criteria
+1. Runtime `trade spot` persists a deterministic pending-intent key and reuses existing `tradeId` when status is `approval_pending`.
+2. Approval wait timeout is 30 minutes; timeout guidance instructs approve then re-run to resume without creating a new approval.
+3. Telegram prompt message text includes swap summary: `<amount> <tokenInSymbol> -> <tokenOutSymbol>`, plus `Chain` and `Trade` lines.
+4. Telegram message is deleted on approve click (OpenClaw inline callback), and runtime clears local prompt state once trade leaves `approval_pending`.
+
+## Non-Goals
+1. No reject-in-Telegram.
+2. No new server endpoints or schemas.
+
+## Acceptance Checks
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
 # Slice 30 Spec: Owner-Managed Daily Trade Caps + Usage Visibility (Trades Only)
 
 ## Goal

@@ -676,3 +676,20 @@ DoD:
 - [x] channel-auth endpoint `/api/v1/channel/approvals/decision` removed and OpenAPI/schemas updated.
 - [x] `/agents/:id` management rail no longer instructs configuring `XCLAW_APPROVALS_TELEGRAM_SECRET`.
 - [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.
+
+---
+
+## Slice 38: Telegram Approval Prompt Details + Pending Approval De-Dupe (No Spam)
+Status: [x]
+Issue: #42 (umbrella)
+
+Goal:
+- Make Telegram approval prompts self-describing (swap details) and prevent repeated identical trade requests from creating multiple `approval_pending` trades/prompt spam. If a matching trade is already `approval_pending`, the runtime reuses it and “resumes” once approved.
+
+DoD:
+- [x] docs sync first: source-of-truth + roadmap + tracker + context/spec/tasks/acceptance aligned to Slice 38.
+- [x] runtime `trade spot` de-dupes identical pending approvals by persisting a local pending-intent key and reusing existing `tradeId` while status remains `approval_pending`.
+- [x] approval wait timeout is 30 minutes; timeout error instructs “approve then re-run to resume without creating a new approval”.
+- [x] Telegram approval prompt text includes: `Approve swap`, `<amount> <tokenInSymbol> -> <tokenOutSymbol>`, `Chain`, `Trade`.
+- [x] Telegram approval prompt is deleted when approval is clicked; runtime also clears local prompt state once the trade leaves `approval_pending`.
+- [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.

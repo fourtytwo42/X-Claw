@@ -1310,3 +1310,38 @@ Note:
   - [x] `npm run seed:verify`
   - [x] `npm run build`
   - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+## 38) Slice 38: Telegram Approval Prompt Details + Pending Approval De-Dupe (No Spam)
+
+### 38.1 Canonical/doc sync
+- [x] Add Slice 38 goal/DoD + issue mapping to `docs/XCLAW_SLICE_TRACKER.md`.
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` with:
+  - required Telegram prompt text fields (amount/symbols + tradeId),
+  - de-dupe semantics (reuse existing pending tradeId for identical request key),
+  - runtime clears local prompt state when trade leaves `approval_pending`.
+- [x] Update handoff/process artifacts:
+  - [x] `docs/CONTEXT_PACK.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+
+### 38.2 Runtime behavior
+- [x] Add local pending-intent persistence file `~/.xclaw-agent/pending-trade-intents.json` with 0600 permissions.
+- [x] `trade spot`:
+  - [x] checks for matching pending intent and reuses tradeId if `approval_pending`,
+  - [x] does not propose new trades while a matching one is pending,
+  - [x] resumes execution after approval without creating new tradeId/prompt.
+- [x] Approval wait timeout set to 30 minutes.
+- [x] Telegram prompt text includes swap summary and deletes message on approval click (OpenClaw patch).
+- [x] runtime clears local Telegram prompt state on any non-pending status transition observed.
+
+### 38.3 Validation + evidence
+- [x] Run required gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`

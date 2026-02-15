@@ -478,3 +478,34 @@ Issue mapping: `#42` (umbrella)
   - [x] `npm run seed:verify`
   - [x] `npm run build`
   - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+# Slice 38 Tasks: Telegram Approval Prompt Details + Pending Approval De-Dupe (No Spam)
+
+Active slice: `Slice 38: Telegram Approval Prompt Details + Pending Approval De-Dupe (No Spam)`
+Issue mapping: `#42` (umbrella)
+
+## Checklist
+- [x] Docs sync first:
+  - [x] `docs/XCLAW_SLICE_TRACKER.md`
+  - [x] `docs/XCLAW_BUILD_ROADMAP.md`
+  - [x] `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - [x] `docs/CONTEXT_PACK.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+- [x] Runtime:
+  - [x] Add local pending-intents file `pending-trade-intents.json` (0600) to reuse pending tradeIds.
+  - [x] Increase approval wait timeout to 30 minutes.
+  - [x] Telegram prompt includes swap summary details and tradeId.
+  - [x] Clear local Telegram prompt state when trade leaves `approval_pending`.
+- [x] Tests:
+  - [x] Add unit coverage for de-dupe reuse and prompt content.
+- [x] Gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`

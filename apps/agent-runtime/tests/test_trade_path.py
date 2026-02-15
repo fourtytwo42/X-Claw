@@ -1,6 +1,7 @@
 import argparse
 import io
 import json
+import tempfile
 import unittest
 from unittest import mock
 from decimal import Decimal
@@ -271,7 +272,11 @@ class TradePathRuntimeTests(unittest.TestCase):
             json=True,
         )
 
-        with mock.patch.object(cli, "_replay_trade_usage_outbox"), mock.patch.object(
+        with tempfile.TemporaryDirectory() as tmpdir, mock.patch.object(
+            cli, "APP_DIR", pathlib.Path(tmpdir)
+        ), mock.patch.object(
+            cli, "PENDING_TRADE_INTENTS_FILE", pathlib.Path(tmpdir) / "pending-trade-intents.json"
+        ), mock.patch.object(cli, "_replay_trade_usage_outbox"), mock.patch.object(
             cli, "_resolve_token_address", side_effect=["0x" + "11" * 20, "0x" + "22" * 20]
         ), mock.patch.object(
             cli, "load_wallet_store", return_value={}
@@ -311,6 +316,112 @@ class TradePathRuntimeTests(unittest.TestCase):
         self.assertFalse(payload.get("ok"))
         self.assertEqual(payload.get("code"), "approval_required")
         send_mock.assert_not_called()
+
+    def test_trade_spot_reuses_existing_pending_trade_intent(self) -> None:
+        args = argparse.Namespace(
+            chain="base_sepolia",
+            token_in="WETH",
+            token_out="USDC",
+            amount_in="5",
+            slippage_bps=50,
+            deadline_sec=120,
+            to=None,
+            json=True,
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir, mock.patch.object(cli, "APP_DIR", pathlib.Path(tmpdir)), mock.patch.object(
+            cli, "PENDING_TRADE_INTENTS_FILE", pathlib.Path(tmpdir) / "pending-trade-intents.json"
+        ), mock.patch.object(cli, "_replay_trade_usage_outbox"), mock.patch.object(
+            cli, "_resolve_token_address", side_effect=["0x" + "11" * 20, "0x" + "22" * 20] * 2
+        ), mock.patch.object(
+            cli, "load_wallet_store", return_value={}
+        ), mock.patch.object(
+            cli, "_execution_wallet", return_value=("0x" + "33" * 20, "0x" + "44" * 32)
+        ), mock.patch.object(
+            cli, "_require_cast_bin", return_value="cast"
+        ), mock.patch.object(
+            cli, "_chain_rpc_url", return_value="https://rpc.example"
+        ), mock.patch.object(
+            cli, "_require_chain_contract_address", return_value="0x" + "55" * 20
+        ), mock.patch.object(
+            cli,
+            "_fetch_erc20_metadata",
+            side_effect=[
+                {"symbol": "WETH", "decimals": 18},
+                {"symbol": "USDC", "decimals": 6},
+                {"symbol": "WETH", "decimals": 18},
+                {"symbol": "USDC", "decimals": 6},
+            ],
+        ), mock.patch.object(
+            cli, "_enforce_spend_preconditions", return_value=({}, "2026-02-15", 0, 0)
+        ), mock.patch.object(
+            cli, "_router_get_amount_out", return_value=123
+        ), mock.patch.object(
+            cli, "_enforce_trade_caps", return_value=({}, "2026-02-15", Decimal("0"), 0, {"maxDailyUsd": "250", "maxDailyTradeCount": 50})
+        ), mock.patch.object(
+            cli, "_read_trade_details", return_value={"tradeId": "trd_1", "chainKey": "base_sepolia", "status": "approval_pending"}
+        ), mock.patch.object(
+            cli, "_wait_for_trade_approval",
+            side_effect=cli.WalletPolicyError(
+                "approval_required",
+                "Trade is waiting for management approval.",
+                "Approve the pending trade (Telegram or web), then re-run the same trade command to resume without creating a new approval.",
+                {"tradeId": "trd_1", "chain": "base_sepolia"},
+            ),
+        ) as wait_mock, mock.patch.object(
+            cli, "_post_trade_proposed", return_value={"ok": True, "tradeId": "trd_1", "status": "approval_pending"}
+        ) as propose_mock, mock.patch.object(cli, "_cast_rpc_send_transaction") as send_mock:
+            first = self._run_and_parse_stdout(lambda: cli.cmd_trade_spot(args))
+            second = self._run_and_parse_stdout(lambda: cli.cmd_trade_spot(args))
+
+        self.assertFalse(first.get("ok"))
+        self.assertEqual(first.get("code"), "approval_required")
+        self.assertFalse(second.get("ok"))
+        self.assertEqual(second.get("code"), "approval_required")
+        self.assertEqual(propose_mock.call_count, 1, "should propose once then reuse the pending tradeId")
+        self.assertGreaterEqual(wait_mock.call_count, 2, "should wait on both invocations")
+        send_mock.assert_not_called()
+
+    def test_telegram_prompt_includes_swap_details(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir, mock.patch.object(cli, "APP_DIR", pathlib.Path(tmpdir)), mock.patch.object(
+            cli, "APPROVAL_PROMPTS_FILE", pathlib.Path(tmpdir) / "approval_prompts.json"
+        ), mock.patch.object(
+            cli, "_get_approval_prompt", return_value=None
+        ), mock.patch.object(
+            cli, "_fetch_outbound_transfer_policy", return_value={"approvalChannels": {"telegram": {"enabled": True}}}
+        ), mock.patch.object(
+            cli, "_read_openclaw_last_delivery", return_value={"lastChannel": "telegram", "lastTo": "123", "lastThreadId": None}
+        ), mock.patch.object(
+            cli, "_require_openclaw_bin", return_value="openclaw"
+        ) as _bin_mock:
+            captured: dict[str, object] = {}
+
+            def fake_run(cmd: list[str], timeout_sec: int, kind: str):
+                captured["cmd"] = cmd
+                return mock.Mock(returncode=0, stdout='{"payload":{"messageId":"777"}}', stderr="")
+
+            with mock.patch.object(cli, "_run_subprocess", side_effect=fake_run), mock.patch.object(cli, "_post_approval_prompt_metadata"), mock.patch.object(
+                cli, "_record_approval_prompt"
+            ):
+                cli._maybe_send_telegram_approval_prompt(
+                    "trd_abc",
+                    "base_sepolia",
+                    {"amountInHuman": "5", "tokenInSymbol": "WETH", "tokenOutSymbol": "USDC", "slippageBps": 50},
+                )
+
+            cmd = captured.get("cmd") or []
+            joined = " ".join(cmd)
+            self.assertIn("--message", joined)
+            # Message text is a separate arg; find it and assert on content.
+            message_arg = None
+            for idx, part in enumerate(cmd):
+                if part == "--message" and idx + 1 < len(cmd):
+                    message_arg = cmd[idx + 1]
+                    break
+            self.assertIsNotNone(message_arg)
+            self.assertIn("Approve swap", message_arg)
+            self.assertIn("5 WETH -> USDC", message_arg)
+            self.assertIn("Trade: trd_abc", message_arg)
 
     def test_trade_caps_blocked_when_owner_chain_disabled(self) -> None:
         policy_payload = {

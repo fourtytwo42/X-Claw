@@ -2540,12 +2540,20 @@ Limitations / notes:
    - when a trade is inserted as `approval_pending`, the runtime may send a Telegram approval prompt **only** if:
      - Telegram approvals are enabled for that agent+chain, and
      - OpenClaw’s last active channel is Telegram (session store `lastChannel == "telegram"`).
+   - Telegram prompt content must be self-describing and include:
+     - swap summary: `<amountIn> <tokenInSymbol> -> <tokenOutSymbol>`,
+     - `chainKey`,
+     - `tradeId`.
 6. Sync between Telegram and web:
    - the pending approval item remains visible on `/agents/:id`.
    - approving in either surface must converge:
      - approving in Telegram marks the trade `approved` and removes the item from the web approvals queue,
      - approving in the web UI removes the item and triggers prompt deletion in Telegram by runtime cleanup (best-effort + periodic sync).
-7. Canonical endpoints:
+   - runtime clears local Telegram prompt state once the trade leaves `approval_pending` (even if message deletion is already handled by OpenClaw).
+7. Pending approval de-dupe:
+   - for server-first `trade spot`, the runtime must not create multiple identical `approval_pending` trades.
+   - if a matching trade is already `approval_pending`, runtime reuses the existing `tradeId` and waits/resumes (no new proposals, no prompt spam).
+8. Canonical endpoints:
    - `POST /api/v1/management/approval-channels/update` (owner-auth):
      - enables/disables Telegram approval prompts (no secret issuance).
    - Telegram approve action uses `POST /api/v1/trades/:tradeId/status` (agent-auth):

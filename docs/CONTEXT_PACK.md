@@ -1,7 +1,7 @@
 # X-Claw Context Pack
 
-## 1) Goal (Active: Slice 37)
-- Primary objective: complete `Slice 37: Telegram Approvals Without Extra Secret (Skill-Authoritative, Web + Telegram OR)`.
+## 1) Goal (Active: Slice 38)
+- Primary objective: complete `Slice 38: Telegram Approval Prompt Details + Pending Approval De-Dupe (No Spam)`.
 - Success criteria:
   - trade `approval_pending` triggers a Telegram approval prompt only when:
     - Telegram approvals are enabled for agent+chain, and
@@ -11,13 +11,15 @@
     - deletes the Telegram approval message,
     - and `/agents/:id` approvals queue reflects approval immediately
   - if web approves first, runtime deletes the Telegram prompt (best-effort + periodic sync)
+  - prompts include swap summary details (amount + token symbols) and tradeId
+  - repeated identical trade requests reuse the existing pending tradeId (no prompt spam)
   - strict security boundary: approval execution is from real Telegram button click (no LLM/tool mediation)
   - source-of-truth + canonical docs remain synchronized (schemas/openapi/tracker/roadmap/spec/tasks/acceptance)
   - required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`
 
 ## 2) Constraints
 - Canonical authority: `docs/XCLAW_SOURCE_OF_TRUTH.md`.
-- Strict slice order: Slice 37 follows completed Slice 36.
+- Strict slice order: Slice 38 follows completed Slice 37.
 - One-site model remains fixed (`/agents/:id` public + auth-gated management).
 - No dependency additions.
 - No new DB migration required for this slice (reuses Slice 34 tables; removes secret requirement and channel-auth path).
@@ -31,8 +33,10 @@
   - `POST /api/v1/agent/approvals/prompt` records prompt metadata for cleanup/sync.
 - Telegram approve path:
   - Telegram approve uses `POST /api/v1/trades/:tradeId/status` (agent-auth + `Idempotency-Key`) to transition `approval_pending -> approved`.
+ - Runtime de-dupe:
+   - `trade spot` reuses existing pending `tradeId` for identical request key while status remains `approval_pending`.
 
-## 4) Files and Boundaries (Slice 37 allowlist)
+## 4) Files and Boundaries (Slice 38 allowlist)
 - Web/API/UI:
   - `apps/network-web/src/app/agents/[agentId]/page.tsx`
   - `apps/network-web/src/app/api/v1/management/approval-channels/update/route.ts`
