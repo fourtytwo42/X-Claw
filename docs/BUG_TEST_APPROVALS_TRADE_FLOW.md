@@ -1,87 +1,51 @@
-# Trade Approval Worksheet (Web + Telegram)
+# Trade Approval Worksheet (Agent-Only)
 
 Date:
-Tester:
 Agent name / id:
 Chain:
-OpenClaw version:
 
-## Setup Snapshot (Fill Once)
-- Global approval: ON / OFF
-- Token preapprovals (tokenIn list):
-- Risk limits: daily USD cap ON/OFF, max, today used
-- Chain access: enabled/disabled
-- Telegram active channel: yes/no
+## Setup Snapshot (Agent-Verifiable)
+- Global approval mode (approval_mode): `auto` / `per_trade`
+- Token preapprovals (tokenIn list / allowed_tokens):
+- Risk limits: daily USD cap enabled/disabled + max + current usage
+- Chain access enabled/disabled for this agent+chain
 
 Notes:
 
-## 1) Web Approval (No Telegram Active)
-Goal: trade becomes `approval_pending`, can be approved/rejected in web, agent informs the user.
+## 1) Approval-Pending To Approved Path
+Goal: trade becomes `approval_pending`, then transitions to `approved`, then the agent executes and fills.
 
 Steps
-- [ ] Ensure Telegram is NOT the last active channel (send from some other channel last).
-- [ ] Ask agent: `trade 50 usdc for weth with 1% slippage`
+- [ ] Propose: `trade 50 usdc for weth with 1% slippage`
 
-Expected (agent queued message)
+Expected (agent-visible)
 - [ ] Contains `Trade ID: trd_...`
 - [ ] Contains exact swap: `<amountIn> <tokenIn> -> <tokenOut>`
 - [ ] Contains `Chain: <chainKey>`
 - [ ] Contains `Status: approval_pending`
 - [ ] Includes slippage bps (or percent) and quote/minOut if available
-
-Expected (web)
-- [ ] Approvals queue shows same tradeId
-- [ ] Queue row includes amounts (at least amountIn) and tokens
-
-Actions
-- [ ] Approve in web
-Expected
-- [ ] Queue clears
-- [ ] Agent posts confirmation in active chat: approved + details + tradeId
-- [ ] Activity shows approved -> executing -> filled; tx hash present
+Approval wait + execution
+- [ ] Poll `GET /api/v1/trades/:tradeId` until status is `approved` (or timeout 30 minutes).
+- [ ] On approval: post confirmation in active chat: approved + details + tradeId.
+- [ ] Execute swap and post fill summary + tx hash.
 
 Reject path
-- [ ] Repeat; reject in web with a reason
+- [ ] Repeat; wait for status `rejected` and record reasonMessage/reasonCode.
 Expected
-- [ ] Queue clears
-- [ ] Agent posts denial + includes reason
-- [ ] No on-chain tx for that tradeId
+- [ ] Agent posts denial + includes reasonMessage if present.
+- [ ] No on-chain tx for that tradeId.
 
 Notes / Issues:
 
-## 2) Telegram Buttons On Queued Trade Message
-Goal: queued trade message has buttons; clicking is immediate; message is deleted; web stays in sync.
+## 2) “Approval Surface” Independence (Agent View)
+Goal: the agent does not care whether approval came from Telegram or web; it only reacts to status change.
 
 Steps
-- [ ] Make Telegram the active channel (send any message in Telegram to the bot).
-- [ ] Ask agent: `trade 75 usdc for weth with 1% slippage`
-
+- [ ] Create a trade that becomes `approval_pending`.
+- [ ] Wait for it to become `approved` OR `rejected`.
 Expected
-- [ ] Agent queued message includes buttons (Approve + Deny).
-- [ ] No separate “prompt” message is required.
-
-Approve
-- [ ] Click Approve once
-Expected
-- [ ] Telegram message deleted (or buttons removed) within 3 seconds
-- [ ] Web approvals queue clears within 5 seconds
-- [ ] Agent posts approved confirmation in Telegram
-- [ ] Trade executes and fills (tx hash in messages + web)
-
-Deny
-- [ ] Repeat and click Deny once
-Expected
-- [ ] Telegram message deleted (or buttons removed)
-- [ ] Web queue clears
-- [ ] Agent posts denied confirmation + reason
-- [ ] No on-chain execution for that tradeId
-
-Latency notes
-- Approve click -> Telegram removed: ___ ms
-- Approve click -> Web queue cleared: ___ ms
-- Approve click -> Agent confirmation: ___ ms
-
-Notes / Issues:
+- [ ] Agent responds correctly (execute only on `approved`, never on `rejected`).
+- [ ] Agent’s user-facing message does not require the human to paste callback payloads; it only references the tradeId and next steps.
 
 ## 3) De-Dupe Rule (Only While Prior Still Pending)
 Goal: the only time we reuse a trade is when the last identical request is still `approval_pending`.
@@ -101,4 +65,3 @@ Expected
 - [ ] New approval flow begins
 
 Notes / Issues:
-

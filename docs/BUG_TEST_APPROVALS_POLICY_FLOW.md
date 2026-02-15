@@ -1,17 +1,15 @@
-# Policy Approval Worksheet (Preapprove Token + Global Approval + Revoke)
+# Policy Approval Worksheet (Agent-Only)
 
 Date:
-Tester:
 Agent id:
 Chain:
-Telegram active: yes/no
 
 ## Setup Snapshot
 - Global approval: ON / OFF
 - Preapproved tokens (tokenIn): list
 
 ## 1) Preapprove Token (USDC)
-Goal: agent can request a policy change; queued message has `ppr_...`; buttons attach; approve updates policy and agent explains result.
+Goal: agent can request a policy change; queued message has `ppr_...`; approval transitions update policy and agent explains result.
 
 Steps
 - [ ] Ask agent: `preapprove USDC for trading on base sepolia`
@@ -21,14 +19,11 @@ Expected (agent queued message)
 - [ ] Contains token symbol + address
 - [ ] Contains `Chain: base_sepolia`
 - [ ] Contains `Status: approval_pending`
-- [ ] Has Approve + Deny buttons on that same message (Telegram)
-- [ ] Shows up in web approvals surface (if your build shows policy approvals in UI)
+- [ ] Contains an explicit instruction: “Approve or Deny via your management surface. I will confirm here once it resolves.”
 
 Approve
-- [ ] Click Approve
+-- [ ] Wait for policy approval status to become `approved` (poll server if needed).
 Expected
-- [ ] Telegram message deleted (or buttons removed) within 3 seconds
-- [ ] Web reflects approved (queue clears)
 - [ ] Agent posts a human-facing explanation:
   - what changed (USDC preapproved)
   - on which chain
@@ -47,10 +42,10 @@ Goal: reverse the above; same approval mechanics; effect is restored to requirin
 Steps
 - [ ] Ask agent: `revoke USDC preapproval on base sepolia`
 Expected
-- [ ] Queued policy message with `ppr_...` + `approval_pending` + buttons.
+- [ ] Queued policy message with `ppr_...` + `approval_pending`.
 
 Approve
-- [ ] Click Approve
+-- [ ] Wait for status `approved`.
 Expected
 - [ ] Agent explains the revoke result and effect.
 
@@ -67,14 +62,13 @@ Goal: agent can request enabling/disabling global approval via policy approvals 
 Enable
 - [ ] Ask agent: `turn on approve all`
 Expected
-- [ ] Queued policy message with `ppr_...` + buttons.
+- [ ] Queued policy message with `ppr_...` + `approval_pending`.
 - [ ] On approve: agent explains that approvals are no longer required for trades.
 
 Disable
 - [ ] Ask agent: `turn off approve all`
 Expected
-- [ ] Queued policy message with `ppr_...` + buttons.
+- [ ] Queued policy message with `ppr_...` + `approval_pending`.
 - [ ] On approve: agent explains approvals are required again unless tokenIn is preapproved.
 
 Notes / Issues:
-

@@ -1,55 +1,51 @@
-# Failures + Agent Feedback Worksheet (Approvals)
+# Failures + Agent Feedback Worksheet (Agent-Only)
 
 Date:
-Tester:
 Agent id:
 Chain:
 
-## 1) Telegram Callback Failure Behavior
-Goal: failures are visible and retryable (not silent).
+## 1) Approval Wait Timeout Behavior
+Goal: on timeout the agent gives actionable instructions and does not execute.
 
 Steps
-- [ ] Create an approval_pending trade with buttons in Telegram.
-- [ ] Simulate server failure (stop web process or block network).
-- [ ] Click Approve.
+- [ ] Create an `approval_pending` trade.
+- [ ] Do not approve it.
+- [ ] Wait until the agent times out (30 minutes).
 
 Expected
-- [ ] Telegram message edits to show a clear error code/message.
-- [ ] Buttons remain usable for retry (or reappear).
-- [ ] Web does not incorrectly mark approved.
+- [ ] Agent returns an error/notice with `code=approval_required` (or equivalent) and includes:
+  - tradeId
+  - exact swap summary
+  - actionHint: approve the pending trade, then rerun the same trade command to resume (no duplicate pending)
+- [ ] Agent does not execute any on-chain tx.
 
 Notes / Issues:
 
-## 2) Idempotency / Double Click
-Goal: repeated clicks do not wedge the system.
+## 2) Idempotency / Duplicate Approvals (Agent View)
+Goal: repeated approvals do not cause double execution.
 
 Steps
-- [ ] Create approval_pending with Telegram buttons.
-- [ ] Click Approve twice quickly.
+- [ ] Create an `approval_pending` trade.
+- [ ] Cause the approval transition to happen (approved).
+- [ ] Re-run the same command immediately again.
 
 Expected
-- [ ] One success; second is safe (no hard failure loop).
-- [ ] Telegram message ends deleted (or buttons removed).
-- [ ] Web queue clears once.
+- [ ] Agent does not execute the *same tradeId* twice.
+- [ ] Any subsequent trade is a new tradeId (unless previous still pending).
 
 Notes / Issues:
 
-## 3) OR Semantics (Telegram vs Web)
-Goal: approving in either surface resolves the other.
+## 3) Denial Feedback Quality
+Goal: denials tell the human exactly what happened and how to proceed.
 
-Web-first
-- [ ] Create pending visible in both web + Telegram
-- [ ] Approve in web
+Steps
+- [ ] Create `approval_pending`, then deny it.
 Expected
-- [ ] Telegram message gets deleted (or buttons removed) within ___ seconds
-
-Telegram-first
-- [ ] Create another pending
-- [ ] Approve in Telegram
-Expected
-- [ ] Web queue clears within ___ seconds
-
-Notes / Issues:
+- [ ] Agent posts a denial confirmation including:
+  - tradeId
+  - swap summary (amount + tokenIn -> tokenOut)
+  - reasonMessage (if provided) or a clear default reason
+  - next step (e.g., “change policy / try smaller amount / retry later”)
 
 ## 4) Agent Feedback Quality (Is The Info Sufficient?)
 Rate 1-5 and note missing fields.
@@ -84,4 +80,3 @@ Agent suggestions:
 3.
 4.
 5.
-
