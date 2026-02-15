@@ -611,6 +611,25 @@ Prevent Telegram decision callbacks from failing with `idempotency_conflict` on 
 
 ---
 
+# Slice 44 Spec: Faster Approval Resume (Lower Poll Interval)
+
+## Goal
+Reduce perceived latency after approve/deny (Telegram or web) by tightening runtime polling while waiting for `approval_pending`.
+
+## Success Criteria
+1. Runtime polls trade status every 1 second while waiting for approval.
+2. No changes to trust boundaries (Telegram callback still updates trade status; runtime remains the executor).
+
+## Acceptance Checks
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
 # Slice 31 Spec: Agents + Agent Management UX Refinement (Operational Clean)
 
 ## Goal

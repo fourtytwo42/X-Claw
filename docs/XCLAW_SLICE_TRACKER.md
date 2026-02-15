@@ -785,3 +785,17 @@ DoD:
 - [x] OpenClaw gateway patch sets `at` deterministically from Telegram callback/query timestamp so replays of the same callback are byte-stable.
 - [x] Clicking Telegram Approve/Deny no longer produces `idempotency_conflict` errors.
 - [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.
+
+---
+
+## Slice 44: Faster Approval Resume (Lower Poll Interval)
+Status: [x]
+Issue: #42 (umbrella)
+
+Goal:
+- Reduce perceived latency after Telegram/web approve/deny by having the runtime resume from `approval_pending` within ~1s (without changing trust boundaries or adding new endpoints).
+
+DoD:
+- [x] docs sync first: source-of-truth + roadmap + tracker + context/spec/tasks/acceptance aligned to Slice 44.
+- [x] runtime polls approval status every 1s while waiting (instead of 3s).
+- [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.

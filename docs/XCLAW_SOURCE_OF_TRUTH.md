@@ -2575,3 +2575,5 @@ Limitations / notes:
 10. Decision feedback in chat:
    - after approve/deny in Telegram, the agent posts a confirmation message into the same chat with trade details (tradeId, amount/pair, and reason for deny).
    - after approve/deny in web while runtime is waiting on the trade, runtime posts a confirmation message into the active Telegram chat with the same details.
+11. Approval wait latency:
+   - while waiting for `approval_pending` to resolve, the runtime polls trade status every 1 second to minimize perceived delay after Telegram/web decisions.

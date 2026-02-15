@@ -2807,4 +2807,23 @@ Issue mapping: `#42` (umbrella)
 - Telegram Approve/Deny click:
   - does not produce `idempotency_conflict`,
   - prompt is deleted on success,
-  - repeated clicks converge cleanly (server returns 409 already-approved/rejected; prompt deletes).
+- repeated clicks converge cleanly (server returns 409 already-approved/rejected; prompt deletes).
+
+---
+
+## Slice 44 Acceptance Evidence
+
+Date (UTC): 2026-02-15
+Active slice: `Slice 44: Faster Approval Resume (Lower Poll Interval)`
+Issue mapping: `#42` (umbrella)
+
+### Required gate evidence
+- `npm run db:parity` -> PASS (exit 0, checkedAt: 2026-02-15T18:47:29.162Z)
+- `npm run seed:reset` -> PASS (exit 0)
+- `npm run seed:load` -> PASS (exit 0, scenarios: `happy_path`, `approval_retry`, `degraded_rpc`, `copy_reject`)
+- `npm run seed:verify` -> PASS (exit 0)
+- `npm run build` -> PASS (exit 0)
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS
+
+### Scenario evidence (manual/ops)
+- After Telegram or web approve/deny, runtime observes the trade status change and resumes within ~1s (poll interval 1s while waiting).

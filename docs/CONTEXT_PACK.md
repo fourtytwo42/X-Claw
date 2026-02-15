@@ -1,10 +1,9 @@
 # X-Claw Context Pack
 
-## 1) Goal (Active: Slice 43)
-- Primary objective: complete `Slice 43: Telegram Callback Idempotency Fix (No idempotency_conflict)`.
+## 1) Goal (Active: Slice 44)
+- Primary objective: complete `Slice 44: Faster Approval Resume (Lower Poll Interval)`.
 - Success criteria:
-  - Telegram inline-button decisions do not fail with `idempotency_conflict`.
-  - OpenClaw gateway patch uses callback-unique idempotency key and deterministic `at` timestamp.
+  - Runtime resumes from `approval_pending` decisions within ~1s by tightening the poll interval.
   - required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.
 
 ## 2) Constraints
@@ -26,7 +25,7 @@
  - No API schema changes in this slice; web UI only.
  - OpenClaw gateway behavior change is delivered as a patch against OpenClaw dist bundle for the deployed version.
 
-## 4) Files and Boundaries (Slice 43 allowlist)
+## 4) Files and Boundaries (Slice 44 allowlist)
 - Web/API/UI:
   - none
 - Canonical docs/process:
@@ -38,7 +37,7 @@
   - `tasks.md`
   - `acceptance.md`
 - Runtime:
-  - none
+  - `apps/agent-runtime/xclaw_agent/cli.py`
 - OpenClaw:
   - `skills/xclaw-agent/scripts/openclaw_gateway_patch.py`
   - `apps/agent-runtime/xclaw_agent/cli.py` (unchanged for this slice)
