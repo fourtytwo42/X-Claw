@@ -560,5 +560,33 @@ Issue mapping: `#42` (umbrella)
   - [x] `npm run seed:reset`
   - [x] `npm run seed:load`
   - [x] `npm run seed:verify`
-  - [x] `npm run build`
-  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- [x] `npm run build`
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+# Slice 41 Tasks: Telegram Approve Button Reliability (Patch Correct Gateway Bundle)
+
+Active slice: `Slice 41: Telegram Approve Button Reliability (Patch Correct Gateway Bundle)`
+Issue mapping: `#42` (umbrella)
+
+## Checklist
+- [ ] Docs sync:
+  - [ ] `docs/XCLAW_SLICE_TRACKER.md`
+  - [ ] `docs/XCLAW_BUILD_ROADMAP.md`
+  - [ ] `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - [ ] `docs/CONTEXT_PACK.md`
+  - [ ] `spec.md`
+  - [ ] `tasks.md`
+  - [ ] `acceptance.md`
+- [ ] Implementation:
+  - [ ] update `skills/xclaw-agent/scripts/openclaw_gateway_patch.py` to patch gateway callback bundles used by `dist/index.js` (including `dist/reply-*.js`)
+  - [ ] patch is idempotent with stable marker/replace semantics (no duplicated blocks)
+  - [ ] record/update patch artifact in `patches/openclaw/`
+- [ ] Gates:
+  - [ ] `npm run db:parity`
+  - [ ] `npm run seed:reset`
+  - [ ] `npm run seed:load`
+  - [ ] `npm run seed:verify`
+  - [ ] `npm run build`
+  - [ ] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`

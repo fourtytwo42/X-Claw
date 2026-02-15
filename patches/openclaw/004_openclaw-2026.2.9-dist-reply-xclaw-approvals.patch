@@ -1,0 +1,52 @@
+diff --git a/dist/reply-DptDUVRg.js b/dist/reply-DptDUVRg.js
+index 7d0f000..7d0f001 100644
+--- a/dist/reply-DptDUVRg.js
++++ b/dist/reply-DptDUVRg.js
+@@ -35895,6 +35895,76 @@
+ \t\t\t\t\t}))) return;
+ \t\t\t\t}
+ \t\t\t}
++
++\t\t\t// X-Claw Telegram approvals: approve-only inline button handling (strict, no LLM).
++\t\t\t// Expected callback_data: xappr|a|<tradeId>|<chainKey>
++\t\t\t// This runs after allowlist/group policy checks.
++\t\t\tif (data.startsWith("xappr|")) {
++\t\t\t\tconst parts = data.split("|").map((p) => String(p || "").trim());
++\t\t\t\tif (parts.length === 4 && parts[1] === "a" && parts[2] && parts[3]) {
++\t\t\t\t\tconst tradeId = parts[2];
++\t\t\t\t\tconst chainKey = parts[3];
++\t\t\t\t\ttry { logger.info({ tradeId, chainKey, chatId, senderId, isGroup }, "xclaw: telegram approval callback received"); } catch {}
++\t\t\t\t\tconst skill = cfg?.skills?.entries?.["xclaw-agent"];
++\t\t\t\t\tconst env = skill?.env ?? {};
++\t\t\t\t\tconst rawBase = String(env?.XCLAW_API_BASE_URL ?? process.env.XCLAW_API_BASE_URL ?? "").trim().replace(/\\/+$/, "");
++\t\t\t\t\tconst apiBase = rawBase ? rawBase.endsWith("/api/v1") ? rawBase : `${rawBase}/api/v1` : "";
++\t\t\t\t\tconst apiKey = String(skill?.apiKey ?? env?.XCLAW_API_KEY ?? process.env.XCLAW_API_KEY ?? "").trim();
++\t\t\t\t\tif (!apiBase) { await bot.api.editMessageText(chatId, callbackMessage.message_id, "Approval failed: missing XCLAW_API_BASE_URL in OpenClaw config."); return; }
++\t\t\t\t\tif (!apiKey) { await bot.api.editMessageText(chatId, callbackMessage.message_id, "Approval failed: missing xclaw-agent apiKey in OpenClaw config."); return; }
++\t\t\t\t\ttry {
++\t\t\t\t\t\tconst res = await fetch(`${apiBase}/trades/${encodeURIComponent(tradeId)}/status`, {
++\t\t\t\t\t\t\tmethod: "POST",
++\t\t\t\t\t\t\theaders: { "content-type": "application/json", authorization: `Bearer ${apiKey}`, "idempotency-key": `tg-approve-${tradeId}-${callbackMessage.message_id}` },
++\t\t\t\t\t\t\tbody: JSON.stringify({ tradeId, fromStatus: "approval_pending", toStatus: "approved", reasonCode: null, reasonMessage: null, at: (/* @__PURE__ */ new Date()).toISOString(), source: { channel: "telegram", chainKey, senderId, to: String(chatId), messageId: String(callbackMessage.message_id) } })
++\t\t\t\t\t\t});
++\t\t\t\t\t\ttry { logger.info({ tradeId, chainKey, status: res.status }, "xclaw: telegram approval callback server response"); } catch {}
++\t\t\t\t\t\tif (res.ok) { await bot.api.deleteMessage(chatId, callbackMessage.message_id); return; }
++\t\t\t\t\t\tlet errCode = "api_error"; let errMsg = `HTTP ${res.status}`;
++\t\t\t\t\t\ttry {
++\t\t\t\t\t\t\tconst body = await res.json();
++\t\t\t\t\t\t\tif (typeof body?.code === "string" && body.code.trim()) errCode = body.code.trim();
++\t\t\t\t\t\t\tif (typeof body?.message === "string" && body.message.trim()) errMsg = body.message.trim();
++\t\t\t\t\t\t\tif (res.status === 409 && (body?.details?.currentStatus === "approved" || body?.details?.currentStatus === "filled")) { await bot.api.deleteMessage(chatId, callbackMessage.message_id); return; }
++\t\t\t\t\t\t} catch {}
++\t\t\t\t\t\tawait bot.api.editMessageText(chatId, callbackMessage.message_id, `Approval failed: ${errCode} (${errMsg}).`);
++\t\t\t\t\t\treturn;
++\t\t\t\t\t} catch (err) {
++\t\t\t\t\t\tawait bot.api.editMessageText(chatId, callbackMessage.message_id, `Approval failed: ${String(err)}`);
++\t\t\t\t\t\treturn;
++\t\t\t\t\t}
++\t\t\t\t}
++\t\t\t}
+ \t\t\tconst paginationMatch = data.match(/^commands_page_(\\d+|noop)(?::(.+))?$/);
+ \t\t\tif (paginationMatch) {
+ \t\t\t\tconst pageValue = paginationMatch[1];
+ \t\t\t\tif (pageValue === "noop") return;

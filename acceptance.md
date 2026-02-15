@@ -2737,3 +2737,25 @@ Issue mapping: `#42` (umbrella)
   - next xclaw-agent skill use auto-applies patch and restarts gateway once.
 - Restart-loop guard:
   - cooldown + lock prevents repeated restarts during frequent skill invocations.
+
+---
+
+## Slice 41 Acceptance Evidence
+
+Date (UTC): 2026-02-15
+Active slice: `Slice 41: Telegram Approve Button Reliability (Patch Correct Gateway Bundle)`
+Issue mapping: `#42` (umbrella)
+
+### Required gate evidence
+- `npm run db:parity` -> TODO
+- `npm run seed:reset` -> TODO
+- `npm run seed:load` -> TODO
+- `npm run seed:verify` -> TODO
+- `npm run build` -> TODO
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> TODO
+
+### Scenario evidence (manual/ops)
+- Telegram Approve button click:
+  - triggers agent-auth `POST /api/v1/trades/:tradeId/status` (`approval_pending -> approved`) via gateway callback intercept from the gateway bundle used in `gateway` mode (e.g. `dist/reply-*.js`),
+  - deletes the Telegram approval message after success (or convergence 409 approved/filled),
+  - web approvals queue converges immediately (trade no longer pending).

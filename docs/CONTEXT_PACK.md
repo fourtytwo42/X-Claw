@@ -1,12 +1,11 @@
 # X-Claw Context Pack
 
-## 1) Goal (Active: Slice 40)
-- Primary objective: complete `Slice 40: OpenClaw Patch Auto-Apply (Portable, No Restart Loops)`.
+## 1) Goal (Active: Slice 41)
+- Primary objective: complete `Slice 41: Telegram Approve Button Reliability (Patch Correct Gateway Bundle)`.
 - Success criteria:
-  - Installer/update flow auto-applies the OpenClaw Telegram callback patch idempotently.
-  - After an OpenClaw update overwrites the gateway bundle, the next use of the xclaw-agent skill auto-reapplies the patch.
-  - Gateway restarts are best-effort and only happen when a patch is newly applied, with a cooldown + lock to prevent loops.
-  - Patch targeting is dynamic (no reliance on hashed `dist/loader-*.js` filenames).
+  - Patch auto-apply targets the OpenClaw gateway bundle that is executed in `gateway` mode (notably `dist/reply-*.js` imported by `dist/index.js`), not just `dist/loader-*.js`.
+  - Clicking Telegram Approve triggers `POST /api/v1/trades/:tradeId/status` (`approval_pending -> approved`) and deletes the prompt message.
+  - Installer/update and next-skill-use paths still auto-apply patch idempotently with cooldown/lock to prevent restart loops.
   - required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.
 
 ## 2) Constraints
@@ -28,7 +27,7 @@
  - No API schema changes in this slice; web UI only.
  - OpenClaw gateway behavior change is delivered as a patch against OpenClaw dist bundle for the deployed version.
 
-## 4) Files and Boundaries (Slice 40 allowlist)
+## 4) Files and Boundaries (Slice 41 allowlist)
 - Web/API/UI:
   - none
 - Canonical docs/process:

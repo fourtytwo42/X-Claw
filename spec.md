@@ -542,6 +542,27 @@ Make Telegram approval callbacks portable across users by auto-applying the Open
 
 ---
 
+# Slice 41 Spec: Telegram Approve Button Reliability (Patch Correct Gateway Bundle)
+
+## Goal
+Fix Telegram Approve buttons not approving trades by ensuring the OpenClaw gateway patch targets the bundle(s) actually executed in `gateway` mode (notably `dist/reply-*.js` imported by `dist/index.js`), not just `dist/loader-*.js`.
+
+## Success Criteria
+1. Patcher detects and patches all `dist/*.js` bundles that contain the Telegram `bot.on("callback_query"` handler used by the gateway runtime (including `reply-*.js`).
+2. Clicking Telegram Approve triggers agent-auth `POST /api/v1/trades/:tradeId/status` to transition `approval_pending -> approved`.
+3. Telegram approval message is deleted after approval click (or converged 409: already approved/filled).
+4. Patch is idempotent and uses stable marker/replace semantics to avoid duplicated intercept blocks.
+
+## Acceptance Checks
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
 # Slice 31 Spec: Agents + Agent Management UX Refinement (Operational Clean)
 
 ## Goal

@@ -2540,6 +2540,7 @@ Limitations / notes:
    - Portability rule: X-Claw provides a Python-first patcher that auto-applies the OpenClaw gateway patch:
      - when installing/updating the xclaw-agent skill, and
      - on the next skill use after an OpenClaw update overwrites the installed gateway bundle.
+   - Patch targeting requirement: the patcher must target the bundle(s) used by OpenClaw `gateway` mode (imported by `dist/index.js`, e.g. `dist/reply-*.js`), not only `dist/loader-*.js`.
    - Restart safety: gateway restart is best-effort and only triggered when the patch is newly applied, with a cooldown + lock to avoid restart loops.
 5. Trade lifecycle:
    - when a trade is inserted as `approval_pending`, the runtime may send a Telegram approval prompt **only** if:

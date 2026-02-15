@@ -28,6 +28,8 @@ from typing import Any, Optional
 
 
 MARKER = "xclaw: telegram approval callback received"
+LEGACY_DM_SENTINEL = 'Allow in DMs even when inlineButtonsScope is "allowlist", gated by chatId == senderId.'
+STATE_SCHEMA_VERSION = 2
 STATE_DIR = Path.home() / ".openclaw" / "xclaw"
 STATE_FILE = STATE_DIR / "openclaw_patch_state.json"
 LOCK_FILE = STATE_DIR / "openclaw_patch.lock"
@@ -155,15 +157,17 @@ def _find_loader_bundles(pkg_root: Path) -> list[Path]:
     dist_dir = pkg_root / "dist"
     if not dist_dir.exists():
         return []
-    candidates = sorted(dist_dir.glob("loader-*.js"))
-    # Filter to those that actually contain the callback_query handler.
+    # OpenClaw gateway mode (`dist/index.js`) imports hashed bundles (e.g. `reply-*.js`).
+    # We patch any bundle that contains the Telegram callback_query handler we need.
+    candidates = sorted(dist_dir.rglob("*.js"))
     bundles: list[Path] = []
     for path in candidates:
         try:
             text = path.read_text(encoding="utf-8")
         except Exception:
             continue
-        if 'bot.on("callback_query"' in text:
+        # Heuristic: Telegram callback_query handler with inline command pagination lives in these bundles.
+        if 'bot.on("callback_query"' in text and "const paginationMatch = data.match(/^commands_page_" in text:
             bundles.append(path)
     return bundles
 
@@ -177,87 +181,56 @@ def _inject_after_anchor(text: str, anchor: str, injection: str) -> tuple[str, b
 
 
 def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
+    # Normalize older patch variants to avoid duplicated intercept blocks (idempotent overwrite semantics).
+    normalized = False
+    if LEGACY_DM_SENTINEL in raw:
+        sentinel_idx = raw.find(LEGACY_DM_SENTINEL)
+        # Remove from the start of the legacy X-Claw block to just before the group-policy block.
+        block_start = raw.rfind("// X-Claw Telegram approvals: approve-only inline button handling (strict, no LLM).", 0, sentinel_idx)
+        if block_start >= 0:
+            line_start = raw.rfind("\n", 0, block_start)
+            if line_start < 0:
+                line_start = 0
+            block_end = raw.find("if (isGroup) {", sentinel_idx)
+            if block_end > sentinel_idx:
+                raw = raw[:line_start] + "\n" + raw[block_end:]
+                normalized = True
+
+    # If the canonical block is already present, we're done (except for any normalization above).
     if MARKER in raw:
-        return raw, False, None
+        return raw, normalized, None
 
-    # 1) DM fast-path injection: after senderUsername is defined.
-    dm_anchor = 'const senderUsername = callback.from?.username ?? "";\n'
-    dm_injection = (
-        '\n'
-        '\t\t\t\t// X-Claw Telegram approvals: approve-only inline button handling (strict, no LLM).\n'
-        '\t\t\t\t// Expected callback_data: xappr|a|<tradeId>|<chainKey>\n'
-        '\t\t\t\t// Allow in DMs even when inlineButtonsScope is "allowlist", gated by chatId == senderId.\n'
-        '\t\t\t\tif (!isGroup && data.startsWith("xappr|") && senderId && String(chatId) === senderId) {\n'
-        '\t\t\t\t\tconst parts = data.split("|").map((p) => String(p || "").trim());\n'
-        '\t\t\t\t\tif (parts.length === 4 && parts[1] === "a" && parts[2] && parts[3]) {\n'
-        '\t\t\t\t\t\tconst tradeId = parts[2];\n'
-        '\t\t\t\t\t\tconst chainKey = parts[3];\n'
-        f'\t\t\t\t\t\ttry {{ logger.info({{ tradeId, chainKey, chatId, senderId, isGroup }}, "{MARKER}"); }} catch {{}}\n'
-        '\t\t\t\t\t\tconst skill = cfg?.skills?.entries?.["xclaw-agent"];\n'
-        '\t\t\t\t\t\tconst env = skill?.env ?? {};\n'
-        '\t\t\t\t\t\tconst rawBase = String(env?.XCLAW_API_BASE_URL ?? process.env.XCLAW_API_BASE_URL ?? "").trim().replace(/\\/+$/, "");\n'
-        '\t\t\t\t\t\tconst apiBase = rawBase ? rawBase.endsWith("/api/v1") ? rawBase : `${rawBase}/api/v1` : "";\n'
-        '\t\t\t\t\t\tconst apiKey = String(skill?.apiKey ?? env?.XCLAW_API_KEY ?? process.env.XCLAW_API_KEY ?? "").trim();\n'
-        '\t\t\t\t\t\tif (!apiBase) { await bot.api.editMessageText(chatId, callbackMessage.message_id, "Approval failed: missing XCLAW_API_BASE_URL in OpenClaw config."); return; }\n'
-        '\t\t\t\t\t\tif (!apiKey) { await bot.api.editMessageText(chatId, callbackMessage.message_id, "Approval failed: missing xclaw-agent apiKey in OpenClaw config."); return; }\n'
-        '\t\t\t\t\t\ttry {\n'
-        '\t\t\t\t\t\t\tconst res = await fetch(`${apiBase}/trades/${encodeURIComponent(tradeId)}/status`, {\n'
-        '\t\t\t\t\t\t\t\tmethod: "POST",\n'
-        '\t\t\t\t\t\t\t\theaders: { "content-type": "application/json", authorization: `Bearer ${apiKey}`, "idempotency-key": `tg-approve-${tradeId}-${callbackMessage.message_id}` },\n'
-        '\t\t\t\t\t\t\t\tbody: JSON.stringify({ tradeId, fromStatus: "approval_pending", toStatus: "approved", reasonCode: null, reasonMessage: null, at: (/* @__PURE__ */ new Date()).toISOString(), source: { channel: "telegram", chainKey, senderId, to: String(chatId), messageId: String(callbackMessage.message_id) } })\n'
-        '\t\t\t\t\t\t\t});\n'
-        '\t\t\t\t\t\t\ttry { logger.info({ tradeId, chainKey, status: res.status }, "xclaw: telegram approval callback server response"); } catch {}\n'
-        '\t\t\t\t\t\t\tif (res.ok) { await bot.api.deleteMessage(chatId, callbackMessage.message_id); return; }\n'
-        '\t\t\t\t\t\t\tlet errCode = "api_error"; let errMsg = `HTTP ${res.status}`;\n'
-        '\t\t\t\t\t\t\ttry { const body = await res.json(); if (typeof body?.code === "string" && body.code.trim()) errCode = body.code.trim(); if (typeof body?.message === "string" && body.message.trim()) errMsg = body.message.trim(); if (res.status === 409 && (body?.details?.currentStatus === "approved" || body?.details?.currentStatus === "filled")) { await bot.api.deleteMessage(chatId, callbackMessage.message_id); return; } } catch {}\n'
-        '\t\t\t\t\t\t\tawait bot.api.editMessageText(chatId, callbackMessage.message_id, `Approval failed: ${errCode} (${errMsg}).`);\n'
-        '\t\t\t\t\t\t\treturn;\n'
-        '\t\t\t\t\t\t} catch (err) {\n'
-        '\t\t\t\t\t\t\tawait bot.api.editMessageText(chatId, callbackMessage.message_id, `Approval failed: ${String(err)}`);\n'
-        '\t\t\t\t\t\t\treturn;\n'
-        '\t\t\t\t\t\t}\n'
-        '\t\t\t\t\t}\n'
-        '\t\t\t\t}\n'
-        '\t\t\t\t\n'
-    )
-
-    out, dm_ok = _inject_after_anchor(raw, dm_anchor, dm_injection)
-    if not dm_ok:
-        return raw, False, "dm_anchor_not_found"
-
-    # 2) Post-allowlist injection: place just before pagination handler in the callback_query handler.
     pagination_anchor = "const paginationMatch = data.match(/^commands_page_"
-    idx = out.find(pagination_anchor)
+    idx = raw.find(pagination_anchor)
     if idx < 0:
         return raw, False, "pagination_anchor_not_found"
 
-    # Find the allowlist block right before pagination and insert after it.
-    # Keep it simple: insert immediately before pagination.
+    # Insert immediately before pagination handling (after allowlist/group policy checks).
     general_injection = (
         '\n'
-        '\t\t\t\t// X-Claw Telegram approvals: approve-only inline button handling (strict, no LLM).\n'
-        '\t\t\t\t// Expected callback_data: xappr|a|<tradeId>|<chainKey>\n'
-        '\t\t\t\t// This runs after allowlist/group policy checks, so group callbacks are permitted only when allowed.\n'
-        '\t\t\t\tif (data.startsWith("xappr|")) {\n'
-        '\t\t\t\t\tconst parts = data.split("|").map((p) => String(p || "").trim());\n'
-        '\t\t\t\t\tif (parts.length === 4 && parts[1] === "a" && parts[2] && parts[3]) {\n'
-        '\t\t\t\t\t\tconst tradeId = parts[2];\n'
-        '\t\t\t\t\t\tconst chainKey = parts[3];\n'
-        f'\t\t\t\t\t\ttry {{ logger.info({{ tradeId, chainKey, chatId, senderId, isGroup }}, "{MARKER}"); }} catch {{}}\n'
-        '\t\t\t\t\t\tconst skill = cfg?.skills?.entries?.["xclaw-agent"];\n'
-        '\t\t\t\t\t\tconst env = skill?.env ?? {};\n'
-        '\t\t\t\t\t\tconst rawBase = String(env?.XCLAW_API_BASE_URL ?? process.env.XCLAW_API_BASE_URL ?? "").trim().replace(/\\/+$/, "");\n'
-        '\t\t\t\t\t\tconst apiBase = rawBase ? rawBase.endsWith("/api/v1") ? rawBase : `${rawBase}/api/v1` : "";\n'
-        '\t\t\t\t\t\tconst apiKey = String(skill?.apiKey ?? env?.XCLAW_API_KEY ?? process.env.XCLAW_API_KEY ?? "").trim();\n'
-        '\t\t\t\t\t\tif (!apiBase) { await bot.api.editMessageText(chatId, callbackMessage.message_id, "Approval failed: missing XCLAW_API_BASE_URL in OpenClaw config."); return; }\n'
-        '\t\t\t\t\t\tif (!apiKey) { await bot.api.editMessageText(chatId, callbackMessage.message_id, "Approval failed: missing xclaw-agent apiKey in OpenClaw config."); return; }\n'
-        '\t\t\t\t\t\ttry {\n'
-        '\t\t\t\t\t\t\tconst res = await fetch(`${apiBase}/trades/${encodeURIComponent(tradeId)}/status`, {\n'
-        '\t\t\t\t\t\t\t\tmethod: "POST",\n'
-        '\t\t\t\t\t\t\t\theaders: { "content-type": "application/json", authorization: `Bearer ${apiKey}`, "idempotency-key": `tg-approve-${tradeId}-${callbackMessage.message_id}` },\n'
-        '\t\t\t\t\t\t\t\tbody: JSON.stringify({ tradeId, fromStatus: "approval_pending", toStatus: "approved", reasonCode: null, reasonMessage: null, at: (/* @__PURE__ */ new Date()).toISOString(), source: { channel: "telegram", chainKey, senderId, to: String(chatId), messageId: String(callbackMessage.message_id) } })\n'
-        '\t\t\t\t\t\t\t});\n'
-        '\t\t\t\t\t\t\ttry { logger.info({ tradeId, chainKey, status: res.status }, "xclaw: telegram approval callback server response"); } catch {}\n'
+        '\t\t\t// X-Claw Telegram approvals: approve-only inline button handling (strict, no LLM).\n'
+        '\t\t\t// Expected callback_data: xappr|a|<tradeId>|<chainKey>\n'
+        '\t\t\t// This runs after allowlist/group policy checks.\n'
+        '\t\t\tif (data.startsWith("xappr|")) {\n'
+        '\t\t\t\tconst parts = data.split("|").map((p) => String(p || "").trim());\n'
+        '\t\t\t\tif (parts.length === 4 && parts[1] === "a" && parts[2] && parts[3]) {\n'
+        '\t\t\t\t\tconst tradeId = parts[2];\n'
+        '\t\t\t\t\tconst chainKey = parts[3];\n'
+        f'\t\t\t\t\ttry {{ logger.info({{ tradeId, chainKey, chatId, senderId, isGroup }}, "{MARKER}"); }} catch {{}}\n'
+        '\t\t\t\t\tconst skill = cfg?.skills?.entries?.["xclaw-agent"];\n'
+        '\t\t\t\t\tconst env = skill?.env ?? {};\n'
+        '\t\t\t\t\tconst rawBase = String(env?.XCLAW_API_BASE_URL ?? process.env.XCLAW_API_BASE_URL ?? "").trim().replace(/\\/+$/, "");\n'
+        '\t\t\t\t\tconst apiBase = rawBase ? rawBase.endsWith("/api/v1") ? rawBase : `${rawBase}/api/v1` : "";\n'
+        '\t\t\t\t\tconst apiKey = String(skill?.apiKey ?? env?.XCLAW_API_KEY ?? process.env.XCLAW_API_KEY ?? "").trim();\n'
+        '\t\t\t\t\tif (!apiBase) { await bot.api.editMessageText(chatId, callbackMessage.message_id, "Approval failed: missing XCLAW_API_BASE_URL in OpenClaw config."); return; }\n'
+        '\t\t\t\t\tif (!apiKey) { await bot.api.editMessageText(chatId, callbackMessage.message_id, "Approval failed: missing xclaw-agent apiKey in OpenClaw config."); return; }\n'
+        '\t\t\t\t\ttry {\n'
+        '\t\t\t\t\t\tconst res = await fetch(`${apiBase}/trades/${encodeURIComponent(tradeId)}/status`, {\n'
+        '\t\t\t\t\t\t\tmethod: "POST",\n'
+        '\t\t\t\t\t\t\theaders: { "content-type": "application/json", authorization: `Bearer ${apiKey}`, "idempotency-key": `tg-approve-${tradeId}-${callbackMessage.message_id}` },\n'
+        '\t\t\t\t\t\t\tbody: JSON.stringify({ tradeId, fromStatus: "approval_pending", toStatus: "approved", reasonCode: null, reasonMessage: null, at: (/* @__PURE__ */ new Date()).toISOString(), source: { channel: "telegram", chainKey, senderId, to: String(chatId), messageId: String(callbackMessage.message_id) } })\n'
+        '\t\t\t\t\t\t});\n'
+        '\t\t\t\t\t\ttry { logger.info({ tradeId, chainKey, status: res.status }, "xclaw: telegram approval callback server response"); } catch {}\n'
         '\t\t\t\t\t\t\tif (res.ok) { await bot.api.deleteMessage(chatId, callbackMessage.message_id); return; }\n'
         '\t\t\t\t\t\t\tlet errCode = "api_error"; let errMsg = `HTTP ${res.status}`;\n'
         '\t\t\t\t\t\t\ttry { const body = await res.json(); if (typeof body?.code === "string" && body.code.trim()) errCode = body.code.trim(); if (typeof body?.message === "string" && body.message.trim()) errMsg = body.message.trim(); if (res.status === 409 && (body?.details?.currentStatus === "approved" || body?.details?.currentStatus === "filled")) { await bot.api.deleteMessage(chatId, callbackMessage.message_id); return; } } catch {}\n'
@@ -272,7 +245,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         '\n'
     )
 
-    out2 = out[:idx] + general_injection + out[idx:]
+    out2 = raw[:idx] + general_injection + raw[idx:]
     if MARKER not in out2:
         return raw, False, "marker_missing_after_patch"
     return out2, True, None
@@ -338,10 +311,11 @@ def ensure_patched(*, restart: bool, cooldown_sec: int) -> PatchResult:
 
         bundles = _find_loader_bundles(pkg_root)
         if not bundles:
-            return PatchResult(ok=False, patched=False, restarted=False, openclaw_version=version, openclaw_root=str(pkg_root), error="loader_bundle_not_found")
+            return PatchResult(ok=False, patched=False, restarted=False, openclaw_version=version, openclaw_root=str(pkg_root), error="callback_bundle_not_found")
 
         state = _read_json(STATE_FILE)
-        state.setdefault("schemaVersion", 1)
+        # Bump schemaVersion when patch heuristics/normalization change to invalidate cached fast-path.
+        state["schemaVersion"] = STATE_SCHEMA_VERSION
         state.setdefault("bundles", {})
         state["lastAttemptAt"] = _utc_now()
         state["openclawVersion"] = version
@@ -382,15 +356,16 @@ def ensure_patched(*, restart: bool, cooldown_sec: int) -> PatchResult:
             bundles_state = state.get("bundles")
             if isinstance(bundles_state, dict):
                 cached = bundles_state.get(str(bundle))
-                if (
-                    isinstance(cached, dict)
-                    and bool(cached.get("patched")) is True
-                    and cached.get("size") == size
-                    and cached.get("mtime") == mtime
-                    and state.get("openclawVersion") == version
-                ):
-                    patched_any = True
-                    continue
+            if (
+                isinstance(cached, dict)
+                and bool(cached.get("patched")) is True
+                and cached.get("size") == size
+                and cached.get("mtime") == mtime
+                and state.get("openclawVersion") == version
+                and cached.get("schemaVersion") == STATE_SCHEMA_VERSION
+            ):
+                patched_any = True
+                continue
 
             try:
                 raw = bundle.read_text(encoding="utf-8")
@@ -439,6 +414,7 @@ def ensure_patched(*, restart: bool, cooldown_sec: int) -> PatchResult:
                     "size": size2,
                     "mtime": mtime2,
                     "updatedAt": _utc_now(),
+                    "schemaVersion": STATE_SCHEMA_VERSION,
                 }
 
         state["lastPatchedAt"] = _utc_now() if changed_any else state.get("lastPatchedAt")
