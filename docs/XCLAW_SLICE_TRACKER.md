@@ -859,3 +859,20 @@ DoD:
 - [x] OpenClaw patcher replaces queued-buttons v2 injection in `sendTelegramText(...)` with v3 (normalized text + broad `trd_...` extraction).
 - [x] OpenClaw emits gateway logs when queued buttons are attached or skipped due to missing tradeId / existing replyMarkup.
 - [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.
+
+---
+
+## Slice 49: OpenClaw Patcher Safety (Syntax Check + Targeted Bundle)
+Status: [x]
+Issue: #42 (umbrella)
+
+Goal:
+- Prevent the OpenClaw gateway patcher from bricking `openclaw` by:
+  - patching only the required gateway bundle(s), and
+  - running a syntax check on patched output before writing to disk.
+
+DoD:
+- [x] docs sync first: source-of-truth + roadmap + tracker + context/spec/tasks/acceptance aligned to Slice 49.
+- [x] patcher only targets the canonical gateway bundle (`dist/reply-*.js`) instead of patching multiple bundles.
+- [x] patcher runs `node --check` against the patched output and refuses to write if syntax fails.
+- [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.

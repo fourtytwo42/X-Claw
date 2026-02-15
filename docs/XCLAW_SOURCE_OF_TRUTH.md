@@ -2542,6 +2542,9 @@ Limitations / notes:
      - on the next skill use after an OpenClaw update overwrites the installed gateway bundle.
    - Patch targeting requirement: the patcher must target the bundle(s) used by OpenClaw `gateway` mode (imported by `dist/index.js`, e.g. `dist/reply-*.js`), not only `dist/loader-*.js`.
    - Restart safety: gateway restart is best-effort and only triggered when the patch is newly applied, with a cooldown + lock to avoid restart loops.
+   - Safety: the patcher must never brick the OpenClaw install:
+     - it must run a JS syntax check on the patched output (e.g. `node --check`) before writing,
+     - and it should target only the canonical gateway bundle(s) (at minimum `dist/reply-*.js`), not broadly patch every dist file that happens to match heuristics.
 5. Trade lifecycle:
    - when a trade is inserted as `approval_pending`, the runtime may send a Telegram approval prompt **only** if:
      - Telegram approvals are enabled for that agent+chain, and

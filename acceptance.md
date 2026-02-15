@@ -2910,3 +2910,23 @@ Issue mapping: `#42` (umbrella)
 - Gateway log evidence:
   - `xclaw: queued buttons attached tradeId=... chainKey=...` appears when queued buttons are attached.
   - `xclaw: queued buttons skipped ...` appears when attach is skipped for an actionable reason.
+
+---
+
+## Slice 49 Acceptance Evidence
+
+Date (UTC): 2026-02-15
+Active slice: `Slice 49: OpenClaw Patcher Safety (Syntax Check + Targeted Bundle)`
+Issue mapping: `#42` (umbrella)
+
+### Required gate evidence
+- `npm run db:parity` -> PASS (exit 0, checkedAt: 2026-02-15T21:19:31.131Z)
+- `npm run seed:reset` -> PASS (exit 0)
+- `npm run seed:load` -> PASS (exit 0, scenarios: `happy_path`, `approval_retry`, `degraded_rpc`, `copy_reject`)
+- `npm run seed:verify` -> PASS (exit 0)
+- `npm run build` -> PASS (exit 0)
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS
+
+### Scenario evidence (manual/ops)
+- Patcher safety:
+  - broken OpenClaw install is recoverable by reinstall, and the patcher refuses to write invalid JS (syntax check failure) instead of bricking the CLI.

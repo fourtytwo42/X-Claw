@@ -141,6 +141,37 @@ Issue mapping: `#42` (umbrella)
 
 ---
 
+## Slice 49 Context: OpenClaw Patcher Safety (Syntax Check + Targeted Bundle)
+
+Issue mapping: `#42` (umbrella)
+
+### Objective + scope lock
+- Objective: ensure the OpenClaw gateway patcher cannot break `openclaw` by validating patched output syntax and targeting only canonical gateway bundles.
+- Scope guard honored: no DB changes, no dependency additions.
+
+### Expected touched files (Slice 49 allowlist)
+- Skill tooling:
+  - `skills/xclaw-agent/scripts/openclaw_gateway_patch.py`
+- Docs/process:
+  - `docs/XCLAW_SLICE_TRACKER.md`
+  - `docs/XCLAW_BUILD_ROADMAP.md`
+  - `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - `docs/CONTEXT_PACK.md`
+  - `spec.md`
+  - `tasks.md`
+  - `acceptance.md`
+
+### Verification Plan
+- Required gates:
+  - `npm run db:parity`
+  - `npm run seed:reset`
+  - `npm run seed:load`
+  - `npm run seed:verify`
+  - `npm run build`
+  - `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
 ## Slice 36 Context: Remove Step-Up Authentication (Management Cookie Only)
 
 Issue mapping: `#42` (umbrella)

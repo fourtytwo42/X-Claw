@@ -1616,3 +1616,30 @@ Note:
   - [x] `npm run seed:verify`
   - [x] `npm run build`
   - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+## 49) Slice 49: OpenClaw Patcher Safety (Syntax Check + Targeted Bundle)
+
+### 49.1 Canonical/doc sync
+- [x] Add Slice 49 goal/DoD + issue mapping to `docs/XCLAW_SLICE_TRACKER.md`.
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` to lock patcher safety requirements (syntax check + targeted bundle).
+- [x] Update handoff/process artifacts:
+  - [x] `docs/CONTEXT_PACK.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+
+### 49.2 Implementation
+- [x] OpenClaw gateway patcher:
+  - [x] only patch the canonical gateway bundle(s) (at minimum `dist/reply-*.js`)
+  - [x] validate patched JS via `node --check` before writing; refuse to write invalid output.
+
+### 49.3 Validation + evidence
+- [x] Run required gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`

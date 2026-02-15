@@ -36,7 +36,7 @@ QUEUED_BUTTONS_MARKER_V2 = "xclaw: telegram queued approval buttons v2"
 QUEUED_BUTTONS_MARKER_V3 = "xclaw: telegram queued approval buttons v3"
 LEGACY_DM_SENTINEL = 'Allow in DMs even when inlineButtonsScope is "allowlist", gated by chatId == senderId.'
 # Bump when patch semantics change so we invalidate the cached "already patched" fast-path.
-STATE_SCHEMA_VERSION = 17
+STATE_SCHEMA_VERSION = 18
 STATE_DIR = Path.home() / ".openclaw" / "xclaw"
 STATE_FILE = STATE_DIR / "openclaw_patch_state.json"
 LOCK_FILE = STATE_DIR / "openclaw_patch.lock"
@@ -177,6 +177,10 @@ def _find_loader_bundles(pkg_root: Path) -> list[Path]:
     candidates = sorted(dist_dir.rglob("*.js"))
     bundles: list[Path] = []
     for path in candidates:
+        # Safety: only patch the canonical gateway reply bundle(s). Patching multiple hashed bundles
+        # has proven too risky (can brick the OpenClaw CLI if we ever mis-inject).
+        if not path.name.startswith("reply-"):
+            continue
         try:
             text = path.read_text(encoding="utf-8")
         except Exception:
@@ -185,6 +189,32 @@ def _find_loader_bundles(pkg_root: Path) -> list[Path]:
         if 'bot.on("callback_query"' in text and "const paginationMatch = data.match(/^commands_page_" in text:
             bundles.append(path)
     return bundles
+
+
+def _node_check_js_text(js_text: str) -> tuple[bool, str | None]:
+    """
+    Validate JS syntax for a would-be patched bundle. If this fails, do not write to disk.
+    """
+    node = shutil.which("node")
+    if not node:
+        return False, "node_not_found"
+    try:
+        STATE_DIR.mkdir(parents=True, exist_ok=True)
+        tmp = STATE_DIR / f".tmp-openclaw-bundle-check-{os.getpid()}.mjs"
+        tmp.write_text(js_text, encoding="utf-8")
+        proc = subprocess.run([node, "--check", str(tmp)], text=True, capture_output=True, timeout=10)
+        ok = proc.returncode == 0
+        if not ok:
+            err = (proc.stderr or proc.stdout or "").strip()
+            return False, err[:600] if err else "node_check_failed"
+        return True, None
+    except Exception as exc:
+        return False, f"node_check_exception:{exc}"
+    finally:
+        try:
+            (STATE_DIR / f".tmp-openclaw-bundle-check-{os.getpid()}.mjs").unlink(missing_ok=True)  # type: ignore[arg-type]
+        except Exception:
+            pass
 
 
 def _inject_after_anchor(text: str, anchor: str, injection: str) -> tuple[str, bool]:
@@ -385,21 +415,24 @@ def _patch_queued_buttons_v2(raw: str) -> tuple[str, bool, str | None]:
     Patch the Telegram *runtime* send path used by agent replies (`sendTelegramText(bot, ...)`),
     not the CLI send path (`sendMessageTelegram(...)`).
     """
-    # v3 is our current canonical behavior. If v2 exists, we remove it and replace with v3
-    # so we can improve matching and add logging without duplicating blocks.
-    if QUEUED_BUTTONS_MARKER_V3 in raw:
-        return raw, False, None
-    if QUEUED_BUTTONS_MARKER_V2 in raw:
-        start = raw.find(f"// {QUEUED_BUTTONS_MARKER_V2}")
-        if start >= 0:
-            # The injected block always precedes the sendMessage `try { ... }` block.
-            end = raw.find("\n\t\ttry {", start)
-            if end > start:
-                raw = raw[:start] + raw[end:]
-
     anchor = 'const htmlText = (opts?.textMode ?? "markdown") === "html" ? text : markdownToTelegramHtml(text);'
     if anchor not in raw:
         return raw, False, "queued_buttons_v2_anchor_not_found"
+
+    # v3 is our current canonical behavior. If v2 exists near this anchor, remove it and replace with v3
+    # so we can improve matching and add logging without duplicating blocks.
+    if QUEUED_BUTTONS_MARKER_V3 in raw:
+        return raw, False, None
+    anchor_idx = raw.find(anchor)
+    if QUEUED_BUTTONS_MARKER_V2 in raw:
+        # Only remove v2 when it appears in the local window right after the anchor (inside sendTelegramText).
+        window = raw[anchor_idx : min(len(raw), anchor_idx + 6000)]
+        local_start = window.find(f"// {QUEUED_BUTTONS_MARKER_V2}")
+        if local_start >= 0:
+            start = anchor_idx + local_start
+            end = raw.find("\n\t\ttry {", start)
+            if end > start and end < anchor_idx + 8000:
+                raw = raw[:start] + raw[end:]
 
     injection = (
         "\n\t// xclaw: telegram queued approval buttons v3\n"
@@ -572,6 +605,15 @@ def ensure_patched(*, restart: bool, cooldown_sec: int) -> PatchResult:
                 state["lastErrorAtEpoch"] = time.time()
                 state["lastErrorVersion"] = version
                 state["lastError"] = f"patch_failed:{bundle}:{err}"
+                continue
+
+            # Safety gate: never write a patched bundle that does not parse.
+            ok_js, js_err = _node_check_js_text(patched_text)
+            if not ok_js:
+                state["lastErrorAt"] = _utc_now()
+                state["lastErrorAtEpoch"] = time.time()
+                state["lastErrorVersion"] = version
+                state["lastError"] = f"syntax_check_failed:{bundle}:{js_err or 'node_check_failed'}"
                 continue
 
             if changed:

@@ -708,6 +708,26 @@ Upgrade the OpenClaw queued-buttons injection from v2 to v3 so it is resilient t
 
 ---
 
+# Slice 49 Spec: OpenClaw Patcher Safety (Syntax Check + Targeted Bundle)
+
+## Goal
+Ensure `skills/xclaw-agent/scripts/openclaw_gateway_patch.py` cannot brick OpenClaw: patch only canonical gateway bundle(s) and validate patched JS syntax before writing.
+
+## Success Criteria
+1. Patcher only modifies `dist/reply-*.js` (and does not touch other dist bundles).
+2. Patcher runs `node --check` on patched output and refuses to write invalid JS.
+3. If syntax check fails, patcher returns a structured error and does not restart the gateway.
+
+## Acceptance Checks
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
 # Slice 31 Spec: Agents + Agent Management UX Refinement (Operational Clean)
 
 ## Goal
