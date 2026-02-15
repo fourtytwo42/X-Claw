@@ -1,10 +1,9 @@
 # X-Claw Context Pack
 
-## 1) Goal (Active: Slice 45)
-- Primary objective: complete `Slice 45: Inline Telegram Approval Buttons (No Extra Prompt Message)`.
+## 1) Goal (Active: Slice 46)
+- Primary objective: complete `Slice 46: Auto-Attach Telegram Approval Buttons To Queued Message`.
 - Success criteria:
-  - For Telegram, Approve/Deny buttons are attached to the same queued trade message (no extra prompt message).
-  - Out-of-band prompt messages are disabled by default; legacy behavior can be re-enabled via env.
+  - For Telegram, OpenClaw auto-attaches Approve/Deny buttons to the queued `approval_pending` trade message.
   - required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.
 
 ## 2) Constraints
@@ -26,7 +25,7 @@
  - No API schema changes in this slice; web UI only.
  - OpenClaw gateway behavior change is delivered as a patch against OpenClaw dist bundle for the deployed version.
 
-## 4) Files and Boundaries (Slice 45 allowlist)
+## 4) Files and Boundaries (Slice 46 allowlist)
 - Web/API/UI:
   - none
 - Canonical docs/process:
@@ -38,9 +37,9 @@
   - `tasks.md`
   - `acceptance.md`
 - Runtime:
-  - `apps/agent-runtime/xclaw_agent/cli.py`
-- Skill instructions:
-  - `skills/xclaw-agent/SKILL.md`
+  - none
+- OpenClaw patcher:
+  - `skills/xclaw-agent/scripts/openclaw_gateway_patch.py`
 - OpenClaw:
   - `skills/xclaw-agent/scripts/openclaw_gateway_patch.py`
   - `apps/agent-runtime/xclaw_agent/cli.py` (unchanged for this slice)

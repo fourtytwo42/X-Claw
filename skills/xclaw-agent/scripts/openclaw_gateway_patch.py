@@ -31,8 +31,9 @@ MARKER = "xclaw: telegram approval callback received"
 DECISION_ACK_MARKER = "xclaw: telegram approval decision ack"
 DECISION_ACK_MARKER_V2 = "xclaw: telegram approval decision ack v2"
 DECISION_ACK_MARKER_V3 = "xclaw: telegram approval decision ack v3"
+QUEUED_BUTTONS_MARKER = "xclaw: telegram queued approval buttons"
 LEGACY_DM_SENTINEL = 'Allow in DMs even when inlineButtonsScope is "allowlist", gated by chatId == senderId.'
-STATE_SCHEMA_VERSION = 13
+STATE_SCHEMA_VERSION = 14
 STATE_DIR = Path.home() / ".openclaw" / "xclaw"
 STATE_FILE = STATE_DIR / "openclaw_patch_state.json"
 LOCK_FILE = STATE_DIR / "openclaw_patch.lock"
@@ -227,6 +228,13 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
 
     # If the canonical block is already present (newest version), we're done (except for any normalization above).
     if MARKER in raw and DECISION_ACK_MARKER_V3 in raw:
+        # Also ensure we have queued-message auto-buttons for Telegram approval_pending messages.
+        if QUEUED_BUTTONS_MARKER not in raw:
+            raw2, changed2, err2 = _patch_queued_buttons(raw)
+            if err2:
+                return raw, normalized, None
+            raw = raw2
+            normalized = normalized or changed2
         return raw, normalized, None
 
     idx = raw.find(PAGINATION_ANCHOR)
@@ -300,7 +308,62 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
     out2 = raw[:idx] + general_injection + raw[idx:]
     if MARKER not in out2:
         return raw, False, "marker_missing_after_patch"
-    return out2, True, None
+    # Ensure queued-message auto-buttons are present too.
+    out3, changed3, err3 = _patch_queued_buttons(out2)
+    if err3:
+        return out2, True, None
+    return out3, True or changed3, None
+
+
+def _patch_queued_buttons(raw: str) -> tuple[str, bool, str | None]:
+    """
+    Patch OpenClaw's Telegram send path so that when a message contains an X-Claw queued approval_pending
+    trade summary, OpenClaw attaches Approve/Deny inline buttons to that same message.
+    """
+    if QUEUED_BUTTONS_MARKER in raw:
+        return raw, False, None
+
+    # Target: sendMessageTelegram(...) where the replyMarkup is derived from opts.buttons.
+    # We change `const replyMarkup = ...` to `let replyMarkup = ...` and add a fallback builder.
+    anchor = "const replyMarkup = buildInlineKeyboard(opts.buttons);"
+    if anchor not in raw:
+        # Already converted to `let`? Patch that variant too.
+        anchor = "let replyMarkup = buildInlineKeyboard(opts.buttons);"
+        if anchor not in raw:
+            return raw, False, "queued_buttons_anchor_not_found"
+        already_let = True
+    else:
+        already_let = False
+
+    injection = (
+        "\n\t// xclaw: telegram queued approval buttons\n"
+        "\t// If the agent posts an approval_pending trade summary (queued message), attach inline Approve/Deny buttons.\n"
+        "\t// This avoids sending a second Telegram prompt message.\n"
+        "\tif (!replyMarkup && typeof text === \"string\" && /\\bStatus:\\s*approval_pending\\b/i.test(text)) {\n"
+        "\t\tconst m = text.match(/\\bTrade ID:\\s*(trd_[a-z0-9]+)\\b/i) ?? text.match(/\\bTrade:\\s*(trd_[a-z0-9]+)\\b/i);\n"
+        "\t\tif (m && m[1]) {\n"
+        "\t\t\tconst tradeId = m[1];\n"
+        "\t\t\tlet chainKey = \"\";\n"
+        "\t\t\tconst cm = text.match(/\\bChain:\\s*([a-z0-9_]+)\\b/i);\n"
+        "\t\t\tif (cm && cm[1]) chainKey = cm[1];\n"
+        "\t\t\tif (!chainKey) {\n"
+        "\t\t\t\tconst skill = cfg?.skills?.entries?.[\"xclaw-agent\"]; const env = skill?.env ?? {};\n"
+        "\t\t\t\tchainKey = String(env?.XCLAW_DEFAULT_CHAIN ?? process.env.XCLAW_DEFAULT_CHAIN ?? \"base_sepolia\").trim() || \"base_sepolia\";\n"
+        "\t\t\t}\n"
+        "\t\t\treplyMarkup = { inline_keyboard: [[{ text: \"Approve\", callback_data: `xappr|a|${tradeId}|${chainKey}` }, { text: \"Deny\", callback_data: `xappr|r|${tradeId}|${chainKey}` }]] };\n"
+        "\t\t}\n"
+        "\t}\n"
+    )
+
+    text2 = raw
+    if not already_let:
+        text2 = text2.replace("const replyMarkup = buildInlineKeyboard(opts.buttons);", "let replyMarkup = buildInlineKeyboard(opts.buttons);", 1)
+    text2, ok = _inject_after_anchor(text2, anchor if already_let else "let replyMarkup = buildInlineKeyboard(opts.buttons);", injection)
+    if not ok:
+        return raw, False, "queued_buttons_injection_failed"
+    if QUEUED_BUTTONS_MARKER not in text2:
+        return raw, False, "queued_buttons_marker_missing_after_patch"
+    return text2, True, None
 
 
 def _restart_gateway_best_effort(cooldown_sec: int, state: dict[str, Any]) -> bool:

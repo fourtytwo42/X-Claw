@@ -2550,7 +2550,9 @@ Limitations / notes:
      - swap summary: `<amountIn> <tokenInSymbol> -> <tokenOutSymbol>`,
      - `chainKey`,
      - `tradeId`.
-   - Preferred delivery: inline buttons in the agent's queued message (single Telegram message). Do not emit a second "approval prompt" message when inline delivery is used.
+   - Preferred delivery: inline buttons in the agent's queued message (single Telegram message).
+     - OpenClaw gateway auto-attaches the inline keyboard when the queued message includes `Status: approval_pending` and `Trade ID: trd_...`.
+     - The model may also emit OpenClaw `[[buttons: ...]]` directives, but auto-attach is the portability default.
 6. Sync between Telegram and web:
    - the pending approval item remains visible on `/agents/:id`.
    - approving in either surface must converge:

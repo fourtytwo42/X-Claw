@@ -650,6 +650,25 @@ Reduce Telegram approval UX noise by attaching Approve/Deny buttons to the same 
 
 ---
 
+# Slice 46 Spec: Auto-Attach Telegram Approval Buttons To Queued Message
+
+## Goal
+Guarantee Telegram queued `approval_pending` trade messages always have Approve/Deny buttons without relying on the model to emit `[[buttons: ...]]`.
+
+## Success Criteria
+1. OpenClaw gateway patch detects the queued message (by `Status: approval_pending` and `Trade ID: trd_...`) and attaches inline keyboard on send.
+2. No second Telegram prompt message is required for buttons to appear.
+
+## Acceptance Checks
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
 # Slice 31 Spec: Agents + Agent Management UX Refinement (Operational Clean)
 
 ## Goal

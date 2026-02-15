@@ -814,3 +814,19 @@ DoD:
 - [x] runtime does not send out-of-band Telegram prompt messages by default (inline delivery is preferred); legacy prompting can be re-enabled via env.
 - [x] skill instructions require embedding OpenClaw `[[buttons: ...]]` directive in the queued message for Telegram.
 - [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.
+
+---
+
+## Slice 46: Auto-Attach Telegram Approval Buttons To Queued Message
+Status: [x]
+Issue: #42 (umbrella)
+
+Goal:
+- For Telegram, when the agent posts the queued `approval_pending` trade summary, OpenClaw auto-attaches Approve/Deny inline buttons to that same message (no second prompt message, no reliance on the model emitting `[[buttons: ...]]`).
+
+DoD:
+- [x] docs sync first: source-of-truth + roadmap + tracker + context/spec/tasks/acceptance aligned to Slice 46.
+- [x] OpenClaw gateway patch auto-attaches buttons when message contains:
+  - `Status: approval_pending`
+  - `Trade ID: trd_...`
+- [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.
