@@ -769,3 +769,19 @@ DoD:
 - [x] Telegram decision sends a confirmation message into the same chat with trade details and (for deny) a reason.
 - [x] When a trade is approved/denied via the web UI while runtime is waiting, runtime posts a decision message into the active Telegram chat with details.
 - [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.
+
+---
+
+## Slice 43: Telegram Callback Idempotency Fix (No `idempotency_conflict`)
+Status: [x]
+Issue: #42 (umbrella)
+
+Goal:
+- Eliminate Telegram inline-button approval failures caused by idempotency key reuse with a different payload (typically because `at` differs across retries/clicks), while keeping strict callback handling in the OpenClaw gateway patch.
+
+DoD:
+- [x] docs sync first: source-of-truth + roadmap + tracker + context/spec/tasks/acceptance aligned to Slice 43.
+- [x] OpenClaw gateway patch uses a callback-unique idempotency key (`tg-cb-<callbackId>`) for `POST /api/v1/trades/:tradeId/status`.
+- [x] OpenClaw gateway patch sets `at` deterministically from Telegram callback/query timestamp so replays of the same callback are byte-stable.
+- [x] Clicking Telegram Approve/Deny no longer produces `idempotency_conflict` errors.
+- [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.

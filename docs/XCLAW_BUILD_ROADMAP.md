@@ -1460,3 +1460,30 @@ Note:
   - [x] `npm run seed:verify`
   - [x] `npm run build`
   - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+## 43) Slice 43: Telegram Callback Idempotency Fix (No `idempotency_conflict`)
+
+### 43.1 Canonical/doc sync
+- [x] Add Slice 43 goal/DoD + issue mapping to `docs/XCLAW_SLICE_TRACKER.md`.
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` to document Telegram callback idempotency key and deterministic `at` requirement.
+- [x] Update handoff/process artifacts:
+  - [x] `docs/CONTEXT_PACK.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+
+### 43.2 Implementation
+- [x] Update `skills/xclaw-agent/scripts/openclaw_gateway_patch.py`:
+  - [x] use `Idempotency-Key: tg-cb-<callbackId>` for decision transitions,
+  - [x] set `at` deterministically from Telegram callback/query timestamp.
+
+### 43.3 Validation + evidence
+- [x] Run required gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`

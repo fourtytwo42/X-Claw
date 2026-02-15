@@ -1,11 +1,10 @@
 # X-Claw Context Pack
 
-## 1) Goal (Active: Slice 42)
-- Primary objective: complete `Slice 42: Telegram Approve+Deny + Approval Decision Chat Feedback + Safer De-Dupe`.
+## 1) Goal (Active: Slice 43)
+- Primary objective: complete `Slice 43: Telegram Callback Idempotency Fix (No idempotency_conflict)`.
 - Success criteria:
-  - Runtime de-dupe only while a matching trade is still `approval_pending`; once approved/terminal, identical requests produce a new tradeId.
-  - Telegram prompt includes Approve + Deny buttons, deletes itself on decision, and posts a decision acknowledgement message with details.
-  - Web approval/deny while runtime is waiting produces a decision acknowledgement message in the active Telegram chat with details.
+  - Telegram inline-button decisions do not fail with `idempotency_conflict`.
+  - OpenClaw gateway patch uses callback-unique idempotency key and deterministic `at` timestamp.
   - required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.
 
 ## 2) Constraints
@@ -27,7 +26,7 @@
  - No API schema changes in this slice; web UI only.
  - OpenClaw gateway behavior change is delivered as a patch against OpenClaw dist bundle for the deployed version.
 
-## 4) Files and Boundaries (Slice 42 allowlist)
+## 4) Files and Boundaries (Slice 43 allowlist)
 - Web/API/UI:
   - none
 - Canonical docs/process:
@@ -42,7 +41,7 @@
   - none
 - OpenClaw:
   - `skills/xclaw-agent/scripts/openclaw_gateway_patch.py`
-  - `apps/agent-runtime/xclaw_agent/cli.py`
+  - `apps/agent-runtime/xclaw_agent/cli.py` (unchanged for this slice)
   - `skills/xclaw-agent/scripts/setup_agent_skill.py`
   - `skills/xclaw-agent/scripts/xclaw_agent_skill.py`
   - patch artifacts in `patches/openclaw/` (for reproducibility / inspection)

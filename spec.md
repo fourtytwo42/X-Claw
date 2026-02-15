@@ -587,6 +587,30 @@ Refine the approvals UX and semantics:
 
 ---
 
+# Slice 43 Spec: Telegram Callback Idempotency Fix (No `idempotency_conflict`)
+
+## Goal
+Prevent Telegram decision callbacks from failing with `idempotency_conflict` on repeated clicks/retries.
+
+## Success Criteria
+1. OpenClaw gateway patch uses callback-unique idempotency key: `Idempotency-Key: tg-cb-<callbackId>`.
+2. The `at` field for `/api/v1/trades/:tradeId/status` is derived deterministically from Telegram callback/query timestamps.
+3. Clicking Approve/Deny does not produce `idempotency_conflict`.
+
+## Non-Goals
+1. No new server endpoints or schemas.
+2. No UI redesign.
+
+## Acceptance Checks
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
 # Slice 31 Spec: Agents + Agent Management UX Refinement (Operational Clean)
 
 ## Goal

@@ -2565,6 +2565,9 @@ Limitations / notes:
      - enables/disables Telegram approval prompts (no secret issuance).
    - Telegram approve action uses `POST /api/v1/trades/:tradeId/status` (agent-auth):
      - idempotently transitions `approval_pending -> approved` when actionable (requires `Idempotency-Key`).
+     - Telegram callback idempotency must not conflict on retries:
+       - use `Idempotency-Key: tg-cb-<callbackId>` (Telegram callback_query id),
+       - set `at` deterministically from the callback/query timestamp so replays are byte-stable.
    - `POST /api/v1/agent/approvals/prompt` (agent-auth):
      - records prompt metadata for cleanup/sync (does not authorize approvals).
 9. Telegram deny:

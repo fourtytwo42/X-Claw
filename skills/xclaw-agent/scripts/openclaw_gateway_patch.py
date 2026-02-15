@@ -30,8 +30,9 @@ from typing import Any, Optional
 MARKER = "xclaw: telegram approval callback received"
 DECISION_ACK_MARKER = "xclaw: telegram approval decision ack"
 DECISION_ACK_MARKER_V2 = "xclaw: telegram approval decision ack v2"
+DECISION_ACK_MARKER_V3 = "xclaw: telegram approval decision ack v3"
 LEGACY_DM_SENTINEL = 'Allow in DMs even when inlineButtonsScope is "allowlist", gated by chatId == senderId.'
-STATE_SCHEMA_VERSION = 12
+STATE_SCHEMA_VERSION = 13
 STATE_DIR = Path.home() / ".openclaw" / "xclaw"
 STATE_FILE = STATE_DIR / "openclaw_patch_state.json"
 LOCK_FILE = STATE_DIR / "openclaw_patch.lock"
@@ -215,7 +216,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
 
     # Upgrade path: if an older canonical block exists, replace it with the current canonical block.
     # This lets us ship UX tweaks (e.g. remove keyboard immediately) without telling users to reinstall OpenClaw.
-    if MARKER in raw and ("xappr|r|" not in raw or DECISION_ACK_MARKER_V2 not in raw):
+    if MARKER in raw and ("xappr|r|" not in raw or DECISION_ACK_MARKER_V3 not in raw):
         idx = raw.find(PAGINATION_ANCHOR)
         if idx < 0:
             return raw, False, "pagination_anchor_not_found"
@@ -225,7 +226,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
             normalized = True
 
     # If the canonical block is already present (newest version), we're done (except for any normalization above).
-    if MARKER in raw and DECISION_ACK_MARKER_V2 in raw:
+    if MARKER in raw and DECISION_ACK_MARKER_V3 in raw:
         return raw, normalized, None
 
     idx = raw.find(PAGINATION_ANCHOR)
@@ -256,15 +257,18 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         '\t\t\t\t\ttry { bot.api.answerCallbackQuery(callback.id, { text: action === "r" ? "Denying..." : "Approving...", show_alert: false }); } catch {}\n'
         '\t\t\t\t\ttry { bot.api.editMessageReplyMarkup(chatId, callbackMessage.message_id, { inline_keyboard: [] }); } catch {}\n'
         '\t\t\t\t\ttry {\n'
+        '\t\t\t\t\t\tconst atEpochSec = (typeof callback?.date === "number" ? callback.date : (typeof callbackMessage?.date === "number" ? callbackMessage.date : Math.floor(Date.now() / 1000)));\n'
+        '\t\t\t\t\t\tconst atIso = (/* @__PURE__ */ new Date(atEpochSec * 1000)).toISOString();\n'
         '\t\t\t\t\t\tconst res = await fetch(`${apiBase}/trades/${encodeURIComponent(tradeId)}/status`, {\n'
         '\t\t\t\t\t\t\tmethod: "POST",\n'
-        '\t\t\t\t\t\t\theaders: { "content-type": "application/json", authorization: `Bearer ${apiKey}`, "idempotency-key": `tg-decision-${action}-${tradeId}-${callbackMessage.message_id}` },\n'
-        '\t\t\t\t\t\t\tbody: JSON.stringify({ tradeId, fromStatus: "approval_pending", toStatus: action === "r" ? "rejected" : "approved", reasonCode: action === "r" ? "approval_rejected" : null, reasonMessage: action === "r" ? "Denied via Telegram" : null, at: (/* @__PURE__ */ new Date()).toISOString() })\n'
+        '\t\t\t\t\t\t\theaders: { "content-type": "application/json", authorization: `Bearer ${apiKey}`, "idempotency-key": `tg-cb-${callback.id}` },\n'
+        '\t\t\t\t\t\t\tbody: JSON.stringify({ tradeId, fromStatus: "approval_pending", toStatus: action === "r" ? "rejected" : "approved", reasonCode: action === "r" ? "approval_rejected" : null, reasonMessage: action === "r" ? "Denied via Telegram" : null, at: atIso })\n'
         '\t\t\t\t\t\t});\n'
         '\t\t\t\t\t\ttry { logger.info({ tradeId, chainKey, status: res.status }, "xclaw: telegram approval callback server response"); } catch {}\n'
         '\t\t\t\t\t\t\tif (res.ok) {\n'
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER}\n'
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V2}\n'
+        f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V3}\n'
         '\t\t\t\t\t\t\t\t// Delete the prompt ASAP, then send a confirmation message.\n'
         '\t\t\t\t\t\t\t\ttry { await bot.api.deleteMessage(chatId, callbackMessage.message_id); } catch {}\n'
         '\t\t\t\t\t\t\t\ttry {\n'
