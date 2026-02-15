@@ -29,7 +29,7 @@ from typing import Any, Optional
 
 MARKER = "xclaw: telegram approval callback received"
 LEGACY_DM_SENTINEL = 'Allow in DMs even when inlineButtonsScope is "allowlist", gated by chatId == senderId.'
-STATE_SCHEMA_VERSION = 4
+STATE_SCHEMA_VERSION = 6
 STATE_DIR = Path.home() / ".openclaw" / "xclaw"
 STATE_FILE = STATE_DIR / "openclaw_patch_state.json"
 LOCK_FILE = STATE_DIR / "openclaw_patch.lock"
@@ -37,6 +37,9 @@ LEGACY_SOURCE_SNIPPET_RE = re.compile(
     r",\s*source\s*:\s*\{\s*channel\s*:\s*\"telegram\"[^}]*\}",
     flags=re.MULTILINE,
 )
+
+CANONICAL_BLOCK_START = "// X-Claw Telegram approvals: approve-only inline button handling (strict, no LLM)."
+PAGINATION_ANCHOR = "const paginationMatch = data.match(/^commands_page_"
 
 
 def _utc_now() -> str:
@@ -207,12 +210,22 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
                 raw = raw[:line_start] + "\n" + raw[block_end:]
                 normalized = True
 
+    # Upgrade path: if an older canonical block exists, replace it with the current canonical block.
+    # This lets us ship UX tweaks (e.g. remove keyboard immediately) without telling users to reinstall OpenClaw.
+    if MARKER in raw and "Approving..." not in raw:
+        idx = raw.find(PAGINATION_ANCHOR)
+        if idx < 0:
+            return raw, False, "pagination_anchor_not_found"
+        start = raw.rfind(CANONICAL_BLOCK_START, 0, idx)
+        if start >= 0:
+            raw = raw[:start] + raw[idx:]
+            normalized = True
+
     # If the canonical block is already present, we're done (except for any normalization above).
     if MARKER in raw:
         return raw, normalized, None
 
-    pagination_anchor = "const paginationMatch = data.match(/^commands_page_"
-    idx = raw.find(pagination_anchor)
+    idx = raw.find(PAGINATION_ANCHOR)
     if idx < 0:
         return raw, False, "pagination_anchor_not_found"
 
@@ -235,6 +248,9 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         '\t\t\t\t\tconst apiKey = String(skill?.apiKey ?? env?.XCLAW_API_KEY ?? process.env.XCLAW_API_KEY ?? "").trim();\n'
         '\t\t\t\t\tif (!apiBase) { await bot.api.editMessageText(chatId, callbackMessage.message_id, "Approval failed: missing XCLAW_API_BASE_URL in OpenClaw config."); return; }\n'
         '\t\t\t\t\tif (!apiKey) { await bot.api.editMessageText(chatId, callbackMessage.message_id, "Approval failed: missing xclaw-agent apiKey in OpenClaw config."); return; }\n'
+        '\t\t\t\t\t// Reduce perceived latency: stop spinner and remove button immediately.\n'
+        '\t\t\t\t\ttry { await bot.api.answerCallbackQuery(callback.id, { text: "Approving...", show_alert: false }); } catch {}\n'
+        '\t\t\t\t\ttry { await bot.api.editMessageReplyMarkup(chatId, callbackMessage.message_id, { inline_keyboard: [] }); } catch {}\n'
         '\t\t\t\t\ttry {\n'
         '\t\t\t\t\t\tconst res = await fetch(`${apiBase}/trades/${encodeURIComponent(tradeId)}/status`, {\n'
         '\t\t\t\t\t\t\tmethod: "POST",\n'
@@ -245,9 +261,11 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         '\t\t\t\t\t\t\tif (res.ok) { await bot.api.deleteMessage(chatId, callbackMessage.message_id); return; }\n'
         '\t\t\t\t\t\t\tlet errCode = "api_error"; let errMsg = `HTTP ${res.status}`;\n'
         '\t\t\t\t\t\t\ttry { const body = await res.json(); if (typeof body?.code === "string" && body.code.trim()) errCode = body.code.trim(); if (typeof body?.message === "string" && body.message.trim()) errMsg = body.message.trim(); if (res.status === 409 && (body?.details?.currentStatus === "approved" || body?.details?.currentStatus === "filled")) { await bot.api.deleteMessage(chatId, callbackMessage.message_id); return; } } catch {}\n'
+        '\t\t\t\t\t\t\ttry { await bot.api.editMessageReplyMarkup(chatId, callbackMessage.message_id, { inline_keyboard: [[{ text: "Approve", callback_data: data }]] }); } catch {}\n'
         '\t\t\t\t\t\t\tawait bot.api.editMessageText(chatId, callbackMessage.message_id, `Approval failed: ${errCode} (${errMsg}).`);\n'
         '\t\t\t\t\t\t\treturn;\n'
         '\t\t\t\t\t\t} catch (err) {\n'
+        '\t\t\t\t\t\t\ttry { await bot.api.editMessageReplyMarkup(chatId, callbackMessage.message_id, { inline_keyboard: [[{ text: "Approve", callback_data: data }]] }); } catch {}\n'
         '\t\t\t\t\t\t\tawait bot.api.editMessageText(chatId, callbackMessage.message_id, `Approval failed: ${String(err)}`);\n'
         '\t\t\t\t\t\t\treturn;\n'
         '\t\t\t\t\t\t}\n'
