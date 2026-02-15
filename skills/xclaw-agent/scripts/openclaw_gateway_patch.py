@@ -33,8 +33,10 @@ DECISION_ACK_MARKER_V2 = "xclaw: telegram approval decision ack v2"
 DECISION_ACK_MARKER_V3 = "xclaw: telegram approval decision ack v3"
 QUEUED_BUTTONS_MARKER = "xclaw: telegram queued approval buttons"
 QUEUED_BUTTONS_MARKER_V2 = "xclaw: telegram queued approval buttons v2"
+QUEUED_BUTTONS_MARKER_V3 = "xclaw: telegram queued approval buttons v3"
 LEGACY_DM_SENTINEL = 'Allow in DMs even when inlineButtonsScope is "allowlist", gated by chatId == senderId.'
-STATE_SCHEMA_VERSION = 15
+# Bump when patch semantics change so we invalidate the cached "already patched" fast-path.
+STATE_SCHEMA_VERSION = 17
 STATE_DIR = Path.home() / ".openclaw" / "xclaw"
 STATE_FILE = STATE_DIR / "openclaw_patch_state.json"
 LOCK_FILE = STATE_DIR / "openclaw_patch.lock"
@@ -235,7 +237,8 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
             if not err2:
                 raw = raw2
                 changed_any = changed_any or changed2
-        if QUEUED_BUTTONS_MARKER_V2 not in raw:
+        # Always upgrade queued-buttons injection to v3 when needed (replaces v2 in-place).
+        if QUEUED_BUTTONS_MARKER_V3 not in raw:
             raw3, changed3, err3 = _patch_queued_buttons_v2(raw)
             if not err3:
                 raw = raw3
@@ -382,37 +385,57 @@ def _patch_queued_buttons_v2(raw: str) -> tuple[str, bool, str | None]:
     Patch the Telegram *runtime* send path used by agent replies (`sendTelegramText(bot, ...)`),
     not the CLI send path (`sendMessageTelegram(...)`).
     """
-    if QUEUED_BUTTONS_MARKER_V2 in raw:
+    # v3 is our current canonical behavior. If v2 exists, we remove it and replace with v3
+    # so we can improve matching and add logging without duplicating blocks.
+    if QUEUED_BUTTONS_MARKER_V3 in raw:
         return raw, False, None
+    if QUEUED_BUTTONS_MARKER_V2 in raw:
+        start = raw.find(f"// {QUEUED_BUTTONS_MARKER_V2}")
+        if start >= 0:
+            # The injected block always precedes the sendMessage `try { ... }` block.
+            end = raw.find("\n\t\ttry {", start)
+            if end > start:
+                raw = raw[:start] + raw[end:]
 
     anchor = 'const htmlText = (opts?.textMode ?? "markdown") === "html" ? text : markdownToTelegramHtml(text);'
     if anchor not in raw:
         return raw, False, "queued_buttons_v2_anchor_not_found"
 
     injection = (
-        "\n\t// xclaw: telegram queued approval buttons v2\n"
+        "\n\t// xclaw: telegram queued approval buttons v3\n"
         "\t// Auto-attach Approve/Deny buttons to queued approval_pending trade summaries sent by the agent runtime.\n"
         "\t// This avoids relying on the model to emit `[[buttons:...]]` directives.\n"
-        "\tif (!opts?.replyMarkup && typeof text === \"string\" && /\\bStatus:\\s*approval_pending\\b/i.test(text)) {\n"
-        "\t\tconst m = text.match(/\\bTrade ID:\\s*(trd_[a-z0-9]+)\\b/i) ?? text.match(/\\bTrade:\\s*(trd_[a-z0-9]+)\\b/i);\n"
+        "\tconst __xclawCheckText = String(opts?.plainText ?? text ?? \"\");\n"
+        "\tconst __xclawNormalized = __xclawCheckText.replace(/<[^>]*>/g, \" \").replace(/&nbsp;/g, \" \").replace(/\\s+/g, \" \").trim();\n"
+        "\tconst __xclawHasPending = /\\bStatus:\\s*approval_pending\\b/i.test(__xclawNormalized);\n"
+        "\tif (__xclawHasPending && !opts?.replyMarkup) {\n"
+        "\t\tconst m = __xclawNormalized.match(/\\bTrade ID:\\s*(trd_[a-z0-9]+)\\b/i) ?? __xclawNormalized.match(/\\bTrade:\\s*(trd_[a-z0-9]+)\\b/i) ?? __xclawNormalized.match(/\\b(trd_[a-z0-9]+)\\b/i);\n"
         "\t\tif (m && m[1]) {\n"
         "\t\t\tconst tradeId = m[1];\n"
-        "\t\t\tlet chainKey = \"base_sepolia\";\n"
-        "\t\t\tconst cm = text.match(/\\bChain:\\s*([a-z0-9_]+)\\b/i);\n"
+        "\t\t\tlet chainKey = \"\";\n"
+        "\t\t\tconst cm = __xclawNormalized.match(/\\bChain:\\s*([a-z0-9_]+)\\b/i);\n"
         "\t\t\tif (cm && cm[1]) chainKey = cm[1];\n"
+        "\t\t\tif (!chainKey) chainKey = String(process.env.XCLAW_DEFAULT_CHAIN ?? \"base_sepolia\").trim() || \"base_sepolia\";\n"
         "\t\t\ttry {\n"
         "\t\t\t\t// Attach buttons to the same message. Callback routing is handled by the gateway callback intercept.\n"
         "\t\t\t\tif (!opts) opts = {};\n"
         "\t\t\t\topts.replyMarkup = { inline_keyboard: [[{ text: \"Approve\", callback_data: `xappr|a|${tradeId}|${chainKey}` }, { text: \"Deny\", callback_data: `xappr|r|${tradeId}|${chainKey}` }]] };\n"
-        "\t\t\t} catch {}\n"
+        "\t\t\t\ttry { runtime.log?.(`xclaw: queued buttons attached tradeId=${tradeId} chainKey=${chainKey}`); } catch {}\n"
+        "\t\t\t} catch (err) {\n"
+        "\t\t\t\ttry { runtime.log?.(`xclaw: queued buttons attach failed err=${String(err)}`); } catch {}\n"
+        "\t\t\t}\n"
+        "\t\t} else {\n"
+        "\t\t\ttry { runtime.log?.(`xclaw: queued buttons skipped (pending but missing trade id) sample=${__xclawNormalized.slice(0, 180)}`); } catch {}\n"
         "\t\t}\n"
+        "\t} else if (__xclawHasPending && opts?.replyMarkup) {\n"
+        "\t\ttry { runtime.log?.(`xclaw: queued buttons skipped (already has replyMarkup)`); } catch {}\n"
         "\t}\n"
     )
 
     out, ok = _inject_after_anchor(raw, anchor, injection)
     if not ok:
         return raw, False, "queued_buttons_v2_injection_failed"
-    if QUEUED_BUTTONS_MARKER_V2 not in out:
+    if QUEUED_BUTTONS_MARKER_V3 not in out:
         return raw, False, "queued_buttons_v2_marker_missing_after_patch"
     return out, True, None
 

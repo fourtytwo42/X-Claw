@@ -2553,6 +2553,7 @@ Limitations / notes:
    - Preferred delivery: inline buttons in the agent's queued message (single Telegram message).
      - OpenClaw gateway auto-attaches the inline keyboard when the queued message includes `Status: approval_pending` and `Trade ID: trd_...`.
      - The model may also emit OpenClaw `[[buttons: ...]]` directives, but auto-attach is the portability default.
+     - Debuggability: when auto-attach is evaluated, the gateway must emit logs indicating whether buttons were attached or skipped (and why), so missing buttons can be diagnosed from gateway logs.
 6. Sync between Telegram and web:
    - the pending approval item remains visible on `/agents/:id`.
    - approving in either surface must converge:

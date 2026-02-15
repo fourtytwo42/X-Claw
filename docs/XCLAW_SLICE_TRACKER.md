@@ -844,3 +844,18 @@ DoD:
 - [x] docs sync first: source-of-truth + roadmap + tracker + context/spec/tasks/acceptance aligned to Slice 47.
 - [x] OpenClaw gateway patch auto-attaches queued approval buttons in the agent reply send path (`sendTelegramText`) as well as the CLI send path.
 - [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.
+
+---
+
+## Slice 48: Queued Approval Buttons v3 Upgrade + Logging (Debuggable)
+Status: [x]
+Issue: #42 (umbrella)
+
+Goal:
+- Make queued-message button attach behavior debuggable and resilient by upgrading the OpenClaw patch from v2 to v3 (normalized matching + explicit logging), so missing buttons can be diagnosed from gateway logs.
+
+DoD:
+- [x] docs sync first: source-of-truth + roadmap + tracker + context/spec/tasks/acceptance aligned to Slice 48.
+- [x] OpenClaw patcher replaces queued-buttons v2 injection in `sendTelegramText(...)` with v3 (normalized text + broad `trd_...` extraction).
+- [x] OpenClaw emits gateway logs when queued buttons are attached or skipped due to missing tradeId / existing replyMarkup.
+- [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.

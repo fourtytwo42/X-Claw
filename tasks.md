@@ -753,3 +753,30 @@ Issue mapping: `#42` (umbrella)
   - [x] `npm run seed:verify`
   - [x] `npm run build`
   - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+# Slice 48 Tasks: Queued Approval Buttons v3 Upgrade + Logging (Debuggable)
+
+Active slice: `Slice 48: Queued Approval Buttons v3 Upgrade + Logging (Debuggable)`
+Issue mapping: `#42` (umbrella)
+
+## Checklist
+- [x] Docs sync:
+  - [x] `docs/XCLAW_SLICE_TRACKER.md`
+  - [x] `docs/XCLAW_BUILD_ROADMAP.md`
+  - [x] `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - [x] `docs/CONTEXT_PACK.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+- [x] Implementation:
+  - [x] OpenClaw patcher replaces queued-buttons v2 injection in `sendTelegramText(...)` with v3
+  - [x] gateway logs include attach/skip messages
+- [x] Gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`

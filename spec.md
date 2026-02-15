@@ -688,6 +688,26 @@ Fix missing Telegram buttons on the agent’s queued `approval_pending` message 
 
 ---
 
+# Slice 48 Spec: Queued Approval Buttons v3 Upgrade + Logging (Debuggable)
+
+## Goal
+Upgrade the OpenClaw queued-buttons injection from v2 to v3 so it is resilient to formatting differences (normalized text) and emits gateway logs when buttons are attached or skipped.
+
+## Success Criteria
+1. For queued `approval_pending` agent replies, Telegram shows Approve/Deny buttons on the same message.
+2. Gateway logs include `xclaw: queued buttons attached ...` when buttons are attached.
+3. If buttons are not attached, gateway logs include a `xclaw: queued buttons skipped ...` reason (e.g. missing tradeId or existing replyMarkup).
+
+## Acceptance Checks
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
 # Slice 31 Spec: Agents + Agent Management UX Refinement (Operational Clean)
 
 ## Goal
