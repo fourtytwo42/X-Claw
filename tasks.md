@@ -726,4 +726,30 @@ Issue mapping: `#42` (umbrella)
   - [x] `npm run seed:load`
   - [x] `npm run seed:verify`
   - [x] `npm run build`
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+# Slice 47 Tasks: Fix Telegram Queued Buttons Attach Point (Agent Reply Send Path)
+
+Active slice: `Slice 47: Fix Telegram Queued Buttons Attach Point (Agent Reply Send Path)`
+Issue mapping: `#42` (umbrella)
+
+## Checklist
+- [x] Docs sync:
+  - [x] `docs/XCLAW_SLICE_TRACKER.md`
+  - [x] `docs/XCLAW_BUILD_ROADMAP.md`
+  - [x] `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - [x] `docs/CONTEXT_PACK.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+- [x] Implementation:
+  - [x] patch OpenClaw `sendTelegramText(bot, ...)` to auto-attach buttons for queued `approval_pending` messages
+- [x] Gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
   - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`

@@ -830,3 +830,17 @@ DoD:
   - `Status: approval_pending`
   - `Trade ID: trd_...`
 - [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.
+
+---
+
+## Slice 47: Fix Telegram Queued Buttons Attach Point (Agent Reply Send Path)
+Status: [x]
+Issue: #42 (umbrella)
+
+Goal:
+- Ensure the queued `approval_pending` message sent by the agent reply pipeline (OpenClaw `sendTelegramText(bot, ...)`) receives Approve/Deny inline buttons. (Slice 46 initially patched only the CLI send path.)
+
+DoD:
+- [x] docs sync first: source-of-truth + roadmap + tracker + context/spec/tasks/acceptance aligned to Slice 47.
+- [x] OpenClaw gateway patch auto-attaches queued approval buttons in the agent reply send path (`sendTelegramText`) as well as the CLI send path.
+- [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.

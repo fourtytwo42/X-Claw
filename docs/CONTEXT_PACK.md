@@ -1,9 +1,9 @@
 # X-Claw Context Pack
 
-## 1) Goal (Active: Slice 46)
-- Primary objective: complete `Slice 46: Auto-Attach Telegram Approval Buttons To Queued Message`.
+## 1) Goal (Active: Slice 47)
+- Primary objective: complete `Slice 47: Fix Telegram Queued Buttons Attach Point (Agent Reply Send Path)`.
 - Success criteria:
-  - For Telegram, OpenClaw auto-attaches Approve/Deny buttons to the queued `approval_pending` trade message.
+  - For Telegram, OpenClaw auto-attaches Approve/Deny buttons to the queued `approval_pending` trade message in the agent reply pipeline (not just the CLI send path).
   - required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.
 
 ## 2) Constraints
@@ -25,7 +25,7 @@
  - No API schema changes in this slice; web UI only.
  - OpenClaw gateway behavior change is delivered as a patch against OpenClaw dist bundle for the deployed version.
 
-## 4) Files and Boundaries (Slice 46 allowlist)
+## 4) Files and Boundaries (Slice 47 allowlist)
 - Web/API/UI:
   - none
 - Canonical docs/process:

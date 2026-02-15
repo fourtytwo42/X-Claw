@@ -669,6 +669,25 @@ Guarantee Telegram queued `approval_pending` trade messages always have Approve/
 
 ---
 
+# Slice 47 Spec: Fix Telegram Queued Buttons Attach Point (Agent Reply Send Path)
+
+## Goal
+Fix missing Telegram buttons on the agent’s queued `approval_pending` message by patching the Telegram send path used for agent replies (`sendTelegramText(bot, ...)`).
+
+## Success Criteria
+1. Queued message that includes `Status: approval_pending` + `Trade ID: trd_...` renders Approve/Deny buttons on the same message in Telegram.
+2. Works for agent replies (not only `openclaw message send`).
+
+## Acceptance Checks
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
 # Slice 31 Spec: Agents + Agent Management UX Refinement (Operational Clean)
 
 ## Goal

@@ -32,8 +32,9 @@ DECISION_ACK_MARKER = "xclaw: telegram approval decision ack"
 DECISION_ACK_MARKER_V2 = "xclaw: telegram approval decision ack v2"
 DECISION_ACK_MARKER_V3 = "xclaw: telegram approval decision ack v3"
 QUEUED_BUTTONS_MARKER = "xclaw: telegram queued approval buttons"
+QUEUED_BUTTONS_MARKER_V2 = "xclaw: telegram queued approval buttons v2"
 LEGACY_DM_SENTINEL = 'Allow in DMs even when inlineButtonsScope is "allowlist", gated by chatId == senderId.'
-STATE_SCHEMA_VERSION = 14
+STATE_SCHEMA_VERSION = 15
 STATE_DIR = Path.home() / ".openclaw" / "xclaw"
 STATE_FILE = STATE_DIR / "openclaw_patch_state.json"
 LOCK_FILE = STATE_DIR / "openclaw_patch.lock"
@@ -226,15 +227,20 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
             raw = raw[:start] + raw[idx:]
             normalized = True
 
-    # If the canonical block is already present (newest version), we're done (except for any normalization above).
+    # If the canonical decision block is already present (newest version), ensure queued-message auto-buttons are too.
     if MARKER in raw and DECISION_ACK_MARKER_V3 in raw:
-        # Also ensure we have queued-message auto-buttons for Telegram approval_pending messages.
+        changed_any = False
         if QUEUED_BUTTONS_MARKER not in raw:
             raw2, changed2, err2 = _patch_queued_buttons(raw)
-            if err2:
-                return raw, normalized, None
-            raw = raw2
-            normalized = normalized or changed2
+            if not err2:
+                raw = raw2
+                changed_any = changed_any or changed2
+        if QUEUED_BUTTONS_MARKER_V2 not in raw:
+            raw3, changed3, err3 = _patch_queued_buttons_v2(raw)
+            if not err3:
+                raw = raw3
+                changed_any = changed_any or changed3
+        normalized = normalized or changed_any
         return raw, normalized, None
 
     idx = raw.find(PAGINATION_ANCHOR)
@@ -308,11 +314,16 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
     out2 = raw[:idx] + general_injection + raw[idx:]
     if MARKER not in out2:
         return raw, False, "marker_missing_after_patch"
-    # Ensure queued-message auto-buttons are present too.
+    # Ensure queued-message auto-buttons are present too (CLI + runtime send paths).
     out3, changed3, err3 = _patch_queued_buttons(out2)
     if err3:
-        return out2, True, None
-    return out3, True or changed3, None
+        out3 = out2
+        changed3 = False
+    out4, changed4, err4 = _patch_queued_buttons_v2(out3)
+    if err4:
+        out4 = out3
+        changed4 = False
+    return out4, True or changed3 or changed4, None
 
 
 def _patch_queued_buttons(raw: str) -> tuple[str, bool, str | None]:
@@ -364,6 +375,46 @@ def _patch_queued_buttons(raw: str) -> tuple[str, bool, str | None]:
     if QUEUED_BUTTONS_MARKER not in text2:
         return raw, False, "queued_buttons_marker_missing_after_patch"
     return text2, True, None
+
+
+def _patch_queued_buttons_v2(raw: str) -> tuple[str, bool, str | None]:
+    """
+    Patch the Telegram *runtime* send path used by agent replies (`sendTelegramText(bot, ...)`),
+    not the CLI send path (`sendMessageTelegram(...)`).
+    """
+    if QUEUED_BUTTONS_MARKER_V2 in raw:
+        return raw, False, None
+
+    anchor = 'const htmlText = (opts?.textMode ?? "markdown") === "html" ? text : markdownToTelegramHtml(text);'
+    if anchor not in raw:
+        return raw, False, "queued_buttons_v2_anchor_not_found"
+
+    injection = (
+        "\n\t// xclaw: telegram queued approval buttons v2\n"
+        "\t// Auto-attach Approve/Deny buttons to queued approval_pending trade summaries sent by the agent runtime.\n"
+        "\t// This avoids relying on the model to emit `[[buttons:...]]` directives.\n"
+        "\tif (!opts?.replyMarkup && typeof text === \"string\" && /\\bStatus:\\s*approval_pending\\b/i.test(text)) {\n"
+        "\t\tconst m = text.match(/\\bTrade ID:\\s*(trd_[a-z0-9]+)\\b/i) ?? text.match(/\\bTrade:\\s*(trd_[a-z0-9]+)\\b/i);\n"
+        "\t\tif (m && m[1]) {\n"
+        "\t\t\tconst tradeId = m[1];\n"
+        "\t\t\tlet chainKey = \"base_sepolia\";\n"
+        "\t\t\tconst cm = text.match(/\\bChain:\\s*([a-z0-9_]+)\\b/i);\n"
+        "\t\t\tif (cm && cm[1]) chainKey = cm[1];\n"
+        "\t\t\ttry {\n"
+        "\t\t\t\t// Attach buttons to the same message. Callback routing is handled by the gateway callback intercept.\n"
+        "\t\t\t\tif (!opts) opts = {};\n"
+        "\t\t\t\topts.replyMarkup = { inline_keyboard: [[{ text: \"Approve\", callback_data: `xappr|a|${tradeId}|${chainKey}` }, { text: \"Deny\", callback_data: `xappr|r|${tradeId}|${chainKey}` }]] };\n"
+        "\t\t\t} catch {}\n"
+        "\t\t}\n"
+        "\t}\n"
+    )
+
+    out, ok = _inject_after_anchor(raw, anchor, injection)
+    if not ok:
+        return raw, False, "queued_buttons_v2_injection_failed"
+    if QUEUED_BUTTONS_MARKER_V2 not in out:
+        return raw, False, "queued_buttons_v2_marker_missing_after_patch"
+    return out, True, None
 
 
 def _restart_gateway_best_effort(cooldown_sec: int, state: dict[str, Any]) -> bool:

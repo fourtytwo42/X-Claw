@@ -1564,3 +1564,28 @@ Note:
   - [x] `npm run seed:verify`
   - [x] `npm run build`
   - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+## 47) Slice 47: Fix Telegram Queued Buttons Attach Point (Agent Reply Send Path)
+
+### 47.1 Canonical/doc sync
+- [x] Add Slice 47 goal/DoD + issue mapping to `docs/XCLAW_SLICE_TRACKER.md`.
+- [x] Update handoff/process artifacts:
+  - [x] `docs/CONTEXT_PACK.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+
+### 47.2 Implementation
+- [x] OpenClaw gateway patch:
+  - [x] attach queued approval buttons in Telegram agent reply send path (`sendTelegramText(bot, ...)`).
+
+### 47.3 Validation + evidence
+- [x] Run required gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
