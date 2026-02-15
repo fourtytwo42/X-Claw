@@ -172,8 +172,12 @@ export async function POST(
 
         if (row.request_type === 'global_approval_enable') {
           nextApprovalMode = 'auto';
+        } else if (row.request_type === 'global_approval_disable') {
+          nextApprovalMode = 'per_trade';
         } else if (row.request_type === 'token_preapprove_add' && row.token_address) {
           nextAllowedTokens.add(String(row.token_address).trim().toLowerCase());
+        } else if (row.request_type === 'token_preapprove_remove' && row.token_address) {
+          nextAllowedTokens.delete(String(row.token_address).trim().toLowerCase());
         }
 
         await client.query(

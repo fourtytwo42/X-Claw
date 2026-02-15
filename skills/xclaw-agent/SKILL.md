@@ -62,6 +62,8 @@ Request policy approvals (owner must approve via web UI or Telegram buttons):
 ```bash
 python3 {baseDir}/scripts/xclaw_agent_skill.py policy-preapprove-token <token_address>
 python3 {baseDir}/scripts/xclaw_agent_skill.py policy-approve-all
+python3 {baseDir}/scripts/xclaw_agent_skill.py policy-revoke-token <token_address>
+python3 {baseDir}/scripts/xclaw_agent_skill.py policy-revoke-all
 ```
 
 ## Telegram Approval Buttons (Inline, Single Message)

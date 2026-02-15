@@ -790,6 +790,30 @@ Make policy approval request tool outputs “agent-ready” so the agent reliabl
 
 ---
 
+# Slice 53 Spec: Policy Approval Revokes (Token + Approve All OFF) With Web + Telegram Buttons
+
+## Goal
+Add revoke permission requests to policy approvals:
+- remove a preapproved token, and
+- turn off global approval (Approve all OFF),
+with the same web + Telegram inline button flow as existing policy approvals.
+
+## Success Criteria
+1. Agent can propose `token_preapprove_remove` and `global_approval_disable` requests.
+2. Web UI policy approval queue shows clear revoke labels and can Approve/Deny.
+3. Telegram queued-message buttons can Approve/Deny revoke requests (same ppr auto-attach).
+4. On approval, server applies the revoke by writing a new policy snapshot (remove token / set approval_mode=per_trade).
+
+## Acceptance Checks
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
 # Slice 31 Spec: Agents + Agent Management UX Refinement (Operational Clean)
 
 ## Goal

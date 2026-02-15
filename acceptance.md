@@ -2996,3 +2996,25 @@ Issue mapping: `#42` (umbrella)
 - Policy approval request tool output includes:
   - `queuedMessage` with `Status: approval_pending` and `Approval ID: ppr_...`
   - `agentInstructions` telling the agent to paste the queued message verbatim into chat
+
+---
+
+## Slice 53 Acceptance Evidence
+
+Date (UTC): 2026-02-15
+Active slice: `Slice 53: Policy Approval Revokes (Token + Approve All OFF) With Web + Telegram Buttons`
+Issue mapping: `#42` (umbrella)
+
+### Required gate evidence
+- `npm run db:parity` -> PASS (exit 0, checkedAt: 2026-02-15T22:30:18.276Z)
+- `npm run seed:reset` -> PASS (exit 0)
+- `npm run seed:load` -> PASS (exit 0, scenarios: `happy_path`, `approval_retry`, `degraded_rpc`, `copy_reject`)
+- `npm run seed:verify` -> PASS (exit 0)
+- `npm run build` -> PASS (exit 0)
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS
+
+### Scenario evidence (manual/ops)
+- Agent can request revoke token/global and receives a `queuedMessage` that includes required `Approval ID:` + `Status:` lines.
+- Approving a revoke request applies:
+  - token removal from preapproved token set, or
+  - `Approve all` OFF (approval_mode=`per_trade`).

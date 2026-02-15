@@ -2593,22 +2593,25 @@ Limitations / notes:
 1. The agent may request owner approval for policy changes that unlock trading:
    - `token_preapprove_add`: add a token address to `agent_policy_snapshots.allowed_tokens` (tokenIn preapproval),
    - `global_approval_enable`: set `agent_policy_snapshots.approval_mode = auto` (Approve all ON).
-2. Requests are stored server-side and are visible/operable on `/agents/:id` (owner-only) like trade approvals.
-3. Approval surfaces:
+2. The agent may also request owner approval for policy changes that revoke permissions:
+   - `token_preapprove_remove`: remove a token address from `agent_policy_snapshots.allowed_tokens`,
+   - `global_approval_disable`: set `agent_policy_snapshots.approval_mode = per_trade` (Approve all OFF).
+3. Requests are stored server-side and are visible/operable on `/agents/:id` (owner-only) like trade approvals.
+4. Approval surfaces:
    - Web UI: owner can Approve/Deny the request in `/agents/:id`.
    - Telegram: queued message receives Approve/Deny inline buttons; callback intercept applies decision (strict, no LLM).
-4. Telegram callback prefix:
+5. Telegram callback prefix:
    - `xpol|a|<policyApprovalId>|<chainKey>` approve
    - `xpol|r|<policyApprovalId>|<chainKey>` deny
-5. Message auto-attach:
+6. Message auto-attach:
    - OpenClaw gateway auto-attaches policy approval buttons when a queued message contains:
      - `Status: approval_pending`
      - `Approval ID: ppr_...`
    - Runtime must return a `queuedMessage` template that includes these lines verbatim so the agent can paste it without formatting mistakes.
-6. Decision feedback:
+7. Decision feedback:
    - After Telegram approve/deny, decision feedback must be routed into the agent message pipeline (synthetic inbound message + instructions) so the agent informs the user.
    - For proposed policy approvals, the agent must echo the `queuedMessage` verbatim to the user so Telegram buttons can attach reliably.
-7. Canonical endpoints:
+8. Canonical endpoints:
    - `POST /api/v1/agent/policy-approvals/proposed` (agent-auth) creates a pending request.
    - `POST /api/v1/policy-approvals/:policyApprovalId/decision` (agent-auth) applies approve/deny for Telegram callbacks.
    - `POST /api/v1/management/policy-approvals/decision` (owner-auth) applies approve/deny from the web UI.

@@ -1742,3 +1742,34 @@ Note:
   - [x] `npm run seed:verify`
   - [x] `npm run build`
   - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+## 53) Slice 53: Policy Approval Revokes (Token + Approve All OFF) With Web + Telegram Buttons
+
+### 53.1 Canonical/doc sync
+- [x] Add Slice 53 goal/DoD + issue mapping to `docs/XCLAW_SLICE_TRACKER.md`.
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` to lock revoke request types and semantics.
+- [x] Update handoff/process artifacts:
+  - [x] `docs/CONTEXT_PACK.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+
+### 53.2 Implementation
+- [x] Server:
+  - [x] allow propose request types `token_preapprove_remove` and `global_approval_disable`
+  - [x] apply revoke requests on approval by writing a new policy snapshot
+- [x] Runtime/skill:
+  - [x] commands to request revoke token and revoke approve-all (OFF)
+- [x] Web UI:
+  - [x] policy approval queue shows clear labels for revoke requests
+
+### 53.3 Validation + evidence
+- [x] Run required gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`

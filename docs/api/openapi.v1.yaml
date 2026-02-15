@@ -1730,7 +1730,7 @@ components:
           type: string
         requestType:
           type: string
-          enum: [token_preapprove_add, global_approval_enable]
+          enum: [token_preapprove_add, token_preapprove_remove, global_approval_enable, global_approval_disable]
         tokenAddress:
           type: string
           nullable: true

@@ -250,6 +250,41 @@ Issue mapping: `#42` (umbrella)
   - `docs/CONTEXT_PACK.md`
   - `spec.md`
   - `tasks.md`
+- `acceptance.md`
+
+---
+
+## Slice 53 Context: Policy Approval Revokes (Token + Approve All OFF) With Web + Telegram Buttons
+
+### Objective
+- Extend policy approvals to support revoking permissions (token removal and global approve-all disable) with the same web + Telegram button surfaces.
+
+### Scope lock
+- In scope: server requestType handling + runtime/skill commands + UI label updates + docs/process + required gates.
+- Out of scope: new DB tables (reuse existing `agent_policy_approval_requests`), new Telegram patch behavior (reuse existing ppr queued-message buttons).
+
+### Expected touched files (Slice 53 allowlist)
+- Server:
+  - `apps/network-web/src/app/api/v1/agent/policy-approvals/proposed/route.ts`
+  - `apps/network-web/src/app/api/v1/management/policy-approvals/decision/route.ts`
+  - `apps/network-web/src/app/api/v1/policy-approvals/[requestId]/decision/route.ts`
+- Schemas/contracts:
+  - `packages/shared-schemas/json/agent-policy-approval-proposed-request.schema.json`
+  - `docs/api/openapi.v1.yaml`
+- Web UI:
+  - `apps/network-web/src/app/agents/[agentId]/page.tsx`
+- Runtime/skill:
+  - `apps/agent-runtime/xclaw_agent/cli.py`
+  - `apps/agent-runtime/tests/test_trade_path.py`
+  - `skills/xclaw-agent/scripts/xclaw_agent_skill.py`
+  - `skills/xclaw-agent/SKILL.md`
+- Docs/process:
+  - `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - `docs/XCLAW_SLICE_TRACKER.md`
+  - `docs/XCLAW_BUILD_ROADMAP.md`
+  - `docs/CONTEXT_PACK.md`
+  - `spec.md`
+  - `tasks.md`
   - `acceptance.md`
 - Contracts/docs:
   - `docs/api/openapi.v1.yaml`

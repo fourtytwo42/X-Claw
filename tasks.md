@@ -276,6 +276,40 @@ Issue mapping: `#42` (umbrella)
 
 ---
 
+# Slice 53 Tasks: Policy Approval Revokes (Token + Approve All OFF) With Web + Telegram Buttons
+
+Active slice: `Slice 53: Policy Approval Revokes (Token + Approve All OFF) With Web + Telegram Buttons`
+Issue mapping: `#42` (umbrella)
+
+## Checklist
+- [x] Docs sync:
+  - [x] `docs/XCLAW_SLICE_TRACKER.md`
+  - [x] `docs/XCLAW_BUILD_ROADMAP.md`
+  - [x] `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - [x] `docs/CONTEXT_PACK.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+- [x] Server:
+  - [x] extend policy approval propose requestType union to include revoke types
+  - [x] apply revoke requests on approval (remove token / set approval_mode=per_trade)
+- [x] Runtime/skill:
+  - [x] add request commands for revoke token and revoke approve-all off
+- [x] Web UI:
+  - [x] show revoke request labels in policy approvals queue
+- [x] Contracts:
+  - [x] `packages/shared-schemas/json/agent-policy-approval-proposed-request.schema.json`
+  - [x] `docs/api/openapi.v1.yaml`
+- [x] Gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
 # Slice 32 Tasks: Per-Agent Chain Enable/Disable (Owner-Gated, Chain-Scoped Ops)
 
 Active slice: `Slice 32: Per-Agent Chain Enable/Disable (Owner-Gated, Chain-Scoped Ops)`

@@ -283,12 +283,22 @@ function policyApprovalLabel(item: { request_type: string; token_address: string
   if (item.request_type === 'global_approval_enable') {
     return 'Enable Approve all';
   }
+  if (item.request_type === 'global_approval_disable') {
+    return 'Disable Approve all';
+  }
   if (item.request_type === 'token_preapprove_add') {
     if (!item.token_address) {
       return 'Preapprove token';
     }
     const sym = symbolByAddress.get(normalizeHexAddress(item.token_address));
     return `Preapprove ${sym ?? shortenAddress(item.token_address)}`;
+  }
+  if (item.request_type === 'token_preapprove_remove') {
+    if (!item.token_address) {
+      return 'Revoke preapproved token';
+    }
+    const sym = symbolByAddress.get(normalizeHexAddress(item.token_address));
+    return `Revoke ${sym ?? shortenAddress(item.token_address)}`;
   }
   return item.request_type;
 }

@@ -221,6 +221,8 @@ def main(argv: List[str]) -> int:
         "approval-check",
         "policy-preapprove-token",
         "policy-approve-all",
+        "policy-revoke-token",
+        "policy-revoke-all",
         "trade-exec",
         "trade-spot",
         "report-send",
@@ -281,6 +283,17 @@ def main(argv: List[str]) -> int:
 
     if cmd == "policy-approve-all":
         return _run_agent(["approvals", "request-global", "--chain", chain, "--json"])
+
+    if cmd == "policy-revoke-token":
+        if len(argv) < 3:
+            return _err("usage", "policy-revoke-token requires <token_address>", "usage: policy-revoke-token <token_address>", exit_code=2)
+        token = argv[2]
+        if _is_hex_address(token) is False:
+            return _err("invalid_input", "token_address must be a 0x address.", "usage: policy-revoke-token 0x...", {"token": token}, exit_code=2)
+        return _run_agent(["approvals", "revoke-token", "--token", token, "--chain", chain, "--json"])
+
+    if cmd == "policy-revoke-all":
+        return _run_agent(["approvals", "revoke-global", "--chain", chain, "--json"])
 
     if cmd == "trade-exec":
         if len(argv) < 3:

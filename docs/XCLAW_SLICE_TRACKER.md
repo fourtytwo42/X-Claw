@@ -934,3 +934,22 @@ DoD:
   - `agentInstructions` (explicitly tells agent to paste the message verbatim).
 - [x] Tests: runtime unit tests assert `queuedMessage` includes the required lines + policyApprovalId.
 - [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.
+
+---
+
+## Slice 53: Policy Approval Revokes (Token + Approve All OFF) With Web + Telegram Buttons
+Status: [x]
+Issue: #42 (umbrella)
+
+Goal:
+- Add revoke permission requests to the policy approvals system:
+  - revoke a preapproved token, and
+  - turn off global approval (Approve all OFF).
+- Requests must appear on `/agents/:id` and be actionable via web UI and Telegram inline buttons.
+
+DoD:
+- [x] docs sync first: source-of-truth + roadmap + tracker + context/spec/tasks/acceptance aligned to Slice 53.
+- [x] Server: support new request types end-to-end (propose + approve/deny applies policy snapshot changes).
+- [x] Runtime/skill: add CLI + skill commands for revoke token and revoke global.
+- [x] Web UI: policy approval queue displays correct labels for revoke requests.
+- [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.

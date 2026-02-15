@@ -15,7 +15,7 @@ export const runtime = 'nodejs';
 type AgentPolicyApprovalProposedRequest = {
   schemaVersion: 1;
   chainKey: string;
-  requestType: 'token_preapprove_add' | 'global_approval_enable';
+  requestType: 'token_preapprove_add' | 'token_preapprove_remove' | 'global_approval_enable' | 'global_approval_disable';
   tokenAddress?: string | null;
 };
 
@@ -70,13 +70,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const tokenAddress = body.requestType === 'token_preapprove_add' ? normalizeTokenAddress(body.tokenAddress) : null;
-    if (body.requestType === 'token_preapprove_add' && !tokenAddress) {
+    const needsToken =
+      body.requestType === 'token_preapprove_add' || body.requestType === 'token_preapprove_remove';
+    const tokenAddress = needsToken ? normalizeTokenAddress(body.tokenAddress) : null;
+    if (needsToken && !tokenAddress) {
       return errorResponse(
         400,
         {
           code: 'payload_invalid',
-          message: 'tokenAddress is required for token_preapprove_add and must be a 0x address.',
+          message: 'tokenAddress is required for token preapprove add/remove and must be a 0x address.',
           actionHint: 'Provide tokenAddress like 0xabc... (20-byte hex).'
         },
         requestId
@@ -156,4 +158,3 @@ export async function POST(req: NextRequest) {
     return internalErrorResponse(requestId);
   }
 }
-

@@ -798,6 +798,41 @@ class TradePathRuntimeTests(unittest.TestCase):
         self.assertEqual(sent.get("requestType"), "token_preapprove_add")
         self.assertEqual(sent.get("chainKey"), "base_sepolia")
 
+    def test_policy_revoke_token_requests_policy_approval(self) -> None:
+        args = argparse.Namespace(chain="base_sepolia", token="0x" + "22" * 20, json=True)
+        captured: dict = {}
+
+        def fake_api_request(
+            method: str,
+            path: str,
+            payload: dict | None = None,
+            include_idempotency: bool = False,
+            idempotency_key: str | None = None,
+            allow_auth_recovery: bool = True,
+        ):
+            captured["method"] = method
+            captured["path"] = path
+            captured["payload"] = payload
+            captured["include_idempotency"] = include_idempotency
+            captured["idempotency_key"] = idempotency_key
+            return 200, {"ok": True, "policyApprovalId": "ppr_2", "status": "approval_pending"}
+
+        with mock.patch.object(cli, "_resolve_api_key", return_value="xak1.ag_1.sig.payload"), mock.patch.object(
+            cli, "_resolve_agent_id", return_value="ag_1"
+        ), mock.patch.object(cli, "_api_request", side_effect=fake_api_request):
+            payload = self._run_and_parse_stdout(lambda: cli.cmd_approvals_revoke_token(args))
+
+        self.assertTrue(payload.get("ok"))
+        queued = str(payload.get("queuedMessage") or "")
+        self.assertIn("Approval ID: ppr_2", queued)
+        self.assertIn("Status: approval_pending", queued)
+        self.assertIn("Chain: base_sepolia", queued)
+        self.assertEqual(captured.get("method"), "POST")
+        self.assertEqual(captured.get("path"), "/agent/policy-approvals/proposed")
+        sent = captured.get("payload") or {}
+        self.assertEqual(sent.get("requestType"), "token_preapprove_remove")
+        self.assertEqual(sent.get("chainKey"), "base_sepolia")
+
     def test_management_link_normalizes_loopback_host_to_public_domain(self) -> None:
         args = argparse.Namespace(ttl_seconds=600, json=True)
         with mock.patch.object(cli, "_resolve_api_key", return_value="xak1.ag_1.sig.payload"), mock.patch.object(

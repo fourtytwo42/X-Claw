@@ -8,8 +8,10 @@
   "properties": {
     "schemaVersion": { "type": "integer", "const": 1 },
     "chainKey": { "type": "string", "minLength": 1 },
-    "requestType": { "type": "string", "enum": ["token_preapprove_add", "global_approval_enable"] },
+    "requestType": {
+      "type": "string",
+      "enum": ["token_preapprove_add", "token_preapprove_remove", "global_approval_enable", "global_approval_disable"]
+    },
     "tokenAddress": { "type": ["string", "null"], "minLength": 1 }
   }
 }
-

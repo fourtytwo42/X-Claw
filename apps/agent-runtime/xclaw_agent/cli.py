@@ -2164,6 +2164,120 @@ def cmd_approvals_request_global(args: argparse.Namespace) -> int:
         return fail("policy_approval_request_failed", str(exc), "Inspect runtime policy approval request and retry.", {"chain": args.chain}, exit_code=1)
 
 
+def cmd_approvals_revoke_token(args: argparse.Namespace) -> int:
+    chk = require_json_flag(args)
+    if chk is not None:
+        return chk
+    token = str(args.token or "").strip()
+    if token == "":
+        return fail("invalid_input", "token is required.", "Provide a token address (0x...) and retry.", {"token": token}, exit_code=2)
+    if is_hex_address(token) is False:
+        return fail(
+            "invalid_input",
+            "token must be a 0x address for policy revoke.",
+            "Provide a token address like 0xabc... and retry.",
+            {"token": token},
+            exit_code=2,
+        )
+    try:
+        payload = {"schemaVersion": 1, "chainKey": args.chain, "requestType": "token_preapprove_remove", "tokenAddress": token}
+        status_code, body = _api_request(
+            "POST",
+            "/agent/policy-approvals/proposed",
+            payload=payload,
+            include_idempotency=True,
+            idempotency_key=f"rt-polrev-token-{args.chain}-{_normalize_address(token)}",
+        )
+        if status_code < 200 or status_code >= 300:
+            return fail(
+                str(body.get("code", "api_error")),
+                str(body.get("message", f"policy approval request failed ({status_code})")),
+                str(body.get("actionHint", "Verify API auth and retry.")),
+                {"status": status_code, "chain": args.chain, "token": token},
+                exit_code=1,
+            )
+        policy_approval_id = str(body.get("policyApprovalId", ""))
+        status = str(body.get("status", "approval_pending"))
+        token_addr = _normalize_address(token)
+        queued_message = (
+            "Approval required (policy)\n\n"
+            "Request: Revoke preapproved token\n"
+            f"Token: {token_addr}\n"
+            f"Chain: {args.chain}\n"
+            f"Approval ID: {policy_approval_id}\n"
+            f"Status: {status}\n\n"
+            "Tap Approve or Deny.\n"
+        )
+        return ok(
+            "Policy revoke requested (pending). Post queuedMessage to the owner verbatim so Telegram buttons can attach.",
+            chain=args.chain,
+            policyApprovalId=policy_approval_id,
+            status=status,
+            requestType="token_preapprove_remove",
+            tokenAddress=token_addr,
+            queuedMessage=queued_message,
+            agentInstructions=(
+                "Send queuedMessage verbatim to the owner in the active chat. "
+                "Do not reformat the 'Approval ID:' and 'Status:' lines; Telegram button auto-attach depends on them."
+            ),
+        )
+    except Exception as exc:
+        return fail(
+            "policy_approval_request_failed",
+            str(exc),
+            "Inspect runtime policy revoke request and retry.",
+            {"chain": args.chain, "token": token},
+            exit_code=1,
+        )
+
+
+def cmd_approvals_revoke_global(args: argparse.Namespace) -> int:
+    chk = require_json_flag(args)
+    if chk is not None:
+        return chk
+    try:
+        payload = {"schemaVersion": 1, "chainKey": args.chain, "requestType": "global_approval_disable", "tokenAddress": None}
+        status_code, body = _api_request(
+            "POST",
+            "/agent/policy-approvals/proposed",
+            payload=payload,
+            include_idempotency=True,
+            idempotency_key=f"rt-polrev-global-{args.chain}",
+        )
+        if status_code < 200 or status_code >= 300:
+            return fail(
+                str(body.get("code", "api_error")),
+                str(body.get("message", f"policy approval request failed ({status_code})")),
+                str(body.get("actionHint", "Verify API auth and retry.")),
+                {"status": status_code, "chain": args.chain},
+                exit_code=1,
+            )
+        policy_approval_id = str(body.get("policyApprovalId", ""))
+        status = str(body.get("status", "approval_pending"))
+        queued_message = (
+            "Approval required (policy)\n\n"
+            "Request: Disable Approve all (global trading)\n"
+            f"Chain: {args.chain}\n"
+            f"Approval ID: {policy_approval_id}\n"
+            f"Status: {status}\n\n"
+            "Tap Approve or Deny.\n"
+        )
+        return ok(
+            "Policy revoke requested (pending). Post queuedMessage to the owner verbatim so Telegram buttons can attach.",
+            chain=args.chain,
+            policyApprovalId=policy_approval_id,
+            status=status,
+            requestType="global_approval_disable",
+            queuedMessage=queued_message,
+            agentInstructions=(
+                "Send queuedMessage verbatim to the owner in the active chat. "
+                "Do not reformat the 'Approval ID:' and 'Status:' lines; Telegram button auto-attach depends on them."
+            ),
+        )
+    except Exception as exc:
+        return fail("policy_approval_request_failed", str(exc), "Inspect runtime policy revoke request and retry.", {"chain": args.chain}, exit_code=1)
+
+
 def _post_trade_status(trade_id: str, from_status: str, to_status: str, extra: dict[str, Any] | None = None) -> None:
     payload: dict[str, Any] = {
         "tradeId": trade_id,
@@ -5033,6 +5147,17 @@ def build_parser() -> argparse.ArgumentParser:
     approvals_req_global.add_argument("--chain", required=True)
     approvals_req_global.add_argument("--json", action="store_true")
     approvals_req_global.set_defaults(func=cmd_approvals_request_global)
+
+    approvals_rev_token = approvals_sub.add_parser("revoke-token")
+    approvals_rev_token.add_argument("--chain", required=True)
+    approvals_rev_token.add_argument("--token", required=True)
+    approvals_rev_token.add_argument("--json", action="store_true")
+    approvals_rev_token.set_defaults(func=cmd_approvals_revoke_token)
+
+    approvals_rev_global = approvals_sub.add_parser("revoke-global")
+    approvals_rev_global.add_argument("--chain", required=True)
+    approvals_rev_global.add_argument("--json", action="store_true")
+    approvals_rev_global.set_defaults(func=cmd_approvals_revoke_global)
 
     trade = sub.add_parser("trade")
     trade_sub = trade.add_subparsers(dest="trade_cmd")
