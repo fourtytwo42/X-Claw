@@ -29,10 +29,14 @@ from typing import Any, Optional
 
 MARKER = "xclaw: telegram approval callback received"
 LEGACY_DM_SENTINEL = 'Allow in DMs even when inlineButtonsScope is "allowlist", gated by chatId == senderId.'
-STATE_SCHEMA_VERSION = 2
+STATE_SCHEMA_VERSION = 4
 STATE_DIR = Path.home() / ".openclaw" / "xclaw"
 STATE_FILE = STATE_DIR / "openclaw_patch_state.json"
 LOCK_FILE = STATE_DIR / "openclaw_patch.lock"
+LEGACY_SOURCE_SNIPPET_RE = re.compile(
+    r",\s*source\s*:\s*\{\s*channel\s*:\s*\"telegram\"[^}]*\}",
+    flags=re.MULTILINE,
+)
 
 
 def _utc_now() -> str:
@@ -183,6 +187,13 @@ def _inject_after_anchor(text: str, anchor: str, injection: str) -> tuple[str, b
 def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
     # Normalize older patch variants to avoid duplicated intercept blocks (idempotent overwrite semantics).
     normalized = False
+    # v1 legacy: payload had an extra `source` field that violates X-Claw trade-status schema.
+    # Remove it in-place to upgrade older patched bundles without requiring marker removal.
+    raw2, n_sub = LEGACY_SOURCE_SNIPPET_RE.subn("", raw)
+    if n_sub:
+        raw = raw2
+        normalized = True
+
     if LEGACY_DM_SENTINEL in raw:
         sentinel_idx = raw.find(LEGACY_DM_SENTINEL)
         # Remove from the start of the legacy X-Claw block to just before the group-policy block.
@@ -228,7 +239,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         '\t\t\t\t\t\tconst res = await fetch(`${apiBase}/trades/${encodeURIComponent(tradeId)}/status`, {\n'
         '\t\t\t\t\t\t\tmethod: "POST",\n'
         '\t\t\t\t\t\t\theaders: { "content-type": "application/json", authorization: `Bearer ${apiKey}`, "idempotency-key": `tg-approve-${tradeId}-${callbackMessage.message_id}` },\n'
-        '\t\t\t\t\t\t\tbody: JSON.stringify({ tradeId, fromStatus: "approval_pending", toStatus: "approved", reasonCode: null, reasonMessage: null, at: (/* @__PURE__ */ new Date()).toISOString(), source: { channel: "telegram", chainKey, senderId, to: String(chatId), messageId: String(callbackMessage.message_id) } })\n'
+        '\t\t\t\t\t\t\tbody: JSON.stringify({ tradeId, fromStatus: "approval_pending", toStatus: "approved", reasonCode: null, reasonMessage: null, at: (/* @__PURE__ */ new Date()).toISOString() })\n'
         '\t\t\t\t\t\t});\n'
         '\t\t\t\t\t\ttry { logger.info({ tradeId, chainKey, status: res.status }, "xclaw: telegram approval callback server response"); } catch {}\n'
         '\t\t\t\t\t\t\tif (res.ok) { await bot.api.deleteMessage(chatId, callbackMessage.message_id); return; }\n'
