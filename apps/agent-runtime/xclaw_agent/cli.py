@@ -1587,6 +1587,16 @@ def _wait_for_trade_approval(trade_id: str, chain: str, summary: dict[str, Any] 
             except Exception:
                 pass
             _remove_approval_prompt(trade_id)
+            try:
+                _maybe_send_telegram_decision_message(
+                    trade_id=trade_id,
+                    chain=chain,
+                    decision="approved",
+                    summary=summary,
+                    trade=trade,
+                )
+            except Exception:
+                pass
             return trade
         if status == "approval_pending":
             time.sleep(APPROVAL_WAIT_POLL_SEC)
@@ -1597,6 +1607,16 @@ def _wait_for_trade_approval(trade_id: str, chain: str, summary: dict[str, Any] 
             except Exception:
                 pass
             _remove_approval_prompt(trade_id)
+            try:
+                _maybe_send_telegram_decision_message(
+                    trade_id=trade_id,
+                    chain=chain,
+                    decision="rejected",
+                    summary=summary,
+                    trade=trade,
+                )
+            except Exception:
+                pass
             reason_code = trade.get("reasonCode")
             reason_message = trade.get("reasonMessage")
             raise WalletPolicyError(
@@ -1835,8 +1855,9 @@ def _maybe_send_telegram_approval_prompt(trade_id: str, chain: str, summary: dic
     elif isinstance(thread_raw, str) and thread_raw.strip():
         thread_id = thread_raw.strip()
 
-    callback_data = f"xappr|a|{trade_id}|{chain}"
-    if len(callback_data.encode("utf-8")) > 64:
+    callback_approve = f"xappr|a|{trade_id}|{chain}"
+    callback_reject = f"xappr|r|{trade_id}|{chain}"
+    if len(callback_approve.encode("utf-8")) > 64 or len(callback_reject.encode("utf-8")) > 64:
         # Fail closed: do not send a prompt we can't action safely.
         return
 
@@ -1849,9 +1870,13 @@ def _maybe_send_telegram_approval_prompt(trade_id: str, chain: str, summary: dic
         f"{amount} {token_in_symbol} -> {token_out_symbol}\n"
         f"Chain: {chain}\n"
         f"Trade: {trade_id}\n\n"
-        "Tap Approve to continue. This will submit an on-chain transaction from the agent wallet."
+        "Tap Approve to continue (or Deny to reject). This will submit an on-chain transaction from the agent wallet."
     )
-    buttons = json.dumps([[{"text": "Approve", "callback_data": callback_data}]], separators=(",", ":"))
+    # Telegram does not support per-button colors; use text labels only.
+    buttons = json.dumps(
+        [[{"text": "Approve", "callback_data": callback_approve}, {"text": "Deny", "callback_data": callback_reject}]],
+        separators=(",", ":"),
+    )
     openclaw = _require_openclaw_bin()
     cmd = [openclaw, "message", "send", "--channel", "telegram", "--target", chat_id, "--message", text, "--buttons", buttons, "--json"]
     if thread_id:
@@ -1884,6 +1909,74 @@ def _maybe_send_telegram_approval_prompt(trade_id: str, chain: str, summary: dic
         _post_approval_prompt_metadata(trade_id, chain, chat_id, thread_id, message_id)
     except Exception:
         pass
+
+
+def _maybe_send_telegram_decision_message(
+    *,
+    trade_id: str,
+    chain: str,
+    decision: str,
+    summary: dict[str, Any] | None,
+    trade: dict[str, Any] | None,
+) -> None:
+    """
+    Best-effort acknowledgement into the active Telegram chat when an approval is decided.
+    This is advisory UX only and must never gate execution.
+    """
+    delivery = _read_openclaw_last_delivery()
+    if not delivery or str(delivery.get("lastChannel") or "").lower() != "telegram":
+        return
+    chat_id = str(delivery.get("lastTo") or "").strip()
+    if not chat_id:
+        return
+
+    thread_raw = delivery.get("lastThreadId")
+    thread_id: str | None = None
+    if isinstance(thread_raw, int):
+        thread_id = str(thread_raw)
+    elif isinstance(thread_raw, str) and thread_raw.strip():
+        thread_id = thread_raw.strip()
+
+    summary = summary or {}
+    trade = trade or {}
+    amount = str(summary.get("amountInHuman") or "").strip() or str(trade.get("amountIn") or "").strip() or "?"
+    token_in = str(summary.get("tokenInSymbol") or "").strip() or str(trade.get("tokenIn") or "").strip() or "TOKEN_IN"
+    token_out = str(summary.get("tokenOutSymbol") or "").strip() or str(trade.get("tokenOut") or "").strip() or "TOKEN_OUT"
+    slip = summary.get("slippageBps")
+    slip_str = ""
+    try:
+        if slip is not None:
+            slip_str = f" (slippage {int(slip)} bps)"
+    except Exception:
+        slip_str = ""
+
+    if decision == "approved":
+        title = "Approved"
+        suffix = "Executing now."
+    else:
+        title = "Denied"
+        reason_code = str(trade.get("reasonCode") or "").strip()
+        reason_message = str(trade.get("reasonMessage") or "").strip()
+        reason = reason_message or reason_code or "Denied."
+        suffix = f"Reason: {reason}"
+
+    text = (
+        f"{title} swap\n"
+        f"{amount} {token_in} -> {token_out}{slip_str}\n"
+        f"Chain: {chain}\n"
+        f"Trade: {trade_id}\n\n"
+        f"{suffix}"
+    )
+
+    openclaw = shutil.which("openclaw")
+    if not openclaw:
+        return
+    cmd = [openclaw, "message", "send", "--channel", "telegram", "--target", chat_id, "--message", text, "--json"]
+    if thread_id:
+        cmd.extend(["--thread-id", thread_id])
+    proc = _run_subprocess(cmd, timeout_sec=20, kind="openclaw_send")
+    if proc.returncode != 0:
+        return
 
 
 def _maybe_delete_telegram_approval_prompt(trade_id: str) -> None:
@@ -2394,19 +2487,10 @@ def cmd_trade_spot(args: argparse.Namespace) -> int:
                     summary["tradeId"] = trade_id
                     _wait_for_trade_approval(trade_id, chain, summary)
                     _remove_pending_trade_intent(intent_key)
-                elif status == "approved":
-                    trade_id = existing_trade_id
-                    summary["tradeId"] = trade_id
-                    _remove_pending_trade_intent(intent_key)
-                    try:
-                        _maybe_delete_telegram_approval_prompt(trade_id)
-                    except Exception:
-                        pass
-                    _remove_approval_prompt(trade_id)
-                elif status in {"rejected", "expired", "failed", "filled", "verification_timeout"}:
-                    _remove_pending_trade_intent(intent_key)
                 else:
-                    # Unknown/non-pending status; do not keep reusing.
+                    # De-dupe applies only while still awaiting approval.
+                    # If the matching trade has been approved/rejected/filled/etc, a repeated identical request
+                    # must propose a new tradeId.
                     _remove_pending_trade_intent(intent_key)
 
         if not trade_id:

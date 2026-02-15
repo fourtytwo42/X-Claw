@@ -1426,3 +1426,37 @@ Note:
   - [ ] `npm run seed:verify`
   - [ ] `npm run build`
   - [ ] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+## 42) Slice 42: Telegram Approve+Deny + Approval Decision Chat Feedback + Safer De-Dupe
+
+### 42.1 Canonical/doc sync
+- [ ] Add Slice 42 goal/DoD + issue mapping to `docs/XCLAW_SLICE_TRACKER.md`.
+- [ ] Update `docs/XCLAW_SOURCE_OF_TRUTH.md`:
+  - [ ] Telegram decisions support Approve + Deny.
+  - [ ] Runtime de-dupe only while status is `approval_pending`.
+  - [ ] Decision feedback is posted to the active Telegram chat with details and reason (for deny).
+- [ ] Update handoff/process artifacts:
+  - [ ] `docs/CONTEXT_PACK.md`
+  - [ ] `spec.md`
+  - [ ] `tasks.md`
+  - [ ] `acceptance.md`
+
+### 42.2 Implementation
+- [ ] Runtime:
+  - [ ] adjust `trade spot` de-dupe semantics (reuse only while `approval_pending`)
+  - [ ] Telegram prompt includes Approve + Deny buttons
+  - [ ] when web approval/deny happens while waiting, send a decision message to active Telegram chat
+- [ ] OpenClaw gateway patch:
+  - [ ] handle `xappr|a|...` approve and `xappr|r|...` reject
+  - [ ] on success delete the prompt and send a confirmation message in the same chat with details
+
+### 42.3 Validation + evidence
+- [ ] Run required gates:
+  - [ ] `npm run db:parity`
+  - [ ] `npm run seed:reset`
+  - [ ] `npm run seed:load`
+  - [ ] `npm run seed:verify`
+  - [ ] `npm run build`
+  - [ ] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`

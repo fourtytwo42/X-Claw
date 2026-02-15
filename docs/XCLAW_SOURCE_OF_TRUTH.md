@@ -2559,6 +2559,7 @@ Limitations / notes:
 7. Pending approval de-dupe:
    - for server-first `trade spot`, the runtime must not create multiple identical `approval_pending` trades.
    - if a matching trade is already `approval_pending`, runtime reuses the existing `tradeId` and waits/resumes (no new proposals, no prompt spam).
+   - once the matching trade is no longer `approval_pending` (approved/rejected/expired/filled/etc), a repeated identical request creates a new tradeId.
 8. Canonical endpoints:
    - `POST /api/v1/management/approval-channels/update` (owner-auth):
      - enables/disables Telegram approval prompts (no secret issuance).
@@ -2566,3 +2567,9 @@ Limitations / notes:
      - idempotently transitions `approval_pending -> approved` when actionable (requires `Idempotency-Key`).
    - `POST /api/v1/agent/approvals/prompt` (agent-auth):
      - records prompt metadata for cleanup/sync (does not authorize approvals).
+9. Telegram reject:
+   - Telegram supports a **Deny** button that transitions `approval_pending -> rejected` (reasonCode `approval_rejected`, reasonMessage set).
+   - Telegram cannot color inline buttons; use text labels only.
+10. Decision feedback in chat:
+   - after approve/deny in Telegram, the agent posts a confirmation message into the same chat with trade details (tradeId, amount/pair, and reason for deny).
+   - after approve/deny in web while runtime is waiting on the trade, runtime posts a confirmation message into the active Telegram chat with the same details.

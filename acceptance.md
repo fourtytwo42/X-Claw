@@ -2759,3 +2759,30 @@ Issue mapping: `#42` (umbrella)
   - triggers agent-auth `POST /api/v1/trades/:tradeId/status` (`approval_pending -> approved`) via gateway callback intercept from the gateway bundle used in `gateway` mode (e.g. `dist/reply-*.js`),
   - deletes the Telegram approval message after success (or convergence 409 approved/filled),
   - web approvals queue converges immediately (trade no longer pending).
+
+---
+
+## Slice 42 Acceptance Evidence
+
+Date (UTC): 2026-02-15
+Active slice: `Slice 42: Telegram Approve+Deny + Approval Decision Chat Feedback + Safer De-Dupe`
+Issue mapping: `#42` (umbrella)
+
+### Required gate evidence
+- `npm run db:parity` -> PASS (exit 0, checkedAt: 2026-02-15T18:13:01.106Z)
+- `npm run seed:reset` -> PASS (exit 0)
+- `npm run seed:load` -> PASS (exit 0, scenarios: `happy_path`, `approval_retry`, `degraded_rpc`, `copy_reject`)
+- `npm run seed:verify` -> PASS (exit 0)
+- `npm run build` -> PASS (exit 0)
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS
+
+### Scenario evidence (manual/ops)
+- De-dupe:
+  - identical `trade spot` request while prior trade is `approval_pending` reuses the pending tradeId (no new approval spam),
+  - repeating after the prior trade resolves creates a new tradeId and a new approval prompt (when policy requires approval).
+- Telegram buttons:
+  - prompt shows Approve + Deny,
+  - click Approve: trade transitions `approval_pending -> approved`, prompt is deleted, a confirmation message is posted to the same chat with details,
+  - click Deny: trade transitions `approval_pending -> rejected` (`approval_rejected`), prompt is deleted, a confirmation message is posted to the same chat with reason.
+- Web decisions:
+  - when owner approves/denies in `/agents/:id` while runtime is waiting, the runtime posts a decision confirmation message into the active Telegram chat with details/reason.

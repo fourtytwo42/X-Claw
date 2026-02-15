@@ -1,11 +1,11 @@
 # X-Claw Context Pack
 
-## 1) Goal (Active: Slice 41)
-- Primary objective: complete `Slice 41: Telegram Approve Button Reliability (Patch Correct Gateway Bundle)`.
+## 1) Goal (Active: Slice 42)
+- Primary objective: complete `Slice 42: Telegram Approve+Deny + Approval Decision Chat Feedback + Safer De-Dupe`.
 - Success criteria:
-  - Patch auto-apply targets the OpenClaw gateway bundle that is executed in `gateway` mode (notably `dist/reply-*.js` imported by `dist/index.js`), not just `dist/loader-*.js`.
-  - Clicking Telegram Approve triggers `POST /api/v1/trades/:tradeId/status` (`approval_pending -> approved`) and deletes the prompt message.
-  - Installer/update and next-skill-use paths still auto-apply patch idempotently with cooldown/lock to prevent restart loops.
+  - Runtime de-dupe only while a matching trade is still `approval_pending`; once approved/terminal, identical requests produce a new tradeId.
+  - Telegram prompt includes Approve + Deny buttons, deletes itself on decision, and posts a decision acknowledgement message with details.
+  - Web approval/deny while runtime is waiting produces a decision acknowledgement message in the active Telegram chat with details.
   - required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.
 
 ## 2) Constraints
@@ -27,7 +27,7 @@
  - No API schema changes in this slice; web UI only.
  - OpenClaw gateway behavior change is delivered as a patch against OpenClaw dist bundle for the deployed version.
 
-## 4) Files and Boundaries (Slice 41 allowlist)
+## 4) Files and Boundaries (Slice 42 allowlist)
 - Web/API/UI:
   - none
 - Canonical docs/process:
@@ -42,6 +42,7 @@
   - none
 - OpenClaw:
   - `skills/xclaw-agent/scripts/openclaw_gateway_patch.py`
+  - `apps/agent-runtime/xclaw_agent/cli.py`
   - `skills/xclaw-agent/scripts/setup_agent_skill.py`
   - `skills/xclaw-agent/scripts/xclaw_agent_skill.py`
   - patch artifacts in `patches/openclaw/` (for reproducibility / inspection)

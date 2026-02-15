@@ -29,7 +29,7 @@ from typing import Any, Optional
 
 MARKER = "xclaw: telegram approval callback received"
 LEGACY_DM_SENTINEL = 'Allow in DMs even when inlineButtonsScope is "allowlist", gated by chatId == senderId.'
-STATE_SCHEMA_VERSION = 6
+STATE_SCHEMA_VERSION = 7
 STATE_DIR = Path.home() / ".openclaw" / "xclaw"
 STATE_FILE = STATE_DIR / "openclaw_patch_state.json"
 LOCK_FILE = STATE_DIR / "openclaw_patch.lock"
@@ -212,7 +212,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
 
     # Upgrade path: if an older canonical block exists, replace it with the current canonical block.
     # This lets us ship UX tweaks (e.g. remove keyboard immediately) without telling users to reinstall OpenClaw.
-    if MARKER in raw and "Approving..." not in raw:
+    if MARKER in raw and "xappr|r|" not in raw:
         idx = raw.find(PAGINATION_ANCHOR)
         if idx < 0:
             return raw, False, "pagination_anchor_not_found"
@@ -232,12 +232,13 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
     # Insert immediately before pagination handling (after allowlist/group policy checks).
     general_injection = (
         '\n'
-        '\t\t\t// X-Claw Telegram approvals: approve-only inline button handling (strict, no LLM).\n'
-        '\t\t\t// Expected callback_data: xappr|a|<tradeId>|<chainKey>\n'
+        '\t\t\t// X-Claw Telegram approvals: inline button handling (strict, no LLM).\n'
+        '\t\t\t// Expected callback_data: xappr|a|<tradeId>|<chainKey> (approve) OR xappr|r|<tradeId>|<chainKey> (reject)\n'
         '\t\t\t// This runs after allowlist/group policy checks.\n'
         '\t\t\tif (data.startsWith("xappr|")) {\n'
         '\t\t\t\tconst parts = data.split("|").map((p) => String(p || "").trim());\n'
-        '\t\t\t\tif (parts.length === 4 && parts[1] === "a" && parts[2] && parts[3]) {\n'
+        '\t\t\t\tif (parts.length === 4 && (parts[1] === "a" || parts[1] === "r") && parts[2] && parts[3]) {\n'
+        '\t\t\t\t\tconst action = parts[1];\n'
         '\t\t\t\t\tconst tradeId = parts[2];\n'
         '\t\t\t\t\tconst chainKey = parts[3];\n'
         f'\t\t\t\t\ttry {{ logger.info({{ tradeId, chainKey, chatId, senderId, isGroup }}, "{MARKER}"); }} catch {{}}\n'
@@ -249,23 +250,23 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         '\t\t\t\t\tif (!apiBase) { await bot.api.editMessageText(chatId, callbackMessage.message_id, "Approval failed: missing XCLAW_API_BASE_URL in OpenClaw config."); return; }\n'
         '\t\t\t\t\tif (!apiKey) { await bot.api.editMessageText(chatId, callbackMessage.message_id, "Approval failed: missing xclaw-agent apiKey in OpenClaw config."); return; }\n'
         '\t\t\t\t\t// Reduce perceived latency: stop spinner and remove button immediately.\n'
-        '\t\t\t\t\ttry { await bot.api.answerCallbackQuery(callback.id, { text: "Approving...", show_alert: false }); } catch {}\n'
+        '\t\t\t\t\ttry { await bot.api.answerCallbackQuery(callback.id, { text: action === "r" ? "Denying..." : "Approving...", show_alert: false }); } catch {}\n'
         '\t\t\t\t\ttry { await bot.api.editMessageReplyMarkup(chatId, callbackMessage.message_id, { inline_keyboard: [] }); } catch {}\n'
         '\t\t\t\t\ttry {\n'
         '\t\t\t\t\t\tconst res = await fetch(`${apiBase}/trades/${encodeURIComponent(tradeId)}/status`, {\n'
         '\t\t\t\t\t\t\tmethod: "POST",\n'
-        '\t\t\t\t\t\t\theaders: { "content-type": "application/json", authorization: `Bearer ${apiKey}`, "idempotency-key": `tg-approve-${tradeId}-${callbackMessage.message_id}` },\n'
-        '\t\t\t\t\t\t\tbody: JSON.stringify({ tradeId, fromStatus: "approval_pending", toStatus: "approved", reasonCode: null, reasonMessage: null, at: (/* @__PURE__ */ new Date()).toISOString() })\n'
+        '\t\t\t\t\t\t\theaders: { "content-type": "application/json", authorization: `Bearer ${apiKey}`, "idempotency-key": `tg-decision-${action}-${tradeId}-${callbackMessage.message_id}` },\n'
+        '\t\t\t\t\t\t\tbody: JSON.stringify({ tradeId, fromStatus: "approval_pending", toStatus: action === "r" ? "rejected" : "approved", reasonCode: action === "r" ? "approval_rejected" : null, reasonMessage: action === "r" ? "Denied via Telegram" : null, at: (/* @__PURE__ */ new Date()).toISOString() })\n'
         '\t\t\t\t\t\t});\n'
         '\t\t\t\t\t\ttry { logger.info({ tradeId, chainKey, status: res.status }, "xclaw: telegram approval callback server response"); } catch {}\n'
         '\t\t\t\t\t\t\tif (res.ok) { await bot.api.deleteMessage(chatId, callbackMessage.message_id); return; }\n'
         '\t\t\t\t\t\t\tlet errCode = "api_error"; let errMsg = `HTTP ${res.status}`;\n'
-        '\t\t\t\t\t\t\ttry { const body = await res.json(); if (typeof body?.code === "string" && body.code.trim()) errCode = body.code.trim(); if (typeof body?.message === "string" && body.message.trim()) errMsg = body.message.trim(); if (res.status === 409 && (body?.details?.currentStatus === "approved" || body?.details?.currentStatus === "filled")) { await bot.api.deleteMessage(chatId, callbackMessage.message_id); return; } } catch {}\n'
-        '\t\t\t\t\t\t\ttry { await bot.api.editMessageReplyMarkup(chatId, callbackMessage.message_id, { inline_keyboard: [[{ text: "Approve", callback_data: data }]] }); } catch {}\n'
+        '\t\t\t\t\t\t\ttry { const body = await res.json(); if (typeof body?.code === "string" && body.code.trim()) errCode = body.code.trim(); if (typeof body?.message === "string" && body.message.trim()) errMsg = body.message.trim(); if (res.status === 409 && (body?.details?.currentStatus === "approved" || body?.details?.currentStatus === "filled" || body?.details?.currentStatus === "rejected")) { await bot.api.deleteMessage(chatId, callbackMessage.message_id); return; } } catch {}\n'
+        '\t\t\t\t\t\t\ttry { await bot.api.editMessageReplyMarkup(chatId, callbackMessage.message_id, { inline_keyboard: [[{ text: "Approve", callback_data: `xappr|a|${tradeId}|${chainKey}` }, { text: "Deny", callback_data: `xappr|r|${tradeId}|${chainKey}` }]] }); } catch {}\n'
         '\t\t\t\t\t\t\tawait bot.api.editMessageText(chatId, callbackMessage.message_id, `Approval failed: ${errCode} (${errMsg}).`);\n'
         '\t\t\t\t\t\t\treturn;\n'
         '\t\t\t\t\t\t} catch (err) {\n'
-        '\t\t\t\t\t\t\ttry { await bot.api.editMessageReplyMarkup(chatId, callbackMessage.message_id, { inline_keyboard: [[{ text: "Approve", callback_data: data }]] }); } catch {}\n'
+        '\t\t\t\t\t\t\ttry { await bot.api.editMessageReplyMarkup(chatId, callbackMessage.message_id, { inline_keyboard: [[{ text: "Approve", callback_data: `xappr|a|${tradeId}|${chainKey}` }, { text: "Deny", callback_data: `xappr|r|${tradeId}|${chainKey}` }]] }); } catch {}\n'
         '\t\t\t\t\t\t\tawait bot.api.editMessageText(chatId, callbackMessage.message_id, `Approval failed: ${String(err)}`);\n'
         '\t\t\t\t\t\t\treturn;\n'
         '\t\t\t\t\t\t}\n'

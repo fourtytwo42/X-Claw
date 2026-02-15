@@ -735,7 +735,7 @@ DoD:
 ---
 
 ## Slice 41: Telegram Approve Button Reliability (Patch Correct Gateway Bundle)
-Status: [~]
+Status: [x]
 Issue: #42 (umbrella)
 
 Goal:
@@ -747,4 +747,25 @@ DoD:
 - [ ] Clicking Telegram Approve triggers `POST /api/v1/trades/:tradeId/status` (`approval_pending -> approved`) and deletes the Telegram prompt message on success (or on 409 already-approved/filled).
 - [ ] Patch is idempotent and does not create duplicated intercept blocks in patched bundles (stable marker / replace semantics).
 - [ ] Patch artifact recorded under `patches/openclaw/` for OpenClaw `2026.2.9` gateway bundle(s) as needed.
+- [ ] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.
+
+---
+
+## Slice 42: Telegram Approve+Deny + Approval Decision Chat Feedback + Safer De-Dupe
+Status: [~]
+Issue: #42 (umbrella)
+
+Goal:
+- Adjust trade de-dupe so identical trades are only de-duped while the prior trade is still awaiting approval (`approval_pending`).
+- Add Telegram **Deny** button alongside Approve (colors not supported; use text), and ensure clicking either produces an immediate agent-visible chat acknowledgement with details.
+- Ensure when approval/denial happens (Telegram or web), the agent reports the decision back into the active Telegram chat with details (tradeId + amount/pair + reason if denied).
+
+DoD:
+- [ ] docs sync first: source-of-truth + roadmap + tracker + context/spec/tasks/acceptance aligned to Slice 42.
+- [ ] runtime de-dupe rule:
+  - [ ] if an identical trade exists in `approval_pending`, reuse that tradeId (no new proposal),
+  - [ ] once the trade is no longer `approval_pending`, a repeated identical request proposes a new tradeId.
+- [ ] Telegram prompt includes Approve + Deny buttons and is deleted on either decision.
+- [ ] Telegram decision sends a confirmation message into the same chat with trade details and (for deny) a reason.
+- [ ] When a trade is approved/denied via the web UI while runtime is waiting, runtime posts a decision message into the active Telegram chat with details.
 - [ ] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.

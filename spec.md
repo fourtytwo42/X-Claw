@@ -563,6 +563,30 @@ Fix Telegram Approve buttons not approving trades by ensuring the OpenClaw gatew
 
 ---
 
+# Slice 42 Spec: Telegram Approve+Deny + Approval Decision Chat Feedback + Safer De-Dupe
+
+## Goal
+Refine the approvals UX and semantics:
+- only de-dupe identical trade requests while the prior trade is still `approval_pending`,
+- add Telegram Deny alongside Approve,
+- and post decision feedback into the active Telegram chat with details (and reason on deny).
+
+## Success Criteria
+1. Runtime reuses an identical tradeId only while the trade is `approval_pending`; once it resolves (approved/rejected/filled/etc), a repeated identical request proposes a new tradeId.
+2. Telegram prompts show two inline buttons: Approve and Deny (no color support).
+3. Clicking either button transitions the trade status (`approval_pending -> approved|rejected`), deletes the prompt message, and posts a confirmation message into the same Telegram chat with details.
+4. When web approve/deny happens while runtime is waiting, runtime posts a confirmation message into the active Telegram chat with details and reason on deny.
+
+## Acceptance Checks
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
 # Slice 31 Spec: Agents + Agent Management UX Refinement (Operational Clean)
 
 ## Goal
