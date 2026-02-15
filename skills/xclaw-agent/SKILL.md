@@ -60,9 +60,9 @@ python3 {baseDir}/scripts/xclaw_agent_skill.py trade-spot <token_in> <token_out>
 Request policy approvals (owner must approve via web UI or Telegram buttons):
 
 ```bash
-python3 {baseDir}/scripts/xclaw_agent_skill.py policy-preapprove-token <token_address>
+python3 {baseDir}/scripts/xclaw_agent_skill.py policy-preapprove-token <token>   # token can be a canonical symbol like USDC or a 0x address
 python3 {baseDir}/scripts/xclaw_agent_skill.py policy-approve-all
-python3 {baseDir}/scripts/xclaw_agent_skill.py policy-revoke-token <token_address>
+python3 {baseDir}/scripts/xclaw_agent_skill.py policy-revoke-token <token>       # token can be a canonical symbol like USDC or a 0x address
 python3 {baseDir}/scripts/xclaw_agent_skill.py policy-revoke-all
 ```
 

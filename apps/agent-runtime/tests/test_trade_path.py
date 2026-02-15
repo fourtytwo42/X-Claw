@@ -752,7 +752,7 @@ class TradePathRuntimeTests(unittest.TestCase):
         self.assertEqual(code, 1)
 
     def test_policy_preapprove_token_rejects_non_address(self) -> None:
-        args = argparse.Namespace(chain="base_sepolia", token="USDC", json=True)
+        args = argparse.Namespace(chain="base_sepolia", token="NOT_A_TOKEN", json=True)
         buf = io.StringIO()
         with redirect_stdout(buf):
             code = cli.cmd_approvals_request_token(args)
@@ -797,6 +797,36 @@ class TradePathRuntimeTests(unittest.TestCase):
         sent = captured.get("payload") or {}
         self.assertEqual(sent.get("requestType"), "token_preapprove_add")
         self.assertEqual(sent.get("chainKey"), "base_sepolia")
+
+    def test_policy_preapprove_token_accepts_symbol(self) -> None:
+        args = argparse.Namespace(chain="base_sepolia", token="USDC", json=True)
+        captured: dict = {}
+
+        def fake_api_request(
+            method: str,
+            path: str,
+            payload: dict | None = None,
+            include_idempotency: bool = False,
+            idempotency_key: str | None = None,
+            allow_auth_recovery: bool = True,
+        ):
+            captured["method"] = method
+            captured["path"] = path
+            captured["payload"] = payload
+            captured["include_idempotency"] = include_idempotency
+            captured["idempotency_key"] = idempotency_key
+            return 200, {"ok": True, "policyApprovalId": "ppr_sym", "status": "approval_pending"}
+
+        expected_addr = cli._resolve_token_address("base_sepolia", "USDC")
+
+        with mock.patch.object(cli, "_resolve_api_key", return_value="xak1.ag_1.sig.payload"), mock.patch.object(
+            cli, "_resolve_agent_id", return_value="ag_1"
+        ), mock.patch.object(cli, "_api_request", side_effect=fake_api_request):
+            payload = self._run_and_parse_stdout(lambda: cli.cmd_approvals_request_token(args))
+
+        self.assertTrue(payload.get("ok"))
+        sent = captured.get("payload") or {}
+        self.assertEqual(sent.get("tokenAddress"), expected_addr)
 
     def test_policy_revoke_token_requests_policy_approval(self) -> None:
         args = argparse.Namespace(chain="base_sepolia", token="0x" + "22" * 20, json=True)

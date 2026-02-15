@@ -275,10 +275,10 @@ def main(argv: List[str]) -> int:
 
     if cmd == "policy-preapprove-token":
         if len(argv) < 3:
-            return _err("usage", "policy-preapprove-token requires <token_address>", "usage: policy-preapprove-token <token_address>", exit_code=2)
+            return _err("usage", "policy-preapprove-token requires <token>", "usage: policy-preapprove-token <token>", exit_code=2)
         token = argv[2]
-        if _is_hex_address(token) is False:
-            return _err("invalid_input", "token_address must be a 0x address.", "usage: policy-preapprove-token 0x...", {"token": token}, exit_code=2)
+        if str(token).strip() == "":
+            return _err("invalid_input", "token must not be empty.", "usage: policy-preapprove-token USDC  (or 0x...)", exit_code=2)
         return _run_agent(["approvals", "request-token", "--token", token, "--chain", chain, "--json"])
 
     if cmd == "policy-approve-all":
@@ -286,10 +286,10 @@ def main(argv: List[str]) -> int:
 
     if cmd == "policy-revoke-token":
         if len(argv) < 3:
-            return _err("usage", "policy-revoke-token requires <token_address>", "usage: policy-revoke-token <token_address>", exit_code=2)
+            return _err("usage", "policy-revoke-token requires <token>", "usage: policy-revoke-token <token>", exit_code=2)
         token = argv[2]
-        if _is_hex_address(token) is False:
-            return _err("invalid_input", "token_address must be a 0x address.", "usage: policy-revoke-token 0x...", {"token": token}, exit_code=2)
+        if str(token).strip() == "":
+            return _err("invalid_input", "token must not be empty.", "usage: policy-revoke-token USDC  (or 0x...)", exit_code=2)
         return _run_agent(["approvals", "revoke-token", "--token", token, "--chain", chain, "--json"])
 
     if cmd == "policy-revoke-all":

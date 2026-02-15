@@ -2057,22 +2057,28 @@ def cmd_approvals_request_token(args: argparse.Namespace) -> int:
     token = str(args.token or "").strip()
     if token == "":
         return fail("invalid_input", "token is required.", "Provide a token address (0x...) and retry.", {"token": token}, exit_code=2)
-    if is_hex_address(token) is False:
+    token_symbol = None
+    token_address = None
+    try:
+        token_address = _resolve_token_address(args.chain, token)
+        if not is_hex_address(token):
+            token_symbol = token.strip().upper()
+    except Exception as exc:
         return fail(
             "invalid_input",
-            "token must be a 0x address for policy preapproval.",
-            "Provide a token address like 0xabc... and retry.",
-            {"token": token},
+            "token must be a 0x address or a canonical token symbol for the active chain.",
+            "Use a token address like 0xabc... or a symbol like USDC/WETH, then retry.",
+            {"token": token, "chain": args.chain, "error": str(exc)},
             exit_code=2,
         )
     try:
-        payload = {"schemaVersion": 1, "chainKey": args.chain, "requestType": "token_preapprove_add", "tokenAddress": token}
+        payload = {"schemaVersion": 1, "chainKey": args.chain, "requestType": "token_preapprove_add", "tokenAddress": token_address}
         status_code, body = _api_request(
             "POST",
             "/agent/policy-approvals/proposed",
             payload=payload,
             include_idempotency=True,
-            idempotency_key=f"rt-polreq-token-{args.chain}-{_normalize_address(token)}",
+            idempotency_key=f"rt-polreq-token-{args.chain}-{_normalize_address(token_address)}",
         )
         if status_code < 200 or status_code >= 300:
             return fail(
@@ -2084,11 +2090,12 @@ def cmd_approvals_request_token(args: argparse.Namespace) -> int:
             )
         policy_approval_id = str(body.get("policyApprovalId", ""))
         status = str(body.get("status", "approval_pending"))
-        token_addr = _normalize_address(token)
+        token_addr = _normalize_address(token_address)
+        token_display = f"{token_symbol} ({token_addr})" if token_symbol else token_addr
         queued_message = (
             "Approval required (policy)\n\n"
             "Request: Preapprove token for trading\n"
-            f"Token: {token_addr}\n"
+            f"Token: {token_display}\n"
             f"Chain: {args.chain}\n"
             f"Approval ID: {policy_approval_id}\n"
             f"Status: {status}\n\n"
@@ -2171,22 +2178,28 @@ def cmd_approvals_revoke_token(args: argparse.Namespace) -> int:
     token = str(args.token or "").strip()
     if token == "":
         return fail("invalid_input", "token is required.", "Provide a token address (0x...) and retry.", {"token": token}, exit_code=2)
-    if is_hex_address(token) is False:
+    token_symbol = None
+    token_address = None
+    try:
+        token_address = _resolve_token_address(args.chain, token)
+        if not is_hex_address(token):
+            token_symbol = token.strip().upper()
+    except Exception as exc:
         return fail(
             "invalid_input",
-            "token must be a 0x address for policy revoke.",
-            "Provide a token address like 0xabc... and retry.",
-            {"token": token},
+            "token must be a 0x address or a canonical token symbol for the active chain.",
+            "Use a token address like 0xabc... or a symbol like USDC/WETH, then retry.",
+            {"token": token, "chain": args.chain, "error": str(exc)},
             exit_code=2,
         )
     try:
-        payload = {"schemaVersion": 1, "chainKey": args.chain, "requestType": "token_preapprove_remove", "tokenAddress": token}
+        payload = {"schemaVersion": 1, "chainKey": args.chain, "requestType": "token_preapprove_remove", "tokenAddress": token_address}
         status_code, body = _api_request(
             "POST",
             "/agent/policy-approvals/proposed",
             payload=payload,
             include_idempotency=True,
-            idempotency_key=f"rt-polrev-token-{args.chain}-{_normalize_address(token)}",
+            idempotency_key=f"rt-polrev-token-{args.chain}-{_normalize_address(token_address)}",
         )
         if status_code < 200 or status_code >= 300:
             return fail(
@@ -2198,11 +2211,12 @@ def cmd_approvals_revoke_token(args: argparse.Namespace) -> int:
             )
         policy_approval_id = str(body.get("policyApprovalId", ""))
         status = str(body.get("status", "approval_pending"))
-        token_addr = _normalize_address(token)
+        token_addr = _normalize_address(token_address)
+        token_display = f"{token_symbol} ({token_addr})" if token_symbol else token_addr
         queued_message = (
             "Approval required (policy)\n\n"
             "Request: Revoke preapproved token\n"
-            f"Token: {token_addr}\n"
+            f"Token: {token_display}\n"
             f"Chain: {args.chain}\n"
             f"Approval ID: {policy_approval_id}\n"
             f"Status: {status}\n\n"
