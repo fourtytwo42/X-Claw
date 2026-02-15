@@ -31,12 +31,13 @@ MARKER = "xclaw: telegram approval callback received"
 DECISION_ACK_MARKER = "xclaw: telegram approval decision ack"
 DECISION_ACK_MARKER_V2 = "xclaw: telegram approval decision ack v2"
 DECISION_ACK_MARKER_V3 = "xclaw: telegram approval decision ack v3"
+DECISION_ROUTE_MARKER_V1 = "xclaw: telegram approval decision routed to agent"
 QUEUED_BUTTONS_MARKER = "xclaw: telegram queued approval buttons"
 QUEUED_BUTTONS_MARKER_V2 = "xclaw: telegram queued approval buttons v2"
 QUEUED_BUTTONS_MARKER_V3 = "xclaw: telegram queued approval buttons v3"
 LEGACY_DM_SENTINEL = 'Allow in DMs even when inlineButtonsScope is "allowlist", gated by chatId == senderId.'
 # Bump when patch semantics change so we invalidate the cached "already patched" fast-path.
-STATE_SCHEMA_VERSION = 19
+STATE_SCHEMA_VERSION = 20
 STATE_DIR = Path.home() / ".openclaw" / "xclaw"
 STATE_FILE = STATE_DIR / "openclaw_patch_state.json"
 LOCK_FILE = STATE_DIR / "openclaw_patch.lock"
@@ -250,7 +251,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
 
     # Upgrade path: if an older canonical block exists, replace it with the current canonical block.
     # This lets us ship UX tweaks (e.g. remove keyboard immediately) without telling users to reinstall OpenClaw.
-    if MARKER in raw and ("xappr|r|" not in raw or DECISION_ACK_MARKER_V3 not in raw):
+    if MARKER in raw and ("xappr|r|" not in raw or DECISION_ACK_MARKER_V3 not in raw or DECISION_ROUTE_MARKER_V1 not in raw):
         idx = raw.find(PAGINATION_ANCHOR)
         if idx < 0:
             return raw, False, "pagination_anchor_not_found"
@@ -260,7 +261,17 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
             normalized = True
 
     # If the canonical decision block is already present (newest version), ensure queued-message auto-buttons are too.
-    if MARKER in raw and DECISION_ACK_MARKER_V3 in raw:
+    # If we see the old ack-only version (missing route marker), drop and re-inject canonical block.
+    if MARKER in raw and DECISION_ACK_MARKER_V3 in raw and DECISION_ROUTE_MARKER_V1 not in raw:
+        idx = raw.find(PAGINATION_ANCHOR)
+        if idx < 0:
+            return raw, False, "pagination_anchor_not_found"
+        start = raw.rfind(CANONICAL_BLOCK_START, 0, idx)
+        if start >= 0:
+            raw = raw[:start] + raw[idx:]
+            normalized = True
+
+    if MARKER in raw and DECISION_ACK_MARKER_V3 in raw and DECISION_ROUTE_MARKER_V1 in raw:
         changed_any = False
         if QUEUED_BUTTONS_MARKER not in raw:
             raw2, changed2, err2 = _patch_queued_buttons(raw)
@@ -337,7 +348,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         '\t\t\t\t\t\t\t\t\t\tdate: atEpochSec\n'
         '\t\t\t\t\t\t\t\t\t};\n'
         '\t\t\t\t\t\t\t\t\tawait processMessage({ message: syntheticMessage, me: ctx.me, getFile }, [], storeAllowFrom, { messageIdOverride: `xclaw-approval-${callback.id}` });\n'
-        '\t\t\t\t\t\t\t\t\ttry { logger.info({ tradeId, chainKey, chatId, action }, \"xclaw: telegram approval decision routed to agent\"); } catch {}\n'
+        f'\t\t\t\t\t\t\t\t\ttry {{ logger.info({{ tradeId, chainKey, chatId, action }}, \"{DECISION_ROUTE_MARKER_V1}\"); }} catch {{}}\n'
         '\t\t\t\t\t\t\t\t} catch (err) {\n'
         '\t\t\t\t\t\t\t\t\t// Fallback: still send minimal confirmation so the user sees feedback even if the agent pipeline fails.\n'
         '\t\t\t\t\t\t\t\t\ttry {\n'
