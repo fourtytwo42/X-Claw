@@ -693,3 +693,20 @@ DoD:
 - [x] Telegram approval prompt text includes: `Approve swap`, `<amount> <tokenInSymbol> -> <tokenOutSymbol>`, `Chain`, `Trade`.
 - [x] Telegram approval prompt is deleted when approval is clicked; runtime also clears local prompt state once the trade leaves `approval_pending`.
 - [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.
+
+---
+
+## Slice 39: Approval Amount Visibility + Gateway Telegram Callback Reliability
+Status: [x]
+Issue: #42 (umbrella)
+
+Goal:
+- Make approvals and activity in `/agents/:id` show human amounts (not just pairs), and ensure Telegram Approve buttons reliably perform `approval_pending -> approved` and delete the Telegram message (no LLM mediation).
+
+DoD:
+- [x] Approval queue rows show amount + tokenIn -> tokenOut (best-effort symbol resolution).
+- [x] Activity feed trade rows show amountIn and (when available) amountOut alongside token labels.
+- [x] OpenClaw gateway intercepts `xappr|a|<tradeId>|<chainKey>` callback payloads and posts `POST /api/v1/trades/:tradeId/status` with agent-auth + Idempotency-Key, then deletes the Telegram prompt on success.
+- [x] Runtime outbox replay is best-effort and does not block input validation (e.g. bad slippage returns `invalid_input` even when API env is missing).
+- [x] Patch artifact recorded under `patches/openclaw/` for OpenClaw `2026.2.9` dist gateway handler.
+- [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.

@@ -2689,3 +2689,27 @@ Issue mapping: `#42` (umbrella)
   - Telegram prompt includes swap summary (amount + token symbols) and tradeId, and is deleted after clicking Approve.
 - De-dupe:
   - Repeating the same trade request while one matching trade is `approval_pending` does not create a new tradeId or a new prompt; it reuses the existing tradeId and resumes after approval.
+
+---
+
+## Slice 39 Acceptance Evidence
+
+Date (UTC): 2026-02-15
+Active slice: `Slice 39: Approval Amount Visibility + Gateway Telegram Callback Reliability`
+Issue mapping: `#42` (umbrella)
+
+### Required gate evidence
+- `npm run db:parity` -> PASS (exit 0, checkedAt: 2026-02-15T10:54:04.763Z)
+- `npm run seed:reset` -> PASS (exit 0)
+- `npm run seed:load` -> PASS (exit 0, scenarios: `happy_path`, `approval_retry`, `degraded_rpc`, `copy_reject`)
+- `npm run seed:verify` -> PASS (exit 0)
+- `npm run build` -> PASS (exit 0)
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS
+
+### Scenario evidence (manual)
+- `/agents/:id` Approval Queue shows amount + tokenIn -> tokenOut (not just pair).
+- `/agents/:id` Activity feed trade rows show amountIn and amountOut when available.
+- Telegram Approve buttons:
+  - trigger agent-auth `POST /api/v1/trades/:tradeId/status` (`approval_pending -> approved`) via gateway callback intercept,
+  - delete the Telegram approval message after success (or convergence 409 approved/filled),
+  - web approvals queue converges immediately (trade no longer pending).

@@ -1345,3 +1345,25 @@ Note:
   - [x] `npm run seed:verify`
   - [x] `npm run build`
   - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+## 39) Slice 39: Approval Amount Visibility + Gateway Telegram Callback Reliability
+
+### 39.1 UX: amounts visible
+- [x] `/agents/:id` Approval Queue shows amount + tokenIn -> tokenOut.
+- [x] `/agents/:id` Activity trade rows show amountIn and (when available) amountOut.
+
+### 39.2 Gateway: Telegram callback reliability
+- [x] OpenClaw gateway intercepts `xappr|a|<tradeId>|<chainKey>` callbacks and transitions trade `approval_pending -> approved` via agent-auth `POST /api/v1/trades/:tradeId/status`.
+- [x] Telegram approval message is deleted after approval click (or converged 409: approved/filled).
+- [x] Patch recorded for OpenClaw `2026.2.9` dist build: `patches/openclaw/003_openclaw-2026.2.9-dist-xclaw-approvals.patch`.
+
+### 39.3 Validation + evidence
+- [x] Run required gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`

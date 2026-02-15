@@ -227,6 +227,27 @@ function formatActivityTitle(eventType: string): string {
   return eventType.replace(/_/g, ' ');
 }
 
+function formatDecimalText(value: string | null | undefined): string {
+  const raw = (value ?? '').trim();
+  if (!raw) {
+    return '—';
+  }
+  const sign = raw.startsWith('-') ? '-' : '';
+  const unsigned = sign ? raw.slice(1) : raw;
+  const [intPartRaw, fracPartRaw] = unsigned.split('.', 2);
+  const intPart = (intPartRaw || '0').replace(/^0+(?=\\d)/, '');
+  const intWithCommas = intPart.replace(/\\B(?=(\\d{3})+(?!\\d))/g, ',');
+  if (fracPartRaw && fracPartRaw.length > 0) {
+    return `${sign}${intWithCommas}.${fracPartRaw}`;
+  }
+  return `${sign}${intWithCommas}`;
+}
+
+function normalizeHexAddress(value: string): string {
+  const raw = (value ?? '').trim();
+  return raw.startsWith('0x') ? raw.toLowerCase() : raw.toLowerCase();
+}
+
 function usagePercent(current: number, maxRaw: string, enabled: boolean): number {
   if (!enabled) {
     return 0;
@@ -673,8 +694,36 @@ export default function AgentPublicProfilePage() {
   }
 
   const activityFeed = useMemo(() => {
+    const tokenSymbolByAddress = new Map<string, string>();
+    if (management.phase === 'ready') {
+      for (const entry of management.data.chainTokens ?? []) {
+        tokenSymbolByAddress.set(normalizeHexAddress(entry.address), entry.symbol);
+      }
+    }
+
+    const resolveTokenLabel = (value: string | null | undefined) => {
+      const raw = (value ?? '').trim();
+      if (!raw) return 'token';
+      if (!raw.startsWith('0x')) return raw;
+      return tokenSymbolByAddress.get(normalizeHexAddress(raw)) ?? shortenAddress(raw);
+    };
+
     const items: Array<
-      | { kind: 'trade'; id: string; at: string; status: string; pair: string; tokenIn: string; tokenOut: string; txHash: string | null; reason: string | null }
+      | {
+          kind: 'trade';
+          id: string;
+          at: string;
+          status: string;
+          pair: string;
+          tokenIn: string;
+          tokenOut: string;
+          tokenInLabel: string;
+          tokenOutLabel: string;
+          amountIn: string | null;
+          amountOut: string | null;
+          txHash: string | null;
+          reason: string | null;
+        }
       | { kind: 'event'; id: string; at: string; eventType: string; pairDisplay: string | null; tokenInSymbol: string | null; tokenOutSymbol: string | null }
     > = [];
 
@@ -687,6 +736,10 @@ export default function AgentPublicProfilePage() {
         pair: trade.pair,
         tokenIn: trade.token_in,
         tokenOut: trade.token_out,
+        tokenInLabel: resolveTokenLabel(trade.token_in),
+        tokenOutLabel: resolveTokenLabel(trade.token_out),
+        amountIn: trade.amount_in,
+        amountOut: trade.amount_out,
         txHash: trade.tx_hash,
         reason: trade.reason_code ?? trade.reason_message ?? trade.reason ?? null
       });
@@ -706,7 +759,7 @@ export default function AgentPublicProfilePage() {
 
     items.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
     return items.slice(0, 30);
-  }, [activity, trades]);
+  }, [activity, trades, management.phase]);
 
   async function refreshManagementState() {
     if (!agentId) {
@@ -1025,6 +1078,11 @@ export default function AgentPublicProfilePage() {
                       <div className="wallet-activity-title">
                         <strong>Swap</strong>
                         <span className="status-chip">{item.status}</span>
+                      </div>
+                      <div className="muted">
+                        {formatDecimalText(item.amountIn)} {item.tokenInLabel} {'->'}{' '}
+                        {item.amountOut ? `${formatDecimalText(item.amountOut)} ` : ''}
+                        {item.tokenOutLabel}
                       </div>
                       <div className="muted">{item.pair || `${item.tokenIn} -> ${item.tokenOut}`}</div>
                       {item.txHash ? <div className="muted hard-wrap">Tx: {shortenHex(item.txHash, 10, 8)}</div> : null}
@@ -1486,7 +1544,26 @@ export default function AgentPublicProfilePage() {
                 {management.data.approvalsQueue.map((item) => (
                   <div key={item.trade_id} className="queue-item">
                     <div>
-                      <strong>{item.pair}</strong>
+                      {(() => {
+                        const symbolByAddress = new Map<string, string>();
+                        for (const entry of management.data.chainTokens ?? []) {
+                          symbolByAddress.set(normalizeHexAddress(entry.address), entry.symbol);
+                        }
+                        const tokenInLabel = item.token_in.startsWith('0x')
+                          ? symbolByAddress.get(normalizeHexAddress(item.token_in)) ?? shortenAddress(item.token_in)
+                          : item.token_in;
+                        const tokenOutLabel = item.token_out.startsWith('0x')
+                          ? symbolByAddress.get(normalizeHexAddress(item.token_out)) ?? shortenAddress(item.token_out)
+                          : item.token_out;
+                        return (
+                          <>
+                            <strong>
+                              {formatDecimalText(item.amount_in)} {tokenInLabel} {'->'} {tokenOutLabel}
+                            </strong>
+                            <div className="muted">{shortenHex(item.trade_id, 10, 8)}</div>
+                          </>
+                        );
+                      })()}
                       <div className="muted">{formatUtc(item.created_at)} UTC</div>
                     </div>
                     <div className="toolbar">

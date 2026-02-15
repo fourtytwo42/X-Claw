@@ -1,21 +1,16 @@
 # X-Claw Context Pack
 
-## 1) Goal (Active: Slice 38)
-- Primary objective: complete `Slice 38: Telegram Approval Prompt Details + Pending Approval De-Dupe (No Spam)`.
+## 1) Goal (Active: Slice 39)
+- Primary objective: complete `Slice 39: Approval Amount Visibility + Gateway Telegram Callback Reliability`.
 - Success criteria:
-  - trade `approval_pending` triggers a Telegram approval prompt only when:
-    - Telegram approvals are enabled for agent+chain, and
-    - OpenClaw last active channel is Telegram (session store `lastChannel == telegram`)
-  - clicking Approve in Telegram:
-    - approves trade via agent-auth trade status transition (no separate Telegram secret),
-    - deletes the Telegram approval message,
-    - and `/agents/:id` approvals queue reflects approval immediately
-  - if web approves first, runtime deletes the Telegram prompt (best-effort + periodic sync)
-  - prompts include swap summary details (amount + token symbols) and tradeId
-  - repeated identical trade requests reuse the existing pending tradeId (no prompt spam)
-  - strict security boundary: approval execution is from real Telegram button click (no LLM/tool mediation)
-  - source-of-truth + canonical docs remain synchronized (schemas/openapi/tracker/roadmap/spec/tasks/acceptance)
-  - required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`
+  - `/agents/:id` Approval Queue shows amount + tokenIn -> tokenOut (not just pair).
+  - `/agents/:id` Activity shows trade amountIn/amountOut in the feed rows.
+  - Telegram Approve buttons:
+    - transition `approval_pending -> approved` via agent-auth `POST /api/v1/trades/:tradeId/status`,
+    - delete the Telegram approval message,
+    - and the web approvals queue converges immediately.
+  - runtime usage outbox replay is best-effort and never blocks local input validation errors.
+  - required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.
 
 ## 2) Constraints
 - Canonical authority: `docs/XCLAW_SOURCE_OF_TRUTH.md`.
@@ -33,37 +28,24 @@
   - `POST /api/v1/agent/approvals/prompt` records prompt metadata for cleanup/sync.
 - Telegram approve path:
   - Telegram approve uses `POST /api/v1/trades/:tradeId/status` (agent-auth + `Idempotency-Key`) to transition `approval_pending -> approved`.
- - Runtime de-dupe:
-   - `trade spot` reuses existing pending `tradeId` for identical request key while status remains `approval_pending`.
+ - No API schema changes in this slice; web UI only.
+ - OpenClaw gateway behavior change is delivered as a patch against OpenClaw dist bundle for the deployed version.
 
-## 4) Files and Boundaries (Slice 38 allowlist)
+## 4) Files and Boundaries (Slice 39 allowlist)
 - Web/API/UI:
   - `apps/network-web/src/app/agents/[agentId]/page.tsx`
-  - `apps/network-web/src/app/api/v1/management/approval-channels/update/route.ts`
-  - `apps/network-web/src/app/api/v1/agent/approvals/prompt/route.ts`
-  - `apps/network-web/src/app/api/v1/management/agent-state/route.ts`
-  - `apps/network-web/src/app/api/v1/agent/transfers/policy/route.ts`
-  - `apps/network-web/src/app/api/v1/trades/[tradeId]/status/route.ts`
 - Canonical docs/process:
   - `docs/XCLAW_SOURCE_OF_TRUTH.md`
   - `docs/XCLAW_SLICE_TRACKER.md`
   - `docs/XCLAW_BUILD_ROADMAP.md`
-  - `docs/api/openapi.v1.yaml`
-  - `docs/api/WALLET_COMMAND_CONTRACT.md`
   - `docs/CONTEXT_PACK.md`
   - `spec.md`
   - `tasks.md`
   - `acceptance.md`
 - Runtime:
   - `apps/agent-runtime/xclaw_agent/cli.py`
-- Shared schemas:
-  - `packages/shared-schemas/json/management-approval-channel-update-request.schema.json`
-  - `packages/shared-schemas/json/agent-approvals-prompt-request.schema.json`
-- Data model:
-  - `infrastructure/migrations/0010_slice34_telegram_approvals.sql`
 - OpenClaw:
-  - `Notes/openclaw/src/telegram/bot-handlers.ts`
-  - `Notes/openclaw/src/telegram/xclaw-approvals.ts`
+  - `patches/openclaw/003_openclaw-2026.2.9-dist-xclaw-approvals.patch`
 
 ## 5) Invariants
 - Status vocabulary remains exactly: `active`, `offline`, `degraded`, `paused`, `deactivated`.
@@ -78,11 +60,11 @@
   - `npm run seed:load`
   - `npm run seed:verify`
   - `npm run build`
+  - `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
 - Feature checks:
-  - enabling Telegram approvals in `/agents/:id` does not return/require any secret
-  - runtime sends a Telegram approval prompt only when OpenClaw last active channel is Telegram
-  - clicking Telegram Approve transitions trade `approval_pending -> approved` via agent-auth trade status and deletes the prompt message
-  - approving from web UI causes runtime cleanup to delete the Telegram prompt (best-effort + `approvals sync`)
+  - approvals queue shows amounts for pending approvals
+  - activity feed shows trade amounts in rows
+  - clicking Telegram Approve transitions trade and deletes the prompt message (no LLM mediation)
 
 ## 7) Evidence + Rollback
 - Capture command outputs and UX evidence in `acceptance.md`.

@@ -500,6 +500,27 @@ Add owner-managed per-agent, per-chain UTC-day trade caps (USD + filled-trade co
 
 ---
 
+# Slice 39 Spec: Approval Amount Visibility + Gateway Telegram Callback Reliability
+
+## Goal
+Improve `/agents/:id` operational readability by showing amounts in approvals and activity, and ensure Telegram Approve buttons reliably perform the approval transition (no LLM mediation) on the deployed OpenClaw gateway.
+
+## Success Criteria
+1. Approval Queue shows `amountIn tokenIn -> tokenOut` (best-effort symbol mapping).
+2. Activity feed trade rows show amountIn and (when available) amountOut.
+3. OpenClaw gateway intercepts `xappr|a|...` callbacks, calls `POST /api/v1/trades/:tradeId/status` with agent-auth + Idempotency-Key, and deletes the Telegram approval message on success.
+4. Runtime outbox replay does not block local input validation failures.
+
+## Acceptance Checks
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
 # Slice 31 Spec: Agents + Agent Management UX Refinement (Operational Clean)
 
 ## Goal

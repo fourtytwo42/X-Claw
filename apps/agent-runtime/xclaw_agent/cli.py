@@ -2310,7 +2310,11 @@ def cmd_trade_spot(args: argparse.Namespace) -> int:
     last_tx_hash: str | None = None
     last_approve_tx_hash: str | None = None
     try:
-        _replay_trade_usage_outbox()
+        # Best-effort: usage outbox replay should not block input validation or proposing.
+        try:
+            _replay_trade_usage_outbox()
+        except Exception:
+            pass
         token_in = _resolve_token_address(chain, args.token_in)
         token_out = _resolve_token_address(chain, args.token_out)
         if token_in.lower() == token_out.lower():
@@ -3006,7 +3010,11 @@ def cmd_trade_execute(args: argparse.Namespace) -> int:
     transition_state = "init"
     previous_status = "approved"
     try:
-        _replay_trade_usage_outbox()
+        # Best-effort: usage outbox replay should not block intent validation/execution.
+        try:
+            _replay_trade_usage_outbox()
+        except Exception:
+            pass
         trade = _read_trade_details(args.intent)
         status = str(trade.get("status"))
         if str(trade.get("chainKey")) != args.chain:
@@ -3986,7 +3994,11 @@ def cmd_limit_orders_run_once(args: argparse.Namespace) -> int:
 
     def _limit_orders_run_once_result(chain: str, sync: bool) -> dict[str, Any]:
         replayed, remaining = _replay_limit_order_outbox()
-        trade_usage_replayed, trade_usage_remaining = _replay_trade_usage_outbox()
+        # Best-effort: usage outbox replay should not block limit-order processing.
+        try:
+            trade_usage_replayed, trade_usage_remaining = _replay_trade_usage_outbox()
+        except Exception:
+            trade_usage_replayed, trade_usage_remaining = 0, 0
         synced = False
         if sync:
             _sync_limit_orders(chain)

@@ -509,3 +509,28 @@ Issue mapping: `#42` (umbrella)
   - [x] `npm run seed:verify`
   - [x] `npm run build`
   - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+# Slice 39 Tasks: Approval Amount Visibility + Gateway Telegram Callback Reliability
+
+Active slice: `Slice 39: Approval Amount Visibility + Gateway Telegram Callback Reliability`
+Issue mapping: `#42` (umbrella)
+
+## Checklist
+- [x] Web UX:
+  - [x] approval queue shows amount + tokenIn -> tokenOut
+  - [x] activity feed trade rows show amountIn/amountOut
+- [x] Gateway:
+  - [x] OpenClaw callback handler intercepts `xappr|a|...` and posts agent-auth trade status update
+  - [x] deletes approval message after success
+  - [x] patch recorded under `patches/openclaw/003_openclaw-2026.2.9-dist-xclaw-approvals.patch`
+- [x] Runtime:
+  - [x] outbox replay is best-effort and does not block input validation failures
+- [x] Gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`

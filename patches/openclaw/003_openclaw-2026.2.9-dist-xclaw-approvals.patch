@@ -1,0 +1,88 @@
+diff --git a/dist/loader-Ds3or8QX.js b/dist/loader-Ds3or8QX.js
+index 6f4d5d5..6f4d5d6 100644
+--- a/dist/loader-Ds3or8QX.js
++++ b/dist/loader-Ds3or8QX.js
+@@ -62341,6 +62341,74 @@
+ \t\t\t\tif (inlineButtonsScope === "allowlist") {
+ \t\t\t\t\tif (!isGroup) {
+ \t\t\t\t\t\tif (dmPolicy === "disabled") return;
+ \t\t\t\t\t\tif (dmPolicy !== "open") {
+ \t\t\t\t\t\t\tif (!(effectiveDmAllow.hasWildcard || effectiveDmAllow.hasEntries && isSenderAllowed({
+ \t\t\t\t\t\t\t\tallow: effectiveDmAllow,
+ \t\t\t\t\t\t\t\tsenderId,
+ \t\t\t\t\t\t\t\tsenderUsername
+ \t\t\t\t\t\t\t}))) return;
+ \t\t\t\t\t\t}
+ \t\t\t\t\t} else if (!(effectiveGroupAllow.hasWildcard || effectiveGroupAllow.hasEntries && isSenderAllowed({
+ \t\t\t\t\t\tallow: effectiveGroupAllow,
+ \t\t\t\t\t\tsenderId,
+ \t\t\t\t\t\tsenderUsername
+ \t\t\t\t\t}))) return;
+ \t\t\t\t}
++
++\t\t\t\t// X-Claw Telegram approvals: approve-only inline button handling (strict, no LLM).
++\t\t\t\t// Expected callback_data: xappr|a|<tradeId>|<chainKey>
++\t\t\t\tif (data.startsWith("xappr|")) {
++\t\t\t\t\tconst parts = data.split("|").map((p) => String(p || "").trim());
++\t\t\t\t\tif (parts.length === 4 && parts[1] === "a" && parts[2] && parts[3]) {
++\t\t\t\t\t\tconst tradeId = parts[2];
++\t\t\t\t\t\tconst chainKey = parts[3];
++\t\t\t\t\t\tconst skill = cfg?.skills?.entries?.["xclaw-agent"];
++\t\t\t\t\t\tconst env = skill?.env ?? {};
++\t\t\t\t\t\tconst rawBase = String(env?.XCLAW_API_BASE_URL ?? process.env.XCLAW_API_BASE_URL ?? "").trim().replace(/\\/+$/, "");
++\t\t\t\t\t\tconst apiBase = rawBase ? rawBase.endsWith("/api/v1") ? rawBase : `${rawBase}/api/v1` : "";
++\t\t\t\t\t\tconst apiKey = String(skill?.apiKey ?? env?.XCLAW_API_KEY ?? process.env.XCLAW_API_KEY ?? "").trim();
++\t\t\t\t\t\tif (!apiBase) {
++\t\t\t\t\t\t\tawait bot.api.editMessageText(chatId, callbackMessage.message_id, "Approval failed: missing XCLAW_API_BASE_URL in OpenClaw config.");
++\t\t\t\t\t\t\treturn;
++\t\t\t\t\t\t}
++\t\t\t\t\t\tif (!apiKey) {
++\t\t\t\t\t\t\tawait bot.api.editMessageText(chatId, callbackMessage.message_id, "Approval failed: missing xclaw-agent apiKey in OpenClaw config.");
++\t\t\t\t\t\t\treturn;
++\t\t\t\t\t\t}
++\t\t\t\t\t\ttry {
++\t\t\t\t\t\t\tconst res = await fetch(`${apiBase}/trades/${encodeURIComponent(tradeId)}/status`, {
++\t\t\t\t\t\t\t\tmethod: "POST",
++\t\t\t\t\t\t\t\theaders: {
++\t\t\t\t\t\t\t\t\t"content-type": "application/json",
++\t\t\t\t\t\t\t\t\tauthorization: `Bearer ${apiKey}`,
++\t\t\t\t\t\t\t\t\t"idempotency-key": `tg-approve-${tradeId}-${callbackMessage.message_id}`
++\t\t\t\t\t\t\t\t},
++\t\t\t\t\t\t\t\tbody: JSON.stringify({
++\t\t\t\t\t\t\t\t\ttradeId,
++\t\t\t\t\t\t\t\t\tfromStatus: "approval_pending",
++\t\t\t\t\t\t\t\t\ttoStatus: "approved",
++\t\t\t\t\t\t\t\t\treasonCode: null,
++\t\t\t\t\t\t\t\t\treasonMessage: null,
++\t\t\t\t\t\t\t\t\tat: (/* @__PURE__ */ new Date()).toISOString(),
++\t\t\t\t\t\t\t\t\tsource: { channel: "telegram", chainKey, senderId, to: String(chatId), messageId: String(callbackMessage.message_id) }
++\t\t\t\t\t\t\t\t})
++\t\t\t\t\t\t\t});
++\t\t\t\t\t\t\tif (res.ok) {
++\t\t\t\t\t\t\t\tawait bot.api.deleteMessage(chatId, callbackMessage.message_id);
++\t\t\t\t\t\t\t\treturn;
++\t\t\t\t\t\t\t}
++\t\t\t\t\t\t\tlet errCode = "api_error";
++\t\t\t\t\t\t\tlet errMsg = `HTTP ${res.status}`;
++\t\t\t\t\t\t\ttry {
++\t\t\t\t\t\t\t\tconst body = await res.json();
++\t\t\t\t\t\t\t\tif (typeof body?.code === "string" && body.code.trim()) errCode = body.code.trim();
++\t\t\t\t\t\t\t\tif (typeof body?.message === "string" && body.message.trim()) errMsg = body.message.trim();
++\t\t\t\t\t\t\t\tif (res.status === 409 && (body?.details?.currentStatus === "approved" || body?.details?.currentStatus === "filled")) {
++\t\t\t\t\t\t\t\t\tawait bot.api.deleteMessage(chatId, callbackMessage.message_id);
++\t\t\t\t\t\t\t\t\treturn;
++\t\t\t\t\t\t\t\t}
++\t\t\t\t\t\t\t} catch {
++\t\t\t\t\t\t\t}
++\t\t\t\t\t\t\tawait bot.api.editMessageText(chatId, callbackMessage.message_id, `Approval failed: ${errCode} (${errMsg}).`);
++\t\t\t\t\t\t\treturn;
++\t\t\t\t\t\t} catch (err) {
++\t\t\t\t\t\t\tawait bot.api.editMessageText(chatId, callbackMessage.message_id, `Approval failed: ${String(err)}`);
++\t\t\t\t\t\t\treturn;
++\t\t\t\t\t\t}
++\t\t\t\t\t}
++\t\t\t\t}
+ \t\t\t\tconst paginationMatch = data.match(/^commands_page_(\\d+|noop)(?::(.+))?$/);
+ \t\t\t\tif (paginationMatch) {
+ \t\t\t\t\tconst pageValue = paginationMatch[1];
+ \t\t\t\t\tif (pageValue === "noop") return;
