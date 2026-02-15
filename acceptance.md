@@ -3018,3 +3018,42 @@ Issue mapping: `#42` (umbrella)
 - Approving a revoke request applies:
   - token removal from preapproved token set, or
   - `Approve all` OFF (approval_mode=`per_trade`).
+
+---
+
+## Slice 54 Acceptance Evidence
+
+Date (UTC): 2026-02-15
+Active slice: `Slice 54: Policy Approval Reliability Fixes (Token Symbols + Agent Event Types)`
+Issue mapping: `#42` (umbrella)
+
+### Required gate evidence
+- `npm run db:parity` -> PASS (exit 0, checkedAt: 2026-02-15T23:00:12.749Z)
+- `npm run seed:reset` -> PASS (exit 0)
+- `npm run seed:load` -> PASS (exit 0, scenarios: `happy_path`, `approval_retry`, `degraded_rpc`, `copy_reject`)
+- `npm run seed:verify` -> PASS (exit 0)
+- `npm run build` -> PASS (exit 0)
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS
+
+### Scenario evidence (manual/ops)
+- Policy preapprove/revoke accepts token symbols (e.g. `USDC`) and resolves to token addresses server-side.
+- Policy approval propose endpoint emits `agent_events` without crashing due to missing `agent_event_type` values.
+
+---
+
+## Slice 55 Acceptance Evidence
+
+Date (UTC): 2026-02-15
+Active slice: `Slice 55: Policy Approval De-Dupe (Reuse Pending Request)`
+Issue mapping: `#42` (umbrella)
+
+### Required gate evidence
+- `npm run db:parity` -> PASS (exit 0, checkedAt: 2026-02-15T23:00:12.749Z)
+- `npm run seed:reset` -> PASS (exit 0)
+- `npm run seed:load` -> PASS (exit 0, scenarios: `happy_path`, `approval_retry`, `degraded_rpc`, `copy_reject`)
+- `npm run seed:verify` -> PASS (exit 0)
+- `npm run build` -> PASS (exit 0)
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS
+
+### Scenario evidence (manual/ops)
+- Proposing the same policy approval repeatedly while the previous is still `approval_pending` returns the same `policyApprovalId` (no new `ppr_...` rows created).

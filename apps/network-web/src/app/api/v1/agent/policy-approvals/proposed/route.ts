@@ -115,6 +115,36 @@ export async function POST(req: NextRequest) {
     }
 
     const approvalId = makeId('ppr');
+    // De-dupe: if an identical request is already pending, reuse it instead of creating a new ppr_... row.
+    const existing = await dbQuery<{ request_id: string; token_address: string | null }>(
+      `
+      select request_id, token_address
+      from agent_policy_approval_requests
+      where agent_id = $1
+        and chain_key = $2
+        and request_type = $3
+        and status = 'approval_pending'
+        and ($4::text is null and token_address is null or token_address = $4)
+      order by created_at desc
+      limit 1
+      `,
+      [auth.agentId, body.chainKey, body.requestType, tokenAddress]
+    );
+
+    if ((existing.rowCount ?? 0) > 0) {
+      const row = existing.rows[0];
+      const responseBody = {
+        ok: true,
+        policyApprovalId: row.request_id,
+        status: 'approval_pending',
+        chainKey: body.chainKey,
+        requestType: body.requestType,
+        tokenAddress: row.token_address ?? null
+      };
+      await storeIdempotencyResponse(idempotency.ctx, 200, responseBody);
+      return successResponse(responseBody, 200, requestId);
+    }
+
     await withTransaction(async (client) => {
       await client.query(
         `

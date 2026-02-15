@@ -814,6 +814,26 @@ with the same web + Telegram inline button flow as existing policy approvals.
 
 ---
 
+# Slice 55 Spec: Policy Approval De-Dupe (Reuse Pending Request)
+
+## Goal
+When a policy approval is already `approval_pending`, repeated identical requests must reuse the existing pending request rather than creating new `ppr_...` records.
+
+## Success Criteria
+1. `POST /api/v1/agent/policy-approvals/proposed` returns the existing pending request when `(agentId, chainKey, requestType, tokenAddress)` match.
+2. No duplicate `approval_pending` rows are created for identical requests under normal retry.
+3. No behavior change for non-pending or non-identical requests (new request is created).
+
+## Acceptance Checks
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
 # Slice 31 Spec: Agents + Agent Management UX Refinement (Operational Clean)
 
 ## Goal

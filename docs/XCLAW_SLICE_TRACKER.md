@@ -953,3 +953,35 @@ DoD:
 - [x] Runtime/skill: add CLI + skill commands for revoke token and revoke global.
 - [x] Web UI: policy approval queue displays correct labels for revoke requests.
 - [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.
+
+---
+
+## Slice 54: Policy Approval Reliability Fixes (Token Symbols + Agent Event Types)
+Status: [x]
+Issue: #42 (umbrella)
+
+Goal:
+- Make policy approval requests reliable in ops:
+  - agent/skill can request policy approvals using canonical token symbols (e.g. `USDC`) as well as 0x addresses, and
+  - server can emit policy approval lifecycle events without crashing due to missing `agent_event_type` enum values.
+
+DoD:
+- [x] Runtime/skill: policy approval request commands accept canonical token symbols and resolve them to chain token addresses.
+- [x] DB: `agent_event_type` includes `policy_approval_pending`, `policy_approved`, `policy_rejected`.
+- [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.
+
+---
+
+## Slice 55: Policy Approval De-Dupe (Reuse Pending Request)
+Status: [x]
+Issue: #42 (umbrella)
+
+Goal:
+- When the same policy approval is requested repeatedly (e.g. user says "try again"), do not spam new `ppr_...` requests if an identical request is already `approval_pending`.
+- De-dupe rule: reuse an existing `approval_pending` request for the same `(agentId, chainKey, requestType, tokenAddress)` and return that `policyApprovalId`.
+
+DoD:
+- [x] docs sync first: source-of-truth + roadmap + tracker + context/spec/tasks/acceptance aligned to Slice 55.
+- [x] Server: `/api/v1/agent/policy-approvals/proposed` reuses an existing pending request rather than creating a new one when parameters match.
+- [x] DB: add index to support efficient lookup for de-dupe.
+- [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.

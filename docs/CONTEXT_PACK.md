@@ -285,6 +285,31 @@ Issue mapping: `#42` (umbrella)
   - `docs/CONTEXT_PACK.md`
   - `spec.md`
   - `tasks.md`
+- `acceptance.md`
+
+---
+
+## Slice 55 Context: Policy Approval De-Dupe (Reuse Pending Request)
+
+### Objective
+- Prevent policy approval spam by reusing an existing pending request when the same policy change is requested repeatedly.
+
+### Scope lock
+- In scope: server propose endpoint behavior + DB index + docs/process evidence.
+- Out of scope: Telegram/web decision handling (unchanged).
+
+### Expected touched files (Slice 55 allowlist)
+- Server:
+  - `apps/network-web/src/app/api/v1/agent/policy-approvals/proposed/route.ts`
+- Data model:
+  - `infrastructure/migrations/*.sql`
+- Docs/process:
+  - `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - `docs/XCLAW_SLICE_TRACKER.md`
+  - `docs/XCLAW_BUILD_ROADMAP.md`
+  - `docs/CONTEXT_PACK.md`
+  - `spec.md`
+  - `tasks.md`
   - `acceptance.md`
 - Contracts/docs:
   - `docs/api/openapi.v1.yaml`

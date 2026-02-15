@@ -1773,3 +1773,57 @@ Note:
   - [x] `npm run seed:verify`
   - [x] `npm run build`
   - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+## 54) Slice 54: Policy Approval Reliability Fixes (Token Symbols + Agent Event Types)
+
+### 54.1 Canonical/doc sync
+- [x] Add Slice 54 goal/DoD + issue mapping to `docs/XCLAW_SLICE_TRACKER.md`.
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` and skill docs to reflect token symbol support and policy approval event types.
+
+### 54.2 Data model
+- [x] Add migration for policy approval lifecycle event enum values.
+- [x] `npm run db:parity`
+
+### 54.3 Implementation
+- [x] Runtime/skill: allow `policy-preapprove-token USDC` / `policy-revoke-token USDC` (resolve canonical symbol to token address).
+- [x] Server: policy approval propose endpoint emits lifecycle events without enum errors.
+
+### 54.4 Validation + evidence
+- [x] Run required gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+## 55) Slice 55: Policy Approval De-Dupe (Reuse Pending Request)
+
+### 55.1 Canonical/doc sync
+- [x] Add Slice 55 goal/DoD + issue mapping to `docs/XCLAW_SLICE_TRACKER.md`.
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` to lock de-dupe semantics.
+- [x] Update handoff/process artifacts:
+  - [x] `docs/CONTEXT_PACK.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+
+### 55.2 Data model
+- [x] Add index to support de-dupe lookup on `agent_policy_approval_requests`.
+- [x] `npm run db:parity`
+
+### 55.3 Implementation
+- [x] Server: policy approval propose endpoint reuses existing `approval_pending` request when parameters match.
+
+### 55.4 Validation + evidence
+- [x] Run required gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`

@@ -2615,3 +2615,10 @@ Limitations / notes:
    - `POST /api/v1/agent/policy-approvals/proposed` (agent-auth) creates a pending request.
    - `POST /api/v1/policy-approvals/:policyApprovalId/decision` (agent-auth) applies approve/deny for Telegram callbacks.
    - `POST /api/v1/management/policy-approvals/decision` (owner-auth) applies approve/deny from the web UI.
+9. De-dupe semantics (locked):
+   - If an identical policy approval request is already `approval_pending` for the same:
+     - `agentId`, `chainKey`, `requestType`, `tokenAddress` (null-safe),
+     then proposing again must reuse and return the existing `policyApprovalId` instead of creating a new request.
+10. Token addressing:
+   - Server requests use `tokenAddress` as a 0x address.
+   - Runtime/skill may accept canonical token symbols (e.g. `USDC`) and must resolve them to the chain canonical token address before proposing.
