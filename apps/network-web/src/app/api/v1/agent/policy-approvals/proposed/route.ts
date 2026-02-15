@@ -154,7 +154,11 @@ export async function POST(req: NextRequest) {
     };
     await storeIdempotencyResponse(idempotency.ctx, 200, responseBody);
     return successResponse(responseBody, 200, requestId);
-  } catch {
+  } catch (error) {
+    console.error('[agent/policy-approvals/proposed] unhandled error', {
+      requestId,
+      error: error instanceof Error ? error.message : String(error)
+    });
     return internalErrorResponse(requestId);
   }
 }
