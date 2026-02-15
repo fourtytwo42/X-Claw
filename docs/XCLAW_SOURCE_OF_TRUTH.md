@@ -2536,7 +2536,11 @@ Limitations / notes:
 4. Execution boundary:
    - clicking a Telegram inline button must trigger approval **without LLM/tool mediation**.
    - OpenClaw intercepts the callback payload and performs an agent-authenticated approval transition using the existing `xclaw-agent` API key (no separate Telegram secret).
-   - Deployment note (gateway): the intercept must occur in the Telegram `callback_query` handler before any routing into the model/message pipeline. For OpenClaw `2026.2.9` packaged installs (dist-only), apply `patches/openclaw/003_openclaw-2026.2.9-dist-xclaw-approvals.patch` in the OpenClaw package root and restart `openclaw-gateway.service`.
+   - Deployment note (gateway): the intercept must occur in the Telegram `callback_query` handler before any routing into the model/message pipeline.
+   - Portability rule: X-Claw provides a Python-first patcher that auto-applies the OpenClaw gateway patch:
+     - when installing/updating the xclaw-agent skill, and
+     - on the next skill use after an OpenClaw update overwrites the installed gateway bundle.
+   - Restart safety: gateway restart is best-effort and only triggered when the patch is newly applied, with a cooldown + lock to avoid restart loops.
 5. Trade lifecycle:
    - when a trade is inserted as `approval_pending`, the runtime may send a Telegram approval prompt **only** if:
      - Telegram approvals are enabled for that agent+chain, and

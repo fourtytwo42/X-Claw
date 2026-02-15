@@ -710,3 +710,24 @@ DoD:
 - [x] Runtime outbox replay is best-effort and does not block input validation (e.g. bad slippage returns `invalid_input` even when API env is missing).
 - [x] Patch artifact recorded under `patches/openclaw/` for OpenClaw `2026.2.9` dist gateway handler.
 - [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.
+
+---
+
+## Slice 40: OpenClaw Patch Auto-Apply (Portable, No Restart Loops)
+Status: [x]
+Issue: #42 (umbrella)
+
+Goal:
+- Make Telegram approval callback support portable: the X-Claw installer/update flow and the xclaw-agent skill wrapper automatically (re)apply the OpenClaw gateway patch after OpenClaw updates, and restart safely without loops.
+
+DoD:
+- [x] docs sync first: source-of-truth + roadmap + tracker + context/spec/tasks/acceptance aligned to Slice 40.
+- [x] patch auto-apply:
+  - [x] installer/update path applies patch idempotently (no-op if already patched),
+  - [x] next skill use after OpenClaw update re-applies patch if overwritten.
+- [x] restart safety:
+  - [x] gateway restart is best-effort and only triggered when a patch is newly applied,
+  - [x] restart uses cooldown + lock to avoid repeated restart loops.
+- [x] patch mechanism does not depend on hardcoded `dist/loader-*.js` filenames (detects target file(s) dynamically).
+- [x] patch state is recorded locally so repeated calls are cheap and failure backoff prevents thrashing.
+- [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.

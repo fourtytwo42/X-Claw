@@ -534,3 +534,31 @@ Issue mapping: `#42` (umbrella)
   - [x] `npm run seed:verify`
   - [x] `npm run build`
   - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+# Slice 40 Tasks: OpenClaw Patch Auto-Apply (Portable, No Restart Loops)
+
+Active slice: `Slice 40: OpenClaw Patch Auto-Apply (Portable, No Restart Loops)`
+Issue mapping: `#42` (umbrella)
+
+## Checklist
+- [x] Docs sync:
+  - [x] `docs/XCLAW_SLICE_TRACKER.md`
+  - [x] `docs/XCLAW_BUILD_ROADMAP.md`
+  - [x] `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - [x] `docs/CONTEXT_PACK.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+- [x] Implementation:
+  - [x] add `skills/xclaw-agent/scripts/openclaw_gateway_patch.py` (idempotent, dynamic bundle detection, lock + cooldown)
+  - [x] call patcher from `skills/xclaw-agent/scripts/setup_agent_skill.py`
+  - [x] call patcher best-effort from `skills/xclaw-agent/scripts/xclaw_agent_skill.py`
+- [x] Gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`

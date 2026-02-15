@@ -1367,3 +1367,36 @@ Note:
   - [x] `npm run seed:verify`
   - [x] `npm run build`
   - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+## 40) Slice 40: OpenClaw Patch Auto-Apply (Portable, No Restart Loops)
+
+### 40.1 Canonical/doc sync
+- [x] Add Slice 40 goal/DoD + issue mapping to `docs/XCLAW_SLICE_TRACKER.md`.
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` with auto-apply + restart-loop guard semantics.
+- [x] Update handoff/process artifacts:
+  - [x] `docs/CONTEXT_PACK.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+
+### 40.2 Implementation
+- [x] Add Python-first patcher that:
+  - [x] locates installed OpenClaw package root from `which openclaw`,
+  - [x] finds the active Telegram callback handler bundle(s) dynamically (no hardcoded hashed filename),
+  - [x] applies patch idempotently using stable anchors and a marker,
+  - [x] records local patch state + failure backoff,
+  - [x] restarts gateway best-effort only when patch newly applied (cooldown + lock).
+- [x] Call patcher from:
+  - [x] installer/update flow (`setup_agent_skill.py`),
+  - [x] skill wrapper path (`xclaw_agent_skill.py`) to recover after OpenClaw updates.
+
+### 40.3 Validation + evidence
+- [x] Run required gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`

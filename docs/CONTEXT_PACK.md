@@ -1,15 +1,12 @@
 # X-Claw Context Pack
 
-## 1) Goal (Active: Slice 39)
-- Primary objective: complete `Slice 39: Approval Amount Visibility + Gateway Telegram Callback Reliability`.
+## 1) Goal (Active: Slice 40)
+- Primary objective: complete `Slice 40: OpenClaw Patch Auto-Apply (Portable, No Restart Loops)`.
 - Success criteria:
-  - `/agents/:id` Approval Queue shows amount + tokenIn -> tokenOut (not just pair).
-  - `/agents/:id` Activity shows trade amountIn/amountOut in the feed rows.
-  - Telegram Approve buttons:
-    - transition `approval_pending -> approved` via agent-auth `POST /api/v1/trades/:tradeId/status`,
-    - delete the Telegram approval message,
-    - and the web approvals queue converges immediately.
-  - runtime usage outbox replay is best-effort and never blocks local input validation errors.
+  - Installer/update flow auto-applies the OpenClaw Telegram callback patch idempotently.
+  - After an OpenClaw update overwrites the gateway bundle, the next use of the xclaw-agent skill auto-reapplies the patch.
+  - Gateway restarts are best-effort and only happen when a patch is newly applied, with a cooldown + lock to prevent loops.
+  - Patch targeting is dynamic (no reliance on hashed `dist/loader-*.js` filenames).
   - required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.
 
 ## 2) Constraints
@@ -31,9 +28,9 @@
  - No API schema changes in this slice; web UI only.
  - OpenClaw gateway behavior change is delivered as a patch against OpenClaw dist bundle for the deployed version.
 
-## 4) Files and Boundaries (Slice 39 allowlist)
+## 4) Files and Boundaries (Slice 40 allowlist)
 - Web/API/UI:
-  - `apps/network-web/src/app/agents/[agentId]/page.tsx`
+  - none
 - Canonical docs/process:
   - `docs/XCLAW_SOURCE_OF_TRUTH.md`
   - `docs/XCLAW_SLICE_TRACKER.md`
@@ -43,9 +40,12 @@
   - `tasks.md`
   - `acceptance.md`
 - Runtime:
-  - `apps/agent-runtime/xclaw_agent/cli.py`
+  - none
 - OpenClaw:
-  - `patches/openclaw/003_openclaw-2026.2.9-dist-xclaw-approvals.patch`
+  - `skills/xclaw-agent/scripts/openclaw_gateway_patch.py`
+  - `skills/xclaw-agent/scripts/setup_agent_skill.py`
+  - `skills/xclaw-agent/scripts/xclaw_agent_skill.py`
+  - patch artifacts in `patches/openclaw/` (for reproducibility / inspection)
 
 ## 5) Invariants
 - Status vocabulary remains exactly: `active`, `offline`, `degraded`, `paused`, `deactivated`.
@@ -62,9 +62,8 @@
   - `npm run build`
   - `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
 - Feature checks:
-  - approvals queue shows amounts for pending approvals
-  - activity feed shows trade amounts in rows
-  - clicking Telegram Approve transitions trade and deletes the prompt message (no LLM mediation)
+  - running installer twice does not restart gateway again when already patched
+  - after simulating an OpenClaw update (patch marker removed), next skill use re-applies patch and restarts once
 
 ## 7) Evidence + Rollback
 - Capture command outputs and UX evidence in `acceptance.md`.

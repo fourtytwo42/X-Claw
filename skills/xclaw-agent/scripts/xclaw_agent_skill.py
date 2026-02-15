@@ -17,6 +17,20 @@ from pathlib import Path
 from typing import Iterable, List, Optional
 
 
+def _maybe_patch_openclaw_gateway() -> None:
+    if os.environ.get("XCLAW_OPENCLAW_AUTO_PATCH", "1").strip().lower() in {"0", "false", "no"}:
+        return
+    script_dir = Path(__file__).resolve().parent
+    patcher = script_dir / "openclaw_gateway_patch.py"
+    if not patcher.exists():
+        return
+    # Best-effort, quiet. Restart is guarded by cooldown+lock inside the patcher.
+    try:
+        subprocess.run(["python3", str(patcher), "--json", "--restart"], text=True, capture_output=True, timeout=20)
+    except Exception:
+        return
+
+
 def _print_json(data: dict) -> None:
     print(json.dumps(data, separators=(",", ":")))
 
@@ -134,6 +148,7 @@ def _run_agent(args: Iterable[str]) -> int:
             return _err("invalid_env", "XCLAW_SKILL_TIMEOUT_SEC must be >= 1.", exit_code=2)
 
     try:
+        _maybe_patch_openclaw_gateway()
         proc = subprocess.run(cmd, text=True, capture_output=True, timeout=timeout_sec)
     except subprocess.TimeoutExpired:
         return _err(

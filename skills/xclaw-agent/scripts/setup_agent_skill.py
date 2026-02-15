@@ -14,6 +14,7 @@ from typing import Optional
 
 APP_DIR = Path.home() / ".xclaw-agent"
 POLICY_FILE = APP_DIR / "policy.json"
+PATCHER = Path(__file__).resolve().parent / "openclaw_gateway_patch.py"
 
 
 def run(cmd: list[str], check: bool = True, capture: bool = True) -> subprocess.CompletedProcess[str]:
@@ -187,6 +188,13 @@ def main() -> int:
         managed_skill = ensure_managed_skill_copy(workspace)
         launcher = ensure_launcher(workspace, openclaw_bin)
         ensure_default_policy_file(os.environ.get("XCLAW_DEFAULT_CHAIN", "base_sepolia"))
+        # Portable Telegram approvals: patch OpenClaw gateway bundle idempotently.
+        try:
+            if os.environ.get("XCLAW_OPENCLAW_AUTO_PATCH", "1").strip().lower() not in {"0", "false", "no"} and PATCHER.exists():
+                # Restart is best-effort and guarded by cooldown+lock inside patcher.
+                run(["python3", str(PATCHER), "--json", "--restart"], check=False)
+        except Exception:
+            pass
         versions = ensure_ready()
     except subprocess.CalledProcessError as exc:
         stderr = (exc.stderr or "").strip()

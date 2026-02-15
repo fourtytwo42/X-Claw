@@ -2713,3 +2713,27 @@ Issue mapping: `#42` (umbrella)
   - trigger agent-auth `POST /api/v1/trades/:tradeId/status` (`approval_pending -> approved`) via gateway callback intercept,
   - delete the Telegram approval message after success (or convergence 409 approved/filled),
   - web approvals queue converges immediately (trade no longer pending).
+
+---
+
+## Slice 40 Acceptance Evidence
+
+Date (UTC): 2026-02-15
+Active slice: `Slice 40: OpenClaw Patch Auto-Apply (Portable, No Restart Loops)`
+Issue mapping: `#42` (umbrella)
+
+### Required gate evidence
+- `npm run db:parity` -> PASS (exit 0, checkedAt: 2026-02-15T11:19:37.124Z)
+- `npm run seed:reset` -> PASS (exit 0)
+- `npm run seed:load` -> PASS (exit 0, scenarios: `happy_path`, `approval_retry`, `degraded_rpc`, `copy_reject`)
+- `npm run seed:verify` -> PASS (exit 0)
+- `npm run build` -> PASS (exit 0)
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS
+
+### Scenario evidence (manual/ops)
+- Running installer/update twice:
+  - second run is a no-op for patch and does not restart gateway.
+- After OpenClaw update overwrites the gateway bundle:
+  - next xclaw-agent skill use auto-applies patch and restarts gateway once.
+- Restart-loop guard:
+  - cooldown + lock prevents repeated restarts during frequent skill invocations.

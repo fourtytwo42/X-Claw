@@ -521,6 +521,27 @@ Improve `/agents/:id` operational readability by showing amounts in approvals an
 
 ---
 
+# Slice 40 Spec: OpenClaw Patch Auto-Apply (Portable, No Restart Loops)
+
+## Goal
+Make Telegram approval callbacks portable across users by auto-applying the OpenClaw gateway patch during install/update and on next skill use after OpenClaw updates, without causing restart loops.
+
+## Success Criteria
+1. Patch is applied idempotently (no-op when already present).
+2. Patch targeting is dynamic (no hardcoded hashed `dist/loader-*.js` filename).
+3. Gateway restart happens only when a new patch is applied and is guarded by a cooldown + lock.
+4. After an OpenClaw update overwrites the bundle, the next skill use re-applies and restarts once.
+
+## Acceptance Checks
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
 # Slice 31 Spec: Agents + Agent Management UX Refinement (Operational Clean)
 
 ## Goal
