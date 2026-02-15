@@ -4,7 +4,6 @@ import { dbQuery } from '@/lib/db';
 import { errorResponse, internalErrorResponse, successResponse } from '@/lib/errors';
 import { getChainConfig } from '@/lib/chains';
 import { requireManagementSession } from '@/lib/management-auth';
-import { STEPUP_COOKIE_NAME } from '@/lib/management-cookies';
 import { getRequestId } from '@/lib/request-id';
 
 export const runtime = 'nodejs';
@@ -207,29 +206,6 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const stepupCookie = req.cookies.get(STEPUP_COOKIE_NAME)?.value;
-    let stepup: { active: boolean; expiresAt: string | null } = { active: false, expiresAt: null };
-
-    if (stepupCookie) {
-      const stepupResult = await dbQuery<{ expires_at: string; revoked_at: string | null }>(
-        `
-        select expires_at::text, revoked_at::text
-        from stepup_sessions
-        where stepup_session_id = $1
-          and agent_id = $2
-          and management_session_id = $3
-        limit 1
-        `,
-        [stepupCookie, agentId, auth.session.sessionId]
-      );
-
-      if ((stepupResult.rowCount ?? 0) > 0) {
-        const row = stepupResult.rows[0];
-        const active = !row.revoked_at && new Date(row.expires_at).getTime() > Date.now();
-        stepup = { active, expiresAt: row.expires_at };
-      }
-    }
-
     const telegramApprovalEnabled = (approvalChannel.rowCount ?? 0) > 0 ? Boolean(approvalChannel.rows[0].enabled) : false;
     const telegramApprovalUpdatedAt = (approvalChannel.rowCount ?? 0) > 0 ? approvalChannel.rows[0].updated_at ?? null : null;
 
@@ -292,7 +268,6 @@ export async function GET(req: NextRequest) {
             ? { chainKey, chainEnabled: Boolean(chainPolicy.rows[0].chain_enabled), updatedAt: chainPolicy.rows[0].updated_at ?? null }
             : { chainKey, chainEnabled: true, updatedAt: null },
         auditLog: audit.rows,
-        stepup,
         managementSession: {
           sessionId: auth.session.sessionId,
           expiresAt: auth.session.expiresAt

@@ -285,35 +285,8 @@ main() {
     fi
   fi
 
-  # Management step-up + withdraw flow
+  # Management withdraw flow
   if [ -n "${csrf}" ]; then
-    code="$(post_json "POST" "${API_BASE}/management/stepup/challenge" \
-      "{\"agentId\":\"${AGENT_ID}\",\"issuedFor\":\"withdraw\"}" \
-      "${WORK_DIR}/stepup_challenge.json" \
-      -b "$COOKIE_JAR" -c "$COOKIE_JAR" \
-      -H "X-CSRF-Token: ${csrf}")"
-    if [ "$code" = "200" ]; then
-      record "PASS" "user:stepup-challenge" "$(cat "${WORK_DIR}/stepup_challenge.json")"
-      local otp
-      otp="$(jq -r '.code // empty' "${WORK_DIR}/stepup_challenge.json")"
-      if [ -n "$otp" ]; then
-        code="$(post_json "POST" "${API_BASE}/management/stepup/verify" \
-          "{\"agentId\":\"${AGENT_ID}\",\"code\":\"${otp}\"}" \
-          "${WORK_DIR}/stepup_verify.json" \
-          -b "$COOKIE_JAR" -c "$COOKIE_JAR" \
-          -H "X-CSRF-Token: ${csrf}")"
-        if [ "$code" = "200" ]; then
-          record "PASS" "user:stepup-verify" "$(cat "${WORK_DIR}/stepup_verify.json")"
-        else
-          record "FAIL" "user:stepup-verify" "status=${code} body=$(cat "${WORK_DIR}/stepup_verify.json" 2>/dev/null)"
-        fi
-      else
-        record "FAIL" "user:stepup-otp" "challenge response did not include test code"
-      fi
-    else
-      record "FAIL" "user:stepup-challenge" "status=${code} body=$(cat "${WORK_DIR}/stepup_challenge.json" 2>/dev/null)"
-    fi
-
     code="$(post_json "POST" "${API_BASE}/management/withdraw/destination" \
       "{\"agentId\":\"${AGENT_ID}\",\"chainKey\":\"base_sepolia\",\"destination\":\"0x1111111111111111111111111111111111111111\"}" \
       "${WORK_DIR}/withdraw_dest.json" \

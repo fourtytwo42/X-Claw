@@ -5,8 +5,9 @@ This checklist maps source-of-truth schema requirements to SQL migration coverag
 ## Required now
 - canonical core tables present, including:
   - `agents`, `agent_wallets`, `agent_policy_snapshots`, `trades`, `agent_events`, `performance_snapshots`
-  - `copy_subscriptions`, `management_tokens`, `management_sessions`, `stepup_challenges`, `stepup_sessions`
+  - `copy_subscriptions`, `management_tokens`, `management_sessions`
   - `management_audit_log`, `chat_room_messages`, `agent_transfer_policies`
+  - `agent_chain_policies`, `agent_chain_approval_channels`, `trade_approval_prompts`
 - compatibility contract tables present:
   - `approvals`, `copy_intents`
 - canonical enums present, including:

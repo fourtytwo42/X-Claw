@@ -124,3 +124,51 @@ Issue mapping: `#42` (umbrella)
   - `npm run seed:verify`
   - `npm run build`
   - `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+## Slice 36 Context: Remove Step-Up Authentication (Management Cookie Only)
+
+Issue mapping: `#42` (umbrella)
+
+### Objective + scope lock
+- Objective: remove step-up entirely (cookies, endpoints, UI prompts, runtime command, DB objects) so management session cookie + CSRF is sufficient for all management actions.
+- Scope guard honored: no replacement 2FA system, no dependency additions.
+
+### Expected touched files (Slice 36 allowlist)
+- Data model:
+  - `infrastructure/migrations/0011_slice36_remove_stepup.sql`
+  - `infrastructure/scripts/check-migration-parity.mjs`
+- Server/API/UI:
+  - `apps/network-web/src/lib/management-auth.ts`
+  - `apps/network-web/src/lib/management-cookies.ts`
+  - `apps/network-web/src/lib/management-service.ts`
+  - `apps/network-web/src/lib/errors.ts`
+  - `apps/network-web/src/app/api/v1/management/*` (remove stepup gates)
+  - `apps/network-web/src/app/api/v1/management/stepup/*` (delete)
+  - `apps/network-web/src/app/api/v1/agent/stepup/*` (delete)
+  - `apps/network-web/src/app/agents/[agentId]/page.tsx`
+- Runtime/skill:
+  - `apps/agent-runtime/xclaw_agent/cli.py`
+  - `skills/xclaw-agent/scripts/xclaw_agent_skill.py`
+  - `skills/xclaw-agent/references/commands.md`
+  - `skills/xclaw-agent/SKILL.md`
+- Docs/contracts:
+  - `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - `docs/XCLAW_SLICE_TRACKER.md`
+  - `docs/XCLAW_BUILD_ROADMAP.md`
+  - `docs/api/openapi.v1.yaml`
+  - `docs/api/AUTH_WIRE_EXAMPLES.md`
+  - `packages/shared-schemas/json/*` (remove stepup schemas, update approval schema)
+  - `spec.md`
+  - `tasks.md`
+  - `acceptance.md`
+
+### Verification Plan
+- Required gates:
+  - `npm run db:parity`
+  - `npm run seed:reset`
+  - `npm run seed:load`
+  - `npm run seed:verify`
+  - `npm run build`
+  - `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`

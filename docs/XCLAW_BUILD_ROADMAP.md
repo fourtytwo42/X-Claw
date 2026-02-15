@@ -197,8 +197,6 @@ Exit criteria:
 
 ### 5.2 Management/auth endpoints
 - [x] `POST /api/v1/management/session/bootstrap`
-- [x] `POST /api/v1/management/stepup/challenge`
-- [x] `POST /api/v1/management/stepup/verify`
 - [x] `POST /api/v1/management/revoke-all`
 
 ### 5.3 Public read endpoints
@@ -226,12 +224,12 @@ Exit criteria:
 
 ### 6.1 Session mechanics
 - [x] management cookie behavior implemented (`xclaw_mgmt`)
-- [x] step-up cookie behavior implemented (`xclaw_stepup`)
+- [x] step-up authentication removed (Slice 36)
 - [x] CSRF protection on sensitive writes (`xclaw_csrf`)
 - [x] token bootstrap strip from URL implemented
 
 ### 6.2 Rotation/revocation
-- [x] management token rotate invalidates mgmt + stepup sessions in correct order
+- [x] management token rotate invalidates mgmt sessions in correct order
 - [x] revoke-all endpoint behavior verified
 - [x] audit events emitted for security-sensitive actions
 
@@ -1230,6 +1228,49 @@ Use this every work session:
 - [x] USDC (and other ERC-20s) are formatted using decimals from deposit/balance snapshot (no hardcoded USDC decimals).
 
 ### 35.4 Validation + evidence
+- [x] Run required gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+## 36) Slice 36: Remove Step-Up Authentication (Management Cookie Only)
+
+### 36.1 Canonical/doc sync (must happen before implementation)
+- [x] Add Slice 36 goal/DoD + issue mapping to `docs/XCLAW_SLICE_TRACKER.md`.
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` to remove step-up tables/endpoints and step-up rules.
+- [x] Update `docs/api/openapi.v1.yaml` and remove step-up security scheme + endpoints.
+- [x] Update shared schemas in `packages/shared-schemas/json/` to remove step-up schemas and legacy `requiresStepup`.
+- [x] Update handoff/process artifacts:
+  - [x] `docs/CONTEXT_PACK.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+
+### 36.2 Data model
+- [x] Migration drops:
+  - [x] `stepup_challenges`
+  - [x] `stepup_sessions`
+  - [x] `stepup_issued_for`
+  - [x] legacy `approvals.requires_stepup`
+- [x] Update `infrastructure/scripts/check-migration-parity.mjs` to stop requiring step-up tables/enum.
+
+### 36.3 Server/API/UI/runtime
+- [x] Remove step-up routes (404 by deletion):
+  - [x] `/api/v1/management/stepup/challenge`
+  - [x] `/api/v1/management/stepup/verify`
+  - [x] `/api/v1/agent/stepup/challenge`
+- [x] Remove `requireStepupSession` and `xclaw_stepup` cookie logic.
+- [x] Remove any remaining step-up gating on management endpoints (withdraw, chain enable, telegram enable, policy update).
+- [x] `/agents/:id` removes all step-up prompt UI and “Session and Step-up” card.
+- [x] runtime removes `xclaw-agent stepup-code` and skill/docs remove `stepup-code`.
+- [x] Update `infrastructure/scripts/e2e-full-pass.sh` to remove step-up flows.
+
+### 36.4 Validation + evidence
 - [x] Run required gates:
   - [x] `npm run db:parity`
   - [x] `npm run seed:reset`

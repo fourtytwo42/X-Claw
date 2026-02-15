@@ -8,7 +8,7 @@ import { parseJsonBody } from '@/lib/http';
 import { makeId } from '@/lib/ids';
 import { getChainConfig } from '@/lib/chains';
 import { hashApprovalChannelSecret } from '@/lib/approval-channel-secret';
-import { requireManagementWriteAuth, requireStepupSession } from '@/lib/management-auth';
+import { requireManagementWriteAuth } from '@/lib/management-auth';
 import { getRequestId } from '@/lib/request-id';
 import { validatePayload } from '@/lib/validation';
 
@@ -70,14 +70,10 @@ export async function POST(req: NextRequest) {
       return auth.response;
     }
 
-    // Enabling Telegram approvals is a sensitive action; disabling is allowed without step-up.
+    // Enabling Telegram approvals rotates and returns a new secret; disabling keeps the existing secret hash.
     let issuedSecret: string | null = null;
     let secretHash: string | null = null;
     if (body.enabled) {
-      const stepup = await requireStepupSession(req, requestId, body.agentId, auth.session.sessionId);
-      if (!stepup.ok) {
-        return stepup.response;
-      }
       issuedSecret = generateTelegramApprovalSecret();
       secretHash = hashApprovalChannelSecret(issuedSecret);
     }
@@ -146,4 +142,3 @@ export async function POST(req: NextRequest) {
     return internalErrorResponse(requestId);
   }
 }
-

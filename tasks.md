@@ -402,3 +402,47 @@ Issue mapping: `#42` (umbrella)
   - [x] `npm run seed:verify`
   - [x] `npm run build`
   - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+# Slice 36 Tasks: Remove Step-Up Authentication (Management Cookie Only)
+
+Active slice: `Slice 36: Remove Step-Up Authentication (Management Cookie Only)`
+Issue mapping: `#42` (umbrella)
+
+## Checklist
+- [x] Docs sync first:
+  - [x] `docs/XCLAW_SLICE_TRACKER.md`
+  - [x] `docs/XCLAW_BUILD_ROADMAP.md`
+  - [x] `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - [x] `docs/api/openapi.v1.yaml`
+  - [x] `docs/api/AUTH_WIRE_EXAMPLES.md`
+  - [x] `docs/CONTEXT_PACK.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+- [x] Data model:
+  - [x] `infrastructure/migrations/0011_slice36_remove_stepup.sql` drops step-up tables/enum and removes legacy `approvals.requires_stepup`.
+  - [x] Update `infrastructure/scripts/check-migration-parity.mjs` to remove step-up checks.
+- [x] Server:
+  - [x] Delete step-up endpoints (404 by removal):
+    - [x] `apps/network-web/src/app/api/v1/management/stepup/challenge/route.ts`
+    - [x] `apps/network-web/src/app/api/v1/management/stepup/verify/route.ts`
+    - [x] `apps/network-web/src/app/api/v1/agent/stepup/challenge/route.ts`
+  - [x] Remove `requireStepupSession` and step-up error codes.
+  - [x] Remove step-up gating from withdraw, chain enable, telegram enable, policy update.
+  - [x] Remove `stepup` field from management agent-state.
+- [x] UI:
+  - [x] Remove all step-up prompt/state from `/agents/:id`.
+- [x] Runtime/skill:
+  - [x] Remove `xclaw-agent stepup-code`.
+  - [x] Remove `stepup-code` from skill wrapper and docs.
+- [x] Ops scripts:
+  - [x] Update `infrastructure/scripts/e2e-full-pass.sh` to remove step-up flows.
+- [x] Gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`

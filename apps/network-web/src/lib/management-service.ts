@@ -33,32 +33,6 @@ export type BootstrapOutput = {
   expiresAt: string;
 };
 
-export type StepupChallengeInput = {
-  agentId: string;
-  issuedFor: 'withdraw' | 'approval_scope_change' | 'sensitive_action';
-  managementSessionId: string | null;
-  userAgent: string | null;
-};
-
-export type StepupChallengeOutput = {
-  challengeId: string;
-  code: string;
-  expiresAt: string;
-};
-
-export type StepupVerifyInput = {
-  agentId: string;
-  code: string;
-  managementSessionId: string;
-  userAgent: string | null;
-};
-
-export type StepupVerifyOutput = {
-  stepupSessionId: string;
-  stepupCookieValue: string;
-  expiresAt: string;
-};
-
 export type RevokeAllInput = {
   agentId: string;
   managementSessionId: string;
@@ -67,7 +41,6 @@ export type RevokeAllInput = {
 
 export type RevokeAllOutput = {
   agentId: string;
-  revokedStepupSessions: number;
   revokedManagementSessions: number;
   newManagementToken: string;
 };
@@ -131,10 +104,6 @@ export function hashManagementCookieSecret(sessionId: string, secret: string): s
   return hmacHex('management_cookie', `${sessionId}.${secret}`);
 }
 
-function hashStepupCode(agentId: string, code: string): string {
-  return hmacHex('stepup_code', `${agentId}.${code}`);
-}
-
 function encryptToken(token: string): string {
   const iv = randomBytes(12);
   const cipher = createCipheriv('aes-256-gcm', getManagementKey(), iv);
@@ -170,12 +139,6 @@ function constantTimeEqual(left: string, right: string): boolean {
 
 function randomBrowserLabel(index: number): string {
   return `browser-${String(index).padStart(3, '0')}`;
-}
-
-function generateOneTimeCode(): string {
-  const raw = randomBytes(4).readUInt32BE(0);
-  const code = raw % 100000000;
-  return String(code).padStart(8, '0');
 }
 
 function generateOpaqueToken(): string {
@@ -388,190 +351,6 @@ export async function issueOwnerManagementLink(input: IssueOwnerManagementLinkIn
   });
 }
 
-export async function createStepupChallenge(input: StepupChallengeInput): Promise<ServiceResult<StepupChallengeOutput>> {
-  return withTransaction(async (client) => {
-    const challengeId = makeId('stc');
-    const code = generateOneTimeCode();
-    const codeHash = hashStepupCode(input.agentId, code);
-    const expiresAt = nowPlusSeconds(24 * 60 * 60);
-
-    await client.query(
-      `
-      insert into stepup_challenges (
-        challenge_id, agent_id, code_hash, issued_for, expires_at, consumed_at, failed_attempts, created_at, updated_at
-      ) values ($1, $2, $3, $4, $5, null, 0, now(), now())
-      `,
-      [challengeId, input.agentId, codeHash, input.issuedFor, expiresAt.toISOString()]
-    );
-
-    await client.query(
-      `
-      insert into management_audit_log (
-        audit_id,
-        agent_id,
-        management_session_id,
-        action_type,
-        action_status,
-        public_redacted_payload,
-        private_payload,
-        user_agent,
-        created_at
-      ) values ($1, $2, $3, 'stepup.challenge', 'accepted', $4::jsonb, $5::jsonb, $6, now())
-      `,
-      [
-        makeId('aud'),
-        input.agentId,
-        input.managementSessionId,
-        JSON.stringify({ issuedFor: input.issuedFor }),
-        JSON.stringify({ challengeId }),
-        input.userAgent
-      ]
-    );
-
-    return {
-      ok: true,
-      data: {
-        challengeId,
-        code,
-        expiresAt: expiresAt.toISOString()
-      }
-    };
-  });
-}
-
-export async function verifyStepupChallenge(input: StepupVerifyInput): Promise<ServiceResult<StepupVerifyOutput>> {
-  const codeHash = hashStepupCode(input.agentId, input.code);
-
-  return withTransaction(async (client) => {
-    const challenge = await client.query<{
-      challenge_id: string;
-      expires_at: string;
-      consumed_at: string | null;
-      failed_attempts: number;
-    }>(
-      `
-      select challenge_id, expires_at::text, consumed_at::text, failed_attempts
-      from stepup_challenges
-      where agent_id = $1
-        and code_hash = $2
-      order by created_at desc
-      limit 1
-      `,
-      [input.agentId, codeHash]
-    );
-
-    if (challenge.rowCount === 0) {
-      await client.query(
-        `
-        update stepup_challenges
-        set failed_attempts = failed_attempts + 1,
-            updated_at = now()
-        where challenge_id = (
-          select challenge_id
-          from stepup_challenges
-          where agent_id = $1
-            and consumed_at is null
-            and expires_at > now()
-          order by created_at desc
-          limit 1
-        )
-        `,
-        [input.agentId]
-      );
-
-      return {
-        ok: false,
-        error: {
-          status: 401,
-          code: 'stepup_invalid' as const,
-          message: 'Step-up code is invalid.',
-          actionHint: 'Request a new step-up challenge and verify with the latest code.'
-        }
-      };
-    }
-
-    const row = challenge.rows[0];
-    if (row.consumed_at) {
-      return {
-        ok: false,
-        error: {
-          status: 401,
-          code: 'stepup_invalid' as const,
-          message: 'Step-up code has already been used.',
-          actionHint: 'Request a new step-up challenge.'
-        }
-      };
-    }
-
-    if (new Date(row.expires_at).getTime() <= Date.now()) {
-      return {
-        ok: false,
-        error: {
-          status: 401,
-          code: 'stepup_expired' as const,
-          message: 'Step-up code has expired.',
-          actionHint: 'Request a new step-up challenge and verify within 24 hours.'
-        }
-      };
-    }
-
-    await client.query(
-      `
-      update stepup_challenges
-      set consumed_at = now(),
-          updated_at = now()
-      where challenge_id = $1
-      `,
-      [row.challenge_id]
-    );
-
-    const stepupSessionId = makeId('stu');
-    const expiresAt = nowPlusSeconds(24 * 60 * 60);
-
-    await client.query(
-      `
-      insert into stepup_sessions (
-        stepup_session_id, agent_id, management_session_id, expires_at, revoked_at, created_at, updated_at
-      ) values ($1, $2, $3, $4, null, now(), now())
-      `,
-      [stepupSessionId, input.agentId, input.managementSessionId, expiresAt.toISOString()]
-    );
-
-    await client.query(
-      `
-      insert into management_audit_log (
-        audit_id,
-        agent_id,
-        management_session_id,
-        action_type,
-        action_status,
-        public_redacted_payload,
-        private_payload,
-        user_agent,
-        created_at
-      ) values ($1, $2, $3, 'stepup.verify', 'accepted', $4::jsonb, $5::jsonb, $6, now())
-      `,
-      [
-        makeId('aud'),
-        input.agentId,
-        input.managementSessionId,
-        JSON.stringify({ expiresAt: expiresAt.toISOString() }),
-        JSON.stringify({ challengeId: row.challenge_id, stepupSessionId }),
-        input.userAgent
-      ]
-    );
-
-    return {
-      ok: true,
-      data: {
-        stepupSessionId,
-        stepupCookieValue: stepupSessionId,
-        expiresAt: expiresAt.toISOString()
-      }
-    };
-  });
-}
-
 export async function revokeAllAndRotateManagementToken(input: RevokeAllInput): Promise<ServiceResult<RevokeAllOutput>> {
   const newToken = generateOpaqueToken();
   const newTokenCiphertext = encryptToken(newToken);
@@ -602,19 +381,6 @@ export async function revokeAllAndRotateManagementToken(input: RevokeAllInput): 
         }
       };
     }
-
-    const revokedStepup = await client.query<{ stepup_session_id: string }>(
-      `
-      update stepup_sessions
-      set revoked_at = now(),
-          updated_at = now()
-      where agent_id = $1
-        and revoked_at is null
-        and expires_at > now()
-      returning stepup_session_id
-      `,
-      [input.agentId]
-    );
 
     const revokedMgmt = await client.query<{ session_id: string }>(
       `
@@ -670,7 +436,6 @@ export async function revokeAllAndRotateManagementToken(input: RevokeAllInput): 
         input.agentId,
         input.managementSessionId,
         JSON.stringify({
-          revokedStepupSessions: revokedStepup.rowCount,
           revokedManagementSessions: revokedMgmt.rowCount
         }),
         JSON.stringify({ previousTokenId: activeToken.rows[0].token_id, newTokenId }),
@@ -682,7 +447,6 @@ export async function revokeAllAndRotateManagementToken(input: RevokeAllInput): 
       ok: true,
       data: {
         agentId: input.agentId,
-        revokedStepupSessions: revokedStepup.rowCount ?? 0,
         revokedManagementSessions: revokedMgmt.rowCount ?? 0,
         newManagementToken: newToken
       }

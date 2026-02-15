@@ -4,7 +4,7 @@ import { dbQuery, withTransaction } from '@/lib/db';
 import { errorResponse, internalErrorResponse, successResponse } from '@/lib/errors';
 import { parseJsonBody } from '@/lib/http';
 import { makeId } from '@/lib/ids';
-import { requireManagementWriteAuth, requireStepupSession } from '@/lib/management-auth';
+import { requireManagementWriteAuth } from '@/lib/management-auth';
 import { getRequestId } from '@/lib/request-id';
 import { validatePayload } from '@/lib/validation';
 
@@ -83,38 +83,6 @@ export async function POST(req: NextRequest) {
     const auth = await requireManagementWriteAuth(req, requestId, body.agentId);
     if (!auth.ok) {
       return auth.response;
-    }
-
-    const outboundFieldsTouched =
-      typeof body.outboundTransfersEnabled === 'boolean' ||
-      typeof body.outboundMode === 'string' ||
-      Array.isArray(body.outboundWhitelistAddresses);
-
-    const previousPolicy = await dbQuery<{ approval_mode: 'per_trade' | 'auto'; allowed_tokens: unknown }>(
-      `
-      select approval_mode, allowed_tokens
-      from agent_policy_snapshots
-      where agent_id = $1
-      order by created_at desc
-      limit 1
-      `,
-      [body.agentId]
-    );
-    const prevMode = previousPolicy.rows[0]?.approval_mode ?? null;
-    const prevAllowed = normalizeTokenSet(previousPolicy.rows[0]?.allowed_tokens ?? []);
-
-    const nextAllowed = normalizeTokenSet(body.allowedTokens);
-    const enablingGlobalApproval = body.approvalMode === 'auto' && prevMode !== 'auto';
-    const enablingAnyTokenPreapproval = [...nextAllowed].some((token) => !prevAllowed.has(token));
-    const approvalEnablingTouched = enablingGlobalApproval || enablingAnyTokenPreapproval;
-
-    // Slice 33: step-up is required to enable Global Approval or enable token preapproval toggles.
-    // Disabling does not require step-up.
-    if (outboundFieldsTouched || approvalEnablingTouched) {
-      const stepup = await requireStepupSession(req, requestId, body.agentId, auth.session.sessionId);
-      if (!stepup.ok) {
-        return stepup.response;
-      }
     }
 
     const snapshotId = makeId('pol');

@@ -1,11 +1,9 @@
 import type { NextRequest, NextResponse } from 'next/server';
 
 export const MGMT_COOKIE_NAME = 'xclaw_mgmt';
-export const STEPUP_COOKIE_NAME = 'xclaw_stepup';
 export const CSRF_COOKIE_NAME = 'xclaw_csrf';
 
 export const MGMT_COOKIE_MAX_AGE_SEC = 30 * 24 * 60 * 60;
-export const STEPUP_COOKIE_MAX_AGE_SEC = 24 * 60 * 60;
 
 function isLoopbackHost(hostname: string): boolean {
   const host = hostname.toLowerCase();
@@ -22,16 +20,6 @@ export function setManagementCookie(res: NextResponse, req: NextRequest, value: 
     secure: shouldUseSecureCookies(req),
     sameSite: 'strict',
     maxAge: MGMT_COOKIE_MAX_AGE_SEC,
-    path: '/'
-  });
-}
-
-export function setStepupCookie(res: NextResponse, req: NextRequest, value: string): void {
-  res.cookies.set(STEPUP_COOKIE_NAME, value, {
-    httpOnly: true,
-    secure: shouldUseSecureCookies(req),
-    sameSite: 'strict',
-    maxAge: STEPUP_COOKIE_MAX_AGE_SEC,
     path: '/'
   });
 }
@@ -60,16 +48,11 @@ export function clearManagementCookie(res: NextResponse, req: NextRequest): void
   clearCookie(res, req, MGMT_COOKIE_NAME);
 }
 
-export function clearStepupCookie(res: NextResponse, req: NextRequest): void {
-  clearCookie(res, req, STEPUP_COOKIE_NAME);
-}
-
 export function clearCsrfCookie(res: NextResponse, req: NextRequest): void {
   clearCookie(res, req, CSRF_COOKIE_NAME);
 }
 
 export function clearAllManagementCookies(res: NextResponse, req: NextRequest): void {
   clearManagementCookie(res, req);
-  clearStepupCookie(res, req);
   clearCsrfCookie(res, req);
 }

@@ -638,3 +638,21 @@ DoD:
 - [x] USDC (and other ERC-20s) display uses decimals from the deposit/balance snapshot (no hardcoded USDC decimals).
 - [x] audit log/details section is expanded by default (no extra click to see it).
 - [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.
+
+---
+
+## Slice 36: Remove Step-Up Authentication (Management Cookie Only)
+Status: [x]
+Issue: #42 (umbrella)
+
+Goal:
+- Remove the step-up mechanism entirely so management session cookie + CSRF is sufficient for all management actions.
+
+DoD:
+- [x] docs sync first: source-of-truth + roadmap + tracker + openapi + context/spec/tasks/acceptance aligned to Slice 36.
+- [x] migration drops step-up tables and enum (`stepup_challenges`, `stepup_sessions`, `stepup_issued_for`) and removes legacy `approvals.requires_stepup`.
+- [x] step-up endpoints removed (404): `/api/v1/management/stepup/challenge`, `/api/v1/management/stepup/verify`, `/api/v1/agent/stepup/challenge`.
+- [x] no API endpoint requires `xclaw_stepup` cookie; `requireStepupSession` removed.
+- [x] `/agents/:id` shows no step-up UI/prompt and management actions no longer require codes.
+- [x] runtime removes `xclaw-agent stepup-code` and skill/docs no longer reference step-up.
+- [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.

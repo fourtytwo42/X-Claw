@@ -3282,49 +3282,6 @@ def cmd_management_link(args: argparse.Namespace) -> int:
         return fail("management_link_failed", str(exc), "Inspect runtime management-link path and retry.", exit_code=1)
 
 
-def cmd_stepup_code(args: argparse.Namespace) -> int:
-    chk = require_json_flag(args)
-    if chk is not None:
-        return chk
-    try:
-        api_key = _resolve_api_key()
-        agent_id = _resolve_agent_id(api_key)
-        if not agent_id:
-            return fail(
-                "auth_invalid",
-                "Agent id could not be resolved for stepup-code command.",
-                "Set XCLAW_AGENT_ID or use signed agent token format.",
-                exit_code=1,
-            )
-        payload = {
-            "agentId": agent_id,
-            "issuedFor": str(args.issued_for),
-        }
-        status_code, body = _api_request("POST", "/agent/stepup/challenge", payload=payload, include_idempotency=True)
-        if status_code < 200 or status_code >= 300:
-            return fail(
-                str(body.get("code", "api_error")),
-                str(body.get("message", f"stepup-code failed ({status_code})")),
-                str(body.get("actionHint", "Verify runtime auth and retry.")),
-                {"status": status_code},
-                exit_code=1,
-            )
-        return ok(
-            "SENSITIVE: Step-up code generated. Share only with authorized owner.",
-            agentId=agent_id,
-            issuedFor=body.get("issuedFor", str(args.issued_for)),
-            challengeId=body.get("challengeId"),
-            code=body.get("code"),
-            expiresAt=body.get("expiresAt"),
-            sensitive=True,
-            sensitiveFields=["code"],
-        )
-    except WalletStoreError as exc:
-        return fail("stepup_code_failed", str(exc), "Verify API env/auth and retry.", exit_code=1)
-    except Exception as exc:
-        return fail("stepup_code_failed", str(exc), "Inspect runtime stepup-code path and retry.", exit_code=1)
-
-
 def cmd_faucet_request(args: argparse.Namespace) -> int:
     chk = require_json_flag(args)
     if chk is not None:
@@ -4726,15 +4683,6 @@ def build_parser() -> argparse.ArgumentParser:
     management_link.add_argument("--ttl-seconds", default=600)
     management_link.add_argument("--json", action="store_true")
     management_link.set_defaults(func=cmd_management_link)
-
-    stepup_code = sub.add_parser("stepup-code")
-    stepup_code.add_argument(
-        "--issued-for",
-        default="sensitive_action",
-        choices=["withdraw", "approval_scope_change", "sensitive_action"],
-    )
-    stepup_code.add_argument("--json", action="store_true")
-    stepup_code.set_defaults(func=cmd_stepup_code)
 
     faucet_request = sub.add_parser("faucet-request")
     faucet_request.add_argument("--chain", required=True)

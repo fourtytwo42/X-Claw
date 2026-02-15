@@ -152,10 +152,6 @@ type ManagementStatePayload = {
     public_redacted_payload: Record<string, unknown>;
     created_at: string;
   }>;
-  stepup: {
-    active: boolean;
-    expiresAt: string | null;
-  };
   managementSession: {
     sessionId: string;
     expiresAt: string;
@@ -443,22 +439,12 @@ export default function AgentPublicProfilePage() {
   const [error, setError] = useState<string | null>(null);
   const [managementNotice, setManagementNotice] = useState<string | null>(null);
   const [managementError, setManagementError] = useState<string | null>(null);
-  const [stepupPromptOpen, setStepupPromptOpen] = useState(false);
-  const [stepupPromptCode, setStepupPromptCode] = useState('');
-  const [stepupPromptIssuedFor, setStepupPromptIssuedFor] = useState<'withdraw' | 'approval_scope_change' | 'sensitive_action'>(
-    'sensitive_action'
-  );
   const [withdrawDestination, setWithdrawDestination] = useState('');
   const [withdrawAmount, setWithdrawAmount] = useState('0.1');
   const [depositCopied, setDepositCopied] = useState(false);
   const [overviewDepositCopied, setOverviewDepositCopied] = useState(false);
   const [depositData, setDepositData] = useState<DepositPayload | null>(null);
   const [limitOrders, setLimitOrders] = useState<LimitOrderItem[]>([]);
-  const pendingStepupActionRef = useRef<{
-    action: () => Promise<void>;
-    successMessage: string;
-    issuedFor: 'withdraw' | 'approval_scope_change' | 'sensitive_action';
-  } | null>(null);
   const [outboundTransfersEnabled, setOutboundTransfersEnabled] = useState(false);
   const [outboundMode, setOutboundMode] = useState<'disabled' | 'allow_all' | 'whitelist'>('disabled');
   const [outboundWhitelistInput, setOutboundWhitelistInput] = useState('');
@@ -620,21 +606,6 @@ export default function AgentPublicProfilePage() {
     };
   }, [agentId, bootstrapState.phase, activeChainKey]);
 
-  const stepupRemaining = useMemo(() => {
-    if (management.phase !== 'ready' || !management.data.stepup.expiresAt || !management.data.stepup.active) {
-      return null;
-    }
-
-    const ms = new Date(management.data.stepup.expiresAt).getTime() - Date.now();
-    if (ms <= 0) {
-      return 'expired';
-    }
-
-    const hours = Math.floor(ms / (1000 * 60 * 60));
-    const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
-    return `${hours}h ${minutes}m`;
-  }, [management]);
-
   const policyAllowedTokenSet = useMemo(() => {
     return new Set(
       policyAllowedTokens
@@ -793,8 +764,7 @@ export default function AgentPublicProfilePage() {
 
   async function runManagementAction(
     action: () => Promise<void>,
-    successMessage: string,
-    issuedFor: 'withdraw' | 'approval_scope_change' | 'sensitive_action' = 'sensitive_action'
+    successMessage: string
   ) {
     setManagementError(null);
     setManagementNotice(null);
@@ -802,50 +772,13 @@ export default function AgentPublicProfilePage() {
       await action();
       setManagementNotice(successMessage);
       await refreshManagementState();
-      pendingStepupActionRef.current = null;
-      setStepupPromptOpen(false);
-      setStepupPromptCode('');
     } catch (actionError) {
-      const coded = actionError as Error & { code?: string; actionHint?: string };
-      if (coded?.code === 'stepup_required' || coded?.code === 'stepup_expired' || coded?.code === 'stepup_invalid') {
-        pendingStepupActionRef.current = { action, successMessage, issuedFor };
-        setStepupPromptIssuedFor(issuedFor);
-        setStepupPromptOpen(true);
-        setManagementError('Step-up required. Ask your agent for a step-up code using `stepup-code`, then enter it below.');
-        return;
-      }
       setManagementError(actionError instanceof Error ? actionError.message : 'Management action failed.');
       try {
         await refreshManagementState();
       } catch {
         // ignore refresh failures on error path
       }
-    }
-  }
-
-  async function submitStepupPrompt() {
-    if (!agentId) {
-      return;
-    }
-    const queued = pendingStepupActionRef.current;
-    if (!queued) {
-      setManagementError('No pending protected action to retry.');
-      return;
-    }
-    if (!stepupPromptCode.trim()) {
-      setManagementError('Enter a step-up code from your agent to continue.');
-      return;
-    }
-
-    setManagementError(null);
-    setManagementNotice(null);
-    try {
-      await managementPost('/api/v1/management/stepup/verify', { agentId, code: stepupPromptCode.trim() });
-      setStepupPromptCode('');
-      setStepupPromptOpen(false);
-      await runManagementAction(queued.action, queued.successMessage, queued.issuedFor);
-    } catch (error) {
-      setManagementError(error instanceof Error ? error.message : 'Step-up verification failed.');
     }
   }
 
@@ -937,8 +870,7 @@ export default function AgentPublicProfilePage() {
                                   managementPost('/api/v1/management/policy/update', buildPolicyUpdatePayload({ approvalMode: next })).then(
                                     () => Promise.resolve()
                                   ),
-                                next === 'auto' ? 'Global approval enabled.' : 'Global approval disabled.',
-                                'sensitive_action'
+                                next === 'auto' ? 'Global approval enabled.' : 'Global approval disabled.'
                               );
                             }}
                           />{' '}
@@ -1032,8 +964,7 @@ export default function AgentPublicProfilePage() {
                                                 allowedTokens: nextAllowedTokensForSymbol(item.symbol, nextEnabled)
                                               })
                                             ).then(() => Promise.resolve()),
-                                          nextEnabled ? `${item.symbol} preapproved.` : `${item.symbol} preapproval removed.`,
-                                          'sensitive_action'
+                                          nextEnabled ? `${item.symbol} preapproved.` : `${item.symbol} preapproval removed.`
                                         );
                                       }}
                                       title={
@@ -1162,31 +1093,8 @@ export default function AgentPublicProfilePage() {
           {management.phase === 'ready' ? (
             <div className="management-stack">
               <article className="management-card">
-                <h3>Session and Step-up</h3>
+                <h3>Session</h3>
                 <p className="muted">Session expires at {formatUtc(management.data.managementSession.expiresAt)} UTC.</p>
-                <p>
-                  Step-up: <strong>{management.data.stepup.active ? 'Active' : 'Inactive'}</strong>
-                  {stepupRemaining ? ` (${stepupRemaining} remaining)` : ''}
-                </p>
-                <p className="muted">
-                  Step-up codes are not generated manually here. If a protected action requires step-up, you will be prompted and must ask the
-                  agent for a code (`stepup-code`).
-                </p>
-                {stepupPromptOpen ? (
-                  <div className="queue-item">
-                    <div className="muted">Protected action blocked. Ask your agent for a step-up code, then verify to continue.</div>
-                    <div className="toolbar">
-                      <input
-                        value={stepupPromptCode}
-                        onChange={(event) => setStepupPromptCode(event.target.value)}
-                        placeholder={`Step-up code (${stepupPromptIssuedFor})`}
-                      />
-                      <button className="theme-toggle" type="button" onClick={() => void submitStepupPrompt()}>
-                        Verify and Continue
-                      </button>
-                    </div>
-                  </div>
-                ) : null}
               </article>
 
               <article className="management-card">
@@ -1267,8 +1175,7 @@ export default function AgentPublicProfilePage() {
                               .map((value) => value.trim())
                               .filter((value) => value.length > 0)
                           }).then(() => Promise.resolve()),
-                        'Transfer policy saved.',
-                        'sensitive_action'
+                        'Transfer policy saved.'
                       )
                     }
                   >
@@ -1300,8 +1207,7 @@ export default function AgentPublicProfilePage() {
                                 chainKey: activeChainKey,
                                 chainEnabled: next
                               }).then(() => Promise.resolve()),
-                            next ? 'Chain enabled.' : 'Chain disabled.',
-                            'sensitive_action'
+                            next ? 'Chain enabled.' : 'Chain disabled.'
                           );
                           setChainUpdatePending(false);
                         })();
@@ -1370,8 +1276,7 @@ export default function AgentPublicProfilePage() {
                             chainKey: activeChainKey,
                             destination: withdrawDestination
                           }).then(() => Promise.resolve()),
-                        'Withdraw destination saved.',
-                        'withdraw'
+                        'Withdraw destination saved.'
                       )
                     }
                   >
@@ -1390,8 +1295,7 @@ export default function AgentPublicProfilePage() {
                             amount: withdrawAmount,
                             destination: withdrawDestination
                           }).then(() => Promise.resolve()),
-                        'Withdraw request submitted.',
-                        'withdraw'
+                        'Withdraw request submitted.'
                       )
                     }
                   >
@@ -1453,8 +1357,7 @@ export default function AgentPublicProfilePage() {
                             maxDailyTradeCount: policyDailyTradeCapEnabled ? Number(policyMaxDailyTradeCount || '0') : null,
                             allowedTokens: policyAllowedTokens
                           }).then(() => Promise.resolve()),
-                        'Policy saved.',
-                        'sensitive_action'
+                        'Policy saved.'
                       )
                     }
                   >
@@ -1492,8 +1395,7 @@ export default function AgentPublicProfilePage() {
                                 setTelegramSecret(String(result.secret));
                               }
                             },
-                            next ? 'Telegram approvals enabled.' : 'Telegram approvals disabled.',
-                            'sensitive_action'
+                            next ? 'Telegram approvals enabled.' : 'Telegram approvals disabled.'
                           );
                           setTelegramUpdatePending(false);
                         })();

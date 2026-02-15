@@ -193,7 +193,7 @@ def main(argv: List[str]) -> int:
         return _err(
             "usage",
             "Missing command.",
-            "Use one of: status, dashboard, intents-poll, approval-check, trade-exec, trade-spot, report-send, chat-poll, chat-post, username-set, owner-link, stepup-code, faucet-request, limit-orders-create, limit-orders-cancel, limit-orders-list, limit-orders-run-once, limit-orders-run-loop, wallet-health, wallet-address, wallet-sign-challenge, wallet-send, wallet-send-token, wallet-balance, wallet-token-balance",
+            "Use one of: status, dashboard, intents-poll, approval-check, trade-exec, trade-spot, report-send, chat-poll, chat-post, username-set, owner-link, faucet-request, limit-orders-create, limit-orders-cancel, limit-orders-list, limit-orders-run-once, limit-orders-run-loop, wallet-health, wallet-address, wallet-sign-challenge, wallet-send, wallet-send-token, wallet-balance, wallet-token-balance",
             exit_code=2,
         )
 
@@ -211,7 +211,6 @@ def main(argv: List[str]) -> int:
         "chat-post",
         "username-set",
         "owner-link",
-        "stepup-code",
         "faucet-request",
         "limit-orders-create",
         "limit-orders-cancel",
@@ -331,12 +330,6 @@ def main(argv: List[str]) -> int:
         if ttl:
             args.extend(["--ttl-seconds", ttl])
         return _run_agent(args)
-
-    if cmd == "stepup-code":
-        issued_for = os.environ.get("XCLAW_STEPUP_ISSUED_FOR", "sensitive_action")
-        if issued_for not in {"withdraw", "approval_scope_change", "sensitive_action"}:
-            issued_for = "sensitive_action"
-        return _run_agent(["stepup-code", "--issued-for", issued_for, "--json"])
 
     if cmd == "faucet-request":
         return _run_agent(["faucet-request", "--chain", chain, "--json"])
@@ -501,7 +494,7 @@ def main(argv: List[str]) -> int:
         return _err(
             "unknown_command",
             f"Unknown command: {cmd}",
-            "Use one of: status, dashboard, intents-poll, approval-check, trade-exec, report-send, chat-poll, chat-post, username-set, owner-link, stepup-code, faucet-request, limit-orders-create, limit-orders-cancel, limit-orders-list, limit-orders-run-once, limit-orders-run-loop, wallet-health, wallet-address, wallet-sign-challenge, wallet-send, wallet-send-token, wallet-balance, wallet-token-balance",
+            "Use one of: status, dashboard, intents-poll, approval-check, trade-exec, report-send, chat-poll, chat-post, username-set, owner-link, faucet-request, limit-orders-create, limit-orders-cancel, limit-orders-list, limit-orders-run-once, limit-orders-run-loop, wallet-health, wallet-address, wallet-sign-challenge, wallet-send, wallet-send-token, wallet-balance, wallet-token-balance",
             exit_code=2,
         )
 

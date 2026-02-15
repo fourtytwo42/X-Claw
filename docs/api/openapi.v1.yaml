@@ -122,31 +122,6 @@ paths:
           $ref: '#/components/responses/ErrorResponse'
         '401':
           $ref: '#/components/responses/ErrorResponse'
-  /api/v1/agent/stepup/challenge:
-    post:
-      summary: Issue a one-time step-up code for the authenticated agent to share with authorized owner.
-      security:
-        - agentBearer: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [agentId]
-              properties:
-                agentId:
-                  type: string
-                issuedFor:
-                  type: string
-                  enum: [withdraw, approval_scope_change, sensitive_action]
-      responses:
-        '200':
-          description: Step-up challenge created.
-        '400':
-          $ref: '#/components/responses/ErrorResponse'
-        '401':
-          $ref: '#/components/responses/ErrorResponse'
   /api/v1/agent/transfers/policy:
     get:
       summary: Read effective outbound transfer policy and trade-cap policy for authenticated agent.
@@ -578,45 +553,9 @@ paths:
           description: Management session issued.
         '401':
           $ref: '#/components/responses/ErrorResponse'
-  /api/v1/management/stepup/challenge:
-    post:
-      summary: Issue one-time step-up challenge code.
-      security:
-        - managementCookie: []
-      parameters:
-        - $ref: '#/components/parameters/CsrfTokenHeader'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/StepupChallengeRequest'
-      responses:
-        '200':
-          description: Step-up challenge created.
-        '401':
-          $ref: '#/components/responses/ErrorResponse'
-  /api/v1/management/stepup/verify:
-    post:
-      summary: Verify challenge code and create 24h step-up session.
-      security:
-        - managementCookie: []
-      parameters:
-        - $ref: '#/components/parameters/CsrfTokenHeader'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/StepupVerifyRequest'
-      responses:
-        '200':
-          description: Step-up granted.
-        '401':
-          $ref: '#/components/responses/ErrorResponse'
   /api/v1/management/revoke-all:
     post:
-      summary: Revoke all management and step-up sessions for the agent.
+      summary: Revoke all management sessions for the agent.
       security:
         - managementCookie: []
       parameters:
@@ -677,7 +616,7 @@ paths:
   /api/v1/management/chains/update:
     post:
       summary: Enable or disable chain access for an agent (per-chain).
-      description: Disabling is allowed without step-up. Enabling requires an active step-up session and may return `stepup_required`.
+      description: Chain access is managed via management session cookie + CSRF.
       security:
         - managementCookie: []
       parameters:
@@ -808,7 +747,6 @@ paths:
       deprecated: true
       security:
         - managementCookie: []
-        - stepupCookie: []
       parameters:
         - $ref: '#/components/parameters/CsrfTokenHeader'
       requestBody:
@@ -861,7 +799,6 @@ paths:
       summary: Update withdraw destination for an agent chain.
       security:
         - managementCookie: []
-        - stepupCookie: []
       parameters:
         - $ref: '#/components/parameters/CsrfTokenHeader'
       requestBody:
@@ -875,10 +812,9 @@ paths:
           description: Destination updated.
   /api/v1/management/withdraw:
     post:
-      summary: Submit step-up gated withdraw request.
+      summary: Submit withdraw request.
       security:
         - managementCookie: []
-        - stepupCookie: []
       parameters:
         - $ref: '#/components/parameters/CsrfTokenHeader'
       requestBody:
@@ -1309,10 +1245,6 @@ components:
       type: apiKey
       in: cookie
       name: xclaw_mgmt
-    stepupCookie:
-      type: apiKey
-      in: cookie
-      name: xclaw_stepup
     channelApprovalBearer:
       type: http
       scheme: bearer
@@ -1677,23 +1609,6 @@ components:
         agentId:
           type: string
         token:
-          type: string
-    StepupChallengeRequest:
-      type: object
-      required: [agentId, issuedFor]
-      properties:
-        agentId:
-          type: string
-        issuedFor:
-          type: string
-          enum: [withdraw, approval_scope_change, sensitive_action]
-    StepupVerifyRequest:
-      type: object
-      required: [agentId, code]
-      properties:
-        agentId:
-          type: string
-        code:
           type: string
     ManagementApprovalDecisionRequest:
       type: object

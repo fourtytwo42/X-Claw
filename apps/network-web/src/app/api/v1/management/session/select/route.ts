@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server';
 
 import { errorResponse, internalErrorResponse, successResponse } from '@/lib/errors';
 import { parseJsonBody } from '@/lib/http';
-import { clearStepupCookie, setCsrfCookie, setManagementCookie } from '@/lib/management-cookies';
+import { setCsrfCookie, setManagementCookie } from '@/lib/management-cookies';
 import { bootstrapManagementSession } from '@/lib/management-service';
 import { getRequestId } from '@/lib/request-id';
 import { validatePayload } from '@/lib/validation';
@@ -59,7 +59,6 @@ export async function POST(req: NextRequest) {
 
     setManagementCookie(response, req, result.data.managementCookieValue);
     setCsrfCookie(response, req, result.data.csrfToken);
-    clearStepupCookie(response, req);
 
     return response;
   } catch {

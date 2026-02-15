@@ -5,7 +5,7 @@ import type { ApiErrorCode } from '@/lib/errors';
 import { parseJsonBody } from '@/lib/http';
 import { getRequestId } from '@/lib/request-id';
 import { validatePayload } from '@/lib/validation';
-import { clearStepupCookie, setCsrfCookie, setManagementCookie } from '@/lib/management-cookies';
+import { setCsrfCookie, setManagementCookie } from '@/lib/management-cookies';
 import { bootstrapManagementSession } from '@/lib/management-service';
 
 export const runtime = 'nodejs';
@@ -70,7 +70,6 @@ export async function POST(req: NextRequest) {
     const response = successResponse(responseBody, 200, requestId);
     setManagementCookie(response, req, result.data.managementCookieValue);
     setCsrfCookie(response, req, result.data.csrfToken);
-    clearStepupCookie(response, req);
     return response;
   } catch {
     return internalErrorResponse(requestId);

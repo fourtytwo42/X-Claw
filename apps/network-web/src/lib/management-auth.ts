@@ -4,7 +4,7 @@ import type { NextRequest } from 'next/server';
 
 import { dbQuery } from '@/lib/db';
 import { errorResponse } from '@/lib/errors';
-import { CSRF_COOKIE_NAME, MGMT_COOKIE_NAME, STEPUP_COOKIE_NAME } from '@/lib/management-cookies';
+import { CSRF_COOKIE_NAME, MGMT_COOKIE_NAME } from '@/lib/management-cookies';
 import { hashManagementCookieSecret } from '@/lib/management-service';
 import { enforceSensitiveManagementWriteRateLimit } from '@/lib/rate-limit';
 
@@ -22,16 +22,6 @@ type AuthFailure = {
 type AuthSuccess = {
   ok: true;
   session: ManagementSession;
-};
-
-type StepupFailure = {
-  ok: false;
-  response: Response;
-};
-
-type StepupSuccess = {
-  ok: true;
-  stepupSessionId: string;
 };
 
 function parseManagementCookie(raw: string | undefined): { sessionId: string; secret: string } | null {
@@ -186,79 +176,4 @@ export async function requireManagementWriteAuth(
   }
 
   return management;
-}
-
-export async function requireStepupSession(
-  req: NextRequest,
-  requestId: string,
-  expectedAgentId: string,
-  managementSessionId: string
-): Promise<StepupFailure | StepupSuccess> {
-  const stepupSessionId = req.cookies.get(STEPUP_COOKIE_NAME)?.value;
-  if (!stepupSessionId) {
-    return {
-      ok: false,
-      response: errorResponse(
-        401,
-        {
-          code: 'stepup_required',
-          message: 'Step-up authentication is required for this action.',
-          actionHint: 'Ask the agent runtime for a step-up code, then verify it in the management prompt.'
-        },
-        requestId
-      )
-    };
-  }
-
-  const stepup = await dbQuery<{
-    stepup_session_id: string;
-    expires_at: string;
-    revoked_at: string | null;
-  }>(
-    `
-    select stepup_session_id, expires_at::text, revoked_at::text
-    from stepup_sessions
-    where stepup_session_id = $1
-      and agent_id = $2
-      and management_session_id = $3
-    limit 1
-    `,
-    [stepupSessionId, expectedAgentId, managementSessionId]
-  );
-
-  if (stepup.rowCount === 0) {
-    return {
-      ok: false,
-      response: errorResponse(
-        401,
-        {
-          code: 'stepup_invalid',
-          message: 'Step-up session is invalid.',
-          actionHint: 'Ask the agent for a fresh step-up code, verify it in the management prompt, and retry.'
-        },
-        requestId
-      )
-    };
-  }
-
-  const row = stepup.rows[0];
-  if (row.revoked_at || new Date(row.expires_at).getTime() <= Date.now()) {
-    return {
-      ok: false,
-      response: errorResponse(
-        401,
-        {
-          code: 'stepup_expired',
-          message: 'Step-up session is expired or revoked.',
-          actionHint: 'Ask the agent for a fresh step-up code and verify it in the management prompt.'
-        },
-        requestId
-      )
-    };
-  }
-
-  return {
-    ok: true,
-    stepupSessionId: row.stepup_session_id
-  };
 }

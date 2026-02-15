@@ -56,7 +56,6 @@ export async function POST(req: NextRequest) {
       {
         ok: true,
         agentId: result.data.agentId,
-        revokedStepupSessions: result.data.revokedStepupSessions,
         revokedManagementSessions: result.data.revokedManagementSessions,
         newManagementToken: result.data.newManagementToken
       },

@@ -2616,3 +2616,30 @@ Issue mapping: `#42` (umbrella)
   - USDC value renders using snapshot decimals and is displayed as `$...` with commas (no raw base-units display).
 - Audit log:
   - expanded by default.
+
+---
+
+## Slice 36 Acceptance Evidence
+
+Date (UTC): 2026-02-15
+Active slice: `Slice 36: Remove Step-Up Authentication (Management Cookie Only)`
+Issue mapping: `#42` (umbrella)
+
+### Required gate evidence
+- `npm run db:parity` -> PASS (checkedAt: 2026-02-15T09:24:03.874Z)
+- `npm run seed:reset` -> PASS
+- `npm run seed:load` -> PASS (scenarios: happy_path, approval_retry, degraded_rpc, copy_reject)
+- `npm run seed:verify` -> PASS
+- `npm run build` -> PASS (Next.js build; routes list does not include any `/api/v1/*/stepup/*` endpoints)
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS (39 tests)
+
+### Scenario evidence (manual)
+- No step-up UI:
+  - `/agents/:id` contains no step-up prompt or “Session and Step-up” section.
+- No step-up gating:
+  - withdraw + withdraw destination work with management cookie + CSRF only.
+  - enabling chain access, enabling Telegram approvals, and policy updates no longer require any step-up cookie.
+- Endpoints removed:
+  - `POST /api/v1/management/stepup/challenge` returns 404.
+  - `POST /api/v1/management/stepup/verify` returns 404.
+  - `POST /api/v1/agent/stepup/challenge` returns 404.

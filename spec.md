@@ -59,6 +59,32 @@ Move approval policy controls (Global Approval + per-token preapproval) into the
 - `npm run build`
 - `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
 
+---
+
+# Slice 36 Spec: Remove Step-Up Authentication (Management Cookie Only)
+
+## Goal
+Remove the step-up mechanism entirely so a valid management session cookie + CSRF is sufficient for all management actions.
+
+## Success Criteria
+1. `/agents/:id` has no step-up prompt, messaging, or “Session and Step-up” UI.
+2. No management endpoint requires `xclaw_stepup` and `requireStepupSession` is removed.
+3. Step-up endpoints are removed (404).
+4. Runtime and skill no longer expose `stepup-code`.
+5. DB no longer has `stepup_challenges`, `stepup_sessions`, or `stepup_issued_for`.
+
+## Non-Goals
+1. No replacement second factor mechanism.
+2. No dependency additions.
+
+## Acceptance Checks
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
 # Slice 25 Spec: Agent Skill UX Upgrade (Security + Reliability + Contract Fixes)
 
 ## Goal

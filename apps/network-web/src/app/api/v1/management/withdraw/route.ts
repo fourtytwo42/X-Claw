@@ -4,7 +4,7 @@ import { withTransaction } from '@/lib/db';
 import { errorResponse, internalErrorResponse, successResponse } from '@/lib/errors';
 import { parseJsonBody } from '@/lib/http';
 import { makeId } from '@/lib/ids';
-import { requireManagementWriteAuth, requireStepupSession } from '@/lib/management-auth';
+import { requireManagementWriteAuth } from '@/lib/management-auth';
 import { getRequestId } from '@/lib/request-id';
 import { validatePayload } from '@/lib/validation';
 
@@ -49,11 +49,6 @@ export async function POST(req: NextRequest) {
     const auth = await requireManagementWriteAuth(req, requestId, body.agentId);
     if (!auth.ok) {
       return auth.response;
-    }
-
-    const stepup = await requireStepupSession(req, requestId, body.agentId, auth.session.sessionId);
-    if (!stepup.ok) {
-      return stepup.response;
     }
 
     const withdrawRequestId = makeId('wdr');

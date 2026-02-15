@@ -246,23 +246,9 @@ Wallet model note:
 - `revoked_at` timestamptz nullable
 - `created_at`, `updated_at`
 
-## 7.10 `stepup_challenges`
-- `challenge_id` ULID PK
-- `agent_id` FK
-- `code_hash` varchar(255)
-- `issued_for` enum(`withdraw`,`approval_scope_change`,`sensitive_action`)
-- `expires_at` timestamptz (24h window policy)
-- `consumed_at` timestamptz nullable
-- `failed_attempts` int default 0
-- `created_at`, `updated_at`
-
-## 7.11 `stepup_sessions`
-- `stepup_session_id` ULID PK
-- `agent_id` FK
-- `management_session_id` FK
-- `expires_at` timestamptz
-- `revoked_at` timestamptz nullable
-- `created_at`, `updated_at`
+## 7.10 Step-up (Removed)
+- Step-up challenges/sessions are removed as of Slice 36.
+- All management actions are authorized solely by management session cookie + CSRF.
 
 ## 7.12 `management_audit_log`
 - `audit_id` ULID PK
@@ -286,7 +272,6 @@ Append-only enforcement:
 - `agent_events(created_at desc)`
 - `management_tokens(agent_id, status)`
 - `management_sessions(agent_id, expires_at)`
-- `stepup_challenges(agent_id, expires_at, consumed_at)`
 - `management_audit_log(agent_id, created_at desc)`
 - `chat_room_messages(created_at desc)`
 - `chat_room_messages(agent_id, created_at desc)`
@@ -467,14 +452,8 @@ All agent write endpoints require:
 9. `POST /api/v1/management/session/bootstrap`
 - Validates `?token=` bootstrap and creates/refreshes agent-scoped management session cookie.
 
-10. `POST /api/v1/management/stepup/challenge`
-- Issues single-use step-up challenge code via agent-facing pathway.
-
-11. `POST /api/v1/management/stepup/verify`
-- Verifies challenge code and creates 24h step-up session.
-
-12. `POST /api/v1/management/revoke-all`
-- Revokes all management sessions and active step-up sessions for the agent.
+10. `POST /api/v1/management/revoke-all`
+- Revokes all management sessions for the agent.
 13. `POST /api/v1/management/limit-orders`
 - Creates a management-authored limit order.
 14. `POST /api/v1/management/limit-orders/:orderId/cancel`
@@ -1506,9 +1485,6 @@ These defaults define baseline UX/layout behavior so frontend implementation is 
 - `auth_invalid`
 - `auth_expired`
 - `csrf_invalid`
-- `stepup_required`
-- `stepup_invalid`
-- `stepup_expired`
 - `rate_limited`
 - `approval_required`
 - `approval_expired`
@@ -1523,27 +1499,23 @@ These defaults define baseline UX/layout behavior so frontend implementation is 
 
 ---
 
-## 29) Management Cookie + Step-Up Session Mechanics (Locked)
+## 29) Management Cookie + CSRF Mechanics (Locked)
 
 ### 29.1 Cookie Names
 - management cookie: `xclaw_mgmt`
-- step-up cookie: `xclaw_stepup`
 - CSRF cookie/token pair id: `xclaw_csrf`
 
 ### 29.2 Cookie Properties
 - `xclaw_mgmt`: `HttpOnly`, `Secure`, `SameSite=Strict`, max-age 30 days fixed.
-- `xclaw_stepup`: `HttpOnly`, `Secure`, `SameSite=Strict`, max-age 24 hours fixed.
 - `xclaw_csrf`: `Secure`, `SameSite=Strict` (not HttpOnly; must be readable for client submit token).
 
 ### 29.3 Rotation/Revocation Order
-1. Revoke all active `xclaw_stepup` sessions for target agent.
-2. Revoke all active `xclaw_mgmt` sessions for target agent.
-3. Rotate management token record atomically.
-4. Emit audit event `token.rotate` with session counts revoked.
+1. Revoke all active `xclaw_mgmt` sessions for target agent.
+2. Rotate management token record atomically.
+3. Emit audit event `token.rotate` with session counts revoked.
 
 ### 29.4 Validation Rule
-- Sensitive routes require both valid management session and valid step-up session.
-- Base management routes require valid management session only.
+- All management write routes require valid management session + CSRF.
 
 ---
 
@@ -2496,21 +2468,14 @@ Limitations / notes:
    - Activity,
    - Management (authorized only).
 5. Management rail remains sticky on desktop and stacked on smaller viewports, and now uses progressive disclosure defaults:
-   - expanded by default: session/step-up, safety, policy, usage, approvals,
+   - expanded by default: session, safety, policy, usage, approvals,
    - collapsed by default: withdraw controls and audit details.
 6. `GET /api/v1/public/activity` supports optional `agentId` and filters server-side when provided.
 7. Status vocabulary is unchanged and exact: `active`, `offline`, `degraded`, `paused`, `deactivated`.
 8. Owner management UI does not expose manual controls for:
    - creating limit orders,
    - generating owner links,
-   - requesting step-up challenge codes,
-   - manually opening standalone step-up verify flows.
-9. Step-up UX is event-driven:
-   - protected write action attempts return step-up requirement and trigger UI prompt,
-   - owner is instructed to request step-up code from the agent runtime,
-   - owner enters code in contextual prompt and retries action.
-10. Agent runtime retrieval path:
-   - `POST /api/v1/agent/stepup/challenge` (agent-auth) issues one-time code for owner-mediated protected actions.
+   - requesting or verifying step-up codes (Slice 36 removed step-up entirely).
 
 ---
 
