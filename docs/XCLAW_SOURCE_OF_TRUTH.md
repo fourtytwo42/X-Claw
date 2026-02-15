@@ -2550,6 +2550,7 @@ Limitations / notes:
      - swap summary: `<amountIn> <tokenInSymbol> -> <tokenOutSymbol>`,
      - `chainKey`,
      - `tradeId`.
+   - Preferred delivery: inline buttons in the agent's queued message (single Telegram message). Do not emit a second "approval prompt" message when inline delivery is used.
 6. Sync between Telegram and web:
    - the pending approval item remains visible on `/agents/:id`.
    - approving in either surface must converge:

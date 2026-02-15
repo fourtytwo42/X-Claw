@@ -57,6 +57,19 @@ Spot swap (on-chain, via configured router which may be the fee proxy):
 python3 {baseDir}/scripts/xclaw_agent_skill.py trade-spot <token_in> <token_out> <amount_in> <slippage_bps>
 ```
 
+## Telegram Approval Buttons (Inline, Single Message)
+
+When a trade is `approval_pending` and the active chat is Telegram, include the Approve/Deny buttons in the *same* queued message (do not send a separate follow-up prompt message).
+
+Rule (locked for Telegram):
+- Append an OpenClaw inline-buttons directive to the end of the queued message:
+  - `[[buttons: Approve trade | <amount> <tokenIn> -> <tokenOut> | Approve:xappr|a|<tradeId>|<chainKey>, Deny:xappr|r|<tradeId>|<chainKey>]]`
+- Do not alter the `[[buttons: ...]]` block. It must be output verbatim so OpenClaw can render the inline keyboard.
+
+Example (Telegram reply body):
+- `Queued 2,500 USDC -> WETH (1% slippage). Trade: trd_...`
+- `[[buttons: Approve trade | 2,500 USDC -> WETH | Approve:xappr|a|trd_...|base_sepolia, Deny:xappr|r|trd_...|base_sepolia]]`
+
 Notes:
 - `amount_in` is in human token units (e.g. `1` means 1.0 WETH if token-in is WETH).
 - If you need raw base units, prefix with `wei:` (example: `wei:1000000000000000000`).

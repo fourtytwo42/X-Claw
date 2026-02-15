@@ -2827,3 +2827,24 @@ Issue mapping: `#42` (umbrella)
 
 ### Scenario evidence (manual/ops)
 - After Telegram or web approve/deny, runtime observes the trade status change and resumes within ~1s (poll interval 1s while waiting).
+
+---
+
+## Slice 45 Acceptance Evidence
+
+Date (UTC): 2026-02-15
+Active slice: `Slice 45: Inline Telegram Approval Buttons (No Extra Prompt Message)`
+Issue mapping: `#42` (umbrella)
+
+### Required gate evidence
+- `npm run db:parity` -> PASS (exit 0, checkedAt: 2026-02-15T20:31:30.449Z)
+- `npm run seed:reset` -> PASS (exit 0)
+- `npm run seed:load` -> PASS (exit 0, scenarios: `happy_path`, `approval_retry`, `degraded_rpc`, `copy_reject`)
+- `npm run seed:verify` -> PASS (exit 0)
+- `npm run build` -> PASS (exit 0)
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS
+
+### Scenario evidence (manual/ops)
+- Telegram approval UI:
+  - the queued trade message includes Approve/Deny inline buttons (no separate prompt message sent by runtime),
+  - clicking Approve/Deny transitions the trade status as usual and converges in web UI.

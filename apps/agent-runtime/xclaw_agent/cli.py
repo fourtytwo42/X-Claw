@@ -1571,11 +1571,17 @@ def _remove_pending_trade_intent(intent_key: str) -> None:
 
 
 def _wait_for_trade_approval(trade_id: str, chain: str, summary: dict[str, Any] | None = None) -> dict[str, Any]:
-    # Slice 34: Telegram approvals (optional). Best-effort prompt delivery + cleanup tracking.
-    try:
-        _maybe_send_telegram_approval_prompt(trade_id, chain, summary or {})
-    except Exception:
-        pass
+    # Telegram approval prompts can be delivered either:
+    # - inline in the agent's chat response (preferred; no extra prompt message), or
+    # - out-of-band via `openclaw message send --buttons` (legacy).
+    #
+    # Default is inline (do not send an extra prompt message). Set
+    # `XCLAW_TELEGRAM_OUT_OF_BAND_APPROVAL_PROMPT=1` to re-enable legacy prompting.
+    if (os.environ.get("XCLAW_TELEGRAM_OUT_OF_BAND_APPROVAL_PROMPT") or "").strip() == "1":
+        try:
+            _maybe_send_telegram_approval_prompt(trade_id, chain, summary or {})
+        except Exception:
+            pass
     deadline_ms = int(time.time() * 1000) + (APPROVAL_WAIT_TIMEOUT_SEC * 1000)
     last_status: str | None = None
     while int(time.time() * 1000) <= deadline_ms:

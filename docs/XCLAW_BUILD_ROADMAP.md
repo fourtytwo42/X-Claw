@@ -1512,3 +1512,29 @@ Note:
   - [x] `npm run seed:verify`
   - [x] `npm run build`
   - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+## 45) Slice 45: Inline Telegram Approval Buttons (No Extra Prompt Message)
+
+### 45.1 Canonical/doc sync
+- [x] Add Slice 45 goal/DoD + issue mapping to `docs/XCLAW_SLICE_TRACKER.md`.
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` to lock "inline buttons on queued message" as preferred Telegram UX.
+- [x] Update handoff/process artifacts:
+  - [x] `docs/CONTEXT_PACK.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+
+### 45.2 Implementation
+- [x] Runtime: disable out-of-band Telegram approval prompt messages by default; allow re-enable via env (`XCLAW_TELEGRAM_OUT_OF_BAND_APPROVAL_PROMPT=1`).
+- [x] Skill instructions: require embedding OpenClaw `[[buttons: ...]]` directive in queued Telegram message for `approval_pending` trades.
+
+### 45.3 Validation + evidence
+- [x] Run required gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`

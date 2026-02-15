@@ -630,6 +630,26 @@ Reduce perceived latency after approve/deny (Telegram or web) by tightening runt
 
 ---
 
+# Slice 45 Spec: Inline Telegram Approval Buttons (No Extra Prompt Message)
+
+## Goal
+Reduce Telegram approval UX noise by attaching Approve/Deny buttons to the same queued trade message (wallet summary), instead of emitting a second Telegram message for the prompt.
+
+## Success Criteria
+1. Runtime does not send out-of-band Telegram prompt messages by default.
+2. Telegram queued message includes OpenClaw inline-buttons directive (`[[buttons: ...]]`) with Approve/Deny callbacks.
+3. Clicking either button still converges with web approvals (server status transitions remain canonical).
+
+## Acceptance Checks
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
 # Slice 31 Spec: Agents + Agent Management UX Refinement (Operational Clean)
 
 ## Goal

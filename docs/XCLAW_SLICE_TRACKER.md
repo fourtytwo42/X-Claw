@@ -799,3 +799,18 @@ DoD:
 - [x] docs sync first: source-of-truth + roadmap + tracker + context/spec/tasks/acceptance aligned to Slice 44.
 - [x] runtime polls approval status every 1s while waiting (instead of 3s).
 - [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.
+
+---
+
+## Slice 45: Inline Telegram Approval Buttons (No Extra Prompt Message)
+Status: [x]
+Issue: #42 (umbrella)
+
+Goal:
+- When a trade becomes `approval_pending`, Telegram should show Approve/Deny buttons on the same queued message (wallet summary) instead of sending a second prompt message.
+
+DoD:
+- [x] docs sync first: source-of-truth + roadmap + tracker + context/spec/tasks/acceptance aligned to Slice 45.
+- [x] runtime does not send out-of-band Telegram prompt messages by default (inline delivery is preferred); legacy prompting can be re-enabled via env.
+- [x] skill instructions require embedding OpenClaw `[[buttons: ...]]` directive in the queued message for Telegram.
+- [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.
