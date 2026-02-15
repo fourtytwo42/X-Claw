@@ -2585,3 +2585,28 @@ Limitations / notes:
    - after approve/deny in web while runtime is waiting on the trade, runtime posts a confirmation message into the active Telegram chat with the same details.
 11. Approval wait latency:
    - while waiting for `approval_pending` to resolve, the runtime polls trade status every 1 second to minimize perceived delay after Telegram/web decisions.
+
+---
+
+## 59) Policy Approval Requests (Token Preapprove + Approve All) Contract (Locked)
+
+1. The agent may request owner approval for policy changes that unlock trading:
+   - `token_preapprove_add`: add a token address to `agent_policy_snapshots.allowed_tokens` (tokenIn preapproval),
+   - `global_approval_enable`: set `agent_policy_snapshots.approval_mode = auto` (Approve all ON).
+2. Requests are stored server-side and are visible/operable on `/agents/:id` (owner-only) like trade approvals.
+3. Approval surfaces:
+   - Web UI: owner can Approve/Deny the request in `/agents/:id`.
+   - Telegram: queued message receives Approve/Deny inline buttons; callback intercept applies decision (strict, no LLM).
+4. Telegram callback prefix:
+   - `xpol|a|<policyApprovalId>|<chainKey>` approve
+   - `xpol|r|<policyApprovalId>|<chainKey>` deny
+5. Message auto-attach:
+   - OpenClaw gateway auto-attaches policy approval buttons when a queued message contains:
+     - `Status: approval_pending`
+     - `Approval ID: ppr_...`
+6. Decision feedback:
+   - After Telegram approve/deny, decision feedback must be routed into the agent message pipeline (synthetic inbound message + instructions) so the agent informs the user.
+7. Canonical endpoints:
+   - `POST /api/v1/agent/policy-approvals/proposed` (agent-auth) creates a pending request.
+   - `POST /api/v1/policy-approvals/:policyApprovalId/decision` (agent-auth) applies approve/deny for Telegram callbacks.
+   - `POST /api/v1/management/policy-approvals/decision` (owner-auth) applies approve/deny from the web UI.

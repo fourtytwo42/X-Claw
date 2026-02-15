@@ -62,7 +62,7 @@ export async function GET(req: NextRequest) {
       address
     }));
 
-    const [agent, approvals, policy, audit, outboundPolicy, dailyUsage, chainPolicy, approvalChannel] = await Promise.all([
+    const [agent, approvals, policyApprovals, policy, audit, outboundPolicy, dailyUsage, chainPolicy, approvalChannel] = await Promise.all([
       dbQuery<{
         agent_id: string;
         public_status: string;
@@ -89,6 +89,23 @@ export async function GET(req: NextRequest) {
         `
         select trade_id, chain_key, pair, amount_in::text, token_in, token_out, reason, created_at::text
         from trades
+        where agent_id = $1
+          and status = 'approval_pending'
+        order by created_at asc
+        limit 50
+        `,
+        [agentId]
+      ),
+      dbQuery<{
+        request_id: string;
+        chain_key: string;
+        request_type: string;
+        token_address: string | null;
+        created_at: string;
+      }>(
+        `
+        select request_id, chain_key, request_type, token_address, created_at::text
+        from agent_policy_approval_requests
         where agent_id = $1
           and status = 'approval_pending'
         order by created_at asc
@@ -222,6 +239,7 @@ export async function GET(req: NextRequest) {
           telegram: { enabled: telegramApprovalEnabled, updatedAt: telegramApprovalUpdatedAt }
         },
         approvalsQueue: approvals.rows,
+        policyApprovalsQueue: policyApprovals.rows,
         latestPolicy: policy.rows[0] ?? null,
         tradeCaps: policy.rows[0]
           ? {

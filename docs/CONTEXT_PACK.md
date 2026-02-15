@@ -203,6 +203,51 @@ Issue mapping: `#42` (umbrella)
 
 ---
 
+## Slice 51 Context: Policy Approval Requests (Token Preapprove + Approve All) With Web + Telegram Buttons
+
+Issue mapping: `#42` (umbrella)
+
+### Objective + scope lock
+- Objective: let the agent request owner approval for token preapproval and global approval, with convergent approvals in web UI and Telegram buttons.
+- Scope guard honored: no new auth model; approvals are web (mgmt cookie) or Telegram buttons (gateway intercept) like trades.
+
+### Expected touched files (Slice 51 allowlist)
+- Data model:
+  - `infrastructure/migrations/0012_slice51_policy_approval_requests.sql`
+- Server/API/UI:
+  - `apps/network-web/src/app/api/v1/agent/policy-approvals/proposed/route.ts`
+  - `apps/network-web/src/app/api/v1/policy-approvals/[requestId]/decision/route.ts`
+  - `apps/network-web/src/app/api/v1/management/policy-approvals/decision/route.ts`
+  - `apps/network-web/src/app/api/v1/management/agent-state/route.ts`
+  - `apps/network-web/src/app/agents/[agentId]/page.tsx`
+  - `apps/network-web/src/lib/*` (helpers as needed)
+- Runtime/skill:
+  - `apps/agent-runtime/xclaw_agent/cli.py`
+  - `skills/xclaw-agent/scripts/xclaw_agent_skill.py`
+  - `skills/xclaw-agent/SKILL.md`
+- OpenClaw patcher:
+  - `skills/xclaw-agent/scripts/openclaw_gateway_patch.py`
+- Contracts/docs:
+  - `docs/api/openapi.v1.yaml`
+  - `packages/shared-schemas/json/*`
+  - `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - `docs/XCLAW_SLICE_TRACKER.md`
+  - `docs/XCLAW_BUILD_ROADMAP.md`
+  - `spec.md`
+  - `tasks.md`
+  - `acceptance.md`
+
+### Verification Plan
+- Required gates:
+  - `npm run db:parity`
+  - `npm run seed:reset`
+  - `npm run seed:load`
+  - `npm run seed:verify`
+  - `npm run build`
+  - `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
 ## Slice 36 Context: Remove Step-Up Authentication (Management Cookie Only)
 
 Issue mapping: `#42` (umbrella)

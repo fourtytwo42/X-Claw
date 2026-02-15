@@ -748,6 +748,27 @@ After Telegram approve/deny, route the decision through the agent message pipeli
 
 ---
 
+# Slice 51 Spec: Policy Approval Requests (Token Preapprove + Approve All) With Web + Telegram Buttons
+
+## Goal
+Allow the agent to request owner approval for policy changes (token preapproval and global approval), using the same web + Telegram button approval surfaces as trade approvals.
+
+## Success Criteria
+1. Agent can create a policy approval request (token preapprove or global approve-all enable).
+2. Pending requests appear on `/agents/:id` with Approve/Deny.
+3. Telegram queued message can receive Approve/Deny inline buttons (auto-attach) and clicking them applies the decision.
+4. After Telegram approve/deny, decision feedback is routed into the agent pipeline (synthetic message + instructions) so the agent informs the user.
+
+## Acceptance Checks
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
 # Slice 31 Spec: Agents + Agent Management UX Refinement (Operational Clean)
 
 ## Goal

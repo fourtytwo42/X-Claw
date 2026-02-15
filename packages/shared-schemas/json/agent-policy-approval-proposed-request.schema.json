@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://xclaw.trade/schemas/agent-policy-approval-proposed-request.schema.json",
+  "title": "AgentPolicyApprovalProposedRequest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "chainKey", "requestType"],
+  "properties": {
+    "schemaVersion": { "type": "integer", "const": 1 },
+    "chainKey": { "type": "string", "minLength": 1 },
+    "requestType": { "type": "string", "enum": ["token_preapprove_add", "global_approval_enable"] },
+    "tokenAddress": { "type": ["string", "null"], "minLength": 1 }
+  }
+}
+

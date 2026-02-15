@@ -751,6 +751,48 @@ class TradePathRuntimeTests(unittest.TestCase):
             code = cli.cmd_profile_set_name(args)
         self.assertEqual(code, 1)
 
+    def test_policy_preapprove_token_rejects_non_address(self) -> None:
+        args = argparse.Namespace(chain="base_sepolia", token="USDC", json=True)
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            code = cli.cmd_approvals_request_token(args)
+        # Invalid user input should return exit code 2.
+        self.assertEqual(code, 2)
+        out = json.loads(buf.getvalue().strip())
+        self.assertFalse(out.get("ok"))
+        self.assertEqual(out.get("code"), "invalid_input")
+
+    def test_policy_preapprove_token_requests_policy_approval(self) -> None:
+        args = argparse.Namespace(chain="base_sepolia", token="0x" + "11" * 20, json=True)
+        captured: dict = {}
+
+        def fake_api_request(
+            method: str,
+            path: str,
+            payload: dict | None = None,
+            include_idempotency: bool = False,
+            idempotency_key: str | None = None,
+            allow_auth_recovery: bool = True,
+        ):
+            captured["method"] = method
+            captured["path"] = path
+            captured["payload"] = payload
+            captured["include_idempotency"] = include_idempotency
+            captured["idempotency_key"] = idempotency_key
+            return 200, {"ok": True, "policyApprovalId": "ppr_1", "status": "approval_pending"}
+
+        with mock.patch.object(cli, "_resolve_api_key", return_value="xak1.ag_1.sig.payload"), mock.patch.object(
+            cli, "_resolve_agent_id", return_value="ag_1"
+        ), mock.patch.object(cli, "_api_request", side_effect=fake_api_request):
+            payload = self._run_and_parse_stdout(lambda: cli.cmd_approvals_request_token(args))
+
+        self.assertTrue(payload.get("ok"))
+        self.assertEqual(captured.get("method"), "POST")
+        self.assertEqual(captured.get("path"), "/agent/policy-approvals/proposed")
+        sent = captured.get("payload") or {}
+        self.assertEqual(sent.get("requestType"), "token_preapprove_add")
+        self.assertEqual(sent.get("chainKey"), "base_sepolia")
+
     def test_management_link_normalizes_loopback_host_to_public_domain(self) -> None:
         args = argparse.Namespace(ttl_seconds=600, json=True)
         with mock.patch.object(cli, "_resolve_api_key", return_value="xak1.ag_1.sig.payload"), mock.patch.object(

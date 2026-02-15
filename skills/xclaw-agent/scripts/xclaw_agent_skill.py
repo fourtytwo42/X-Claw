@@ -219,6 +219,8 @@ def main(argv: List[str]) -> int:
         "dashboard",
         "intents-poll",
         "approval-check",
+        "policy-preapprove-token",
+        "policy-approve-all",
         "trade-exec",
         "trade-spot",
         "report-send",
@@ -268,6 +270,17 @@ def main(argv: List[str]) -> int:
         if len(argv) < 3:
             return _err("usage", "approval-check requires <intent_id>", "usage: approval-check <intent_id>", exit_code=2)
         return _run_agent(["approvals", "check", "--intent", argv[2], "--chain", chain, "--json"])
+
+    if cmd == "policy-preapprove-token":
+        if len(argv) < 3:
+            return _err("usage", "policy-preapprove-token requires <token_address>", "usage: policy-preapprove-token <token_address>", exit_code=2)
+        token = argv[2]
+        if _is_hex_address(token) is False:
+            return _err("invalid_input", "token_address must be a 0x address.", "usage: policy-preapprove-token 0x...", {"token": token}, exit_code=2)
+        return _run_agent(["approvals", "request-token", "--token", token, "--chain", chain, "--json"])
+
+    if cmd == "policy-approve-all":
+        return _run_agent(["approvals", "request-global", "--chain", chain, "--json"])
 
     if cmd == "trade-exec":
         if len(argv) < 3:

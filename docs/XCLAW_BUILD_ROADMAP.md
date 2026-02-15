@@ -1670,3 +1670,47 @@ Note:
   - [x] `npm run seed:verify`
   - [x] `npm run build`
   - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+## 51) Slice 51: Policy Approval Requests (Token Preapprove + Approve All) With Web + Telegram Buttons
+
+### 51.1 Canonical/doc sync
+- [x] Add Slice 51 goal/DoD + issue mapping to `docs/XCLAW_SLICE_TRACKER.md`.
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` to lock policy approval request semantics and Telegram callback prefix.
+- [x] Update handoff/process artifacts:
+  - [x] `docs/CONTEXT_PACK.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+- [x] Update API contracts:
+  - [x] `docs/api/openapi.v1.yaml`
+  - [x] `packages/shared-schemas/json/*`
+
+### 51.2 Data model
+- [x] Add migration for policy approval requests table.
+- [x] `npm run db:parity`
+
+### 51.3 Implementation
+- [x] Server:
+  - [x] agent-auth propose policy approval request
+  - [x] agent-auth approve/deny policy approval (Telegram callback)
+  - [x] management approve/deny policy approval (web UI)
+  - [x] management agent-state includes pending policy approvals
+- [x] Runtime:
+  - [x] add CLI commands to request token/global policy approvals
+- [x] OpenClaw gateway patch:
+  - [x] auto-attach policy approval buttons to queued message
+  - [x] intercept policy approval callbacks and apply decision
+  - [x] route decision into agent pipeline (synthetic message + instructions)
+- [x] Web UI:
+  - [x] show pending policy approvals on `/agents/:id` with Approve/Deny
+
+### 51.4 Validation + evidence
+- [x] Run required gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`

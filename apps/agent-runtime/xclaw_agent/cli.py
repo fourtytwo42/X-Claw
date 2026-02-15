@@ -2050,6 +2050,88 @@ def cmd_approvals_sync(args: argparse.Namespace) -> int:
         return fail("approvals_sync_failed", str(exc), "Verify API auth and OpenClaw availability, then retry.", {"chain": chain}, exit_code=1)
 
 
+def cmd_approvals_request_token(args: argparse.Namespace) -> int:
+    chk = require_json_flag(args)
+    if chk is not None:
+        return chk
+    token = str(args.token or "").strip()
+    if token == "":
+        return fail("invalid_input", "token is required.", "Provide a token address (0x...) and retry.", {"token": token}, exit_code=2)
+    if is_hex_address(token) is False:
+        return fail(
+            "invalid_input",
+            "token must be a 0x address for policy preapproval.",
+            "Provide a token address like 0xabc... and retry.",
+            {"token": token},
+            exit_code=2,
+        )
+    try:
+        payload = {"schemaVersion": 1, "chainKey": args.chain, "requestType": "token_preapprove_add", "tokenAddress": token}
+        status_code, body = _api_request(
+            "POST",
+            "/agent/policy-approvals/proposed",
+            payload=payload,
+            include_idempotency=True,
+            idempotency_key=f"rt-polreq-token-{args.chain}-{_normalize_address(token)}",
+        )
+        if status_code < 200 or status_code >= 300:
+            return fail(
+                str(body.get("code", "api_error")),
+                str(body.get("message", f"policy approval request failed ({status_code})")),
+                str(body.get("actionHint", "Verify API auth and retry.")),
+                {"status": status_code, "chain": args.chain, "token": token},
+                exit_code=1,
+            )
+        return ok(
+            "Policy approval requested: token preapproval pending.",
+            chain=args.chain,
+            policyApprovalId=str(body.get("policyApprovalId", "")),
+            status=str(body.get("status", "approval_pending")),
+            requestType="token_preapprove_add",
+            tokenAddress=_normalize_address(token),
+        )
+    except Exception as exc:
+        return fail(
+            "policy_approval_request_failed",
+            str(exc),
+            "Inspect runtime policy approval request and retry.",
+            {"chain": args.chain, "token": token},
+            exit_code=1,
+        )
+
+
+def cmd_approvals_request_global(args: argparse.Namespace) -> int:
+    chk = require_json_flag(args)
+    if chk is not None:
+        return chk
+    try:
+        payload = {"schemaVersion": 1, "chainKey": args.chain, "requestType": "global_approval_enable", "tokenAddress": None}
+        status_code, body = _api_request(
+            "POST",
+            "/agent/policy-approvals/proposed",
+            payload=payload,
+            include_idempotency=True,
+            idempotency_key=f"rt-polreq-global-{args.chain}",
+        )
+        if status_code < 200 or status_code >= 300:
+            return fail(
+                str(body.get("code", "api_error")),
+                str(body.get("message", f"policy approval request failed ({status_code})")),
+                str(body.get("actionHint", "Verify API auth and retry.")),
+                {"status": status_code, "chain": args.chain},
+                exit_code=1,
+            )
+        return ok(
+            "Policy approval requested: enable Approve all pending.",
+            chain=args.chain,
+            policyApprovalId=str(body.get("policyApprovalId", "")),
+            status=str(body.get("status", "approval_pending")),
+            requestType="global_approval_enable",
+        )
+    except Exception as exc:
+        return fail("policy_approval_request_failed", str(exc), "Inspect runtime policy approval request and retry.", {"chain": args.chain}, exit_code=1)
+
+
 def _post_trade_status(trade_id: str, from_status: str, to_status: str, extra: dict[str, Any] | None = None) -> None:
     payload: dict[str, Any] = {
         "tradeId": trade_id,
@@ -4908,6 +4990,17 @@ def build_parser() -> argparse.ArgumentParser:
     approvals_sync.add_argument("--chain", required=True)
     approvals_sync.add_argument("--json", action="store_true")
     approvals_sync.set_defaults(func=cmd_approvals_sync)
+
+    approvals_req_token = approvals_sub.add_parser("request-token")
+    approvals_req_token.add_argument("--chain", required=True)
+    approvals_req_token.add_argument("--token", required=True)
+    approvals_req_token.add_argument("--json", action="store_true")
+    approvals_req_token.set_defaults(func=cmd_approvals_request_token)
+
+    approvals_req_global = approvals_sub.add_parser("request-global")
+    approvals_req_global.add_argument("--chain", required=True)
+    approvals_req_global.add_argument("--json", action="store_true")
+    approvals_req_global.set_defaults(func=cmd_approvals_request_global)
 
     trade = sub.add_parser("trade")
     trade_sub = trade.add_subparsers(dest="trade_cmd")

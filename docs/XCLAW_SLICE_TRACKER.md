@@ -892,3 +892,26 @@ DoD:
 - [x] Telegram callback intercept triggers `processMessage(...)` with a synthetic inbound message describing the decision + instructions.
 - [x] Fallback behavior: if synthetic processing fails, post a minimal confirmation message (so the user still gets feedback).
 - [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.
+
+---
+
+## Slice 51: Policy Approval Requests (Token Preapprove + Approve All) With Web + Telegram Buttons
+Status: [x]
+Issue: #42 (umbrella)
+
+Goal:
+- Let the agent request owner approval to:
+  - preapprove a token for trading (tokenIn preapproval), and
+  - enable global trading approvals (Approve all / `approval_mode=auto`).
+- Requests must appear on `/agents/:id` like trade approvals and be approvable/denyable from both web UI and Telegram (inline buttons).
+
+DoD:
+- [x] docs sync first: source-of-truth + roadmap + tracker + context/spec/tasks/acceptance aligned to Slice 51.
+- [x] DB: add table to store pending policy approval requests.
+- [x] Server: agent-auth endpoint to propose a policy approval request; endpoints to approve/deny:
+  - Telegram callback via agent-auth (OpenClaw inline button) and
+  - Web management action via management cookie.
+- [x] Web UI: `/agents/:id` shows pending policy approval requests with Approve/Deny buttons.
+- [x] OpenClaw patch: auto-attach Approve/Deny buttons to the queued approval message and route decisions into agent pipeline (like trade approvals).
+- [x] Runtime/skill: add CLI surface to create policy approval requests so the agent can trigger them.
+- [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.

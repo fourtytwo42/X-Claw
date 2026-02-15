@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://xclaw.trade/schemas/management-policy-approval-decision-request.schema.json",
+  "title": "ManagementPolicyApprovalDecisionRequest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["agentId", "policyApprovalId", "decision"],
+  "properties": {
+    "agentId": { "type": "string", "minLength": 1 },
+    "policyApprovalId": { "type": "string", "minLength": 1 },
+    "decision": { "type": "string", "enum": ["approve", "reject"] },
+    "reasonMessage": { "type": ["string", "null"], "maxLength": 280 }
+  }
+}
+

@@ -57,6 +57,13 @@ Spot swap (on-chain, via configured router which may be the fee proxy):
 python3 {baseDir}/scripts/xclaw_agent_skill.py trade-spot <token_in> <token_out> <amount_in> <slippage_bps>
 ```
 
+Request policy approvals (owner must approve via web UI or Telegram buttons):
+
+```bash
+python3 {baseDir}/scripts/xclaw_agent_skill.py policy-preapprove-token <token_address>
+python3 {baseDir}/scripts/xclaw_agent_skill.py policy-approve-all
+```
+
 ## Telegram Approval Buttons (Inline, Single Message)
 
 When a trade is `approval_pending` and the active chat is Telegram, include the Approve/Deny buttons in the *same* queued message (do not send a separate follow-up prompt message).
@@ -69,6 +76,12 @@ Rule (locked for Telegram):
 Example (Telegram reply body):
 - `Queued 2,500 USDC -> WETH (1% slippage). Trade: trd_...`
 - `[[buttons: Approve trade | 2,500 USDC -> WETH | Approve:xappr|a|trd_...|base_sepolia, Deny:xappr|r|trd_...|base_sepolia]]`
+
+Policy approval queued message (Telegram):
+- Include `Status: approval_pending` and `Approval ID: ppr_...` so OpenClaw can auto-attach inline buttons.
+- Button callback_data:
+  - Approve: `xpol|a|<policyApprovalId>|<chainKey>`
+  - Deny: `xpol|r|<policyApprovalId>|<chainKey>`
 
 Notes:
 - `amount_in` is in human token units (e.g. `1` means 1.0 WETH if token-in is WETH).

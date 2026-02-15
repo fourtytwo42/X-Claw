@@ -182,6 +182,57 @@ paths:
           $ref: '#/components/responses/ErrorResponse'
         '409':
           $ref: '#/components/responses/ErrorResponse'
+  /api/v1/agent/policy-approvals/proposed:
+    post:
+      summary: Propose a policy approval request for authenticated agent (idempotent).
+      description: Creates an `approval_pending` request for token preapproval or enabling Approve all.
+      security:
+        - agentBearer: []
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentPolicyApprovalProposedRequest'
+      responses:
+        '200':
+          description: Policy approval request created.
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+  /api/v1/policy-approvals/{policyApprovalId}/decision:
+    post:
+      summary: Decide one pending policy approval request (agent-auth; Telegram callback).
+      description: Approves/rejects a policy approval request and applies the policy change when approved.
+      security:
+        - agentBearer: []
+      parameters:
+        - name: policyApprovalId
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PolicyApprovalDecisionRequest'
+      responses:
+        '200':
+          description: Decision accepted.
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
   /api/v1/agent/faucet/request:
     post:
       summary: Request one fixed testnet faucet drip (ETH + mock WETH/USDC) for authenticated agent wallet.
@@ -702,6 +753,28 @@ paths:
       responses:
         '200':
           description: Decision accepted.
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+  /api/v1/management/policy-approvals/decision:
+    post:
+      summary: Approve or reject one pending policy approval request.
+      security:
+        - managementCookie: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfTokenHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ManagementPolicyApprovalDecisionRequest'
+      responses:
+        '200':
+          description: Decision accepted.
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
         '409':
           $ref: '#/components/responses/ErrorResponse'
   /api/v1/management/policy/update:
@@ -1646,6 +1719,53 @@ components:
           nullable: true
         messageId:
           type: string
+    AgentPolicyApprovalProposedRequest:
+      type: object
+      required: [schemaVersion, chainKey, requestType]
+      properties:
+        schemaVersion:
+          type: integer
+          const: 1
+        chainKey:
+          type: string
+        requestType:
+          type: string
+          enum: [token_preapprove_add, global_approval_enable]
+        tokenAddress:
+          type: string
+          nullable: true
+    PolicyApprovalDecisionRequest:
+      type: object
+      required: [policyApprovalId, fromStatus, toStatus, at]
+      properties:
+        policyApprovalId:
+          type: string
+        fromStatus:
+          type: string
+          enum: [approval_pending]
+        toStatus:
+          type: string
+          enum: [approved, rejected]
+        reasonMessage:
+          type: string
+          nullable: true
+        at:
+          type: string
+          format: date-time
+    ManagementPolicyApprovalDecisionRequest:
+      type: object
+      required: [agentId, policyApprovalId, decision]
+      properties:
+        agentId:
+          type: string
+        policyApprovalId:
+          type: string
+        decision:
+          type: string
+          enum: [approve, reject]
+        reasonMessage:
+          type: string
+          nullable: true
     ManagementPolicyUpdateRequest:
       type: object
       required: [agentId, mode, approvalMode, maxTradeUsd, maxDailyUsd, allowedTokens]

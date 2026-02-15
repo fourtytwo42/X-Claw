@@ -118,6 +118,13 @@ type ManagementStatePayload = {
     reason: string | null;
     created_at: string;
   }>;
+  policyApprovalsQueue?: Array<{
+    request_id: string;
+    chain_key: string;
+    request_type: string;
+    token_address: string | null;
+    created_at: string;
+  }>;
   latestPolicy: {
     mode: 'real';
     approval_mode: 'per_trade' | 'auto';
@@ -266,6 +273,24 @@ function CopyIcon() {
       <rect x="4" y="4" width="11" height="11" rx="2" />
     </svg>
   );
+}
+
+function policyApprovalLabel(item: { request_type: string; token_address: string | null }, chainTokens?: Array<{ symbol: string; address: string }>) {
+  const symbolByAddress = new Map<string, string>();
+  for (const entry of chainTokens ?? []) {
+    symbolByAddress.set(normalizeHexAddress(entry.address), entry.symbol);
+  }
+  if (item.request_type === 'global_approval_enable') {
+    return 'Enable Approve all';
+  }
+  if (item.request_type === 'token_preapprove_add') {
+    if (!item.token_address) {
+      return 'Preapprove token';
+    }
+    const sym = symbolByAddress.get(normalizeHexAddress(item.token_address));
+    return `Preapprove ${sym ?? shortenAddress(item.token_address)}`;
+  }
+  return item.request_type;
 }
 
 function shortenHex(value: string | null | undefined, head = 6, tail = 4): string {
@@ -1613,6 +1638,67 @@ export default function AgentPublicProfilePage() {
                         }
                       >
                         Reject Trade
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </article>
+
+              <article className="management-card">
+                <h3>Policy Approvals</h3>
+                {(management.data.policyApprovalsQueue?.length ?? 0) === 0 ? <p className="muted">No pending policy approvals.</p> : null}
+                {(management.data.policyApprovalsQueue ?? []).map((item) => (
+                  <div key={item.request_id} className="queue-item">
+                    <div>
+                      <strong>{policyApprovalLabel(item, management.data.chainTokens)}</strong>
+                      <div className="muted">{shortenHex(item.request_id, 10, 8)}</div>
+                      <div className="muted">{formatUtc(item.created_at)} UTC</div>
+                    </div>
+                    <div className="toolbar">
+                      <input
+                        value={approvalRejectReasons[item.request_id] ?? ''}
+                        onChange={(event) =>
+                          setApprovalRejectReasons((current) => ({
+                            ...current,
+                            [item.request_id]: event.target.value
+                          }))
+                        }
+                        placeholder="Rejection reason (optional)"
+                      />
+                      <button
+                        type="button"
+                        className="theme-toggle"
+                        onClick={() =>
+                          void runManagementAction(
+                            () =>
+                              managementPost('/api/v1/management/policy-approvals/decision', {
+                                agentId,
+                                policyApprovalId: item.request_id,
+                                decision: 'approve'
+                              }).then(() => Promise.resolve()),
+                            `Approved ${item.request_id}`
+                          )
+                        }
+                      >
+                        Approve
+                      </button>
+                      <button
+                        type="button"
+                        className="theme-toggle"
+                        onClick={() =>
+                          void runManagementAction(
+                            () =>
+                              managementPost('/api/v1/management/policy-approvals/decision', {
+                                agentId,
+                                policyApprovalId: item.request_id,
+                                decision: 'reject',
+                                reasonMessage: (approvalRejectReasons[item.request_id] ?? '').trim() || 'Rejected by owner.'
+                              }).then(() => Promise.resolve()),
+                            `Rejected ${item.request_id}`
+                          )
+                        }
+                      >
+                        Deny
                       </button>
                     </div>
                   </div>
