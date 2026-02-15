@@ -446,3 +446,35 @@ Issue mapping: `#42` (umbrella)
   - [x] `npm run seed:verify`
   - [x] `npm run build`
   - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+# Slice 37 Tasks: Telegram Approvals Without Extra Secret (Skill-Authoritative, Web + Telegram OR)
+
+Active slice: `Slice 37: Telegram Approvals Without Extra Secret (Skill-Authoritative, Web + Telegram OR)`
+Issue mapping: `#42` (umbrella)
+
+## Checklist
+- [x] Docs sync first:
+  - [x] `docs/XCLAW_SLICE_TRACKER.md`
+  - [x] `docs/XCLAW_BUILD_ROADMAP.md`
+  - [x] `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - [x] `docs/api/openapi.v1.yaml`
+  - [x] `docs/CONTEXT_PACK.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+- [x] Server/API:
+  - [x] `POST /api/v1/management/approval-channels/update` no longer issues a secret.
+  - [x] Delete `/api/v1/channel/approvals/decision` and remove `channel-approval-decision-request.schema.json`.
+- [x] Web UI:
+  - [x] `/agents/:id` "Approval Delivery" card shows toggle only; no secret UI/instructions.
+- [x] OpenClaw:
+  - [x] Telegram callback approve uses agent-auth `POST /api/v1/trades/:tradeId/status` with `Idempotency-Key`.
+- [x] Gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`

@@ -459,8 +459,6 @@ export default function AgentPublicProfilePage() {
   const [chainUpdatePending, setChainUpdatePending] = useState(false);
   const [telegramApprovalsEnabled, setTelegramApprovalsEnabled] = useState(false);
   const [telegramUpdatePending, setTelegramUpdatePending] = useState(false);
-  const [telegramSecret, setTelegramSecret] = useState<string | null>(null);
-  const [telegramSecretCopied, setTelegramSecretCopied] = useState(false);
 
   useEffect(() => {
     if (!agentId) {
@@ -1379,63 +1377,30 @@ export default function AgentPublicProfilePage() {
                       checked={telegramApprovalsEnabled}
                       disabled={telegramUpdatePending}
                       onChange={(event) => {
-                        const next = Boolean(event.target.checked);
-                        setTelegramUpdatePending(true);
-                        void (async () => {
-                          await runManagementAction(
-                            async () => {
-                              const result = (await managementPost('/api/v1/management/approval-channels/update', {
-                                agentId,
-                                chainKey: activeChainKey,
-                                channel: 'telegram',
-                                enabled: next
-                              })) as { secret?: string } | null;
-                              setTelegramApprovalsEnabled(next);
-                              if (next && result?.secret) {
-                                setTelegramSecret(String(result.secret));
-                              }
-                            },
-                            next ? 'Telegram approvals enabled.' : 'Telegram approvals disabled.'
-                          );
-                          setTelegramUpdatePending(false);
-                        })();
-                      }}
-                    />{' '}
-                    Telegram approvals enabled
-                  </label>
-                  <span className="muted">{telegramApprovalsEnabled ? 'On: runtime may send approve prompts.' : 'Off: web UI only.'}</span>
-                </div>
-                {telegramSecret ? (
-                  <>
-                    <p className="muted">Secret (shown once on enable):</p>
-                    <button
-                      type="button"
-                      className="copy-row"
-                      onClick={async () => {
-                        try {
-                          await navigator.clipboard.writeText(telegramSecret);
-                          setTelegramSecretCopied(true);
-                          window.setTimeout(() => setTelegramSecretCopied(false), 1000);
-                        } catch {
-                          setTelegramSecretCopied(false);
-                        }
-                      }}
-                      aria-label="Copy Telegram approval secret"
-                      title="Copy Telegram approval secret"
-                    >
-                      <span className="copy-row-icon">
-                        <CopyIcon />
-                      </span>
-                      <span className="copy-row-text">{telegramSecret}</span>
-                    </button>
-                    {telegramSecretCopied ? <p className="muted">Copied.</p> : null}
-                    <p className="muted" style={{ marginTop: '0.35rem' }}>
-                      Configure on gateway host (OpenClaw config), then restart gateway:
-                    </p>
-                    <pre className="code-block">{`openclaw config set skills.entries.xclaw-agent.env.XCLAW_APPROVALS_TELEGRAM_SECRET \"${telegramSecret}\"\nopenclaw gateway restart`}</pre>
-                  </>
-                ) : null}
-              </article>
+                              const next = Boolean(event.target.checked);
+                              setTelegramUpdatePending(true);
+                              void (async () => {
+                                await runManagementAction(
+                                  async () => {
+                                    await managementPost('/api/v1/management/approval-channels/update', {
+                                      agentId,
+                                      chainKey: activeChainKey,
+                                      channel: 'telegram',
+                                      enabled: next
+                                    });
+                                    setTelegramApprovalsEnabled(next);
+                                  },
+                                  next ? 'Telegram approvals enabled.' : 'Telegram approvals disabled.'
+                                );
+                                setTelegramUpdatePending(false);
+                              })();
+                            }}
+                          />{' '}
+                          Telegram approvals enabled
+                        </label>
+                        <span className="muted">{telegramApprovalsEnabled ? 'On: runtime may send approve prompts.' : 'Off: web UI only.'}</span>
+                      </div>
+                    </article>
 
               <article className="management-card">
                 <h3>Usage Progress</h3>

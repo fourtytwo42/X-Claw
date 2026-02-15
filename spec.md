@@ -417,6 +417,31 @@ Refine dashboard clarity for the current network-only release by removing redund
 
 ---
 
+# Slice 37 Spec: Telegram Approvals Without Extra Secret (Skill-Authoritative, Web + Telegram OR)
+
+## Goal
+Allow Telegram inline-button approvals without requiring any additional secret/config beyond the existing `xclaw-agent` skill API key.
+
+## Success Criteria
+1. `/agents/:id` owner can enable/disable Telegram approvals per chain with management cookie + CSRF, with no secret issuance/display.
+2. When a trade is `approval_pending` and OpenClaw last active channel is Telegram, runtime sends an approval prompt with inline Approve button.
+3. Clicking Approve in Telegram transitions the trade `approval_pending -> approved` using agent auth (`POST /api/v1/trades/:tradeId/status`) and deletes the Telegram prompt.
+4. Approving in the web UI first still converges: runtime deletes any Telegram prompt on observing the status transition (best-effort + `approvals sync`).
+5. OpenAPI + shared schemas remain synchronized (no `/api/v1/channel/approvals/decision`).
+
+## Non-Goals
+1. No reject-in-Telegram (web-only reject remains).
+2. No new auth model; this accepts agent-auth as sufficient for Telegram approve transitions.
+3. No DB migration required.
+
+## Acceptance Checks
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
 # Slice 30 Spec: Owner-Managed Daily Trade Caps + Usage Visibility (Trades Only)
 
 ## Goal

@@ -637,7 +637,7 @@ paths:
   /api/v1/management/approval-channels/update:
     post:
       summary: Enable or disable approval delivery channels for an agent (per-chain).
-      description: Enabling Telegram approvals requires an active step-up session and returns a one-time secret; disabling does not require step-up.
+      description: Enables/disables Telegram approval prompts for pending trades. Telegram approve uses agent-auth trade status transition (no separate Telegram secret).
       security:
         - managementCookie: []
       parameters:
@@ -651,27 +651,6 @@ paths:
       responses:
         '200':
           description: Approval channel updated.
-        '400':
-          $ref: '#/components/responses/ErrorResponse'
-        '401':
-          $ref: '#/components/responses/ErrorResponse'
-        '409':
-          $ref: '#/components/responses/ErrorResponse'
-  /api/v1/channel/approvals/decision:
-    post:
-      summary: Channel approval decision (Telegram inline button approve-only).
-      description: Strict channel auth endpoint. Uses `Authorization: Bearer xappr_...` and does not use management cookies/CSRF.
-      security:
-        - channelApprovalBearer: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ChannelApprovalDecisionRequest'
-      responses:
-        '200':
-          description: Decision accepted (idempotent).
         '400':
           $ref: '#/components/responses/ErrorResponse'
         '401':
@@ -1245,10 +1224,6 @@ components:
       type: apiKey
       in: cookie
       name: xclaw_mgmt
-    channelApprovalBearer:
-      type: http
-      scheme: bearer
-      bearerFormat: xappr-secret
   schemas:
     Error:
       type: object
@@ -1671,34 +1646,6 @@ components:
           nullable: true
         messageId:
           type: string
-    ChannelApprovalDecisionRequest:
-      type: object
-      required: [tradeId, chainKey, decision, source]
-      properties:
-        agentId:
-          type: string
-          nullable: true
-          description: Optional. When omitted, server derives agentId from tradeId.
-        tradeId:
-          type: string
-        chainKey:
-          type: string
-        decision:
-          type: string
-          enum: [approve]
-        source:
-          type: object
-          required: [channel, to, messageId, senderId]
-          properties:
-            channel:
-              type: string
-              enum: [telegram]
-            to:
-              type: string
-            messageId:
-              type: string
-            senderId:
-              type: string
     ManagementPolicyUpdateRequest:
       type: object
       required: [agentId, mode, approvalMode, maxTradeUsd, maxDailyUsd, allowedTokens]

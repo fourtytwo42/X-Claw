@@ -1143,6 +1143,9 @@ Use this every work session:
 
 ## 34) Slice 34: Telegram Approvals (Inline Button Approve) + Web UI Sync
 
+Note:
+- Superseded by Slice 37 (secretless Telegram approvals via agent-auth trade status) and Slice 36 (step-up removed). The checklist below reflects the Slice 34 implementation at the time.
+
 ### 34.1 Canonical/doc sync (must happen before implementation)
 - [x] Add Slice 34 goal/DoD + issue mapping to `docs/XCLAW_SLICE_TRACKER.md`.
 - [x] Add Slice 34 roadmap checklist (this section).
@@ -1271,6 +1274,35 @@ Use this every work session:
 - [x] Update `infrastructure/scripts/e2e-full-pass.sh` to remove step-up flows.
 
 ### 36.4 Validation + evidence
+- [x] Run required gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+## 37) Slice 37: Telegram Approvals Without Extra Secret (Skill-Authoritative, Web + Telegram OR)
+
+### 37.1 Canonical/doc sync
+- [x] Add Slice 37 goal/DoD + issue mapping to `docs/XCLAW_SLICE_TRACKER.md`.
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` to reflect secretless Telegram approvals and OR convergence semantics.
+- [x] Update `docs/api/openapi.v1.yaml` and shared schemas to remove `/api/v1/channel/approvals/decision` and the secret-bearing enable response.
+- [x] Update handoff/process artifacts:
+  - [x] `docs/CONTEXT_PACK.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+
+### 37.2 Server/API/UI/OpenClaw
+- [x] `POST /api/v1/management/approval-channels/update` no longer issues a secret; stores enablement only.
+- [x] Delete channel-auth endpoint `/api/v1/channel/approvals/decision` and remove schema.
+- [x] OpenClaw Telegram callback approves by calling X-Claw trade status endpoint using `skills.entries.xclaw-agent.apiKey` (agent auth) with idempotency.
+- [x] `/agents/:id` "Approval Delivery" card removes secret display and configuration instructions.
+
+### 37.3 Validation + evidence
 - [x] Run required gates:
   - [x] `npm run db:parity`
   - [x] `npm run seed:reset`

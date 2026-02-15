@@ -2643,3 +2643,27 @@ Issue mapping: `#42` (umbrella)
   - `POST /api/v1/management/stepup/challenge` returns 404.
   - `POST /api/v1/management/stepup/verify` returns 404.
   - `POST /api/v1/agent/stepup/challenge` returns 404.
+
+---
+
+## Slice 37 Acceptance Evidence
+
+Date (UTC): 2026-02-15
+Active slice: `Slice 37: Telegram Approvals Without Extra Secret (Skill-Authoritative, Web + Telegram OR)`
+Issue mapping: `#42` (umbrella)
+
+### Required gate evidence
+- `npm run db:parity` -> PASS (checkedAt: 2026-02-15T09:59:10.551Z)
+- `npm run seed:reset` -> PASS
+- `npm run seed:load` -> PASS
+- `npm run seed:verify` -> PASS
+- `npm run build` -> PASS (Next.js build; routes list does not include `/api/v1/channel/approvals/decision`)
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS
+
+### Scenario evidence (manual)
+- No Telegram secret required:
+  - `/agents/:id` "Approval Delivery" shows no secret and no `XCLAW_APPROVALS_TELEGRAM_SECRET` instructions.
+- Telegram approve action:
+  - Clicking Telegram Approve transitions trade via agent-auth `POST /api/v1/trades/:tradeId/status` (`approval_pending -> approved`) and deletes the prompt message.
+- Web approval convergence:
+  - Approving on `/agents/:id` removes it from the approvals queue and runtime cleanup removes any outstanding Telegram prompt.

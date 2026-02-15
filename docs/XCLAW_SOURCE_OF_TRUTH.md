@@ -538,7 +538,7 @@ Security defaults:
 - bootstrap via `/agents/:id?token=<opaque_token>` over HTTPS (except localhost)
 - token stripped from URL after validation
 - agent-scoped 30-day management cookie (`Secure`, `HttpOnly`, `SameSite=Strict`)
-- 24h step-up auth for sensitive actions
+- management writes require CSRF header (`X-CSRF-Token`) in addition to management cookie (Slice 36 removed step-up).
 
 ---
 
@@ -914,16 +914,13 @@ This section supersedes any earlier conflicting statements in this file.
 - Withdrawals are same-chain only in MVP.
 - No separate withdraw max cap; enforce balance + fixed gas buffer + auth/policy.
 - Fixed native gas buffer is 0.005 ETH minimum and not user-lowerable.
-- Withdraw destination changes require step-up auth.
+- Withdraw destination changes require management cookie + CSRF only (Slice 36 removed step-up).
 - Approvals are managed on web; agent executes locally and enforces policy before trading.
 - Approval model is policy-driven:
   - Global Approval ON (`approval_mode=auto`) means new trade proposals are auto-approved.
   - Global Approval OFF (`approval_mode=per_trade`) means approval is required unless `tokenIn` is preapproved (present in `allowed_tokens`).
   - Token preapproval is evaluated on `tokenIn` only (chain-scoped).
-- Per-trade approval decisions do not require step-up beyond base management auth.
-- Sensitive actions (`withdraw`, enabling Global Approval, enabling token preapproval, outbound transfer policy enablements) require 24h step-up.
-- Step-up is server-verified HttpOnly session, not localStorage.
-- Step-up code is single-use and rate-limited to 5 failed attempts per 10 minutes.
+- Per-trade approval decisions require management cookie + CSRF only (Slice 36 removed step-up).
 - Pause/resume is user-controlled from management UI and requires base management auth only.
 - Pause halts all pending execution.
 - Resume requires fresh validation before execution.
@@ -1307,7 +1304,7 @@ These defaults define baseline UX/layout behavior so frontend implementation is 
 ### 25.3 Approvals and Sensitive Actions
 - Approval queue is persistent (panel block), not modal-only.
 - Sensitive actions use action-specific confirmation modals.
-- Step-up auth shows a visible validity indicator/countdown in management UI.
+- No step-up mechanism is used (Slice 36 removed step-up).
 
 ### 25.4 Identity and Tables
 - Wallets are shortened by default with copy-to-clipboard and explorer link affordance.
@@ -1540,7 +1537,6 @@ These defaults define baseline UX/layout behavior so frontend implementation is 
   "chainKey": "base_sepolia",
   "scope": "trade|pair|global",
   "status": "active|revoked|expired|consumed",
-  "requiresStepup": true,
   "grantedBySessionId": "ulid",
   "tradeRef": "ulid|null",
   "pairRef": "TOKENA/TOKENB|null",
@@ -1813,7 +1809,7 @@ Required enforcement classes:
 1. Public read routes: no auth.
 2. Agent write routes: bearer token + idempotency key.
 3. Management write routes: management cookie + CSRF token.
-4. Sensitive management routes: management cookie + step-up cookie + CSRF token.
+4. Sensitive management routes: management cookie + CSRF token (Slice 36 removed step-up).
 5. Error responses: `code`, `message`, optional `actionHint`, optional `details`, `requestId`.
 
 ---
@@ -2186,11 +2182,10 @@ Required sections:
 - Policy controls: Global Approval toggle + per-token preapproval toggles (tokenIn-only), chain-scoped
 - Withdraw controls: set destination + initiate withdraw
 - Pause/Resume control
-- Step-up auth status card with expiry countdown (24h)
 - Management audit log panel
 
 Behavior and guardrails to visualize:
-- sensitive actions indicate step-up requirement
+- sensitive actions remain gated by management cookie + CSRF (no step-up)
 - management controls shown only because user is authorized for this agent
 - clear separation between public data and private controls
 
@@ -2299,7 +2294,7 @@ Output requirements:
 3. Outbound transfer policy is owner-managed and chain-scoped:
    - modes: `disabled`, `allow_all`, `whitelist`.
    - applies to native + ERC20 outbound runtime sends.
-   - management updates to outbound fields require step-up session.
+   - management updates require management cookie + CSRF (Slice 36 removed step-up).
 4. Agent limit-order surface is `create`, `cancel`, `list`, `run-loop`.
    - For testing, `run-once` is supported and the OpenClaw wrapper defaults `run-loop` to a single iteration unless explicitly configured.
    - `limitPrice` semantics (locked):
@@ -2502,10 +2497,8 @@ Limitations / notes:
    - stored as `agent_policy_snapshots.allowed_tokens` (array of token addresses),
    - evaluated on `tokenIn` only (case-insensitive address compare),
    - chain-scoped via trade `chain_key` and management chain selector context.
-4. Step-up rules:
-   - enabling Global Approval requires step-up,
-   - enabling a token preapproval toggle requires step-up,
-   - disabling either does not require step-up.
+4. Management auth rules:
+   - management cookie + CSRF is sufficient for enabling/disabling Global Approval and token preapprovals (Slice 36 removed step-up).
 5. Trade proposal behavior (`POST /api/v1/trades/proposed`):
    - sets initial trade status to `approved` or `approval_pending` based on Global Approval + tokenIn preapproval rule.
 6. Agent runtime `trade spot` behavior:
@@ -2523,9 +2516,8 @@ Limitations / notes:
    - owner-only approval policy controls live in the wallet card (not the rail):
      - Global Approval toggle (`Approve all`),
      - per-token preapproval controls inline on token rows.
-4. Enabling chain access is a protected action:
-   - enabling requires an active step-up session,
-   - disabling does not require step-up.
+4. Chain access management:
+   - management session cookie + CSRF is sufficient for enable/disable (Slice 36 removed step-up).
 5. Canonical endpoints:
    - `POST /api/v1/management/chains/update` upserts per-agent chain access.
    - `GET /api/v1/management/agent-state?agentId=...&chainKey=...` returns `chainPolicy` for active chain context.
@@ -2533,7 +2525,7 @@ Limitations / notes:
 
 ---
 
-## 58) Slice 34 Telegram Approvals Delivery (Inline Button, Strict) Contract (Locked)
+## 58) Telegram Approvals Delivery (Inline Button, Skill-Authoritative) Contract (Locked)
 
 1. Telegram is an optional, owner-enabled approval delivery channel for trade approvals.
 2. Telegram approvals are per-agent and per-chain:
@@ -2541,10 +2533,9 @@ Limitations / notes:
 3. Approve-only in Telegram:
    - Telegram offers an **Approve** button only.
    - Reject remains web-only from `/agents/:id`.
-4. Strict execution boundary:
-   - clicking a Telegram inline button must trigger approval server-side **without LLM/tool mediation**.
-   - OpenClaw must intercept the callback payload and call the X-Claw channel approval endpoint directly.
-   - In this repo, the OpenClaw patch is shipped as `patches/openclaw/001_slice34_telegram_approvals.patch`.
+4. Execution boundary:
+   - clicking a Telegram inline button must trigger approval **without LLM/tool mediation**.
+   - OpenClaw intercepts the callback payload and performs an agent-authenticated approval transition using the existing `xclaw-agent` API key (no separate Telegram secret).
 5. Trade lifecycle:
    - when a trade is inserted as `approval_pending`, the runtime may send a Telegram approval prompt **only** if:
      - Telegram approvals are enabled for that agent+chain, and
@@ -2552,18 +2543,12 @@ Limitations / notes:
 6. Sync between Telegram and web:
    - the pending approval item remains visible on `/agents/:id`.
    - approving in either surface must converge:
-     - approving in Telegram removes the item from the web approvals queue,
-     - approving in the web UI triggers prompt deletion in Telegram by runtime cleanup (best-effort + periodic sync).
-7. Secrets:
-   - enabling Telegram approvals generates a new one-time secret (`xappr_...`) that is shown once.
-   - server stores only a hash; raw secrets are never persisted.
-   - approval decisions sent via Telegram must authenticate with the secret (Bearer token).
-8. Canonical endpoints:
+     - approving in Telegram marks the trade `approved` and removes the item from the web approvals queue,
+     - approving in the web UI removes the item and triggers prompt deletion in Telegram by runtime cleanup (best-effort + periodic sync).
+7. Canonical endpoints:
    - `POST /api/v1/management/approval-channels/update` (owner-auth):
-     - enable requires step-up; disable does not.
-     - returns the generated secret only on enable.
-   - `POST /api/v1/channel/approvals/decision` (channel auth):
-     - authorizes via Bearer secret (no management cookies/CSRF).
-     - idempotently transitions `approval_pending -> approved` when actionable.
+     - enables/disables Telegram approval prompts (no secret issuance).
+   - Telegram approve action uses `POST /api/v1/trades/:tradeId/status` (agent-auth):
+     - idempotently transitions `approval_pending -> approved` when actionable (requires `Idempotency-Key`).
    - `POST /api/v1/agent/approvals/prompt` (agent-auth):
      - records prompt metadata for cleanup/sync (does not authorize approvals).

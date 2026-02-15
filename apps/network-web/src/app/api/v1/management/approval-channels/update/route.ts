@@ -1,5 +1,3 @@
-import { randomBytes } from 'node:crypto';
-
 import type { NextRequest } from 'next/server';
 
 import { withTransaction } from '@/lib/db';
@@ -7,7 +5,6 @@ import { errorResponse, internalErrorResponse, successResponse } from '@/lib/err
 import { parseJsonBody } from '@/lib/http';
 import { makeId } from '@/lib/ids';
 import { getChainConfig } from '@/lib/chains';
-import { hashApprovalChannelSecret } from '@/lib/approval-channel-secret';
 import { requireManagementWriteAuth } from '@/lib/management-auth';
 import { getRequestId } from '@/lib/request-id';
 import { validatePayload } from '@/lib/validation';
@@ -20,10 +17,6 @@ type ManagementApprovalChannelUpdateRequest = {
   channel: 'telegram';
   enabled: boolean;
 };
-
-function generateTelegramApprovalSecret(): string {
-  return `xappr_${randomBytes(24).toString('base64url')}`;
-}
 
 export async function POST(req: NextRequest) {
   const requestId = getRequestId(req);
@@ -70,14 +63,6 @@ export async function POST(req: NextRequest) {
       return auth.response;
     }
 
-    // Enabling Telegram approvals rotates and returns a new secret; disabling keeps the existing secret hash.
-    let issuedSecret: string | null = null;
-    let secretHash: string | null = null;
-    if (body.enabled) {
-      issuedSecret = generateTelegramApprovalSecret();
-      secretHash = hashApprovalChannelSecret(issuedSecret);
-    }
-
     const channelPolicyId = makeId('acp');
 
     const result = await withTransaction(async (client) => {
@@ -96,7 +81,7 @@ export async function POST(req: NextRequest) {
         ) values ($1, $2, $3, $4, $5, $6, $7, now(), now())
         on conflict (agent_id, chain_key, channel) do update
           set enabled = excluded.enabled,
-              secret_hash = case when excluded.secret_hash is null then agent_chain_approval_channels.secret_hash else excluded.secret_hash end,
+              secret_hash = null,
               created_by_management_session_id = excluded.created_by_management_session_id,
               updated_at = now()
         `,
@@ -106,7 +91,7 @@ export async function POST(req: NextRequest) {
           body.chainKey,
           body.channel,
           body.enabled,
-          secretHash,
+          null,
           auth.session.sessionId
         ]
       );
@@ -132,8 +117,7 @@ export async function POST(req: NextRequest) {
         chainKey: body.chainKey,
         channel: body.channel,
         enabled: result?.enabled ?? body.enabled,
-        updatedAt: result?.updated_at ?? null,
-        ...(issuedSecret ? { secret: issuedSecret } : {})
+        updatedAt: result?.updated_at ?? null
       },
       200,
       requestId

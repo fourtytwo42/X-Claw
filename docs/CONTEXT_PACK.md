@@ -1,13 +1,13 @@
 # X-Claw Context Pack
 
-## 1) Goal (Active: Slice 34)
-- Primary objective: complete `Slice 34: Telegram Approvals (Inline Button Approve) + Web UI Sync`.
+## 1) Goal (Active: Slice 37)
+- Primary objective: complete `Slice 37: Telegram Approvals Without Extra Secret (Skill-Authoritative, Web + Telegram OR)`.
 - Success criteria:
   - trade `approval_pending` triggers a Telegram approval prompt only when:
     - Telegram approvals are enabled for agent+chain, and
     - OpenClaw last active channel is Telegram (session store `lastChannel == telegram`)
   - clicking Approve in Telegram:
-    - approves trade server-side (no management cookies/CSRF),
+    - approves trade via agent-auth trade status transition (no separate Telegram secret),
     - deletes the Telegram approval message,
     - and `/agents/:id` approvals queue reflects approval immediately
   - if web approves first, runtime deletes the Telegram prompt (best-effort + periodic sync)
@@ -17,30 +17,29 @@
 
 ## 2) Constraints
 - Canonical authority: `docs/XCLAW_SOURCE_OF_TRUTH.md`.
-- Strict slice order: Slice 34 follows completed Slice 33.
+- Strict slice order: Slice 37 follows completed Slice 36.
 - One-site model remains fixed (`/agents/:id` public + auth-gated management).
 - No dependency additions.
-- DB migration required for this slice (approval channel + prompt tracking tables).
+- No new DB migration required for this slice (reuses Slice 34 tables; removes secret requirement and channel-auth path).
 
 ## 3) Contract Impact
-- Management toggle + secret issuance:
-  - `POST /api/v1/management/approval-channels/update` enables/disables Telegram approvals per chain.
-  - enable is step-up gated and returns a one-time secret; disable is not step-up gated.
+- Management toggle:
+  - `POST /api/v1/management/approval-channels/update` enables/disables Telegram approvals per chain (no secret issuance).
 - Agent policy read change:
   - `GET /api/v1/agent/transfers/policy` includes `approvalChannels.telegram.enabled` (no secrets).
 - Runtime prompt reporting:
   - `POST /api/v1/agent/approvals/prompt` records prompt metadata for cleanup/sync.
-- Telegram approval decision:
-  - `POST /api/v1/channel/approvals/decision` authorizes via Bearer secret and idempotently approves pending trades.
+- Telegram approve path:
+  - Telegram approve uses `POST /api/v1/trades/:tradeId/status` (agent-auth + `Idempotency-Key`) to transition `approval_pending -> approved`.
 
-## 4) Files and Boundaries (Slice 34 allowlist)
+## 4) Files and Boundaries (Slice 37 allowlist)
 - Web/API/UI:
   - `apps/network-web/src/app/agents/[agentId]/page.tsx`
   - `apps/network-web/src/app/api/v1/management/approval-channels/update/route.ts`
-  - `apps/network-web/src/app/api/v1/channel/approvals/decision/route.ts`
   - `apps/network-web/src/app/api/v1/agent/approvals/prompt/route.ts`
   - `apps/network-web/src/app/api/v1/management/agent-state/route.ts`
   - `apps/network-web/src/app/api/v1/agent/transfers/policy/route.ts`
+  - `apps/network-web/src/app/api/v1/trades/[tradeId]/status/route.ts`
 - Canonical docs/process:
   - `docs/XCLAW_SOURCE_OF_TRUTH.md`
   - `docs/XCLAW_SLICE_TRACKER.md`
@@ -56,7 +55,6 @@
 - Shared schemas:
   - `packages/shared-schemas/json/management-approval-channel-update-request.schema.json`
   - `packages/shared-schemas/json/agent-approvals-prompt-request.schema.json`
-  - `packages/shared-schemas/json/channel-approval-decision-request.schema.json`
 - Data model:
   - `infrastructure/migrations/0010_slice34_telegram_approvals.sql`
 - OpenClaw:
@@ -77,17 +75,17 @@
   - `npm run seed:verify`
   - `npm run build`
 - Feature checks:
-  - enabling Telegram approvals in `/agents/:id` requires step-up and returns a secret once
+  - enabling Telegram approvals in `/agents/:id` does not return/require any secret
   - runtime sends a Telegram approval prompt only when OpenClaw last active channel is Telegram
-  - clicking Telegram Approve transitions trade to `approved` and deletes the prompt message
+  - clicking Telegram Approve transitions trade `approval_pending -> approved` via agent-auth trade status and deletes the prompt message
   - approving from web UI causes runtime cleanup to delete the Telegram prompt (best-effort + `approvals sync`)
 
 ## 7) Evidence + Rollback
 - Capture command outputs and UX evidence in `acceptance.md`.
 - Rollback plan:
-  1. revert Slice 34 touched files only,
+  1. revert Slice 37 touched files only,
   2. rerun required gates,
-  3. confirm approvals continue to function in web UI with no Telegram delivery behavior.
+  3. confirm approvals continue to function in web UI and Telegram prompts do not attempt secretless approvals.
 
 ---
 

@@ -608,6 +608,9 @@ Issue: #42 (umbrella)
 Goal:
 - Add Telegram as an optional approvals surface that stays aligned with `/agents/:id` approvals UI.
 
+Note:
+- Slice 34 shipped a strict Bearer-secret channel approval endpoint. Slice 37 removes the extra secret requirement and deletes the channel-auth endpoint in favor of agent-auth trade status transition for Telegram approve.
+
 DoD:
 - [x] docs sync first: source-of-truth + roadmap + tracker + openapi + context/spec/tasks/acceptance aligned to Slice 34.
 - [x] migration adds per-agent/per-chain approval channel enablement + secret hash storage and prompt tracking tables.
@@ -655,4 +658,21 @@ DoD:
 - [x] no API endpoint requires `xclaw_stepup` cookie; `requireStepupSession` removed.
 - [x] `/agents/:id` shows no step-up UI/prompt and management actions no longer require codes.
 - [x] runtime removes `xclaw-agent stepup-code` and skill/docs no longer reference step-up.
+- [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.
+
+---
+
+## Slice 37: Telegram Approvals Without Extra Secret (Skill-Authoritative, Web + Telegram OR)
+Status: [x]
+Issue: #42 (umbrella)
+
+Goal:
+- Remove the Telegram approvals secret/config step. Telegram approvals should work using the existing `xclaw-agent` skill API key (agent auth) and remain in sync with the web approvals UI: clicking Approve in either surface approves the trade and the other surface converges.
+
+DoD:
+- [x] docs sync first: source-of-truth + roadmap + tracker + openapi + context/spec/tasks/acceptance aligned to Slice 37.
+- [x] management toggle remains chain-scoped (`Telegram approvals enabled`) and no longer returns/shows a secret.
+- [x] OpenClaw Telegram callback approve uses `xclaw-agent` API key to post `approval_pending -> approved` via `/api/v1/trades/:tradeId/status` (agent-auth + Idempotency-Key).
+- [x] channel-auth endpoint `/api/v1/channel/approvals/decision` removed and OpenAPI/schemas updated.
+- [x] `/agents/:id` management rail no longer instructs configuring `XCLAW_APPROVALS_TELEGRAM_SECRET`.
 - [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.
