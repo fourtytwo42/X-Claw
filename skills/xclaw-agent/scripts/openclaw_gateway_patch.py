@@ -37,7 +37,7 @@ QUEUED_BUTTONS_MARKER_V2 = "xclaw: telegram queued approval buttons v2"
 QUEUED_BUTTONS_MARKER_V3 = "xclaw: telegram queued approval buttons v3"
 LEGACY_DM_SENTINEL = 'Allow in DMs even when inlineButtonsScope is "allowlist", gated by chatId == senderId.'
 # Bump when patch semantics change so we invalidate the cached "already patched" fast-path.
-STATE_SCHEMA_VERSION = 21
+STATE_SCHEMA_VERSION = 24
 STATE_DIR = Path.home() / ".openclaw" / "xclaw"
 STATE_FILE = STATE_DIR / "openclaw_patch_state.json"
 LOCK_FILE = STATE_DIR / "openclaw_patch.lock"
@@ -62,6 +62,15 @@ def _emit(payload: dict[str, Any]) -> int:
 
 def _sha256_text(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _bundle_supports_queued_policy_buttons(text: str) -> bool:
+    """
+    Heuristic: ensure the *sendTelegramText* queued-buttons block supports policy approvals
+    (Approval ID: ppr_...) and emits the policy attach log.
+    """
+    # Keep this intentionally simple and stable: if these strings exist, we consider it upgraded.
+    return ("queued policy buttons attached" in text) and ("xpol|a|${approvalId}" in text)
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -278,12 +287,11 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
             if not err2:
                 raw = raw2
                 changed_any = changed_any or changed2
-        # Always upgrade queued-buttons injection to v3 when needed (replaces v2 in-place).
-        if QUEUED_BUTTONS_MARKER_V3 not in raw:
-            raw3, changed3, err3 = _patch_queued_buttons_v2(raw)
-            if not err3:
-                raw = raw3
-                changed_any = changed_any or changed3
+        # Always evaluate the v3 queued-buttons injection for upgrades (trade-only v3 -> trade+policy v3).
+        raw3, changed3, err3 = _patch_queued_buttons_v2(raw)
+        if not err3:
+            raw = raw3
+            changed_any = changed_any or changed3
         normalized = normalized or changed_any
         return raw, normalized, None
 
@@ -483,11 +491,22 @@ def _patch_queued_buttons_v2(raw: str) -> tuple[str, bool, str | None]:
     if anchor not in raw:
         return raw, False, "queued_buttons_v2_anchor_not_found"
 
-    # v3 is our current canonical behavior. If v2 exists near this anchor, remove it and replace with v3
-    # so we can improve matching and add logging without duplicating blocks.
-    if QUEUED_BUTTONS_MARKER_V3 in raw:
-        return raw, False, None
+    # v3 is our current canonical behavior. If a v3 block exists but doesn't support policy approvals,
+    # replace it in-place. This handles upgrades from trade-only v3 -> trade+policy v3.
     anchor_idx = raw.find(anchor)
+    if QUEUED_BUTTONS_MARKER_V3 in raw:
+        window = raw[anchor_idx : min(len(raw), anchor_idx + 9000)]
+        if ("xpol|a|${approvalId}" in window) and ("queued policy buttons attached" in window) and ("missing trade/policy id" in window):
+            return raw, False, None
+        start = raw.find(f"\n\t// {QUEUED_BUTTONS_MARKER_V3}", anchor_idx)
+        if start >= 0:
+            end = raw.find("\n\n\ttry {", start)
+            if end < 0:
+                end = raw.find("\n\ttry {", start)
+            if end > start and end < anchor_idx + 12000:
+                # Replace the existing v3 block with the current injection.
+                raw = raw[:start] + raw[end:]
+
     if QUEUED_BUTTONS_MARKER_V2 in raw:
         # Only remove v2 when it appears in the local window right after the anchor (inside sendTelegramText).
         window = raw[anchor_idx : min(len(raw), anchor_idx + 6000)]
@@ -536,7 +555,7 @@ def _patch_queued_buttons_v2(raw: str) -> tuple[str, bool, str | None]:
         "\t\t\t\ttry { runtime.log?.(`xclaw: queued policy buttons attach failed err=${String(err)}`); } catch {}\n"
         "\t\t\t}\n"
         "\t\t} else {\n"
-        "\t\t\ttry { runtime.log?.(`xclaw: queued buttons skipped (pending but missing trade id) sample=${__xclawNormalized.slice(0, 180)}`); } catch {}\n"
+        "\t\t\ttry { runtime.log?.(`xclaw: queued buttons skipped (pending but missing trade/policy id) sample=${__xclawNormalized.slice(0, 180)}`); } catch {}\n"
         "\t\t}\n"
         "\t} else if (__xclawHasPending && opts?.replyMarkup) {\n"
         "\t\ttry { runtime.log?.(`xclaw: queued buttons skipped (already has replyMarkup)`); } catch {}\n"
@@ -663,6 +682,7 @@ def ensure_patched(*, restart: bool, cooldown_sec: int) -> PatchResult:
                 and cached.get("mtime") == mtime
                 and state.get("openclawVersion") == version
                 and cached.get("schemaVersion") == STATE_SCHEMA_VERSION
+                and bool(cached.get("supportsQueuedPolicyButtons")) is True
             ):
                 patched_any = True
                 continue
@@ -720,6 +740,7 @@ def ensure_patched(*, restart: bool, cooldown_sec: int) -> PatchResult:
                     "beforeSha256": before_hash,
                     "afterSha256": after_hash,
                     "patched": MARKER in patched_text,
+                    "supportsQueuedPolicyButtons": _bundle_supports_queued_policy_buttons(patched_text),
                     "size": size2,
                     "mtime": mtime2,
                     "updatedAt": _utc_now(),
