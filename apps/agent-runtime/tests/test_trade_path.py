@@ -423,6 +423,77 @@ class TradePathRuntimeTests(unittest.TestCase):
             self.assertIn("5 WETH -> USDC", message_arg)
             self.assertIn("Trade: trd_abc", message_arg)
 
+            # Buttons include both Approve and Deny.
+            buttons_arg = None
+            for idx, part in enumerate(cmd):
+                if part == "--buttons" and idx + 1 < len(cmd):
+                    buttons_arg = cmd[idx + 1]
+                    break
+            self.assertIsNotNone(buttons_arg)
+            buttons = json.loads(buttons_arg or "[]")
+            self.assertIsInstance(buttons, list)
+            self.assertGreaterEqual(len(buttons), 1)
+            row0 = buttons[0]
+            self.assertIsInstance(row0, list)
+            texts = [b.get("text") for b in row0 if isinstance(b, dict)]
+            self.assertIn("Approve", texts)
+            self.assertIn("Deny", texts)
+            callback_data = [b.get("callback_data") for b in row0 if isinstance(b, dict)]
+            self.assertIn("xappr|a|trd_abc|base_sepolia", callback_data)
+            self.assertIn("xappr|r|trd_abc|base_sepolia", callback_data)
+
+    def test_trade_spot_does_not_reuse_after_approval(self) -> None:
+        # De-dupe only applies while approval is pending; once approved, a repeated identical request
+        # should propose a new tradeId.
+        args = argparse.Namespace(
+            chain="base_sepolia",
+            token_in="WETH",
+            token_out="USDC",
+            amount_in="1",
+            slippage_bps="100",
+            deadline_sec="120",
+            to=None,
+            json=True,
+        )
+        with mock.patch.object(cli, "_resolve_token_address", side_effect=["0x1111111111111111111111111111111111111111", "0x2222222222222222222222222222222222222222"]), mock.patch.object(
+            cli, "_fetch_erc20_metadata", side_effect=[{"decimals": 18, "symbol": "WETH"}, {"decimals": 6, "symbol": "USDC"}]
+        ), mock.patch.object(
+            cli, "load_wallet_store", return_value={"wallets": {"base_sepolia": {"address": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "privateKey": "0x" + "11" * 32}}}
+        ), mock.patch.object(
+            cli, "_execution_wallet", return_value=("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "0x" + "11" * 32)
+        ), mock.patch.object(
+            cli, "_require_cast_bin", return_value="cast"
+        ), mock.patch.object(
+            cli, "_chain_rpc_url", return_value="http://127.0.0.1:8545"
+        ), mock.patch.object(
+            cli, "_require_chain_contract_address", return_value="0x4444444444444444444444444444444444444444"
+        ), mock.patch.object(
+            cli, "_enforce_spend_preconditions", return_value=({}, "2026-02-15", 0, 0)
+        ), mock.patch.object(
+            cli, "_router_get_amount_out", return_value=10000
+        ), mock.patch.object(
+            cli, "_enforce_trade_caps", return_value=({}, "2026-02-15", Decimal("0"), 0, {"maxDailyUsd": "250", "maxDailyTradeCount": 50})
+        ), mock.patch.object(
+            cli, "_get_pending_trade_intent", return_value={"tradeId": "trd_old"}
+        ), mock.patch.object(
+            cli, "_read_trade_details", return_value={"tradeId": "trd_old", "chainKey": "base_sepolia", "status": "approved"}
+        ), mock.patch.object(
+            cli, "_post_trade_proposed", return_value={"ok": True, "tradeId": "trd_new", "status": "approval_pending"}
+        ) as propose_mock, mock.patch.object(
+            cli, "_wait_for_trade_approval",
+            side_effect=cli.WalletPolicyError(
+                "approval_required",
+                "Trade is waiting for management approval.",
+                "Approve the pending trade (Telegram or web), then re-run the same trade command to resume without creating a new approval.",
+                {"tradeId": "trd_new", "chain": "base_sepolia"},
+            ),
+        ):
+            out = self._run_and_parse_stdout(lambda: cli.cmd_trade_spot(args))
+
+        self.assertFalse(out.get("ok"))
+        self.assertEqual(out.get("code"), "approval_required")
+        self.assertEqual(propose_mock.call_count, 1, "should propose a new tradeId after the old one was approved")
+
     def test_trade_caps_blocked_when_owner_chain_disabled(self) -> None:
         policy_payload = {
             "ok": True,

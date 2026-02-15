@@ -571,25 +571,25 @@ Active slice: `Slice 41: Telegram Approve Button Reliability (Patch Correct Gate
 Issue mapping: `#42` (umbrella)
 
 ## Checklist
-- [ ] Docs sync:
-  - [ ] `docs/XCLAW_SLICE_TRACKER.md`
-  - [ ] `docs/XCLAW_BUILD_ROADMAP.md`
-  - [ ] `docs/XCLAW_SOURCE_OF_TRUTH.md`
-  - [ ] `docs/CONTEXT_PACK.md`
-  - [ ] `spec.md`
-  - [ ] `tasks.md`
-  - [ ] `acceptance.md`
-- [ ] Implementation:
-  - [ ] update `skills/xclaw-agent/scripts/openclaw_gateway_patch.py` to patch gateway callback bundles used by `dist/index.js` (including `dist/reply-*.js`)
-  - [ ] patch is idempotent with stable marker/replace semantics (no duplicated blocks)
-  - [ ] record/update patch artifact in `patches/openclaw/`
-- [ ] Gates:
-  - [ ] `npm run db:parity`
-  - [ ] `npm run seed:reset`
-  - [ ] `npm run seed:load`
-  - [ ] `npm run seed:verify`
-- [ ] `npm run build`
-- [ ] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- [x] Docs sync:
+  - [x] `docs/XCLAW_SLICE_TRACKER.md`
+  - [x] `docs/XCLAW_BUILD_ROADMAP.md`
+  - [x] `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - [x] `docs/CONTEXT_PACK.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+- [x] Implementation:
+  - [x] update `skills/xclaw-agent/scripts/openclaw_gateway_patch.py` to patch gateway callback bundles used by `dist/index.js` (including `dist/reply-*.js`)
+  - [x] patch is idempotent with stable marker/replace semantics (no duplicated blocks)
+  - [x] record/update patch artifact in `patches/openclaw/`
+- [x] Gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
 
 ---
 
@@ -599,25 +599,25 @@ Active slice: `Slice 42: Telegram Approve+Deny + Approval Decision Chat Feedback
 Issue mapping: `#42` (umbrella)
 
 ## Checklist
-- [ ] Docs sync:
-  - [ ] `docs/XCLAW_SLICE_TRACKER.md`
-  - [ ] `docs/XCLAW_BUILD_ROADMAP.md`
-  - [ ] `docs/XCLAW_SOURCE_OF_TRUTH.md`
-  - [ ] `docs/CONTEXT_PACK.md`
-  - [ ] `spec.md`
-  - [ ] `tasks.md`
-  - [ ] `acceptance.md`
-- [ ] Runtime:
-  - [ ] change `trade spot` de-dupe: reuse only while `approval_pending`
-  - [ ] Telegram prompt includes Approve + Deny buttons
-  - [ ] when web approval/deny happens while waiting, send decision message into active Telegram chat
-- [ ] OpenClaw gateway patch:
-  - [ ] handle `xappr|a|...` (approve) and `xappr|r|...` (reject)
-  - [ ] delete prompt message and send confirmation message into same chat with details
-- [ ] Gates:
-  - [ ] `npm run db:parity`
-  - [ ] `npm run seed:reset`
-  - [ ] `npm run seed:load`
-  - [ ] `npm run seed:verify`
-  - [ ] `npm run build`
-  - [ ] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- [x] Docs sync:
+  - [x] `docs/XCLAW_SLICE_TRACKER.md`
+  - [x] `docs/XCLAW_BUILD_ROADMAP.md`
+  - [x] `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - [x] `docs/CONTEXT_PACK.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+- [x] Runtime:
+  - [x] change `trade spot` de-dupe: reuse only while `approval_pending`
+  - [x] Telegram prompt includes Approve + Deny buttons
+  - [x] when web approval/deny happens while waiting, send decision message into active Telegram chat
+- [x] OpenClaw gateway patch:
+  - [x] handle `xappr|a|...` (approve) and `xappr|r|...` (reject)
+  - [x] delete prompt message and send confirmation message into same chat with details
+- [x] Gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`

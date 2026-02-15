@@ -1923,19 +1923,29 @@ def _maybe_send_telegram_decision_message(
     Best-effort acknowledgement into the active Telegram chat when an approval is decided.
     This is advisory UX only and must never gate execution.
     """
-    delivery = _read_openclaw_last_delivery()
-    if not delivery or str(delivery.get("lastChannel") or "").lower() != "telegram":
-        return
-    chat_id = str(delivery.get("lastTo") or "").strip()
-    if not chat_id:
-        return
-
-    thread_raw = delivery.get("lastThreadId")
+    # Prefer the exact prompt destination when available; session-store "last delivery" can drift.
+    chat_id = ""
     thread_id: str | None = None
-    if isinstance(thread_raw, int):
-        thread_id = str(thread_raw)
-    elif isinstance(thread_raw, str) and thread_raw.strip():
-        thread_id = thread_raw.strip()
+    prompt = _get_approval_prompt(trade_id)
+    if prompt and str(prompt.get("channel") or "") == "telegram":
+        chat_id = str(prompt.get("to") or "").strip()
+        thread_raw = prompt.get("threadId")
+        if isinstance(thread_raw, int):
+            thread_id = str(thread_raw)
+        elif isinstance(thread_raw, str) and thread_raw.strip():
+            thread_id = thread_raw.strip()
+    if not chat_id:
+        delivery = _read_openclaw_last_delivery()
+        if not delivery or str(delivery.get("lastChannel") or "").lower() != "telegram":
+            return
+        chat_id = str(delivery.get("lastTo") or "").strip()
+        if not chat_id:
+            return
+        thread_raw = delivery.get("lastThreadId")
+        if isinstance(thread_raw, int):
+            thread_id = str(thread_raw)
+        elif isinstance(thread_raw, str) and thread_raw.strip():
+            thread_id = thread_raw.strip()
 
     summary = summary or {}
     trade = trade or {}

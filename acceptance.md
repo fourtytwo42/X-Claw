@@ -2747,12 +2747,12 @@ Active slice: `Slice 41: Telegram Approve Button Reliability (Patch Correct Gate
 Issue mapping: `#42` (umbrella)
 
 ### Required gate evidence
-- `npm run db:parity` -> TODO
-- `npm run seed:reset` -> TODO
-- `npm run seed:load` -> TODO
-- `npm run seed:verify` -> TODO
-- `npm run build` -> TODO
-- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> TODO
+- `npm run db:parity` -> PASS (exit 0, checkedAt: 2026-02-15T18:25:02.169Z)
+- `npm run seed:reset` -> PASS (exit 0)
+- `npm run seed:load` -> PASS (exit 0, scenarios: `happy_path`, `approval_retry`, `degraded_rpc`, `copy_reject`)
+- `npm run seed:verify` -> PASS (exit 0)
+- `npm run build` -> PASS (exit 0)
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS
 
 ### Scenario evidence (manual/ops)
 - Telegram Approve button click:
@@ -2769,7 +2769,7 @@ Active slice: `Slice 42: Telegram Approve+Deny + Approval Decision Chat Feedback
 Issue mapping: `#42` (umbrella)
 
 ### Required gate evidence
-- `npm run db:parity` -> PASS (exit 0, checkedAt: 2026-02-15T18:13:01.106Z)
+- `npm run db:parity` -> PASS (exit 0, checkedAt: 2026-02-15T18:25:02.169Z)
 - `npm run seed:reset` -> PASS (exit 0)
 - `npm run seed:load` -> PASS (exit 0, scenarios: `happy_path`, `approval_retry`, `degraded_rpc`, `copy_reject`)
 - `npm run seed:verify` -> PASS (exit 0)

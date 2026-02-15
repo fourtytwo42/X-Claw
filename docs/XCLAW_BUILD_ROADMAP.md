@@ -1406,57 +1406,57 @@ Note:
 ## 41) Slice 41: Telegram Approve Button Reliability (Patch Correct Gateway Bundle)
 
 ### 41.1 Canonical/doc sync
-- [ ] Add Slice 41 goal/DoD + issue mapping to `docs/XCLAW_SLICE_TRACKER.md`.
-- [ ] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` to reflect that OpenClaw gateway patching must target the bundle(s) used by `dist/index.js` gateway mode (e.g. `dist/reply-*.js`).
-- [ ] Update handoff/process artifacts:
-  - [ ] `docs/CONTEXT_PACK.md`
-  - [ ] `spec.md`
-  - [ ] `tasks.md`
-  - [ ] `acceptance.md`
+- [x] Add Slice 41 goal/DoD + issue mapping to `docs/XCLAW_SLICE_TRACKER.md`.
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` to reflect that OpenClaw gateway patching must target the bundle(s) used by `dist/index.js` gateway mode (e.g. `dist/reply-*.js`).
+- [x] Update handoff/process artifacts:
+  - [x] `docs/CONTEXT_PACK.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
 
 ### 41.2 Implementation
-- [ ] Update `skills/xclaw-agent/scripts/openclaw_gateway_patch.py` to patch all detected Telegram `callback_query` handler bundles in `dist/` (not only `loader-*.js`) with stable marker/replace semantics.
-- [ ] Record/update patch artifact under `patches/openclaw/` for OpenClaw `2026.2.9` as needed.
+- [x] Update `skills/xclaw-agent/scripts/openclaw_gateway_patch.py` to patch all detected Telegram `callback_query` handler bundles in `dist/` (not only `loader-*.js`) with stable marker/replace semantics.
+- [x] Record/update patch artifact under `patches/openclaw/` for OpenClaw `2026.2.9` as needed.
 
 ### 41.3 Validation + evidence
-- [ ] Run required gates:
-  - [ ] `npm run db:parity`
-  - [ ] `npm run seed:reset`
-  - [ ] `npm run seed:load`
-  - [ ] `npm run seed:verify`
-  - [ ] `npm run build`
-  - [ ] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- [x] Run required gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
 
 ---
 
 ## 42) Slice 42: Telegram Approve+Deny + Approval Decision Chat Feedback + Safer De-Dupe
 
 ### 42.1 Canonical/doc sync
-- [ ] Add Slice 42 goal/DoD + issue mapping to `docs/XCLAW_SLICE_TRACKER.md`.
-- [ ] Update `docs/XCLAW_SOURCE_OF_TRUTH.md`:
-  - [ ] Telegram decisions support Approve + Deny.
-  - [ ] Runtime de-dupe only while status is `approval_pending`.
-  - [ ] Decision feedback is posted to the active Telegram chat with details and reason (for deny).
-- [ ] Update handoff/process artifacts:
-  - [ ] `docs/CONTEXT_PACK.md`
-  - [ ] `spec.md`
-  - [ ] `tasks.md`
-  - [ ] `acceptance.md`
+- [x] Add Slice 42 goal/DoD + issue mapping to `docs/XCLAW_SLICE_TRACKER.md`.
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md`:
+  - [x] Telegram decisions support Approve + Deny.
+  - [x] Runtime de-dupe only while status is `approval_pending`.
+  - [x] Decision feedback is posted to the active Telegram chat with details and reason (for deny).
+- [x] Update handoff/process artifacts:
+  - [x] `docs/CONTEXT_PACK.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
 
 ### 42.2 Implementation
-- [ ] Runtime:
-  - [ ] adjust `trade spot` de-dupe semantics (reuse only while `approval_pending`)
-  - [ ] Telegram prompt includes Approve + Deny buttons
-  - [ ] when web approval/deny happens while waiting, send a decision message to active Telegram chat
-- [ ] OpenClaw gateway patch:
-  - [ ] handle `xappr|a|...` approve and `xappr|r|...` reject
-  - [ ] on success delete the prompt and send a confirmation message in the same chat with details
+- [x] Runtime:
+  - [x] adjust `trade spot` de-dupe semantics (reuse only while `approval_pending`)
+  - [x] Telegram prompt includes Approve + Deny buttons
+  - [x] when web approval/deny happens while waiting, send a decision message to active Telegram chat
+- [x] OpenClaw gateway patch:
+  - [x] handle `xappr|a|...` approve and `xappr|r|...` reject
+  - [x] on success delete the prompt and send a confirmation message in the same chat with details
 
 ### 42.3 Validation + evidence
-- [ ] Run required gates:
-  - [ ] `npm run db:parity`
-  - [ ] `npm run seed:reset`
-  - [ ] `npm run seed:load`
-  - [ ] `npm run seed:verify`
-  - [ ] `npm run build`
-  - [ ] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- [x] Run required gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`

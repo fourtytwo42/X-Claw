@@ -2530,9 +2530,9 @@ Limitations / notes:
 1. Telegram is an optional, owner-enabled approval delivery channel for trade approvals.
 2. Telegram approvals are per-agent and per-chain:
    - a chain-scoped owner toggle determines whether Telegram prompts may be sent for that agent+chain.
-3. Approve-only in Telegram:
-   - Telegram offers an **Approve** button only.
-   - Reject remains web-only from `/agents/:id`.
+3. Approve + Deny in Telegram:
+   - Telegram offers **Approve** and **Deny** inline buttons.
+   - Telegram cannot color inline buttons; use text labels only.
 4. Execution boundary:
    - clicking a Telegram inline button must trigger approval **without LLM/tool mediation**.
    - OpenClaw intercepts the callback payload and performs an agent-authenticated approval transition using the existing `xclaw-agent` API key (no separate Telegram secret).
@@ -2567,9 +2567,8 @@ Limitations / notes:
      - idempotently transitions `approval_pending -> approved` when actionable (requires `Idempotency-Key`).
    - `POST /api/v1/agent/approvals/prompt` (agent-auth):
      - records prompt metadata for cleanup/sync (does not authorize approvals).
-9. Telegram reject:
-   - Telegram supports a **Deny** button that transitions `approval_pending -> rejected` (reasonCode `approval_rejected`, reasonMessage set).
-   - Telegram cannot color inline buttons; use text labels only.
+9. Telegram deny:
+   - Deny transitions `approval_pending -> rejected` (reasonCode `approval_rejected`, reasonMessage set).
 10. Decision feedback in chat:
    - after approve/deny in Telegram, the agent posts a confirmation message into the same chat with trade details (tradeId, amount/pair, and reason for deny).
    - after approve/deny in web while runtime is waiting on the trade, runtime posts a confirmation message into the active Telegram chat with the same details.
