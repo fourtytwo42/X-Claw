@@ -728,6 +728,26 @@ Ensure `skills/xclaw-agent/scripts/openclaw_gateway_patch.py` cannot brick OpenC
 
 ---
 
+# Slice 50 Spec: Telegram Decision Feedback Routed Through Agent (No Direct Gateway Ack)
+
+## Goal
+After Telegram approve/deny, route the decision through the agent message pipeline (so the agent informs the user) instead of the gateway posting a raw ack message.
+
+## Success Criteria
+1. Clicking Telegram Approve/Deny still performs the strict server-side status transition (no LLM mediation).
+2. The follow-up message comes from the agent pipeline (triggered by a synthetic inbound message with instructions).
+3. If the synthetic pipeline call fails, a minimal fallback confirmation message is posted to the chat.
+
+## Acceptance Checks
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
 # Slice 31 Spec: Agents + Agent Management UX Refinement (Operational Clean)
 
 ## Goal

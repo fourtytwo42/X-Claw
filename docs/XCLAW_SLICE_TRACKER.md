@@ -876,3 +876,19 @@ DoD:
 - [x] patcher only targets the canonical gateway bundle (`dist/reply-*.js`) instead of patching multiple bundles.
 - [x] patcher runs `node --check` against the patched output and refuses to write if syntax fails.
 - [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.
+
+---
+
+## Slice 50: Telegram Decision Feedback Routed Through Agent (No Direct Gateway Ack)
+Status: [x]
+Issue: #42 (umbrella)
+
+Goal:
+- After Telegram Approve/Deny is clicked, do not have the OpenClaw gateway post a raw "Approved trade ..." message.
+- Instead, route the decision into the agent message pipeline with clear instructions so the agent informs the user (and continues/halts execution accordingly).
+
+DoD:
+- [x] docs sync first: source-of-truth + roadmap + tracker + context/spec/tasks/acceptance aligned to Slice 50.
+- [x] Telegram callback intercept triggers `processMessage(...)` with a synthetic inbound message describing the decision + instructions.
+- [x] Fallback behavior: if synthetic processing fails, post a minimal confirmation message (so the user still gets feedback).
+- [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.

@@ -807,3 +807,30 @@ Issue mapping: `#42` (umbrella)
   - [x] `npm run seed:verify`
   - [x] `npm run build`
   - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+# Slice 50 Tasks: Telegram Decision Feedback Routed Through Agent (No Direct Gateway Ack)
+
+Active slice: `Slice 50: Telegram Decision Feedback Routed Through Agent (No Direct Gateway Ack)`
+Issue mapping: `#42` (umbrella)
+
+## Checklist
+- [x] Docs sync:
+  - [x] `docs/XCLAW_SLICE_TRACKER.md`
+  - [x] `docs/XCLAW_BUILD_ROADMAP.md`
+  - [x] `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - [x] `docs/CONTEXT_PACK.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+- [x] Implementation:
+  - [x] Telegram callback intercept routes decision into agent pipeline via `processMessage(...)`
+  - [x] fallback minimal ack message if synthetic processing fails
+- [x] Gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`

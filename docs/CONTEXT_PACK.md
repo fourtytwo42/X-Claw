@@ -172,6 +172,37 @@ Issue mapping: `#42` (umbrella)
 
 ---
 
+## Slice 50 Context: Telegram Decision Feedback Routed Through Agent (No Direct Gateway Ack)
+
+Issue mapping: `#42` (umbrella)
+
+### Objective + scope lock
+- Objective: after Telegram Approve/Deny, route the decision into the agent message pipeline (so the agent informs the user), rather than the gateway posting a raw ack message.
+- Scope guard honored: no DB changes, no dependency additions, no server contract changes.
+
+### Expected touched files (Slice 50 allowlist)
+- Skill tooling:
+  - `skills/xclaw-agent/scripts/openclaw_gateway_patch.py`
+- Docs/process:
+  - `docs/XCLAW_SLICE_TRACKER.md`
+  - `docs/XCLAW_BUILD_ROADMAP.md`
+  - `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - `docs/CONTEXT_PACK.md`
+  - `spec.md`
+  - `tasks.md`
+  - `acceptance.md`
+
+### Verification Plan
+- Required gates:
+  - `npm run db:parity`
+  - `npm run seed:reset`
+  - `npm run seed:load`
+  - `npm run seed:verify`
+  - `npm run build`
+  - `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
 ## Slice 36 Context: Remove Step-Up Authentication (Management Cookie Only)
 
 Issue mapping: `#42` (umbrella)
