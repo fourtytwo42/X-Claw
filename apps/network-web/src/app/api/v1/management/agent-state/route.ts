@@ -44,7 +44,8 @@ export async function GET(req: NextRequest) {
     }
 
     const chainKey = req.nextUrl.searchParams.get('chainKey')?.trim() || 'base_sepolia';
-    if (!getChainConfig(chainKey)) {
+    const chainCfg = getChainConfig(chainKey);
+    if (!chainCfg) {
       return errorResponse(
         400,
         {
@@ -56,6 +57,11 @@ export async function GET(req: NextRequest) {
         requestId
       );
     }
+
+    const chainTokens = Object.entries(chainCfg.canonicalTokens ?? {}).map(([symbol, address]) => ({
+      symbol,
+      address
+    }));
 
     const [agent, approvals, policy, audit, outboundPolicy, dailyUsage, chainPolicy, approvalChannel] = await Promise.all([
       dbQuery<{
@@ -235,6 +241,7 @@ export async function GET(req: NextRequest) {
           publicStatus: agent.rows[0].public_status,
           metadata: agent.rows[0].openclaw_metadata ?? {}
         },
+        chainTokens,
         approvalChannels: {
           telegram: { enabled: telegramApprovalEnabled, updatedAt: telegramApprovalUpdatedAt }
         },

@@ -2554,7 +2554,10 @@ Limitations / notes:
      - unified activity feed (trades + lifecycle events) in a MetaMask-like list.
    - authorized management rail:
      - approvals queue (approve/reject with rejection reason message),
-     - policy controls show Global Approval toggle + per-token preapproval toggles (no pair approvals UI).
+     - risk limits (caps) and other advanced controls remain in the rail.
+   - owner-only approval policy controls live in the wallet card (not the rail):
+     - Global Approval toggle (`Approve all`),
+     - per-token preapproval controls inline on token rows.
 4. Enabling chain access is a protected action:
    - enabling requires an active step-up session,
    - disabling does not require step-up.

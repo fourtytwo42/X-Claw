@@ -369,4 +369,36 @@ Issue mapping: `#42` (umbrella)
   - [x] `npm run seed:verify`
   - [x] `npm run build`
   - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
-- [ ] Commit + push Slice 34 (exclude `memory/`)
+- [x] Commit + push Slice 34 (exclude `memory/`)
+
+---
+
+# Slice 35 Tasks: Wallet-Embedded Approval Controls + Correct Token Decimals
+
+Active slice: `Slice 35: Wallet-Embedded Approval Controls + Correct Token Decimals`
+Issue mapping: `#42` (umbrella)
+
+## Checklist
+- [x] Docs sync first:
+  - [x] `docs/XCLAW_SLICE_TRACKER.md`
+  - [x] `docs/XCLAW_BUILD_ROADMAP.md`
+  - [x] `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - [x] `docs/CONTEXT_PACK.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+- [x] UI:
+  - [x] Move approval policy controls into the wallet card on `/agents/:id`.
+  - [x] Replace per-token toggles with per-asset preapproval buttons.
+  - [x] Add `Approve all` toggle in wallet card (step-up gated on enable).
+  - [x] Remove approval policy controls from the management rail (leave caps/risk limits).
+  - [x] Expand audit log/details by default.
+- [x] Balance formatting:
+  - [x] Render token balances using decimals from deposit/balance snapshot (no hardcoded USDC decimals).
+- [x] Gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`

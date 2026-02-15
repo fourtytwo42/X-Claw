@@ -88,3 +88,39 @@
   1. revert Slice 34 touched files only,
   2. rerun required gates,
   3. confirm approvals continue to function in web UI with no Telegram delivery behavior.
+
+---
+
+## Slice 35 Context: Wallet-Embedded Approval Controls + Correct Token Decimals
+
+Issue mapping: `#42` (umbrella)
+
+### Objective + scope lock
+- Objective: embed approval policy controls into the wallet card on `/agents/:id`, fix token decimals formatting (USDC), and expand default-collapsed management details.
+- Scope guard honored: no DB migrations, no new auth model, no dependency additions.
+
+### Expected touched files (Slice 35 allowlist)
+- Web/UI:
+  - `apps/network-web/src/app/agents/[agentId]/page.tsx`
+  - `apps/network-web/src/app/globals.css`
+- Server:
+  - `apps/network-web/src/app/api/v1/management/agent-state/route.ts`
+  - `apps/network-web/src/app/api/v1/trades/proposed/route.ts`
+  - `apps/network-web/src/lib/copy-lifecycle.ts`
+- Docs/process:
+  - `docs/XCLAW_SLICE_TRACKER.md`
+  - `docs/XCLAW_BUILD_ROADMAP.md`
+  - `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - `docs/CONTEXT_PACK.md`
+  - `spec.md`
+  - `tasks.md`
+  - `acceptance.md`
+
+### Verification Plan
+- Required gates:
+  - `npm run db:parity`
+  - `npm run seed:reset`
+  - `npm run seed:load`
+  - `npm run seed:verify`
+  - `npm run build`
+  - `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`

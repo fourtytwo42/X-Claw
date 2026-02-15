@@ -682,7 +682,7 @@ th {
 .asset-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 0.9rem;
   padding: 0.65rem 0.75rem;
 }
@@ -740,6 +740,62 @@ th {
 .asset-balance-sub {
   font-size: 0.82rem;
   color: var(--text-muted);
+}
+
+.asset-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.asset-actions {
+  flex: 0 0 auto;
+}
+
+.asset-approval-btn {
+  padding: 0.35rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--bg-elev-2) 88%, transparent);
+  color: var(--text);
+  font-size: 0.82rem;
+  line-height: 1;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.asset-approval-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.asset-approval-btn-on {
+  border-color: color-mix(in srgb, var(--line) 40%, transparent);
+  background: color-mix(in srgb, var(--accent) 18%, var(--bg-elev-2));
+}
+
+.wallet-approvals {
+  margin-top: 0.6rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--bg-elev) 72%, transparent);
+}
+
+.wallet-approvals-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+}
+
+.wallet-approvals-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-weight: 650;
 }
 
 .overview-wallet {

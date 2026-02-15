@@ -33,6 +33,32 @@ This must work transparently with the Slice 22 fee-router proxy (router may be t
 
 ---
 
+# Slice 35 Spec: Wallet-Embedded Approval Controls + Correct Token Decimals
+
+## Goal
+Move approval policy controls (Global Approval + per-token preapproval) into the wallet card on `/agents/:id`, fix token decimals formatting (notably USDC) to use observed decimals from the deposit snapshot, and remove default-collapsed UI that hides operational info.
+
+## Success Criteria
+1. `/agents/:id` wallet card shows owner-only:
+   - `Approve all` toggle (Global Approval),
+   - per-token preapproval buttons inline with token rows.
+2. Management rail no longer contains approval policy controls (caps/risk limits remain).
+3. USDC and other ERC-20 balances format correctly using snapshot decimals (no hardcoded USDC=6).
+4. Audit log/details is expanded by default.
+
+## Non-Goals
+1. No schema/migration changes.
+2. No change to approval queue semantics or trade lifecycle.
+3. No dependency additions.
+
+## Acceptance Checks
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
 # Slice 25 Spec: Agent Skill UX Upgrade (Security + Reliability + Contract Fixes)
 
 ## Goal

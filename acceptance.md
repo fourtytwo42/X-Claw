@@ -2589,3 +2589,30 @@ Issue mapping: `#42` (umbrella)
   - clicking Approve transitions trade to `approved` on server and deletes the Telegram prompt message.
 - Web approval first:
   - approving in web UI causes runtime to delete the Telegram prompt (best-effort) and via `xclaw-agent approvals sync`.
+
+---
+
+## Slice 35 Acceptance Evidence
+
+Date (UTC): 2026-02-15
+Active slice: `Slice 35: Wallet-Embedded Approval Controls + Correct Token Decimals`
+Issue mapping: `#42` (umbrella)
+
+### Required gate evidence
+- `npm run db:parity` -> PASS (exit 0)
+- `npm run seed:reset` -> PASS (exit 0)
+- `npm run seed:load` -> PASS (exit 0)
+- `npm run seed:verify` -> PASS (exit 0)
+- `npm run build` -> PASS (exit 0)
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS (exit 0)
+
+### Scenario evidence (manual)
+- Wallet-embedded approval policy controls:
+  - `Approve all` toggle is visible owner-only in the wallet card and step-up gated on enable.
+  - Per-token `Preapprove` button appears on token rows and step-up gated on enable.
+- Management rail:
+  - no approval policy controls present (caps/risk limits remain).
+- Balance formatting:
+  - USDC value renders using snapshot decimals and is displayed as `$...` with commas (no raw base-units display).
+- Audit log:
+  - expanded by default.

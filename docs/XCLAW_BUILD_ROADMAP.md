@@ -1204,3 +1204,36 @@ Use this every work session:
   - [x] `npm run seed:verify`
   - [x] `npm run build`
   - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+## 35) Slice 35: Wallet-Embedded Approval Controls + Correct Token Decimals
+
+### 35.1 Canonical/doc sync (must happen before implementation)
+- [x] Add Slice 35 goal/DoD + issue mapping to `docs/XCLAW_SLICE_TRACKER.md`.
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` with the locked UI placement (approval controls in wallet card) and decimals rules.
+- [x] Update handoff/process artifacts:
+  - [x] `docs/CONTEXT_PACK.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+
+### 35.2 UI behavior (`/agents/:id`)
+- [x] Wallet card:
+  - [x] Global `Approve all` toggle (step-up gated on enable).
+  - [x] Per-token preapproval button per token row (step-up gated on enable).
+- [x] Management rail:
+  - [x] remove Global Approval + token preapproval controls (leave caps/risk limits).
+- [x] Audit log/details expanded by default.
+
+### 35.3 Balance formatting
+- [x] USDC (and other ERC-20s) are formatted using decimals from deposit/balance snapshot (no hardcoded USDC decimals).
+
+### 35.4 Validation + evidence
+- [x] Run required gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`

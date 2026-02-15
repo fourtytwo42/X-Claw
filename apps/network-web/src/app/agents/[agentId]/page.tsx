@@ -99,6 +99,7 @@ type ManagementStatePayload = {
     publicStatus: string;
     metadata: Record<string, unknown>;
   };
+  chainTokens?: Array<{ symbol: string; address: string }>;
   approvalChannels?: {
     telegram?: { enabled: boolean; updatedAt?: string | null };
   };
@@ -634,23 +635,73 @@ export default function AgentPublicProfilePage() {
     return `${hours}h ${minutes}m`;
   }, [management]);
 
-  const policyTokenOptions = useMemo(() => {
-    const unique = new Set<string>();
-    for (const token of policyAllowedTokens) {
-      if (typeof token === 'string' && token.trim()) {
-        unique.add(token.trim());
-      }
+  const policyAllowedTokenSet = useMemo(() => {
+    return new Set(
+      policyAllowedTokens
+        .map((token) => String(token).trim().toLowerCase())
+        .filter((token) => token.length > 0)
+    );
+  }, [policyAllowedTokens]);
+
+  const chainTokenAddressBySymbol = useMemo(() => {
+    const out: Record<string, string> = {};
+    if (management.phase !== 'ready') {
+      return out;
     }
-    const chain = depositData?.chains?.[0];
-    for (const row of chain?.balances ?? []) {
-      const token = typeof row?.token === 'string' ? row.token.trim() : '';
-      if (!token || token.toUpperCase() === 'NATIVE') {
+    for (const entry of management.data.chainTokens ?? []) {
+      const symbol = typeof entry?.symbol === 'string' ? entry.symbol.trim().toUpperCase() : '';
+      const address = typeof entry?.address === 'string' ? entry.address.trim() : '';
+      if (!symbol || !address) {
         continue;
       }
-      unique.add(token);
+      out[symbol] = address;
     }
-    return [...unique].sort((a, b) => a.localeCompare(b));
-  }, [depositData, policyAllowedTokens]);
+    return out;
+  }, [management]);
+
+  function buildPolicyUpdatePayload(next: { approvalMode?: 'per_trade' | 'auto'; allowedTokens?: string[] }) {
+    return {
+      agentId,
+      mode: 'real' as const,
+      approvalMode: next.approvalMode ?? policyApprovalMode,
+      maxTradeUsd: policyMaxTradeUsd,
+      maxDailyUsd: policyMaxDailyUsd,
+      dailyCapUsdEnabled: policyDailyCapUsdEnabled,
+      dailyTradeCapEnabled: policyDailyTradeCapEnabled,
+      maxDailyTradeCount: policyDailyTradeCapEnabled ? Number(policyMaxDailyTradeCount || '0') : null,
+      allowedTokens: next.allowedTokens ?? policyAllowedTokens
+    };
+  }
+
+  function isTokenPreapproved(symbol: string): boolean {
+    const normalizedSymbol = symbol.trim().toUpperCase();
+    const address = chainTokenAddressBySymbol[normalizedSymbol];
+    if (address) {
+      return policyAllowedTokenSet.has(address.toLowerCase());
+    }
+    // Back-compat fallback if old snapshots stored symbols directly.
+    return policyAllowedTokenSet.has(normalizedSymbol.toLowerCase());
+  }
+
+  function nextAllowedTokensForSymbol(symbol: string, enable: boolean): string[] {
+    const normalizedSymbol = symbol.trim().toUpperCase();
+    const address = chainTokenAddressBySymbol[normalizedSymbol]?.trim() ?? '';
+    const current = policyAllowedTokens.map((token) => String(token).trim()).filter((token) => token.length > 0);
+
+    const removeKeys = new Set<string>([normalizedSymbol.toLowerCase()]);
+    if (address) {
+      removeKeys.add(address.toLowerCase());
+    }
+
+    const cleaned = current.filter((token) => !removeKeys.has(token.toLowerCase()));
+    if (!enable) {
+      return cleaned;
+    }
+    if (address) {
+      return [...cleaned, address];
+    }
+    return [...cleaned, normalizedSymbol];
+  }
 
   const activityFeed = useMemo(() => {
     const items: Array<
@@ -872,20 +923,49 @@ export default function AgentPublicProfilePage() {
 
                 <div style={{ marginTop: '0.9rem' }}>
                   <div className="muted">Assets</div>
+                  {management.phase === 'ready' ? (
+                    <div className="wallet-approvals">
+                      <div className="wallet-approvals-row">
+                        <label className="wallet-approvals-toggle">
+                          <input
+                            type="checkbox"
+                            checked={policyApprovalMode === 'auto'}
+                            onChange={(event) => {
+                              const next = event.target.checked ? 'auto' : 'per_trade';
+                              void runManagementAction(
+                                () =>
+                                  managementPost('/api/v1/management/policy/update', buildPolicyUpdatePayload({ approvalMode: next })).then(
+                                    () => Promise.resolve()
+                                  ),
+                                next === 'auto' ? 'Global approval enabled.' : 'Global approval disabled.',
+                                'sensitive_action'
+                              );
+                            }}
+                          />{' '}
+                          Approve all
+                        </label>
+                        <span className="muted">
+                          {policyApprovalMode === 'auto'
+                            ? 'On: new trades auto-approved.'
+                            : 'Off: approvals required unless tokenIn is preapproved.'}
+                        </span>
+                      </div>
+                    </div>
+                  ) : null}
                   {(() => {
                   const chain = depositData?.chains?.[0];
                   const balances = chain?.balances ?? [];
-                  const byToken = new Map<string, { balance: string; decimals: number | null }>();
+                  const byToken = new Map<string, { balance: string; decimals: number }>();
                   for (const row of balances) {
                     if (!row?.token) continue;
                     const token = String(row.token);
                     const balance = String(row.balance ?? '0');
-                    // `deposit` payload sometimes omits decimals; do not default to 18 for known stables.
                     const decimals =
-                      typeof row.decimals === 'number' && Number.isFinite(row.decimals) ? Math.trunc(row.decimals) : null;
+                      typeof row.decimals === 'number' && Number.isFinite(row.decimals) ? Math.trunc(row.decimals) : 18;
                     byToken.set(token, { balance, decimals });
                   }
 
+                  const usdcDecimals = byToken.get('USDC')?.decimals ?? 6;
                   const items: Array<{ symbol: string; name: string; decimals: number; raw: string | null }> = [
                     {
                       symbol: 'ETH',
@@ -902,8 +982,7 @@ export default function AgentPublicProfilePage() {
                     {
                       symbol: 'USDC',
                       name: 'USD Coin',
-                      // Canonical: USDC is 6 decimals on Base/EVM.
-                      decimals: 6,
+                      decimals: usdcDecimals,
                       raw: byToken.get('USDC')?.balance ?? null
                     }
                   ];
@@ -921,6 +1000,8 @@ export default function AgentPublicProfilePage() {
                         const display = item.symbol === 'USDC'
                           ? formatUsdFromBaseUnits(item.raw, item.decimals)
                           : formatUnitsTruncated(item.raw, item.decimals, 4);
+                        const preapprovable = item.symbol !== 'ETH' && item.symbol !== 'NATIVE';
+                        const approved = management.phase === 'ready' ? isTokenPreapproved(item.symbol) : false;
                         return (
                           <div className="asset-row" key={item.symbol}>
                             <div className="asset-left">
@@ -930,9 +1011,43 @@ export default function AgentPublicProfilePage() {
                                   <div className="asset-name">{item.name}</div>
                                 </div>
                               </div>
-                              <div className="asset-balance">
-                                <div className="asset-balance-main">{display}</div>
-                                <div className="asset-balance-sub">{item.symbol}</div>
+                              <div className="asset-right">
+                                <div className="asset-balance">
+                                  <div className="asset-balance-main">{display}</div>
+                                  <div className="asset-balance-sub">{item.symbol}</div>
+                                </div>
+                                {management.phase === 'ready' && preapprovable ? (
+                                  <div className="asset-actions">
+                                    <button
+                                      type="button"
+                                      className={approved ? 'asset-approval-btn asset-approval-btn-on' : 'asset-approval-btn'}
+                                      disabled={policyApprovalMode === 'auto'}
+                                      onClick={() => {
+                                        const nextEnabled = !approved;
+                                        void runManagementAction(
+                                          () =>
+                                            managementPost(
+                                              '/api/v1/management/policy/update',
+                                              buildPolicyUpdatePayload({
+                                                allowedTokens: nextAllowedTokensForSymbol(item.symbol, nextEnabled)
+                                              })
+                                            ).then(() => Promise.resolve()),
+                                          nextEnabled ? `${item.symbol} preapproved.` : `${item.symbol} preapproval removed.`,
+                                          'sensitive_action'
+                                        );
+                                      }}
+                                      title={
+                                        policyApprovalMode === 'auto'
+                                          ? 'Global approval is on.'
+                                          : approved
+                                            ? 'Remove preapproval'
+                                            : 'Preapprove tokenIn'
+                                      }
+                                    >
+                                      {approved ? 'Preapproved' : 'Preapprove'}
+                                    </button>
+                                  </div>
+                                ) : null}
                               </div>
                             </div>
                           );
@@ -1286,55 +1401,7 @@ export default function AgentPublicProfilePage() {
               </article>
 
               <article className="management-card">
-                <h3>Policy Controls</h3>
-                <div className="toolbar">
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={policyApprovalMode === 'auto'}
-                      onChange={(event) => setPolicyApprovalMode(event.target.checked ? 'auto' : 'per_trade')}
-                    />{' '}
-                    Global Approval
-                  </label>
-                  <span className="muted">
-                    {policyApprovalMode === 'auto'
-                      ? 'On: new trades are auto-approved.'
-                      : 'Off: approvals required unless tokenIn is preapproved.'}
-                  </span>
-                </div>
-                <div style={{ marginTop: '0.6rem' }}>
-                  <div className="muted">Token preapprovals (tokenIn only)</div>
-                  {policyTokenOptions.length === 0 ? <p className="muted">No tokens discovered yet for this agent.</p> : null}
-                  {policyTokenOptions.length > 0 ? (
-                    <div className="token-toggle-list">
-                      {policyTokenOptions.map((token) => {
-                        const enabled = policyAllowedTokens.includes(token);
-                        const label = /^0x[a-fA-F0-9]{40}$/.test(token) ? shortenAddress(token) : token.toUpperCase();
-                        return (
-                          <label key={token} className="token-toggle">
-                            <input
-                              type="checkbox"
-                              checked={enabled}
-                              disabled={policyApprovalMode === 'auto'}
-                              onChange={(event) => {
-                                const next = Boolean(event.target.checked);
-                                setPolicyAllowedTokens((current) => {
-                                  const normalized = token.trim();
-                                  if (!normalized) return current;
-                                  if (next) {
-                                    return current.includes(normalized) ? current : [...current, normalized];
-                                  }
-                                  return current.filter((value) => value !== normalized);
-                                });
-                              }}
-                            />{' '}
-                            {label}
-                          </label>
-                        );
-                      })}
-                    </div>
-                  ) : null}
-                </div>
+                <h3>Risk Limits</h3>
                 <div className="toolbar">
                   <label>
                     <input
@@ -1609,7 +1676,7 @@ export default function AgentPublicProfilePage() {
               </article>
 
               <article className="management-card">
-                <details className="mgmt-details">
+                <details className="mgmt-details" open>
                   <summary>Management Audit Log</summary>
                   {management.data.auditLog.length === 0 ? <p className="muted">No audit entries.</p> : null}
                   <div className="audit-list">

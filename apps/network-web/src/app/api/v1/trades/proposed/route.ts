@@ -8,6 +8,7 @@ import { ensureIdempotency, storeIdempotencyResponse } from '@/lib/idempotency';
 import { makeId } from '@/lib/ids';
 import { getRequestId } from '@/lib/request-id';
 import { requireAgentChainEnabled } from '@/lib/agent-chain-policy';
+import { getChainConfig } from '@/lib/chains';
 import { evaluateTradeCaps } from '@/lib/trade-caps';
 import { validatePayload } from '@/lib/validation';
 
@@ -91,7 +92,17 @@ export async function POST(req: NextRequest) {
       }
 
       const tokenInNormalized = body.tokenIn.trim().toLowerCase();
-      const allowedTokenSet = new Set(capCheck.caps.allowedTokens.map((token) => String(token).trim().toLowerCase()).filter((v) => v.length > 0));
+      const allowedTokenSet = new Set(
+        capCheck.caps.allowedTokens.map((token) => String(token).trim().toLowerCase()).filter((v) => v.length > 0)
+      );
+      // Back-compat: older snapshots may contain canonical token symbols. Convert those to addresses for the current chain.
+      const cfg = getChainConfig(body.chainKey);
+      for (const [symbol, address] of Object.entries(cfg?.canonicalTokens ?? {})) {
+        if (!symbol || !address) continue;
+        if (allowedTokenSet.has(symbol.trim().toLowerCase())) {
+          allowedTokenSet.add(address.trim().toLowerCase());
+        }
+      }
       const approvalRequired = capCheck.caps.approvalMode !== 'auto' && !allowedTokenSet.has(tokenInNormalized);
       const initialStatus = approvalRequired ? 'approval_pending' : 'approved';
       const initialEventType = approvalRequired ? 'trade_approval_pending' : 'trade_approved';

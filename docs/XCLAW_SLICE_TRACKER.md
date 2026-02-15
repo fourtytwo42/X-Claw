@@ -619,3 +619,22 @@ DoD:
 - [x] runtime sends Telegram approval prompt only when Telegram approvals are enabled and OpenClaw last active channel is Telegram; runtime deletes prompt on approval and supports periodic `approvals sync`.
 - [x] OpenClaw Telegram callback handler intercepts `xappr|...` approve callbacks and calls X-Claw server directly (no LLM mediation); deletes message on success.
 - [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.
+
+---
+
+## Slice 35: Wallet-Embedded Approval Controls + Correct Token Decimals
+Status: [x]
+Issue: #42 (umbrella)
+
+Goal:
+- Move approval policy controls (Global Approval + per-token preapproval) into the wallet card on `/agents/:id`, ensure token balances (notably USDC) render with correct decimals, and remove unnecessary default-collapsed UI for core operator visibility.
+
+DoD:
+- [x] docs sync first: source-of-truth + roadmap + tracker + context/spec/tasks/acceptance aligned to Slice 35.
+- [x] `/agents/:id` wallet card includes owner-only:
+  - [x] `Approve all` (Global Approval) toggle (step-up gated on enable),
+  - [x] per-token preapproval buttons inline with asset rows (step-up gated on enable).
+- [x] management rail keeps risk limits (caps) controls; approval policy controls are removed from the management rail.
+- [x] USDC (and other ERC-20s) display uses decimals from the deposit/balance snapshot (no hardcoded USDC decimals).
+- [x] audit log/details section is expanded by default (no extra click to see it).
+- [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.

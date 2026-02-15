@@ -1,6 +1,7 @@
 import type { PoolClient } from 'pg';
 
 import { makeId } from '@/lib/ids';
+import { getChainConfig } from '@/lib/chains';
 
 type LeaderTrade = {
   trade_id: string;
@@ -347,10 +348,22 @@ export async function generateCopyIntentsForLeaderFill(
       [sub.follower_agent_id]
     );
     const approvalMode = approvalModeResult.rows[0]?.approval_mode ?? 'per_trade';
-    const allowedTokens = Array.isArray(approvalModeResult.rows[0]?.allowed_tokens)
-      ? approvalModeResult.rows[0].allowed_tokens.map((value) => String(value).trim().toLowerCase()).filter((value) => value.length > 0)
-      : [];
-    const tokenInPreapproved = allowedTokens.includes(String(leaderTrade.token_in).trim().toLowerCase());
+    const allowedTokenSet = new Set(
+      Array.isArray(approvalModeResult.rows[0]?.allowed_tokens)
+        ? approvalModeResult.rows[0].allowed_tokens
+            .map((value) => String(value).trim().toLowerCase())
+            .filter((value) => value.length > 0)
+        : []
+    );
+    // Back-compat: older snapshots may contain canonical token symbols.
+    const cfg = getChainConfig(leaderTrade.chain_key);
+    for (const [symbol, address] of Object.entries(cfg?.canonicalTokens ?? {})) {
+      if (!symbol || !address) continue;
+      if (allowedTokenSet.has(symbol.trim().toLowerCase())) {
+        allowedTokenSet.add(address.trim().toLowerCase());
+      }
+    }
+    const tokenInPreapproved = allowedTokenSet.has(String(leaderTrade.token_in).trim().toLowerCase());
     const followerTradeStatus = approvalMode === 'auto' || tokenInPreapproved ? 'approved' : 'approval_pending';
 
     await client.query(
