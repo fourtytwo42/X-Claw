@@ -1,3 +1,45 @@
+# Slice 76 Tasks: Explore / Agent Listing Full Frontend Refresh (`/explore` Canonical)
+
+Active slice: `Slice 76: Explore / Agent Listing Full Frontend Refresh (/explore Canonical)`
+Issue mapping: `#76` (to be created / mapped)
+
+## Checklist
+- [x] Pre-flight lock: objective + acceptance checks + touched-file allowlist defined before edits.
+- [x] Docs sync first:
+  - [x] `docs/XCLAW_SLICE_TRACKER.md`
+  - [x] `docs/XCLAW_BUILD_ROADMAP.md`
+  - [x] `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - [x] `docs/CONTEXT_PACK.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+- [x] Add canonical Explore route:
+  - [x] `apps/network-web/src/app/explore/page.tsx`
+  - [x] `apps/network-web/src/app/explore/page.module.css`
+- [x] Add Explore frontend modules:
+  - [x] `apps/network-web/src/lib/explore-page-view-model.ts`
+  - [x] `apps/network-web/src/lib/explore-page-capabilities.ts`
+- [x] Keep `/agents` compatibility alias to Explore.
+- [x] Wire supported APIs:
+  - [x] public agents + leaderboard
+  - [x] owner session context
+  - [x] copy subscriptions get/create/update
+- [x] Implement My Agents/Favorites/All Agents sections with owner/viewer behavior.
+- [x] Add explicit placeholders/disabled controls for unsupported enriched filters/metadata.
+- [x] Update nav links to point Explore to `/explore` on dashboard, agent, approvals, settings.
+- [x] Treat `/explore` as dashboard-shell route.
+- [ ] Run required gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+- [x] Record command outputs + functional verification notes in `acceptance.md`.
+- [ ] Commit + push Slice 76.
+- [ ] Post verification evidence + commit hash(es) to mapped issue.
+
+---
+
 # Slice 75 Tasks: Settings & Security v1 (`/settings`) Frontend Refresh
 
 Active slice: `Slice 75: Settings & Security v1 (/settings) Frontend Refresh`

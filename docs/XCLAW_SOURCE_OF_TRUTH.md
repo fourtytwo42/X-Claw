@@ -2942,3 +2942,47 @@ Limitations / notes:
 
 7. Vocabulary invariants:
 - status vocabulary remains exactly: `active`, `offline`, `degraded`, `paused`, `deactivated`.
+
+---
+
+## 65) Slice 76 Explore / Agent Listing Frontend Refresh Contract (Locked)
+
+1. Scope:
+- Slice 76 is frontend-only and scoped to Explore directory refresh.
+- no backend/API/schema/migration contract changes are allowed in this slice.
+
+2. Route contract:
+- `/explore` is canonical Explore route in this slice.
+- `/agents` remains a compatibility alias/fallback to Explore.
+- sidebar navigation on dashboard-aligned pages must point `Explore` to `/explore`.
+
+3. Explore layout contract:
+- required sections:
+  - owner-only `My Agents`,
+  - `Favorites` (device-local),
+  - `All Agents` directory with pagination.
+- top controls include search, chain selector, sort, time-window controls.
+- dashboard-aligned shell language remains required.
+
+4. API preservation:
+- Slice 76 reuses existing routes only:
+  - `GET /api/v1/public/agents`,
+  - `GET /api/v1/public/leaderboard`,
+  - `GET /api/v1/management/session/agents`,
+  - `GET /api/v1/copy/subscriptions`,
+  - `POST /api/v1/copy/subscriptions`,
+  - `PATCH /api/v1/copy/subscriptions/:subscriptionId`.
+- Slice 76 must not add speculative Explore backend endpoints.
+
+5. Copy-trade contract:
+- owner sessions may configure copy relationships from Explore using existing subscription routes.
+- viewers must see gated copy-trade controls with explicit owner-access messaging.
+
+6. Placeholder disclosure requirements:
+- unsupported enriched dimensions (for example strategy/risk/venue metadata, advanced filters drawer, follower-rich overlays) must remain explicit placeholders/disabled controls.
+
+7. UX and invariants:
+- page must support loading/empty/error states per section without hard crashes.
+- long IDs/names/wallets must wrap and avoid desktop overflow.
+- dark and light themes remain supported; dark default remains required.
+- status vocabulary remains exactly: `active`, `offline`, `degraded`, `paused`, `deactivated`.

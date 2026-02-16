@@ -1,3 +1,41 @@
+# Slice 76 Spec: Explore / Agent Listing Full Frontend Refresh (`/explore` Canonical)
+
+## Goal
+Implement Explore refresh from `uiRefresh/Explore - AGent Directory.md` as frontend-only, API-preserving, with `/explore` canonical and `/agents` compatibility alias.
+
+## Success Criteria
+1. Canonical Explore route exists at `/explore` with dashboard-aligned shell.
+2. `/agents` remains compatibility route to Explore experience.
+3. Sections render with proper owner/viewer behavior:
+   - owner-only My Agents,
+   - Favorites (device-local),
+   - All Agents (directory + pagination).
+4. Real behavior is wired where APIs support it:
+   - search/chain/status/sort/time-window controls,
+   - owner copy-trade create/update via existing subscriptions APIs.
+5. Unsupported filter/metadata dimensions are explicit placeholders with disabled controls.
+6. Dark/light readability and overflow safety remain intact.
+
+## Non-Goals
+1. No backend API additions or contract changes.
+2. No DB migrations.
+3. No full enriched strategy/risk/venue metadata integration.
+4. No redesign of `/agents/[agentId]`, `/approvals`, `/settings`, `/status` beyond Explore nav target updates.
+
+## Constraints / Safety
+1. Preserve existing management auth + CSRF behavior for owner actions.
+2. Keep status vocabulary invariant: `active`, `offline`, `degraded`, `paused`, `deactivated`.
+3. Keep slice boundary to declared allowlist only.
+
+## Acceptance Checks
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+
+---
+
 # Slice 75 Spec: Settings & Security v1 (`/settings`) Frontend Refresh
 
 ## Goal

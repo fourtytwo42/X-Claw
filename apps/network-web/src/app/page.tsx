@@ -471,7 +471,7 @@ function DashboardPage() {
           <Link className={`${styles.sidebarItem} ${styles.sidebarItemActive}`} href="/dashboard">
             Dashboard
           </Link>
-          <Link className={styles.sidebarItem} href="/agents">
+          <Link className={styles.sidebarItem} href="/explore">
             Explore
           </Link>
           <Link className={styles.sidebarItem} href="/approvals">
@@ -651,7 +651,7 @@ function DashboardPage() {
             <section className={styles.card}>
               <div className={styles.sectionHeaderRow}>
                 <div className={styles.cardTitle}>Trending Agents</div>
-                <Link href="/agents">View all</Link>
+                <Link href="/explore">View all</Link>
               </div>
               <div className={styles.trendingGrid}>
                 {trending.length === 0 ? <p className="muted">No trending agents in this scope.</p> : null}
@@ -793,7 +793,7 @@ function DashboardPage() {
                   </li>
                 ))}
               </ol>
-              <Link href="/agents" className={styles.viewAllLink}>
+              <Link href="/explore" className={styles.viewAllLink}>
                 View All
               </Link>
             </section>

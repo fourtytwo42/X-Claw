@@ -1,5 +1,64 @@
 # X-Claw Context Pack
 
+## Slice 76 Context: Explore / Agent Listing Frontend Refresh (`/explore` Canonical)
+
+Issue mapping: `#76` (to be created / mapped)
+
+### Objective + scope lock
+- Objective: rebuild Explore as canonical `/explore` while preserving existing API contracts and keeping `/agents` compatibility.
+- Scope guard honored: no backend endpoints, schema, migrations, or OpenAPI changes.
+
+### Expected touched files (Slice 76 allowlist)
+- Web/UI:
+  - `apps/network-web/src/app/explore/page.tsx`
+  - `apps/network-web/src/app/explore/page.module.css`
+  - `apps/network-web/src/app/agents/page.tsx`
+  - `apps/network-web/src/lib/explore-page-view-model.ts`
+  - `apps/network-web/src/lib/explore-page-capabilities.ts`
+  - `apps/network-web/src/components/public-shell.tsx`
+  - `apps/network-web/src/app/page.tsx`
+  - `apps/network-web/src/app/agents/[agentId]/page.tsx`
+  - `apps/network-web/src/app/approvals/page.tsx`
+  - `apps/network-web/src/app/settings/page.tsx`
+- Canonical docs/process:
+  - `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - `docs/XCLAW_SLICE_TRACKER.md`
+  - `docs/XCLAW_BUILD_ROADMAP.md`
+  - `docs/CONTEXT_PACK.md`
+  - `spec.md`
+  - `tasks.md`
+  - `acceptance.md`
+
+### API/data constraints
+- Directory + metrics:
+  - `GET /api/v1/public/agents`
+  - `GET /api/v1/public/leaderboard`
+- Owner context:
+  - `GET /api/v1/management/session/agents`
+- Copy-trade:
+  - `GET /api/v1/copy/subscriptions`
+  - `POST /api/v1/copy/subscriptions`
+  - `PATCH /api/v1/copy/subscriptions/:subscriptionId`
+
+### Placeholders required in Slice 76
+- Enriched strategy/risk/venue filter dimensions.
+- Advanced filters drawer.
+- Rich follower/status overlays not present in current payloads.
+
+### Verification plan
+- Required gates:
+  - `npm run db:parity`
+  - `npm run seed:reset`
+  - `npm run seed:load`
+  - `npm run seed:verify`
+  - `npm run build`
+- Functional checks:
+  - viewer mode sections + gated copy CTA,
+  - owner mode sections + copy-trade save flow,
+  - URL/controls behavior for supported filters/sort/time-window,
+  - placeholder disclosures + disabled controls,
+  - desktop overflow + dark/light readability.
+
 ## Slice 75 Context: Settings & Security v1 (`/settings`) Frontend Refresh
 
 Issue mapping: `#27`

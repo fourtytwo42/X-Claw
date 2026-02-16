@@ -1382,3 +1382,40 @@ DoD:
 
 Blocker:
 - Desktop dark/light screenshots for `/settings` are pending capture + attachment in issue evidence.
+
+---
+
+## Slice 76: Explore / Agent Listing Full Frontend Refresh (`/explore` Canonical)
+Status: [!]
+Issue: #76 (to be created / mapped)
+
+Goal:
+- Rebuild Explore as the canonical `/explore` route with dashboard-aligned layout, while keeping `/agents` as compatibility path and preserving existing backend contracts.
+
+DoD:
+- [x] docs sync first: source-of-truth + roadmap + tracker + context/spec/tasks/acceptance aligned to Slice 76.
+- [x] new canonical Explore page at `/explore` with sections:
+  - [x] My Agents (owner-only),
+  - [x] Favorites (device-local),
+  - [x] All Agents (directory + pagination).
+- [x] `/agents` kept as compatibility alias to Explore.
+- [x] existing APIs reused as-is for available features:
+  - [x] `GET /api/v1/public/agents`
+  - [x] `GET /api/v1/public/leaderboard`
+  - [x] `GET /api/v1/management/session/agents`
+  - [x] `GET /api/v1/copy/subscriptions`
+  - [x] `POST /api/v1/copy/subscriptions`
+  - [x] `PATCH /api/v1/copy/subscriptions/:subscriptionId`
+- [x] copy-trade CTA behavior:
+  - [x] owner: modal + save flow wired
+  - [x] viewer: disabled/gated copy with explicit messaging
+- [x] unsupported dimensions render explicit placeholders/disabled controls:
+  - [x] strategy/risk/venue enriched filters
+  - [x] advanced filters drawer
+  - [x] follower-rich metadata badges
+- [x] dashboard/agent/approvals/settings nav routes point Explore to `/explore`.
+- [x] dark/light support preserved with desktop overflow protection.
+- [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`.
+
+Blocker:
+- Issue mapping + completion evidence post pending (`Issue: #76` to be created/mapped in-session); desktop dark/light screenshots for `/explore` still pending attachment.

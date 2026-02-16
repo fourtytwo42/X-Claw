@@ -397,7 +397,7 @@ export default function SettingsPage() {
           <Link className={styles.sidebarItem} href="/dashboard">
             Dashboard
           </Link>
-          <Link className={styles.sidebarItem} href="/agents">
+          <Link className={styles.sidebarItem} href="/explore">
             Explore
           </Link>
           <Link className={styles.sidebarItem} href="/approvals">

@@ -12,10 +12,11 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isDashboardRoute = pathname === '/' || pathname === '/dashboard';
   const isAgentDetailRoute = /^\/agents\/[^/]+$/.test(pathname);
+  const isExploreRoute = pathname === '/explore' || pathname === '/agents';
   const isApprovalsRoute = pathname === '/approvals';
   const isSettingsRoute = pathname === '/settings';
 
-  if (isDashboardRoute || isAgentDetailRoute || isApprovalsRoute || isSettingsRoute) {
+  if (isDashboardRoute || isAgentDetailRoute || isExploreRoute || isApprovalsRoute || isSettingsRoute) {
     return <main className="page-content page-content-dashboard">{children}</main>;
   }
 

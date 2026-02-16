@@ -2491,3 +2491,45 @@ Note:
   - [x] danger actions route to existing endpoints
   - [x] placeholder modules remain disabled with explicit copy
   - [ ] desktop dark/light screenshots for `/settings`
+
+---
+
+## 76) Slice 76: Explore / Agent Listing Full Frontend Refresh (`/explore` Canonical)
+
+### 76.1 Canonical/doc sync
+- [x] Add Slice 76 goal/DoD + issue mapping to `docs/XCLAW_SLICE_TRACKER.md`.
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` with locked Slice 76 frontend contract.
+- [x] Update handoff/process artifacts:
+  - [x] `docs/CONTEXT_PACK.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+
+### 76.2 Implementation
+- [x] Add canonical Explore route:
+  - [x] `apps/network-web/src/app/explore/page.tsx`
+  - [x] `apps/network-web/src/app/explore/page.module.css`
+- [x] Keep `/agents` compatibility alias to `/explore`.
+- [x] Add Explore frontend modules:
+  - [x] `apps/network-web/src/lib/explore-page-view-model.ts`
+  - [x] `apps/network-web/src/lib/explore-page-capabilities.ts`
+- [x] Wire existing data surfaces:
+  - [x] public agents + leaderboard
+  - [x] owner session context
+  - [x] copy subscriptions get/create/update
+- [x] Add explicit placeholders/disabled controls for unsupported enriched filters/metadata.
+- [x] Update dashboard/agent/approvals/settings nav links to `/explore`.
+- [x] Treat `/explore` as dashboard-shell route in `public-shell`.
+
+### 76.3 Validation + evidence
+- [x] Run required gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+- [ ] Record functional verification evidence:
+  - [x] viewer mode (all/favorites, gated copy CTA)
+  - [x] owner mode (my agents + copy-trade save flow)
+  - [x] placeholders for unsupported filter dimensions
+  - [ ] desktop dark/light screenshots for `/explore`

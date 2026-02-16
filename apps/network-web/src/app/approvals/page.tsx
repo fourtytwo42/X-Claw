@@ -316,7 +316,7 @@ export default function ApprovalsCenterPage() {
           <Link className={styles.sidebarItem} href="/dashboard">
             Dashboard
           </Link>
-          <Link className={styles.sidebarItem} href="/agents">
+          <Link className={styles.sidebarItem} href="/explore">
             Explore
           </Link>
           <Link className={`${styles.sidebarItem} ${styles.sidebarItemActive}`} href="/approvals">
@@ -357,7 +357,7 @@ export default function ApprovalsCenterPage() {
               <Link href="/settings#access" className={styles.primaryLink}>
                 Add agent via key link
               </Link>
-              <Link href="/agents" className={styles.secondaryLink}>
+              <Link href="/explore" className={styles.secondaryLink}>
                 Browse agents
               </Link>
             </div>

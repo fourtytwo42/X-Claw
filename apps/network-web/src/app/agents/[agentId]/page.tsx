@@ -550,7 +550,7 @@ export default function AgentPublicProfilePage() {
           <Link href="/dashboard" className={styles.navItem}>
             Dashboard
           </Link>
-          <Link href="/agents" className={`${styles.navItem} ${styles.navItemActive}`}>
+          <Link href="/explore" className={`${styles.navItem} ${styles.navItemActive}`}>
             Explore
           </Link>
           <Link href="/approvals" className={styles.navItem}>

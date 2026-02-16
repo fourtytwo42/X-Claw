@@ -1,0 +1,494 @@
+.root {
+  --explore-bg-light: #f6f8fc;
+  --explore-surface-light: #ffffff;
+  --explore-border-light: #e6ecf5;
+  --explore-text-light: #0b1220;
+  --explore-muted-light: #5b6b84;
+  --explore-accent-light: #2563eb;
+
+  --explore-bg-dark: #0b1220;
+  --explore-surface-dark: #111a2e;
+  --explore-border-dark: #22304d;
+  --explore-text-dark: #eaf0ff;
+  --explore-muted-dark: #a7b4d0;
+  --explore-accent-dark: #3b82f6;
+
+  --explore-bg: var(--explore-bg-dark);
+  --explore-surface: var(--explore-surface-dark);
+  --explore-border: var(--explore-border-dark);
+  --explore-text: var(--explore-text-dark);
+  --explore-muted: var(--explore-muted-dark);
+  --explore-accent: var(--explore-accent-dark);
+
+  min-height: calc(100vh - 2rem);
+  display: grid;
+  grid-template-columns: 82px minmax(0, 1fr);
+  gap: 1rem;
+  color: var(--explore-text);
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+:global(:root[data-theme='light']) .root {
+  --explore-bg: var(--explore-bg-light);
+  --explore-surface: var(--explore-surface-light);
+  --explore-border: var(--explore-border-light);
+  --explore-text: var(--explore-text-light);
+  --explore-muted: var(--explore-muted-light);
+  --explore-accent: var(--explore-accent-light);
+}
+
+.sidebar {
+  position: sticky;
+  top: 0.75rem;
+  align-self: start;
+  height: calc(100vh - 1.5rem);
+  border: 1px solid var(--explore-border);
+  border-radius: 22px;
+  background: linear-gradient(180deg, var(--explore-surface), color-mix(in srgb, var(--explore-surface) 70%, transparent));
+  display: grid;
+  grid-template-rows: auto 1fr;
+  padding: 0.8rem 0.45rem;
+}
+
+.sidebarLogo {
+  width: 58px;
+  height: 44px;
+  border-radius: 10px;
+  margin: 0 auto 0.8rem;
+  display: grid;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--explore-accent) 45%, var(--explore-border));
+  background: color-mix(in srgb, var(--explore-accent) 10%, var(--explore-surface));
+  padding: 0.2rem;
+}
+
+.sidebarLogoImage {
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+
+.sidebarNav {
+  display: grid;
+  gap: 0.42rem;
+  align-content: start;
+}
+
+.sidebarItem {
+  border: 1px solid transparent;
+  border-radius: 12px;
+  color: var(--explore-muted);
+  font-size: 0.72rem;
+  text-align: center;
+  line-height: 1.2;
+  padding: 0.65rem 0.4rem;
+}
+
+.sidebarItem:hover {
+  border-color: var(--explore-border);
+  color: var(--explore-text);
+}
+
+.sidebarItemActive {
+  color: var(--explore-text);
+  border-color: color-mix(in srgb, var(--explore-accent) 55%, var(--explore-border));
+  background: color-mix(in srgb, var(--explore-accent) 16%, transparent);
+}
+
+.mainSurface {
+  border: 1px solid var(--explore-border);
+  border-radius: 24px;
+  background: radial-gradient(circle at 90% 0%, color-mix(in srgb, var(--explore-accent) 17%, transparent), transparent 30%),
+    linear-gradient(180deg, var(--explore-bg), color-mix(in srgb, var(--explore-bg) 78%, #091428));
+  padding: 0.95rem;
+  min-width: 0;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 15;
+  border: 1px solid var(--explore-border);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--explore-surface) 92%, transparent);
+  backdrop-filter: blur(10px);
+  padding: 0.65rem;
+  display: grid;
+  grid-template-columns: auto minmax(220px, 1fr) auto;
+  gap: 0.65rem;
+  align-items: center;
+}
+
+.topbarTitle {
+  font-size: 1.8rem;
+  font-weight: 700;
+}
+
+.search {
+  width: 100%;
+  border: 1px solid var(--explore-border);
+  border-radius: 12px;
+  background: var(--explore-surface);
+  color: var(--explore-text);
+  padding: 0.5rem 0.65rem;
+}
+
+.topbarControls {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.chainControl :global(.chain-select) {
+  border-radius: 12px;
+  border: 1px solid var(--explore-border);
+  background: var(--explore-surface);
+  color: var(--explore-text);
+  padding: 0.45rem 0.55rem;
+}
+
+.topbarThemeToggle {
+  border: 1px solid var(--explore-border);
+  border-radius: 12px;
+  background: var(--explore-surface);
+  color: var(--explore-text);
+  display: inline-flex;
+  gap: 0.34rem;
+  align-items: center;
+  padding: 0.42rem 0.6rem;
+  cursor: pointer;
+}
+
+.warningBanner,
+.successBanner {
+  border: 1px solid var(--explore-border);
+  border-radius: 12px;
+  background: var(--explore-surface);
+  padding: 0.55rem 0.68rem;
+  margin: 0.7rem 0 0;
+}
+
+.headerRow {
+  margin-top: 0.7rem;
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.switches {
+  display: flex;
+  gap: 0.42rem;
+  flex-wrap: wrap;
+}
+
+.switchBtn,
+.switchActive,
+.windowBtn,
+.windowActive,
+.filterBar button,
+.copyBtn,
+.viewBtn,
+.pagination button,
+.modalActions button,
+.starBtn {
+  border: 1px solid var(--explore-border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--explore-accent) 12%, transparent);
+  color: var(--explore-text);
+  padding: 0.38rem 0.58rem;
+}
+
+.switchBtn,
+.windowBtn,
+.filterBar button,
+.copyBtn,
+.pagination button,
+.modalActions button,
+.starBtn {
+  cursor: pointer;
+}
+
+.switchActive,
+.windowActive {
+  border-color: color-mix(in srgb, var(--explore-accent) 60%, var(--explore-border));
+  background: color-mix(in srgb, var(--explore-accent) 20%, transparent);
+}
+
+.controls {
+  display: inline-flex;
+  gap: 0.55rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.controls label {
+  display: inline-flex;
+  gap: 0.35rem;
+  align-items: center;
+  color: var(--explore-muted);
+}
+
+.controls select,
+.filterBar select,
+.modalCard select,
+.modalCard input {
+  border: 1px solid var(--explore-border);
+  border-radius: 10px;
+  background: var(--explore-surface);
+  color: var(--explore-text);
+  padding: 0.4rem 0.52rem;
+}
+
+.windowButtons {
+  display: inline-flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.filterBar {
+  margin-top: 0.65rem;
+  border: 1px solid var(--explore-border);
+  border-radius: 14px;
+  background: var(--explore-surface);
+  padding: 0.55rem;
+  display: flex;
+  gap: 0.45rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.filterSummary {
+  margin-left: auto;
+  color: var(--explore-muted);
+}
+
+.sectionCard {
+  margin-top: 0.75rem;
+  border: 1px solid var(--explore-border);
+  border-radius: 16px;
+  background: var(--explore-surface);
+  padding: 0.7rem;
+}
+
+.sectionHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.sectionHeader h2 {
+  margin: 0;
+}
+
+.grid {
+  margin-top: 0.62rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.agentCard {
+  border: 1px solid var(--explore-border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--explore-surface) 92%, transparent);
+  padding: 0.58rem;
+  min-width: 0;
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.titleRow {
+  display: flex;
+  gap: 0.42rem;
+  align-items: center;
+}
+
+.titleRow h3 {
+  margin: 0;
+  font-size: 1.16rem;
+}
+
+.subMeta,
+.copyState,
+.gated,
+.placeholderNotice,
+.empty,
+.muted {
+  color: var(--explore-muted);
+}
+
+.subMeta,
+.copyState,
+.gated,
+.placeholderNotice,
+.empty {
+  margin: 0.35rem 0 0;
+}
+
+.starBtn {
+  padding: 0.2rem 0.42rem;
+}
+
+.metricRow {
+  margin-top: 0.55rem;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+
+.metricRow div {
+  border: 1px solid var(--explore-border);
+  border-radius: 10px;
+  padding: 0.35rem 0.42rem;
+  display: grid;
+  gap: 0.15rem;
+}
+
+.metricRow span {
+  font-size: 0.75rem;
+  color: var(--explore-muted);
+}
+
+.metricRow strong,
+.chip,
+.filterSummary,
+.placeholderNotice {
+  overflow-wrap: anywhere;
+}
+
+.metaRow {
+  margin-top: 0.5rem;
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.chip {
+  border: 1px solid var(--explore-border);
+  border-radius: 999px;
+  padding: 0.18rem 0.5rem;
+  font-size: 0.75rem;
+}
+
+.actionRow {
+  margin-top: 0.58rem;
+  display: flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.viewBtn {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+
+.copyBtn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.pagination {
+  margin-top: 0.72rem;
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: center;
+}
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.42);
+  display: grid;
+  place-items: center;
+  z-index: 100;
+  padding: 0.8rem;
+}
+
+.modalCard {
+  width: min(480px, 96vw);
+  border: 1px solid var(--explore-border);
+  border-radius: 14px;
+  background: var(--explore-surface);
+  padding: 0.72rem;
+  display: grid;
+  gap: 0.48rem;
+}
+
+.modalCard h3 {
+  margin: 0;
+}
+
+.modalCard label {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.checkbox {
+  display: flex !important;
+  gap: 0.42rem !important;
+  align-items: flex-start !important;
+}
+
+.modalActions {
+  display: flex;
+  gap: 0.45rem;
+  justify-content: flex-end;
+}
+
+@media (max-width: 1240px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 1080px) {
+  .root {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: static;
+    height: auto;
+  }
+
+  .sidebarNav {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .topbar {
+    grid-template-columns: 1fr;
+  }
+
+  .filterSummary {
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 720px) {
+  .metricRow {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .modalActions,
+  .actionRow {
+    flex-direction: column;
+  }
+
+  .modalActions button,
+  .actionRow button,
+  .viewBtn {
+    width: 100%;
+    justify-content: center;
+    text-align: center;
+  }
+}

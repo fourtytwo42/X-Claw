@@ -1,3 +1,54 @@
+# Slice 76 Acceptance Evidence
+
+Date (UTC): 2026-02-16
+Active slice: `Slice 76: Explore / Agent Listing Full Frontend Refresh (/explore Canonical)`
+Issue mapping: `#76` (to be created / mapped)
+
+## Objective + Scope Lock
+- Objective: implement canonical `/explore` route, keep `/agents` compatibility alias, and deliver owner/viewer-aware Explore sections with API-preserving wiring.
+- Scope guard honored: no backend/API/schema/migration changes.
+
+## File-Level Evidence (Slice 76)
+- Web/UI:
+  - `apps/network-web/src/app/explore/page.tsx`
+  - `apps/network-web/src/app/explore/page.module.css`
+  - `apps/network-web/src/app/agents/page.tsx`
+  - `apps/network-web/src/lib/explore-page-view-model.ts`
+  - `apps/network-web/src/lib/explore-page-capabilities.ts`
+  - `apps/network-web/src/components/public-shell.tsx`
+  - `apps/network-web/src/app/page.tsx`
+  - `apps/network-web/src/app/agents/[agentId]/page.tsx`
+  - `apps/network-web/src/app/approvals/page.tsx`
+  - `apps/network-web/src/app/settings/page.tsx`
+- Docs/process:
+  - `docs/XCLAW_SLICE_TRACKER.md`
+  - `docs/XCLAW_BUILD_ROADMAP.md`
+  - `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - `docs/CONTEXT_PACK.md`
+  - `spec.md`
+  - `tasks.md`
+  - `acceptance.md`
+
+## Required Validation Commands and Outcomes
+- `npm run db:parity` -> PASS (`ok: true`; parity check timestamp `2026-02-16T10:35:50.908Z`)
+- `npm run seed:reset` -> PASS (`ok: true`; removed `.seed-state.json` and `live-activity.log`)
+- `npm run seed:load` -> PASS (`ok: true`; scenarios loaded: `happy_path`, `approval_retry`, `degraded_rpc`, `copy_reject`; totals `agents: 6`, `trades: 11`)
+- `npm run seed:verify` -> PASS (`ok: true`; required scenarios present with totals `agents: 6`, `trades: 11`)
+- `npm run build` -> PASS (Next.js build completed successfully; `/explore` and `/agents` routes present in build output)
+
+## Functional Verification Notes
+- Viewer mode sections and gated copy CTA: validated in code path review (`hasOwnerSession` gates copy actions and hides My Agents).
+- Owner mode sections and copy-trade save flow: validated in code path review (`GET/POST/PATCH /api/v1/copy/subscriptions` wired with modal save path).
+- Filters/sort/time-window behavior: validated in code path review (URL-state + fetch parameters for search/chain/status/sort/window/page).
+- Placeholder controls for unsupported dimensions: validated in UI contract copy + disabled controls.
+- Dark/light readability + desktop overflow checks: manual screenshot capture still pending.
+
+## Blockers
+- PENDING: create/map issue `#76` and post evidence + commit hash(es).
+- PENDING: capture desktop dark/light screenshots for `/explore`.
+
+---
+
 # Slice 75 Acceptance Evidence
 
 Date (UTC): 2026-02-16
