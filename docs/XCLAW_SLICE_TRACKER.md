@@ -1233,3 +1233,90 @@ DoD:
 
 Blocker:
 - Issue mapping + completion evidence post is pending (`Issue: #69A` not created/mapped in-session yet).
+
+---
+
+## Slice 70: Single-Trigger Spot Flow + Guaranteed Final Result Reporting
+Status: [!]
+Issue: #70 (to be created / mapped)
+
+Goal:
+- Make Telegram-focused `trade spot` one-trigger:
+  - if approval is needed, owner approves/denies via Telegram buttons,
+  - approve auto-resumes execution without a second human message,
+  - final trade outcome is always sent to the same chat and routed into the agent message pipeline.
+- Limit-order behavior remains unchanged.
+
+DoD:
+- [x] docs sync first: source-of-truth + roadmap + tracker + context/spec/tasks/acceptance aligned to Slice 70.
+- [x] Runtime: persist pending spot-flow context for approval-pending `trade spot` and expose deterministic `approvals resume-spot`.
+- [x] Gateway patch: on `xappr approve`, trigger guarded async `resume-spot`, emit deterministic final trade result chat message, and route synthetic final-result message to agent pipeline.
+- [x] Duplicate callback safety: no double execution trigger for repeated approve callbacks on the same trade.
+- [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.
+
+Blocker:
+- Issue mapping + completion evidence post is pending (`Issue: #70` not created/mapped in-session yet).
+
+---
+
+## Slice 71: Single-Trigger Outbound Transfers + Runtime-Canonical Transfer Approvals
+Status: [!]
+Issue: #71 (to be created / mapped)
+
+Goal:
+- Make `wallet-send` and `wallet-send-token` one-trigger for Telegram-focused chats using runtime-canonical transfer approvals (`xfr_...`) with deterministic approve/deny callback handling and guaranteed final result reporting.
+
+DoD:
+- [x] docs sync first: source-of-truth + roadmap + tracker + context/spec/tasks/acceptance aligned to Slice 71.
+- [x] Runtime: local transfer approval state (`pending-transfer-flows.json`) + local transfer approval policy (`transfer-policy.json`) + deterministic commands:
+  - `approvals decide-transfer`
+  - `approvals resume-transfer`
+  - `transfers policy-get`
+  - `transfers policy-set`
+- [x] Runtime: `wallet-send` and `wallet-send-token` orchestrate approval-required path with `queuedMessage` (`Approval ID: xfr_...`, `Status: approval_pending`) and auto execution when policy allows.
+- [x] Gateway patch: support `xfer|a|...` / `xfer|r|...` callbacks, trigger runtime decide-transfer, emit deterministic transfer result, and route synthetic transfer-result message to agent pipeline.
+- [x] Web/API: add transfer-approval mirror + management queue/decision endpoints and transfer-policy update/get mirror endpoints.
+- [x] `/agents/:id` management view: transfer approval policy controls + transfer approvals queue/history with periodic refresh.
+- [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.
+
+Blocker:
+- Issue mapping + completion evidence post is pending (`Issue: #71` not created/mapped in-session yet).
+
+---
+
+## Slice 72: Transfer Policy-Override Approvals (Keep Gate/Whitelist)
+Status: [!]
+Issue: #72 (to be created / mapped)
+
+Goal:
+- Keep outbound gate + whitelist controls but route policy-blocked transfer intents to `xfr_...` Approve/Deny instead of immediate hard-fail.
+
+DoD:
+- [x] Runtime evaluates outbound policy without hard-failing transfer orchestration (`chain_disabled` still hard-fails).
+- [x] Policy-blocked transfers create `approval_pending` with policy-block metadata.
+- [x] Approve executes one-off override (`executionMode=policy_override`) without policy mutation.
+- [x] Deny remains terminal rejected with deterministic refusal context.
+- [x] Mirror/API/UI include policy-block metadata and override mode indicators.
+- [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.
+
+---
+
+## Slice 73: Agent Page Full Frontend Refresh (Dashboard-Aligned, API-Preserving)
+Status: [!]
+Issue: #73
+
+Goal:
+- Rebuild `/agents/:id` as a dashboard-aligned wallet console while preserving existing backend contracts and owner/viewer access boundaries.
+
+DoD:
+- [x] docs sync first: source-of-truth + roadmap + tracker + context/spec/tasks/acceptance aligned to Slice 73.
+- [x] `/agents/:id` is direct-replaced with new desktop-first layout (hero, KPI strip, tabs, two-column content, right rail).
+- [x] existing APIs remain unchanged; owner operations continue using existing management routes.
+- [x] unsupported API surfaces render explicit placeholders/disabled controls (no speculative backend changes).
+- [x] viewer mode hides owner-only controls while preserving public profile observability.
+- [x] dark/light themes remain supported with dark default.
+- [x] canonical status vocabulary remains unchanged (`active`, `offline`, `degraded`, `paused`, `deactivated`).
+- [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`.
+
+Blocker:
+- Dark/light parity screenshots at desktop breakpoints are pending capture + attachment in issue evidence post.

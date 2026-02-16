@@ -2262,3 +2262,156 @@ Note:
   - [ ] chain filter updates room rows
   - [ ] owner `My agents` scope filters room rows
   - [x] `/room` renders read-only full room stream.
+
+---
+
+## 70) Slice 70: Single-Trigger Spot Flow + Guaranteed Final Result Reporting
+
+### 70.1 Canonical/doc sync
+- [x] Add Slice 70 goal/DoD + issue mapping to `docs/XCLAW_SLICE_TRACKER.md`.
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` with locked single-trigger Telegram spot flow semantics.
+- [x] Update handoff/process artifacts:
+  - [x] `docs/CONTEXT_PACK.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+
+### 70.2 Implementation
+- [x] Runtime: add persisted pending spot-flow context (`trade spot` approval-pending path).
+- [x] Runtime: add `approvals resume-spot --trade-id <id> --chain <key> --json`.
+- [x] Runtime: clear pending spot-flow context on terminal outcomes.
+- [x] Skill wrapper/docs:
+  - [x] add `trade-resume <trade_id>` in `skills/xclaw-agent/scripts/xclaw_agent_skill.py`
+  - [x] update `skills/xclaw-agent/SKILL.md` + `skills/xclaw-agent/references/commands.md`
+- [x] OpenClaw gateway patch:
+  - [x] on `xappr approve` success, trigger guarded async `resume-spot` execution path.
+  - [x] emit deterministic final trade result message in same Telegram chat/thread.
+  - [x] route synthetic final result message into agent pipeline.
+  - [x] enforce duplicate-callback in-flight guard for same `(tradeId, chainKey)`.
+
+### 70.3 Validation + evidence
+- [x] Run required gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] runtime unit tests
+- [ ] Record functional verification evidence:
+  - [ ] one-trigger Telegram `trade spot` approval-required path auto-resumes after Approve.
+  - [ ] Deny yields refusal feedback in chat.
+  - [ ] final result message always includes status/tradeId/chain and txHash when available.
+  - [ ] duplicate Approve callbacks do not trigger duplicate execution.
+
+---
+
+## 71) Slice 71: Single-Trigger Outbound Transfers + Runtime-Canonical Transfer Approvals
+
+### 71.1 Canonical/doc sync
+- [x] Add Slice 71 goal/DoD + issue mapping to `docs/XCLAW_SLICE_TRACKER.md`.
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` with locked transfer-approval contract (`xfr_...`, runtime-canonical).
+- [x] Update handoff/process artifacts:
+  - [x] `docs/CONTEXT_PACK.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+
+### 71.2 Implementation
+- [x] Runtime transfer approval orchestration:
+  - [x] local pending transfer flow state + local transfer policy state.
+  - [x] `approvals decide-transfer`, `approvals resume-transfer`.
+  - [x] `transfers policy-get`, `transfers policy-set`.
+  - [x] `wallet-send` / `wallet-send-token` approval-required queued path + auto execution when allowed.
+- [x] OpenClaw gateway patch:
+  - [x] support `xfer|a|<approvalId>|<chainKey>` and `xfer|r|...` callbacks.
+  - [x] deterministic transfer final result chat message.
+  - [x] synthetic transfer-result route into agent pipeline.
+- [x] API/mirror + management:
+  - [x] agent transfer approval mirror endpoint.
+  - [x] agent transfer policy get/mirror endpoints.
+  - [x] management transfer approvals list/decision endpoints.
+  - [x] management transfer policy update endpoint.
+- [x] `/agents/:id` management UI:
+  - [x] transfer approval policy controls.
+  - [x] transfer approvals queue + history.
+
+### 71.3 Validation + evidence
+- [x] Run required gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] runtime unit tests
+- [ ] Record functional verification evidence:
+  - [ ] Telegram approve path (`xfer`) executes once and reports tx result.
+  - [ ] Telegram deny path reports refusal and no execution.
+  - [ ] Web approve/deny path converges to terminal transfer status.
+  - [ ] duplicate callback does not double execute.
+
+---
+
+## 72) Slice 72: Transfer Policy-Override Approvals (Keep Gate/Whitelist)
+
+### 72.1 Canonical/doc sync
+- [x] Update source-of-truth to lock one-off override behavior for policy-blocked transfer approvals.
+- [x] Add Slice 72 tracker entry + roadmap checklist.
+- [x] Update wallet contract + OpenAPI/schema docs for new policy-block/override fields.
+
+### 72.2 Implementation
+- [x] Runtime transfer orchestration evaluates outbound gate/whitelist and routes blocked requests to `xfr_...` approvals.
+- [x] Runtime execution enforces one-off override semantics for approved blocked-origin flows.
+- [x] Transfer mirror payload includes:
+  - [x] `policyBlockedAtCreate`
+  - [x] `policyBlockReasonCode`
+  - [x] `policyBlockReasonMessage`
+  - [x] `executionMode`
+- [x] Web/API read-model paths expose and render policy-block + override indicators.
+- [x] Gateway transfer final message includes override mode line when applicable.
+
+### 72.3 Validation + evidence
+- [x] Run required gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] runtime unit tests
+
+---
+
+## 73) Slice 73: Agent Page Full Frontend Refresh (Dashboard-Aligned, API-Preserving)
+
+### 73.1 Canonical/doc sync
+- [x] Add Slice 73 goal/DoD + issue mapping to `docs/XCLAW_SLICE_TRACKER.md`.
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` with locked Slice 73 frontend contract.
+- [x] Update handoff/process artifacts:
+  - [x] `docs/CONTEXT_PACK.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+
+### 73.2 Implementation
+- [x] Replace `/agents/:id` UI with dashboard-aligned shell and card system.
+- [x] Preserve existing API integration for profile/trades/activity/management actions.
+- [x] Keep owner controls reachable (policy, approvals, transfer policy/approvals, limits, audit, withdraw/deposit, pause/resume, revoke-all).
+- [x] Enforce viewer lock behavior for owner-only controls.
+- [x] Add explicit placeholder states for unsupported API-backed modules.
+- [x] Add frontend view-model/capability modules:
+  - [x] `apps/network-web/src/lib/agent-page-view-model.ts`
+  - [x] `apps/network-web/src/lib/agent-page-capabilities.ts`
+- [x] Add route-local stylesheet:
+  - [x] `apps/network-web/src/app/agents/[agentId]/page.module.css`
+
+### 73.3 Validation + evidence
+- [x] Run required gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+- [ ] Record functional verification evidence:
+  - [x] viewer mode hides owner actions
+  - [x] owner mode action controls operate via existing endpoints
+  - [x] approval decision buttons update queue state
+  - [ ] dark/light parity screenshots at desktop breakpoints
