@@ -54,6 +54,9 @@ LIMIT_ORDER_OUTBOX_FILE = APP_DIR / "limit_orders_outbox.json"
 TRADE_USAGE_OUTBOX_FILE = APP_DIR / "trade_usage_outbox.json"
 APPROVAL_PROMPTS_FILE = APP_DIR / "approval_prompts.json"
 PENDING_TRADE_INTENTS_FILE = APP_DIR / "pending-trade-intents.json"
+PENDING_SPOT_TRADE_FLOWS_FILE = APP_DIR / "pending-spot-trade-flows.json"
+PENDING_TRANSFER_FLOWS_FILE = APP_DIR / "pending-transfer-flows.json"
+TRANSFER_POLICY_FILE = APP_DIR / "transfer-policy.json"
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
 CHAIN_CONFIG_DIR = REPO_ROOT / "config" / "chains"
 
@@ -1190,6 +1193,38 @@ def _enforce_owner_chain_enabled(chain: str, policy_payload: dict[str, Any], *, 
 
 
 def _enforce_outbound_transfer_policy(chain: str, destination: str) -> dict[str, Any]:
+    evaluated = _evaluate_outbound_transfer_policy(chain, destination)
+    if not bool(evaluated.get("allowed")):
+        code = str(evaluated.get("policyBlockReasonCode") or "transfer_policy_blocked")
+        message = str(evaluated.get("policyBlockReasonMessage") or "Outbound transfer policy blocked this destination.")
+        details = {
+            "chain": chain,
+            "destination": destination,
+            "outboundMode": evaluated.get("outboundMode"),
+            "policyBlockReasonCode": evaluated.get("policyBlockReasonCode"),
+        }
+        if code == "outbound_disabled":
+            raise WalletPolicyError(
+                "transfer_policy_blocked",
+                message,
+                "Ask the bot owner to enable outbound transfers on the agent management page.",
+                details,
+            )
+        raise WalletPolicyError(
+            "transfer_policy_blocked",
+            message,
+            "Ask the bot owner to add this destination address to the whitelist.",
+            details,
+        )
+    return {
+        "outboundTransfersEnabled": bool(evaluated.get("outboundTransfersEnabled")),
+        "outboundMode": str(evaluated.get("outboundMode") or "disabled"),
+        "outboundWhitelistAddresses": list(evaluated.get("outboundWhitelistAddresses") or []),
+        "updatedAt": evaluated.get("updatedAt"),
+    }
+
+
+def _evaluate_outbound_transfer_policy(chain: str, destination: str) -> dict[str, Any]:
     policy = _fetch_outbound_transfer_policy(chain)
     _enforce_owner_chain_enabled(chain, policy, action="Spend")
     enabled = bool(policy.get("outboundTransfersEnabled"))
@@ -1197,27 +1232,27 @@ def _enforce_outbound_transfer_policy(chain: str, destination: str) -> dict[str,
     whitelist_raw = policy.get("outboundWhitelistAddresses")
     whitelist = {_normalize_address(str(item)) for item in whitelist_raw if isinstance(item, str)} if isinstance(whitelist_raw, list) else set()
 
+    policy_blocked = False
+    policy_block_reason_code: str | None = None
+    policy_block_reason_message: str | None = None
     if not enabled or mode == "disabled":
-        raise WalletPolicyError(
-            "transfer_policy_blocked",
-            "Outbound transfers are disabled by owner policy.",
-            "Ask the bot owner to enable outbound transfers on the agent management page.",
-            {"chain": chain, "outboundMode": mode},
-        )
-
-    if mode == "whitelist" and _normalize_address(destination) not in whitelist:
-        raise WalletPolicyError(
-            "transfer_policy_blocked",
-            "Destination is not in the outbound transfer whitelist.",
-            "Ask the bot owner to add this destination address to the whitelist.",
-            {"chain": chain, "destination": destination, "outboundMode": mode},
-        )
+        policy_blocked = True
+        policy_block_reason_code = "outbound_disabled"
+        policy_block_reason_message = "Outbound transfers are disabled by owner policy."
+    elif mode == "whitelist" and _normalize_address(destination) not in whitelist:
+        policy_blocked = True
+        policy_block_reason_code = "destination_not_whitelisted"
+        policy_block_reason_message = "Destination is not in the outbound transfer whitelist."
 
     return {
         "outboundTransfersEnabled": enabled,
         "outboundMode": mode,
         "outboundWhitelistAddresses": sorted(list(whitelist)),
         "updatedAt": policy.get("updatedAt"),
+        "allowed": not policy_blocked,
+        "policyBlockedAtCreate": policy_blocked,
+        "policyBlockReasonCode": policy_block_reason_code,
+        "policyBlockReasonMessage": policy_block_reason_message,
     }
 
 
@@ -1570,6 +1605,518 @@ def _remove_pending_trade_intent(intent_key: str) -> None:
         _save_pending_trade_intents(state)
 
 
+def _load_pending_spot_trade_flows() -> dict[str, Any]:
+    try:
+        ensure_app_dir()
+        if not PENDING_SPOT_TRADE_FLOWS_FILE.exists():
+            return {"version": 1, "flows": {}}
+        raw = PENDING_SPOT_TRADE_FLOWS_FILE.read_text(encoding="utf-8")
+        payload = json.loads(raw or "{}")
+        if not isinstance(payload, dict):
+            return {"version": 1, "flows": {}}
+        flows = payload.get("flows")
+        if not isinstance(flows, dict):
+            payload["flows"] = {}
+        if payload.get("version") != 1:
+            return {"version": 1, "flows": {}}
+        return payload
+    except Exception:
+        return {"version": 1, "flows": {}}
+
+
+def _save_pending_spot_trade_flows(payload: dict[str, Any]) -> None:
+    ensure_app_dir()
+    if payload.get("version") != 1:
+        payload["version"] = 1
+    if not isinstance(payload.get("flows"), dict):
+        payload["flows"] = {}
+    tmp = f"{PENDING_SPOT_TRADE_FLOWS_FILE}.{os.getpid()}.tmp"
+    pathlib.Path(tmp).write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+    if os.name != "nt":
+        os.chmod(tmp, 0o600)
+    pathlib.Path(tmp).replace(PENDING_SPOT_TRADE_FLOWS_FILE)
+    if os.name != "nt":
+        os.chmod(PENDING_SPOT_TRADE_FLOWS_FILE, 0o600)
+
+
+def _get_pending_spot_trade_flow(trade_id: str) -> dict[str, Any] | None:
+    state = _load_pending_spot_trade_flows()
+    flows = state.get("flows")
+    if not isinstance(flows, dict):
+        return None
+    entry = flows.get(trade_id)
+    return entry if isinstance(entry, dict) else None
+
+
+def _record_pending_spot_trade_flow(trade_id: str, entry: dict[str, Any]) -> None:
+    state = _load_pending_spot_trade_flows()
+    flows = state.get("flows")
+    if not isinstance(flows, dict):
+        flows = {}
+        state["flows"] = flows
+    flows[trade_id] = {**entry, "updatedAt": utc_now()}
+    _save_pending_spot_trade_flows(state)
+
+
+def _remove_pending_spot_trade_flow(trade_id: str) -> None:
+    state = _load_pending_spot_trade_flows()
+    flows = state.get("flows")
+    if not isinstance(flows, dict):
+        return
+    if trade_id in flows:
+        flows.pop(trade_id, None)
+        _save_pending_spot_trade_flows(state)
+
+
+def _load_pending_transfer_flows() -> dict[str, Any]:
+    try:
+        ensure_app_dir()
+        if not PENDING_TRANSFER_FLOWS_FILE.exists():
+            return {"version": 1, "flows": {}}
+        raw = PENDING_TRANSFER_FLOWS_FILE.read_text(encoding="utf-8")
+        payload = json.loads(raw or "{}")
+        if not isinstance(payload, dict):
+            return {"version": 1, "flows": {}}
+        flows = payload.get("flows")
+        if not isinstance(flows, dict):
+            payload["flows"] = {}
+        if payload.get("version") != 1:
+            return {"version": 1, "flows": {}}
+        return payload
+    except Exception:
+        return {"version": 1, "flows": {}}
+
+
+def _save_pending_transfer_flows(payload: dict[str, Any]) -> None:
+    ensure_app_dir()
+    if payload.get("version") != 1:
+        payload["version"] = 1
+    if not isinstance(payload.get("flows"), dict):
+        payload["flows"] = {}
+    tmp = f"{PENDING_TRANSFER_FLOWS_FILE}.{os.getpid()}.tmp"
+    pathlib.Path(tmp).write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+    if os.name != "nt":
+        os.chmod(tmp, 0o600)
+    pathlib.Path(tmp).replace(PENDING_TRANSFER_FLOWS_FILE)
+    if os.name != "nt":
+        os.chmod(PENDING_TRANSFER_FLOWS_FILE, 0o600)
+
+
+def _get_pending_transfer_flow(approval_id: str) -> dict[str, Any] | None:
+    state = _load_pending_transfer_flows()
+    flows = state.get("flows")
+    if not isinstance(flows, dict):
+        return None
+    entry = flows.get(approval_id)
+    return entry if isinstance(entry, dict) else None
+
+
+def _record_pending_transfer_flow(approval_id: str, entry: dict[str, Any]) -> None:
+    state = _load_pending_transfer_flows()
+    flows = state.get("flows")
+    if not isinstance(flows, dict):
+        flows = {}
+        state["flows"] = flows
+    flows[approval_id] = {**entry, "updatedAt": utc_now()}
+    _save_pending_transfer_flows(state)
+
+
+def _remove_pending_transfer_flow(approval_id: str) -> None:
+    state = _load_pending_transfer_flows()
+    flows = state.get("flows")
+    if not isinstance(flows, dict):
+        return
+    if approval_id in flows:
+        flows.pop(approval_id, None)
+        _save_pending_transfer_flows(state)
+
+
+def _default_transfer_policy() -> dict[str, Any]:
+    return {
+        "schemaVersion": 1,
+        "chains": {},
+    }
+
+
+def _load_transfer_policy_state() -> dict[str, Any]:
+    try:
+        ensure_app_dir()
+        if not TRANSFER_POLICY_FILE.exists():
+            return _default_transfer_policy()
+        payload = _read_json(TRANSFER_POLICY_FILE)
+        if not isinstance(payload, dict):
+            return _default_transfer_policy()
+        if payload.get("schemaVersion") != 1:
+            return _default_transfer_policy()
+        chains = payload.get("chains")
+        if not isinstance(chains, dict):
+            payload["chains"] = {}
+        return payload
+    except Exception:
+        return _default_transfer_policy()
+
+
+def _save_transfer_policy_state(payload: dict[str, Any]) -> None:
+    if payload.get("schemaVersion") != 1:
+        payload["schemaVersion"] = 1
+    chains = payload.get("chains")
+    if not isinstance(chains, dict):
+        payload["chains"] = {}
+    _write_json(TRANSFER_POLICY_FILE, payload)
+
+
+def _normalize_transfer_policy(chain: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    payload = payload or {}
+    mode = str(payload.get("transferApprovalMode") or "per_transfer").strip().lower()
+    if mode not in {"auto", "per_transfer"}:
+        mode = "per_transfer"
+    native_preapproved = bool(payload.get("nativeTransferPreapproved", False))
+    raw_tokens = payload.get("allowedTransferTokens")
+    out_tokens: list[str] = []
+    if isinstance(raw_tokens, list):
+        seen: set[str] = set()
+        for token in raw_tokens:
+            if not isinstance(token, str):
+                continue
+            normalized = token.strip().lower()
+            if re.fullmatch(r"0x[a-f0-9]{40}", normalized) and normalized not in seen:
+                seen.add(normalized)
+                out_tokens.append(normalized)
+    updated_at = str(payload.get("updatedAt") or "").strip() or utc_now()
+    return {
+        "chainKey": chain,
+        "transferApprovalMode": mode,
+        "nativeTransferPreapproved": native_preapproved,
+        "allowedTransferTokens": out_tokens,
+        "updatedAt": updated_at,
+    }
+
+
+def _get_transfer_policy(chain: str) -> dict[str, Any]:
+    state = _load_transfer_policy_state()
+    chains = state.get("chains")
+    if not isinstance(chains, dict):
+        chains = {}
+    row = chains.get(chain)
+    if not isinstance(row, dict):
+        row = {}
+    return _normalize_transfer_policy(chain, row)
+
+
+def _set_transfer_policy(chain: str, policy: dict[str, Any]) -> dict[str, Any]:
+    normalized = _normalize_transfer_policy(chain, policy)
+    state = _load_transfer_policy_state()
+    chains = state.get("chains")
+    if not isinstance(chains, dict):
+        chains = {}
+        state["chains"] = chains
+    chains[chain] = normalized
+    _save_transfer_policy_state(state)
+    return normalized
+
+
+def _sync_transfer_policy_from_remote(chain: str) -> dict[str, Any]:
+    local = _get_transfer_policy(chain)
+    try:
+        status_code, body = _api_request("GET", f"/agent/transfer-policy?chainKey={urllib.parse.quote(chain)}")
+        if status_code < 200 or status_code >= 300:
+            return local
+        remote_raw = body.get("transferPolicy")
+        if not isinstance(remote_raw, dict):
+            return local
+        remote = _normalize_transfer_policy(chain, remote_raw)
+        try:
+            local_updated = datetime.fromisoformat(str(local.get("updatedAt")).replace("Z", "+00:00"))
+            remote_updated = datetime.fromisoformat(str(remote.get("updatedAt")).replace("Z", "+00:00"))
+            if remote_updated <= local_updated:
+                return local
+        except Exception:
+            pass
+        return _set_transfer_policy(chain, remote)
+    except Exception:
+        return local
+
+
+def _mirror_transfer_approval(flow: dict[str, Any]) -> None:
+    try:
+        approval_id = str(flow.get("approvalId") or "").strip()
+        chain = str(flow.get("chainKey") or "").strip()
+        if not approval_id or not chain:
+            return
+        payload = {
+            "schemaVersion": 1,
+            "approvalId": approval_id,
+            "chainKey": chain,
+            "status": str(flow.get("status") or "approval_pending"),
+            "transferType": str(flow.get("transferType") or "native"),
+            "tokenAddress": flow.get("tokenAddress"),
+            "tokenSymbol": flow.get("tokenSymbol"),
+            "toAddress": flow.get("toAddress"),
+            "amountWei": str(flow.get("amountWei") or "0"),
+            "txHash": flow.get("txHash"),
+            "reasonCode": flow.get("reasonCode"),
+            "reasonMessage": flow.get("reasonMessage"),
+            "policyBlockedAtCreate": bool(flow.get("policyBlockedAtCreate", False)),
+            "policyBlockReasonCode": flow.get("policyBlockReasonCode"),
+            "policyBlockReasonMessage": flow.get("policyBlockReasonMessage"),
+            "executionMode": flow.get("executionMode"),
+            "createdAt": flow.get("createdAt") or utc_now(),
+            "updatedAt": flow.get("updatedAt") or utc_now(),
+            "decidedAt": flow.get("decidedAt"),
+            "terminalAt": flow.get("terminalAt"),
+        }
+        _api_request(
+            "POST",
+            "/agent/transfer-approvals/mirror",
+            payload=payload,
+            include_idempotency=True,
+            idempotency_key=f"rt-transfer-mirror-{approval_id}-{secrets.token_hex(8)}",
+        )
+    except Exception:
+        pass
+
+
+def _mirror_transfer_policy(chain: str, policy: dict[str, Any]) -> None:
+    try:
+        payload = {
+            "agentId": _resolve_agent_id(_resolve_api_key()),
+            "chainKey": chain,
+            "transferPolicy": _normalize_transfer_policy(chain, policy),
+        }
+        _api_request(
+            "POST",
+            "/agent/transfer-policy/mirror",
+            payload=payload,
+            include_idempotency=True,
+            idempotency_key=f"rt-transfer-policy-{chain}-{secrets.token_hex(8)}",
+        )
+    except Exception:
+        pass
+
+
+def _transfer_requires_approval(chain: str, transfer_type: str, token_address: str | None) -> tuple[bool, dict[str, Any]]:
+    policy = _sync_transfer_policy_from_remote(chain)
+    mode = str(policy.get("transferApprovalMode") or "per_transfer")
+    if mode == "auto":
+        return False, policy
+    if transfer_type == "native":
+        return (not bool(policy.get("nativeTransferPreapproved", False))), policy
+    if token_address:
+        normalized = token_address.strip().lower()
+        allowed = policy.get("allowedTransferTokens")
+        if isinstance(allowed, list):
+            for item in allowed:
+                if isinstance(item, str) and item.strip().lower() == normalized:
+                    return False, policy
+    return True, policy
+
+
+def _make_transfer_approval_id() -> str:
+    return f"xfr_{secrets.token_hex(10)}"
+
+
+def _transfer_amount_display(
+    amount_wei: str | int,
+    transfer_type: str,
+    token_symbol: str | None,
+    token_decimals: int | None,
+) -> tuple[str, str]:
+    try:
+        amount_int = int(str(amount_wei).strip())
+    except Exception:
+        return str(amount_wei), str(token_symbol or ("ETH" if transfer_type == "native" else "TOKEN"))
+    if amount_int < 0:
+        amount_int = 0
+    unit = "ETH" if transfer_type == "native" else (str(token_symbol or "TOKEN").strip() or "TOKEN")
+    decimals = 18
+    if transfer_type == "token":
+        try:
+            decimals = int(token_decimals if token_decimals is not None else 18)
+        except Exception:
+            decimals = 18
+        if decimals < 0:
+            decimals = 18
+    return _format_units(amount_int, decimals), unit
+
+
+def _execute_pending_transfer_flow(flow: dict[str, Any]) -> dict[str, Any]:
+    approval_id = str(flow.get("approvalId") or "").strip()
+    chain = str(flow.get("chainKey") or "").strip()
+    transfer_type = str(flow.get("transferType") or "native").strip().lower()
+    amount_wei = str(flow.get("amountWei") or "0").strip()
+    to_address = str(flow.get("toAddress") or "").strip()
+    token_address = str(flow.get("tokenAddress") or "").strip().lower() if transfer_type == "token" else None
+    token_symbol = str(flow.get("tokenSymbol") or ("ETH" if transfer_type == "native" else "TOKEN")).strip()
+    token_decimals_raw = flow.get("tokenDecimals", 18 if transfer_type == "native" else None)
+    token_decimals: int | None
+    try:
+        token_decimals = int(token_decimals_raw) if token_decimals_raw is not None else None
+    except Exception:
+        token_decimals = 18 if transfer_type == "native" else None
+    amount_human, amount_unit = _transfer_amount_display(amount_wei, transfer_type, token_symbol, token_decimals)
+    amount_display = f"{amount_human} {amount_unit}"
+    if not approval_id or not chain:
+        return {"ok": False, "code": "invalid_state", "message": "Missing approvalId/chain in transfer flow."}
+    if not re.fullmatch(r"[0-9]+", amount_wei):
+        return {"ok": False, "code": "invalid_state", "message": "Transfer flow amountWei must be uint."}
+    if not is_hex_address(to_address):
+        return {"ok": False, "code": "invalid_state", "message": "Transfer flow destination is invalid."}
+    if transfer_type == "token" and (not token_address or not is_hex_address(token_address)):
+        return {"ok": False, "code": "invalid_state", "message": "Transfer token address is invalid."}
+
+    outbound_eval = _evaluate_outbound_transfer_policy(chain, to_address)
+    policy_blocked_now = not bool(outbound_eval.get("allowed"))
+    policy_blocked_at_create = bool(flow.get("policyBlockedAtCreate", False))
+    execution_mode = "normal"
+    if policy_blocked_now:
+        if not policy_blocked_at_create:
+            return {
+                "ok": False,
+                "code": "not_actionable",
+                "message": "Transfer is no longer actionable because outbound transfer policy now blocks it.",
+                "approvalId": approval_id,
+                "chain": chain,
+                "status": str(flow.get("status") or "approval_pending"),
+                "policyBlockedAtCreate": policy_blocked_at_create,
+                "policyBlockReasonCode": outbound_eval.get("policyBlockReasonCode"),
+                "policyBlockReasonMessage": outbound_eval.get("policyBlockReasonMessage"),
+            }
+        execution_mode = "policy_override"
+    flow["executionMode"] = execution_mode
+    flow["status"] = "executing"
+    flow["updatedAt"] = utc_now()
+    _record_pending_transfer_flow(approval_id, flow)
+    _mirror_transfer_approval(flow)
+
+    try:
+        amount_int = int(amount_wei)
+        state, day_key, current_spend, max_daily_wei = _enforce_spend_preconditions(chain, amount_int)
+        transfer_policy = {
+            "outboundTransfersEnabled": bool(outbound_eval.get("outboundTransfersEnabled")),
+            "outboundMode": str(outbound_eval.get("outboundMode") or "disabled"),
+            "outboundWhitelistAddresses": list(outbound_eval.get("outboundWhitelistAddresses") or []),
+            "updatedAt": outbound_eval.get("updatedAt"),
+            "policyBlockedAtCreate": policy_blocked_at_create,
+            "policyBlockReasonCode": flow.get("policyBlockReasonCode") or outbound_eval.get("policyBlockReasonCode"),
+            "policyBlockReasonMessage": flow.get("policyBlockReasonMessage") or outbound_eval.get("policyBlockReasonMessage"),
+            "executionMode": execution_mode,
+        }
+
+        store = load_wallet_store()
+        _, wallet = _chain_wallet(store, chain)
+        if wallet is None:
+            raise WalletStoreError(f"No wallet configured for chain '{chain}'.")
+        _validate_wallet_entry_shape(wallet)
+        passphrase = _require_wallet_passphrase_for_signing(chain)
+        private_key_hex = _decrypt_private_key(wallet, passphrase).hex()
+
+        tx_hash: str
+        if transfer_type == "native":
+            cast_bin = _require_cast_bin()
+            rpc_url = _chain_rpc_url(chain)
+            proc = _run_subprocess(
+                [cast_bin, "send", "--json", "--rpc-url", rpc_url, "--private-key", private_key_hex, to_address, amount_wei],
+                timeout_sec=_cast_send_timeout_sec(),
+                kind="cast_send",
+            )
+            if proc.returncode != 0:
+                stderr = (proc.stderr or "").strip()
+                stdout = (proc.stdout or "").strip()
+                raise WalletStoreError(stderr or stdout or "cast send failed.")
+            tx_hash = _extract_tx_hash(proc.stdout)
+        else:
+            from_address = str(wallet.get("address"))
+            rpc_url = _chain_rpc_url(chain)
+            data = _cast_calldata("transfer(address,uint256)(bool)", [to_address, amount_wei])
+            tx_hash = _cast_rpc_send_transaction(
+                rpc_url,
+                {"from": from_address, "to": str(token_address), "data": data},
+                private_key_hex,
+            )
+            cast_bin = _require_cast_bin()
+            receipt_proc = _run_subprocess(
+                [cast_bin, "receipt", "--json", "--rpc-url", rpc_url, tx_hash],
+                timeout_sec=_cast_receipt_timeout_sec(),
+                kind="cast_receipt",
+            )
+            if receipt_proc.returncode != 0:
+                stderr = (receipt_proc.stderr or "").strip()
+                stdout = (receipt_proc.stdout or "").strip()
+                raise WalletStoreError(stderr or stdout or "cast receipt failed.")
+            receipt_payload = json.loads((receipt_proc.stdout or "{}").strip() or "{}")
+            receipt_status = str(receipt_payload.get("status", "0x0")).lower()
+            if receipt_status not in {"0x1", "1"}:
+                raise WalletStoreError(f"On-chain receipt indicates failure status '{receipt_status}'.")
+
+        _record_spend(state, chain, day_key, current_spend + amount_int)
+        flow["status"] = "filled"
+        flow["txHash"] = tx_hash
+        flow["updatedAt"] = utc_now()
+        flow["terminalAt"] = flow["updatedAt"]
+        _record_pending_transfer_flow(approval_id, flow)
+        _mirror_transfer_approval(flow)
+        _remove_pending_transfer_flow(approval_id)
+        return {
+            "ok": True,
+            "code": "ok",
+            "message": "Transfer executed.",
+            "approvalId": approval_id,
+            "chain": chain,
+            "status": "filled",
+            "transferType": transfer_type,
+            "tokenAddress": token_address,
+            "tokenSymbol": token_symbol,
+            "tokenDecimals": token_decimals,
+            "to": to_address,
+            "amountWei": amount_wei,
+            "amount": amount_human,
+            "amountUnit": amount_unit,
+            "amountDisplay": amount_display,
+            "txHash": tx_hash,
+            "day": day_key,
+            "dailySpendWei": str(current_spend + amount_int),
+            "maxDailyNativeWei": str(max_daily_wei),
+            "transferPolicy": transfer_policy,
+            "policyBlockedAtCreate": policy_blocked_at_create,
+            "policyBlockReasonCode": flow.get("policyBlockReasonCode"),
+            "policyBlockReasonMessage": flow.get("policyBlockReasonMessage"),
+            "executionMode": execution_mode,
+        }
+    except Exception as exc:
+        message = str(exc) or "Transfer execution failed."
+        flow["status"] = "failed"
+        flow["reasonCode"] = "transfer_execution_failed"
+        flow["reasonMessage"] = message
+        flow["updatedAt"] = utc_now()
+        flow["terminalAt"] = flow["updatedAt"]
+        _record_pending_transfer_flow(approval_id, flow)
+        _mirror_transfer_approval(flow)
+        return {
+            "ok": False,
+            "code": "transfer_execution_failed",
+            "message": message,
+            "approvalId": approval_id,
+            "chain": chain,
+            "status": "failed",
+            "transferType": transfer_type,
+            "tokenAddress": token_address,
+            "tokenSymbol": token_symbol,
+            "tokenDecimals": token_decimals,
+            "to": to_address,
+            "amountWei": amount_wei,
+            "amount": amount_human,
+            "amountUnit": amount_unit,
+            "amountDisplay": amount_display,
+            "txHash": flow.get("txHash"),
+            "reasonCode": "transfer_execution_failed",
+            "reasonMessage": message,
+            "policyBlockedAtCreate": policy_blocked_at_create,
+            "policyBlockReasonCode": flow.get("policyBlockReasonCode"),
+            "policyBlockReasonMessage": flow.get("policyBlockReasonMessage"),
+            "executionMode": execution_mode,
+        }
+
+
 def _wait_for_trade_approval(trade_id: str, chain: str, summary: dict[str, Any] | None = None) -> dict[str, Any]:
     # Telegram approval prompts can be delivered either:
     # - inline in the agent's chat response (preferred; no extra prompt message), or
@@ -1604,6 +2151,7 @@ def _wait_for_trade_approval(trade_id: str, chain: str, summary: dict[str, Any] 
                 )
             except Exception:
                 pass
+            _remove_pending_spot_trade_flow(trade_id)
             return trade
         if status == "approval_pending":
             time.sleep(APPROVAL_WAIT_POLL_SEC)
@@ -1624,6 +2172,7 @@ def _wait_for_trade_approval(trade_id: str, chain: str, summary: dict[str, Any] 
                 )
             except Exception:
                 pass
+            _remove_pending_spot_trade_flow(trade_id)
             reason_code = trade.get("reasonCode")
             reason_message = trade.get("reasonMessage")
             raise WalletPolicyError(
@@ -1638,6 +2187,7 @@ def _wait_for_trade_approval(trade_id: str, chain: str, summary: dict[str, Any] 
             except Exception:
                 pass
             _remove_approval_prompt(trade_id)
+            _remove_pending_spot_trade_flow(trade_id)
             raise WalletPolicyError(
                 "approval_expired",
                 "Trade approval has expired.",
@@ -1650,6 +2200,7 @@ def _wait_for_trade_approval(trade_id: str, chain: str, summary: dict[str, Any] 
         except Exception:
             pass
         _remove_approval_prompt(trade_id)
+        _remove_pending_spot_trade_flow(trade_id)
         raise WalletPolicyError(
             "policy_denied",
             f"Trade is not executable from status '{status}'.",
@@ -2050,6 +2601,296 @@ def cmd_approvals_sync(args: argparse.Namespace) -> int:
         return fail("approvals_sync_failed", str(exc), "Verify API auth and OpenClaw availability, then retry.", {"chain": chain}, exit_code=1)
 
 
+def cmd_approvals_resume_spot(args: argparse.Namespace) -> int:
+    chk = require_json_flag(args)
+    if chk is not None:
+        return chk
+    trade_id = str(args.trade_id or "").strip()
+    if not trade_id:
+        return fail("invalid_input", "trade_id is required.", "Provide --trade-id trd_... and retry.", {"tradeId": trade_id}, exit_code=2)
+
+    flow = _get_pending_spot_trade_flow(trade_id) or {}
+    flow_chain = str(flow.get("chainKey") or "").strip()
+    chain = str(args.chain or flow_chain).strip()
+    if not chain:
+        return fail(
+            "invalid_input",
+            "chain is required when no saved spot-flow exists for this trade.",
+            "Provide --chain <chainKey> and retry.",
+            {"tradeId": trade_id},
+            exit_code=2,
+        )
+
+    try:
+        trade = _read_trade_details(trade_id)
+        status = str(trade.get("status") or "")
+        terminal = {"filled", "failed", "rejected", "expired"}
+        non_actionable = {"approval_pending", "proposed", "executing", "verifying"}
+        if status in terminal:
+            _remove_pending_spot_trade_flow(trade_id)
+            return ok(
+                "Spot trade resume skipped: trade already terminal.",
+                tradeId=trade_id,
+                chain=chain,
+                status=status,
+                skipped=True,
+                reason="already_terminal",
+                txHash=trade.get("txHash"),
+                reasonCode=trade.get("reasonCode"),
+                reasonMessage=trade.get("reasonMessage"),
+                flow=flow or None,
+            )
+        if status in non_actionable:
+            if status != "approval_pending":
+                _remove_pending_spot_trade_flow(trade_id)
+            return fail(
+                "not_actionable",
+                f"Spot trade resume is not actionable from status '{status}'.",
+                "Resume only when the trade is approved (or retry-eligible failed).",
+                {"tradeId": trade_id, "chain": chain, "status": status, "flow": flow or None},
+                exit_code=1,
+            )
+
+        nested = argparse.Namespace(intent=trade_id, chain=chain, json=True)
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            code = cmd_trade_execute(nested)
+        raw = buf.getvalue().strip()
+        payload: dict[str, Any] = {"ok": bool(code == 0), "code": "resume_result_unavailable", "message": "Resume result unavailable."}
+        if raw:
+            try:
+                parsed = json.loads(raw)
+                if isinstance(parsed, dict):
+                    payload = parsed
+            except Exception:
+                payload = {"ok": False, "code": "resume_parse_failed", "message": raw[:400]}
+
+        # Enrich with flow context to make deterministic callback reporting easier.
+        if isinstance(payload, dict):
+            payload.setdefault("tradeId", trade_id)
+            payload.setdefault("chain", chain)
+            if flow:
+                payload.setdefault("flowSummary", flow)
+        if code == 0:
+            _remove_pending_spot_trade_flow(trade_id)
+            payload["ok"] = True
+            payload["code"] = "ok"
+            payload["message"] = str(payload.get("message") or "Spot trade resumed and executed.")
+            return emit(payload)
+
+        # Keep flow only if still pending; otherwise clear stale entry.
+        try:
+            latest = _read_trade_details(trade_id)
+            if str(latest.get("status") or "") != "approval_pending":
+                _remove_pending_spot_trade_flow(trade_id)
+        except Exception:
+            pass
+        return emit(payload)
+    except Exception as exc:
+        return fail(
+            "spot_resume_failed",
+            str(exc),
+            "Inspect trade status and runtime execution path, then retry.",
+            {"tradeId": trade_id, "chain": chain, "flow": flow or None},
+            exit_code=1,
+        )
+
+
+def cmd_approvals_resume_transfer(args: argparse.Namespace) -> int:
+    chk = require_json_flag(args)
+    if chk is not None:
+        return chk
+    approval_id = str(args.approval_id or "").strip()
+    if not approval_id:
+        return fail("invalid_input", "approval_id is required.", "Provide --approval-id xfr_... and retry.", exit_code=2)
+    flow = _get_pending_transfer_flow(approval_id)
+    if not flow:
+        return fail(
+            "not_found",
+            "Transfer approval flow was not found.",
+            "Use a pending approval ID from the latest transfer request.",
+            {"approvalId": approval_id},
+            exit_code=1,
+        )
+    chain = str(args.chain or flow.get("chainKey") or "").strip()
+    if not chain:
+        return fail("invalid_input", "chain is required.", "Provide --chain and retry.", {"approvalId": approval_id}, exit_code=2)
+    status = str(flow.get("status") or "")
+    if status in {"filled", "failed", "rejected"}:
+        return ok(
+            "Transfer resume skipped: approval already terminal.",
+            approvalId=approval_id,
+            chain=chain,
+            status=status,
+            txHash=flow.get("txHash"),
+            reasonCode=flow.get("reasonCode"),
+            reasonMessage=flow.get("reasonMessage"),
+            skipped=True,
+        )
+    if status == "approved":
+        return emit(_execute_pending_transfer_flow(flow))
+    return fail(
+        "not_actionable",
+        f"Transfer resume is not actionable from status '{status}'.",
+        "Resume only when transfer approval is approved.",
+        {"approvalId": approval_id, "chain": chain, "status": status},
+        exit_code=1,
+    )
+
+
+def cmd_approvals_decide_transfer(args: argparse.Namespace) -> int:
+    chk = require_json_flag(args)
+    if chk is not None:
+        return chk
+    approval_id = str(args.approval_id or "").strip()
+    decision = str(args.decision or "").strip().lower()
+    if not approval_id:
+        return fail("invalid_input", "approval_id is required.", "Provide --approval-id xfr_... and retry.", exit_code=2)
+    if decision not in {"approve", "deny"}:
+        return fail("invalid_input", "decision must be approve|deny.", "Use --decision approve or --decision deny.", exit_code=2)
+
+    flow = _get_pending_transfer_flow(approval_id)
+    if not flow:
+        return fail(
+            "not_found",
+            "Transfer approval flow was not found.",
+            "Use a pending approval ID from the latest transfer request.",
+            {"approvalId": approval_id},
+            exit_code=1,
+        )
+    status = str(flow.get("status") or "")
+    chain = str(args.chain or flow.get("chainKey") or "").strip()
+    flow_transfer_type = str(flow.get("transferType") or "native").strip().lower()
+    flow_token_symbol = str(flow.get("tokenSymbol") or ("ETH" if flow_transfer_type == "native" else "TOKEN")).strip()
+    flow_token_decimals_raw = flow.get("tokenDecimals", 18 if flow_transfer_type == "native" else None)
+    try:
+        flow_token_decimals = int(flow_token_decimals_raw) if flow_token_decimals_raw is not None else None
+    except Exception:
+        flow_token_decimals = 18 if flow_transfer_type == "native" else None
+    flow_amount_human, flow_amount_unit = _transfer_amount_display(
+        str(flow.get("amountWei") or "0"),
+        flow_transfer_type,
+        flow_token_symbol,
+        flow_token_decimals,
+    )
+    flow_amount_display = f"{flow_amount_human} {flow_amount_unit}"
+    if status in {"filled", "failed", "rejected"}:
+        return ok(
+            "Transfer decision converged on terminal approval.",
+            approvalId=approval_id,
+            chain=chain,
+            status=status,
+            txHash=flow.get("txHash"),
+            reasonCode=flow.get("reasonCode"),
+            reasonMessage=flow.get("reasonMessage"),
+            amountWei=flow.get("amountWei"),
+            amount=flow_amount_human,
+            amountUnit=flow_amount_unit,
+            amountDisplay=flow_amount_display,
+            policyBlockedAtCreate=bool(flow.get("policyBlockedAtCreate", False)),
+            policyBlockReasonCode=flow.get("policyBlockReasonCode"),
+            policyBlockReasonMessage=flow.get("policyBlockReasonMessage"),
+            executionMode=flow.get("executionMode"),
+            converged=True,
+        )
+    if status not in {"approval_pending", "approved"}:
+        return fail(
+            "not_actionable",
+            f"Transfer decision is not actionable from status '{status}'.",
+            "Use a pending transfer approval.",
+            {"approvalId": approval_id, "chain": chain, "status": status},
+            exit_code=1,
+        )
+
+    if decision == "deny":
+        flow["status"] = "rejected"
+        flow["reasonCode"] = "approval_rejected"
+        flow["reasonMessage"] = str(args.reason_message or "Denied via management/telegram").strip()
+        flow["decidedAt"] = utc_now()
+        flow["updatedAt"] = flow["decidedAt"]
+        flow["terminalAt"] = flow["decidedAt"]
+        _record_pending_transfer_flow(approval_id, flow)
+        _mirror_transfer_approval(flow)
+        return ok(
+            "Transfer denied.",
+            approvalId=approval_id,
+            chain=chain,
+            status="rejected",
+            reasonCode=flow.get("reasonCode"),
+            reasonMessage=flow.get("reasonMessage"),
+            transferType=flow.get("transferType"),
+            tokenAddress=flow.get("tokenAddress"),
+            tokenSymbol=flow_token_symbol,
+            tokenDecimals=flow_token_decimals,
+            to=flow.get("toAddress"),
+            amountWei=flow.get("amountWei"),
+            amount=flow_amount_human,
+            amountUnit=flow_amount_unit,
+            amountDisplay=flow_amount_display,
+            policyBlockedAtCreate=bool(flow.get("policyBlockedAtCreate", False)),
+            policyBlockReasonCode=flow.get("policyBlockReasonCode"),
+            policyBlockReasonMessage=flow.get("policyBlockReasonMessage"),
+            executionMode=flow.get("executionMode"),
+        )
+
+    flow["status"] = "approved"
+    flow["decidedAt"] = utc_now()
+    flow["updatedAt"] = flow["decidedAt"]
+    _record_pending_transfer_flow(approval_id, flow)
+    _mirror_transfer_approval(flow)
+    return emit(_execute_pending_transfer_flow(flow))
+
+
+def cmd_transfers_policy_get(args: argparse.Namespace) -> int:
+    chk = require_json_flag(args)
+    if chk is not None:
+        return chk
+    chain = str(args.chain or "").strip()
+    if not chain:
+        return fail("invalid_input", "chain is required.", "Provide --chain and retry.", exit_code=2)
+    policy = _sync_transfer_policy_from_remote(chain)
+    return ok("Transfer approval policy loaded.", chain=chain, transferPolicy=policy)
+
+
+def cmd_transfers_policy_set(args: argparse.Namespace) -> int:
+    chk = require_json_flag(args)
+    if chk is not None:
+        return chk
+    chain = str(args.chain or "").strip()
+    mode = str(args.global_mode or "").strip().lower()
+    if not chain:
+        return fail("invalid_input", "chain is required.", "Provide --chain and retry.", exit_code=2)
+    if mode not in {"auto", "per_transfer"}:
+        return fail("invalid_input", "global mode must be auto|per_transfer.", "Use --global auto|per_transfer.", exit_code=2)
+    native_preapproved = str(args.native_preapproved or "0").strip() in {"1", "true", "yes"}
+    tokens: list[str] = []
+    for token in list(args.allowed_token or []):
+        if not isinstance(token, str):
+            continue
+        normalized = token.strip().lower()
+        if not re.fullmatch(r"0x[a-f0-9]{40}", normalized):
+            return fail(
+                "invalid_input",
+                "allowed-token must be a 0x address.",
+                "Use --allowed-token 0x... for ERC-20 token preapproval.",
+                {"token": token},
+                exit_code=2,
+            )
+        if normalized not in tokens:
+            tokens.append(normalized)
+    policy = _set_transfer_policy(
+        chain,
+        {
+            "transferApprovalMode": mode,
+            "nativeTransferPreapproved": native_preapproved,
+            "allowedTransferTokens": tokens,
+            "updatedAt": utc_now(),
+        },
+    )
+    _mirror_transfer_policy(chain, policy)
+    return ok("Transfer approval policy saved.", chain=chain, transferPolicy=policy)
+
+
 def cmd_approvals_request_token(args: argparse.Namespace) -> int:
     chk = require_json_flag(args)
     if chk is not None:
@@ -2078,7 +2919,7 @@ def cmd_approvals_request_token(args: argparse.Namespace) -> int:
             "/agent/policy-approvals/proposed",
             payload=payload,
             include_idempotency=True,
-            idempotency_key=f"rt-polreq-token-{args.chain}-{_normalize_address(token_address)}",
+            idempotency_key=f"rt-polreq-token-{args.chain}-{_normalize_address(token_address)}-{secrets.token_hex(8)}",
         )
         if status_code < 200 or status_code >= 300:
             return fail(
@@ -2111,7 +2952,8 @@ def cmd_approvals_request_token(args: argparse.Namespace) -> int:
             queuedMessage=queued_message,
             agentInstructions=(
                 "Send queuedMessage verbatim to the owner in the active chat. "
-                "Do not reformat the 'Approval ID:' and 'Status:' lines; Telegram button auto-attach depends on them."
+                "Do not reformat the 'Approval ID:' and 'Status:' lines; Telegram button auto-attach depends on them. "
+                "Use only the Approval ID returned in this command result; never reuse a historical Approval ID from memory/chat."
             ),
         )
     except Exception as exc:
@@ -2135,7 +2977,7 @@ def cmd_approvals_request_global(args: argparse.Namespace) -> int:
             "/agent/policy-approvals/proposed",
             payload=payload,
             include_idempotency=True,
-            idempotency_key=f"rt-polreq-global-{args.chain}",
+            idempotency_key=f"rt-polreq-global-{args.chain}-{secrets.token_hex(8)}",
         )
         if status_code < 200 or status_code >= 300:
             return fail(
@@ -2164,7 +3006,8 @@ def cmd_approvals_request_global(args: argparse.Namespace) -> int:
             queuedMessage=queued_message,
             agentInstructions=(
                 "Send queuedMessage verbatim to the owner in the active chat. "
-                "Do not reformat the 'Approval ID:' and 'Status:' lines; Telegram button auto-attach depends on them."
+                "Do not reformat the 'Approval ID:' and 'Status:' lines; Telegram button auto-attach depends on them. "
+                "Use only the Approval ID returned in this command result; never reuse a historical Approval ID from memory/chat."
             ),
         )
     except Exception as exc:
@@ -2199,7 +3042,7 @@ def cmd_approvals_revoke_token(args: argparse.Namespace) -> int:
             "/agent/policy-approvals/proposed",
             payload=payload,
             include_idempotency=True,
-            idempotency_key=f"rt-polrev-token-{args.chain}-{_normalize_address(token_address)}",
+            idempotency_key=f"rt-polrev-token-{args.chain}-{_normalize_address(token_address)}-{secrets.token_hex(8)}",
         )
         if status_code < 200 or status_code >= 300:
             return fail(
@@ -2232,7 +3075,8 @@ def cmd_approvals_revoke_token(args: argparse.Namespace) -> int:
             queuedMessage=queued_message,
             agentInstructions=(
                 "Send queuedMessage verbatim to the owner in the active chat. "
-                "Do not reformat the 'Approval ID:' and 'Status:' lines; Telegram button auto-attach depends on them."
+                "Do not reformat the 'Approval ID:' and 'Status:' lines; Telegram button auto-attach depends on them. "
+                "Use only the Approval ID returned in this command result; never reuse a historical Approval ID from memory/chat."
             ),
         )
     except Exception as exc:
@@ -2256,7 +3100,7 @@ def cmd_approvals_revoke_global(args: argparse.Namespace) -> int:
             "/agent/policy-approvals/proposed",
             payload=payload,
             include_idempotency=True,
-            idempotency_key=f"rt-polrev-global-{args.chain}",
+            idempotency_key=f"rt-polrev-global-{args.chain}-{secrets.token_hex(8)}",
         )
         if status_code < 200 or status_code >= 300:
             return fail(
@@ -2285,7 +3129,8 @@ def cmd_approvals_revoke_global(args: argparse.Namespace) -> int:
             queuedMessage=queued_message,
             agentInstructions=(
                 "Send queuedMessage verbatim to the owner in the active chat. "
-                "Do not reformat the 'Approval ID:' and 'Status:' lines; Telegram button auto-attach depends on them."
+                "Do not reformat the 'Approval ID:' and 'Status:' lines; Telegram button auto-attach depends on them. "
+                "Use only the Approval ID returned in this command result; never reuse a historical Approval ID from memory/chat."
             ),
         )
     except Exception as exc:
@@ -2744,6 +3589,21 @@ def cmd_trade_spot(args: argparse.Namespace) -> int:
                 if status == "approval_pending":
                     trade_id = existing_trade_id
                     summary["tradeId"] = trade_id
+                    _record_pending_spot_trade_flow(
+                        trade_id,
+                        {
+                            "tradeId": trade_id,
+                            "chainKey": chain,
+                            "tokenIn": token_in.lower(),
+                            "tokenOut": token_out.lower(),
+                            "tokenInSymbol": str(token_in_meta.get("symbol") or "").strip() or str(token_in),
+                            "tokenOutSymbol": str(token_out_meta.get("symbol") or "").strip() or str(token_out),
+                            "amountInHuman": _normalize_amount_human_text(amount_in_for_server),
+                            "slippageBps": slippage_bps,
+                            "source": "trade_spot_existing_pending",
+                            "createdAt": utc_now(),
+                        },
+                    )
                     _wait_for_trade_approval(trade_id, chain, summary)
                     _remove_pending_trade_intent(intent_key)
                 else:
@@ -2779,6 +3639,21 @@ def cmd_trade_spot(args: argparse.Namespace) -> int:
                         "slippageBps": slippage_bps,
                         "createdAt": utc_now(),
                         "lastSeenStatus": proposed_status,
+                    },
+                )
+                _record_pending_spot_trade_flow(
+                    trade_id,
+                    {
+                        "tradeId": trade_id,
+                        "chainKey": chain,
+                        "tokenIn": token_in.lower(),
+                        "tokenOut": token_out.lower(),
+                        "tokenInSymbol": str(token_in_meta.get("symbol") or "").strip() or str(token_in),
+                        "tokenOutSymbol": str(token_out_meta.get("symbol") or "").strip() or str(token_out),
+                        "amountInHuman": _normalize_amount_human_text(amount_in_for_server),
+                        "slippageBps": slippage_bps,
+                        "source": "trade_spot_proposed_pending",
+                        "createdAt": utc_now(),
                     },
                 )
                 _wait_for_trade_approval(trade_id, chain, summary)
@@ -2892,6 +3767,7 @@ def cmd_trade_spot(args: argparse.Namespace) -> int:
         except Exception:
             pass
         _post_trade_status(trade_id, "verifying", "filled", {"txHash": tx_hash})
+        _remove_pending_spot_trade_flow(trade_id)
 
         def _parse_receipt_uint(field: str, payload: dict[str, Any]) -> int | None:
             value = payload.get(field)
@@ -2977,6 +3853,7 @@ def cmd_trade_spot(args: argparse.Namespace) -> int:
             try:
                 from_status = "executing" if transition_state == "executing" else "verifying"
                 _post_trade_status(trade_id, from_status, "failed", {"reasonCode": "verification_timeout", "reasonMessage": str(exc), "txHash": last_tx_hash})
+                _remove_pending_spot_trade_flow(trade_id)
             except Exception:
                 pass
         if exc.kind == "cast_receipt":
@@ -2999,6 +3876,7 @@ def cmd_trade_spot(args: argparse.Namespace) -> int:
             try:
                 from_status = "executing" if transition_state == "executing" else "verifying"
                 _post_trade_status(trade_id, from_status, "failed", {"reasonCode": "policy_denied", "reasonMessage": str(exc), "txHash": last_tx_hash})
+                _remove_pending_spot_trade_flow(trade_id)
             except Exception:
                 pass
         return fail(exc.code, str(exc), exc.action_hint, exc.details, exit_code=1)
@@ -3016,6 +3894,7 @@ def cmd_trade_spot(args: argparse.Namespace) -> int:
             try:
                 from_status = "executing" if transition_state == "executing" else "verifying"
                 _post_trade_status(trade_id, from_status, "failed", {"reasonCode": "rpc_unavailable", "reasonMessage": msg, "txHash": last_tx_hash})
+                _remove_pending_spot_trade_flow(trade_id)
             except Exception:
                 pass
         return fail("trade_spot_failed", msg, "Verify wallet, RPC, token addresses, and retry.", {"chain": chain}, exit_code=1)
@@ -4841,49 +5720,75 @@ def cmd_wallet_send(args: argparse.Namespace) -> int:
     chain = args.chain
     amount_wei = int(args.amount_wei)
     try:
-        store = load_wallet_store()
-        _, wallet = _chain_wallet(store, chain)
-        if wallet is None:
+        _enforce_spend_preconditions(chain, amount_wei)
+        outbound_eval = _evaluate_outbound_transfer_policy(chain, args.to)
+
+        approval_required, transfer_policy = _transfer_requires_approval(chain, "native", None)
+        amount_human, amount_unit = _transfer_amount_display(str(args.amount_wei), "native", "ETH", 18)
+        amount_display = f"{amount_human} {amount_unit}"
+        if not bool(outbound_eval.get("allowed")):
+            approval_required = True
+        approval_id = _make_transfer_approval_id()
+        flow = {
+            "approvalId": approval_id,
+            "chainKey": chain,
+            "status": "approval_pending" if approval_required else "approved",
+            "transferType": "native",
+            "tokenAddress": None,
+            "tokenSymbol": "ETH",
+            "tokenDecimals": 18,
+            "toAddress": args.to.lower(),
+            "amountWei": str(args.amount_wei),
+            "reasonCode": None,
+            "reasonMessage": None,
+            "createdAt": utc_now(),
+            "updatedAt": utc_now(),
+            "transferPolicy": transfer_policy,
+            "policyBlockedAtCreate": bool(outbound_eval.get("policyBlockedAtCreate", False)),
+            "policyBlockReasonCode": outbound_eval.get("policyBlockReasonCode"),
+            "policyBlockReasonMessage": outbound_eval.get("policyBlockReasonMessage"),
+            "executionMode": None,
+        }
+        _record_pending_transfer_flow(approval_id, flow)
+        _mirror_transfer_approval(flow)
+
+        if approval_required:
+            queued_message = (
+                "Approval required (transfer)\n\n"
+                "Request: Send native token\n"
+                f"Amount: {amount_display} ({args.amount_wei} wei)\n"
+                f"To: {args.to.lower()}\n"
+                f"Chain: {chain}\n"
+                f"Approval ID: {approval_id}\n"
+                "Status: approval_pending\n\n"
+                "Tap Approve or Deny."
+            )
+            if bool(outbound_eval.get("policyBlockedAtCreate")):
+                queued_message += (
+                    f"\n\nPolicy blocked at create: {str(outbound_eval.get('policyBlockReasonCode') or 'unknown')}"
+                    "\nApprove to execute this transfer as a one-off override."
+                )
             return fail(
-                "wallet_missing",
-                f"No wallet configured for chain '{chain}'.",
-                "Run hosted bootstrap installer to initialize wallet.",
-                {"chain": chain},
+                "approval_required",
+                "Transfer is waiting for management approval.",
+                "Send queuedMessage verbatim so Telegram buttons can attach, then wait for Approve/Deny.",
+                {
+                    "approvalId": approval_id,
+                    "chain": chain,
+                    "status": "approval_pending",
+                    "queuedMessage": queued_message,
+                    "amount": amount_human,
+                    "amountUnit": amount_unit,
+                    "amountDisplay": amount_display,
+                    "nextAction": "Post queuedMessage verbatim to the user in the active chat.",
+                    "policyBlockedAtCreate": bool(outbound_eval.get("policyBlockedAtCreate", False)),
+                    "policyBlockReasonCode": outbound_eval.get("policyBlockReasonCode"),
+                    "policyBlockReasonMessage": outbound_eval.get("policyBlockReasonMessage"),
+                },
                 exit_code=1,
             )
-        _validate_wallet_entry_shape(wallet)
 
-        state, day_key, current_spend, max_daily_wei = _enforce_spend_preconditions(chain, amount_wei)
-        transfer_policy = _enforce_outbound_transfer_policy(chain, args.to)
-        passphrase = _require_wallet_passphrase_for_signing(chain)
-        private_key_hex = _decrypt_private_key(wallet, passphrase).hex()
-        cast_bin = _require_cast_bin()
-        rpc_url = _chain_rpc_url(chain)
-
-        proc = _run_subprocess(
-            [cast_bin, "send", "--json", "--rpc-url", rpc_url, "--private-key", private_key_hex, args.to, args.amount_wei],
-            timeout_sec=_cast_send_timeout_sec(),
-            kind="cast_send",
-        )
-        if proc.returncode != 0:
-            stderr = (proc.stderr or "").strip()
-            stdout = (proc.stdout or "").strip()
-            raise WalletStoreError(stderr or stdout or "cast send failed.")
-
-        tx_hash = _extract_tx_hash(proc.stdout)
-        _record_spend(state, chain, day_key, current_spend + amount_wei)
-
-        return ok(
-            "Wallet send executed.",
-            chain=chain,
-            to=args.to,
-            amountWei=args.amount_wei,
-            txHash=tx_hash,
-            day=day_key,
-            dailySpendWei=str(current_spend + amount_wei),
-            maxDailyNativeWei=str(max_daily_wei),
-            transferPolicy=transfer_policy,
-        )
+        return emit(_execute_pending_transfer_flow(flow))
     except WalletPolicyError as exc:
         return fail(exc.code, str(exc), exc.action_hint, exc.details, exit_code=1)
     except WalletPassphraseError as exc:
@@ -4921,63 +5826,82 @@ def cmd_wallet_send_token(args: argparse.Namespace) -> int:
     chain = args.chain
     amount_wei = int(args.amount_wei)
     try:
-        store = load_wallet_store()
-        _, wallet = _chain_wallet(store, chain)
-        if wallet is None:
+        _enforce_spend_preconditions(chain, amount_wei)
+        outbound_eval = _evaluate_outbound_transfer_policy(chain, args.to)
+
+        token_meta = _fetch_erc20_metadata(chain, args.token)
+        token_symbol = str(token_meta.get("symbol") or "").strip() or "TOKEN"
+        try:
+            token_decimals = int(token_meta.get("decimals", 18))
+        except Exception:
+            token_decimals = 18
+        amount_human, amount_unit = _transfer_amount_display(str(args.amount_wei), "token", token_symbol, token_decimals)
+        amount_display = f"{amount_human} {amount_unit}"
+        approval_required, transfer_policy = _transfer_requires_approval(chain, "token", args.token)
+        if not bool(outbound_eval.get("allowed")):
+            approval_required = True
+        approval_id = _make_transfer_approval_id()
+        flow = {
+            "approvalId": approval_id,
+            "chainKey": chain,
+            "status": "approval_pending" if approval_required else "approved",
+            "transferType": "token",
+            "tokenAddress": args.token.lower(),
+            "tokenSymbol": token_symbol,
+            "tokenDecimals": token_decimals,
+            "toAddress": args.to.lower(),
+            "amountWei": str(args.amount_wei),
+            "reasonCode": None,
+            "reasonMessage": None,
+            "createdAt": utc_now(),
+            "updatedAt": utc_now(),
+            "transferPolicy": transfer_policy,
+            "policyBlockedAtCreate": bool(outbound_eval.get("policyBlockedAtCreate", False)),
+            "policyBlockReasonCode": outbound_eval.get("policyBlockReasonCode"),
+            "policyBlockReasonMessage": outbound_eval.get("policyBlockReasonMessage"),
+            "executionMode": None,
+        }
+        _record_pending_transfer_flow(approval_id, flow)
+        _mirror_transfer_approval(flow)
+
+        if approval_required:
+            queued_message = (
+                "Approval required (transfer)\n\n"
+                "Request: Send token\n"
+                f"Token: {token_symbol} ({args.token.lower()})\n"
+                f"Amount: {amount_display} ({args.amount_wei} wei)\n"
+                f"To: {args.to.lower()}\n"
+                f"Chain: {chain}\n"
+                f"Approval ID: {approval_id}\n"
+                "Status: approval_pending\n\n"
+                "Tap Approve or Deny."
+            )
+            if bool(outbound_eval.get("policyBlockedAtCreate")):
+                queued_message += (
+                    f"\n\nPolicy blocked at create: {str(outbound_eval.get('policyBlockReasonCode') or 'unknown')}"
+                    "\nApprove to execute this transfer as a one-off override."
+                )
             return fail(
-                "wallet_missing",
-                f"No wallet configured for chain '{chain}'.",
-                "Run hosted bootstrap installer to initialize wallet.",
-                {"chain": chain},
+                "approval_required",
+                "Transfer is waiting for management approval.",
+                "Send queuedMessage verbatim so Telegram buttons can attach, then wait for Approve/Deny.",
+                {
+                    "approvalId": approval_id,
+                    "chain": chain,
+                    "status": "approval_pending",
+                    "queuedMessage": queued_message,
+                    "amount": amount_human,
+                    "amountUnit": amount_unit,
+                    "amountDisplay": amount_display,
+                    "nextAction": "Post queuedMessage verbatim to the user in the active chat.",
+                    "policyBlockedAtCreate": bool(outbound_eval.get("policyBlockedAtCreate", False)),
+                    "policyBlockReasonCode": outbound_eval.get("policyBlockReasonCode"),
+                    "policyBlockReasonMessage": outbound_eval.get("policyBlockReasonMessage"),
+                },
                 exit_code=1,
             )
-        _validate_wallet_entry_shape(wallet)
 
-        state, day_key, current_spend, max_daily_wei = _enforce_spend_preconditions(chain, amount_wei)
-        transfer_policy = _enforce_outbound_transfer_policy(chain, args.to)
-        passphrase = _require_wallet_passphrase_for_signing(chain)
-        private_key_hex = _decrypt_private_key(wallet, passphrase).hex()
-        from_address = str(wallet.get("address"))
-        rpc_url = _chain_rpc_url(chain)
-        data = _cast_calldata("transfer(address,uint256)(bool)", [args.to, args.amount_wei])
-
-        tx_hash = _cast_rpc_send_transaction(
-            rpc_url,
-            {
-                "from": from_address,
-                "to": args.token,
-                "data": data,
-            },
-            private_key_hex,
-        )
-        cast_bin = _require_cast_bin()
-        receipt_proc = _run_subprocess(
-            [cast_bin, "receipt", "--json", "--rpc-url", rpc_url, tx_hash],
-            timeout_sec=_cast_receipt_timeout_sec(),
-            kind="cast_receipt",
-        )
-        if receipt_proc.returncode != 0:
-            stderr = (receipt_proc.stderr or "").strip()
-            stdout = (receipt_proc.stdout or "").strip()
-            raise WalletStoreError(stderr or stdout or "cast receipt failed.")
-        receipt_payload = json.loads((receipt_proc.stdout or "{}").strip() or "{}")
-        receipt_status = str(receipt_payload.get("status", "0x0")).lower()
-        if receipt_status not in {"0x1", "1"}:
-            raise WalletStoreError(f"On-chain receipt indicates failure status '{receipt_status}'.")
-
-        _record_spend(state, chain, day_key, current_spend + amount_wei)
-        return ok(
-            "Wallet token transfer executed.",
-            chain=chain,
-            token=args.token,
-            to=args.to,
-            amountWei=args.amount_wei,
-            txHash=tx_hash,
-            day=day_key,
-            dailySpendWei=str(current_spend + amount_wei),
-            maxDailyNativeWei=str(max_daily_wei),
-            transferPolicy=transfer_policy,
-        )
+        return emit(_execute_pending_transfer_flow(flow))
     except WalletPolicyError as exc:
         return fail(exc.code, str(exc), exc.action_hint, exc.details, exit_code=1)
     except WalletPassphraseError as exc:
@@ -5166,6 +6090,26 @@ def build_parser() -> argparse.ArgumentParser:
     approvals_sync.add_argument("--json", action="store_true")
     approvals_sync.set_defaults(func=cmd_approvals_sync)
 
+    approvals_resume_spot = approvals_sub.add_parser("resume-spot")
+    approvals_resume_spot.add_argument("--trade-id", required=True)
+    approvals_resume_spot.add_argument("--chain")
+    approvals_resume_spot.add_argument("--json", action="store_true")
+    approvals_resume_spot.set_defaults(func=cmd_approvals_resume_spot)
+
+    approvals_resume_transfer = approvals_sub.add_parser("resume-transfer")
+    approvals_resume_transfer.add_argument("--approval-id", required=True)
+    approvals_resume_transfer.add_argument("--chain")
+    approvals_resume_transfer.add_argument("--json", action="store_true")
+    approvals_resume_transfer.set_defaults(func=cmd_approvals_resume_transfer)
+
+    approvals_decide_transfer = approvals_sub.add_parser("decide-transfer")
+    approvals_decide_transfer.add_argument("--approval-id", required=True)
+    approvals_decide_transfer.add_argument("--decision", required=True, choices=["approve", "deny"])
+    approvals_decide_transfer.add_argument("--reason-message")
+    approvals_decide_transfer.add_argument("--chain")
+    approvals_decide_transfer.add_argument("--json", action="store_true")
+    approvals_decide_transfer.set_defaults(func=cmd_approvals_decide_transfer)
+
     approvals_req_token = approvals_sub.add_parser("request-token")
     approvals_req_token.add_argument("--chain", required=True)
     approvals_req_token.add_argument("--token", required=True)
@@ -5206,6 +6150,22 @@ def build_parser() -> argparse.ArgumentParser:
     trade_spot.add_argument("--deadline-sec", default=120)
     trade_spot.add_argument("--json", action="store_true")
     trade_spot.set_defaults(func=cmd_trade_spot)
+
+    transfers = sub.add_parser("transfers")
+    transfers_sub = transfers.add_subparsers(dest="transfers_cmd")
+
+    transfers_policy_get = transfers_sub.add_parser("policy-get")
+    transfers_policy_get.add_argument("--chain", required=True)
+    transfers_policy_get.add_argument("--json", action="store_true")
+    transfers_policy_get.set_defaults(func=cmd_transfers_policy_get)
+
+    transfers_policy_set = transfers_sub.add_parser("policy-set")
+    transfers_policy_set.add_argument("--chain", required=True)
+    transfers_policy_set.add_argument("--global", dest="global_mode", required=True, choices=["auto", "per_transfer"])
+    transfers_policy_set.add_argument("--native-preapproved", default="0")
+    transfers_policy_set.add_argument("--allowed-token", action="append", default=[])
+    transfers_policy_set.add_argument("--json", action="store_true")
+    transfers_policy_set.set_defaults(func=cmd_transfers_policy_set)
 
     report = sub.add_parser("report")
     report_sub = report.add_subparsers(dest="report_cmd")

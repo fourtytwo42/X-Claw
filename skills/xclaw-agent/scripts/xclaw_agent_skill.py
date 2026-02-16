@@ -208,7 +208,7 @@ def main(argv: List[str]) -> int:
         return _err(
             "usage",
             "Missing command.",
-            "Use one of: status, dashboard, intents-poll, approval-check, trade-exec, trade-spot, report-send, chat-poll, chat-post, username-set, owner-link, faucet-request, limit-orders-create, limit-orders-cancel, limit-orders-list, limit-orders-run-once, limit-orders-run-loop, wallet-health, wallet-address, wallet-sign-challenge, wallet-send, wallet-send-token, wallet-balance, wallet-token-balance",
+            "Use one of: status, dashboard, intents-poll, approval-check, trade-exec, trade-spot, trade-resume, transfer-resume, transfer-decide, transfer-policy-get, transfer-policy-set, report-send, chat-poll, chat-post, username-set, owner-link, faucet-request, limit-orders-create, limit-orders-cancel, limit-orders-list, limit-orders-run-once, limit-orders-run-loop, wallet-health, wallet-address, wallet-sign-challenge, wallet-send, wallet-send-token, wallet-balance, wallet-token-balance",
             exit_code=2,
         )
 
@@ -225,6 +225,11 @@ def main(argv: List[str]) -> int:
         "policy-revoke-all",
         "trade-exec",
         "trade-spot",
+        "trade-resume",
+        "transfer-resume",
+        "transfer-decide",
+        "transfer-policy-get",
+        "transfer-policy-set",
         "report-send",
         "chat-poll",
         "chat-post",
@@ -346,6 +351,61 @@ def main(argv: List[str]) -> int:
                 "--json",
             ]
         )
+
+    if cmd == "trade-resume":
+        if len(argv) < 3:
+            return _err("usage", "trade-resume requires <trade_id>", "usage: trade-resume <trade_id>", exit_code=2)
+        trade_id = argv[2].strip()
+        if not trade_id:
+            return _err("invalid_input", "trade_id cannot be empty.", "usage: trade-resume <trade_id>", exit_code=2)
+        return _run_agent(["approvals", "resume-spot", "--trade-id", trade_id, "--chain", chain, "--json"])
+
+    if cmd == "transfer-resume":
+        if len(argv) < 3:
+            return _err("usage", "transfer-resume requires <approval_id>", "usage: transfer-resume <approval_id>", exit_code=2)
+        approval_id = argv[2].strip()
+        if not approval_id:
+            return _err("invalid_input", "approval_id cannot be empty.", "usage: transfer-resume <approval_id>", exit_code=2)
+        return _run_agent(["approvals", "resume-transfer", "--approval-id", approval_id, "--chain", chain, "--json"])
+
+    if cmd == "transfer-decide":
+        if len(argv) < 4:
+            return _err(
+                "usage",
+                "transfer-decide requires <approval_id> <approve|deny>",
+                "usage: transfer-decide <approval_id> <approve|deny>",
+                exit_code=2,
+            )
+        approval_id = argv[2].strip()
+        decision = argv[3].strip().lower()
+        if not approval_id:
+            return _err("invalid_input", "approval_id cannot be empty.", "usage: transfer-decide <approval_id> <approve|deny>", exit_code=2)
+        if decision not in {"approve", "deny"}:
+            return _err("invalid_input", "decision must be approve or deny.", "usage: transfer-decide <approval_id> <approve|deny>", exit_code=2)
+        return _run_agent(["approvals", "decide-transfer", "--approval-id", approval_id, "--decision", decision, "--chain", chain, "--json"])
+
+    if cmd == "transfer-policy-get":
+        return _run_agent(["transfers", "policy-get", "--chain", chain, "--json"])
+
+    if cmd == "transfer-policy-set":
+        if len(argv) < 4:
+            return _err(
+                "usage",
+                "transfer-policy-set requires <auto|per_transfer> <native_preapproved:0|1> [allowed_token ...]",
+                "usage: transfer-policy-set <auto|per_transfer> <native_preapproved:0|1> [allowed_token ...]",
+                exit_code=2,
+            )
+        mode = argv[2].strip().lower()
+        native_preapproved = argv[3].strip()
+        if mode not in {"auto", "per_transfer"}:
+            return _err("invalid_input", "mode must be auto or per_transfer.", exit_code=2)
+        if native_preapproved not in {"0", "1"}:
+            return _err("invalid_input", "native_preapproved must be 0 or 1.", exit_code=2)
+        args = ["transfers", "policy-set", "--chain", chain, "--global", mode, "--native-preapproved", native_preapproved]
+        for token in argv[4:]:
+            args.extend(["--allowed-token", token])
+        args.append("--json")
+        return _run_agent(args)
 
     if cmd == "report-send":
         if len(argv) < 3:
@@ -535,7 +595,7 @@ def main(argv: List[str]) -> int:
         return _err(
             "unknown_command",
             f"Unknown command: {cmd}",
-            "Use one of: status, dashboard, intents-poll, approval-check, trade-exec, report-send, chat-poll, chat-post, username-set, owner-link, faucet-request, limit-orders-create, limit-orders-cancel, limit-orders-list, limit-orders-run-once, limit-orders-run-loop, wallet-health, wallet-address, wallet-sign-challenge, wallet-send, wallet-send-token, wallet-balance, wallet-token-balance",
+            "Use one of: status, dashboard, intents-poll, approval-check, trade-exec, trade-spot, trade-resume, transfer-resume, transfer-decide, transfer-policy-get, transfer-policy-set, report-send, chat-poll, chat-post, username-set, owner-link, faucet-request, limit-orders-create, limit-orders-cancel, limit-orders-list, limit-orders-run-once, limit-orders-run-loop, wallet-health, wallet-address, wallet-sign-challenge, wallet-send, wallet-send-token, wallet-balance, wallet-token-balance",
             exit_code=2,
         )
 

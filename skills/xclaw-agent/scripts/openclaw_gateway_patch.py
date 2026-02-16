@@ -35,13 +35,19 @@ DECISION_ACK_MARKER_V4 = "xclaw: telegram approval decision ack v4"
 DECISION_ACK_MARKER_V5 = "xclaw: telegram approval decision ack v5"
 DECISION_ACK_MARKER_V6 = "xclaw: telegram approval decision ack v6"
 DECISION_ACK_MARKER_V7 = "xclaw: telegram approval decision ack v7"
+DECISION_ACK_MARKER_V8 = "xclaw: telegram approval decision ack v8"
+DECISION_ACK_MARKER_V9 = "xclaw: telegram approval decision ack v9"
+DECISION_ACK_MARKER_V10 = "xclaw: telegram approval decision ack v10"
+DECISION_ACK_MARKER_V11 = "xclaw: telegram approval decision ack v11"
 DECISION_ROUTE_MARKER_V1 = "xclaw: telegram approval decision routed to agent"
+DECISION_EXEC_MARKER_V1 = "xclaw: telegram trade resume trigger v1"
+DECISION_RESULT_ROUTE_MARKER_V1 = "xclaw: telegram trade result routed to agent"
 QUEUED_BUTTONS_MARKER = "xclaw: telegram queued approval buttons"
 QUEUED_BUTTONS_MARKER_V2 = "xclaw: telegram queued approval buttons v2"
 QUEUED_BUTTONS_MARKER_V3 = "xclaw: telegram queued approval buttons v3"
 LEGACY_DM_SENTINEL = 'Allow in DMs even when inlineButtonsScope is "allowlist", gated by chatId == senderId.'
 # Bump when patch semantics change so we invalidate the cached "already patched" fast-path.
-STATE_SCHEMA_VERSION = 29
+STATE_SCHEMA_VERSION = 40
 STATE_DIR = Path.home() / ".openclaw" / "xclaw"
 STATE_FILE = STATE_DIR / "openclaw_patch_state.json"
 LOCK_FILE = STATE_DIR / "openclaw_patch.lock"
@@ -272,7 +278,14 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         or DECISION_ACK_MARKER_V5 not in raw
         or DECISION_ACK_MARKER_V6 not in raw
         or DECISION_ACK_MARKER_V7 not in raw
+        or DECISION_ACK_MARKER_V8 not in raw
+        or DECISION_ACK_MARKER_V9 not in raw
+        or DECISION_ACK_MARKER_V10 not in raw
+        or DECISION_ACK_MARKER_V11 not in raw
         or DECISION_ROUTE_MARKER_V1 not in raw
+        or DECISION_EXEC_MARKER_V1 not in raw
+        or DECISION_RESULT_ROUTE_MARKER_V1 not in raw
+        or "xfer|" not in raw
     ):
         idx = raw.find(PAGINATION_ANCHOR)
         if idx < 0:
@@ -289,8 +302,15 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         or DECISION_ACK_MARKER_V5 not in raw
         or DECISION_ACK_MARKER_V6 not in raw
         or DECISION_ACK_MARKER_V7 not in raw
+        or DECISION_ACK_MARKER_V8 not in raw
+        or DECISION_ACK_MARKER_V9 not in raw
+        or DECISION_ACK_MARKER_V10 not in raw
+        or DECISION_ACK_MARKER_V11 not in raw
         or DECISION_ROUTE_MARKER_V1 not in raw
+        or DECISION_EXEC_MARKER_V1 not in raw
+        or DECISION_RESULT_ROUTE_MARKER_V1 not in raw
         or "xpol|" not in raw
+        or "xfer|" not in raw
     ):
         idx = raw.find(PAGINATION_ANCHOR)
         if idx < 0:
@@ -300,6 +320,54 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
             raw = raw[:start] + raw[idx:]
             normalized = True
 
+    def _upgrade_spawn_env(text: str) -> tuple[str, bool]:
+        changed = False
+        text, n_transfer = re.subn(
+            r'const child = childMod\.spawn\(runtimeBin, \["approvals", "decide-transfer", [^\n]*\{ stdio: \["ignore", "pipe", "pipe"\] \}\);',
+            'const childEnv = { ...process.env, ...Object.fromEntries(Object.entries(env || {}).map(([k, v]) => [String(k), String(v)])) }; const child = childMod.spawn(runtimeBin, ["approvals", "decide-transfer", "--approval-id", subjectId, "--decision", decision, "--chain", chainKey, "--reason-message", action === "r" ? "Denied via Telegram" : "", "--json"], { stdio: ["ignore", "pipe", "pipe"], env: childEnv });',
+            text,
+        )
+        text, n_trade = re.subn(
+            r'const child = childMod\.spawn\(runtimeBin, \["approvals", "resume-spot", [^\n]*\{ stdio: \["ignore", "pipe", "pipe"\] \}\);',
+            'const childEnv = { ...process.env, ...Object.fromEntries(Object.entries(env || {}).map(([k, v]) => [String(k), String(v)])) }; const child = childMod.spawn(runtimeBin, ["approvals", "resume-spot", "--trade-id", subjectId, "--chain", chainKey, "--json"], { stdio: ["ignore", "pipe", "pipe"], env: childEnv });',
+            text,
+        )
+        changed = (n_transfer > 0) or (n_trade > 0)
+        return text, changed
+
+    def _upgrade_transfer_result_routing(text: str) -> tuple[str, bool]:
+        text2, n = re.subn(
+            r'const decisionWord = body\?\.ok \? "FILLED" : "FAILED";\s*const instruction = body\?\.ok \? "Reply to the user confirming the transfer succeeded with tx details\." : "Reply to the user confirming the transfer failed and provide next steps\.";',
+            'const transferStatus = String(body?.status ?? (body?.ok ? "filled" : "failed")).toLowerCase(); const isRejected = transferStatus === "rejected"; const isFilled = transferStatus === "filled"; const decisionWord = isFilled ? "FILLED" : (isRejected ? "REJECTED" : "FAILED"); const instruction = isFilled ? "Reply to the user confirming the transfer succeeded with tx details." : (isRejected ? "Reply to the user confirming the transfer was denied and no transaction was executed." : "Reply to the user confirming the transfer failed and provide next steps.");',
+            text,
+        )
+        text3, n2 = re.subn(
+            r'const amountWei = String\(body\?\.amountWei \?\? "\?"\);\s*const toAddress = String\(body\?\.to \?\? "\?"\);',
+            'const amountWei = String(body?.amountWei ?? "?"); const amountDisplay = String(body?.amountDisplay ?? "").trim(); const toAddress = String(body?.to ?? "?");',
+            text2,
+        )
+        text4, n3 = re.subn(
+            r'const finalMsg = `\$\{head\}\\n\$\{amountWei\} \$\{tokenSymbol\}\\nTo: \$\{toAddress\}\\nApproval: \$\{subjectId\}\\nChain: \$\{chainKey\}\$\{modeLine\}\$\{txLine\}\$\{reasonLine\}`;',
+            'const amountLine = amountDisplay ? amountDisplay : `${amountWei} ${tokenSymbol}`; const finalMsg = `${head}\\n${amountLine}\\nTo: ${toAddress}\\nApproval: ${subjectId}\\nChain: ${chainKey}${modeLine}${txLine}${reasonLine}`;',
+            text3,
+        )
+        text5, n4 = re.subn(
+            r'AmountWei: \$\{amountWei\}\\nToken: \$\{tokenSymbol\}',
+            'Amount: ${amountDisplay || `${amountWei} ${tokenSymbol}`}\\nAmountWei: ${amountWei}\\nToken: ${tokenSymbol}',
+            text4,
+        )
+        text6, n5 = re.subn(
+            r'const amountLine = amountDisplay \? amountDisplay : `\$\{amountWei\} \$\{tokenSymbol\}`;',
+            'let normalizedAmount = ""; if (!amountDisplay && /^[0-9]+$/.test(amountWei)) { const tokenDecimalsRaw = Number(body?.tokenDecimals); const tokenDecimals = Number.isFinite(tokenDecimalsRaw) && tokenDecimalsRaw >= 0 ? Math.floor(tokenDecimalsRaw) : 18; if (tokenDecimals <= 36) { const s = String(BigInt(amountWei)); const padded = s.length <= tokenDecimals ? s.padStart(tokenDecimals + 1, "0") : s; const whole = tokenDecimals > 0 ? padded.slice(0, -tokenDecimals) : padded; const fracRaw = tokenDecimals > 0 ? padded.slice(-tokenDecimals) : ""; const frac = fracRaw.replace(/0+$/, ""); normalizedAmount = frac ? `${whole}.${frac} ${tokenSymbol}` : `${whole} ${tokenSymbol}`; } } const amountLine = amountDisplay ? amountDisplay : (normalizedAmount || `${amountWei} ${tokenSymbol}`);',
+            text5,
+        )
+        text7, n6 = re.subn(
+            r'Amount: \$\{amountDisplay \|\| `\$\{amountWei\} \$\{tokenSymbol\}`\}',
+            'Amount: ${amountLine}',
+            text6,
+        )
+        return text7, (n > 0) or (n2 > 0) or (n3 > 0) or (n4 > 0) or (n5 > 0) or (n6 > 0)
+
     if (
         MARKER in raw
         and DECISION_ACK_MARKER_V3 in raw
@@ -307,10 +375,21 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         and DECISION_ACK_MARKER_V5 in raw
         and DECISION_ACK_MARKER_V6 in raw
         and DECISION_ACK_MARKER_V7 in raw
+        and DECISION_ACK_MARKER_V8 in raw
+        and DECISION_ACK_MARKER_V9 in raw
+        and DECISION_ACK_MARKER_V10 in raw
+        and DECISION_ACK_MARKER_V11 in raw
         and DECISION_ROUTE_MARKER_V1 in raw
+        and DECISION_EXEC_MARKER_V1 in raw
+        and DECISION_RESULT_ROUTE_MARKER_V1 in raw
         and "xpol|" in raw
+        and "xfer|" in raw
     ):
         changed_any = False
+        raw, changed_spawn = _upgrade_spawn_env(raw)
+        changed_any = changed_any or changed_spawn
+        raw, changed_route = _upgrade_transfer_result_routing(raw)
+        changed_any = changed_any or changed_route
         if QUEUED_BUTTONS_MARKER not in raw:
             raw2, changed2, err2 = _patch_queued_buttons(raw)
             if not err2:
@@ -335,10 +414,11 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         '\t\t\t// Expected callback_data:\n'
         '\t\t\t// - trade approval: xappr|a|<tradeId>|<chainKey> (approve) OR xappr|r|<tradeId>|<chainKey> (reject)\n'
         '\t\t\t// - policy approval: xpol|a|<policyApprovalId>|<chainKey> (approve) OR xpol|r|<policyApprovalId>|<chainKey> (reject)\n'
+        '\t\t\t// - transfer approval: xfer|a|<approvalId>|<chainKey> (approve) OR xfer|r|<approvalId>|<chainKey> (deny)\n'
         '\t\t\t// This runs after allowlist/group policy checks.\n'
-        '\t\t\tif (data.startsWith("xappr|") || data.startsWith("xpol|")) {\n'
+        '\t\t\tif (data.startsWith("xappr|") || data.startsWith("xpol|") || data.startsWith("xfer|")) {\n'
         '\t\t\t\tconst parts = data.split("|").map((p) => String(p || "").trim());\n'
-        '\t\t\t\tif (parts.length === 4 && (parts[0] === "xappr" || parts[0] === "xpol") && (parts[1] === "a" || parts[1] === "r") && parts[2] && parts[3]) {\n'
+        '\t\t\t\tif (parts.length === 4 && (parts[0] === "xappr" || parts[0] === "xpol" || parts[0] === "xfer") && (parts[1] === "a" || parts[1] === "r") && parts[2] && parts[3]) {\n'
         '\t\t\t\t\tconst action = parts[1];\n'
         '\t\t\t\t\tconst subjectId = parts[2];\n'
         '\t\t\t\t\tconst chainKey = parts[3];\n'
@@ -348,14 +428,84 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         '\t\t\t\t\tconst rawBase = String(env?.XCLAW_API_BASE_URL ?? process.env.XCLAW_API_BASE_URL ?? "").trim().replace(/\\/+$/, "");\n'
         '\t\t\t\t\tconst apiBase = rawBase ? rawBase.endsWith("/api/v1") ? rawBase : `${rawBase}/api/v1` : "";\n'
         '\t\t\t\t\tconst apiKey = String(skill?.apiKey ?? env?.XCLAW_API_KEY ?? process.env.XCLAW_API_KEY ?? "").trim();\n'
-        '\t\t\t\t\tif (!apiBase) { await bot.api.editMessageText(chatId, callbackMessage.message_id, "Approval failed: missing XCLAW_API_BASE_URL in OpenClaw config."); return; }\n'
-        '\t\t\t\t\tif (!apiKey) { await bot.api.editMessageText(chatId, callbackMessage.message_id, "Approval failed: missing xclaw-agent apiKey in OpenClaw config."); return; }\n'
+        '\t\t\t\t\tif (parts[0] !== "xfer" && !apiBase) { await bot.api.editMessageText(chatId, callbackMessage.message_id, "Approval failed: missing XCLAW_API_BASE_URL in OpenClaw config."); return; }\n'
+        '\t\t\t\t\tif (parts[0] !== "xfer" && !apiKey) { await bot.api.editMessageText(chatId, callbackMessage.message_id, "Approval failed: missing xclaw-agent apiKey in OpenClaw config."); return; }\n'
         '\t\t\t\t\t// Reduce perceived latency: best-effort stop spinner + remove buttons immediately.\n'
         '\t\t\t\t\ttry { bot.api.answerCallbackQuery(callback.id, { text: action === "r" ? "Denying..." : "Approving...", show_alert: false }); } catch {}\n'
         '\t\t\t\t\ttry { bot.api.editMessageReplyMarkup(chatId, callbackMessage.message_id, { inline_keyboard: [] }); } catch {}\n'
         '\t\t\t\t\ttry {\n'
         '\t\t\t\t\t\tconst atEpochSec = (typeof callback?.date === "number" ? callback.date : (typeof callbackMessage?.date === "number" ? callbackMessage.date : Math.floor(Date.now() / 1000)));\n'
         '\t\t\t\t\t\tconst atIso = (/* @__PURE__ */ new Date(atEpochSec * 1000)).toISOString();\n'
+        '\t\t\t\t\t\tif (parts[0] === "xfer") {\n'
+        '\t\t\t\t\t\t\tconst decision = action === "r" ? "deny" : "approve";\n'
+        '\t\t\t\t\t\t\tconst childMod = await import("node:child_process");\n'
+        '\t\t\t\t\t\t\tconst fsMod = await import("node:fs");\n'
+        '\t\t\t\t\t\t\tconst runtimeCandidates = [\n'
+        '\t\t\t\t\t\t\t\tString(env?.XCLAW_AGENT_RUNTIME_BIN ?? process.env.XCLAW_AGENT_RUNTIME_BIN ?? "").trim(),\n'
+        '\t\t\t\t\t\t\t\t`${String(process.env.HOME ?? "").trim()}/.local/bin/xclaw-agent`,\n'
+        '\t\t\t\t\t\t\t\t`${String(process.env.HOME ?? "").trim()}/.nvm/current/bin/xclaw-agent`,\n'
+        '\t\t\t\t\t\t\t\t"xclaw-agent"\n'
+        '\t\t\t\t\t\t\t].filter((v) => !!v);\n'
+        '\t\t\t\t\t\t\tconst runtimeBin = runtimeCandidates.find((candidate) => candidate === "xclaw-agent" || fsMod.existsSync(candidate)) || "xclaw-agent";\n'
+        '\t\t\t\t\t\t\tconst childEnv = { ...process.env, ...Object.fromEntries(Object.entries(env || {}).map(([k, v]) => [String(k), String(v)])) };\n'
+        '\t\t\t\t\t\t\tconst child = childMod.spawn(runtimeBin, ["approvals", "decide-transfer", "--approval-id", subjectId, "--decision", decision, "--chain", chainKey, "--reason-message", action === "r" ? "Denied via Telegram" : "", "--json"], { stdio: ["ignore", "pipe", "pipe"], env: childEnv });\n'
+        '\t\t\t\t\t\t\tlet out = "";\n'
+        '\t\t\t\t\t\t\tlet err = "";\n'
+        '\t\t\t\t\t\t\tchild.stdout?.on("data", (chunk) => { if (out.length < 12000) out += String(chunk); });\n'
+        '\t\t\t\t\t\t\tchild.stderr?.on("data", (chunk) => { if (err.length < 4000) err += String(chunk); });\n'
+        '\t\t\t\t\t\t\tconst exitCode = await new Promise((resolve) => child.on("close", (code) => resolve(Number(code ?? 1))));\n'
+        '\t\t\t\t\t\t\tconst lines = out.split(/\\r?\\n/).map((v) => String(v || "").trim()).filter((v) => v.length > 0);\n'
+        '\t\t\t\t\t\t\tlet body = null;\n'
+        '\t\t\t\t\t\t\ttry { body = lines.length > 0 ? JSON.parse(lines[lines.length - 1]) : null; } catch {}\n'
+        '\t\t\t\t\t\t\tconst currentStatus = String(body?.status ?? (body?.ok ? "filled" : "failed"));\n'
+        '\t\t\t\t\t\t\tconst txHash = String(body?.txHash ?? "").trim();\n'
+        '\t\t\t\t\t\t\tconst tokenSymbol = String(body?.tokenSymbol ?? body?.tokenAddress ?? "TOKEN");\n'
+        '\t\t\t\t\t\t\tconst amountWei = String(body?.amountWei ?? "?");\n'
+        '\t\t\t\t\t\t\tconst amountDisplay = String(body?.amountDisplay ?? "").trim();\n'
+        '\t\t\t\t\t\t\tconst toAddress = String(body?.to ?? "?");\n'
+        '\t\t\t\t\t\t\tconst executionMode = String(body?.executionMode ?? "normal");\n'
+        '\t\t\t\t\t\t\tconst head = body?.ok ? `Transfer result: ${currentStatus}` : `Transfer result: failed`;\n'
+        '\t\t\t\t\t\t\tconst txLine = txHash ? `\\nTx: ${txHash}` : "";\n'
+        '\t\t\t\t\t\t\tconst modeLine = executionMode === "policy_override" ? `\\nMode: policy override (one-off)` : "";\n'
+        '\t\t\t\t\t\t\tconst reasonLine = !body?.ok ? `\\nReason: ${String(body?.message ?? err ?? `transfer exit ${exitCode}`)}` : "";\n'
+        '\t\t\t\t\t\t\tlet normalizedAmount = "";\n'
+        '\t\t\t\t\t\t\tif (!amountDisplay && /^[0-9]+$/.test(amountWei)) {\n'
+        '\t\t\t\t\t\t\t\tconst tokenDecimalsRaw = Number(body?.tokenDecimals);\n'
+        '\t\t\t\t\t\t\t\tconst tokenDecimals = Number.isFinite(tokenDecimalsRaw) && tokenDecimalsRaw >= 0 ? Math.floor(tokenDecimalsRaw) : 18;\n'
+        '\t\t\t\t\t\t\t\tif (tokenDecimals <= 36) {\n'
+        '\t\t\t\t\t\t\t\t\tconst s = String(BigInt(amountWei));\n'
+        '\t\t\t\t\t\t\t\t\tconst padded = s.length <= tokenDecimals ? s.padStart(tokenDecimals + 1, "0") : s;\n'
+        '\t\t\t\t\t\t\t\t\tconst whole = tokenDecimals > 0 ? padded.slice(0, -tokenDecimals) : padded;\n'
+        '\t\t\t\t\t\t\t\t\tconst fracRaw = tokenDecimals > 0 ? padded.slice(-tokenDecimals) : "";\n'
+        '\t\t\t\t\t\t\t\t\tconst frac = fracRaw.replace(/0+$/, "");\n'
+        '\t\t\t\t\t\t\t\t\tnormalizedAmount = frac ? `${whole}.${frac} ${tokenSymbol}` : `${whole} ${tokenSymbol}`;\n'
+        '\t\t\t\t\t\t\t\t}\n'
+        '\t\t\t\t\t\t\t}\n'
+        '\t\t\t\t\t\t\tconst amountLine = amountDisplay ? amountDisplay : (normalizedAmount || `${amountWei} ${tokenSymbol}`);\n'
+        '\t\t\t\t\t\t\tconst finalMsg = `${head}\\n${amountLine}\\nTo: ${toAddress}\\nApproval: ${subjectId}\\nChain: ${chainKey}${modeLine}${txLine}${reasonLine}`;\n'
+        '\t\t\t\t\t\t\ttry { await bot.api.sendMessage(chatId, finalMsg); } catch {}\n'
+        '\t\t\t\t\t\t\ttry {\n'
+        '\t\t\t\t\t\t\t\tconst transferStatus = String(body?.status ?? (body?.ok ? "filled" : "failed")).toLowerCase();\n'
+        '\t\t\t\t\t\t\t\tconst isRejected = transferStatus === "rejected";\n'
+        '\t\t\t\t\t\t\t\tconst isFilled = transferStatus === "filled";\n'
+        '\t\t\t\t\t\t\t\tconst decisionWord = isFilled ? "FILLED" : (isRejected ? "REJECTED" : "FAILED");\n'
+        '\t\t\t\t\t\t\t\tconst instruction = isFilled ? "Reply to the user confirming the transfer succeeded with tx details." : (isRejected ? "Reply to the user confirming the transfer was denied and no transaction was executed." : "Reply to the user confirming the transfer failed and provide next steps.");\n'
+        '\t\t\t\t\t\t\t\tconst syntheticText = `[X-CLAW TRANSFER RESULT]\\nDecision: ${decisionWord}\\nApproval: ${subjectId}\\nChain: ${chainKey}\\nTxHash: ${txHash || "n/a"}\\nAmount: ${amountLine}\\nAmountWei: ${amountWei}\\nToken: ${tokenSymbol}\\nTo: ${toAddress}\\nSource: telegram_callback_transfer\\nInstruction: ${instruction}`;\n'
+        '\t\t\t\t\t\t\t\tconst storeAllowFrom2 = await readChannelAllowFromStore("telegram").catch(() => []);\n'
+        '\t\t\t\t\t\t\t\tconst getFile2 = typeof ctx.getFile === "function" ? ctx.getFile.bind(ctx) : async () => ({});\n'
+        '\t\t\t\t\t\t\t\tconst syntheticMessage2 = {\n'
+        '\t\t\t\t\t\t\t\t\t...callbackMessage,\n'
+        '\t\t\t\t\t\t\t\t\tfrom: callback.from,\n'
+        '\t\t\t\t\t\t\t\t\ttext: syntheticText,\n'
+        '\t\t\t\t\t\t\t\t\tcaption: void 0,\n'
+        '\t\t\t\t\t\t\t\t\tcaption_entities: void 0,\n'
+        '\t\t\t\t\t\t\t\t\tentities: void 0,\n'
+        '\t\t\t\t\t\t\t\t\tdate: Math.floor(Date.now() / 1000)\n'
+        '\t\t\t\t\t\t\t\t};\n'
+        '\t\t\t\t\t\t\t\tawait processMessage({ message: syntheticMessage2, me: ctx.me, getFile: getFile2 }, [], storeAllowFrom2, { messageIdOverride: `xclaw-transfer-result-${callback.id}` });\n'
+        '\t\t\t\t\t\t\t} catch {}\n'
+        '\t\t\t\t\t\t\treturn;\n'
+        '\t\t\t\t\t\t}\n'
         '\t\t\t\t\t\tconst url = parts[0] === "xpol"\n'
         '\t\t\t\t\t\t\t? `${apiBase}/policy-approvals/${encodeURIComponent(subjectId)}/decision`\n'
         '\t\t\t\t\t\t\t: `${apiBase}/trades/${encodeURIComponent(subjectId)}/status`;\n'
@@ -376,11 +526,15 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V5}\n'
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V6}\n'
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V7}\n'
+        f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V8}\n'
+        f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V9}\n'
+        f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V10}\n'
+        f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V11}\n'
         '\t\t\t\t\t\t\t\t// Keep queued text in chat history and only clear inline buttons.\n'
         '\t\t\t\t\t\t\t\ttry { await bot.api.editMessageReplyMarkup(chatId, callbackMessage.message_id, { inline_keyboard: [] }); } catch {}\n'
         '\t\t\t\t\t\t\t\t// Emit deterministic confirmation immediately so users always see a result.\n'
         '\t\t\t\t\t\t\t\ttry {\n'
-        '\t\t\t\t\t\t\t\t\tconst subjectLabel = parts[0] === "xpol" ? "policy approval" : "trade";\n'
+        '\t\t\t\t\t\t\t\t\tconst subjectLabel = parts[0] === "xpol" ? "policy approval" : (parts[0] === "xfer" ? "transfer approval" : "trade");\n'
         '\t\t\t\t\t\t\t\t\tconst msg = `${action === "r" ? "Denied" : "Approved"} ${subjectLabel} ${subjectId}\\nChain: ${chainKey}`;\n'
         '\t\t\t\t\t\t\t\t\tawait bot.api.sendMessage(chatId, msg);\n'
         '\t\t\t\t\t\t\t\t} catch {}\n'
@@ -388,10 +542,11 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         '\t\t\t\t\t\t\t\t\tconst promptText = String(callbackMessage.text ?? \"\");\n'
         '\t\t\t\t\t\t\t\t\tconst decisionWord = action === \"r\" ? \"DENIED\" : \"APPROVED\";\n'
         '\t\t\t\t\t\t\t\t\tconst isPolicy = parts[0] === \"xpol\";\n'
+        '\t\t\t\t\t\t\t\t\tconst isTransfer = parts[0] === \"xfer\";\n'
         '\t\t\t\t\t\t\t\t\tconst instruction = action === \"r\"\n'
-        '\t\t\t\t\t\t\t\t\t\t? (isPolicy ? \"Reply to the user confirming this policy change was denied (include reason).\" : \"Reply to the user confirming this trade was denied (include reason). Do not execute the trade.\")\n'
-        '\t\t\t\t\t\t\t\t\t\t: (isPolicy ? \"Reply to the user confirming this policy change was approved.\" : \"Reply to the user confirming this trade was approved, then proceed to execute it (trade-exec).\" );\n'
-        '\t\t\t\t\t\t\t\t\tconst subjectLabel = parts[0] === "xpol" ? "PolicyApproval" : "Trade";\n'
+        '\t\t\t\t\t\t\t\t\t\t? (isPolicy ? \"Reply to the user confirming this policy change was denied (include reason).\" : (isTransfer ? \"Reply to the user confirming this transfer was denied (include reason).\" : \"Reply to the user confirming this trade was denied (include reason). Do not execute the trade.\"))\n'
+        '\t\t\t\t\t\t\t\t\t\t: (isPolicy ? \"Reply to the user confirming this policy change was approved.\" : (isTransfer ? \"Reply to the user confirming this transfer approval was accepted and execution is underway.\" : \"Reply to the user confirming this trade was approved, then proceed to execute it (trade-exec).\"));\n'
+        '\t\t\t\t\t\t\t\t\tconst subjectLabel = parts[0] === "xpol" ? "PolicyApproval" : (parts[0] === "xfer" ? "TransferApproval" : "Trade");\n'
         '\t\t\t\t\t\t\t\t\tconst syntheticText = `[X-CLAW APPROVAL DECISION]\\nDecision: ${decisionWord}\\n${subjectLabel}: ${subjectId}\\nChain: ${chainKey}\\nSource: telegram_button\\nInstruction: ${instruction}\\n\\nContext (queued message):\\n${promptText.slice(0, 700)}`;\n'
         '\t\t\t\t\t\t\t\t\tconst storeAllowFrom = await readChannelAllowFromStore(\"telegram\").catch(() => []);\n'
         '\t\t\t\t\t\t\t\t\tconst getFile = typeof ctx.getFile === \"function\" ? ctx.getFile.bind(ctx) : async () => ({});\n'
@@ -406,12 +561,80 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         '\t\t\t\t\t\t\t\t\t};\n'
         '\t\t\t\t\t\t\t\t\tawait processMessage({ message: syntheticMessage, me: ctx.me, getFile }, [], storeAllowFrom, { messageIdOverride: `xclaw-approval-${callback.id}` });\n'
         f'\t\t\t\t\t\t\t\t\ttry {{ logger.info({{ subjectId, chainKey, chatId, action, kind: parts[0] }}, \"{DECISION_ROUTE_MARKER_V1}\"); }} catch {{}}\n'
+        '\t\t\t\t\t\t\t\t\tif (parts[0] === "xappr" && action !== "r") {\n'
+        f'\t\t\t\t\t\t\t\t\t\t// {DECISION_EXEC_MARKER_V1}\n'
+        '\t\t\t\t\t\t\t\t\t\ttry {\n'
+        '\t\t\t\t\t\t\t\t\t\t\tconst inflightKey = `${subjectId}|${chainKey}`;\n'
+        '\t\t\t\t\t\t\t\t\t\t\tconst __resumeSet = (globalThis.__xclawTradeResumeInflight && globalThis.__xclawTradeResumeInflight instanceof Set)\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t? globalThis.__xclawTradeResumeInflight\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t: (() => { const s = new Set(); globalThis.__xclawTradeResumeInflight = s; return s; })();\n'
+        '\t\t\t\t\t\t\t\t\t\t\tif (!__resumeSet.has(inflightKey)) {\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t__resumeSet.add(inflightKey);\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\tsetTimeout(async () => {\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\ttry {\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst childMod = await import("node:child_process");\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst fsMod = await import("node:fs");\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst runtimeCandidates = [\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tString(env?.XCLAW_AGENT_RUNTIME_BIN ?? process.env.XCLAW_AGENT_RUNTIME_BIN ?? "").trim(),\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t`${String(process.env.HOME ?? "").trim()}/.local/bin/xclaw-agent`,\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t`${String(process.env.HOME ?? "").trim()}/.nvm/current/bin/xclaw-agent`,\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t"xclaw-agent"\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\t].filter((v) => !!v);\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst runtimeBin = runtimeCandidates.find((candidate) => candidate === "xclaw-agent" || fsMod.existsSync(candidate)) || "xclaw-agent";\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst childEnv = { ...process.env, ...Object.fromEntries(Object.entries(env || {}).map(([k, v]) => [String(k), String(v)])) };\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst child = childMod.spawn(runtimeBin, ["approvals", "resume-spot", "--trade-id", subjectId, "--chain", chainKey, "--json"], { stdio: ["ignore", "pipe", "pipe"], env: childEnv });\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\tlet out = "";\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\tlet err = "";\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\tchild.stdout?.on("data", (chunk) => { if (out.length < 12000) out += String(chunk); });\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\tchild.stderr?.on("data", (chunk) => { if (err.length < 4000) err += String(chunk); });\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst exitCode = await new Promise((resolve) => child.on("close", (code) => resolve(Number(code ?? 1))));\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst lines = out.split(/\\r?\\n/).map((v) => String(v || "").trim()).filter((v) => v.length > 0);\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\tlet body = null;\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\ttry { body = lines.length > 0 ? JSON.parse(lines[lines.length - 1]) : null; } catch {}\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst statusWord = String(body?.status ?? (body?.ok ? "filled" : "failed"));\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst txHash = String(body?.txHash ?? "").trim();\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst flow = body?.flowSummary ?? {};\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst amountHuman = String(body?.amountIn ?? flow?.amountInHuman ?? "?");\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst tokenInSym = String(body?.tokenInSymbol ?? flow?.tokenInSymbol ?? "TOKEN_IN");\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst tokenOutSym = String(body?.tokenOutSymbol ?? flow?.tokenOutSymbol ?? "TOKEN_OUT");\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst head = body?.ok ? `Trade result: ${statusWord}` : `Trade result: failed`;\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst txLine = txHash ? `\\nTx: ${txHash}` : "";\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst reasonLine = !body?.ok ? `\\nReason: ${String(body?.message ?? err ?? `resume exit ${exitCode}`)}` : "";\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst finalMsg = `${head}\\n${amountHuman} ${tokenInSym} -> ${tokenOutSym}\\nTrade: ${subjectId}\\nChain: ${chainKey}${txLine}${reasonLine}`;\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\ttry { await bot.api.sendMessage(chatId, finalMsg); } catch {}\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\ttry {\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst decisionWord = body?.ok ? "FILLED" : "FAILED";\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst instruction = body?.ok ? "Reply to the user confirming the swap succeeded with tx details." : "Reply to the user confirming the swap failed and provide next steps.";\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst syntheticText = `[X-CLAW TRADE RESULT]\\nDecision: ${decisionWord}\\nTrade: ${subjectId}\\nChain: ${chainKey}\\nTxHash: ${txHash || "n/a"}\\nAmount: ${amountHuman} ${tokenInSym} -> ${tokenOutSym}\\nSource: telegram_callback_resume\\nInstruction: ${instruction}`;\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst storeAllowFrom2 = await readChannelAllowFromStore("telegram").catch(() => []);\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst getFile2 = typeof ctx.getFile === "function" ? ctx.getFile.bind(ctx) : async () => ({});\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst syntheticMessage2 = {\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t...callbackMessage,\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tfrom: callback.from,\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\ttext: syntheticText,\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tcaption: void 0,\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tcaption_entities: void 0,\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tentities: void 0,\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tdate: Math.floor(Date.now() / 1000)\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t};\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tawait processMessage({ message: syntheticMessage2, me: ctx.me, getFile: getFile2 }, [], storeAllowFrom2, { messageIdOverride: `xclaw-trade-result-${callback.id}` });\n'
+        f'\t\t\t\t\t\t\t\t\t\t\t\t\t\t\ttry {{ logger.info({{ subjectId, chainKey, chatId, ok: !!body?.ok }}, "{DECISION_RESULT_ROUTE_MARKER_V1}"); }} catch {{}}\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\t} catch {}\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t} catch (resumeErr) {\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\ttry { logger.error({ subjectId, chainKey, err: String(resumeErr) }, "xclaw: trade resume trigger failed"); } catch {}\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t} finally {\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\ttry { __resumeSet.delete(inflightKey); } catch {}\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t}\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t}, 0);\n'
+        '\t\t\t\t\t\t\t\t\t\t\t}\n'
+        '\t\t\t\t\t\t\t\t\t\t} catch {}\n'
+        '\t\t\t\t\t\t\t\t\t}\n'
         '\t\t\t\t\t\t\t\t} catch (err) {\n'
         '\t\t\t\t\t\t\t\t\t// Fallback: still send minimal confirmation so the user sees feedback even if the agent pipeline fails.\n'
         '\t\t\t\t\t\t\t\t\ttry {\n'
         '\t\t\t\t\t\t\t\t\t\tconst promptLine = (callbackMessage.text ?? \"\").split(\"\\n\")[0] ?? \"\";\n'
         '\t\t\t\t\t\t\t\t\t\tconst summary = promptLine.trim() ? `\\n${promptLine.trim()}` : \"\";\n'
-        '\t\t\t\t\t\t\t\t\t\tconst subjectLabel = parts[0] === \"xpol\" ? \"policy approval\" : \"trade\";\n'
+        '\t\t\t\t\t\t\t\t\t\tconst subjectLabel = parts[0] === \"xpol\" ? \"policy approval\" : (parts[0] === \"xfer\" ? \"transfer approval\" : \"trade\");\n'
         '\t\t\t\t\t\t\t\t\t\tconst msg = `${action === \"r\" ? \"Denied\" : \"Approved\"} ${subjectLabel} ${subjectId}${summary}\\nChain: ${chainKey}`;\n'
         '\t\t\t\t\t\t\t\t\t\tawait bot.api.sendMessage(chatId, msg);\n'
         '\t\t\t\t\t\t\t\t\t\ttry { logger.error({ subjectId, chainKey, chatId, action, kind: parts[0], err: String(err) }, \"xclaw: telegram approval decision route failed; fallback ack sent\"); } catch {}\n'
@@ -420,11 +643,13 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         '\t\t\t\t\t\t\t\treturn;\n'
         '\t\t\t\t\t\t\t}\n'
         '\t\t\t\t\t\t\tlet errCode = "api_error"; let errMsg = `HTTP ${res.status}`;\n'
-        '\t\t\t\t\t\t\ttry { const body = await res.json(); if (typeof body?.code === "string" && body.code.trim()) errCode = body.code.trim(); if (typeof body?.message === "string" && body.message.trim()) errMsg = body.message.trim(); if (res.status === 409 && (body?.details?.currentStatus === "approved" || body?.details?.currentStatus === "filled" || body?.details?.currentStatus === "rejected")) { try { await bot.api.editMessageReplyMarkup(chatId, callbackMessage.message_id, { inline_keyboard: [] }); } catch {} const currentStatus = String(body?.details?.currentStatus || ""); const decision = currentStatus === "rejected" ? "Denied" : "Approved"; const subjectLabel = parts[0] === "xpol" ? "policy approval" : "trade"; await bot.api.sendMessage(chatId, `${decision} ${subjectLabel} ${subjectId}\\nChain: ${chainKey}`); return; } } catch {}\n'
+        '\t\t\t\t\t\t\ttry { const body = await res.json(); if (typeof body?.code === "string" && body.code.trim()) errCode = body.code.trim(); if (typeof body?.message === "string" && body.message.trim()) errMsg = body.message.trim(); if (res.status === 409 && (body?.details?.currentStatus === "approved" || body?.details?.currentStatus === "filled" || body?.details?.currentStatus === "rejected")) { try { await bot.api.editMessageReplyMarkup(chatId, callbackMessage.message_id, { inline_keyboard: [] }); } catch {} const currentStatus = String(body?.details?.currentStatus || ""); const decision = currentStatus === "rejected" ? "Denied" : "Approved"; const subjectLabel = parts[0] === "xpol" ? "policy approval" : (parts[0] === "xfer" ? "transfer approval" : "trade"); await bot.api.sendMessage(chatId, `${decision} ${subjectLabel} ${subjectId}\\nChain: ${chainKey}`); return; } } catch {}\n'
         '\t\t\t\t\t\t\ttry {\n'
         '\t\t\t\t\t\t\t\tconst kb = parts[0] === "xpol"\n'
         '\t\t\t\t\t\t\t\t\t? [[{ text: "Approve", callback_data: `xpol|a|${subjectId}|${chainKey}` }, { text: "Deny", callback_data: `xpol|r|${subjectId}|${chainKey}` }]]\n'
-        '\t\t\t\t\t\t\t\t\t: [[{ text: "Approve", callback_data: `xappr|a|${subjectId}|${chainKey}` }, { text: "Deny", callback_data: `xappr|r|${subjectId}|${chainKey}` }]];\n'
+        '\t\t\t\t\t\t\t\t\t: (parts[0] === "xfer"\n'
+        '\t\t\t\t\t\t\t\t\t\t? [[{ text: "Approve", callback_data: `xfer|a|${subjectId}|${chainKey}` }, { text: "Deny", callback_data: `xfer|r|${subjectId}|${chainKey}` }]]\n'
+        '\t\t\t\t\t\t\t\t\t\t: [[{ text: "Approve", callback_data: `xappr|a|${subjectId}|${chainKey}` }, { text: "Deny", callback_data: `xappr|r|${subjectId}|${chainKey}` }]]);\n'
         '\t\t\t\t\t\t\t\tawait bot.api.editMessageReplyMarkup(chatId, callbackMessage.message_id, { inline_keyboard: kb });\n'
         '\t\t\t\t\t\t\t} catch {}\n'
         '\t\t\t\t\t\t\tawait bot.api.editMessageText(chatId, callbackMessage.message_id, `Approval failed: ${errCode} (${errMsg}).`);\n'
@@ -433,7 +658,9 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         '\t\t\t\t\t\t\ttry {\n'
         '\t\t\t\t\t\t\t\tconst kb = parts[0] === "xpol"\n'
         '\t\t\t\t\t\t\t\t\t? [[{ text: "Approve", callback_data: `xpol|a|${subjectId}|${chainKey}` }, { text: "Deny", callback_data: `xpol|r|${subjectId}|${chainKey}` }]]\n'
-        '\t\t\t\t\t\t\t\t\t: [[{ text: "Approve", callback_data: `xappr|a|${subjectId}|${chainKey}` }, { text: "Deny", callback_data: `xappr|r|${subjectId}|${chainKey}` }]];\n'
+        '\t\t\t\t\t\t\t\t\t: (parts[0] === "xfer"\n'
+        '\t\t\t\t\t\t\t\t\t\t? [[{ text: "Approve", callback_data: `xfer|a|${subjectId}|${chainKey}` }, { text: "Deny", callback_data: `xfer|r|${subjectId}|${chainKey}` }]]\n'
+        '\t\t\t\t\t\t\t\t\t\t: [[{ text: "Approve", callback_data: `xappr|a|${subjectId}|${chainKey}` }, { text: "Deny", callback_data: `xappr|r|${subjectId}|${chainKey}` }]]);\n'
         '\t\t\t\t\t\t\t\tawait bot.api.editMessageReplyMarkup(chatId, callbackMessage.message_id, { inline_keyboard: kb });\n'
         '\t\t\t\t\t\t\t} catch {}\n'
         '\t\t\t\t\t\t\tawait bot.api.editMessageText(chatId, callbackMessage.message_id, `Approval failed: ${String(err)}`);\n'
@@ -486,6 +713,7 @@ def _patch_queued_buttons(raw: str) -> tuple[str, bool, str | None]:
         "\tif (!replyMarkup && typeof text === \"string\" && /\\bStatus:\\s*approval_pending\\b/i.test(text)) {\n"
         "\t\tconst tradeMatch = text.match(/\\bTrade ID:\\s*(trd_[a-z0-9]+)\\b/i) ?? text.match(/\\bTrade:\\s*(trd_[a-z0-9]+)\\b/i);\n"
         "\t\tconst policyMatch = text.match(/\\bApproval ID:\\s*(ppr_[a-z0-9]+)\\b/i) ?? text.match(/\\bPolicy Approval ID:\\s*(ppr_[a-z0-9]+)\\b/i);\n"
+        "\t\tconst transferMatch = text.match(/\\bApproval ID:\\s*(xfr(?:\\\\_|[_-])?[a-z0-9]+)\\b/i) ?? text.match(/\\bTransfer Approval ID:\\s*(xfr(?:\\\\_|[_-])?[a-z0-9]+)\\b/i);\n"
         "\t\tif (tradeMatch && tradeMatch[1]) {\n"
         "\t\t\tconst tradeId = tradeMatch[1];\n"
         "\t\t\tlet chainKey = \"\";\n"
@@ -506,6 +734,16 @@ def _patch_queued_buttons(raw: str) -> tuple[str, bool, str | None]:
         "\t\t\t\tchainKey = String(env?.XCLAW_DEFAULT_CHAIN ?? process.env.XCLAW_DEFAULT_CHAIN ?? \"base_sepolia\").trim() || \"base_sepolia\";\n"
         "\t\t\t}\n"
         "\t\t\treplyMarkup = { inline_keyboard: [[{ text: \"Approve\", callback_data: `xpol|a|${approvalId}|${chainKey}` }, { text: \"Deny\", callback_data: `xpol|r|${approvalId}|${chainKey}` }]] };\n"
+        "\t\t} else if (transferMatch && transferMatch[1]) {\n"
+        "\t\t\tconst approvalId = `xfr_${String(transferMatch[1] || \"\").replace(/^xfr(?:\\\\_|[_-])?/i, \"\").toLowerCase()}`;\n"
+        "\t\t\tlet chainKey = \"\";\n"
+        "\t\t\tconst cm = text.match(/\\bChain:\\s*([a-z0-9_]+)\\b/i);\n"
+        "\t\t\tif (cm && cm[1]) chainKey = cm[1];\n"
+        "\t\t\tif (!chainKey) {\n"
+        "\t\t\t\tconst skill = cfg?.skills?.entries?.[\"xclaw-agent\"]; const env = skill?.env ?? {};\n"
+        "\t\t\t\tchainKey = String(env?.XCLAW_DEFAULT_CHAIN ?? process.env.XCLAW_DEFAULT_CHAIN ?? \"base_sepolia\").trim() || \"base_sepolia\";\n"
+        "\t\t\t}\n"
+        "\t\t\treplyMarkup = { inline_keyboard: [[{ text: \"Approve\", callback_data: `xfer|a|${approvalId}|${chainKey}` }, { text: \"Deny\", callback_data: `xfer|r|${approvalId}|${chainKey}` }]] };\n"
         "\t\t}\n"
         "\t}\n"
     )
@@ -535,7 +773,13 @@ def _patch_queued_buttons_v2(raw: str) -> tuple[str, bool, str | None]:
     anchor_idx = raw.find(anchor)
     if QUEUED_BUTTONS_MARKER_V3 in raw:
         window = raw[anchor_idx : min(len(raw), anchor_idx + 9000)]
-        if ("xpol|a|${approvalId}" in window) and ("queued policy buttons attached" in window) and ("missing trade/policy id" in window):
+        if (
+            ("xpol|a|${approvalId}" in window)
+            and ("xfer|a|${approvalId}" in window)
+            and ("queued policy buttons attached" in window)
+            and ("missing trade/policy/transfer id" in window)
+            and ("xfr(?:\\\\_|[_-])?" in window)
+        ):
             return raw, False, None
         start = raw.find(f"\n\t// {QUEUED_BUTTONS_MARKER_V3}", anchor_idx)
         if start >= 0:
@@ -566,6 +810,7 @@ def _patch_queued_buttons_v2(raw: str) -> tuple[str, bool, str | None]:
         "\tif (__xclawHasPending && !opts?.replyMarkup) {\n"
         "\t\tconst tradeMatch = __xclawNormalized.match(/\\bTrade ID:\\s*(trd_[a-z0-9]+)\\b/i) ?? __xclawNormalized.match(/\\bTrade:\\s*(trd_[a-z0-9]+)\\b/i) ?? __xclawNormalized.match(/\\b(trd_[a-z0-9]+)\\b/i);\n"
         "\t\tconst policyMatch = __xclawNormalized.match(/\\bApproval ID:\\s*(ppr_[a-z0-9]+)\\b/i) ?? __xclawNormalized.match(/\\bPolicy Approval ID:\\s*(ppr_[a-z0-9]+)\\b/i) ?? __xclawNormalized.match(/\\b(ppr_[a-z0-9]+)\\b/i);\n"
+        "\t\tconst transferMatch = __xclawNormalized.match(/\\bApproval ID:\\s*(xfr(?:\\\\_|[_-])?[a-z0-9]+)\\b/i) ?? __xclawNormalized.match(/\\bTransfer Approval ID:\\s*(xfr(?:\\\\_|[_-])?[a-z0-9]+)\\b/i) ?? __xclawNormalized.match(/\\b(xfr(?:\\\\_|[_-])?[a-z0-9]{10,})\\b/i);\n"
         "\t\tif (tradeMatch && tradeMatch[1]) {\n"
         "\t\t\tconst tradeId = tradeMatch[1];\n"
         "\t\t\tlet chainKey = \"\";\n"
@@ -593,8 +838,21 @@ def _patch_queued_buttons_v2(raw: str) -> tuple[str, bool, str | None]:
         "\t\t\t} catch (err) {\n"
         "\t\t\t\ttry { runtime.log?.(`xclaw: queued policy buttons attach failed err=${String(err)}`); } catch {}\n"
         "\t\t\t}\n"
+        "\t\t} else if (transferMatch && transferMatch[1]) {\n"
+        "\t\t\tconst approvalId = `xfr_${String(transferMatch[1] || \"\").replace(/^xfr(?:\\\\_|[_-])?/i, \"\").toLowerCase()}`;\n"
+        "\t\t\tlet chainKey = \"\";\n"
+        "\t\t\tconst cm = __xclawNormalized.match(/\\bChain:\\s*([a-z0-9_]+)\\b/i);\n"
+        "\t\t\tif (cm && cm[1]) chainKey = cm[1];\n"
+        "\t\t\tif (!chainKey) chainKey = String(process.env.XCLAW_DEFAULT_CHAIN ?? \"base_sepolia\").trim() || \"base_sepolia\";\n"
+        "\t\t\ttry {\n"
+        "\t\t\t\tif (!opts) opts = {};\n"
+        "\t\t\t\topts.replyMarkup = { inline_keyboard: [[{ text: \"Approve\", callback_data: `xfer|a|${approvalId}|${chainKey}` }, { text: \"Deny\", callback_data: `xfer|r|${approvalId}|${chainKey}` }]] };\n"
+        "\t\t\t\ttry { runtime.log?.(`xclaw: queued transfer buttons attached approvalId=${approvalId} chainKey=${chainKey}`); } catch {}\n"
+        "\t\t\t} catch (err) {\n"
+        "\t\t\t\ttry { runtime.log?.(`xclaw: queued transfer buttons attach failed err=${String(err)}`); } catch {}\n"
+        "\t\t\t}\n"
         "\t\t} else {\n"
-        "\t\t\ttry { runtime.log?.(`xclaw: queued buttons skipped (pending but missing trade/policy id) sample=${__xclawNormalized.slice(0, 180)}`); } catch {}\n"
+        "\t\t\ttry { runtime.log?.(`xclaw: queued buttons skipped (pending but missing trade/policy/transfer id) sample=${__xclawNormalized.slice(0, 180)}`); } catch {}\n"
         "\t\t}\n"
         "\t} else if (__xclawHasPending && opts?.replyMarkup) {\n"
         "\t\ttry { runtime.log?.(`xclaw: queued buttons skipped (already has replyMarkup)`); } catch {}\n"

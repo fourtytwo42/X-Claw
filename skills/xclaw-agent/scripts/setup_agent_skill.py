@@ -118,6 +118,23 @@ def ensure_launcher(workspace: Path, openclaw_bin: Path) -> Path:
     return launcher_path
 
 
+def ensure_runtime_bin_env(launcher_path: Path) -> None:
+    cfg = Path.home() / ".openclaw" / "openclaw.json"
+    if not cfg.exists():
+        return
+    payload = json.loads(cfg.read_text(encoding="utf-8"))
+    skills = payload.setdefault("skills", {})
+    entries = skills.setdefault("entries", {})
+    xclaw = entries.setdefault("xclaw-agent", {})
+    env = xclaw.setdefault("env", {})
+    current = str(env.get("XCLAW_AGENT_RUNTIME_BIN", "")).strip()
+    expected = str(launcher_path)
+    if current == expected:
+        return
+    env["XCLAW_AGENT_RUNTIME_BIN"] = expected
+    cfg.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+
 def ensure_ready() -> dict[str, str]:
     if shutil.which("python3") is None:
         raise RuntimeError("python3 is required")
@@ -187,6 +204,7 @@ def main() -> int:
         openclaw_bin = ensure_openclaw(workspace)
         managed_skill = ensure_managed_skill_copy(workspace)
         launcher = ensure_launcher(workspace, openclaw_bin)
+        ensure_runtime_bin_env(launcher)
         ensure_default_policy_file(os.environ.get("XCLAW_DEFAULT_CHAIN", "base_sepolia"))
         # Portable Telegram approvals: patch OpenClaw gateway bundle idempotently.
         try:

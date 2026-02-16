@@ -63,6 +63,26 @@ Spot swap (on-chain, via configured router which may be the fee proxy):
 python3 {baseDir}/scripts/xclaw_agent_skill.py trade-spot <token_in> <token_out> <amount_in> <slippage_bps>
 ```
 
+Internal spot-resume action (gateway callback orchestration):
+
+```bash
+python3 {baseDir}/scripts/xclaw_agent_skill.py trade-resume <trade_id>
+```
+
+Single-trigger spot flow (Telegram-focused):
+- Treat `trade-spot` as one user trigger.
+- If approval is needed, post queued approval message and wait for owner approve/deny.
+- On Telegram Approve callback, runtime auto-resumes execution (`trade-resume`) without requiring a second user message.
+- Always report final trade result (success/failure, trade id, tx hash when available) back to the human.
+
+Single-trigger transfer flow (Telegram-focused):
+- `wallet-send` / `wallet-send-token` may return queued transfer approval with `Approval ID: xfr_...` and `Status: approval_pending`.
+- Post queued transfer message verbatim so Telegram buttons can auto-attach.
+- Telegram callbacks:
+  - approve: `xfer|a|<approvalId>|<chainKey>`
+  - deny: `xfer|r|<approvalId>|<chainKey>`
+- Callback path is deterministic (non-LLM mediation) and must emit final transfer result message (`status`, `approvalId`, `chain`, `txHash` when available).
+
 Natural-language normalization (locked for trading intent interpretation):
 - If user says `ETH` in a trade intent, interpret it as `WETH`.
 - If user expresses amount in dollars (`$5`, `5 usd`), treat it as stablecoin amount.
@@ -100,6 +120,8 @@ Example (Telegram reply body):
 Policy approval queued message (Telegram):
 - Include `Status: approval_pending` and `Approval ID: ppr_...` so OpenClaw can auto-attach inline buttons.
 - Preferred: when using `policy-preapprove-token` / `policy-approve-all`, paste the returned `queuedMessage` field verbatim into chat. It is formatted to include the required `Status:` and `Approval ID:` lines without mistakes.
+- Approval ID source rule: use only the `policyApprovalId`/`queuedMessage` returned by the most recent policy-approval command result. Never invent or reuse `ppr_...` IDs from memory/history.
+- If a repeat request returns the same `ppr_...`, treat it as the currently pending canonical request (server de-dupe) and present that ID as-is.
 - Button callback_data:
   - Approve: `xpol|a|<policyApprovalId>|<chainKey>`
   - Deny: `xpol|r|<policyApprovalId>|<chainKey>`

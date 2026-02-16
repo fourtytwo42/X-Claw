@@ -317,6 +317,114 @@ class TradePathRuntimeTests(unittest.TestCase):
         self.assertEqual(payload.get("code"), "approval_required")
         send_mock.assert_not_called()
 
+    def test_trade_spot_records_pending_spot_flow_context(self) -> None:
+        args = argparse.Namespace(
+            chain="base_sepolia",
+            token_in="WETH",
+            token_out="USDC",
+            amount_in="1",
+            slippage_bps=50,
+            deadline_sec=120,
+            to=None,
+            json=True,
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir, mock.patch.object(cli, "APP_DIR", pathlib.Path(tmpdir)), mock.patch.object(
+            cli, "PENDING_TRADE_INTENTS_FILE", pathlib.Path(tmpdir) / "pending-trade-intents.json"
+        ), mock.patch.object(
+            cli, "PENDING_SPOT_TRADE_FLOWS_FILE", pathlib.Path(tmpdir) / "pending-spot-trade-flows.json"
+        ), mock.patch.object(cli, "_replay_trade_usage_outbox"), mock.patch.object(
+            cli, "_resolve_token_address", side_effect=["0x" + "11" * 20, "0x" + "22" * 20]
+        ), mock.patch.object(
+            cli, "load_wallet_store", return_value={}
+        ), mock.patch.object(
+            cli, "_execution_wallet", return_value=("0x" + "33" * 20, "0x" + "44" * 32)
+        ), mock.patch.object(
+            cli, "_require_cast_bin", return_value="cast"
+        ), mock.patch.object(
+            cli, "_chain_rpc_url", return_value="https://rpc.example"
+        ), mock.patch.object(
+            cli, "_require_chain_contract_address", return_value="0x" + "55" * 20
+        ), mock.patch.object(
+            cli,
+            "_fetch_erc20_metadata",
+            side_effect=[{"symbol": "WETH", "decimals": 18}, {"symbol": "USDC", "decimals": 6}],
+        ), mock.patch.object(
+            cli, "_enforce_spend_preconditions", return_value=({}, "2026-02-15", 0, 0)
+        ), mock.patch.object(
+            cli, "_router_get_amount_out", return_value=123
+        ), mock.patch.object(
+            cli, "_enforce_trade_caps", return_value=({}, "2026-02-15", Decimal("0"), 0, {"maxDailyUsd": "250", "maxDailyTradeCount": 50})
+        ), mock.patch.object(
+            cli, "_post_trade_proposed", return_value={"ok": True, "tradeId": "trd_1", "status": "approval_pending"}
+        ), mock.patch.object(
+            cli,
+            "_wait_for_trade_approval",
+            side_effect=cli.WalletPolicyError(
+                "approval_required",
+                "Trade is waiting for management approval.",
+                "Approve trade from authorized management view, then retry.",
+                {"tradeId": "trd_1", "chain": "base_sepolia"},
+            ),
+        ):
+            payload = self._run_and_parse_stdout(lambda: cli.cmd_trade_spot(args))
+            flow = cli._get_pending_spot_trade_flow("trd_1")
+
+        self.assertFalse(payload.get("ok"))
+        self.assertEqual(payload.get("code"), "approval_required")
+        self.assertIsInstance(flow, dict)
+        self.assertEqual((flow or {}).get("tradeId"), "trd_1")
+        self.assertEqual((flow or {}).get("chainKey"), "base_sepolia")
+        self.assertEqual((flow or {}).get("tokenInSymbol"), "WETH")
+        self.assertEqual((flow or {}).get("tokenOutSymbol"), "USDC")
+
+    def test_approvals_resume_spot_blocks_when_trade_not_actionable(self) -> None:
+        args = argparse.Namespace(trade_id="trd_1", chain="base_sepolia", json=True)
+        with tempfile.TemporaryDirectory() as tmpdir, mock.patch.object(
+            cli, "APP_DIR", pathlib.Path(tmpdir)
+        ), mock.patch.object(
+            cli, "PENDING_SPOT_TRADE_FLOWS_FILE", pathlib.Path(tmpdir) / "pending-spot-trade-flows.json"
+        ), mock.patch.object(
+            cli, "_read_trade_details", return_value={"tradeId": "trd_1", "chainKey": "base_sepolia", "status": "approval_pending"}
+        ):
+            payload = self._run_and_parse_stdout(lambda: cli.cmd_approvals_resume_spot(args))
+
+        self.assertFalse(payload.get("ok"))
+        self.assertEqual(payload.get("code"), "not_actionable")
+
+    def test_approvals_resume_spot_executes_and_clears_saved_flow(self) -> None:
+        args = argparse.Namespace(trade_id="trd_1", chain="base_sepolia", json=True)
+        with tempfile.TemporaryDirectory() as tmpdir, mock.patch.object(
+            cli, "APP_DIR", pathlib.Path(tmpdir)
+        ), mock.patch.object(
+            cli, "PENDING_SPOT_TRADE_FLOWS_FILE", pathlib.Path(tmpdir) / "pending-spot-trade-flows.json"
+        ), mock.patch.object(
+            cli, "_read_trade_details", return_value={"tradeId": "trd_1", "chainKey": "base_sepolia", "status": "approved"}
+        ), mock.patch.object(
+            cli, "cmd_trade_execute", return_value=0
+        ):
+            cli._record_pending_spot_trade_flow(
+                "trd_1",
+                {
+                    "tradeId": "trd_1",
+                    "chainKey": "base_sepolia",
+                    "tokenInSymbol": "USDC",
+                    "tokenOutSymbol": "WETH",
+                    "amountInHuman": "50",
+                    "slippageBps": 50,
+                },
+            )
+            buf = io.StringIO()
+            with redirect_stdout(buf):
+                code = cli.cmd_approvals_resume_spot(args)
+            out = json.loads(buf.getvalue().strip())
+            flow_after = cli._get_pending_spot_trade_flow("trd_1")
+
+        self.assertEqual(code, 0)
+        self.assertTrue(out.get("ok"))
+        self.assertEqual(out.get("tradeId"), "trd_1")
+        self.assertIsNone(flow_after)
+
     def test_trade_spot_reuses_existing_pending_trade_intent(self) -> None:
         args = argparse.Namespace(
             chain="base_sepolia",
@@ -600,6 +708,161 @@ class TradePathRuntimeTests(unittest.TestCase):
             with self.assertRaises(cli.WalletPolicyError) as ctx:
                 cli._enforce_outbound_transfer_policy("base_sepolia", "0x" + "11" * 20)
         self.assertEqual(ctx.exception.code, "chain_disabled")
+
+    def test_wallet_send_token_requires_transfer_approval(self) -> None:
+        args = argparse.Namespace(
+            token="0x" + "11" * 20,
+            to="0x" + "22" * 20,
+            amount_wei="100",
+            chain="base_sepolia",
+            json=True,
+        )
+        with mock.patch.object(
+            cli,
+            "_evaluate_outbound_transfer_policy",
+            return_value={
+                "allowed": True,
+                "policyBlockedAtCreate": False,
+                "policyBlockReasonCode": None,
+                "policyBlockReasonMessage": None,
+            },
+        ), mock.patch.object(
+            cli, "_enforce_spend_preconditions", return_value=({}, "2026-02-16", 0, 10**30)
+        ), mock.patch.object(
+            cli, "_sync_transfer_policy_from_remote", return_value={"transferApprovalMode": "per_transfer", "nativeTransferPreapproved": False, "allowedTransferTokens": []}
+        ), mock.patch.object(
+            cli, "_fetch_erc20_metadata", return_value={"symbol": "USDC", "decimals": 18}
+        ), mock.patch.object(
+            cli, "_mirror_transfer_approval"
+        ):
+            payload = self._run_and_parse_stdout(lambda: cli.cmd_wallet_send_token(args))
+        self.assertEqual(payload.get("ok"), False)
+        self.assertEqual(payload.get("code"), "approval_required")
+        details = payload.get("details") or {}
+        approval_id = str(details.get("approvalId") or "")
+        self.assertTrue(approval_id.startswith("xfr_"))
+        queued = str(details.get("queuedMessage") or "")
+        self.assertIn("Approval ID:", queued)
+        self.assertIn("Status: approval_pending", queued)
+        self.assertIn("Amount: 0.0000000000000001 USDC (100 wei)", queued)
+
+    def test_wallet_send_token_policy_blocked_routes_to_transfer_approval(self) -> None:
+        args = argparse.Namespace(
+            token="0x" + "11" * 20,
+            to="0x" + "22" * 20,
+            amount_wei="100",
+            chain="base_sepolia",
+            json=True,
+        )
+        with mock.patch.object(
+            cli,
+            "_evaluate_outbound_transfer_policy",
+            return_value={
+                "allowed": False,
+                "policyBlockedAtCreate": True,
+                "policyBlockReasonCode": "outbound_disabled",
+                "policyBlockReasonMessage": "Outbound transfers are disabled by owner policy.",
+            },
+        ), mock.patch.object(
+            cli, "_enforce_spend_preconditions", return_value=({}, "2026-02-16", 0, 10**30)
+        ), mock.patch.object(
+            cli, "_sync_transfer_policy_from_remote", return_value={"transferApprovalMode": "auto", "nativeTransferPreapproved": True, "allowedTransferTokens": []}
+        ), mock.patch.object(
+            cli, "_fetch_erc20_metadata", return_value={"symbol": "USDC", "decimals": 18}
+        ), mock.patch.object(
+            cli, "_mirror_transfer_approval"
+        ):
+            payload = self._run_and_parse_stdout(lambda: cli.cmd_wallet_send_token(args))
+        self.assertEqual(payload.get("ok"), False)
+        self.assertEqual(payload.get("code"), "approval_required")
+        details = payload.get("details") or {}
+        self.assertEqual(details.get("policyBlockedAtCreate"), True)
+        self.assertEqual(details.get("policyBlockReasonCode"), "outbound_disabled")
+        self.assertIn("one-off override", str(details.get("queuedMessage") or "").lower())
+
+    def test_approvals_decide_transfer_approve_executes(self) -> None:
+        approval_id = "xfr_test_1"
+        cli._record_pending_transfer_flow(
+            approval_id,
+            {
+                "approvalId": approval_id,
+                "chainKey": "base_sepolia",
+                "status": "approval_pending",
+                "transferType": "native",
+                "toAddress": "0x" + "22" * 20,
+                "amountWei": "1",
+                "createdAt": cli.utc_now(),
+            },
+        )
+        args = argparse.Namespace(approval_id=approval_id, decision="approve", reason_message=None, chain="base_sepolia", json=True)
+        with mock.patch.object(
+            cli,
+            "_execute_pending_transfer_flow",
+            return_value={
+                "ok": True,
+                "code": "ok",
+                "approvalId": approval_id,
+                "status": "filled",
+                "txHash": "0x" + "ab" * 32,
+                "executionMode": "policy_override",
+            },
+        ), mock.patch.object(cli, "_mirror_transfer_approval"):
+            payload = self._run_and_parse_stdout(lambda: cli.cmd_approvals_decide_transfer(args))
+        self.assertEqual(payload.get("ok"), True)
+        self.assertEqual(payload.get("status"), "filled")
+        self.assertEqual(payload.get("executionMode"), "policy_override")
+
+    def test_approvals_decide_transfer_deny_sets_rejected(self) -> None:
+        approval_id = "xfr_test_2"
+        cli._record_pending_transfer_flow(
+            approval_id,
+            {
+                "approvalId": approval_id,
+                "chainKey": "base_sepolia",
+                "status": "approval_pending",
+                "transferType": "token",
+                "tokenAddress": "0x" + "11" * 20,
+                "tokenSymbol": "USDC",
+                "toAddress": "0x" + "22" * 20,
+                "amountWei": "1",
+                "createdAt": cli.utc_now(),
+            },
+        )
+        args = argparse.Namespace(
+            approval_id=approval_id,
+            decision="deny",
+            reason_message="No",
+            chain="base_sepolia",
+            json=True,
+        )
+        with mock.patch.object(cli, "_mirror_transfer_approval"):
+            payload = self._run_and_parse_stdout(lambda: cli.cmd_approvals_decide_transfer(args))
+        self.assertEqual(payload.get("ok"), True)
+        self.assertEqual(payload.get("status"), "rejected")
+        self.assertEqual(payload.get("amountDisplay"), "0.000000000000000001 USDC")
+        saved = cli._get_pending_transfer_flow(approval_id)
+        self.assertIsNotNone(saved)
+        self.assertEqual(str((saved or {}).get("status")), "rejected")
+
+    def test_execute_pending_transfer_flow_blocks_without_override_when_policy_now_blocked(self) -> None:
+        flow = {
+            "approvalId": "xfr_test_3",
+            "chainKey": "base_sepolia",
+            "status": "approved",
+            "transferType": "native",
+            "toAddress": "0x" + "22" * 20,
+            "amountWei": "1",
+            "policyBlockedAtCreate": False,
+            "createdAt": cli.utc_now(),
+        }
+        with mock.patch.object(
+            cli,
+            "_evaluate_outbound_transfer_policy",
+            return_value={"allowed": False, "policyBlockReasonCode": "destination_not_whitelisted", "policyBlockReasonMessage": "blocked"},
+        ):
+            out = cli._execute_pending_transfer_flow(flow)
+        self.assertEqual(out.get("ok"), False)
+        self.assertEqual(out.get("code"), "not_actionable")
 
     def test_trade_spot_builds_quote_and_swap_calls(self) -> None:
         args = argparse.Namespace(
@@ -914,6 +1177,7 @@ class TradePathRuntimeTests(unittest.TestCase):
         sent = captured.get("payload") or {}
         self.assertEqual(sent.get("requestType"), "token_preapprove_add")
         self.assertEqual(sent.get("chainKey"), "base_sepolia")
+        self.assertRegex(str(captured.get("idempotency_key") or ""), r"^rt-polreq-token-base_sepolia-0x[0-9a-f]{40}-[0-9a-f]{16}$")
 
     def test_policy_preapprove_token_accepts_symbol(self) -> None:
         args = argparse.Namespace(chain="base_sepolia", token="USDC", json=True)
@@ -979,6 +1243,65 @@ class TradePathRuntimeTests(unittest.TestCase):
         sent = captured.get("payload") or {}
         self.assertEqual(sent.get("requestType"), "token_preapprove_remove")
         self.assertEqual(sent.get("chainKey"), "base_sepolia")
+        self.assertRegex(str(captured.get("idempotency_key") or ""), r"^rt-polrev-token-base_sepolia-0x[0-9a-f]{40}-[0-9a-f]{16}$")
+
+    def test_policy_preapprove_global_uses_nonce_idempotency_key(self) -> None:
+        args = argparse.Namespace(chain="base_sepolia", json=True)
+        captured: dict = {}
+
+        def fake_api_request(
+            method: str,
+            path: str,
+            payload: dict | None = None,
+            include_idempotency: bool = False,
+            idempotency_key: str | None = None,
+            allow_auth_recovery: bool = True,
+        ):
+            captured["method"] = method
+            captured["path"] = path
+            captured["payload"] = payload
+            captured["idempotency_key"] = idempotency_key
+            return 200, {"ok": True, "policyApprovalId": "ppr_3", "status": "approval_pending"}
+
+        with mock.patch.object(cli, "_resolve_api_key", return_value="xak1.ag_1.sig.payload"), mock.patch.object(
+            cli, "_resolve_agent_id", return_value="ag_1"
+        ), mock.patch.object(cli, "_api_request", side_effect=fake_api_request):
+            payload = self._run_and_parse_stdout(lambda: cli.cmd_approvals_request_global(args))
+
+        self.assertTrue(payload.get("ok"))
+        self.assertEqual(captured.get("method"), "POST")
+        self.assertEqual(captured.get("path"), "/agent/policy-approvals/proposed")
+        self.assertEqual((captured.get("payload") or {}).get("requestType"), "global_approval_enable")
+        self.assertRegex(str(captured.get("idempotency_key") or ""), r"^rt-polreq-global-base_sepolia-[0-9a-f]{16}$")
+
+    def test_policy_revoke_global_uses_nonce_idempotency_key(self) -> None:
+        args = argparse.Namespace(chain="base_sepolia", json=True)
+        captured: dict = {}
+
+        def fake_api_request(
+            method: str,
+            path: str,
+            payload: dict | None = None,
+            include_idempotency: bool = False,
+            idempotency_key: str | None = None,
+            allow_auth_recovery: bool = True,
+        ):
+            captured["method"] = method
+            captured["path"] = path
+            captured["payload"] = payload
+            captured["idempotency_key"] = idempotency_key
+            return 200, {"ok": True, "policyApprovalId": "ppr_4", "status": "approval_pending"}
+
+        with mock.patch.object(cli, "_resolve_api_key", return_value="xak1.ag_1.sig.payload"), mock.patch.object(
+            cli, "_resolve_agent_id", return_value="ag_1"
+        ), mock.patch.object(cli, "_api_request", side_effect=fake_api_request):
+            payload = self._run_and_parse_stdout(lambda: cli.cmd_approvals_revoke_global(args))
+
+        self.assertTrue(payload.get("ok"))
+        self.assertEqual(captured.get("method"), "POST")
+        self.assertEqual(captured.get("path"), "/agent/policy-approvals/proposed")
+        self.assertEqual((captured.get("payload") or {}).get("requestType"), "global_approval_disable")
+        self.assertRegex(str(captured.get("idempotency_key") or ""), r"^rt-polrev-global-base_sepolia-[0-9a-f]{16}$")
 
     def test_management_link_normalizes_loopback_host_to_public_domain(self) -> None:
         args = argparse.Namespace(ttl_seconds=600, json=True)

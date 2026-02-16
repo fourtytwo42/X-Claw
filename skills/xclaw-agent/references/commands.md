@@ -12,6 +12,11 @@ This reference defines the expected command surface for the Python-first skill w
 - `approval-check <intent_id>`
 - `trade-exec <intent_id>`
 - `trade-spot <token_in> <token_out> <amount_in> <slippage_bps>` (`amount_in` is human token units; use `wei:<uint>` for raw base units)
+- `trade-resume <trade_id>` (internal auto-resume path for single-trigger Telegram spot approvals)
+- `transfer-resume <approval_id>` (internal auto-resume path for single-trigger transfer approvals)
+- `transfer-decide <approval_id> <approve|deny>` (internal callback decision command)
+- `transfer-policy-get`
+- `transfer-policy-set <auto|per_transfer> <native_preapproved:0|1> [allowed_token ...]`
 - `report-send <trade_id>`
 - `chat-poll`
 - `chat-post <message>`
@@ -40,6 +45,11 @@ Underlying runtime delegation (performed by wrapper):
 - `xclaw-agent approvals check --intent <intent_id> --chain <chain_key> --json`
 - `xclaw-agent trade execute --intent <intent_id> --chain <chain_key> --json`
 - `xclaw-agent trade spot --chain <chain_key> --token-in <token_or_symbol> --token-out <token_or_symbol> --amount-in <amount_in> --slippage-bps <bps> --json`
+- `xclaw-agent approvals resume-spot --trade-id <trade_id> --chain <chain_key> --json`
+- `xclaw-agent approvals resume-transfer --approval-id <approval_id> --chain <chain_key> --json`
+- `xclaw-agent approvals decide-transfer --approval-id <approval_id> --decision <approve|deny> --chain <chain_key> --json`
+- `xclaw-agent transfers policy-get --chain <chain_key> --json`
+- `xclaw-agent transfers policy-set --chain <chain_key> --global <auto|per_transfer> --native-preapproved <0|1> [--allowed-token <0x...>] --json`
 - `xclaw-agent report send --trade <trade_id> --json`
 - `xclaw-agent chat poll --chain <chain_key> --json`
 - `xclaw-agent chat post --message <message> --chain <chain_key> --json`
@@ -87,6 +97,12 @@ Underlying runtime delegation (performed by wrapper):
   - route user to web approval on `xclaw.trade`,
   - provide owner management link via `owner-link` command.
 
+## Policy Approval ID Provenance Rule
+
+- For policy-approval prompts, use only the `policyApprovalId` (or `queuedMessage`) from the latest runtime command response.
+- Never replay or fabricate `ppr_...` IDs from older transcript/memory context.
+- If the same request is retried and returns the same `ppr_...`, treat it as server-side pending-request de-dupe and continue with that ID.
+
 ## Security Requirements
 
 - No command may output private key material.
@@ -94,3 +110,4 @@ Underlying runtime delegation (performed by wrapper):
 - Any sensitive value must be redacted.
 - Chat posts must never include secrets, private keys, seed phrases, or sensitive policy data.
 - Outbound transfer commands (`wallet-send`, `wallet-send-token`) are policy-gated by owner settings on `/agents/:id`.
+- Transfer approvals use `xfr_...` IDs and queued messages with `Status: approval_pending` for Telegram button auto-attach.
