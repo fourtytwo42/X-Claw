@@ -8,6 +8,25 @@ import { getRequestId } from '@/lib/request-id';
 
 export const runtime = 'nodejs';
 
+function isMissingTransferMirrorSchema(error: unknown): boolean {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+  const code = 'code' in error ? String((error as { code?: unknown }).code ?? '') : '';
+  if (code === '42703' || code === '42P01') {
+    return true;
+  }
+  const message = 'message' in error ? String((error as { message?: unknown }).message ?? '') : '';
+  return (
+    message.includes('agent_transfer_approval_mirror') ||
+    message.includes('agent_transfer_policy_mirror') ||
+    message.includes('policy_blocked_at_create') ||
+    message.includes('policy_block_reason_code') ||
+    message.includes('policy_block_reason_message') ||
+    message.includes('execution_mode')
+  );
+}
+
 export async function GET(req: NextRequest) {
   const requestId = getRequestId(req);
 
@@ -62,7 +81,21 @@ export async function GET(req: NextRequest) {
       address
     }));
 
-    const [agent, approvals, policyApprovals, policyApprovalsHistory, policy, audit, outboundPolicy, dailyUsage, chainPolicy, approvalChannel] = await Promise.all([
+    const [
+      agent,
+      approvals,
+      policyApprovals,
+      policyApprovalsHistory,
+      policy,
+      audit,
+      outboundPolicy,
+      dailyUsage,
+      chainPolicy,
+      approvalChannel,
+      transferApprovalsQueue,
+      transferApprovalsHistory,
+      transferPolicyMirror
+    ] = await Promise.all([
       dbQuery<{
         agent_id: string;
         public_status: string;
@@ -235,7 +268,126 @@ export async function GET(req: NextRequest) {
         limit 1
         `,
         [agentId, chainKey]
-      )
+      ),
+      dbQuery<{
+        approval_id: string;
+        chain_key: string;
+        status: string;
+        transfer_type: string;
+        token_address: string | null;
+        token_symbol: string | null;
+        to_address: string;
+        amount_wei: string;
+        policy_blocked_at_create: boolean;
+        policy_block_reason_code: string | null;
+        policy_block_reason_message: string | null;
+        execution_mode: 'normal' | 'policy_override' | null;
+        created_at: string;
+      }>(
+        `
+        select
+          approval_id,
+          chain_key,
+          status::text,
+          transfer_type::text,
+          token_address,
+          token_symbol,
+          to_address,
+          amount_wei::text,
+          policy_blocked_at_create,
+          policy_block_reason_code,
+          policy_block_reason_message,
+          execution_mode,
+          created_at::text
+        from agent_transfer_approval_mirror
+        where agent_id = $1
+          and chain_key = $2
+          and status = 'approval_pending'
+        order by created_at asc
+        limit 50
+        `,
+        [agentId, chainKey]
+      ).catch((error) => {
+        if (isMissingTransferMirrorSchema(error)) {
+          return { rowCount: 0, rows: [] };
+        }
+        throw error;
+      }),
+      dbQuery<{
+        approval_id: string;
+        chain_key: string;
+        status: string;
+        transfer_type: string;
+        token_address: string | null;
+        token_symbol: string | null;
+        to_address: string;
+        amount_wei: string;
+        tx_hash: string | null;
+        reason_message: string | null;
+        policy_blocked_at_create: boolean;
+        policy_block_reason_code: string | null;
+        policy_block_reason_message: string | null;
+        execution_mode: 'normal' | 'policy_override' | null;
+        created_at: string;
+        decided_at: string | null;
+        terminal_at: string | null;
+      }>(
+        `
+        select
+          approval_id,
+          chain_key,
+          status::text,
+          transfer_type::text,
+          token_address,
+          token_symbol,
+          to_address,
+          amount_wei::text,
+          tx_hash,
+          reason_message,
+          policy_blocked_at_create,
+          policy_block_reason_code,
+          policy_block_reason_message,
+          execution_mode,
+          created_at::text,
+          decided_at::text,
+          terminal_at::text
+        from agent_transfer_approval_mirror
+        where agent_id = $1
+          and chain_key = $2
+        order by created_at desc
+        limit 50
+        `,
+        [agentId, chainKey]
+      ).catch((error) => {
+        if (isMissingTransferMirrorSchema(error)) {
+          return { rowCount: 0, rows: [] };
+        }
+        throw error;
+      }),
+      dbQuery<{
+        transfer_approval_mode: 'auto' | 'per_transfer';
+        native_transfer_preapproved: boolean;
+        allowed_transfer_tokens: unknown;
+        updated_at: string;
+      }>(
+        `
+        select
+          transfer_approval_mode::text,
+          native_transfer_preapproved,
+          allowed_transfer_tokens,
+          updated_at::text
+        from agent_transfer_policy_mirror
+        where agent_id = $1
+          and chain_key = $2
+        limit 1
+        `,
+        [agentId, chainKey]
+      ).catch((error) => {
+        if (isMissingTransferMirrorSchema(error)) {
+          return { rowCount: 0, rows: [] };
+        }
+        throw error;
+      })
     ]);
 
     if (agent.rowCount === 0) {
@@ -268,6 +420,26 @@ export async function GET(req: NextRequest) {
         approvalsQueue: approvals.rows,
         policyApprovalsQueue: policyApprovals.rows,
         policyApprovalsHistory: policyApprovalsHistory.rows,
+        transferApprovalsQueue: transferApprovalsQueue.rows,
+        transferApprovalsHistory: transferApprovalsHistory.rows,
+        transferApprovalPolicy:
+          (transferPolicyMirror.rowCount ?? 0) > 0
+            ? {
+                chainKey,
+                transferApprovalMode: transferPolicyMirror.rows[0].transfer_approval_mode,
+                nativeTransferPreapproved: transferPolicyMirror.rows[0].native_transfer_preapproved,
+                allowedTransferTokens: Array.isArray(transferPolicyMirror.rows[0].allowed_transfer_tokens)
+                  ? transferPolicyMirror.rows[0].allowed_transfer_tokens
+                  : [],
+                updatedAt: transferPolicyMirror.rows[0].updated_at
+              }
+            : {
+                chainKey,
+                transferApprovalMode: 'per_transfer',
+                nativeTransferPreapproved: false,
+                allowedTransferTokens: [],
+                updatedAt: null
+              },
         latestPolicy: policy.rows[0] ?? null,
         tradeCaps: policy.rows[0]
           ? {

@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "approvalId",
+    "agentId",
+    "chainKey",
+    "status",
+    "transferType",
+    "toAddress",
+    "amountWei",
+    "createdAt",
+    "updatedAt"
+  ],
+  "properties": {
+    "approvalId": { "type": "string", "minLength": 1 },
+    "agentId": { "type": "string", "minLength": 1 },
+    "chainKey": { "type": "string", "minLength": 1 },
+    "status": {
+      "type": "string",
+      "enum": ["proposed", "approval_pending", "approved", "rejected", "executing", "filled", "failed"]
+    },
+    "transferType": { "type": "string", "enum": ["native", "token"] },
+    "tokenAddress": { "type": ["string", "null"], "pattern": "^0x[a-fA-F0-9]{40}$" },
+    "tokenSymbol": { "type": ["string", "null"] },
+    "toAddress": { "type": "string", "pattern": "^0x[a-fA-F0-9]{40}$" },
+    "amountWei": { "type": "string", "pattern": "^[0-9]+$" },
+    "txHash": { "type": ["string", "null"], "pattern": "^0x[a-fA-F0-9]{64}$" },
+    "reasonCode": { "type": ["string", "null"] },
+    "reasonMessage": { "type": ["string", "null"] },
+    "policyBlockedAtCreate": { "type": "boolean" },
+    "policyBlockReasonCode": {
+      "type": ["string", "null"],
+      "enum": ["outbound_disabled", "destination_not_whitelisted", null]
+    },
+    "policyBlockReasonMessage": { "type": ["string", "null"] },
+    "executionMode": {
+      "type": ["string", "null"],
+      "enum": ["normal", "policy_override", null]
+    },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "updatedAt": { "type": "string", "format": "date-time" },
+    "decidedAt": { "type": ["string", "null"], "format": "date-time" },
+    "terminalAt": { "type": ["string", "null"], "format": "date-time" }
+  }
+}

@@ -37,24 +37,14 @@ export async function GET(
       select
         a.agent_id,
         a.agent_name,
-        a.description,
-        a.owner_label,
+        null::text as description,
+        null::text as owner_label,
         a.runtime_platform,
         a.public_status,
         a.created_at::text,
-        a.updated_at::text,
-        (
-          select max(ev.created_at)::text
-          from agent_events ev
-          where ev.agent_id = a.agent_id
-        ) as last_activity_at
-        ,
-        (
-          select max(ev.created_at)::text
-          from agent_events ev
-          where ev.agent_id = a.agent_id
-            and ev.event_type = 'heartbeat'
-        ) as last_heartbeat_at
+        a.created_at::text as updated_at,
+        null::text as last_activity_at,
+        null::text as last_heartbeat_at
       from agents a
       where a.agent_id = $1
       limit 1
@@ -86,7 +76,34 @@ export async function GET(
       order by chain_key asc
       `,
       [agentId]
-    );
+    ).catch(() => ({ rowCount: 0, rows: [] }));
+
+    const walletBalances = await dbQuery<{
+      chain_key: string;
+      token: string;
+      balance: string;
+      decimals: number | null;
+      observed_at: string;
+    }>(
+      `
+      with ranked as (
+        select
+          chain_key,
+          token,
+          balance::text,
+          null::int as decimals,
+          observed_at::text,
+          row_number() over (partition by chain_key, token order by observed_at desc) as rn
+        from wallet_balance_snapshots
+        where agent_id = $1
+      )
+      select chain_key, token, balance, decimals, observed_at
+      from ranked
+      where rn = 1
+      order by chain_key asc, token asc
+      `,
+      [agentId]
+    ).catch(() => ({ rowCount: 0, rows: [] }));
 
     const metrics = await dbQuery<{
       mode: 'mock' | 'real';
@@ -160,7 +177,7 @@ export async function GET(
       order by mode asc
       `,
       [agentId]
-    );
+    ).catch(() => ({ rowCount: 0, rows: [] }));
 
     const mapMetric = (row: (typeof metrics.rows)[number] | null) =>
       row
@@ -189,6 +206,7 @@ export async function GET(
         ok: true,
         agent: agent.rows[0],
         wallets: wallets.rows,
+        walletBalances: walletBalances.rows,
         latestMetrics,
         metricsByMode: {
           mock: null,

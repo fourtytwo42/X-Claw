@@ -70,23 +70,37 @@ export async function requireManagementSession(req: NextRequest, requestId: stri
     return failManagementAuth(requestId);
   }
 
-  const result = await dbQuery<{
-    session_id: string;
-    agent_id: string;
-    cookie_hash: string;
-    expires_at: string;
-    revoked_at: string | null;
-  }>(
-    `
-    select session_id, agent_id, cookie_hash, expires_at::text, revoked_at::text
-    from management_sessions
-    where session_id = $1
-    limit 1
-    `,
-    [parsed.sessionId]
-  );
+  let result: {
+    rowCount: number | null;
+    rows: Array<{
+      session_id: string;
+      agent_id: string;
+      cookie_hash: string;
+      expires_at: string;
+      revoked_at: string | null;
+    }>;
+  };
+  try {
+    result = await dbQuery<{
+      session_id: string;
+      agent_id: string;
+      cookie_hash: string;
+      expires_at: string;
+      revoked_at: string | null;
+    }>(
+      `
+      select session_id, agent_id, cookie_hash, expires_at::text, revoked_at::text
+      from management_sessions
+      where session_id = $1
+      limit 1
+      `,
+      [parsed.sessionId]
+    );
+  } catch {
+    return failManagementAuth(requestId);
+  }
 
-  if (result.rowCount === 0) {
+  if ((result.rowCount ?? 0) === 0) {
     return failManagementAuth(requestId);
   }
 

@@ -7,3 +7,4 @@ Start with the smoke sheet after every deploy.
 2) `docs/BUG_TEST_APPROVALS_TRADE_FLOW.md`
 3) `docs/BUG_TEST_APPROVALS_POLICY_FLOW.md`
 4) `docs/BUG_TEST_APPROVALS_FAILURES_AND_AGENT_FEEDBACK.md`
+5) `docs/BUG_TEST_APPROVALS_TRANSFER_FLOW.md` (Slice 71 transfer approvals)

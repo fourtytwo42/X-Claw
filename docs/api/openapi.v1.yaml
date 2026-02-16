@@ -139,6 +139,59 @@ paths:
           description: Outbound transfer policy payload including chain access, effective trade caps, and UTC-day usage.
         '401':
           $ref: '#/components/responses/ErrorResponse'
+  /api/v1/agent/transfer-policy:
+    get:
+      summary: Read runtime-mirrored transfer approval policy for authenticated agent.
+      security:
+        - agentBearer: []
+      parameters:
+        - name: chainKey
+          in: query
+          required: false
+          schema:
+            type: string
+            default: base_sepolia
+      responses:
+        '200':
+          description: Transfer approval policy payload.
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+  /api/v1/agent/transfer-policy/mirror:
+    post:
+      summary: Mirror runtime transfer approval policy into server read model (agent-auth).
+      security:
+        - agentBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentTransferPolicyMirrorRequest'
+      responses:
+        '200':
+          description: Transfer policy mirror accepted.
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+  /api/v1/agent/transfer-approvals/mirror:
+    post:
+      summary: Mirror runtime transfer approval lifecycle into server read model (agent-auth).
+      security:
+        - agentBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentTransferApprovalsMirrorRequest'
+      responses:
+        '200':
+          description: Transfer approval mirror accepted.
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
   /api/v1/agent/trade-usage:
     post:
       summary: Report UTC-day trade usage deltas for authenticated agent (idempotent).
@@ -776,6 +829,72 @@ paths:
         '401':
           $ref: '#/components/responses/ErrorResponse'
         '409':
+          $ref: '#/components/responses/ErrorResponse'
+  /api/v1/management/transfer-approvals:
+    get:
+      summary: List pending and recent mirrored transfer approvals for authorized management session.
+      security:
+        - managementCookie: []
+      parameters:
+        - name: agentId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: chainKey
+          in: query
+          required: false
+          schema:
+            type: string
+            default: base_sepolia
+      responses:
+        '200':
+          description: Transfer approval queue/history payload.
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+  /api/v1/management/transfer-approvals/decision:
+    post:
+      summary: Apply approve/deny decision to one mirrored transfer approval.
+      security:
+        - managementCookie: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfTokenHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ManagementTransferApprovalDecisionRequest'
+      responses:
+        '200':
+          description: Transfer decision accepted and runtime apply attempted.
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+  /api/v1/management/transfer-policy/update:
+    post:
+      summary: Update mirrored runtime transfer approval policy for active chain.
+      security:
+        - managementCookie: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfTokenHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ManagementTransferPolicyUpdateRequest'
+      responses:
+        '200':
+          description: Transfer policy update accepted.
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
           $ref: '#/components/responses/ErrorResponse'
   /api/v1/management/policy/update:
     post:
@@ -1734,6 +1853,95 @@ components:
         tokenAddress:
           type: string
           nullable: true
+    AgentTransferApprovalsMirrorRequest:
+      type: object
+      required: [schemaVersion, approvalId, chainKey, status, transferType, toAddress, amountWei, createdAt, updatedAt]
+      properties:
+        schemaVersion:
+          type: integer
+          enum: [1]
+        approvalId:
+          type: string
+        chainKey:
+          type: string
+        status:
+          type: string
+          enum: [proposed, approval_pending, approved, rejected, executing, filled, failed]
+        transferType:
+          type: string
+          enum: [native, token]
+        tokenAddress:
+          type: string
+          nullable: true
+        tokenSymbol:
+          type: string
+          nullable: true
+        toAddress:
+          type: string
+        amountWei:
+          type: string
+        txHash:
+          type: string
+          nullable: true
+        reasonCode:
+          type: string
+          nullable: true
+        reasonMessage:
+          type: string
+          nullable: true
+        policyBlockedAtCreate:
+          type: boolean
+        policyBlockReasonCode:
+          type: string
+          enum: [outbound_disabled, destination_not_whitelisted]
+          nullable: true
+        policyBlockReasonMessage:
+          type: string
+          nullable: true
+        executionMode:
+          type: string
+          enum: [normal, policy_override]
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        decidedAt:
+          type: string
+          format: date-time
+          nullable: true
+        terminalAt:
+          type: string
+          format: date-time
+          nullable: true
+    AgentTransferPolicyMirrorRequest:
+      type: object
+      required: [agentId, chainKey, transferPolicy]
+      properties:
+        agentId:
+          type: string
+        chainKey:
+          type: string
+        transferPolicy:
+          type: object
+          required: [chainKey, transferApprovalMode, nativeTransferPreapproved, allowedTransferTokens, updatedAt]
+          properties:
+            chainKey:
+              type: string
+            transferApprovalMode:
+              type: string
+              enum: [auto, per_transfer]
+            nativeTransferPreapproved:
+              type: boolean
+            allowedTransferTokens:
+              type: array
+              items:
+                type: string
+            updatedAt:
+              type: string
+              format: date-time
     PolicyApprovalDecisionRequest:
       type: object
       required: [policyApprovalId, fromStatus, toStatus, at]
@@ -1766,6 +1974,40 @@ components:
         reasonMessage:
           type: string
           nullable: true
+    ManagementTransferApprovalDecisionRequest:
+      type: object
+      required: [agentId, approvalId, decision]
+      properties:
+        agentId:
+          type: string
+        approvalId:
+          type: string
+        decision:
+          type: string
+          enum: [approve, deny]
+        reasonMessage:
+          type: string
+          nullable: true
+        chainKey:
+          type: string
+    ManagementTransferPolicyUpdateRequest:
+      type: object
+      required: [agentId, chainKey, transferApprovalMode, nativeTransferPreapproved, allowedTransferTokens]
+      properties:
+        agentId:
+          type: string
+        chainKey:
+          type: string
+        transferApprovalMode:
+          type: string
+          enum: [auto, per_transfer]
+        nativeTransferPreapproved:
+          type: boolean
+        allowedTransferTokens:
+          type: array
+          items:
+            type: string
+            pattern: '^0x[a-fA-F0-9]{40}$'
     ManagementPolicyUpdateRequest:
       type: object
       required: [agentId, mode, approvalMode, maxTradeUsd, maxDailyUsd, allowedTokens]

@@ -1,0 +1,431 @@
+import { shortenAddress } from '@/lib/public-format';
+
+export type AgentProfilePayload = {
+  ok: boolean;
+  agent: {
+    agent_id: string;
+    agent_name: string;
+    description: string | null;
+    owner_label: string | null;
+    runtime_platform: string;
+    public_status: string;
+    created_at: string;
+    updated_at: string;
+    last_activity_at: string | null;
+    last_heartbeat_at: string | null;
+  };
+  wallets: Array<{
+    chain_key: string;
+    address: string;
+    custody: string;
+  }>;
+  walletBalances?: Array<{
+    chain_key: string;
+    token: string;
+    balance: string;
+    decimals: number | null;
+    observed_at: string;
+  }>;
+  latestMetrics:
+    | {
+        window: string;
+        pnl_usd: string | null;
+        return_pct: string | null;
+        volume_usd: string | null;
+        trades_count: number;
+        followers_count: number;
+        created_at: string;
+      }
+    | null;
+  copyBreakdown:
+    | {
+        selfTradesCount: number;
+        copiedTradesCount: number;
+        selfVolumeUsd: string | null;
+        copiedVolumeUsd: string | null;
+        selfPnlUsd: string | null;
+        copiedPnlUsd: string | null;
+      }
+    | null;
+};
+
+export type TradePayload = {
+  ok: boolean;
+  items: Array<{
+    trade_id: string;
+    source_trade_id: string | null;
+    source_label?: 'self' | 'copied';
+    chain_key: string;
+    status: string;
+    token_in: string;
+    token_out: string;
+    pair: string;
+    amount_in: string | null;
+    amount_out: string | null;
+    reason: string | null;
+    reason_code: string | null;
+    reason_message: string | null;
+    tx_hash: string | null;
+    executed_at: string | null;
+    created_at: string;
+  }>;
+};
+
+export type ActivityPayload = {
+  ok: boolean;
+  items: Array<{
+    event_id: string;
+    agent_id: string;
+    event_type: string;
+    chain_key: string;
+    pair_display: string | null;
+    token_in_symbol: string | null;
+    token_out_symbol: string | null;
+    created_at: string;
+  }>;
+};
+
+export type ManagementStatePayload = {
+  ok: boolean;
+  agent: {
+    agentId: string;
+    publicStatus: string;
+    metadata: Record<string, unknown>;
+  };
+  chainTokens?: Array<{ symbol: string; address: string }>;
+  approvalChannels?: {
+    telegram?: { enabled: boolean; updatedAt?: string | null };
+  };
+  chainPolicy: {
+    chainKey: string;
+    chainEnabled: boolean;
+    updatedAt: string | null;
+  };
+  approvalsQueue: Array<{
+    trade_id: string;
+    chain_key: string;
+    pair: string;
+    amount_in: string | null;
+    token_in: string;
+    token_out: string;
+    reason: string | null;
+    created_at: string;
+  }>;
+  policyApprovalsQueue?: Array<{
+    request_id: string;
+    chain_key: string;
+    request_type: string;
+    token_address: string | null;
+    created_at: string;
+  }>;
+  policyApprovalsHistory?: Array<{
+    request_id: string;
+    chain_key: string;
+    request_type: string;
+    token_address: string | null;
+    status: string;
+    reason_message: string | null;
+    created_at: string;
+    decided_at: string | null;
+  }>;
+  transferApprovalsQueue?: Array<{
+    approval_id: string;
+    chain_key: string;
+    status: string;
+    transfer_type: 'native' | 'token';
+    token_address: string | null;
+    token_symbol: string | null;
+    to_address: string;
+    amount_wei: string;
+    policy_blocked_at_create: boolean;
+    policy_block_reason_code: 'outbound_disabled' | 'destination_not_whitelisted' | null;
+    policy_block_reason_message: string | null;
+    execution_mode: 'normal' | 'policy_override' | null;
+    created_at: string;
+  }>;
+  transferApprovalsHistory?: Array<{
+    approval_id: string;
+    chain_key: string;
+    status: string;
+    transfer_type: 'native' | 'token';
+    token_address: string | null;
+    token_symbol: string | null;
+    to_address: string;
+    amount_wei: string;
+    tx_hash: string | null;
+    reason_message: string | null;
+    policy_blocked_at_create: boolean;
+    policy_block_reason_code: 'outbound_disabled' | 'destination_not_whitelisted' | null;
+    policy_block_reason_message: string | null;
+    execution_mode: 'normal' | 'policy_override' | null;
+    created_at: string;
+    decided_at: string | null;
+    terminal_at: string | null;
+  }>;
+  transferApprovalPolicy?: {
+    chainKey: string;
+    transferApprovalMode: 'auto' | 'per_transfer';
+    nativeTransferPreapproved: boolean;
+    allowedTransferTokens: string[];
+    updatedAt: string | null;
+  };
+  latestPolicy: {
+    mode: 'real';
+    approval_mode: 'per_trade' | 'auto';
+    max_trade_usd: string | null;
+    max_daily_usd: string | null;
+    max_daily_trade_count: string | null;
+    daily_cap_usd_enabled: boolean;
+    daily_trade_cap_enabled: boolean;
+    allowed_tokens: string[];
+    created_at: string;
+  } | null;
+  tradeCaps: {
+    dailyCapUsdEnabled: boolean;
+    dailyTradeCapEnabled: boolean;
+    maxDailyTradeCount: number | null;
+  };
+  dailyUsage: {
+    utcDay: string;
+    dailySpendUsd: string;
+    dailyFilledTrades: number;
+  };
+  outboundTransfersPolicy: {
+    outboundTransfersEnabled: boolean;
+    outboundMode: 'disabled' | 'allow_all' | 'whitelist';
+    outboundWhitelistAddresses: string[];
+    updatedAt: string | null;
+  };
+  auditLog: Array<{
+    audit_id: string;
+    action_type: string;
+    action_status: string;
+    public_redacted_payload: Record<string, unknown>;
+    created_at: string;
+  }>;
+  managementSession: {
+    sessionId: string;
+    expiresAt: string;
+  };
+};
+
+export type DepositPayload = {
+  ok: boolean;
+  agentId: string;
+  chains: Array<{
+    chainKey: string;
+    depositAddress: string;
+    minConfirmations: number;
+    lastSyncedAt: string | null;
+    syncStatus: 'ok' | 'degraded';
+    syncDetail: string | null;
+    balances: Array<{ token: string; balance: string; decimals?: number; blockNumber: number | null; observedAt: string }>;
+    recentDeposits: Array<{
+      token: string;
+      amount: string;
+      txHash: string;
+      blockNumber: number;
+      confirmedAt: string;
+      status: string;
+    }>;
+    explorerBaseUrl: string | null;
+  }>;
+};
+
+export type LimitOrderItem = {
+  orderId: string;
+  agentId: string;
+  chainKey: string;
+  mode: 'real';
+  side: 'buy' | 'sell';
+  tokenIn: string;
+  tokenOut: string;
+  amountIn: string;
+  limitPrice: string;
+  slippageBps: number;
+  status: string;
+  expiresAt: string | null;
+  cancelledAt: string | null;
+  triggerSource: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ActivityRow = {
+  id: string;
+  at: string;
+  title: string;
+  subtitle: string;
+  status: string;
+};
+
+export type HoldingRow = {
+  token: string;
+  amountRaw: string;
+  decimals: number;
+};
+
+export function normalizeHexAddress(value: string): string {
+  const raw = (value ?? '').trim();
+  return raw.toLowerCase();
+}
+
+export function tokenSymbolByAddress(chainTokens?: Array<{ symbol: string; address: string }>): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const token of chainTokens ?? []) {
+    if (!token.address || !token.symbol) {
+      continue;
+    }
+    map.set(normalizeHexAddress(token.address), token.symbol);
+  }
+  return map;
+}
+
+export function resolveTokenLabel(value: string | null | undefined, byAddress: Map<string, string>): string {
+  const raw = (value ?? '').trim();
+  if (!raw) {
+    return 'token';
+  }
+  if (!raw.startsWith('0x')) {
+    return raw;
+  }
+  return byAddress.get(normalizeHexAddress(raw)) ?? shortenAddress(raw);
+}
+
+export function formatActivityTitle(eventType: string): string {
+  if (eventType === 'trade_filled') {
+    return 'Trade filled';
+  }
+  if (eventType === 'trade_failed') {
+    return 'Trade failed';
+  }
+  if (eventType === 'trade_executing') {
+    return 'Trade executing';
+  }
+  if (eventType === 'trade_approval_pending') {
+    return 'Awaiting approval';
+  }
+  if (eventType === 'policy_approval_pending') {
+    return 'Policy awaiting approval';
+  }
+  if (eventType === 'policy_approved') {
+    return 'Policy approved';
+  }
+  if (eventType === 'policy_rejected') {
+    return 'Policy rejected';
+  }
+  if (eventType.startsWith('trade_')) {
+    return eventType.replace(/^trade_/, '').replace(/_/g, ' ');
+  }
+  if (eventType.startsWith('policy_')) {
+    return eventType.replace(/^policy_/, '').replace(/_/g, ' ');
+  }
+  return eventType.replace(/_/g, ' ');
+}
+
+export function buildActivityRows(
+  trades: TradePayload['items'] | null,
+  activity: ActivityPayload['items'] | null,
+  chainTokens?: Array<{ symbol: string; address: string }>
+): ActivityRow[] {
+  const symbolMap = tokenSymbolByAddress(chainTokens);
+  const rows: ActivityRow[] = [];
+
+  for (const trade of trades ?? []) {
+    const tokenIn = resolveTokenLabel(trade.token_in, symbolMap);
+    const tokenOut = resolveTokenLabel(trade.token_out, symbolMap);
+    rows.push({
+      id: `trade:${trade.trade_id}`,
+      at: trade.created_at,
+      title: `${tokenIn} -> ${tokenOut}`,
+      subtitle: trade.reason ?? trade.reason_code ?? trade.reason_message ?? 'Trade lifecycle event',
+      status: trade.status
+    });
+  }
+
+  for (const event of activity ?? []) {
+    const pair = event.pair_display ?? `${event.token_in_symbol ?? 'token'} / ${event.token_out_symbol ?? 'token'}`;
+    rows.push({
+      id: `event:${event.event_id}`,
+      at: event.created_at,
+      title: formatActivityTitle(event.event_type),
+      subtitle: pair,
+      status: event.event_type
+    });
+  }
+
+  rows.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+  return rows;
+}
+
+export function buildHoldings(
+  profile: AgentProfilePayload | null,
+  depositData: DepositPayload | null,
+  chainKey: string
+): HoldingRow[] {
+  const byToken = new Map<string, HoldingRow>();
+
+  for (const item of profile?.walletBalances ?? []) {
+    if (item.chain_key !== chainKey) {
+      continue;
+    }
+    byToken.set(item.token, {
+      token: item.token,
+      amountRaw: item.balance,
+      decimals: item.decimals ?? 18
+    });
+  }
+
+  const chain = depositData?.chains.find((entry) => entry.chainKey === chainKey);
+  for (const item of chain?.balances ?? []) {
+    byToken.set(item.token, {
+      token: item.token,
+      amountRaw: item.balance,
+      decimals: item.decimals ?? 18
+    });
+  }
+
+  return [...byToken.values()].sort((a, b) => a.token.localeCompare(b.token));
+}
+
+export function formatDecimalText(value: string | null | undefined): string {
+  const raw = (value ?? '').trim();
+  if (!raw) {
+    return '—';
+  }
+  const sign = raw.startsWith('-') ? '-' : '';
+  const unsigned = sign ? raw.slice(1) : raw;
+  const [intPartRaw, fracPartRaw] = unsigned.split('.', 2);
+  const intPart = (intPartRaw || '0').replace(/^0+(?=\d)/, '');
+  const intWithCommas = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  if (fracPartRaw && fracPartRaw.length > 0) {
+    return `${sign}${intWithCommas}.${fracPartRaw}`;
+  }
+  return `${sign}${intWithCommas}`;
+}
+
+export function formatUnitsTruncated(raw: string | null | undefined, decimals: number, maxFraction: number): string {
+  if (!raw) {
+    return '—';
+  }
+  let value: bigint;
+  try {
+    value = BigInt(raw);
+  } catch {
+    return '—';
+  }
+  if (decimals <= 0) {
+    return value.toString();
+  }
+  const neg = value < BigInt(0);
+  const digits = (neg ? -value : value).toString();
+  const padded = digits.padStart(decimals + 1, '0');
+  const whole = padded.slice(0, -decimals) || '0';
+  let frac = padded.slice(-decimals);
+  frac = frac.replace(/0+$/, '');
+  if (maxFraction >= 0 && frac.length > maxFraction) {
+    frac = frac.slice(0, maxFraction).replace(/0+$/, '');
+  }
+  const core = frac.length > 0 ? `${whole}.${frac}` : whole;
+  return neg ? `-${core}` : core;
+}

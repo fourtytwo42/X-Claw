@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["agentId", "chainKey", "transferPolicy"],
+  "properties": {
+    "agentId": { "type": "string", "minLength": 1 },
+    "chainKey": { "type": "string", "minLength": 1 },
+    "transferPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["chainKey", "transferApprovalMode", "nativeTransferPreapproved", "allowedTransferTokens", "updatedAt"],
+      "properties": {
+        "chainKey": { "type": "string", "minLength": 1 },
+        "transferApprovalMode": { "type": "string", "enum": ["auto", "per_transfer"] },
+        "nativeTransferPreapproved": { "type": "boolean" },
+        "allowedTransferTokens": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^0x[a-fA-F0-9]{40}$" },
+          "maxItems": 200
+        },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}

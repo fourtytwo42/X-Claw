@@ -19,6 +19,10 @@ Required wallet commands:
 7. `wallet-balance`
 8. `wallet-token-balance <token_address>`
 9. `wallet-remove`
+10. `transfer-policy-get`
+11. `transfer-policy-set`
+12. `transfer-resume`
+13. `transfer-decide`
 
 Notes:
 - `chain` is sourced from `XCLAW_DEFAULT_CHAIN`.
@@ -37,6 +41,10 @@ Wrapper delegation target commands:
 - `xclaw-agent wallet balance --chain <chain_key> --json`
 - `xclaw-agent wallet token-balance --token <token_address> --chain <chain_key> --json`
 - `xclaw-agent wallet remove --chain <chain_key> --json`
+- `xclaw-agent transfers policy-get --chain <chain_key> --json`
+- `xclaw-agent transfers policy-set --chain <chain_key> --global <auto|per_transfer> --native-preapproved <0|1> [--allowed-token <0x...>] --json`
+- `xclaw-agent approvals resume-transfer --approval-id <xfr_id> --chain <chain_key> --json`
+- `xclaw-agent approvals decide-transfer --approval-id <xfr_id> --decision <approve|deny> --chain <chain_key> --json`
 
 Wrapper binary resolution order:
 1. PATH lookup (`shutil.which("xclaw-agent")`)
@@ -134,6 +142,11 @@ Current behavior in `apps/agent-runtime/xclaw_agent/cli.py`:
    - owner chain access enabled: `chainEnabled == true` from `GET /api/v1/agent/transfers/policy?chainKey=...`
    - if `spend.approval_required == true`, then `spend.approval_granted == true`
    - `spend.max_daily_native_wei` not exceeded (UTC day ledger in `state.json`)
+8. Slice 72 policy-override behavior:
+   - outbound policy blocks (`outbound disabled` or `destination not whitelisted`) route to transfer approval flow (`xfr_...`) instead of immediate hard-fail,
+   - approve executes one-off override for that transfer (`executionMode=policy_override`) without mutating outbound policy,
+   - deny marks transfer `rejected`,
+   - `chain_disabled` remains hard block.
 8. `wallet-balance` is implemented via cast-backed native balance query for wallet address and chain RPC.
 9. `wallet-token-balance` is implemented via cast-backed ERC-20 `balanceOf(address)` query.
 10. Missing cast dependency returns structured `missing_dependency` error.
@@ -178,3 +191,18 @@ The following non-wallet commands are part of the same Python-first wrapper cont
   - `totalGasCostEthExact` (numeric string),
   - `totalGasCostEthPretty` (display string),
   - `totalGasCostEth` (compat alias of exact).
+
+5. `trade-resume`
+- internal orchestration command used for single-trigger Telegram spot approvals.
+- delegates to runtime `approvals resume-spot --trade-id <id> --chain <key> --json`.
+- returns JSON with `tradeId`, `chain`, `status`, and execution fields (for example `txHash`) when available.
+
+6. `transfer-resume`
+- internal orchestration command used for single-trigger transfer approvals.
+- delegates to runtime `approvals resume-transfer --approval-id <xfr_id> --chain <key> --json`.
+- returns JSON with terminal transfer fields (`status`, `approvalId`, `txHash` when available).
+
+7. `transfer-decide`
+- internal orchestration command used by Telegram/web callback flows.
+- delegates to runtime `approvals decide-transfer --approval-id <xfr_id> --decision <approve|deny> --chain <key> --json`.
+- `approve` path continues execution; `deny` path marks transfer `rejected`.

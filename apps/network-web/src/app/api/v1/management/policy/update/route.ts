@@ -89,9 +89,34 @@ export async function POST(req: NextRequest) {
     const dailyCapUsdEnabled = body.dailyCapUsdEnabled ?? true;
     const dailyTradeCapEnabled = body.dailyTradeCapEnabled ?? true;
     const maxDailyTradeCount = body.maxDailyTradeCount ?? null;
-    const outboundTransfersEnabled = body.outboundTransfersEnabled ?? false;
-    const outboundMode = body.outboundMode ?? (outboundTransfersEnabled ? 'allow_all' : 'disabled');
-    const outboundWhitelistAddresses = normalizeWhitelist(body.outboundWhitelistAddresses);
+
+    const existingTransferPolicy = await dbQuery<{
+      outbound_transfers_enabled: boolean;
+      outbound_mode: 'disabled' | 'allow_all' | 'whitelist';
+      outbound_whitelist_addresses: unknown;
+    }>(
+      `
+      select outbound_transfers_enabled, outbound_mode::text, outbound_whitelist_addresses
+      from agent_transfer_policies
+      where agent_id = $1
+        and chain_key = 'base_sepolia'
+      limit 1
+      `,
+      [body.agentId]
+    );
+    const existingRow = existingTransferPolicy.rows[0];
+    const outboundTransfersEnabled =
+      body.outboundTransfersEnabled ?? existingRow?.outbound_transfers_enabled ?? false;
+    const outboundMode =
+      body.outboundMode ?? existingRow?.outbound_mode ?? (outboundTransfersEnabled ? 'allow_all' : 'disabled');
+    const outboundWhitelistAddresses =
+      body.outboundWhitelistAddresses !== undefined
+        ? normalizeWhitelist(body.outboundWhitelistAddresses)
+        : normalizeWhitelist(
+            Array.isArray(existingRow?.outbound_whitelist_addresses)
+              ? (existingRow?.outbound_whitelist_addresses as string[])
+              : []
+          );
 
     await withTransaction(async (client) => {
       await client.query(
