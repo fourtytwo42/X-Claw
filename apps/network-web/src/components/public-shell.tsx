@@ -1,11 +1,21 @@
-import Link from 'next/link';
+'use client';
+
 import Image from 'next/image';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
 import { ChainHeaderControl } from '@/components/chain-header-control';
 import { ManagementHeaderControls } from '@/components/management-header-controls';
 import { ThemeToggle } from '@/components/theme-toggle';
 
 export function PublicShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const isDashboardRoute = pathname === '/' || pathname === '/dashboard';
+
+  if (isDashboardRoute) {
+    return <main className="page-content page-content-dashboard">{children}</main>;
+  }
+
   return (
     <div className="app-shell">
       <header className="app-header">

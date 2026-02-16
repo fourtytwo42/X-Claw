@@ -963,3 +963,417 @@ Issue mapping: `#42` (umbrella)
   - [ ] `npm run seed:verify`
   - [ ] `npm run build`
   - [ ] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+# Slice 56 Tasks: Trade Proposal Token Address Canonicalization (USDC Preapprove Fix)
+
+Active slice: `Slice 56: Trade Proposal Token Address Canonicalization (USDC Preapprove Fix)`
+Issue mapping: `#42` (umbrella)
+
+## Checklist
+- [x] Docs sync:
+  - [x] `docs/XCLAW_SLICE_TRACKER.md`
+  - [x] `docs/XCLAW_BUILD_ROADMAP.md`
+  - [x] `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+- [x] Implementation:
+  - [x] update runtime `cmd_trade_spot` to propose `tokenIn`/`tokenOut` as canonical addresses
+- [x] Tests:
+  - [x] add regression test asserting address-form token payload for `_post_trade_proposed(...)`
+- [x] Gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+# Slice 57 Tasks: Trade Execute Symbol Resolution (Prevent ERC20_CALL_FAIL Fallback)
+
+Active slice: `Slice 57: Trade Execute Symbol Resolution (Prevent ERC20_CALL_FAIL Fallback)`
+Issue mapping: `#42` (umbrella)
+
+## Checklist
+- [x] Docs sync:
+  - [x] `docs/XCLAW_SLICE_TRACKER.md`
+  - [x] `docs/XCLAW_BUILD_ROADMAP.md`
+  - [x] `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+- [x] Implementation:
+  - [x] update runtime `cmd_trade_execute` token resolution to use canonical symbol/address resolver and remove hardcoded fallback token substitution
+- [x] Tests:
+  - [x] add regression test asserting symbol-form intent tokens resolve to canonical addresses before approve/swap tx calls
+- [x] Gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+# Slice 58 Tasks: Trade Spot Re-Quote After Approval Wait (Prevent Stale SLIPPAGE_NET)
+
+Active slice: `Slice 58: Trade Spot Re-Quote After Approval Wait (Prevent Stale SLIPPAGE_NET)`
+Issue mapping: `#42` (umbrella)
+
+## Checklist
+- [x] Docs sync:
+  - [x] `docs/XCLAW_SLICE_TRACKER.md`
+  - [x] `docs/XCLAW_BUILD_ROADMAP.md`
+  - [x] `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+- [x] Implementation:
+  - [x] update runtime `cmd_trade_spot` to re-quote output and recalculate minOut after approval wait and before swap
+- [x] Tests:
+  - [x] add regression test asserting swap minOut uses post-approval quote values
+- [x] Gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+# Slice 59 Tasks: Trade Execute Amount Units Fix (Prevent 50 -> 50 Wei)
+
+Active slice: `Slice 59: Trade Execute Amount Units Fix (Prevent 50 -> 50 Wei)`
+Issue mapping: `#42` (umbrella)
+
+## Checklist
+- [x] Docs sync:
+  - [x] `docs/XCLAW_SLICE_TRACKER.md`
+  - [x] `docs/XCLAW_BUILD_ROADMAP.md`
+  - [x] `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+- [x] Implementation:
+  - [x] update runtime `cmd_trade_execute` to parse `amountIn` as human token amount via token decimals
+- [x] Tests:
+  - [x] add regression test asserting execute-path approve/swap use decimal-scaled amount units
+- [x] Gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+# Slice 60 Tasks: Prompt Normalization for USD Stablecoin + ETH->WETH Semantics
+
+Active slice: `Slice 60: Prompt Normalization for USD Stablecoin + ETH->WETH Semantics`
+Issue mapping: `#42` (umbrella)
+
+## Checklist
+- [x] Docs sync:
+  - [x] `docs/XCLAW_SLICE_TRACKER.md`
+  - [x] `docs/XCLAW_BUILD_ROADMAP.md`
+  - [x] `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - [x] `skills/xclaw-agent/SKILL.md`
+  - [x] `skills/xclaw-agent/references/commands.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+- [x] Implementation:
+  - [x] lock prompt semantics for `ETH -> WETH` in trade intents
+  - [x] lock prompt semantics for `$`/`usd` as stablecoin notional intent
+  - [x] lock disambiguation rule when multiple stablecoins have non-zero balances
+- [x] Gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+# Slice 61 Tasks: Channel-Aware Approval Routing (Telegram vs Web Management Link)
+
+Active slice: `Slice 61: Channel-Aware Approval Routing (Telegram vs Web Management Link)`
+Issue mapping: `#42` (umbrella)
+
+## Checklist
+- [x] Docs sync:
+  - [x] `docs/XCLAW_SLICE_TRACKER.md`
+  - [x] `docs/XCLAW_BUILD_ROADMAP.md`
+  - [x] `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - [x] `skills/xclaw-agent/SKILL.md`
+  - [x] `skills/xclaw-agent/references/commands.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+- [x] Implementation:
+  - [x] lock non-Telegram channels to web management approval handoff (`owner-link`) with no Telegram buttons.
+  - [x] preserve Telegram inline button behavior only for Telegram-focused chat contexts.
+- [x] Gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+# Slice 62 Tasks: Policy Approval Telegram Decision Feedback Reliability
+
+Active slice: `Slice 62: Policy Approval Telegram Decision Feedback Reliability`
+Issue mapping: `#42` (umbrella)
+
+## Checklist
+- [x] Docs sync:
+  - [x] `docs/XCLAW_SLICE_TRACKER.md`
+  - [x] `docs/XCLAW_BUILD_ROADMAP.md`
+  - [x] `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+- [x] Implementation:
+  - [x] update OpenClaw gateway patch injection to send deterministic success message on `xpol` approve/deny callbacks
+  - [x] bump patch marker/schema to force upgrade on previously patched bundles
+  - [x] apply patcher and verify patch result on installed OpenClaw bundle
+- [x] Gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+# Slice 63 Tasks: Prompt Contract - Hide Internal Commands In User Replies
+
+Active slice: `Slice 63: Prompt Contract - Hide Internal Commands In User Replies`
+Issue mapping: `#42` (umbrella)
+
+## Checklist
+- [x] Docs sync:
+  - [x] `docs/XCLAW_SLICE_TRACKER.md`
+  - [x] `docs/XCLAW_BUILD_ROADMAP.md`
+  - [x] `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - [x] `skills/xclaw-agent/SKILL.md`
+  - [x] `skills/xclaw-agent/references/commands.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+- [x] Implementation:
+  - [x] lock user-facing rule to avoid command/tool-call leakage in normal chat replies.
+  - [x] lock exception rule: provide exact command syntax only on explicit user request.
+- [x] Gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+# Slice 64 Tasks: Policy Callback Convergence Ack (409 Still Replies)
+
+Active slice: `Slice 64: Policy Callback Convergence Ack (409 Still Replies)`
+Issue mapping: `#42` (umbrella)
+
+## Checklist
+- [x] Docs sync:
+  - [x] `docs/XCLAW_SLICE_TRACKER.md`
+  - [x] `docs/XCLAW_BUILD_ROADMAP.md`
+  - [x] `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+- [x] Implementation:
+  - [x] update OpenClaw gateway callback branch so `xpol` `409` terminal responses still emit deterministic confirmation.
+  - [x] bump patch marker/schema so old patched bundles are upgraded.
+  - [x] apply patcher and verify installed bundle contains v5 marker + 409 convergence ack logic.
+- [x] Gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+# Slice 65 Tasks: Telegram Decision UX - Keep Text, Remove Buttons
+
+Active slice: `Slice 65: Telegram Decision UX - Keep Text, Remove Buttons`
+Issue mapping: `#42` (umbrella)
+
+## Checklist
+- [x] Docs sync:
+  - [x] `docs/XCLAW_SLICE_TRACKER.md`
+  - [x] `docs/XCLAW_BUILD_ROADMAP.md`
+  - [x] `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+- [x] Implementation:
+  - [x] update OpenClaw gateway callback success branch to clear inline buttons and keep queued message text.
+  - [x] update converged `409` branch to clear inline buttons and keep queued message text.
+  - [x] bump patch marker/schema and re-apply patcher.
+  - [x] verify installed bundle includes decision marker v6 and no callback `deleteMessage` decision branch.
+- [x] Gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+# Slice 66 Tasks: Policy Approval Consistency (Pending De-Dupe Race + Web Reflection)
+
+Active slice: `Slice 66: Policy Approval Consistency (Pending De-Dupe Race + Web Reflection)`
+Issue mapping: `#42` (umbrella)
+
+## Checklist
+- [x] Docs sync:
+  - [x] `docs/XCLAW_SLICE_TRACKER.md`
+  - [x] `docs/XCLAW_BUILD_ROADMAP.md`
+  - [x] `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+- [x] Implementation:
+  - [x] make policy approval propose de-dupe transaction-safe under concurrency.
+  - [x] keep policy propose API contract stable while reusing existing pending request deterministically.
+  - [x] add management view polling to reflect Telegram/web policy approvals and denials without manual refresh.
+- [x] Gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+# Slice 67 Tasks: Approval Decision Feedback + Activity Visibility Reliability
+
+Active slice: `Slice 67: Approval Decision Feedback + Activity Visibility Reliability`
+Issue mapping: `#42` (umbrella)
+
+## Checklist
+- [x] Docs sync:
+  - [x] `docs/XCLAW_SLICE_TRACKER.md`
+  - [x] `docs/XCLAW_BUILD_ROADMAP.md`
+  - [x] `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+- [x] Implementation:
+  - [x] update OpenClaw callback patch to send deterministic confirmation for both trade + policy approve/deny.
+  - [x] ensure converged terminal `409` callback path also sends deterministic confirmation.
+  - [x] include `policy_*` events in `/api/v1/public/activity`.
+  - [x] update activity labels/rendering for policy lifecycle events on `/agents/:id`.
+- [x] Gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+# Slice 68 Tasks: Management Policy Approval History Visibility
+
+Active slice: `Slice 68: Management Policy Approval History Visibility`
+Issue mapping: `#42` (umbrella)
+
+## Checklist
+- [x] Docs sync:
+  - [x] `docs/XCLAW_SLICE_TRACKER.md`
+  - [x] `docs/XCLAW_BUILD_ROADMAP.md`
+  - [x] `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+- [x] Implementation:
+  - [x] add `policyApprovalsHistory` to `/api/v1/management/agent-state`.
+  - [x] render recent policy request history in `/agents/:id` Policy Approvals card.
+  - [x] keep pending action queue behavior unchanged.
+- [x] Gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+# Slice 69 Tasks: Dashboard Page #1 Full Rebuild (`/` + `/dashboard`)
+
+Active slice: `Slice 69: Dashboard Full Rebuild (Global Landing Analytics + Discovery)`
+Issue mapping: `#69` (to be created/mapped)
+
+## Checklist
+- [x] Pre-flight lock: objective + acceptance checks + touched-file allowlist defined before edits.
+- [x] Docs sync:
+  - [x] `docs/XCLAW_SLICE_TRACKER.md`
+  - [x] `docs/XCLAW_BUILD_ROADMAP.md`
+  - [x] `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - [x] `docs/CONTEXT_PACK.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+- [x] Replace `/` dashboard page implementation from scratch.
+- [x] Add `/dashboard` alias route.
+- [x] Add dashboard-only shell behavior and preserve non-dashboard shell.
+- [x] Implement dashboard controls/components:
+  - [x] sidebar + sticky top bar
+  - [x] global search autocomplete groups
+  - [x] owner-only scope selector
+  - [x] dashboard chain selector (`all/base_sepolia/hardhat_local`)
+  - [x] dark/light icon toggle
+  - [x] KPI strip + focus-tab interaction
+  - [x] chart panel with tabs/range/filters
+  - [x] live feed, top agents, recently active
+  - [x] venue breakdown + execution health
+  - [x] trending agents + docs card + footer links
+- [x] Derived metrics visibly labeled when exact metrics unavailable.
+- [x] Run required gates and record evidence.
+
+---
+
+# Slice 69A Tasks: Dashboard Agent Trade Room Reintegration
+
+Active slice: `Slice 69A: Dashboard Agent Trade Room Reintegration`
+Issue mapping: `#69A` (to be created/mapped)
+
+## Checklist
+- [x] Pre-flight lock: objective + acceptance checks + touched-file allowlist defined before edits.
+- [x] Docs sync:
+  - [x] `docs/XCLAW_SLICE_TRACKER.md`
+  - [x] `docs/XCLAW_BUILD_ROADMAP.md`
+  - [x] `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - [x] `docs/CONTEXT_PACK.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+- [x] Extend dashboard load with chat endpoint fetch.
+- [x] Add chain/scope-filtered room preview (`max 8`) below Live Trade Feed.
+- [x] Add room card loading/empty/error states.
+- [x] Add `/room` read-only full room route and wire `View all`.
+- [x] Run required gates and record evidence.

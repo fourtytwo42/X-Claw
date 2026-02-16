@@ -3057,3 +3057,358 @@ Issue mapping: `#42` (umbrella)
 
 ### Scenario evidence (manual/ops)
 - Proposing the same policy approval repeatedly while the previous is still `approval_pending` returns the same `policyApprovalId` (no new `ppr_...` rows created).
+
+---
+
+## Slice 56 Acceptance Evidence
+
+Date (UTC): 2026-02-15
+Active slice: `Slice 56: Trade Proposal Token Address Canonicalization (USDC Preapprove Fix)`
+Issue mapping: `#42` (umbrella)
+
+### Required gate evidence
+- `npm run db:parity` -> PASS (exit 0, checkedAt: 2026-02-15T23:37:16.242Z)
+- `npm run seed:reset` -> PASS (exit 0)
+- `npm run seed:load` -> PASS (exit 0, scenarios: `happy_path`, `approval_retry`, `degraded_rpc`, `copy_reject`)
+- `npm run seed:verify` -> PASS (exit 0)
+- `npm run build` -> PASS (exit 0)
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS
+
+### Scenario evidence (manual/ops)
+- Runtime proposes trade payload with `tokenIn`/`tokenOut` in canonical address form.
+- Policy token preapproval matching remains address-based and no longer fails due to symbol-form payloads.
+
+---
+
+## Slice 57 Acceptance Evidence
+
+Date (UTC): 2026-02-15
+Active slice: `Slice 57: Trade Execute Symbol Resolution (Prevent ERC20_CALL_FAIL Fallback)`
+Issue mapping: `#42` (umbrella)
+
+### Required gate evidence
+- `npm run db:parity` -> PASS (exit 0, checkedAt: 2026-02-15T23:43:56.299Z)
+- `npm run seed:reset` -> PASS (exit 0)
+- `npm run seed:load` -> PASS (exit 0, scenarios: `happy_path`, `approval_retry`, `degraded_rpc`, `copy_reject`)
+- `npm run seed:verify` -> PASS (exit 0)
+- `npm run build` -> PASS (exit 0)
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS
+
+### Scenario evidence (manual/ops)
+- Runtime `trade execute` resolves symbol-form intent tokens to canonical addresses before approve/swap tx assembly.
+- Execution no longer substitutes hardcoded fallback token pair for non-address intent tokens.
+
+---
+
+## Slice 58 Acceptance Evidence
+
+Date (UTC): 2026-02-15
+Active slice: `Slice 58: Trade Spot Re-Quote After Approval Wait (Prevent Stale SLIPPAGE_NET)`
+Issue mapping: `#42` (umbrella)
+
+### Required gate evidence
+- `npm run db:parity` -> PASS (exit 0, checkedAt: 2026-02-15T23:50:04.962Z)
+- `npm run seed:reset` -> PASS (exit 0)
+- `npm run seed:load` -> PASS (exit 0, scenarios: `happy_path`, `approval_retry`, `degraded_rpc`, `copy_reject`)
+- `npm run seed:verify` -> PASS (exit 0)
+- `npm run build` -> PASS (exit 0)
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS
+
+### Scenario evidence (manual/ops)
+- Runtime `trade spot` recomputes quote and slippage minOut after approval wait and before swap execution.
+- Swap calldata minOut follows post-approval quote values (not initial proposal-time quote).
+
+---
+
+## Slice 59 Acceptance Evidence
+
+Date (UTC): 2026-02-15
+Active slice: `Slice 59: Trade Execute Amount Units Fix (Prevent 50 -> 50 Wei)`
+Issue mapping: `#42` (umbrella)
+
+### Required gate evidence
+- `npm run db:parity` -> PASS (exit 0, checkedAt: 2026-02-15T23:54:46.751Z)
+- `npm run seed:reset` -> PASS (exit 0)
+- `npm run seed:load` -> PASS (exit 0, scenarios: `happy_path`, `approval_retry`, `degraded_rpc`, `copy_reject`)
+- `npm run seed:verify` -> PASS (exit 0)
+- `npm run build` -> PASS (exit 0)
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS
+
+### Scenario evidence (manual/ops)
+- Runtime execute path interprets human `amountIn` via token decimals (`5` USDC => `5e18` units for mock 18-decimals token).
+- Execution no longer sends near-zero input amounts from raw integer-as-wei parsing.
+
+---
+
+## Slice 60 Acceptance Evidence
+
+Date (UTC): 2026-02-15
+Active slice: `Slice 60: Prompt Normalization for USD Stablecoin + ETH->WETH Semantics`
+Issue mapping: `#42` (umbrella)
+
+### Required gate evidence
+- `npm run db:parity` -> PASS (exit 0, checkedAt: 2026-02-15T23:59:06.271Z)
+- `npm run seed:reset` -> PASS (exit 0)
+- `npm run seed:load` -> PASS (exit 0, scenarios: `happy_path`, `approval_retry`, `degraded_rpc`, `copy_reject`)
+- `npm run seed:verify` -> PASS (exit 0)
+- `npm run build` -> PASS (exit 0)
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS
+
+### Scenario evidence (manual/ops)
+- Prompt contract maps `ETH` trade intent to canonical `WETH`.
+- Prompt contract maps `$`/`usd` amount intent to stablecoin notional and enforces stablecoin disambiguation when multiple stablecoins have non-zero balances.
+
+---
+
+## Slice 61 Acceptance Evidence
+
+Date (UTC): 2026-02-15
+Active slice: `Slice 61: Channel-Aware Approval Routing (Telegram vs Web Management Link)`
+Issue mapping: `#42` (umbrella)
+
+### Required gate evidence
+- `npm run db:parity` -> PASS (exit 0, checkedAt: 2026-02-16T00:04:09.262Z)
+- `npm run seed:reset` -> PASS (exit 0)
+- `npm run seed:load` -> PASS (exit 0, scenarios: `happy_path`, `approval_retry`, `degraded_rpc`, `copy_reject`)
+- `npm run seed:verify` -> PASS (exit 0)
+- `npm run build` -> PASS (exit 0)
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS
+
+### Scenario evidence (manual/ops)
+- Non-Telegram channel contract: no Telegram button directives/callback payloads in approval guidance.
+- Non-Telegram approval handoff contract: direct user to web management on `xclaw.trade` and provide management link (`owner-link`).
+- Telegram-focused chats continue inline approval button flow.
+
+---
+
+## Slice 62 Acceptance Evidence
+
+Date (UTC): 2026-02-16
+Active slice: `Slice 62: Policy Approval Telegram Decision Feedback Reliability`
+Issue mapping: `#42` (umbrella)
+
+### Required gate evidence
+- `npm run db:parity` -> PASS (exit 0, checkedAt: 2026-02-16T00:10:00Z)
+- `npm run seed:reset` -> PASS (exit 0)
+- `npm run seed:load` -> PASS (exit 0, scenarios: `happy_path`, `approval_retry`, `degraded_rpc`, `copy_reject`)
+- `npm run seed:verify` -> PASS (exit 0)
+- `npm run build` -> PASS (exit 0)
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS
+
+### Scenario evidence (manual/ops)
+- OpenClaw patcher run result: `{"ok":true,"patched":true,"restarted":false,"openclawVersion":"2026.2.9","loaderPaths":[".../openclaw/dist/reply-DptDUVRg.js"]}`.
+- On successful policy callback (`xpol`), gateway now emits deterministic confirmation message (`Approved policy approval ...` or `Denied policy approval ...`) and still routes decision to agent pipeline.
+
+---
+
+## Slice 63 Acceptance Evidence
+
+Date (UTC): 2026-02-16
+Active slice: `Slice 63: Prompt Contract - Hide Internal Commands In User Replies`
+Issue mapping: `#42` (umbrella)
+
+### Required gate evidence
+- `npm run db:parity` -> PASS (exit 0, checkedAt: 2026-02-16T00:11:37.346Z)
+- `npm run seed:reset` -> PASS (exit 0)
+- `npm run seed:load` -> PASS (exit 0, scenarios: `happy_path`, `approval_retry`, `degraded_rpc`, `copy_reject`)
+- `npm run seed:verify` -> PASS (exit 0)
+- `npm run build` -> PASS (exit 0)
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS
+
+### Scenario evidence (manual/ops)
+- Source-of-truth now locks a user-facing response contract to avoid exposing internal `python3 ... xclaw_agent_skill.py ...` commands unless explicitly requested.
+- Skill prompt contract and command reference now mirror the same rule so model replies stay outcome-focused in normal chat.
+
+---
+
+## Slice 64 Acceptance Evidence
+
+Date (UTC): 2026-02-16
+Active slice: `Slice 64: Policy Callback Convergence Ack (409 Still Replies)`
+Issue mapping: `#42` (umbrella)
+
+### Required gate evidence
+- `npm run db:parity` -> PASS (exit 0, checkedAt: 2026-02-16T00:22:12.623Z)
+- `npm run seed:reset` -> PASS (exit 0)
+- `npm run seed:load` -> PASS (exit 0, scenarios: `happy_path`, `approval_retry`, `degraded_rpc`, `copy_reject`)
+- `npm run seed:verify` -> PASS (exit 0)
+- `npm run build` -> PASS (exit 0)
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS
+
+### Scenario evidence (manual/ops)
+- OpenClaw patcher run result: `{"ok":true,"patched":true,"restarted":false,"openclawVersion":"2026.2.9","loaderPaths":[".../openclaw/dist/reply-DptDUVRg.js"]}`.
+- Installed gateway bundle contains decision marker `xclaw: telegram approval decision ack v5`.
+- On `xpol` callback with converged `409` terminal status, gateway sends deterministic confirmation (`Approved/Denied policy approval ...`) and, in current behavior, preserves queued text while clearing inline buttons.
+
+---
+
+## Slice 65 Acceptance Evidence
+
+Date (UTC): 2026-02-16
+Active slice: `Slice 65: Telegram Decision UX - Keep Text, Remove Buttons`
+Issue mapping: `#42` (umbrella)
+
+### Required gate evidence
+- `npm run db:parity` -> PASS (exit 0, checkedAt: 2026-02-16T00:32:45.880Z)
+- `npm run seed:reset` -> PASS (exit 0)
+- `npm run seed:load` -> PASS (exit 0, scenarios: `happy_path`, `approval_retry`, `degraded_rpc`, `copy_reject`)
+- `npm run seed:verify` -> PASS (exit 0)
+- `npm run build` -> PASS (exit 0)
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS
+
+### Scenario evidence (manual/ops)
+- OpenClaw patcher run result: `{"ok":true,"patched":true,"restarted":false,"openclawVersion":"2026.2.9","loaderPaths":[".../openclaw/dist/reply-DptDUVRg.js"]}`.
+- Installed gateway bundle contains marker `xclaw: telegram approval decision ack v6`.
+- Decision callback branches no longer delete the queued Telegram message; they clear inline keyboard (`editMessageReplyMarkup(..., { inline_keyboard: [] })`) so text remains visible.
+
+---
+
+## Slice 66 Acceptance Evidence
+
+Date (UTC): 2026-02-16
+Active slice: `Slice 66: Policy Approval Consistency (Pending De-Dupe Race + Web Reflection)`
+Issue mapping: `#42` (umbrella)
+
+### Required gate evidence
+- `npm run db:parity` -> PASS (exit 0)
+- `npm run seed:reset` -> PASS (exit 0)
+- `npm run seed:load` -> PASS (exit 0, scenarios: `happy_path`, `approval_retry`, `degraded_rpc`, `copy_reject`)
+- `npm run seed:verify` -> PASS (exit 0)
+- `npm run build` -> PASS (exit 0)
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS
+
+### Scenario evidence (manual/ops)
+- DB investigation for reported IDs confirmed:
+  - `ppr_b0fca13447172b8c355d` was approved for agent `ag_a123e3bc428c12675f93` on `base_sepolia` (USDC token address).
+  - a later approved remove request `ppr_f5e7d1d20235ebbe4f6f` removed that USDC from `allowed_tokens`, so subsequent USDC trades correctly returned `approval_pending`.
+- Server fix: `agent/policy-approvals/proposed` now serializes same logical key via transaction advisory lock and runs de-dupe + insert atomically to prevent duplicate pending `ppr_...` rows under concurrent retries.
+- Web reflection fix: `/agents/:id` management view now refreshes policy/approval state periodically while open so Telegram/web policy decisions are visible without manual reload.
+
+---
+
+## Slice 67 Acceptance Evidence
+
+Date (UTC): 2026-02-16
+Active slice: `Slice 67: Approval Decision Feedback + Activity Visibility Reliability`
+Issue mapping: `#42` (umbrella)
+
+### Required gate evidence
+- `npm run db:parity` -> PASS (exit 0)
+- `npm run seed:reset` -> PASS (exit 0)
+- `npm run seed:load` -> PASS (exit 0, scenarios: `happy_path`, `approval_retry`, `degraded_rpc`, `copy_reject`)
+- `npm run seed:verify` -> PASS (exit 0)
+- `npm run build` -> PASS (exit 0)
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS
+
+### Scenario evidence (manual/ops)
+- OpenClaw callback patch now emits deterministic confirmation for both callback kinds:
+  - trade: `Approved/Denied trade trd_...`
+  - policy: `Approved/Denied policy approval ppr_...`
+  including converged terminal `409` callback responses.
+- `/api/v1/public/activity` now includes both `trade_*` and `policy_*` events.
+- `/agents/:id` activity renders policy lifecycle titles (`Policy awaiting approval`, `Policy approved`, `Policy rejected`) and token context from payload token address.
+
+---
+
+## Slice 68 Acceptance Evidence
+
+Date (UTC): 2026-02-16
+Active slice: `Slice 68: Management Policy Approval History Visibility`
+Issue mapping: `#42` (umbrella)
+
+### Required gate evidence
+- `npm run db:parity` -> PASS (exit 0)
+- `npm run seed:reset` -> PASS (exit 0)
+- `npm run seed:load` -> PASS (exit 0, scenarios: `happy_path`, `approval_retry`, `degraded_rpc`, `copy_reject`)
+- `npm run seed:verify` -> PASS (exit 0)
+- `npm run build` -> PASS (exit 0)
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS
+
+### Scenario evidence (manual/ops)
+- `/api/v1/management/agent-state` now returns `policyApprovalsHistory` with `status`, `created_at`, `decided_at`, `reason_message`.
+- `/agents/:id` Policy Approvals card now shows pending requests and a recent policy request history list, so approved/rejected requests remain visible after leaving queue.
+
+---
+
+## Slice 69 Acceptance Evidence
+
+Date (UTC): 2026-02-16
+Active slice: `Slice 69: Dashboard Full Rebuild (Global Landing Analytics + Discovery)`
+
+### Objective + scope lock
+- Objective: rebuild dashboard UI (`/` + `/dashboard`) to match Page #1 analytics/discovery spec with dashboard-scoped shell.
+- Scope guard honored: no backend schema/API changes; derived/estimated dashboard metrics used where exact values are unavailable.
+
+### File-level evidence (Slice 69)
+- UI/shell/components:
+  - `apps/network-web/src/app/page.tsx`
+  - `apps/network-web/src/app/dashboard/page.tsx`
+  - `apps/network-web/src/app/page.module.css`
+  - `apps/network-web/src/app/globals.css`
+  - `apps/network-web/src/components/public-shell.tsx`
+  - `apps/network-web/src/components/top-bar-search.tsx`
+  - `apps/network-web/src/components/scope-selector.tsx`
+  - `apps/network-web/src/components/theme-toggle.tsx`
+  - `apps/network-web/src/components/chain-header-control.tsx`
+  - `apps/network-web/src/lib/active-chain.ts`
+- Governance/process:
+  - `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - `docs/XCLAW_SLICE_TRACKER.md`
+  - `docs/XCLAW_BUILD_ROADMAP.md`
+  - `docs/CONTEXT_PACK.md`
+  - `spec.md`
+  - `tasks.md`
+  - `acceptance.md`
+
+### Required gates
+- `npm run db:parity` -> PASS (exit 0, checkedAt: 2026-02-16T01:28:56.311Z)
+- `npm run seed:reset` -> PASS (exit 0)
+- `npm run seed:load` -> PASS (exit 0, scenarios: `happy_path`, `approval_retry`, `degraded_rpc`, `copy_reject`)
+- `npm run seed:verify` -> PASS (exit 0)
+- `npm run build` -> PASS (exit 0, Next.js build lists static route `/dashboard`)
+
+### Functional checks
+- `/` and `/dashboard` parity -> PASS (build output includes both routes, `/dashboard` aliases dashboard component)
+- owner vs anonymous scope selector behavior -> IMPLEMENTED, manual browser verification pending
+- dashboard chain selector all/base/hardhat filtering -> IMPLEMENTED, manual browser verification pending
+- mobile order at `390x844` -> manual viewport verification pending
+- desktop composition at `1440x900` -> manual viewport verification pending
+- dark/light persistence -> IMPLEMENTED (localStorage-backed theme toggle), manual browser verification pending
+
+---
+
+## Slice 69A Acceptance Evidence
+
+Date (UTC): 2026-02-16
+Active slice: `Slice 69A: Dashboard Agent Trade Room Reintegration`
+
+### Objective + scope lock
+- Objective: reintroduce Agent Trade Room on dashboard right rail with compact read-only preview and dedicated `/room` view.
+- Scope guard honored: no API/schema change; existing `GET /api/v1/chat/messages` reused.
+
+### File-level evidence (Slice 69A)
+- UI:
+  - `apps/network-web/src/app/page.tsx`
+  - `apps/network-web/src/app/page.module.css`
+  - `apps/network-web/src/app/room/page.tsx`
+- Governance/process:
+  - `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - `docs/XCLAW_SLICE_TRACKER.md`
+  - `docs/XCLAW_BUILD_ROADMAP.md`
+  - `docs/CONTEXT_PACK.md`
+  - `spec.md`
+  - `tasks.md`
+  - `acceptance.md`
+
+### Required gates
+- `npm run db:parity` -> PASS (exit 0, checkedAt: 2026-02-16T01:40:21.427Z)
+- `npm run seed:reset` -> PASS (exit 0)
+- `npm run seed:load` -> PASS (exit 0, scenarios: `happy_path`, `approval_retry`, `degraded_rpc`, `copy_reject`)
+- `npm run seed:verify` -> PASS (exit 0)
+- `npm run build` -> PASS (exit 0, Next.js build lists `/room`)
+
+### Functional checks
+- room card appears below Live Trade Feed -> PASS (implemented in dashboard right rail card order)
+- chain filter updates room rows -> IMPLEMENTED, manual browser verification pending
+- owner `My agents` scope filters room rows -> IMPLEMENTED, manual browser verification pending
+- `/room` renders read-only room stream -> PASS (route built and listed by Next.js build)

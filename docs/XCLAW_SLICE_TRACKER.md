@@ -985,3 +985,251 @@ DoD:
 - [x] Server: `/api/v1/agent/policy-approvals/proposed` reuses an existing pending request rather than creating a new one when parameters match.
 - [x] DB: add index to support efficient lookup for de-dupe.
 - [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.
+
+---
+
+## Slice 56: Trade Proposal Token Address Canonicalization (USDC Preapprove Fix)
+Status: [x]
+Issue: #42 (umbrella)
+
+Goal:
+- Ensure token preapproval (`allowed_tokens`) is honored during `trade spot` proposals by sending canonical token addresses to `POST /api/v1/trades/proposed` instead of symbols, preventing false `approval_pending` trades after USDC preapprove approval.
+
+DoD:
+- [x] docs sync first: source-of-truth + roadmap + tracker + context/spec/tasks/acceptance aligned to Slice 56.
+- [x] Runtime: `cmd_trade_spot` proposes `tokenIn`/`tokenOut` using resolved canonical addresses.
+- [x] Tests: runtime unit coverage proves `trade spot` proposal payload uses addresses (policy-match safe).
+- [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.
+
+---
+
+## Slice 57: Trade Execute Symbol Resolution (Prevent ERC20_CALL_FAIL Fallback)
+Status: [x]
+Issue: #42 (umbrella)
+
+Goal:
+- Prevent `trade execute` from failing approved USDC trades with `ERC20_CALL_FAIL` due to hardcoded token fallback behavior when intent payload carries token symbols.
+
+DoD:
+- [x] docs sync first: source-of-truth + roadmap + tracker + context/spec/tasks/acceptance aligned to Slice 57.
+- [x] Runtime: `cmd_trade_execute` resolves `tokenIn`/`tokenOut` from intent payload to canonical addresses (symbol or 0x address input), with fail-closed error on invalid token fields.
+- [x] Tests: runtime unit coverage proves symbol-form intent tokens resolve correctly before approve/swap tx assembly.
+- [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.
+
+---
+
+## Slice 58: Trade Spot Re-Quote After Approval Wait (Prevent Stale SLIPPAGE_NET)
+Status: [x]
+Issue: #42 (umbrella)
+
+Goal:
+- Prevent `trade spot` execution from reverting with `SLIPPAGE_NET` due to stale pre-approval quote/minOut values when owner approval is delayed.
+
+DoD:
+- [x] docs sync first: source-of-truth + roadmap + tracker + context/spec/tasks/acceptance aligned to Slice 58.
+- [x] Runtime: `cmd_trade_spot` recomputes quote + minOut immediately before swap tx assembly (after approval wait resolves).
+- [x] Tests: runtime unit coverage proves execution uses post-approval quote for minOut, not the initial proposal-time quote.
+- [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.
+
+---
+
+## Slice 59: Trade Execute Amount Units Fix (Prevent 50 -> 50 Wei)
+Status: [x]
+Issue: #42 (umbrella)
+
+Goal:
+- Prevent `trade execute` from misreading human `amountIn` strings (e.g. `"50"`) as base units (`50 wei`), which can force near-zero output and deterministic `SLIPPAGE_NET` reverts.
+
+DoD:
+- [x] docs sync first: source-of-truth + roadmap + tracker + context/spec/tasks/acceptance aligned to Slice 59.
+- [x] Runtime: `cmd_trade_execute` converts `amountIn` from human units using tokenIn decimals before approve/swap calldata construction.
+- [x] Tests: runtime unit coverage proves symbol-form execute path uses decimal-scaled amount units (e.g. `5` => `5e18` for 18-decimals token).
+- [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.
+
+---
+
+## Slice 60: Prompt Normalization for USD Stablecoin + ETH->WETH Semantics
+Status: [x]
+Issue: #42 (umbrella)
+
+Goal:
+- Ensure prompt/skill contract interprets natural language trade intent consistently:
+  - `$` means stablecoin-denominated amount,
+  - `ETH` trade intent maps to `WETH`,
+  - disambiguation occurs when multiple stablecoins are available.
+
+DoD:
+- [x] docs sync first: source-of-truth + roadmap + tracker + context/spec/tasks/acceptance aligned to Slice 60.
+- [x] Source-of-truth and skill docs explicitly lock USD/stablecoin + ETH/WETH interpretation behavior.
+- [x] Skill command reference includes the disambiguation rule when multiple stablecoins have non-zero balance.
+- [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.
+
+---
+
+## Slice 61: Channel-Aware Approval Routing (Telegram vs Web Management Link)
+Status: [x]
+Issue: #42 (umbrella)
+
+Goal:
+- Ensure the agent routes approval UX by active channel:
+  - Telegram-focused chats use Telegram inline approval buttons,
+  - non-Telegram chats must use `xclaw.trade` web approvals via management link and must not emit Telegram button directives.
+
+DoD:
+- [x] docs sync first: source-of-truth + roadmap + tracker + context/spec/tasks/acceptance aligned to Slice 61.
+- [x] Source-of-truth locks non-Telegram rule: no Telegram buttons/callback instructions outside Telegram-focused chat.
+- [x] Skill docs require `owner-link` handoff to web approval when channel is non-Telegram.
+- [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.
+
+---
+
+## Slice 62: Policy Approval Telegram Decision Feedback Reliability
+Status: [x]
+Issue: #42 (umbrella)
+
+Goal:
+- Ensure clicking Telegram Approve/Deny on policy approvals always yields visible user feedback in chat, even when agent decision-routing pipeline is silent.
+
+DoD:
+- [x] docs sync first: source-of-truth + roadmap + tracker + context/spec/tasks/acceptance aligned to Slice 62.
+- [x] OpenClaw gateway callback patch emits deterministic policy decision confirmation message on successful callback (`xpol`) before/alongside agent decision routing.
+- [x] Gateway patch normalization/versioning upgrades existing installs to include the reliability behavior.
+- [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.
+
+---
+
+## Slice 63: Prompt Contract - Hide Internal Commands In User Replies
+Status: [x]
+Issue: #42 (umbrella)
+
+Goal:
+- Prevent the agent from exposing internal wrapper/CLI command strings in user-facing chat by default.
+- Keep command syntax available only when the user explicitly asks for commands.
+
+DoD:
+- [x] docs sync first: source-of-truth + roadmap + tracker + context/spec/tasks/acceptance aligned to Slice 63.
+- [x] Source-of-truth locks user-facing response contract: no internal tool-call command strings unless explicitly requested.
+- [x] Skill docs/command reference lock the same behavior for runtime prompt guidance.
+- [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.
+
+---
+
+## Slice 64: Policy Callback Convergence Ack (409 Still Replies)
+Status: [x]
+Issue: #42 (umbrella)
+
+Goal:
+- Ensure policy approval Telegram callbacks still send visible confirmation when server returns converged/idempotent `409` terminal status (`approved`/`rejected`/`filled`), instead of silently deleting buttons only.
+
+DoD:
+- [x] docs sync first: source-of-truth + roadmap + tracker + context/spec/tasks/acceptance aligned to Slice 64.
+- [x] OpenClaw gateway patch handles `409` terminal callback responses for `xpol` by clearing inline buttons (preserving text) and sending deterministic confirmation message.
+- [x] Gateway patch versioning/normalization upgrades existing patched bundles to include convergence-ack behavior.
+- [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.
+
+---
+
+## Slice 65: Telegram Decision UX - Keep Text, Remove Buttons
+Status: [x]
+Issue: #42 (umbrella)
+
+Goal:
+- On Telegram approve/deny callbacks, preserve the queued message text in chat history and remove only inline buttons.
+
+DoD:
+- [x] docs sync first: source-of-truth + roadmap + tracker + context/spec/tasks/acceptance aligned to Slice 65.
+- [x] OpenClaw gateway callback success path (`xappr`/`xpol`) clears inline keyboard instead of deleting the message.
+- [x] OpenClaw gateway callback converged `409` path clears inline keyboard instead of deleting the message.
+- [x] Gateway patch versioning/normalization upgrades existing patched bundles to include this UX behavior.
+- [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.
+
+---
+
+## Slice 66: Policy Approval Consistency (Pending De-Dupe Race + Web Reflection)
+Status: [x]
+Issue: #42 (umbrella)
+
+Goal:
+- Prevent duplicate pending policy approval requests under concurrent retries and ensure policy approve/deny outcomes are reflected in `/agents/:id` management view without manual refresh.
+
+DoD:
+- [x] docs sync first: source-of-truth + roadmap + tracker + context/spec/tasks/acceptance aligned to Slice 66.
+- [x] Server: `/api/v1/agent/policy-approvals/proposed` de-dupe is transaction-safe under concurrency.
+- [x] Web: `/agents/:id` management view auto-refreshes state so token/global policy approvals/denials from Telegram/web are visible promptly.
+- [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.
+
+---
+
+## Slice 67: Approval Decision Feedback + Activity Visibility Reliability
+Status: [x]
+Issue: #42 (umbrella)
+
+Goal:
+- Ensure every Telegram approve/deny callback (trade or policy) emits a visible confirmation message.
+- Ensure `/agents/:id` activity reflects policy lifecycle events (`policy_*`) in addition to trade events.
+
+DoD:
+- [x] docs sync first: source-of-truth + roadmap + tracker + context/spec/tasks/acceptance aligned to Slice 67.
+- [x] OpenClaw callback patch emits deterministic confirmation for both `xappr` and `xpol` success/converged terminal responses.
+- [x] Public activity endpoint includes `policy_*` lifecycle events with token-address resolution for display.
+- [x] `/agents/:id` activity rendering labels policy lifecycle events clearly.
+- [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.
+
+---
+
+## Slice 68: Management Policy Approval History Visibility
+Status: [x]
+Issue: #42 (umbrella)
+
+Goal:
+- Ensure `/agents/:id` clearly shows that policy approval requests existed and how they resolved (approved/rejected), not only pending queue items.
+
+DoD:
+- [x] docs sync first: source-of-truth + roadmap + tracker + context/spec/tasks/acceptance aligned to Slice 68.
+- [x] management agent-state API returns recent policy approval history (status + timestamps + reason).
+- [x] `/agents/:id` Policy Approvals card renders recent policy request history below pending queue.
+- [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.
+
+---
+
+## Slice 69: Dashboard Full Rebuild (Global Landing Analytics + Discovery)
+Status: [!]
+Issue: #69 (to be created / mapped)
+
+Goal:
+- Rebuild `/` dashboard from scratch as a wallet-like analytics and discovery terminal (not trading UI), with a new dashboard shell (sidebar + sticky topbar), full mobile ordering, and dark/light parity.
+
+DoD:
+- [x] docs sync first: source-of-truth + roadmap + tracker + context/spec/tasks/acceptance aligned to Slice 69.
+- [x] `/` and `/dashboard` both render the new dashboard layout and behavior.
+- [x] dashboard shell is route-scoped (`/`, `/dashboard`) and does not regress non-dashboard pages.
+- [x] owner-only scope selector (`All agents` / `My agents`) appears only when owner session context exists.
+- [x] dashboard chain selector supports `All chains`, `Base Sepolia`, `Hardhat Local` and consistently filters dashboard data.
+- [x] KPI strip, chart panel (tabs + time range + filters), live feed, top agents, recently active, venue breakdown, execution health, trending cards, and docs card are present with loading/empty/error handling.
+- [x] unsupported metrics (fees/slippage/health internals) are visibly labeled as estimated/derived where exact API data is unavailable.
+- [x] dark/light theme tokens for dashboard match locked palette and remain readable.
+- [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`.
+
+Blocker:
+- Issue mapping + completion evidence post is pending (`Issue: #69` not created/mapped in-session yet).
+
+---
+
+## Slice 69A: Dashboard Agent Trade Room Reintegration
+Status: [!]
+Issue: #69A (to be created / mapped)
+
+Goal:
+- Reintroduce Agent Trade Room on dashboard right rail with visual parity and compact read-only preview, plus full-room `View all` route.
+
+DoD:
+- [x] docs sync first: source-of-truth + roadmap + tracker + context/spec/tasks/acceptance aligned to Slice 69A.
+- [x] dashboard right rail includes Agent Trade Room card directly below Live Trade Feed.
+- [x] room card uses read-only compact preview (max 8), chat-style rows, and tags.
+- [x] room card applies same chain and owner scope filters as dashboard.
+- [x] room card loading/empty/error states are card-scoped.
+- [x] `View all` routes to `/room` read-only room page.
+- [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`.
+
+Blocker:
+- Issue mapping + completion evidence post is pending (`Issue: #69A` not created/mapped in-session yet).

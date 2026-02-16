@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 
 import { authenticateAgentByToken } from '@/lib/agent-auth';
-import { dbQuery, withTransaction } from '@/lib/db';
+import { withTransaction } from '@/lib/db';
 import { errorResponse, internalErrorResponse, successResponse } from '@/lib/errors';
 import { getChainConfig } from '@/lib/chains';
 import { parseJsonBody } from '@/lib/http';
@@ -93,59 +93,49 @@ export async function POST(req: NextRequest) {
       return successResponse(idempotency.ctx.replayResponse.body as Record<string, unknown>, idempotency.ctx.replayResponse.status, requestId);
     }
 
-    const agent = await dbQuery<{ agent_id: string }>(
-      `
-      select agent_id
-      from agents
-      where agent_id = $1
-      limit 1
-      `,
-      [auth.agentId]
-    );
-    if (agent.rowCount === 0) {
-      return errorResponse(
-        404,
-        {
-          code: 'payload_invalid',
-          message: 'Agent was not found.',
-          actionHint: 'Register agent before proposing policy approvals.'
-        },
-        requestId
+    const proposal = await withTransaction(async (client) => {
+      const dedupeKey = `${auth.agentId}|${body.chainKey}|${body.requestType}|${tokenAddress ?? ''}`;
+      // Serialize proposes for the same logical request key to avoid duplicate pending rows under concurrent retries.
+      await client.query(`select pg_advisory_xact_lock(hashtext('policy_approval_proposed'), hashtext($1))`, [dedupeKey]);
+
+      const agent = await client.query<{ agent_id: string }>(
+        `
+        select agent_id
+        from agents
+        where agent_id = $1
+        limit 1
+        `,
+        [auth.agentId]
       );
-    }
+      if (agent.rowCount === 0) {
+        return { kind: 'missing_agent' as const };
+      }
 
-    const approvalId = makeId('ppr');
-    // De-dupe: if an identical request is already pending, reuse it instead of creating a new ppr_... row.
-    const existing = await dbQuery<{ request_id: string; token_address: string | null }>(
-      `
-      select request_id, token_address
-      from agent_policy_approval_requests
-      where agent_id = $1
-        and chain_key = $2
-        and request_type = $3
-        and status = 'approval_pending'
-        and ($4::text is null and token_address is null or token_address = $4)
-      order by created_at desc
-      limit 1
-      `,
-      [auth.agentId, body.chainKey, body.requestType, tokenAddress]
-    );
+      const existing = await client.query<{ request_id: string; token_address: string | null }>(
+        `
+        select request_id, token_address
+        from agent_policy_approval_requests
+        where agent_id = $1
+          and chain_key = $2
+          and request_type = $3
+          and status = 'approval_pending'
+          and ($4::text is null and token_address is null or token_address = $4)
+        order by created_at desc
+        limit 1
+        `,
+        [auth.agentId, body.chainKey, body.requestType, tokenAddress]
+      );
 
-    if ((existing.rowCount ?? 0) > 0) {
-      const row = existing.rows[0];
-      const responseBody = {
-        ok: true,
-        policyApprovalId: row.request_id,
-        status: 'approval_pending',
-        chainKey: body.chainKey,
-        requestType: body.requestType,
-        tokenAddress: row.token_address ?? null
-      };
-      await storeIdempotencyResponse(idempotency.ctx, 200, responseBody);
-      return successResponse(responseBody, 200, requestId);
-    }
+      if ((existing.rowCount ?? 0) > 0) {
+        const row = existing.rows[0];
+        return {
+          kind: 'existing' as const,
+          policyApprovalId: row.request_id,
+          tokenAddress: row.token_address ?? null
+        };
+      }
 
-    await withTransaction(async (client) => {
+      const approvalId = makeId('ppr');
       await client.query(
         `
         insert into agent_policy_approval_requests (
@@ -172,15 +162,28 @@ export async function POST(req: NextRequest) {
           })
         ]
       );
+      return { kind: 'created' as const, policyApprovalId: approvalId, tokenAddress };
     });
+
+    if (proposal.kind === 'missing_agent') {
+      return errorResponse(
+        404,
+        {
+          code: 'payload_invalid',
+          message: 'Agent was not found.',
+          actionHint: 'Register agent before proposing policy approvals.'
+        },
+        requestId
+      );
+    }
 
     const responseBody = {
       ok: true,
-      policyApprovalId: approvalId,
+      policyApprovalId: proposal.policyApprovalId,
       status: 'approval_pending',
       chainKey: body.chainKey,
       requestType: body.requestType,
-      tokenAddress
+      tokenAddress: proposal.tokenAddress
     };
     await storeIdempotencyResponse(idempotency.ctx, 200, responseBody);
     return successResponse(responseBody, 200, requestId);

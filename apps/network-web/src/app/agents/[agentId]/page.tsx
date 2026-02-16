@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 
 import { rememberManagedAgent } from '@/components/management-header-controls';
@@ -125,6 +125,16 @@ type ManagementStatePayload = {
     token_address: string | null;
     created_at: string;
   }>;
+  policyApprovalsHistory?: Array<{
+    request_id: string;
+    chain_key: string;
+    request_type: string;
+    token_address: string | null;
+    status: string;
+    reason_message: string | null;
+    created_at: string;
+    decided_at: string | null;
+  }>;
   latestPolicy: {
     mode: 'real';
     approval_mode: 'per_trade' | 'auto';
@@ -228,8 +238,20 @@ function formatActivityTitle(eventType: string): string {
   if (eventType === 'trade_approval_pending') {
     return 'Awaiting approval';
   }
+  if (eventType === 'policy_approval_pending') {
+    return 'Policy awaiting approval';
+  }
+  if (eventType === 'policy_approved') {
+    return 'Policy approved';
+  }
+  if (eventType === 'policy_rejected') {
+    return 'Policy rejected';
+  }
   if (eventType.startsWith('trade_')) {
     return eventType.replace(/^trade_/, '').replace(/_/g, ' ');
+  }
+  if (eventType.startsWith('policy_')) {
+    return eventType.replace(/^policy_/, '').replace(/_/g, ' ');
   }
   return eventType.replace(/_/g, ' ');
 }
@@ -796,19 +818,23 @@ export default function AgentPublicProfilePage() {
     return items.slice(0, 30);
   }, [activity, trades, management.phase]);
 
-  async function refreshManagementState() {
+  const refreshManagementState = useCallback(async () => {
     if (!agentId) {
       return;
     }
 
     try {
-      const managementRes = await fetch(
-        `/api/v1/management/agent-state?agentId=${encodeURIComponent(agentId)}&chainKey=${encodeURIComponent(activeChainKey)}`,
-        {
-          cache: 'no-store',
-          credentials: 'same-origin'
-        }
-      );
+      const [managementRes, tradesRes, activityRes] = await Promise.all([
+        fetch(
+          `/api/v1/management/agent-state?agentId=${encodeURIComponent(agentId)}&chainKey=${encodeURIComponent(activeChainKey)}`,
+          {
+            cache: 'no-store',
+            credentials: 'same-origin'
+          }
+        ),
+        fetch(`/api/v1/public/agents/${agentId}/trades?limit=20`, { cache: 'no-store' }),
+        fetch(`/api/v1/public/activity?limit=20&agentId=${encodeURIComponent(agentId)}`, { cache: 'no-store' })
+      ]);
 
       if (managementRes.status === 401) {
         setManagement({ phase: 'unauthorized' });
@@ -837,6 +863,17 @@ export default function AgentPublicProfilePage() {
       );
       setPolicyAllowedTokens(payload.latestPolicy?.allowed_tokens ?? []);
       setTelegramApprovalsEnabled(Boolean(payload.approvalChannels?.telegram?.enabled));
+
+      // Refresh activity feed and trades so policy events appear in real-time.
+      if (tradesRes.ok) {
+        const tradesPayload = (await tradesRes.json()) as TradePayload;
+        setTrades(tradesPayload.items);
+      }
+      if (activityRes.ok) {
+        const activityPayload = (await activityRes.json()) as ActivityPayload;
+        setActivity(activityPayload.items.slice(0, 12));
+      }
+
       const [depositPayload, limitOrderPayload] = await Promise.all([
         managementGet(`/api/v1/management/deposit?agentId=${encodeURIComponent(agentId)}&chainKey=${encodeURIComponent(activeChainKey)}`),
         managementGet(`/api/v1/management/limit-orders?agentId=${encodeURIComponent(agentId)}&limit=50`)
@@ -846,7 +883,19 @@ export default function AgentPublicProfilePage() {
     } catch (loadError) {
       setManagementError(loadError instanceof Error ? loadError.message : 'Failed to refresh management state.');
     }
-  }
+  }, [agentId, activeChainKey]);
+
+  useEffect(() => {
+    if (management.phase !== 'ready' || !agentId) {
+      return;
+    }
+    const intervalId = window.setInterval(() => {
+      void refreshManagementState();
+    }, 5000);
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [management.phase, agentId, refreshManagementState]);
 
   async function runManagementAction(
     action: () => Promise<void>,
@@ -1132,7 +1181,10 @@ export default function AgentPublicProfilePage() {
                         <strong>{formatActivityTitle(item.eventType)}</strong>
                       </div>
                       <div className="muted">
-                        {item.pairDisplay ?? `${item.tokenInSymbol ?? 'token'} -> ${item.tokenOutSymbol ?? 'token'}`}
+                        {item.pairDisplay ??
+                          (item.tokenInSymbol && item.tokenOutSymbol
+                            ? `${item.tokenInSymbol} -> ${item.tokenOutSymbol}`
+                            : (item.tokenInSymbol ?? item.tokenOutSymbol ?? '—'))}
                       </div>
                     </div>
                     <div className="wallet-activity-meta muted">{formatUtc(item.at)} UTC</div>
@@ -1713,6 +1765,24 @@ export default function AgentPublicProfilePage() {
                     </div>
                   </div>
                 ))}
+                <div style={{ marginTop: '0.75rem' }}>
+                  <div className="muted">Recent policy requests</div>
+                  {(management.data.policyApprovalsHistory ?? []).slice(0, 10).map((item) => (
+                    <div key={`hist-${item.request_id}`} className="queue-item">
+                      <div>
+                        <strong>{policyApprovalLabel(item, management.data.chainTokens)}</strong>
+                        <div className="muted">
+                          {shortenHex(item.request_id, 10, 8)} · {item.status}
+                        </div>
+                        <div className="muted">
+                          Created: {formatUtc(item.created_at)} UTC
+                          {item.decided_at ? ` · Decided: ${formatUtc(item.decided_at)} UTC` : ''}
+                        </div>
+                        {item.reason_message ? <div className="muted">Reason: {item.reason_message}</div> : null}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </article>
 
               <article className="management-card">

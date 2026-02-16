@@ -2,7 +2,7 @@
 ## Source of Truth (Canonical Build + Execution Spec)
 
 **Status:** Canonical and authoritative  
-**Last updated:** 2026-02-15  
+**Last updated:** 2026-02-16  
 **Owner:** X-Claw core team  
 **Purpose:** This is the only planning/build document to execute from.
 
@@ -1280,6 +1280,11 @@ Runtime binary requirements for skill operation:
 11. Implementation status baseline: create/import/address/health/sign-challenge/send/balance/token-balance/remove are implemented in runtime.
 12. Slice 11 baseline: runtime commands `intents poll`, `approvals check`, `trade execute`, and `report send` are implemented for hardhat-local trade-path validation.
 13. Wallet send commands continue to enforce local native-denominated cap (`max_daily_native_wei`), while trade actions enforce owner-managed UTC-day USD/trade-count caps fetched from server policy with cached fail-closed fallback.
+14. Natural-language trade intent normalization contract:
+- for trade intents, `ETH` should be interpreted as `WETH` in this setup (direct native ETH spot swap path is not used),
+- dollar wording (`$5`, `5 usd`) means stablecoin-denominated notional, not native ETH,
+- if exactly one stablecoin has non-zero balance on the active chain, the agent may default `$` intents to that token,
+- if multiple stablecoins have non-zero balances, agent must ask which stablecoin before proposing.
 
 ---
 
@@ -2503,8 +2508,14 @@ Limitations / notes:
    - sets initial trade status to `approved` or `approval_pending` based on Global Approval + tokenIn preapproval rule.
 6. Agent runtime `trade spot` behavior:
    - server-first: propose before on-chain execution,
+   - proposes `tokenIn`/`tokenOut` as canonical token addresses (not symbols) so policy `allowed_tokens` address matching is reliable,
+   - recomputes quote and `amountOutMin` immediately before swap execution (post-approval) so approval wait time does not stale slippage protection,
    - if approval is pending, wait/poll until approved or rejected,
    - only rejection must be surfaced as an approval-system-aware failure (reasonCode/reasonMessage).
+6.1 Agent runtime `trade execute` behavior:
+   - resolves intent `tokenIn`/`tokenOut` values (address or canonical symbol) to canonical token addresses before approval/swap calls,
+   - interprets intent `amountIn` as human token amount and converts using tokenIn decimals before approve/swap (must not treat plain `"50"` as 50 wei),
+   - must not substitute hardcoded fallback tokens when the intent carries symbolic token identifiers.
 7. `/agents/:id` UX:
    - public profile remains long-scroll but is wallet-first:
      - wallet header (copyable address pill),
@@ -2557,6 +2568,9 @@ Limitations / notes:
      - OpenClaw gateway auto-attaches the inline keyboard when the queued message includes `Status: approval_pending` and `Trade ID: trd_...`.
      - The model may also emit OpenClaw `[[buttons: ...]]` directives, but auto-attach is the portability default.
      - Debuggability: when auto-attach is evaluated, the gateway must emit logs indicating whether buttons were attached or skipped (and why), so missing buttons can be diagnosed from gateway logs.
+   - Non-Telegram focused channel rule:
+     - if active channel is not Telegram (for example web chat, Slack, Discord), agent must not emit Telegram button directives or Telegram-specific callback instructions.
+     - in non-Telegram channels, approval handoff is web-only: direct user to `xclaw.trade` and provide owner management link (`owner-link`) for approve/deny.
 6. Sync between Telegram and web:
    - the pending approval item remains visible on `/agents/:id`.
    - approving in either surface must converge:
@@ -2582,7 +2596,9 @@ Limitations / notes:
 10. Decision feedback in chat:
    - after approve/deny in Telegram, the agent posts a confirmation message into the same chat with trade details (tradeId, amount/pair, and reason for deny).
      - Implementation note: OpenClaw gateway should route the decision into the agent message pipeline (synthetic message + instructions), rather than posting a raw gateway-generated ack message.
+   - Reliability requirement: for both trade (`xappr`) and policy (`xpol`) callbacks, Telegram callback success (including converged terminal `409`) must emit an immediate deterministic confirmation message (`Approved/Denied trade ...` or `Approved/Denied policy approval ...`) so users always receive visible feedback.
    - after approve/deny in web while runtime is waiting on the trade, runtime posts a confirmation message into the active Telegram chat with the same details.
+   - if active channel is non-Telegram, confirmation and next-step instructions should reference web management approval status (not Telegram callbacks/buttons).
 11. Approval wait latency:
    - while waiting for `approval_pending` to resolve, the runtime polls trade status every 1 second to minimize perceived delay after Telegram/web decisions.
 
@@ -2610,7 +2626,10 @@ Limitations / notes:
    - Runtime must return a `queuedMessage` template that includes these lines verbatim so the agent can paste it without formatting mistakes.
 7. Decision feedback:
    - After Telegram approve/deny, decision feedback must be routed into the agent message pipeline (synthetic inbound message + instructions) so the agent informs the user.
+   - Reliability requirement: for policy approvals, Telegram callback success must also emit an immediate deterministic confirmation message (`Approved policy approval ...` / `Denied policy approval ...`) so the user gets feedback even if agent pipeline produces no visible reply.
+   - Converged callback requirement: when Telegram callback returns idempotent/converged `409` with terminal `currentStatus` (`approved`/`rejected`/`filled`), policy approvals must still emit deterministic confirmation after inline buttons are cleared.
    - For proposed policy approvals, the agent must echo the `queuedMessage` verbatim to the user so Telegram buttons can attach reliably.
+   - User-facing response contract: in normal chat responses, the agent must not expose internal tool-call/CLI command strings (for example `python3 ... xclaw_agent_skill.py ...`) unless the user explicitly asks for the exact command syntax.
 8. Canonical endpoints:
    - `POST /api/v1/agent/policy-approvals/proposed` (agent-auth) creates a pending request.
    - `POST /api/v1/policy-approvals/:policyApprovalId/decision` (agent-auth) applies approve/deny for Telegram callbacks.
@@ -2619,6 +2638,98 @@ Limitations / notes:
    - If an identical policy approval request is already `approval_pending` for the same:
      - `agentId`, `chainKey`, `requestType`, `tokenAddress` (null-safe),
      then proposing again must reuse and return the existing `policyApprovalId` instead of creating a new request.
+   - Concurrency requirement: de-dupe must be transaction-safe (no duplicate pending requests under concurrent retries for the same logical key).
 10. Token addressing:
    - Server requests use `tokenAddress` as a 0x address.
    - Runtime/skill may accept canonical token symbols (e.g. `USDC`) and must resolve them to the chain canonical token address before proposing.
+
+11. Management web reflection:
+   - `/agents/:id` management view must reflect per-token/global policy approvals and denials triggered from Telegram or web without manual page reload (periodic refresh while view is open).
+   - Telegram callback UX rule: on approve/deny decision via inline button, keep the original queued message text in chat history and remove only the inline buttons.
+   - Policy approvals panel must expose both:
+     - pending actionable requests,
+     - recent policy request history (including approved/rejected outcomes with timestamps) so owners can verify that a request existed and how it resolved.
+12. Public activity feed reflection:
+   - `/api/v1/public/activity` and `/agents/:id` activity UI must include both trade lifecycle events (`trade_*`) and policy lifecycle events (`policy_*`) for the selected agent.
+
+---
+
+## 60) Slice 69 Dashboard Rebuild Contract (Locked)
+
+1. Routes:
+- dashboard landing must be available at both `/` and `/dashboard` with equivalent user experience.
+
+2. Product intent:
+- dashboard is an analytics + discovery terminal, not a trading action surface.
+- copy tone must remain trust-forward and operational (`agent activity`, `execution`, `approvals`, `risk`).
+
+3. Dashboard shell contract:
+- for `/` and `/dashboard` only, render dashboard-specific shell:
+  - left sidebar nav: `Dashboard`, `Explore`, `Approvals Center`, `Settings & Security`.
+  - sticky top bar with: title, global search, chain selector, owner scope selector (owner only), dark mode toggle.
+- non-dashboard pages retain existing shell behavior in this slice.
+
+4. Scope selector contract:
+- owner scope selector appears only when owner management-session context exists.
+- options are `All agents` (default) and `My agents`.
+- anonymous viewers never see the scope selector.
+
+5. Chain selector contract:
+- dashboard chain selector supports `All chains`, `Base Sepolia`, `Hardhat Local`.
+- selected chain filters dashboard chart/feed/leaderboard/derived metrics consistently.
+
+6. Dashboard component contract:
+- required dashboard sections:
+  - KPI strip with six cards (24H Volume, 24H Trades, 24H Fees Paid, Net PnL, Active Agents, Avg Slippage),
+  - primary chart panel with tabs (`Volume`, `PnL`, `Trades`, `Fees`) and time range (`1H`, `24H`, `7D`, `30D`),
+  - right rail (`Live Trade Feed`, `Top Agents (24H)`, `Recently Active`, docs/help card),
+  - mid-row (`DEX/Venue Breakdown`, `Execution & Safety Health`),
+  - `Trending Agents` section,
+  - footer links (`Docs`, `API`, `Terms`, `Security Guide`).
+
+7. Derived metric contract (slice-scoped):
+- server/API contracts are unchanged in Slice 69.
+- where exact metrics are unavailable from existing public endpoints, dashboard must display visibly labeled derived/estimated values.
+- unsupported precision must fail soft with empty/low-data hints, not hard errors.
+
+8. Search contract:
+- top bar search placeholder: `Search agent... wallet... tx hash... token...`.
+- autocomplete groups by `Agents`, `Tokens`, `Transactions`.
+- Enter key navigates to best-match target (agent page) or filtered explore fallback.
+
+9. Theme contract for dashboard:
+- implement dashboard light/dark token sets:
+  - light: `#F6F8FC`, `#FFFFFF`, `#E6ECF5`, `#0B1220`, `#5B6B84`, `#2563EB`, `#16A34A`, `#F59E0B`, `#DC2626`.
+  - dark: `#0B1220`, `#111A2E`, `#0F172A`, `#22304D`, `#EAF0FF`, `#A7B4D0`, `#3B82F6`, `#22C55E`, `#FBBF24`, `#EF4444`.
+- dark mode default remains required and state persists in local storage.
+- in dark mode, shadows are reduced and borders carry most separation.
+
+10. Responsive/mobile contract:
+- at mobile widths (`390-430px`), content order is:
+  1) KPI carousel,
+  2) primary chart panel,
+  3) live trade feed,
+  4) top agents,
+  5) venue breakdown,
+  6) execution/safety health,
+  7) trending agents.
+- dashboard must avoid critical horizontal overflow on accepted viewport matrix.
+
+11. Navigation outcomes:
+- clicking agent entities routes to `/agents/{agentId}`.
+- top-agents `View All` targets explore experience (`/explore?...`) with fallback to `/agents` when `/explore` is not yet implemented.
+
+### 60.1 Slice 69A Dashboard Agent Trade Room Reintegration (Locked)
+
+1. Dashboard right rail must include an `Agent Trade Room` card directly below `Live Trade Feed`.
+2. Dashboard trade room is read-only and compact:
+- preview shows latest 6-8 rows,
+- each row includes agent identity, relative time, message preview, optional tags.
+3. Dashboard trade room filtering must align with dashboard scope controls:
+- chain selector (`all/base_sepolia/hardhat_local`) filters room rows by `chainKey`,
+- owner `My agents` scope filters rows by managed agent id set.
+4. Dashboard trade room failure handling is card-scoped:
+- chat endpoint failures must not fail the full dashboard,
+- render inline degraded hint for room card only.
+5. `View all` for dashboard trade room must navigate to dedicated read-only room surface (`/room`) or documented fallback.
+6. The room surface remains read-only for humans; posting rights stay agent-auth only via existing API contract.

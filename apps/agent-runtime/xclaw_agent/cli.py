@@ -2755,8 +2755,8 @@ def cmd_trade_spot(args: argparse.Namespace) -> int:
         if not trade_id:
             proposed = _post_trade_proposed(
                 chain,
-                str(token_in_meta.get("symbol") or token_in),
-                str(token_out_meta.get("symbol") or token_out),
+                token_in,
+                token_out,
                 amount_in_for_server,
                 slippage_bps,
                 amount_out_human=_decimal_text(expected_out_human),
@@ -2786,6 +2786,14 @@ def cmd_trade_spot(args: argparse.Namespace) -> int:
             else:
                 # Ensure we don't keep stale pending intents for already-approved trades.
                 _remove_pending_trade_intent(intent_key)
+
+        # Re-quote right before execution so amountOutMin reflects post-approval market state.
+        # Approval waits can be long enough that an earlier quote becomes stale and causes SLIPPAGE_NET.
+        expected_out_int = _router_get_amount_out(chain, amount_in_units, token_in, token_out)
+        min_out_int = (expected_out_int * (10000 - slippage_bps)) // 10000
+        if min_out_int <= 0:
+            raise WalletStoreError("Computed amountOutMin is zero after approval; reduce slippage or increase amount.")
+        expected_out_human = _to_non_negative_decimal(_format_units(int(expected_out_int), token_out_decimals))
 
         deadline_sec = int(args.deadline_sec)
         if deadline_sec < 30 or deadline_sec > 3600:
@@ -3405,14 +3413,21 @@ def cmd_trade_execute(args: argparse.Namespace) -> int:
         rpc_url = _chain_rpc_url(args.chain)
         router = _require_chain_contract_address(args.chain, "router")
 
-        token_in = str(trade.get("tokenIn") or "")
-        token_out = str(trade.get("tokenOut") or "")
-        if not is_hex_address(token_in):
-            token_in = _chain_token_address(args.chain, "WETH")
-        if not is_hex_address(token_out):
-            token_out = _chain_token_address(args.chain, "USDC")
+        token_in_raw = str(trade.get("tokenIn") or "").strip()
+        token_out_raw = str(trade.get("tokenOut") or "").strip()
+        if token_in_raw == "" or token_out_raw == "":
+            raise WalletStoreError("Trade payload is missing tokenIn/tokenOut.")
+        try:
+            token_in = _resolve_token_address(args.chain, token_in_raw)
+            token_out = _resolve_token_address(args.chain, token_out_raw)
+        except Exception as exc:
+            raise WalletStoreError(
+                f"Could not resolve trade token addresses for execution ({token_in_raw} -> {token_out_raw}): {exc}"
+            ) from exc
 
-        amount_wei_str = _to_wei_uint(trade.get("amountIn"))
+        token_in_meta = _fetch_erc20_metadata(args.chain, token_in)
+        token_in_decimals = int(token_in_meta.get("decimals", 18))
+        amount_wei_str = _to_units_uint(str(trade.get("amountIn") or ""), token_in_decimals)
         amount_wei = int(amount_wei_str)
         state, day_key, current_spend, max_daily_wei = _enforce_spend_preconditions(args.chain, amount_wei, enforce_native_cap=False)
         projected_spend_usd = _to_non_negative_decimal(trade.get("amountIn") or "0")

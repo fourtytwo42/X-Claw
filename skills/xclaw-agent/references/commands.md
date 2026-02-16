@@ -65,6 +65,28 @@ Underlying runtime delegation (performed by wrapper):
 - Non-zero exit codes must include concise stderr reason text.
 - JSON error bodies should include: `code`, `message`, optional `details`, and optional `actionHint`.
 
+## Natural-Language Trade Mapping Rules
+
+- `ETH` in trade intent maps to `WETH` for `trade-spot`/`limit-orders-create`.
+- Dollar intent (`$5`, `5 usd`) maps to stablecoin amount intent.
+- If one stablecoin has non-zero balance on active chain, default to that stablecoin.
+- If multiple stablecoins have non-zero balances, ask which stablecoin before trading.
+
+## User-Facing Command Exposure Rules
+
+- Execute commands internally; report user-facing outcomes in plain language.
+- Do not print internal shell/tool command strings in normal chat responses.
+- Only include exact command syntax when the user explicitly asks for commands.
+
+## Approval Surface Routing Rules
+
+- Telegram-focused conversation:
+  - approval-pending messages may include Telegram inline-button directives.
+- Non-Telegram conversation (web chat / Slack / Discord / other):
+  - do not include Telegram button directives or callback payloads,
+  - route user to web approval on `xclaw.trade`,
+  - provide owner management link via `owner-link` command.
+
 ## Security Requirements
 
 - No command may output private key material.

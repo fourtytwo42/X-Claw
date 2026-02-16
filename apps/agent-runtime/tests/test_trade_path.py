@@ -382,6 +382,68 @@ class TradePathRuntimeTests(unittest.TestCase):
         self.assertGreaterEqual(wait_mock.call_count, 2, "should wait on both invocations")
         send_mock.assert_not_called()
 
+    def test_trade_spot_requotes_after_approval_wait_for_min_out(self) -> None:
+        args = argparse.Namespace(
+            chain="base_sepolia",
+            token_in="USDC",
+            token_out="WETH",
+            amount_in="50",
+            slippage_bps="500",
+            deadline_sec=120,
+            to=None,
+            json=True,
+        )
+        captured: dict[str, object] = {}
+
+        def fake_calldata(signature: str, values: list[object]) -> str:
+            if signature.startswith("swapExactTokensForTokens("):
+                captured["swapValues"] = values
+            return "0xdeadbeef"
+
+        with mock.patch.object(cli, "_resolve_token_address", side_effect=["0x" + "11" * 20, "0x" + "22" * 20]), mock.patch.object(
+            cli, "_execution_wallet", return_value=("0x" + "aa" * 20, "0x" + "33" * 32)
+        ), mock.patch.object(
+            cli, "_require_cast_bin", return_value="cast"
+        ), mock.patch.object(cli, "_chain_rpc_url", return_value="https://rpc.example"), mock.patch.object(
+            cli, "_require_chain_contract_address", return_value="0x" + "44" * 20
+        ), mock.patch.object(cli, "_fetch_erc20_metadata", side_effect=[{"decimals": 18, "symbol": "USDC"}, {"decimals": 18, "symbol": "WETH"}]), mock.patch.object(
+            cli, "_fetch_token_allowance_wei", return_value=str(10**30)
+        ), mock.patch.object(
+            cli, "_enforce_spend_preconditions", return_value=({}, "2026-02-14", 0, 10**30)
+        ), mock.patch.object(
+            cli, "_replay_trade_usage_outbox", return_value=(0, 0)
+        ), mock.patch.object(
+            cli, "_enforce_trade_caps", return_value=({}, "2026-02-14", cli.Decimal("0"), 0, {"maxDailyUsd": "1000", "maxDailyTradeCount": 10})
+        ), mock.patch.object(
+            cli, "_router_get_amount_out", side_effect=[1000, 600]
+        ), mock.patch.object(
+            cli, "_post_trade_proposed", return_value={"ok": True, "tradeId": "trd_1", "status": "approval_pending"}
+        ), mock.patch.object(
+            cli, "_wait_for_trade_approval", return_value={"tradeId": "trd_1", "status": "approved"}
+        ), mock.patch.object(
+            cli, "_post_trade_status"
+        ), mock.patch.object(
+            cli, "_record_trade_cap_ledger"
+        ), mock.patch.object(
+            cli, "_post_trade_usage"
+        ), mock.patch.object(
+            cli, "_record_spend"
+        ), mock.patch.object(
+            cli, "_cast_calldata", side_effect=fake_calldata
+        ), mock.patch.object(
+            cli, "_cast_rpc_send_transaction", return_value="0x" + "ab" * 32
+        ), mock.patch.object(
+            cli.subprocess, "run", return_value=mock.Mock(returncode=0, stdout='{"status":"0x1"}', stderr="")
+        ):
+            code = cli.cmd_trade_spot(args)
+
+        self.assertEqual(code, 0)
+        swap_values = captured.get("swapValues")
+        self.assertIsInstance(swap_values, list)
+        self.assertEqual(str(swap_values[0]), str(50 * 10**18))
+        # Re-quoted output is 600, with 5% slippage => minOut=570.
+        self.assertEqual(str(swap_values[1]), "570")
+
     def test_telegram_prompt_includes_swap_details(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir, mock.patch.object(cli, "APP_DIR", pathlib.Path(tmpdir)), mock.patch.object(
             cli, "APPROVAL_PROMPTS_FILE", pathlib.Path(tmpdir) / "approval_prompts.json"
@@ -618,6 +680,61 @@ class TradePathRuntimeTests(unittest.TestCase):
         )
         code = cli.cmd_trade_spot(args)
         self.assertEqual(code, 2)
+
+    def test_trade_spot_proposes_with_token_addresses_for_policy_matching(self) -> None:
+        args = argparse.Namespace(
+            chain="base_sepolia",
+            token_in="USDC",
+            token_out="WETH",
+            amount_in="10",
+            slippage_bps="50",
+            to=None,
+            deadline_sec=120,
+            json=True,
+        )
+
+        with mock.patch.object(cli, "_resolve_token_address", side_effect=["0x" + "11" * 20, "0x" + "22" * 20]), mock.patch.object(
+            cli, "_execution_wallet", return_value=("0x" + "aa" * 20, "0x" + "33" * 32)
+        ), mock.patch.object(
+            cli, "_require_cast_bin", return_value="cast"
+        ), mock.patch.object(cli, "_chain_rpc_url", return_value="https://rpc.example"), mock.patch.object(
+            cli, "_require_chain_contract_address", return_value="0x" + "44" * 20
+        ), mock.patch.object(cli, "_fetch_erc20_metadata", side_effect=[{"decimals": 18, "symbol": "USDC"}, {"decimals": 18, "symbol": "WETH"}]), mock.patch.object(
+            cli, "_fetch_token_allowance_wei", return_value=str(10**30)
+        ), mock.patch.object(
+            cli, "_enforce_spend_preconditions", return_value=({}, "2026-02-14", 0, 10**30)
+        ), mock.patch.object(
+            cli, "_replay_trade_usage_outbox", return_value=(0, 0)
+        ), mock.patch.object(
+            cli, "_enforce_trade_caps", return_value=({}, "2026-02-14", cli.Decimal("0"), 0, {"maxDailyUsd": "1000", "maxDailyTradeCount": 10})
+        ), mock.patch.object(
+            cli, "_router_get_amount_out", return_value=10**18
+        ), mock.patch.object(
+            cli, "_post_trade_proposed", return_value={"ok": True, "tradeId": "trd_1", "status": "approved"}
+        ) as propose_mock, mock.patch.object(
+            cli, "_wait_for_trade_approval", side_effect=AssertionError("trade-spot should not wait when proposal is already approved")
+        ), mock.patch.object(
+            cli, "_post_trade_status"
+        ), mock.patch.object(
+            cli, "_record_trade_cap_ledger"
+        ), mock.patch.object(
+            cli, "_post_trade_usage"
+        ), mock.patch.object(
+            cli, "_record_spend"
+        ), mock.patch.object(
+            cli, "_cast_calldata", return_value="0xdeadbeef"
+        ), mock.patch.object(
+            cli, "_cast_rpc_send_transaction", return_value="0x" + "ab" * 32
+        ), mock.patch.object(
+            cli.subprocess, "run", return_value=mock.Mock(returncode=0, stdout='{"status":"0x1"}', stderr="")
+        ):
+            code = cli.cmd_trade_spot(args)
+
+        self.assertEqual(code, 0)
+        called = propose_mock.call_args
+        self.assertIsNotNone(called)
+        self.assertEqual(called.args[1], "0x" + "11" * 20)
+        self.assertEqual(called.args[2], "0x" + "22" * 20)
 
     def test_faucet_request_daily_limited(self) -> None:
         args = argparse.Namespace(chain="base_sepolia", json=True)
@@ -1004,6 +1121,74 @@ class TradePathRuntimeTests(unittest.TestCase):
             payload = self._run_and_parse_stdout(lambda: cli.cmd_trade_execute(args))
         self.assertFalse(payload.get("ok"))
         self.assertEqual(payload.get("code"), "daily_trade_count_cap_exceeded")
+
+    def test_trade_execute_resolves_symbol_tokens_before_approve_and_swap(self) -> None:
+        args = argparse.Namespace(intent="trd_real_sym", chain="base_sepolia", json=True)
+        trade_payload = {
+            "tradeId": "trd_real_sym",
+            "chainKey": "base_sepolia",
+            "status": "approved",
+            "mode": "real",
+            "retry": {"eligible": False},
+            "tokenIn": "USDC",
+            "tokenOut": "WETH",
+            "amountIn": "5",
+            "slippageBps": 50,
+        }
+        sent_txs: list[dict] = []
+        captured: dict[str, list[object]] = {}
+
+        def fake_send(rpc_url: str, tx_obj: dict, private_key_hex: str) -> str:
+            sent_txs.append(tx_obj)
+            return "0x" + "ab" * 32
+
+        def fake_calldata(signature: str, values: list[object]) -> str:
+            if signature.startswith("approve("):
+                captured["approveValues"] = values
+            if signature.startswith("swapExactTokensForTokens("):
+                captured["swapValues"] = values
+            return "0xdeadbeef"
+
+        with mock.patch.object(cli, "_read_trade_details", return_value=trade_payload), mock.patch.object(
+            cli, "_resolve_token_address", side_effect=["0x" + "11" * 20, "0x" + "22" * 20]
+        ), mock.patch.object(
+            cli, "_fetch_erc20_metadata", return_value={"decimals": 18, "symbol": "USDC"}
+        ), mock.patch.object(
+            cli, "_enforce_spend_preconditions", return_value=({}, "2026-02-14", 0, 1000000000)
+        ), mock.patch.object(
+            cli, "_replay_trade_usage_outbox", return_value=(0, 0)
+        ), mock.patch.object(
+            cli, "_enforce_trade_caps", return_value=({}, "2026-02-14", cli.Decimal("0"), 0, {"maxDailyUsd": "1000", "maxDailyTradeCount": 10})
+        ), mock.patch.object(
+            cli, "_record_trade_cap_ledger"
+        ), mock.patch.object(
+            cli, "_post_trade_usage"
+        ), mock.patch.object(
+            cli, "_execution_wallet", return_value=("0x1111111111111111111111111111111111111111", "11" * 32)
+        ), mock.patch.object(
+            cli, "_require_chain_contract_address", return_value="0x3333333333333333333333333333333333333333"
+        ), mock.patch.object(
+            cli, "_cast_calldata", side_effect=fake_calldata
+        ), mock.patch.object(
+            cli, "_cast_rpc_send_transaction", side_effect=fake_send
+        ), mock.patch.object(
+            cli.subprocess, "run", return_value=mock.Mock(returncode=0, stdout='{"status":"0x1"}', stderr="")
+        ), mock.patch.object(
+            cli, "_post_trade_status"
+        ), mock.patch.object(
+            cli, "_record_spend"
+        ), mock.patch.object(
+            cli, "_send_trade_execution_report"
+        ):
+            code = cli.cmd_trade_execute(args)
+
+        self.assertEqual(code, 0)
+        self.assertGreaterEqual(len(sent_txs), 2)
+        # First tx is token approval; it must target resolved tokenIn (USDC), not a hardcoded fallback token.
+        self.assertEqual(str(sent_txs[0].get("to")), "0x" + "11" * 20)
+        # amountIn "5" must be interpreted as 5.0 tokens => 5e18 units for 18-decimals mock USDC.
+        self.assertEqual(str((captured.get("approveValues") or [None, None])[1]), str(5 * 10**18))
+        self.assertEqual(str((captured.get("swapValues") or [None])[0]), str(5 * 10**18))
 
     def test_removed_offdex_command_is_not_available(self) -> None:
         with self.assertRaises(SystemExit):

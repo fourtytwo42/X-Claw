@@ -2,24 +2,64 @@
 
 import { useRouter } from 'next/navigation';
 
-import { CHAIN_OPTIONS, type ChainKey, useActiveChainKey } from '@/lib/active-chain';
+import {
+  CHAIN_OPTIONS,
+  DASHBOARD_CHAIN_OPTIONS,
+  type ChainKey,
+  type DashboardChainKey,
+  useActiveChainKey,
+  useDashboardChainKey
+} from '@/lib/active-chain';
 
-export function ChainHeaderControl() {
+type ChainHeaderControlProps = {
+  includeAll?: boolean;
+  className?: string;
+  id?: string;
+};
+
+export function ChainHeaderControl({ includeAll = false, className, id = 'chain-select' }: ChainHeaderControlProps) {
   const router = useRouter();
   const [chainKey, setChainKey] = useActiveChainKey();
+  const [dashboardChainKey, setDashboardChainKey] = useDashboardChainKey();
+
+  if (includeAll) {
+    const onChange = (next: DashboardChainKey) => {
+      setDashboardChainKey(next);
+      router.refresh();
+    };
+
+    return (
+      <div className={className ?? 'chain-header-control'}>
+        <label className="sr-only" htmlFor={id}>
+          Network
+        </label>
+        <select
+          id={id}
+          value={dashboardChainKey}
+          onChange={(e) => onChange(e.target.value as DashboardChainKey)}
+          className="chain-select"
+        >
+          {DASHBOARD_CHAIN_OPTIONS.map((opt) => (
+            <option key={opt.key} value={opt.key}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      </div>
+    );
+  }
 
   const onChange = (next: ChainKey) => {
     setChainKey(next);
-    // Ensure any server components/data fetches keyed by chain revalidate.
     router.refresh();
   };
 
   return (
-    <div className="chain-header-control">
-      <label className="sr-only" htmlFor="chain-select">
+    <div className={className ?? 'chain-header-control'}>
+      <label className="sr-only" htmlFor={id}>
         Network
       </label>
-      <select id="chain-select" value={chainKey} onChange={(e) => onChange(e.target.value as ChainKey)} className="chain-select">
+      <select id={id} value={chainKey} onChange={(e) => onChange(e.target.value as ChainKey)} className="chain-select">
         {CHAIN_OPTIONS.map((opt) => (
           <option key={opt.key} value={opt.key}>
             {opt.label}

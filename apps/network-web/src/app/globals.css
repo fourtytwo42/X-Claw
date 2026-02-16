@@ -200,6 +200,9 @@ a {
 .theme-toggle,
 .logout-button {
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.34rem;
 }
 
 .theme-toggle:disabled,
@@ -211,6 +214,83 @@ a {
 .page-content {
   width: min(1560px, 96vw);
   margin: clamp(0.8rem, 1.4vw, 1.4rem) auto;
+}
+
+.page-content-dashboard {
+  width: min(100vw, 1840px);
+  margin: 0 auto;
+  padding: 0.75rem;
+}
+
+.dashboard-search-wrap {
+  position: relative;
+  min-width: 260px;
+}
+
+.dashboard-search {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0.55rem 0.7rem;
+  background: var(--bg-elev);
+  color: var(--text);
+}
+
+.dashboard-search-dropdown {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  right: 0;
+  z-index: 80;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg-elev);
+  box-shadow: var(--shadow-soft);
+  max-height: 330px;
+  overflow: auto;
+  padding: 0.55rem;
+}
+
+.dashboard-search-empty {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.dashboard-search-group {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.dashboard-search-group + .dashboard-search-group {
+  margin-top: 0.45rem;
+}
+
+.dashboard-search-group h4 {
+  margin: 0;
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.dashboard-search-group button {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg-elev-2);
+  color: var(--text);
+  display: flex;
+  justify-content: space-between;
+  gap: 0.4rem;
+  padding: 0.38rem 0.48rem;
+  cursor: pointer;
+}
+
+.dashboard-scope select {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg-elev);
+  color: var(--text);
+  padding: 0.45rem 0.55rem;
 }
 
 .panel {
@@ -1032,6 +1112,11 @@ th {
     margin: 0.65rem auto;
   }
 
+  .page-content-dashboard {
+    width: min(100%, 100vw);
+    padding: 0.5rem;
+  }
+
   .panel {
     border-radius: 14px;
     padding: 0.68rem;
@@ -1053,6 +1138,10 @@ th {
   .toolbar button,
   .toolbar .theme-toggle {
     width: 100%;
+  }
+
+  .dashboard-search-wrap {
+    min-width: 100%;
   }
 
   .join-choice-row {

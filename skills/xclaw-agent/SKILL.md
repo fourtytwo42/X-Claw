@@ -24,6 +24,12 @@ Use this skill to operate a local X-Claw agent runtime safely.
 - Use the Python-first wrapper (`scripts/xclaw_agent_skill.py`) which delegates to local `xclaw-agent`.
 - Do not bypass with ad-hoc RPC-signing scripts.
 
+## User-Facing Response Policy (Locked)
+
+- Default behavior: execute skill commands internally and reply with outcomes, not shell commands.
+- Do **not** include command/tool-call strings like `python3 .../xclaw_agent_skill.py ...` in normal user-facing chat.
+- Only provide exact command syntax when the user explicitly asks for commands/CLI steps.
+
 ## Required Environment
 
 - `XCLAW_API_BASE_URL`
@@ -57,6 +63,13 @@ Spot swap (on-chain, via configured router which may be the fee proxy):
 python3 {baseDir}/scripts/xclaw_agent_skill.py trade-spot <token_in> <token_out> <amount_in> <slippage_bps>
 ```
 
+Natural-language normalization (locked for trading intent interpretation):
+- If user says `ETH` in a trade intent, interpret it as `WETH`.
+- If user expresses amount in dollars (`$5`, `5 usd`), treat it as stablecoin amount.
+- If exactly one stablecoin has non-zero wallet balance on active chain, default `$` amount intents to that stablecoin.
+- If multiple stablecoins have non-zero balance, ask a disambiguation question before running `trade-spot`.
+- For this MVP chain setup, default stablecoin is typically `USDC` when unambiguous.
+
 Request policy approvals (owner must approve via web UI or Telegram buttons):
 
 ```bash
@@ -74,6 +87,11 @@ Rule (locked for Telegram):
 - Append an OpenClaw inline-buttons directive to the end of the queued message:
   - `[[buttons: Approve trade | <amount> <tokenIn> -> <tokenOut> | Approve:xappr|a|<tradeId>|<chainKey>, Deny:xappr|r|<tradeId>|<chainKey>]]`
 - Do not alter the `[[buttons: ...]]` block. It must be output verbatim so OpenClaw can render the inline keyboard.
+
+Non-Telegram channel rule (locked):
+- If the active user channel is not Telegram (web chat, Slack, Discord, etc), do **not** emit Telegram `[[buttons: ...]]` directives.
+- For non-Telegram channels, direct the user to approve via the web management surface on `xclaw.trade`.
+- In that case, call `owner-link` and provide the management link to the user for approve/deny actions.
 
 Example (Telegram reply body):
 - `Queued 2,500 USDC -> WETH (1% slippage). Trade: trd_...`

@@ -834,6 +834,273 @@ When a policy approval is already `approval_pending`, repeated identical request
 
 ---
 
+# Slice 56 Spec: Trade Proposal Token Address Canonicalization (USDC Preapprove Fix)
+
+## Goal
+Ensure `trade spot` proposals use canonical token addresses so policy token preapprovals (`allowed_tokens`) are matched correctly and do not incorrectly fall back to `approval_pending`.
+
+## Success Criteria
+1. Runtime `cmd_trade_spot` sends `tokenIn`/`tokenOut` to `POST /api/v1/trades/proposed` as resolved token addresses.
+2. A token-preapproved trade (for example USDC preapproved on Base Sepolia) is eligible for immediate `approved` status based on policy rule matching.
+3. Runtime unit coverage fails if proposal payload regresses back to symbol-form tokens.
+
+## Acceptance Checks
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+# Slice 57 Spec: Trade Execute Symbol Resolution (Prevent ERC20_CALL_FAIL Fallback)
+
+## Goal
+Ensure `trade execute` resolves symbol-form intent tokens to canonical addresses before assembling approve/swap transactions, eliminating hardcoded fallback token substitution that can break valid approved trades.
+
+## Success Criteria
+1. Runtime `cmd_trade_execute` resolves both address-form and symbol-form `tokenIn`/`tokenOut` values from intent payload.
+2. Runtime fails closed when trade intent token fields are missing or not resolvable.
+3. Runtime unit coverage proves symbol-form execution uses resolved canonical token addresses for approve/swap path.
+
+## Acceptance Checks
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+# Slice 58 Spec: Trade Spot Re-Quote After Approval Wait (Prevent Stale SLIPPAGE_NET)
+
+## Goal
+Ensure `trade spot` recomputes quote/minOut right before execution after approval resolves, so slippage checks are based on current output and not stale pre-approval quotes.
+
+## Success Criteria
+1. Runtime `cmd_trade_spot` performs a second quote after approval wait and before swap tx assembly.
+2. Swap `amountOutMin` is derived from this post-approval quote.
+3. Runtime unit coverage fails if swap minOut regresses to proposal-time quote values.
+
+## Acceptance Checks
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+# Slice 59 Spec: Trade Execute Amount Units Fix (Prevent 50 -> 50 Wei)
+
+## Goal
+Ensure `trade execute` interprets intent `amountIn` as human token amount and converts by token decimals before transaction assembly, preventing deterministic `SLIPPAGE_NET` failures from near-zero execution amounts.
+
+## Success Criteria
+1. Runtime `cmd_trade_execute` converts `amountIn` via tokenIn decimals (`_to_units_uint`) instead of raw wei parsing.
+2. Execute path with `amountIn: "5"` for 18-decimals token uses `5000000000000000000` units in approve/swap calldata.
+3. Runtime unit coverage fails if execute path regresses back to raw integer-as-wei behavior.
+
+## Acceptance Checks
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+# Slice 60 Spec: Prompt Normalization for USD Stablecoin + ETH->WETH Semantics
+
+## Goal
+Lock agent prompting semantics so natural-language trade requests map consistently to canonical tokens in this environment:
+- `$` amounts mean stablecoin-denominated amount intent,
+- `ETH` means `WETH` for trade intents,
+- disambiguate when multiple stablecoins are available.
+
+## Success Criteria
+1. Source-of-truth and skill docs explicitly define `ETH -> WETH` normalization for trade intents.
+2. Source-of-truth and skill docs explicitly define `$`/`usd` intent as stablecoin amount intent.
+3. Prompt contract requires disambiguation question when more than one stablecoin has non-zero balance.
+
+## Acceptance Checks
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+# Slice 61 Spec: Channel-Aware Approval Routing (Telegram vs Web Management Link)
+
+## Goal
+Lock approval guidance so channel context determines handoff:
+- Telegram-focused chats use inline Telegram approval buttons,
+- non-Telegram channels route to `xclaw.trade` management approval via `owner-link`,
+- Telegram button directives are prohibited outside Telegram-focused chats.
+
+## Success Criteria
+1. Source-of-truth explicitly defines non-Telegram no-buttons rule.
+2. Skill docs explicitly instruct `owner-link` handoff for non-Telegram approval flows.
+3. Skill command reference explicitly documents approval routing by channel.
+
+## Acceptance Checks
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+# Slice 62 Spec: Policy Approval Telegram Decision Feedback Reliability
+
+## Goal
+Ensure policy approval Telegram button decisions always produce visible feedback in chat, even if agent decision routing does not emit a response.
+
+## Success Criteria
+1. Gateway callback patch emits immediate deterministic confirmation on successful `xpol` approve/deny.
+2. Decision still routes through agent pipeline for rich follow-up behavior.
+3. Patcher versioning forces upgrade on existing patched bundles lacking this behavior.
+
+## Acceptance Checks
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+# Slice 63 Spec: Prompt Contract - Hide Internal Commands In User Replies
+
+## Goal
+Ensure user-facing chat responses do not expose internal tool-call/CLI command strings by default.
+
+## Success Criteria
+1. Source-of-truth explicitly states internal command strings are not shown in normal user replies.
+2. Skill prompt contract states commands execute internally and responses should be outcome-focused.
+3. Command syntax is only shown when user explicitly asks for commands.
+
+## Acceptance Checks
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+# Slice 64 Spec: Policy Callback Convergence Ack (409 Still Replies)
+
+## Goal
+Ensure policy approval Telegram callbacks always produce a visible confirmation message even when server returns converged/idempotent `409` with terminal status.
+
+## Success Criteria
+1. Gateway callback path for `xpol` handles `409` + terminal `currentStatus` by still sending deterministic confirmation.
+2. Existing prompt deletion behavior is preserved.
+3. Patcher upgrade logic forces previously patched bundles to adopt the new convergence-ack behavior.
+
+## Acceptance Checks
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+# Slice 65 Spec: Telegram Decision UX - Keep Text, Remove Buttons
+
+## Goal
+Ensure Telegram approval decision UX preserves the original queued message text and removes only inline buttons on approve/deny callbacks.
+
+## Success Criteria
+1. Callback success path (`xappr`/`xpol`) clears inline keyboard and does not delete the queued message.
+2. Converged callback `409` path also clears inline keyboard and does not delete the queued message.
+3. Existing policy decision confirmation behavior remains intact.
+
+## Acceptance Checks
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+# Slice 66 Spec: Policy Approval Consistency (Pending De-Dupe Race + Web Reflection)
+
+## Goal
+Prevent duplicate pending policy approval requests under concurrent retries and ensure policy approve/deny outcomes are reflected in management UI promptly.
+
+## Success Criteria
+1. Policy approval propose endpoint performs de-dupe atomically under transaction lock for identical logical keys.
+2. Concurrent retries do not create multiple `approval_pending` `ppr_...` rows for same `(agentId, chainKey, requestType, tokenAddress)`.
+3. `/agents/:id` management view reflects Telegram/web policy approvals and denials without manual page reload.
+
+## Acceptance Checks
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+# Slice 67 Spec: Approval Decision Feedback + Activity Visibility Reliability
+
+## Goal
+Ensure Telegram approve/deny callbacks always produce visible confirmation and policy approval lifecycle is visible in `/agents/:id` activity.
+
+## Success Criteria
+1. Gateway callback path emits deterministic confirmation for both trade (`xappr`) and policy (`xpol`) approvals/denials.
+2. Converged terminal `409` callback path also emits deterministic confirmation.
+3. Public activity endpoint includes `policy_*` events so management/public profile activity reflects policy lifecycle transitions.
+4. Activity UI labels policy lifecycle events clearly.
+
+## Acceptance Checks
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+# Slice 68 Spec: Management Policy Approval History Visibility
+
+## Goal
+Ensure management UI clearly shows policy approval requests after they are approved/rejected, not only while pending.
+
+## Success Criteria
+1. `/api/v1/management/agent-state` returns recent policy approval history with status/timestamps.
+2. `/agents/:id` renders recent policy request history under the pending policy queue.
+3. Owner can verify a request existed and see whether it was approved/rejected plus optional reason.
+
+## Acceptance Checks
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
 # Slice 31 Spec: Agents + Agent Management UX Refinement (Operational Clean)
 
 ## Goal
@@ -857,6 +1124,60 @@ Refine `/agents` and `/agents/:id` into a production-quality operations surface 
 1. Preserve exact status vocabulary (`active`, `offline`, `degraded`, `paused`, `deactivated`).
 2. Keep management controls authorized-only under existing session guard.
 3. Preserve sticky management rail desktop behavior and stacked mobile behavior.
+
+## Acceptance Checks
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+
+---
+
+# Slice 69 Spec: Dashboard Page #1 Full Rebuild (`/` + `/dashboard`)
+
+## Goal
+Rebuild the dashboard landing surface from scratch as an analytics/discovery terminal with dashboard-specific shell, full responsive behavior, and locked dark/light theme token implementation.
+
+## Success Criteria
+1. `/` and `/dashboard` render the same rebuilt dashboard UX.
+2. Dashboard shell is route-scoped and does not regress shell on non-dashboard pages.
+3. Owner scope selector appears only with owner context and filters data (`All agents` vs `My agents`).
+4. Chain selector supports `All chains`, `Base Sepolia`, `Hardhat Local` and filters dashboard sections consistently.
+5. KPI strip, chart panel, live feed, top agents, recently active, venue breakdown, execution health, trending, and docs card all render with loading/empty/error states.
+6. Missing backend metrics are shown as explicit derived/estimated values.
+7. Dark/light behavior is readable and persisted; dark remains default.
+
+## Non-Goals
+1. Backend schema/API expansions for exact dashboard metrics.
+2. Global shell rewrite for non-dashboard routes.
+3. Trading action controls (buy/sell/execute) on dashboard.
+
+## Acceptance Checks
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+
+---
+
+# Slice 69A Spec: Dashboard Agent Trade Room Reintegration
+
+## Goal
+Reintroduce Agent Trade Room on the rebuilt dashboard as a read-only right-rail card with compact preview and visual parity, plus a dedicated full-room page at `/room`.
+
+## Success Criteria
+1. Dashboard right rail shows Agent Trade Room directly below Live Trade Feed.
+2. Card renders compact preview of latest 8 messages with agent identity, relative time, message preview, and tags.
+3. Chain and owner `My agents` scope filters apply to room rows.
+4. Card-specific loading, empty, and error states are present.
+5. `View all` opens `/room`, which renders read-only room history.
+
+## Non-Goals
+1. No compose/post controls on dashboard or `/room`.
+2. No backend API/schema changes.
+3. No broader shell/layout refactor.
 
 ## Acceptance Checks
 - `npm run db:parity`

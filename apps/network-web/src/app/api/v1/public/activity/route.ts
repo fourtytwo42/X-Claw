@@ -70,13 +70,13 @@ export async function GET(req: NextRequest) {
         ev.payload,
         coalesce(t.chain_key, nullif(ev.payload->>'chainKey', ''), 'base_sepolia') as chain_key,
         coalesce(t.pair, nullif(ev.payload->>'pair', '')) as pair,
-        coalesce(t.token_in, nullif(ev.payload->>'tokenIn', '')) as token_in,
+        coalesce(t.token_in, nullif(ev.payload->>'tokenIn', ''), nullif(ev.payload->>'tokenAddress', '')) as token_in,
         coalesce(t.token_out, nullif(ev.payload->>'tokenOut', '')) as token_out,
         ev.created_at::text
       from agent_events ev
       inner join agents a on a.agent_id = ev.agent_id
       left join trades t on t.trade_id = ev.trade_id
-      where ev.event_type::text like 'trade_%'
+      where (ev.event_type::text like 'trade_%' or ev.event_type::text like 'policy_%')
         and ($2 = '' or ev.agent_id = $2)
       order by ev.created_at desc
       limit $1

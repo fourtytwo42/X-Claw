@@ -377,3 +377,85 @@ Issue mapping: `#42` (umbrella)
   - `npm run seed:verify`
   - `npm run build`
   - `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+## Slice 69 Context: Dashboard Full Rebuild (Global Landing Analytics + Discovery)
+
+Issue mapping: `#69` (to be created/mapped)
+
+### Objective + scope lock
+- Objective: rebuild `/` dashboard from scratch to match Page #1 spec with desktop/mobile/dark-mode behavior, add `/dashboard` alias, and keep implementation dashboard-scoped.
+- Scope guard honored: no backend schema/API contract change; unsupported metrics are derived with explicit estimated labeling.
+
+### Expected touched files (Slice 69 allowlist)
+- Dashboard UI/shell:
+  - `apps/network-web/src/app/page.tsx`
+  - `apps/network-web/src/app/dashboard/page.tsx`
+  - `apps/network-web/src/app/page.module.css`
+  - `apps/network-web/src/app/globals.css`
+  - `apps/network-web/src/components/public-shell.tsx`
+  - `apps/network-web/src/components/top-bar-search.tsx`
+  - `apps/network-web/src/components/scope-selector.tsx`
+  - `apps/network-web/src/components/theme-toggle.tsx`
+  - `apps/network-web/src/components/chain-header-control.tsx`
+  - `apps/network-web/src/lib/active-chain.ts`
+- Docs/process:
+  - `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - `docs/XCLAW_SLICE_TRACKER.md`
+  - `docs/XCLAW_BUILD_ROADMAP.md`
+  - `docs/CONTEXT_PACK.md`
+  - `spec.md`
+  - `tasks.md`
+  - `acceptance.md`
+
+### Verification Plan
+- Required gates:
+  - `npm run db:parity`
+  - `npm run seed:reset`
+  - `npm run seed:load`
+  - `npm run seed:verify`
+  - `npm run build`
+- Functional checks:
+  - `/` and `/dashboard` parity
+  - owner-only scope selector visibility
+  - chain filtering (`all/base_sepolia/hardhat_local`)
+  - dark/light persistence
+  - mobile ordering + desktop layout
+
+---
+
+## Slice 69A Context: Dashboard Agent Trade Room Reintegration
+
+Issue mapping: `#69A` (to be created/mapped)
+
+### Objective + scope lock
+- Objective: add back Agent Trade Room in dashboard right rail with compact read-only preview and full `/room` view while preserving analytics-first hierarchy.
+- Scope guard honored: no backend schema/API changes; existing chat API contract reused.
+
+### Expected touched files (Slice 69A allowlist)
+- UI:
+  - `apps/network-web/src/app/page.tsx`
+  - `apps/network-web/src/app/page.module.css`
+  - `apps/network-web/src/app/room/page.tsx`
+- Docs/process:
+  - `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - `docs/XCLAW_SLICE_TRACKER.md`
+  - `docs/XCLAW_BUILD_ROADMAP.md`
+  - `docs/CONTEXT_PACK.md`
+  - `spec.md`
+  - `tasks.md`
+  - `acceptance.md`
+
+### Verification Plan
+- Required gates:
+  - `npm run db:parity`
+  - `npm run seed:reset`
+  - `npm run seed:load`
+  - `npm run seed:verify`
+  - `npm run build`
+- Functional checks:
+  - dashboard room card placement below live feed
+  - room chain and owner-scope filtering
+  - room loading/empty/error states
+  - `/room` read-only view behavior.

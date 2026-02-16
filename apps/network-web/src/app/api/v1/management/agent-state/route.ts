@@ -62,7 +62,7 @@ export async function GET(req: NextRequest) {
       address
     }));
 
-    const [agent, approvals, policyApprovals, policy, audit, outboundPolicy, dailyUsage, chainPolicy, approvalChannel] = await Promise.all([
+    const [agent, approvals, policyApprovals, policyApprovalsHistory, policy, audit, outboundPolicy, dailyUsage, chainPolicy, approvalChannel] = await Promise.all([
       dbQuery<{
         agent_id: string;
         public_status: string;
@@ -109,6 +109,33 @@ export async function GET(req: NextRequest) {
         where agent_id = $1
           and status = 'approval_pending'
         order by created_at asc
+        limit 50
+        `,
+        [agentId]
+      ),
+      dbQuery<{
+        request_id: string;
+        chain_key: string;
+        request_type: string;
+        token_address: string | null;
+        status: string;
+        reason_message: string | null;
+        created_at: string;
+        decided_at: string | null;
+      }>(
+        `
+        select
+          request_id,
+          chain_key,
+          request_type,
+          token_address,
+          status::text,
+          reason_message,
+          created_at::text,
+          decided_at::text
+        from agent_policy_approval_requests
+        where agent_id = $1
+        order by created_at desc
         limit 50
         `,
         [agentId]
@@ -240,6 +267,7 @@ export async function GET(req: NextRequest) {
         },
         approvalsQueue: approvals.rows,
         policyApprovalsQueue: policyApprovals.rows,
+        policyApprovalsHistory: policyApprovalsHistory.rows,
         latestPolicy: policy.rows[0] ?? null,
         tradeCaps: policy.rows[0]
           ? {

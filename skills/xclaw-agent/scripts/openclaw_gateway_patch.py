@@ -31,13 +31,17 @@ MARKER = "xclaw: telegram approval callback received"
 DECISION_ACK_MARKER = "xclaw: telegram approval decision ack"
 DECISION_ACK_MARKER_V2 = "xclaw: telegram approval decision ack v2"
 DECISION_ACK_MARKER_V3 = "xclaw: telegram approval decision ack v3"
+DECISION_ACK_MARKER_V4 = "xclaw: telegram approval decision ack v4"
+DECISION_ACK_MARKER_V5 = "xclaw: telegram approval decision ack v5"
+DECISION_ACK_MARKER_V6 = "xclaw: telegram approval decision ack v6"
+DECISION_ACK_MARKER_V7 = "xclaw: telegram approval decision ack v7"
 DECISION_ROUTE_MARKER_V1 = "xclaw: telegram approval decision routed to agent"
 QUEUED_BUTTONS_MARKER = "xclaw: telegram queued approval buttons"
 QUEUED_BUTTONS_MARKER_V2 = "xclaw: telegram queued approval buttons v2"
 QUEUED_BUTTONS_MARKER_V3 = "xclaw: telegram queued approval buttons v3"
 LEGACY_DM_SENTINEL = 'Allow in DMs even when inlineButtonsScope is "allowlist", gated by chatId == senderId.'
 # Bump when patch semantics change so we invalidate the cached "already patched" fast-path.
-STATE_SCHEMA_VERSION = 24
+STATE_SCHEMA_VERSION = 29
 STATE_DIR = Path.home() / ".openclaw" / "xclaw"
 STATE_FILE = STATE_DIR / "openclaw_patch_state.json"
 LOCK_FILE = STATE_DIR / "openclaw_patch.lock"
@@ -260,7 +264,16 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
 
     # Upgrade path: if an older canonical block exists, replace it with the current canonical block.
     # This lets us ship UX tweaks (e.g. remove keyboard immediately) without telling users to reinstall OpenClaw.
-    if MARKER in raw and ("xappr|r|" not in raw or "xpol|" not in raw or DECISION_ACK_MARKER_V3 not in raw or DECISION_ROUTE_MARKER_V1 not in raw):
+    if MARKER in raw and (
+        "xappr|r|" not in raw
+        or "xpol|" not in raw
+        or DECISION_ACK_MARKER_V3 not in raw
+        or DECISION_ACK_MARKER_V4 not in raw
+        or DECISION_ACK_MARKER_V5 not in raw
+        or DECISION_ACK_MARKER_V6 not in raw
+        or DECISION_ACK_MARKER_V7 not in raw
+        or DECISION_ROUTE_MARKER_V1 not in raw
+    ):
         idx = raw.find(PAGINATION_ANCHOR)
         if idx < 0:
             return raw, False, "pagination_anchor_not_found"
@@ -271,7 +284,14 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
 
     # If the canonical decision block is already present (newest version), ensure queued-message auto-buttons are too.
     # If we see the old ack-only version (missing route marker), drop and re-inject canonical block.
-    if MARKER in raw and DECISION_ACK_MARKER_V3 in raw and (DECISION_ROUTE_MARKER_V1 not in raw or "xpol|" not in raw):
+    if MARKER in raw and DECISION_ACK_MARKER_V3 in raw and (
+        DECISION_ACK_MARKER_V4 not in raw
+        or DECISION_ACK_MARKER_V5 not in raw
+        or DECISION_ACK_MARKER_V6 not in raw
+        or DECISION_ACK_MARKER_V7 not in raw
+        or DECISION_ROUTE_MARKER_V1 not in raw
+        or "xpol|" not in raw
+    ):
         idx = raw.find(PAGINATION_ANCHOR)
         if idx < 0:
             return raw, False, "pagination_anchor_not_found"
@@ -280,7 +300,16 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
             raw = raw[:start] + raw[idx:]
             normalized = True
 
-    if MARKER in raw and DECISION_ACK_MARKER_V3 in raw and DECISION_ROUTE_MARKER_V1 in raw and "xpol|" in raw:
+    if (
+        MARKER in raw
+        and DECISION_ACK_MARKER_V3 in raw
+        and DECISION_ACK_MARKER_V4 in raw
+        and DECISION_ACK_MARKER_V5 in raw
+        and DECISION_ACK_MARKER_V6 in raw
+        and DECISION_ACK_MARKER_V7 in raw
+        and DECISION_ROUTE_MARKER_V1 in raw
+        and "xpol|" in raw
+    ):
         changed_any = False
         if QUEUED_BUTTONS_MARKER not in raw:
             raw2, changed2, err2 = _patch_queued_buttons(raw)
@@ -343,8 +372,18 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER}\n'
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V2}\n'
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V3}\n'
-        '\t\t\t\t\t\t\t\t// Delete the prompt ASAP. Then route a decision event into the agent pipeline so the agent informs the user.\n'
-        '\t\t\t\t\t\t\t\ttry { await bot.api.deleteMessage(chatId, callbackMessage.message_id); } catch {}\n'
+        f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V4}\n'
+        f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V5}\n'
+        f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V6}\n'
+        f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V7}\n'
+        '\t\t\t\t\t\t\t\t// Keep queued text in chat history and only clear inline buttons.\n'
+        '\t\t\t\t\t\t\t\ttry { await bot.api.editMessageReplyMarkup(chatId, callbackMessage.message_id, { inline_keyboard: [] }); } catch {}\n'
+        '\t\t\t\t\t\t\t\t// Emit deterministic confirmation immediately so users always see a result.\n'
+        '\t\t\t\t\t\t\t\ttry {\n'
+        '\t\t\t\t\t\t\t\t\tconst subjectLabel = parts[0] === "xpol" ? "policy approval" : "trade";\n'
+        '\t\t\t\t\t\t\t\t\tconst msg = `${action === "r" ? "Denied" : "Approved"} ${subjectLabel} ${subjectId}\\nChain: ${chainKey}`;\n'
+        '\t\t\t\t\t\t\t\t\tawait bot.api.sendMessage(chatId, msg);\n'
+        '\t\t\t\t\t\t\t\t} catch {}\n'
         '\t\t\t\t\t\t\t\ttry {\n'
         '\t\t\t\t\t\t\t\t\tconst promptText = String(callbackMessage.text ?? \"\");\n'
         '\t\t\t\t\t\t\t\t\tconst decisionWord = action === \"r\" ? \"DENIED\" : \"APPROVED\";\n'
@@ -381,7 +420,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         '\t\t\t\t\t\t\t\treturn;\n'
         '\t\t\t\t\t\t\t}\n'
         '\t\t\t\t\t\t\tlet errCode = "api_error"; let errMsg = `HTTP ${res.status}`;\n'
-        '\t\t\t\t\t\t\ttry { const body = await res.json(); if (typeof body?.code === "string" && body.code.trim()) errCode = body.code.trim(); if (typeof body?.message === "string" && body.message.trim()) errMsg = body.message.trim(); if (res.status === 409 && (body?.details?.currentStatus === "approved" || body?.details?.currentStatus === "filled" || body?.details?.currentStatus === "rejected")) { await bot.api.deleteMessage(chatId, callbackMessage.message_id); return; } } catch {}\n'
+        '\t\t\t\t\t\t\ttry { const body = await res.json(); if (typeof body?.code === "string" && body.code.trim()) errCode = body.code.trim(); if (typeof body?.message === "string" && body.message.trim()) errMsg = body.message.trim(); if (res.status === 409 && (body?.details?.currentStatus === "approved" || body?.details?.currentStatus === "filled" || body?.details?.currentStatus === "rejected")) { try { await bot.api.editMessageReplyMarkup(chatId, callbackMessage.message_id, { inline_keyboard: [] }); } catch {} const currentStatus = String(body?.details?.currentStatus || ""); const decision = currentStatus === "rejected" ? "Denied" : "Approved"; const subjectLabel = parts[0] === "xpol" ? "policy approval" : "trade"; await bot.api.sendMessage(chatId, `${decision} ${subjectLabel} ${subjectId}\\nChain: ${chainKey}`); return; } } catch {}\n'
         '\t\t\t\t\t\t\ttry {\n'
         '\t\t\t\t\t\t\t\tconst kb = parts[0] === "xpol"\n'
         '\t\t\t\t\t\t\t\t\t? [[{ text: "Approve", callback_data: `xpol|a|${subjectId}|${chainKey}` }, { text: "Deny", callback_data: `xpol|r|${subjectId}|${chainKey}` }]]\n'
