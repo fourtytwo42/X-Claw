@@ -3562,6 +3562,7 @@ Active slice: `Slice 72: Transfer Policy-Override Approvals (Keep Gate/Whitelist
 
 Date (UTC): 2026-02-16
 Active slice: `Slice 73: Agent Page Full Frontend Refresh (Dashboard-Aligned, API-Preserving)`
+Issue mapping: `#26` (`https://github.com/fourtytwo42/ETHDenver2026/issues/26`)
 
 ### Objective + scope lock
 - Objective: rebuild `/agents/:id` frontend using dashboard-aligned layout while preserving existing API contracts and owner/viewer security boundaries.
@@ -3620,6 +3621,10 @@ Active slice: `Slice 73: Agent Page Full Frontend Refresh (Dashboard-Aligned, AP
 - Approval decision actions call `runManagementAction(...); refreshAll()` to update queue state -> PASS (code-path verification)
 - Full manual browser QA screenshots at desktop breakpoints -> PENDING
 
+### Issue evidence post
+- Posted verification evidence + commit hash to issue `#26`:
+  - `https://github.com/fourtytwo42/ETHDenver2026/issues/26#issuecomment-3906528670`
+
 ### Blockers
 - Browser screenshot tooling is unavailable in this shell environment (no Chrome/Chromium binary).
 - Owner-mode runtime-click verification in browser requires a valid management bootstrap token flow.
@@ -3629,4 +3634,4 @@ Active slice: `Slice 73: Agent Page Full Frontend Refresh (Dashboard-Aligned, AP
   - `sudo apt-get update && sudo apt-get install -y chromium-browser` (or distro-equivalent package name)
   - `npm run dev`
   - open `/agents/<agentId>` (viewer) and `/agents/<agentId>?token=<token>` (owner), capture dark/light desktop screenshots.
-- Post evidence in issue `#73` with screenshot attachments and commit hash(es).
+- Post evidence in issue `#26` with screenshot attachments and commit hash(es).

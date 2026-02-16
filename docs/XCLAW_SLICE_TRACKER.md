@@ -1303,7 +1303,7 @@ DoD:
 
 ## Slice 73: Agent Page Full Frontend Refresh (Dashboard-Aligned, API-Preserving)
 Status: [!]
-Issue: #73
+Issue: #26
 
 Goal:
 - Rebuild `/agents/:id` as a dashboard-aligned wallet console while preserving existing backend contracts and owner/viewer access boundaries.
