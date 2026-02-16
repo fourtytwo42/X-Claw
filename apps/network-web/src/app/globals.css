@@ -170,10 +170,15 @@ a {
   border: 1px solid transparent;
   border-radius: 12px;
   color: var(--text-muted);
-  font-size: 0.72rem;
-  text-align: center;
-  line-height: 1.2;
-  padding: 0.65rem 0.4rem;
+  display: grid;
+  place-items: center;
+  min-height: 42px;
+  padding: 0.58rem 0.35rem;
+}
+
+.left-nav-links a svg {
+  width: 18px;
+  height: 18px;
 }
 
 .left-nav-links a:hover {

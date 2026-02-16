@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 
 import { ChainHeaderControl } from '@/components/chain-header-control';
+import { SidebarIcon } from '@/components/sidebar-icons';
 import { ScopeSelector } from '@/components/scope-selector';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { TopBarSearch } from '@/components/top-bar-search';
@@ -468,17 +469,17 @@ function DashboardPage() {
           <Image src="/X-Claw-Logo.png" alt="X-Claw" width={900} height={280} className={styles.sidebarLogoImage} priority />
         </Link>
         <nav className={styles.sidebarNav} aria-label="Dashboard sections">
-          <Link className={`${styles.sidebarItem} ${styles.sidebarItemActive}`} href="/dashboard">
-            Dashboard
+          <Link className={`${styles.sidebarItem} ${styles.sidebarItemActive}`} href="/dashboard" aria-label="Dashboard" title="Dashboard">
+            <SidebarIcon name="dashboard" />
           </Link>
-          <Link className={styles.sidebarItem} href="/explore">
-            Explore
+          <Link className={styles.sidebarItem} href="/explore" aria-label="Explore" title="Explore">
+            <SidebarIcon name="explore" />
           </Link>
-          <Link className={styles.sidebarItem} href="/approvals">
-            Approvals Center
+          <Link className={styles.sidebarItem} href="/approvals" aria-label="Approvals Center" title="Approvals Center">
+            <SidebarIcon name="approvals" />
           </Link>
-          <Link className={styles.sidebarItem} href="/settings">
-            Settings &amp; Security
+          <Link className={styles.sidebarItem} href="/settings" aria-label="Settings & Security" title="Settings & Security">
+            <SidebarIcon name="settings" />
           </Link>
         </nav>
       </aside>

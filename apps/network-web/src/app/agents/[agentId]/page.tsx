@@ -7,6 +7,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { ChainHeaderControl } from '@/components/chain-header-control';
 import { rememberManagedAgent } from '@/components/management-header-controls';
 import { PublicStatusBadge } from '@/components/public-status-badge';
+import { SidebarIcon } from '@/components/sidebar-icons';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { useActiveChainKey } from '@/lib/active-chain';
 import { AGENT_PAGE_CAPABILITIES } from '@/lib/agent-page-capabilities';
@@ -547,17 +548,17 @@ export default function AgentPublicProfilePage() {
       <aside className={styles.sidebar}>
         <div className={styles.logo}>X</div>
         <nav className={styles.nav}>
-          <Link href="/dashboard" className={styles.navItem}>
-            Dashboard
+          <Link href="/dashboard" className={styles.navItem} aria-label="Dashboard" title="Dashboard">
+            <SidebarIcon name="dashboard" />
           </Link>
-          <Link href="/explore" className={`${styles.navItem} ${styles.navItemActive}`}>
-            Explore
+          <Link href="/explore" className={`${styles.navItem} ${styles.navItemActive}`} aria-label="Explore" title="Explore">
+            <SidebarIcon name="explore" />
           </Link>
-          <Link href="/approvals" className={styles.navItem}>
-            Approvals Center
+          <Link href="/approvals" className={styles.navItem} aria-label="Approvals Center" title="Approvals Center">
+            <SidebarIcon name="approvals" />
           </Link>
-          <Link href="/settings" className={styles.navItem}>
-            Settings &amp; Security
+          <Link href="/settings" className={styles.navItem} aria-label="Settings & Security" title="Settings & Security">
+            <SidebarIcon name="settings" />
           </Link>
         </nav>
       </aside>
