@@ -1387,7 +1387,7 @@ Blocker:
 
 ## Slice 76: Explore / Agent Listing Full Frontend Refresh (`/explore` Canonical)
 Status: [!]
-Issue: #76 (to be created / mapped)
+Issue: #28
 
 Goal:
 - Rebuild Explore as the canonical `/explore` route with dashboard-aligned layout, while keeping `/agents` as compatibility path and preserving existing backend contracts.
@@ -1418,4 +1418,4 @@ DoD:
 - [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`.
 
 Blocker:
-- Issue mapping + completion evidence post pending (`Issue: #76` to be created/mapped in-session); desktop dark/light screenshots for `/explore` still pending attachment.
+- Desktop dark/light screenshots for `/explore` still pending attachment in issue #28.

@@ -2,7 +2,7 @@
 
 Date (UTC): 2026-02-16
 Active slice: `Slice 76: Explore / Agent Listing Full Frontend Refresh (/explore Canonical)`
-Issue mapping: `#76` (to be created / mapped)
+Issue mapping: `#28`
 
 ## Objective + Scope Lock
 - Objective: implement canonical `/explore` route, keep `/agents` compatibility alias, and deliver owner/viewer-aware Explore sections with API-preserving wiring.
@@ -44,8 +44,7 @@ Issue mapping: `#76` (to be created / mapped)
 - Dark/light readability + desktop overflow checks: manual screenshot capture still pending.
 
 ## Blockers
-- PENDING: create/map issue `#76` and post evidence + commit hash(es).
-- PENDING: capture desktop dark/light screenshots for `/explore`.
+- PENDING: capture desktop dark/light screenshots for `/explore` and attach to issue `#28`.
 
 ---
 

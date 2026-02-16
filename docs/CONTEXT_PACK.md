@@ -2,7 +2,7 @@
 
 ## Slice 76 Context: Explore / Agent Listing Frontend Refresh (`/explore` Canonical)
 
-Issue mapping: `#76` (to be created / mapped)
+Issue mapping: `#28`
 
 ### Objective + scope lock
 - Objective: rebuild Explore as canonical `/explore` while preserving existing API contracts and keeping `/agents` compatibility.

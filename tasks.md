@@ -1,7 +1,7 @@
 # Slice 76 Tasks: Explore / Agent Listing Full Frontend Refresh (`/explore` Canonical)
 
 Active slice: `Slice 76: Explore / Agent Listing Full Frontend Refresh (/explore Canonical)`
-Issue mapping: `#76` (to be created / mapped)
+Issue mapping: `#28`
 
 ## Checklist
 - [x] Pre-flight lock: objective + acceptance checks + touched-file allowlist defined before edits.
@@ -35,8 +35,8 @@ Issue mapping: `#76` (to be created / mapped)
   - [x] `npm run seed:verify`
   - [x] `npm run build`
 - [x] Record command outputs + functional verification notes in `acceptance.md`.
-- [ ] Commit + push Slice 76.
-- [ ] Post verification evidence + commit hash(es) to mapped issue.
+- [x] Commit + push Slice 76.
+- [x] Post verification evidence + commit hash(es) to mapped issue.
 
 ---
 
