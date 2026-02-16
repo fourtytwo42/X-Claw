@@ -31,10 +31,13 @@
   --dash-danger: var(--dash-danger-dark);
 
   min-height: calc(100vh - 2rem);
+  width: 100%;
+  max-width: 100%;
   display: grid;
   grid-template-columns: 82px minmax(0, 1fr);
   gap: 1rem;
   color: var(--dash-text);
+  overflow-x: clip;
 }
 
 :global(:root[data-theme='light']) .dashboardRoot {
@@ -113,6 +116,7 @@
   background: radial-gradient(circle at 90% 0%, color-mix(in srgb, var(--dash-accent) 17%, transparent), transparent 30%),
     linear-gradient(180deg, var(--dash-bg), color-mix(in srgb, var(--dash-bg) 78%, #091428));
   padding: 1rem;
+  min-width: 0;
 }
 
 .topbar {
@@ -128,10 +132,15 @@
   grid-template-columns: auto minmax(300px, 1fr) auto;
   gap: 0.7rem;
   align-items: center;
+  min-width: 0;
+}
+
+.topbar > * {
+  min-width: 0;
 }
 
 .topbarTitle {
-  font-size: 1.5rem;
+  font-size: clamp(1.15rem, 4vw, 1.5rem);
   font-weight: 700;
   line-height: 1;
 }
@@ -141,6 +150,8 @@
   justify-content: flex-end;
   gap: 0.5rem;
   align-items: center;
+  min-width: 0;
+  flex-wrap: wrap;
 }
 
 .chainControl :global(.chain-select) {
@@ -218,6 +229,7 @@
   display: grid;
   grid-template-columns: minmax(0, 2fr) minmax(320px, 1fr);
   gap: 0.75rem;
+  min-width: 0;
 }
 
 .leftColumn,
@@ -225,6 +237,7 @@
   display: grid;
   gap: 0.75rem;
   align-content: start;
+  min-width: 0;
 }
 
 .card {
@@ -232,6 +245,7 @@
   border-radius: 16px;
   background: var(--dash-surface);
   padding: 0.78rem;
+  min-width: 0;
 }
 
 .cardTitle {
@@ -245,6 +259,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
+  min-width: 0;
+  flex-wrap: wrap;
 }
 
 .sectionHeaderRow a {
@@ -255,6 +271,7 @@
 .segmentTabs {
   display: flex;
   gap: 0.4rem;
+  flex-wrap: wrap;
 }
 
 .segmentTab,
@@ -280,6 +297,7 @@
 .chartControls {
   display: flex;
   gap: 0.32rem;
+  flex-wrap: wrap;
 }
 
 .inlineFilters {
@@ -764,6 +782,9 @@
     grid-auto-flow: column;
     grid-auto-columns: minmax(210px, 78%);
     overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
     padding-bottom: 0.25rem;
   }
 

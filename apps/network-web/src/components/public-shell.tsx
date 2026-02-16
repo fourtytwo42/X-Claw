@@ -21,30 +21,25 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="app-shell">
-      <header className="app-header">
-        <div className="header-left">
-          <Link href="/" className="brand" aria-label="X-Claw home">
-            <Image src="/X-Claw-Logo.png" alt="X-Claw" width={900} height={280} className="brand-logo" priority />
-          </Link>
-          <nav className="main-nav" aria-label="Primary">
-            <Link href="/">Dashboard</Link>
-            <Link href="/agents">Agents</Link>
-            <Link href="/status">Status</Link>
-          </nav>
+    <div className="left-nav-shell">
+      <aside className="left-nav-sidebar">
+        <Link href="/dashboard" className="left-nav-logo" aria-label="X-Claw dashboard">
+          <Image src="/X-Claw-Logo.png" alt="X-Claw" width={900} height={280} className="left-nav-logo-image" priority />
+        </Link>
+        <nav className="left-nav-links" aria-label="Primary">
+          <Link href="/dashboard">Dashboard</Link>
+          <Link href="/explore">Explore</Link>
+          <Link href="/approvals">Approvals Center</Link>
+          <Link href="/settings">Settings &amp; Security</Link>
+          <Link href="/status">Status</Link>
+        </nav>
+        <div className="left-nav-controls">
+          <ChainHeaderControl />
+          <ManagementHeaderControls />
+          <ThemeToggle />
         </div>
-        <div className="header-right">
-          <div className="header-controls">
-            <ChainHeaderControl />
-            <ManagementHeaderControls />
-            <ThemeToggle />
-          </div>
-        </div>
-      </header>
-      <main className="page-content">{children}</main>
-      <footer className="app-footer">
-        <Link href="/status">Diagnostics and status</Link>
-      </footer>
+      </aside>
+      <main className="left-nav-content">{children}</main>
     </div>
   );
 }
