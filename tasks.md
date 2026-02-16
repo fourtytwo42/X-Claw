@@ -1,7 +1,7 @@
 # Slice 75 Tasks: Settings & Security v1 (`/settings`) Frontend Refresh
 
 Active slice: `Slice 75: Settings & Security v1 (/settings) Frontend Refresh`
-Issue mapping: `#75` (to be created / mapped)
+Issue mapping: `#27`
 
 ## Checklist
 - [x] Pre-flight lock: objective + acceptance checks + touched-file allowlist defined before edits.

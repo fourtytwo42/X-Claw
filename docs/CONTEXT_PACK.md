@@ -2,7 +2,7 @@
 
 ## Slice 75 Context: Settings & Security v1 (`/settings`) Frontend Refresh
 
-Issue mapping: `#75` (to be created / mapped)
+Issue mapping: `#27`
 
 ### Objective + scope lock
 - Objective: implement `/settings` as Settings & Security while preserving `/status` diagnostics and existing management APIs.

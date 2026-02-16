@@ -1356,7 +1356,7 @@ Blocker:
 
 ## Slice 75: Settings & Security v1 (`/settings`) Frontend Refresh
 Status: [!]
-Issue: #75 (to be created / mapped)
+Issue: #27
 
 Goal:
 - Implement `/settings` as a dashboard-aligned Settings & Security page while preserving existing APIs and keeping `/status` as diagnostics.
@@ -1381,4 +1381,4 @@ DoD:
 - [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`.
 
 Blocker:
-- Issue mapping + completion evidence post pending (`Issue: #75` to be created/mapped in-session).
+- Desktop dark/light screenshots for `/settings` are pending capture + attachment in issue evidence.

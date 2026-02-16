@@ -2,7 +2,7 @@
 
 Date (UTC): 2026-02-16
 Active slice: `Slice 75: Settings & Security v1 (/settings) Frontend Refresh`
-Issue mapping: `#75` (to be created / mapped)
+Issue mapping: `#27`
 
 ## Objective + Scope Lock
 - Objective: implement `/settings` with Access/Security/Danger tabs while preserving `/status` diagnostics and existing API contracts.
@@ -60,7 +60,6 @@ Issue mapping: `#75` (to be created / mapped)
   - Screenshot/manual desktop pass still pending.
 
 ## Blockers
-- Create/map issue `#75` and post evidence + commit hash(es).
 - Capture desktop dark/light screenshots for `/settings`.
 
 ---
