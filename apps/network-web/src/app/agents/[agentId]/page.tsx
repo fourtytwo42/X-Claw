@@ -556,7 +556,7 @@ export default function AgentPublicProfilePage() {
           <Link href="/approvals" className={styles.navItem}>
             Approvals Center
           </Link>
-          <Link href="/status" className={styles.navItem}>
+          <Link href="/settings" className={styles.navItem}>
             Settings &amp; Security
           </Link>
         </nav>

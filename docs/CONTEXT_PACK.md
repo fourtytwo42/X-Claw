@@ -1,5 +1,62 @@
 # X-Claw Context Pack
 
+## Slice 75 Context: Settings & Security v1 (`/settings`) Frontend Refresh
+
+Issue mapping: `#75` (to be created / mapped)
+
+### Objective + scope lock
+- Objective: implement `/settings` as Settings & Security while preserving `/status` diagnostics and existing management APIs.
+- Scope guard honored: no backend endpoints, schema, migrations, or OpenAPI changes.
+
+### Expected touched files (Slice 75 allowlist)
+- Web/UI:
+  - `apps/network-web/src/app/settings/page.tsx`
+  - `apps/network-web/src/app/settings/page.module.css`
+  - `apps/network-web/src/lib/settings-security-capabilities.ts`
+  - `apps/network-web/src/components/public-shell.tsx`
+  - `apps/network-web/src/app/page.tsx`
+  - `apps/network-web/src/app/agents/[agentId]/page.tsx`
+  - `apps/network-web/src/app/approvals/page.tsx`
+- Canonical docs/process:
+  - `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - `docs/XCLAW_SLICE_TRACKER.md`
+  - `docs/XCLAW_BUILD_ROADMAP.md`
+  - `docs/CONTEXT_PACK.md`
+  - `spec.md`
+  - `tasks.md`
+  - `acceptance.md`
+
+### API/data constraints
+- Owner/session context:
+  - `GET /api/v1/management/session/agents`
+- Add access from key link:
+  - `POST /api/v1/management/session/select`
+- Clear local access:
+  - `POST /api/v1/management/logout`
+- Danger actions (active session agent):
+  - `POST /api/v1/management/pause`
+  - `POST /api/v1/management/resume`
+  - `POST /api/v1/management/revoke-all`
+
+### Placeholders required in Slice 75
+- Verified multi-agent access inventory + per-agent remove access.
+- Global panic actions across all owned agents in a single operation.
+- On-chain allowance inventory/revoke sweep from settings.
+
+### Verification plan
+- Required gates:
+  - `npm run db:parity`
+  - `npm run seed:reset`
+  - `npm run seed:load`
+  - `npm run seed:verify`
+  - `npm run build`
+- Functional checks:
+  - viewer/no-session empty-state behavior,
+  - owner session controls + key-link add flow,
+  - danger actions + panel-scoped errors,
+  - placeholder disclosure + disabled CTAs,
+  - desktop overflow + dark/light readability.
+
 ## Slice 74 Context: Approvals Center v1 (Frontend-Only, API-Preserving)
 
 Issue mapping: `#74` (to be created / mapped)

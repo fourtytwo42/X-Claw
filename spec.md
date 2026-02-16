@@ -1,3 +1,40 @@
+# Slice 75 Spec: Settings & Security v1 (`/settings`) Frontend Refresh
+
+## Goal
+Implement a new `/settings` page (Settings & Security) aligned to `uiRefresh/Settings and Security.md`, while preserving `/status` as diagnostics and reusing existing APIs.
+
+## Success Criteria
+1. `/settings` route exists with dashboard-aligned shell and tabs: Access, Security, Danger Zone.
+2. `/status` remains unchanged as Public Status diagnostics.
+3. Owner/session actions use existing endpoints only:
+   - session context/read,
+   - key-link add access (`session/select`),
+   - clear local access (`logout`),
+   - active-agent danger actions (`pause/resume/revoke-all`).
+4. Unsupported modules (multi-agent/global/allowance inventory) are explicit placeholders with disabled controls.
+5. Dark/light readability and overflow-safe desktop layout are preserved.
+
+## Non-Goals
+1. No backend endpoint additions or contract changes.
+2. No DB migrations.
+3. No Notifications tab in v1.
+4. No replacement/removal of `/status`.
+
+## Constraints / Safety
+1. Keep device/browser language explicit (“on this device”, “in this browser”).
+2. Distinguish device access from on-chain approvals in copy.
+3. Preserve status vocabulary invariant: `active`, `offline`, `degraded`, `paused`, `deactivated`.
+4. Keep changes inside Slice 75 allowlist only.
+
+## Acceptance Checks
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+
+---
+
 # Slice 74 Spec: Approvals Center v1 (Frontend-Only, API-Preserving)
 
 ## Goal

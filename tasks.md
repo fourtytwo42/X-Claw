@@ -1,3 +1,44 @@
+# Slice 75 Tasks: Settings & Security v1 (`/settings`) Frontend Refresh
+
+Active slice: `Slice 75: Settings & Security v1 (/settings) Frontend Refresh`
+Issue mapping: `#75` (to be created / mapped)
+
+## Checklist
+- [x] Pre-flight lock: objective + acceptance checks + touched-file allowlist defined before edits.
+- [x] Docs sync first:
+  - [x] `docs/XCLAW_SLICE_TRACKER.md`
+  - [x] `docs/XCLAW_BUILD_ROADMAP.md`
+  - [x] `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - [x] `docs/CONTEXT_PACK.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+- [x] Add `/settings` route with dashboard-aligned shell + sticky topbar.
+- [x] Add tabs `Access`, `Security`, `Danger Zone` (hide Notifications in v1).
+- [x] Add settings capabilities module:
+  - [x] `apps/network-web/src/lib/settings-security-capabilities.ts`
+- [x] Wire existing API-backed actions:
+  - [x] `GET /api/v1/management/session/agents`
+  - [x] `POST /api/v1/management/session/select`
+  - [x] `POST /api/v1/management/logout`
+  - [x] `POST /api/v1/management/pause`
+  - [x] `POST /api/v1/management/resume`
+  - [x] `POST /api/v1/management/revoke-all`
+- [x] Keep `/status` unchanged.
+- [x] Update nav links to point Settings & Security to `/settings` on dashboard, agents, approvals.
+- [x] Add explicit placeholders/disabled controls for unsupported multi-agent/global/allowance modules.
+- [ ] Run required gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+- [x] Record command outputs + functional verification notes in `acceptance.md`.
+- [ ] Commit + push Slice 75.
+- [ ] Post verification evidence + commit hash(es) to mapped issue.
+
+---
+
 # Slice 74 Tasks: Approvals Center v1 (Frontend-Only, API-Preserving)
 
 Active slice: `Slice 74: Approvals Center v1 (Frontend-Only, API-Preserving)`

@@ -1,3 +1,70 @@
+# Slice 75 Acceptance Evidence
+
+Date (UTC): 2026-02-16
+Active slice: `Slice 75: Settings & Security v1 (/settings) Frontend Refresh`
+Issue mapping: `#75` (to be created / mapped)
+
+## Objective + Scope Lock
+- Objective: implement `/settings` with Access/Security/Danger tabs while preserving `/status` diagnostics and existing API contracts.
+- Scope guard honored: no backend/API/schema/migration changes.
+
+## File-Level Evidence (Slice 75)
+- Web/UI:
+  - `apps/network-web/src/app/settings/page.tsx`
+  - `apps/network-web/src/app/settings/page.module.css`
+  - `apps/network-web/src/lib/settings-security-capabilities.ts`
+  - `apps/network-web/src/components/public-shell.tsx`
+  - `apps/network-web/src/app/page.tsx`
+  - `apps/network-web/src/app/agents/[agentId]/page.tsx`
+  - `apps/network-web/src/app/approvals/page.tsx`
+- Docs/process:
+  - `docs/XCLAW_SLICE_TRACKER.md`
+  - `docs/XCLAW_BUILD_ROADMAP.md`
+  - `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - `docs/CONTEXT_PACK.md`
+  - `spec.md`
+  - `tasks.md`
+  - `acceptance.md`
+
+## Required Validation Commands and Outcomes
+- `npm run db:parity` -> PASS
+  - `ok: true`
+  - `missingTables: []`, `missingEnums: []`, `missingChecks: []`
+- `npm run seed:reset` -> PASS
+  - `ok: true`
+- `npm run seed:load` -> PASS
+  - scenarios: `happy_path`, `approval_retry`, `degraded_rpc`, `copy_reject`
+  - totals: `agents=6`, `trades=11`
+- `npm run seed:verify` -> PASS
+  - `ok: true`
+- `npm run build` -> PASS
+  - Next.js production build completed
+  - `/settings` emitted as static route
+
+## Functional Verification Notes
+- Viewer/no-session settings state:
+  - `/settings` Access tab renders device-scoped empty state and no active-agent danger actions when no management session is present.
+- Owner session controls + add-access form:
+  - Owner context loads from `/api/v1/management/session/agents`.
+  - Add access form parses key URL (`/agents/{agentId}?token=...`) and posts to `/api/v1/management/session/select`.
+- Danger actions (`pause/resume/revoke-all`):
+  - Action buttons call existing routes:
+    - `/api/v1/management/pause`
+    - `/api/v1/management/resume`
+    - `/api/v1/management/revoke-all`
+  - Panel-scoped success/error banners render without page crash.
+- Placeholder modules + disabled CTAs:
+  - Multi-agent verified inventory/remove access, global panic controls, and on-chain allowance sweep are explicitly disabled with placeholder copy.
+- Dark/light readability + desktop overflow checks:
+  - Route-level CSS includes light/dark token mapping and overflow controls (`overflow-x: clip`, wrap-safe row/action patterns).
+  - Screenshot/manual desktop pass still pending.
+
+## Blockers
+- Create/map issue `#75` and post evidence + commit hash(es).
+- Capture desktop dark/light screenshots for `/settings`.
+
+---
+
 # Slice 74 Acceptance Evidence
 
 Date (UTC): 2026-02-16

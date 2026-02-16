@@ -2891,3 +2891,54 @@ Limitations / notes:
 
 7. Vocabulary invariants:
 - status vocabulary remains exactly: `active`, `offline`, `degraded`, `paused`, `deactivated`.
+
+---
+
+## 64) Slice 75 Settings & Security v1 Contract (Locked)
+
+1. Scope:
+- Slice 75 is frontend-only and scoped to adding `/settings` (Settings & Security) page.
+- No backend/API/schema/migration contract changes are allowed in this slice.
+
+2. Route contract:
+- add `/settings` as the Settings & Security route.
+- preserve `/status` as Public Status diagnostics; it is not repurposed in this slice.
+- dashboard-aligned pages should route `Settings & Security` nav item to `/settings`.
+
+3. Tab contract (v1):
+- `/settings` must ship:
+  - `Access`,
+  - `Security`,
+  - `Danger Zone`.
+- `Notifications` tab remains hidden in v1.
+- hash tabs must be supported:
+  - `/settings#access`,
+  - `/settings#security`,
+  - `/settings#danger`.
+
+4. API preservation and wiring:
+- Slice 75 reuses existing routes as-is:
+  - `GET /api/v1/management/session/agents`,
+  - `POST /api/v1/management/session/select`,
+  - `POST /api/v1/management/logout`,
+  - `POST /api/v1/management/pause`,
+  - `POST /api/v1/management/resume`,
+  - `POST /api/v1/management/revoke-all`.
+- Slice 75 must not add speculative settings/security backend endpoints.
+
+5. Placeholder requirements:
+- Unsupported features must be explicit placeholders/disabled CTAs:
+  - verified cross-agent access inventory with per-agent removal,
+  - global panic controls across all owned agents in one server operation,
+  - full allowance inventory/revoke sweep from settings.
+
+6. UX and copy invariants:
+- copy must explicitly distinguish:
+  - device/browser access (cookie/session based),
+  - on-chain approvals/allowances.
+- copy should use device-scoped language (for example: “on this device”, “in this browser”).
+- page must support loading/empty/error states per panel and avoid desktop overflow.
+- dark and light themes remain supported; dark default remains required.
+
+7. Vocabulary invariants:
+- status vocabulary remains exactly: `active`, `offline`, `degraded`, `paused`, `deactivated`.

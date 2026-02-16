@@ -1351,3 +1351,34 @@ DoD:
 
 Blocker:
 - Issue mapping + evidence post for Slice 74 is pending (`Issue: #74` to be created/mapped in-session).
+
+---
+
+## Slice 75: Settings & Security v1 (`/settings`) Frontend Refresh
+Status: [!]
+Issue: #75 (to be created / mapped)
+
+Goal:
+- Implement `/settings` as a dashboard-aligned Settings & Security page while preserving existing APIs and keeping `/status` as diagnostics.
+
+DoD:
+- [x] docs sync first: source-of-truth + roadmap + tracker + context/spec/tasks/acceptance aligned to Slice 75.
+- [x] add `/settings` route with tabs: Access, Security, Danger Zone.
+- [x] preserve `/status` route as Public Status diagnostics surface.
+- [x] owner/session controls reuse existing endpoints:
+  - [x] `GET /api/v1/management/session/agents`
+  - [x] `POST /api/v1/management/session/select`
+  - [x] `POST /api/v1/management/logout`
+  - [x] `POST /api/v1/management/pause`
+  - [x] `POST /api/v1/management/resume`
+  - [x] `POST /api/v1/management/revoke-all`
+- [x] unsupported modules are explicit placeholders with disabled actions:
+  - [x] verified cross-agent access inventory + per-agent remove access
+  - [x] global panic actions across all owned agents in one operation
+  - [x] full on-chain allowance inventory/revoke sweep from settings
+- [x] dashboard/agents/approvals nav routes point Settings & Security to `/settings`.
+- [x] dark/light support preserved (dark default) and desktop overflow guarded.
+- [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`.
+
+Blocker:
+- Issue mapping + completion evidence post pending (`Issue: #75` to be created/mapped in-session).

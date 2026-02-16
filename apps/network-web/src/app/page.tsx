@@ -477,7 +477,7 @@ function DashboardPage() {
           <Link className={styles.sidebarItem} href="/approvals">
             Approvals Center
           </Link>
-          <Link className={styles.sidebarItem} href="/status">
+          <Link className={styles.sidebarItem} href="/settings">
             Settings &amp; Security
           </Link>
         </nav>

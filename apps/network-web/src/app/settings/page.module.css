@@ -1,0 +1,405 @@
+.root {
+  --settings-bg-light: #f6f8fc;
+  --settings-surface-light: #ffffff;
+  --settings-border-light: #e6ecf5;
+  --settings-text-light: #0b1220;
+  --settings-muted-light: #5b6b84;
+  --settings-accent-light: #2563eb;
+  --settings-danger-light: #dc2626;
+
+  --settings-bg-dark: #0b1220;
+  --settings-surface-dark: #111a2e;
+  --settings-border-dark: #22304d;
+  --settings-text-dark: #eaf0ff;
+  --settings-muted-dark: #a7b4d0;
+  --settings-accent-dark: #3b82f6;
+  --settings-danger-dark: #ef4444;
+
+  --settings-bg: var(--settings-bg-dark);
+  --settings-surface: var(--settings-surface-dark);
+  --settings-border: var(--settings-border-dark);
+  --settings-text: var(--settings-text-dark);
+  --settings-muted: var(--settings-muted-dark);
+  --settings-accent: var(--settings-accent-dark);
+  --settings-danger: var(--settings-danger-dark);
+
+  min-height: calc(100vh - 2rem);
+  display: grid;
+  grid-template-columns: 82px minmax(0, 1fr);
+  gap: 1rem;
+  color: var(--settings-text);
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+:global(:root[data-theme='light']) .root {
+  --settings-bg: var(--settings-bg-light);
+  --settings-surface: var(--settings-surface-light);
+  --settings-border: var(--settings-border-light);
+  --settings-text: var(--settings-text-light);
+  --settings-muted: var(--settings-muted-light);
+  --settings-accent: var(--settings-accent-light);
+  --settings-danger: var(--settings-danger-light);
+}
+
+.sidebar {
+  position: sticky;
+  top: 0.75rem;
+  align-self: start;
+  height: calc(100vh - 1.5rem);
+  border: 1px solid var(--settings-border);
+  border-radius: 22px;
+  background: linear-gradient(180deg, var(--settings-surface), color-mix(in srgb, var(--settings-surface) 70%, transparent));
+  display: grid;
+  grid-template-rows: auto 1fr;
+  padding: 0.8rem 0.45rem;
+}
+
+.sidebarLogo {
+  width: 58px;
+  height: 44px;
+  border-radius: 10px;
+  margin: 0 auto 0.8rem;
+  display: grid;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--settings-accent) 45%, var(--settings-border));
+  background: color-mix(in srgb, var(--settings-accent) 10%, var(--settings-surface));
+  padding: 0.2rem;
+}
+
+.sidebarLogoImage {
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+
+.sidebarNav {
+  display: grid;
+  gap: 0.42rem;
+  align-content: start;
+}
+
+.sidebarItem {
+  border: 1px solid transparent;
+  border-radius: 12px;
+  color: var(--settings-muted);
+  font-size: 0.72rem;
+  text-align: center;
+  line-height: 1.2;
+  padding: 0.65rem 0.4rem;
+}
+
+.sidebarItem:hover {
+  border-color: var(--settings-border);
+  color: var(--settings-text);
+}
+
+.sidebarItemActive {
+  color: var(--settings-text);
+  border-color: color-mix(in srgb, var(--settings-accent) 55%, var(--settings-border));
+  background: color-mix(in srgb, var(--settings-accent) 16%, transparent);
+}
+
+.mainSurface {
+  border: 1px solid var(--settings-border);
+  border-radius: 24px;
+  background: radial-gradient(circle at 90% 0%, color-mix(in srgb, var(--settings-accent) 17%, transparent), transparent 30%),
+    linear-gradient(180deg, var(--settings-bg), color-mix(in srgb, var(--settings-bg) 78%, #091428));
+  padding: 0.95rem;
+  min-width: 0;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 15;
+  border: 1px solid var(--settings-border);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--settings-surface) 92%, transparent);
+  backdrop-filter: blur(10px);
+  padding: 0.65rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.75rem;
+}
+
+.subtitle {
+  margin: 0.2rem 0 0;
+  color: var(--settings-muted);
+  font-size: 0.85rem;
+}
+
+.topbarControls {
+  display: inline-flex;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.chainControl :global(.chain-select) {
+  border-radius: 12px;
+  border: 1px solid var(--settings-border);
+  background: var(--settings-surface);
+  color: var(--settings-text);
+  padding: 0.45rem 0.55rem;
+}
+
+.topbarThemeToggle {
+  border: 1px solid var(--settings-border);
+  border-radius: 12px;
+  background: var(--settings-surface);
+  color: var(--settings-text);
+  display: inline-flex;
+  gap: 0.34rem;
+  align-items: center;
+  padding: 0.42rem 0.6rem;
+  cursor: pointer;
+}
+
+.warningBanner,
+.successBanner {
+  border: 1px solid var(--settings-border);
+  border-radius: 12px;
+  background: var(--settings-surface);
+  padding: 0.55rem 0.68rem;
+  margin: 0.7rem 0 0;
+}
+
+.warningBanner {
+  border-color: color-mix(in srgb, var(--settings-danger) 55%, var(--settings-border));
+}
+
+.successBanner {
+  border-color: color-mix(in srgb, var(--settings-accent) 55%, var(--settings-border));
+}
+
+.tabs {
+  margin-top: 0.78rem;
+  display: flex;
+  gap: 0.42rem;
+  flex-wrap: wrap;
+}
+
+.tabButton,
+.tabActive {
+  border: 1px solid var(--settings-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--settings-muted);
+  padding: 0.28rem 0.62rem;
+  cursor: pointer;
+}
+
+.tabActive {
+  color: var(--settings-text);
+  border-color: color-mix(in srgb, var(--settings-accent) 55%, var(--settings-border));
+  background: color-mix(in srgb, var(--settings-accent) 16%, transparent);
+}
+
+.panelGrid {
+  margin-top: 0.8rem;
+  display: grid;
+  gap: 0.7rem;
+}
+
+.card {
+  border: 1px solid var(--settings-border);
+  border-radius: 16px;
+  background: var(--settings-surface);
+  padding: 0.8rem;
+  min-width: 0;
+}
+
+.card h2 {
+  margin: 0;
+  font-size: 1.14rem;
+}
+
+.muted {
+  color: var(--settings-muted);
+  margin: 0.35rem 0 0;
+}
+
+.kvList {
+  margin-top: 0.68rem;
+  display: grid;
+  gap: 0.44rem;
+}
+
+.kvList div {
+  border: 1px solid var(--settings-border);
+  border-radius: 12px;
+  padding: 0.5rem 0.55rem;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.kvList span {
+  font-size: 0.78rem;
+  color: var(--settings-muted);
+}
+
+.kvList strong,
+.agentRow strong {
+  overflow-wrap: anywhere;
+}
+
+.card button,
+.inlineForm button,
+.agentActions a,
+.agentActions button,
+.actionRow button {
+  border: 1px solid var(--settings-border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--settings-accent) 14%, transparent);
+  color: var(--settings-text);
+  padding: 0.4rem 0.58rem;
+}
+
+.card button,
+.inlineForm button,
+.agentActions button,
+.actionRow button {
+  cursor: pointer;
+}
+
+.card button:disabled,
+.inlineForm button:disabled,
+.agentActions button:disabled,
+.actionRow button:disabled {
+  opacity: 0.72;
+  cursor: not-allowed;
+}
+
+.helper {
+  margin: 0.52rem 0 0;
+  color: var(--settings-muted);
+  font-size: 0.8rem;
+}
+
+.warningInline {
+  margin: 0.55rem 0 0;
+  color: var(--settings-danger);
+  font-size: 0.84rem;
+}
+
+.inlineForm {
+  margin-top: 0.62rem;
+  display: grid;
+  gap: 0.44rem;
+}
+
+.inlineForm input,
+.inlineForm select {
+  width: 100%;
+  border: 1px solid var(--settings-border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--settings-surface) 90%, transparent);
+  color: var(--settings-text);
+  padding: 0.45rem 0.52rem;
+}
+
+.agentList {
+  margin-top: 0.62rem;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.agentRow {
+  border: 1px solid var(--settings-border);
+  border-radius: 12px;
+  padding: 0.55rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.agentRow p {
+  margin: 0.2rem 0 0;
+  font-size: 0.78rem;
+  color: var(--settings-muted);
+}
+
+.agentActions {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.radioGroup,
+.toggleList {
+  margin-top: 0.62rem;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.radioGroup label,
+.toggleList label {
+  display: flex;
+  gap: 0.45rem;
+  align-items: flex-start;
+  color: var(--settings-text);
+}
+
+.radioGroup input,
+.toggleList input {
+  margin-top: 0.15rem;
+}
+
+.dangerCard {
+  border-color: color-mix(in srgb, var(--settings-danger) 50%, var(--settings-border));
+  background: color-mix(in srgb, var(--settings-danger) 6%, var(--settings-surface));
+}
+
+.actionRow {
+  margin-top: 0.62rem;
+  display: flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.dangerButton {
+  border-color: color-mix(in srgb, var(--settings-danger) 70%, var(--settings-border)) !important;
+  background: color-mix(in srgb, var(--settings-danger) 18%, transparent) !important;
+}
+
+@media (max-width: 1080px) {
+  .root {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: static;
+    height: auto;
+  }
+
+  .sidebarNav {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .agentRow {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 720px) {
+  .agentActions,
+  .actionRow {
+    width: 100%;
+  }
+
+  .agentActions a,
+  .agentActions button,
+  .actionRow button {
+    width: 100%;
+    text-align: center;
+  }
+}

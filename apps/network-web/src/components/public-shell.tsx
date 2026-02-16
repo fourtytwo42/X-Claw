@@ -13,8 +13,9 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
   const isDashboardRoute = pathname === '/' || pathname === '/dashboard';
   const isAgentDetailRoute = /^\/agents\/[^/]+$/.test(pathname);
   const isApprovalsRoute = pathname === '/approvals';
+  const isSettingsRoute = pathname === '/settings';
 
-  if (isDashboardRoute || isAgentDetailRoute || isApprovalsRoute) {
+  if (isDashboardRoute || isAgentDetailRoute || isApprovalsRoute || isSettingsRoute) {
     return <main className="page-content page-content-dashboard">{children}</main>;
   }
 

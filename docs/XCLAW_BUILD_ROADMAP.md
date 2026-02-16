@@ -2452,3 +2452,42 @@ Note:
   - [x] owner mode queue loads and decision actions execute
   - [x] placeholder sections remain disabled and explicit
   - [ ] desktop dark/light screenshots for `/approvals`
+
+---
+
+## 75) Slice 75: Settings & Security v1 (`/settings`) Frontend Refresh
+
+### 75.1 Canonical/doc sync
+- [x] Add Slice 75 goal/DoD + issue mapping to `docs/XCLAW_SLICE_TRACKER.md`.
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` with locked Slice 75 frontend contract.
+- [x] Update handoff/process artifacts:
+  - [x] `docs/CONTEXT_PACK.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+
+### 75.2 Implementation
+- [x] Add `/settings` route with dashboard-aligned shell and sticky topbar.
+- [x] Keep `/status` unchanged as diagnostics.
+- [x] Add tabs `Access`, `Security`, `Danger Zone` (hide Notifications in v1).
+- [x] Wire existing session/device actions (session select/logout + pause/resume/revoke-all).
+- [x] Add frontend capability module:
+  - [x] `apps/network-web/src/lib/settings-security-capabilities.ts`
+- [x] Add route-local stylesheet:
+  - [x] `apps/network-web/src/app/settings/page.module.css`
+- [x] Add explicit placeholders/disabled controls for unsupported multi-agent/global/allowance modules.
+- [x] Update nav links to point Settings & Security to `/settings` on dashboard, agent page, approvals page.
+
+### 75.3 Validation + evidence
+- [x] Run required gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+- [ ] Record functional verification evidence:
+  - [x] viewer/no-session settings state
+  - [x] owner session controls wired
+  - [x] danger actions route to existing endpoints
+  - [x] placeholder modules remain disabled with explicit copy
+  - [ ] desktop dark/light screenshots for `/settings`

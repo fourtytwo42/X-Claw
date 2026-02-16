@@ -322,7 +322,7 @@ export default function ApprovalsCenterPage() {
           <Link className={`${styles.sidebarItem} ${styles.sidebarItemActive}`} href="/approvals">
             Approvals Center
           </Link>
-          <Link className={styles.sidebarItem} href="/status">
+          <Link className={styles.sidebarItem} href="/settings">
             Settings &amp; Security
           </Link>
         </nav>
@@ -354,7 +354,7 @@ export default function ApprovalsCenterPage() {
             <h2>No agent access found on this device</h2>
             <p>Approvals Center appears only when this device has an active owner management session.</p>
             <div className={styles.emptyActions}>
-              <Link href="/status" className={styles.primaryLink}>
+              <Link href="/settings#access" className={styles.primaryLink}>
                 Add agent via key link
               </Link>
               <Link href="/agents" className={styles.secondaryLink}>
