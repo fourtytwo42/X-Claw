@@ -1,5 +1,59 @@
 # X-Claw Context Pack
 
+## Slice 74 Context: Approvals Center v1 (Frontend-Only, API-Preserving)
+
+Issue mapping: `#74` (to be created / mapped)
+
+### Objective + scope lock
+- Objective: implement `/approvals` as a dashboard-aligned approvals inbox while preserving existing API contracts.
+- Scope guard honored: no backend endpoints, schema, migrations, or OpenAPI changes.
+
+### Expected touched files (Slice 74 allowlist)
+- Web/UI:
+  - `apps/network-web/src/app/approvals/page.tsx`
+  - `apps/network-web/src/app/approvals/page.module.css`
+  - `apps/network-web/src/lib/approvals-center-view-model.ts`
+  - `apps/network-web/src/lib/approvals-center-capabilities.ts`
+  - `apps/network-web/src/components/public-shell.tsx`
+  - `apps/network-web/src/app/page.tsx`
+  - `apps/network-web/src/app/agents/[agentId]/page.tsx`
+- Canonical docs/process:
+  - `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - `docs/XCLAW_SLICE_TRACKER.md`
+  - `docs/XCLAW_BUILD_ROADMAP.md`
+  - `docs/CONTEXT_PACK.md`
+  - `spec.md`
+  - `tasks.md`
+  - `acceptance.md`
+
+### API/data constraints
+- Owner context:
+  - `GET /api/v1/management/session/agents`
+- Queue/state data:
+  - `GET /api/v1/management/agent-state`
+- Decisions:
+  - `POST /api/v1/management/approvals/decision`
+  - `POST /api/v1/management/policy-approvals/decision`
+  - `POST /api/v1/management/transfer-approvals/decision`
+
+### Placeholders required in Slice 74
+- Cross-agent aggregation (single-session agent state only in current API).
+- Full allowances inventory table with revoke/cap actions.
+- Risk enrichment chips + route/gas detail + bulk action workflows.
+
+### Verification plan
+- Required gates:
+  - `npm run db:parity`
+  - `npm run seed:reset`
+  - `npm run seed:load`
+  - `npm run seed:verify`
+  - `npm run build`
+- Functional checks:
+  - viewer/no-session empty-state behavior,
+  - owner queue loading and decision actions,
+  - placeholder disclosure + disabled CTAs,
+  - desktop overflow + dark/light readability.
+
 ## 1) Goal (Active: Slice 47)
 - Primary objective: complete `Slice 47: Fix Telegram Queued Buttons Attach Point (Agent Reply Send Path)`.
 - Success criteria:
@@ -459,3 +513,165 @@ Issue mapping: `#69A` (to be created/mapped)
   - room chain and owner-scope filtering
   - room loading/empty/error states
   - `/room` read-only view behavior.
+
+---
+
+## Slice 70 Context: Single-Trigger Spot Flow + Guaranteed Final Result Reporting
+
+Issue mapping: `#70` (to be created/mapped)
+
+### Objective + scope lock
+- Objective: for Telegram-focused `trade spot`, make approval->execution->result a one-trigger flow with deterministic human-visible final outcome reporting.
+- Scope guard honored: limit-order behavior remains unchanged; policy callback contract (`xpol`) remains unchanged.
+
+### Expected touched files (Slice 70 allowlist)
+- Runtime:
+  - `apps/agent-runtime/xclaw_agent/cli.py`
+  - `apps/agent-runtime/tests/test_trade_path.py`
+- Skill/gateway:
+  - `skills/xclaw-agent/scripts/xclaw_agent_skill.py`
+  - `skills/xclaw-agent/scripts/openclaw_gateway_patch.py`
+  - `skills/xclaw-agent/SKILL.md`
+  - `skills/xclaw-agent/references/commands.md`
+- Docs/process:
+  - `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - `docs/XCLAW_SLICE_TRACKER.md`
+  - `docs/XCLAW_BUILD_ROADMAP.md`
+  - `docs/CONTEXT_PACK.md`
+  - `spec.md`
+  - `tasks.md`
+  - `acceptance.md`
+
+### Verification Plan
+- Required gates:
+  - `npm run db:parity`
+  - `npm run seed:reset`
+  - `npm run seed:load`
+  - `npm run seed:verify`
+  - `npm run build`
+  - `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- Functional checks:
+  - one-trigger Telegram `trade spot` approval-required path auto-resumes execution after Approve callback.
+  - Deny callback produces refusal feedback with reason.
+  - final deterministic result message includes status/tradeId/chain/txHash (when available).
+  - synthetic final-result message is routed to agent pipeline.
+
+---
+
+## Slice 71 Context: Single-Trigger Outbound Transfers + Runtime-Canonical Transfer Approvals
+
+Issue mapping: `#71` (to be created/mapped)
+
+### Objective + scope lock
+- Objective: implement one-trigger transfer approvals for `wallet-send` and `wallet-send-token` with runtime-canonical state and deterministic Telegram/web decision behavior.
+- Scope guard honored: no limit-order behavior changes; existing spot-trade and policy approval semantics remain intact outside transfer-specific additions.
+
+### Expected touched files (Slice 71 allowlist)
+- Runtime:
+  - `apps/agent-runtime/xclaw_agent/cli.py`
+  - `apps/agent-runtime/tests/test_trade_path.py`
+- Gateway/skill:
+  - `skills/xclaw-agent/scripts/openclaw_gateway_patch.py`
+  - `skills/xclaw-agent/scripts/xclaw_agent_skill.py`
+  - `skills/xclaw-agent/SKILL.md`
+  - `skills/xclaw-agent/references/commands.md`
+- API/UI:
+  - `apps/network-web/src/app/api/v1/agent/transfer-policy/route.ts`
+  - `apps/network-web/src/app/api/v1/agent/transfer-policy/mirror/route.ts`
+  - `apps/network-web/src/app/api/v1/agent/transfer-approvals/mirror/route.ts`
+  - `apps/network-web/src/app/api/v1/management/transfer-approvals/route.ts`
+  - `apps/network-web/src/app/api/v1/management/transfer-approvals/decision/route.ts`
+  - `apps/network-web/src/app/api/v1/management/transfer-policy/update/route.ts`
+  - `apps/network-web/src/app/api/v1/management/agent-state/route.ts`
+  - `apps/network-web/src/app/agents/[agentId]/page.tsx`
+- Contracts/data/docs:
+  - `infrastructure/migrations/0015_slice71_transfer_approvals_runtime_mirror.sql`
+  - `packages/shared-schemas/json/*transfer*`
+  - `docs/api/openapi.v1.yaml`
+  - `docs/api/WALLET_COMMAND_CONTRACT.md`
+  - `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - `docs/XCLAW_SLICE_TRACKER.md`
+  - `docs/XCLAW_BUILD_ROADMAP.md`
+  - `spec.md`
+  - `tasks.md`
+  - `acceptance.md`
+
+### Verification Plan
+- Required gates:
+  - `npm run db:parity`
+  - `npm run seed:reset`
+  - `npm run seed:load`
+  - `npm run seed:verify`
+  - `npm run build`
+  - `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- Functional checks:
+  - Telegram `xfer` approve executes once and reports terminal result.
+  - Telegram `xfer` deny rejects without execution.
+  - web management transfer approve/deny converges with runtime state.
+  - transfer policy updates reflect in runtime-driven decisions.
+
+---
+
+## Slice 72 Context: Transfer Policy-Override Approvals (Keep Gate/Whitelist)
+
+### Objective + scope lock
+- Objective: keep outbound gate/whitelist intact, but route policy-blocked transfer intents into transfer approval workflow with one-off override execution on approve.
+- Scope guard honored: trade approvals and limit-order behavior remain unchanged.
+
+### Expected touched files (Slice 72 allowlist)
+- `apps/agent-runtime/xclaw_agent/cli.py`
+- `apps/agent-runtime/tests/test_trade_path.py`
+- `skills/xclaw-agent/scripts/openclaw_gateway_patch.py`
+- `apps/network-web/src/app/api/v1/agent/transfer-approvals/mirror/route.ts`
+- `apps/network-web/src/app/api/v1/management/transfer-approvals/route.ts`
+- `apps/network-web/src/app/api/v1/management/agent-state/route.ts`
+- `apps/network-web/src/app/agents/[agentId]/page.tsx`
+- `packages/shared-schemas/json/agent-transfer-approvals-mirror-request.schema.json`
+- `packages/shared-schemas/json/transfer-approval.schema.json`
+- `infrastructure/migrations/0016_slice72_transfer_policy_override_fields.sql`
+- `docs/api/openapi.v1.yaml`
+- `docs/XCLAW_SOURCE_OF_TRUTH.md`
+- `docs/XCLAW_SLICE_TRACKER.md`
+- `docs/XCLAW_BUILD_ROADMAP.md`
+- `docs/api/WALLET_COMMAND_CONTRACT.md`
+- `spec.md`
+- `tasks.md`
+- `acceptance.md`
+
+---
+
+## Slice 73 Context: Agent Page Full Frontend Refresh (Dashboard-Aligned, API-Preserving)
+
+Issue mapping: `#26`
+
+### Objective + scope lock
+- Objective: direct-replace `/agents/:id` with a new dashboard-aligned wallet console UI while preserving all existing API behavior and owner/viewer security boundaries.
+- Scope guard honored: frontend-only; no backend route/schema/migration changes.
+
+### Expected touched files (Slice 73 allowlist)
+- Docs/process:
+  - `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - `docs/XCLAW_SLICE_TRACKER.md`
+  - `docs/XCLAW_BUILD_ROADMAP.md`
+  - `docs/CONTEXT_PACK.md`
+  - `spec.md`
+  - `tasks.md`
+  - `acceptance.md`
+- Web/UI:
+  - `apps/network-web/src/app/agents/[agentId]/page.tsx`
+  - `apps/network-web/src/app/agents/[agentId]/page.module.css`
+  - `apps/network-web/src/lib/agent-page-view-model.ts`
+  - `apps/network-web/src/lib/agent-page-capabilities.ts`
+
+### Verification Plan
+- Required gates:
+  - `npm run db:parity`
+  - `npm run seed:reset`
+  - `npm run seed:load`
+  - `npm run seed:verify`
+  - `npm run build`
+- Functional checks:
+  - viewer mode hides owner controls,
+  - owner mode operations still hit existing management endpoints,
+  - approvals queue decisions reflect in refreshed UI state,
+  - placeholder modules are clearly labeled where APIs do not yet exist.

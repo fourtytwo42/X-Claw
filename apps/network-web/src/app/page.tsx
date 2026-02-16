@@ -474,7 +474,7 @@ function DashboardPage() {
           <Link className={styles.sidebarItem} href="/agents">
             Explore
           </Link>
-          <Link className={styles.sidebarItem} href="/agents">
+          <Link className={styles.sidebarItem} href="/approvals">
             Approvals Center
           </Link>
           <Link className={styles.sidebarItem} href="/status">

@@ -11,8 +11,10 @@ import { ThemeToggle } from '@/components/theme-toggle';
 export function PublicShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isDashboardRoute = pathname === '/' || pathname === '/dashboard';
+  const isAgentDetailRoute = /^\/agents\/[^/]+$/.test(pathname);
+  const isApprovalsRoute = pathname === '/approvals';
 
-  if (isDashboardRoute) {
+  if (isDashboardRoute || isAgentDetailRoute || isApprovalsRoute) {
     return <main className="page-content page-content-dashboard">{children}</main>;
   }
 

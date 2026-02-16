@@ -1,3 +1,72 @@
+# Slice 74 Acceptance Evidence
+
+Date (UTC): 2026-02-16
+Active slice: `Slice 74: Approvals Center v1 (Frontend-Only, API-Preserving)`
+Issue mapping: `#74` (to be created / mapped)
+
+## Objective + Scope Lock
+- Objective: add `/approvals` dashboard-aligned approvals inbox using existing management APIs.
+- Scope guard honored: no backend/API/schema/migration changes.
+
+## File-Level Evidence (Slice 74)
+- Web/UI:
+  - `apps/network-web/src/app/approvals/page.tsx`
+  - `apps/network-web/src/app/approvals/page.module.css`
+  - `apps/network-web/src/lib/approvals-center-view-model.ts`
+  - `apps/network-web/src/lib/approvals-center-capabilities.ts`
+  - `apps/network-web/src/components/public-shell.tsx`
+  - `apps/network-web/src/app/page.tsx`
+  - `apps/network-web/src/app/agents/[agentId]/page.tsx`
+- Docs/process:
+  - `docs/XCLAW_SLICE_TRACKER.md`
+  - `docs/XCLAW_BUILD_ROADMAP.md`
+  - `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - `docs/CONTEXT_PACK.md`
+  - `spec.md`
+  - `tasks.md`
+  - `acceptance.md`
+
+## Required Validation Commands and Outcomes
+- `npm run db:parity` -> PASS
+  - `ok: true`
+  - `missingTables: []`, `missingEnums: []`, `missingChecks: []`
+- `npm run seed:reset` -> PASS
+  - `ok: true`
+- `npm run seed:load` -> PASS
+  - scenarios: `happy_path`, `approval_retry`, `degraded_rpc`, `copy_reject`
+  - totals: `agents=6`, `trades=11`
+- `npm run seed:verify` -> PASS
+  - `ok: true`
+- `npm run build` -> PASS
+  - Next.js production build completed
+  - `/approvals` emitted as static route
+
+## Functional Verification Notes
+- Viewer mode:
+  - Implemented explicit no-session empty state with no owner actions rendered in `/approvals`.
+  - Verification method: code-path check (`ownerContext.phase === 'none'`) and build validation.
+- Owner mode:
+  - Implemented owner-context fetch from `/api/v1/management/session/agents` and queue load from `/api/v1/management/agent-state`.
+  - Verification method: endpoint wiring + build pass.
+- Trade/policy/transfer decisions:
+  - Implemented decision handlers wired to existing POST endpoints:
+    - `/api/v1/management/approvals/decision`
+    - `/api/v1/management/policy-approvals/decision`
+    - `/api/v1/management/transfer-approvals/decision`
+  - Verification method: request payload/path inspection + build pass.
+- Placeholder modules + disabled CTAs:
+  - Implemented explicit placeholders for cross-agent aggregation and allowances inventory actions.
+  - Verification method: capability flags + disabled controls in page render.
+- Dark/light readability + desktop overflow checks:
+  - Route-level CSS includes light/dark token mapping and overflow-safe wrapping (`overflow-x: clip`, `overflow-wrap: anywhere`).
+  - Screenshot/manual desktop pass still pending.
+
+## Blockers
+- Create/map issue `#74` and post evidence + commit hash(es).
+- Capture and attach desktop dark/light screenshots for `/approvals`.
+
+---
+
 # Slice 03 Acceptance Evidence
 
 Date (UTC): 2026-02-13

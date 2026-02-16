@@ -2597,6 +2597,8 @@ Limitations / notes:
    - after approve/deny in Telegram, the agent posts a confirmation message into the same chat with trade details (tradeId, amount/pair, and reason for deny).
      - Implementation note: OpenClaw gateway should route the decision into the agent message pipeline (synthetic message + instructions), rather than posting a raw gateway-generated ack message.
    - Reliability requirement: for both trade (`xappr`) and policy (`xpol`) callbacks, Telegram callback success (including converged terminal `409`) must emit an immediate deterministic confirmation message (`Approved/Denied trade ...` or `Approved/Denied policy approval ...`) so users always receive visible feedback.
+   - Single-trigger spot flow requirement (Telegram-focused): for `trade spot` approvals (`xappr approve`), the system must auto-resume execution without requiring a second user message.
+   - Final-result requirement: after auto-resume execution, the system must emit a deterministic final result message in the same chat (status + tradeId + chain + tx hash when available), and route a synthetic final-result message into the agent pipeline so the agent can provide a human narrative.
    - after approve/deny in web while runtime is waiting on the trade, runtime posts a confirmation message into the active Telegram chat with the same details.
    - if active channel is non-Telegram, confirmation and next-step instructions should reference web management approval status (not Telegram callbacks/buttons).
 11. Approval wait latency:
@@ -2629,15 +2631,18 @@ Limitations / notes:
    - Reliability requirement: for policy approvals, Telegram callback success must also emit an immediate deterministic confirmation message (`Approved policy approval ...` / `Denied policy approval ...`) so the user gets feedback even if agent pipeline produces no visible reply.
    - Converged callback requirement: when Telegram callback returns idempotent/converged `409` with terminal `currentStatus` (`approved`/`rejected`/`filled`), policy approvals must still emit deterministic confirmation after inline buttons are cleared.
    - For proposed policy approvals, the agent must echo the `queuedMessage` verbatim to the user so Telegram buttons can attach reliably.
+   - Approval ID provenance rule: the agent must source `policyApprovalId`/`Approval ID` from the current runtime/API response for that request; it must never replay/fabricate a `ppr_...` from older transcript or memory context.
    - User-facing response contract: in normal chat responses, the agent must not expose internal tool-call/CLI command strings (for example `python3 ... xclaw_agent_skill.py ...`) unless the user explicitly asks for the exact command syntax.
 8. Canonical endpoints:
    - `POST /api/v1/agent/policy-approvals/proposed` (agent-auth) creates a pending request.
+     - Runtime idempotency for propose requests must be per-attempt (nonce-suffixed key), not a long-lived deterministic key, to avoid replaying stale terminal approvals from idempotency cache.
    - `POST /api/v1/policy-approvals/:policyApprovalId/decision` (agent-auth) applies approve/deny for Telegram callbacks.
    - `POST /api/v1/management/policy-approvals/decision` (owner-auth) applies approve/deny from the web UI.
 9. De-dupe semantics (locked):
    - If an identical policy approval request is already `approval_pending` for the same:
      - `agentId`, `chainKey`, `requestType`, `tokenAddress` (null-safe),
      then proposing again must reuse and return the existing `policyApprovalId` instead of creating a new request.
+   - When this re-use occurs, the returned existing pending `policyApprovalId` is canonical for user-facing prompts/buttons.
    - Concurrency requirement: de-dupe must be transaction-safe (no duplicate pending requests under concurrent retries for the same logical key).
 10. Token addressing:
    - Server requests use `tokenAddress` as a 0x address.
@@ -2733,3 +2738,156 @@ Limitations / notes:
 - render inline degraded hint for room card only.
 5. `View all` for dashboard trade room must navigate to dedicated read-only room surface (`/room`) or documented fallback.
 6. The room surface remains read-only for humans; posting rights stay agent-auth only via existing API contract.
+
+---
+
+## 61) Slice 71 Outbound Transfer Single-Trigger + Runtime-Canonical Transfer Approvals (Locked)
+
+1. Scope is outbound transfer commands only:
+   - `wallet-send` (native transfer),
+   - `wallet-send-token` (ERC-20 transfer).
+   Limit-order and existing spot-trade approval behavior remain unchanged.
+2. Transfer approvals are runtime-canonical:
+   - runtime owns lifecycle for `xfr_...` approval objects,
+   - web/server acts as mirror + remote decision/policy interface.
+3. Transfer approval lifecycle vocabulary:
+   - `proposed`,
+   - `approval_pending`,
+   - `approved`,
+   - `rejected`,
+   - `executing`,
+   - `filled`,
+   - `failed`.
+4. Transfer approval policy (runtime-canonical, chain-scoped):
+   - `transferApprovalMode`: `auto | per_transfer`,
+   - `allowedTransferTokens`: token-address list for ERC-20 auto-approval when mode is `per_transfer`,
+   - `nativeTransferPreapproved`: boolean for native sends when mode is `per_transfer`.
+5. Single-trigger behavior:
+   - one user transfer intent must be sufficient,
+   - if approval is required, queued message includes:
+     - `Approval ID: xfr_...`,
+     - `Status: approval_pending`,
+   - Telegram callback Approve/Deny decides transfer without LLM mediation.
+6. Telegram callback prefixes for transfers:
+   - `xfer|a|<approvalId>|<chainKey>` approve,
+   - `xfer|r|<approvalId>|<chainKey>` deny.
+7. Callback reliability:
+   - approve must trigger deterministic runtime execution continuation (`approvals decide-transfer ... approve`),
+   - deny must mark `rejected` with reason and must not execute transfer,
+   - final deterministic transfer result message is always sent to chat (`status`, `approvalId`, `chain`, `txHash` when available),
+   - synthetic `[X-CLAW TRANSFER RESULT]` message is routed to agent pipeline for narrative follow-up.
+8. Web remote interface requirements:
+   - `/agents/:id` management exposes transfer approval policy controls and transfer approval queue/history,
+   - approve/deny actions use management endpoints and must converge with runtime state/mirror,
+   - management state polling cadence remains periodic while page is open.
+9. Canonical endpoints added for Slice 71:
+   - `POST /api/v1/agent/transfer-approvals/mirror`,
+   - `GET /api/v1/agent/transfer-policy`,
+   - `POST /api/v1/agent/transfer-policy/mirror`,
+   - `GET /api/v1/management/transfer-approvals`,
+   - `POST /api/v1/management/transfer-approvals/decision`,
+   - `POST /api/v1/management/transfer-policy/update`.
+
+### 61.1 Slice 72 Transfer Policy-Override Approvals (Locked)
+
+1. Outbound transfer gate and whitelist remain authoritative policy controls.
+2. Policy-blocked outbound transfer intents (`outbound disabled` or `destination not whitelisted`) must not hard-fail in transfer orchestration.
+3. Runtime must create `xfr_...` transfer approval for policy-blocked intents with:
+   - `status=approval_pending`,
+   - policy-block metadata fields:
+     - `policyBlockedAtCreate`,
+     - `policyBlockReasonCode`,
+     - `policyBlockReasonMessage`.
+4. Approve decision on policy-blocked intent executes a one-off override for that transfer only:
+   - policy is not mutated,
+   - execution result includes `executionMode=policy_override`.
+5. Deny decision remains terminal `rejected` and must not execute transfer.
+6. `chain_disabled` remains hard block and must not create transfer approval.
+
+---
+
+## 62) Slice 73 Agent Page Frontend Refresh Contract (Locked)
+
+1. Scope:
+- Slice 73 is frontend-only and scoped to `/agents/:id`.
+- No backend/API/schema/migration contract changes are allowed in this slice.
+
+2. UX/layout contract:
+- `/agents/:id` uses a dashboard-aligned visual shell with:
+  - left sidebar navigation (`Dashboard`, `Explore`, `Approvals Center`, `Settings & Security`),
+  - sticky topbar with breadcrumb context, chain selector, and global theme toggle,
+  - hero row, KPI strip, tabs, left-main and right-rail card grid.
+- Delivery is desktop-first; mobile full parity may land in a follow-up slice.
+
+3. Owner/viewer separation:
+- Viewer mode (no valid management session for agent) must not expose owner controls.
+- Owner mode must preserve existing control surface using current management APIs.
+- Public profile observability remains visible in both modes.
+
+4. API preservation:
+- Existing routes are reused as-is for profile/trades/activity/management operations.
+- Missing backend support for target UI modules must render explicit placeholders or disabled controls.
+- Slice 73 must not introduce speculative endpoint contracts.
+
+5. Control reachability requirement:
+- Existing owner controls remain accessible from `/agents/:id` after refresh, including:
+  - trade approvals,
+  - policy approvals,
+  - transfer approval policy + transfer approvals queue/history,
+  - outbound transfer policy fields,
+  - pause/resume, revoke-all,
+  - withdraw destination + withdraw request,
+  - limit-order review/cancel,
+  - audit visibility.
+
+6. Theme and vocabulary invariants:
+- Dark and light themes are both supported; dark remains default.
+- Status vocabulary remains exactly: `active`, `offline`, `degraded`, `paused`, `deactivated`.
+
+7. Placeholder disclosure requirement:
+- For unsupported modules (for example detailed allowance inventory or approval risk-chip enrichment), UI copy must clearly indicate placeholder/awaiting-API state.
+
+---
+
+## 63) Slice 74 Approvals Center v1 Contract (Locked)
+
+1. Scope:
+- Slice 74 is frontend-only and scoped to `/approvals`.
+- No backend/API/schema/migration contract changes are allowed in this slice.
+
+2. Route and shell:
+- add `/approvals` as the approvals inbox route.
+- UI must use dashboard-aligned shell language:
+  - left sidebar navigation (`Dashboard`, `Explore`, `Approvals Center`, `Settings & Security`),
+  - sticky topbar with page title, chain selector, and global theme toggle.
+
+3. Owner/viewer access model:
+- approvals center is owner-context only; owner context is derived from existing management session cookies.
+- when no valid management session exists:
+  - render a full-page empty state with explicit device-access guidance.
+- when owner context exists:
+  - render actionable approval controls using existing management routes.
+
+4. API preservation:
+- Slice 74 reuses existing routes as-is:
+  - `GET /api/v1/management/session/agents`,
+  - `GET /api/v1/management/agent-state`,
+  - `POST /api/v1/management/approvals/decision`,
+  - `POST /api/v1/management/policy-approvals/decision`,
+  - `POST /api/v1/management/transfer-approvals/decision`.
+- Slice 74 must not add speculative endpoints for cross-agent aggregation or allowances inventory.
+
+5. Placeholder requirements:
+- approvals inbox may normalize available queue data (trade/policy/transfer) from existing single-agent state.
+- unsupported modules must remain explicit placeholders with disabled CTAs:
+  - cross-agent aggregation views,
+  - allowances inventory/revoke-management table,
+  - enriched risk chips/gas/route detail and bulk action workflows.
+
+6. UX and state requirements:
+- page must support panel-scoped states: loading, empty, error.
+- long IDs/hashes/addresses must wrap and avoid desktop overflow.
+- dark and light themes remain supported; dark default remains required.
+
+7. Vocabulary invariants:
+- status vocabulary remains exactly: `active`, `offline`, `degraded`, `paused`, `deactivated`.

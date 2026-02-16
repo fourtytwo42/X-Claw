@@ -1,3 +1,35 @@
+# Slice 74 Spec: Approvals Center v1 (Frontend-Only, API-Preserving)
+
+## Goal
+Add `/approvals` as a dashboard-aligned approvals inbox that reuses existing management APIs and keeps unsupported aggregation/allowances modules as explicit placeholders.
+
+## Success Criteria
+1. `/approvals` route exists with dashboard-aligned shell, topbar controls, summary strip, and two-panel desktop layout.
+2. Viewer mode (no management session) shows explicit empty-state guidance and no owner action execution path.
+3. Owner mode loads request queues from existing management endpoints and allows trade/policy/transfer decisions via existing POST routes.
+4. Unsupported modules show explicit placeholder copy and disabled CTAs (no speculative backend assumptions).
+5. Dark/light theme readability and overflow-safe desktop layout are preserved.
+
+## Non-Goals
+1. No backend API additions or contract changes.
+2. No DB migrations.
+3. No cross-agent aggregation backend in this slice.
+4. No full allowances inventory backend in this slice.
+
+## Constraints / Safety
+1. Preserve existing management auth + CSRF flows.
+2. Keep status vocabulary invariant: `active`, `offline`, `degraded`, `paused`, `deactivated`.
+3. Keep changes inside Slice 74 allowlist only.
+
+## Acceptance Checks
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+
+---
+
 # Slice 23 Spec: Agent Spot Swap (Token->Token via Configured Router)
 
 ## Goal
@@ -30,6 +62,25 @@ This must work transparently with the Slice 22 fee-router proxy (router may be t
 - `npm run seed:verify`
 - `npm run build`
 - `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+# Slice 72 Spec: Transfer Policy-Override Approvals (Keep Gate/Whitelist)
+
+## Goal
+Route outbound policy-blocked transfer intents to transfer approvals (`xfr_...`) with one-off override execution on approve, while keeping gate/whitelist controls intact.
+
+## Success Criteria
+1. `wallet-send` / `wallet-send-token` do not hard-fail on outbound disabled/whitelist miss.
+2. Policy-blocked requests create `approval_pending` transfer approvals with policy-block metadata.
+3. Approve executes one-off override (`executionMode=policy_override`) without policy mutation.
+4. Deny rejects and does not execute.
+5. UI/API surface policy-block reason and override execution mode.
+
+## Non-Goals
+1. No change to trade approval flow.
+2. No automatic outbound policy mutation from approve.
+3. No change to `chain_disabled` hard-fail.
 
 ---
 
@@ -1178,6 +1229,93 @@ Reintroduce Agent Trade Room on the rebuilt dashboard as a read-only right-rail 
 1. No compose/post controls on dashboard or `/room`.
 2. No backend API/schema changes.
 3. No broader shell/layout refactor.
+
+## Acceptance Checks
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+
+---
+
+# Slice 70 Spec: Single-Trigger Spot Flow + Guaranteed Final Result Reporting
+
+## Goal
+Make Telegram-focused `trade spot` a single-trigger flow: approval callback auto-resumes execution and final result is always reported to the human with agent-pipeline follow-up context.
+
+## Success Criteria
+1. One user trade intent is sufficient for approval-required Telegram spot flows.
+2. `xappr approve` callback triggers deterministic runtime resume execution (no second user message).
+3. `xappr deny` yields refusal feedback with reason context.
+4. Final deterministic result message includes status, tradeId, chain, and tx hash when available.
+5. Synthetic final-result message is routed into agent pipeline for human narrative.
+6. Duplicate approve callbacks do not produce duplicate executions.
+
+## Non-Goals
+1. No limit-order behavior changes.
+2. No policy callback (`xpol`) behavior changes.
+3. No new public API endpoints.
+
+## Acceptance Checks
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+# Slice 71 Spec: Single-Trigger Outbound Transfers + Runtime-Canonical Transfer Approvals
+
+## Goal
+Implement one-trigger transfer orchestration for `wallet-send` and `wallet-send-token` with runtime-canonical transfer approvals and deterministic Telegram/web decision handling.
+
+## Success Criteria
+1. Transfer commands emit `xfr_...` queued approval messages when approval is required.
+2. Telegram callback `xfer|a|...` auto-continues execution and posts deterministic final result.
+3. Telegram callback `xfer|r|...` denies execution and posts deterministic refusal.
+4. Runtime exposes deterministic transfer orchestration commands:
+   - `approvals decide-transfer`
+   - `approvals resume-transfer`
+   - `transfers policy-get`
+   - `transfers policy-set`
+5. Management web exposes transfer approval queue/history and transfer approval policy controls.
+6. Server mirrors runtime transfer approvals/policy for web visibility.
+
+## Non-Goals
+1. No limit-order flow changes.
+2. No behavior changes to existing spot-trade/policy approval surfaces outside transfer-specific additions.
+3. No custody model changes.
+
+## Acceptance Checks
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+# Slice 73 Spec: Agent Page Full Frontend Refresh (`/agents/:id`)
+
+## Goal
+Replace the current `/agents/:id` UI with a dashboard-aligned wallet console that preserves existing API behavior and owner/viewer separation.
+
+## Success Criteria
+1. `/agents/:id` is fully rebuilt with hero, KPI strip, tabbed content, and right rail cards.
+2. Existing public + management endpoints are reused; backend contracts are unchanged.
+3. Owner controls remain accessible for all current management functions.
+4. Viewer mode does not expose owner-only controls.
+5. Unsupported API-backed modules render explicit placeholder/disabled states.
+6. Dark/light parity is retained with dark default.
+
+## Non-Goals
+1. No new backend APIs for chart series/risk enrichments/allowance inventory.
+2. No schema or migration changes.
+3. No global shell rewrite outside `/agents/:id`.
 
 ## Acceptance Checks
 - `npm run db:parity`

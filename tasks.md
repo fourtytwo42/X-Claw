@@ -1,3 +1,39 @@
+# Slice 74 Tasks: Approvals Center v1 (Frontend-Only, API-Preserving)
+
+Active slice: `Slice 74: Approvals Center v1 (Frontend-Only, API-Preserving)`
+Issue mapping: `#74` (to be created / mapped)
+
+## Checklist
+- [x] Pre-flight lock: objective + acceptance checks + touched-file allowlist defined before edits.
+- [x] Docs sync first:
+  - [x] `docs/XCLAW_SLICE_TRACKER.md`
+  - [x] `docs/XCLAW_BUILD_ROADMAP.md`
+  - [x] `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - [x] `docs/CONTEXT_PACK.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+- [x] Add `/approvals` route with dashboard-aligned shell + sticky topbar.
+- [x] Add approvals-center frontend modules:
+  - [x] `apps/network-web/src/lib/approvals-center-view-model.ts`
+  - [x] `apps/network-web/src/lib/approvals-center-capabilities.ts`
+- [x] Wire owner context + queue data from existing endpoints.
+- [x] Wire decision actions for trade/policy/transfer via existing management POST routes.
+- [x] Add placeholder modules for unsupported aggregation/allowances/risk enrichments with disabled CTAs.
+- [x] Update nav links to route Approvals Center to `/approvals`.
+- [x] Preserve dark/light behavior and desktop overflow safety.
+- [ ] Run required gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+- [x] Record command outputs + functional verification notes in `acceptance.md`.
+- [ ] Commit + push Slice 74.
+- [ ] Post verification evidence + commit hash(es) to mapped issue.
+
+---
+
 # Slice 23 Tasks: Agent Spot Swap (Token->Token via Configured Router)
 
 Active slice: `Slice 23: Agent Spot Swap Command (Token->Token via Configured Router)`
@@ -1377,3 +1413,136 @@ Issue mapping: `#69A` (to be created/mapped)
 - [x] Add room card loading/empty/error states.
 - [x] Add `/room` read-only full room route and wire `View all`.
 - [x] Run required gates and record evidence.
+
+---
+
+# Slice 70 Tasks: Single-Trigger Spot Flow + Guaranteed Final Result Reporting
+
+Active slice: `Slice 70: Single-Trigger Spot Flow + Guaranteed Final Result Reporting`
+Issue mapping: `#70` (to be created/mapped)
+
+## Checklist
+- [x] Docs sync:
+  - [x] `docs/XCLAW_SLICE_TRACKER.md`
+  - [x] `docs/XCLAW_BUILD_ROADMAP.md`
+  - [x] `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - [x] `docs/CONTEXT_PACK.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+- [x] Runtime:
+  - [x] add pending spot-flow persistence (`pending-spot-trade-flows.json`).
+  - [x] record spot-flow context when `trade spot` is `approval_pending`.
+  - [x] add `approvals resume-spot --trade-id --chain --json`.
+  - [x] clear pending spot-flow on terminal outcomes.
+- [x] Gateway patch:
+  - [x] on `xappr approve`, guarded async trigger of `resume-spot`.
+  - [x] resolve runtime binary deterministically (`XCLAW_AGENT_RUNTIME_BIN` + explicit fallbacks), avoiding PATH-only `xclaw-agent` lookup.
+  - [x] deterministic final result message in same Telegram chat/thread.
+  - [x] synthetic final-result route into agent pipeline.
+  - [x] duplicate-callback in-flight guard.
+- [x] Skill wrapper/docs:
+  - [x] add `trade-resume <trade_id>` helper.
+  - [x] update skill docs/reference to lock single-trigger spot behavior.
+- [x] Tests:
+  - [x] runtime tests for spot-flow persistence and resume behavior.
+- [x] Required gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+# Slice 72 Tasks: Transfer Policy-Override Approvals (Keep Gate/Whitelist)
+
+Active slice: `Slice 72: Transfer Policy-Override Approvals (Keep Gate/Whitelist)`
+Issue mapping: `#72` (to be created/mapped)
+
+## Checklist
+- [x] Runtime evaluates outbound policy and routes blocked requests to approval queue.
+- [x] Runtime execution supports one-off override mode for approved blocked-origin flows.
+- [x] Transfer mirror payload/schema updated with policy-block metadata + execution mode.
+- [x] Web/API routes include/read metadata fields for queue/history.
+- [x] `/agents/:id` transfer approvals UI shows policy-block and override indicators.
+- [x] Gateway deterministic transfer result includes override mode marker.
+- [x] Required gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+# Slice 71 Tasks: Single-Trigger Outbound Transfers + Runtime-Canonical Transfer Approvals
+
+Active slice: `Slice 71: Single-Trigger Outbound Transfers + Runtime-Canonical Transfer Approvals`
+Issue mapping: `#71` (to be created/mapped)
+
+## Checklist
+- [x] Docs sync:
+  - [x] `docs/XCLAW_SLICE_TRACKER.md`
+  - [x] `docs/XCLAW_BUILD_ROADMAP.md`
+  - [x] `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - [x] `docs/CONTEXT_PACK.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+- [x] Runtime:
+  - [x] pending transfer flows + transfer policy local state.
+  - [x] `approvals decide-transfer`.
+  - [x] `approvals resume-transfer`.
+  - [x] `transfers policy-get` / `transfers policy-set`.
+  - [x] orchestrated `wallet-send` / `wallet-send-token` queued approval path.
+- [x] Gateway patch:
+  - [x] support `xfer|a|...` / `xfer|r|...` callback intercept.
+  - [x] deterministic transfer result message.
+  - [x] synthetic transfer result route to agent pipeline.
+- [x] API + UI:
+  - [x] transfer approval mirror endpoints.
+  - [x] transfer policy get/mirror/update endpoints.
+  - [x] management transfer approvals list/decision endpoints.
+  - [x] `/agents/:id` transfer approval policy + queue/history UI.
+- [x] Required gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+
+---
+
+# Slice 73 Tasks: Agent Page Full Frontend Refresh
+
+Active slice: `Slice 73: Agent Page Full Frontend Refresh (Dashboard-Aligned, API-Preserving)`
+Issue mapping: `#26`
+
+## Checklist
+- [x] Docs sync:
+  - [x] `docs/XCLAW_SLICE_TRACKER.md`
+  - [x] `docs/XCLAW_BUILD_ROADMAP.md`
+  - [x] `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - [x] `docs/CONTEXT_PACK.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+- [x] Replace `/agents/:id` page implementation with dashboard-aligned frontend layout.
+- [x] Preserve existing management/public API calls and action handlers.
+- [x] Add owner/viewer UI separation in refreshed layout.
+- [x] Add explicit API-placeholder surfaces for unsupported modules.
+- [x] Add view-model/capability helpers for the refreshed page:
+  - [x] `apps/network-web/src/lib/agent-page-view-model.ts`
+  - [x] `apps/network-web/src/lib/agent-page-capabilities.ts`
+- [x] Add route-local stylesheet:
+  - [x] `apps/network-web/src/app/agents/[agentId]/page.module.css`
+- [x] Run required gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`

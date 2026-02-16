@@ -2415,3 +2415,40 @@ Note:
   - [x] owner mode action controls operate via existing endpoints
   - [x] approval decision buttons update queue state
   - [ ] dark/light parity screenshots at desktop breakpoints
+
+---
+
+## 74) Slice 74: Approvals Center v1 (Frontend-Only, API-Preserving)
+
+### 74.1 Canonical/doc sync
+- [x] Add Slice 74 goal/DoD + issue mapping to `docs/XCLAW_SLICE_TRACKER.md`.
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` with locked Slice 74 frontend contract.
+- [x] Update handoff/process artifacts:
+  - [x] `docs/CONTEXT_PACK.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+
+### 74.2 Implementation
+- [x] Add `/approvals` route with dashboard-aligned shell and sticky topbar.
+- [x] Wire owner context + queue loading with existing management APIs.
+- [x] Wire decision actions for trade/policy/transfer approvals using existing endpoints.
+- [x] Add frontend view-model/capability modules:
+  - [x] `apps/network-web/src/lib/approvals-center-view-model.ts`
+  - [x] `apps/network-web/src/lib/approvals-center-capabilities.ts`
+- [x] Add route-local stylesheet:
+  - [x] `apps/network-web/src/app/approvals/page.module.css`
+- [x] Add explicit placeholders/disabled actions for unsupported modules (allowances inventory, cross-agent/risk enrichments, bulk actions).
+
+### 74.3 Validation + evidence
+- [x] Run required gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+- [ ] Record functional verification evidence:
+  - [x] viewer mode empty state + no owner actions
+  - [x] owner mode queue loads and decision actions execute
+  - [x] placeholder sections remain disabled and explicit
+  - [ ] desktop dark/light screenshots for `/approvals`

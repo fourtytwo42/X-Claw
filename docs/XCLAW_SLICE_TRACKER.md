@@ -1320,3 +1320,34 @@ DoD:
 
 Blocker:
 - Dark/light parity screenshots at desktop breakpoints are pending capture + attachment in issue evidence post.
+
+---
+
+## Slice 74: Approvals Center v1 (Frontend-Only, API-Preserving)
+Status: [!]
+Issue: #74 (to be created / mapped)
+
+Goal:
+- Add `/approvals` as a dashboard-aligned approvals inbox that reuses existing management APIs, with explicit placeholder modules for unsupported cross-agent aggregation and allowances inventory.
+
+DoD:
+- [x] docs sync first: source-of-truth + roadmap + tracker + context/spec/tasks/acceptance aligned to Slice 74.
+- [x] `/approvals` route implemented with dashboard-aligned shell, summary strip, requests inbox, and allowances placeholder panel.
+- [x] owner/viewer separation enforced:
+  - [x] no-management-session users see empty state with guidance.
+  - [x] owner session users can execute existing approval decisions.
+- [x] existing endpoints reused as-is:
+  - [x] `GET /api/v1/management/session/agents`
+  - [x] `GET /api/v1/management/agent-state`
+  - [x] `POST /api/v1/management/approvals/decision`
+  - [x] `POST /api/v1/management/policy-approvals/decision`
+  - [x] `POST /api/v1/management/transfer-approvals/decision`
+- [x] unsupported surfaces are explicit placeholders with disabled actions:
+  - [x] cross-agent aggregation
+  - [x] full allowances inventory
+  - [x] risk-chip enrichment/bulk actions
+- [x] dark/light theme support preserved with dark default.
+- [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`.
+
+Blocker:
+- Issue mapping + evidence post for Slice 74 is pending (`Issue: #74` to be created/mapped in-session).
