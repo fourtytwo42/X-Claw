@@ -384,6 +384,63 @@ export default function SettingsPage() {
     }
   }
 
+  async function onRemoveAgentAccess(agentId: string) {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const agentName = managedAgentLabel(agentId);
+    const confirmed = window.confirm(
+      `Remove access to "${agentName}" on this browser?\n\nThis only removes local device access. On-chain approvals are unchanged.`
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setNotice(null);
+    setError(null);
+    setPendingAction(`remove-access:${agentId}`);
+
+    try {
+      const nextStoredAgents = parseStoredManagedAgentIds().filter((id) => id !== agentId);
+      storeManagedAgentIds(nextStoredAgents);
+      setManagedAgentNames((current) => {
+        const copy = { ...current };
+        delete copy[agentId];
+        return copy;
+      });
+
+      const activeAgentId = ownerContext.phase === 'ready' ? ownerContext.activeAgentId : null;
+      const isActiveAgent = activeAgentId === agentId;
+
+      if (isActiveAgent) {
+        await postJson('/api/v1/management/logout', {});
+        setOwnerContext({ phase: 'none' });
+        setNotice(
+          nextStoredAgents.length > 0
+            ? `Removed ${agentName}. Open another agent key link to continue managing on this device.`
+            : `Removed ${agentName} from this device.`
+        );
+        return;
+      }
+
+      if (ownerContext.phase === 'ready') {
+        const nextManagedAgents = ownerContext.managedAgents.filter((id) => id !== agentId);
+        if (nextManagedAgents.length === 0) {
+          setOwnerContext({ phase: 'none' });
+        } else {
+          setOwnerContext({ ...ownerContext, managedAgents: nextManagedAgents });
+        }
+      }
+
+      setNotice(`Removed ${agentName} from this device.`);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'Failed to remove access.');
+    } finally {
+      setPendingAction(null);
+    }
+  }
+
   return (
     <div className={styles.root}>
       <PrimaryNav />
@@ -453,7 +510,12 @@ export default function SettingsPage() {
                       </div>
                       <div className={styles.agentActions}>
                         <Link href={`/agents/${encodeURIComponent(agentId)}`}>Open</Link>
-                        <button type="button" disabled>
+                        <button
+                          type="button"
+                          className={styles.dangerButton}
+                          disabled={pendingAction === `remove-access:${agentId}`}
+                          onClick={() => void onRemoveAgentAccess(agentId)}
+                        >
                           Remove Access
                         </button>
                       </div>

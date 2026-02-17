@@ -2487,7 +2487,7 @@ Note:
   - [x] `apps/network-web/src/lib/settings-security-capabilities.ts`
 - [x] Add route-local stylesheet:
   - [x] `apps/network-web/src/app/settings/page.module.css`
-- [x] Add explicit placeholders/disabled controls for unsupported multi-agent/global/allowance modules.
+- [x] Add explicit placeholders/disabled controls for unsupported global/allowance modules; keep per-agent remove-access device-local in settings.
 - [x] Update nav links to point Settings & Security to `/settings` on dashboard, agent page, approvals page.
 
 ### 75.3 Validation + evidence

@@ -2967,9 +2967,13 @@ Limitations / notes:
 
 5. Placeholder requirements:
 - Unsupported features must be explicit placeholders/disabled CTAs:
-  - verified cross-agent access inventory with per-agent removal,
+  - verified cross-agent access inventory,
   - global panic controls across all owned agents in one server operation,
   - full allowance inventory/revoke sweep from settings.
+- Per-agent `Remove Access` in `/settings#access` is implemented as a device-local/session action with confirmation:
+  - removing non-active agents updates local browser-managed access list,
+  - removing active agent clears current management session and local access for that agent,
+  - on-chain approvals/allowances remain unchanged.
 
 6. UX and copy invariants:
 - copy must explicitly distinguish:

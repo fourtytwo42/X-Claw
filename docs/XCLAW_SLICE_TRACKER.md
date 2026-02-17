@@ -1376,7 +1376,7 @@ DoD:
   - [x] `POST /api/v1/management/resume`
   - [x] `POST /api/v1/management/revoke-all`
 - [x] unsupported modules are explicit placeholders with disabled actions:
-  - [x] verified cross-agent access inventory + per-agent remove access
+  - [x] verified cross-agent access inventory
   - [x] global panic actions across all owned agents in one operation
   - [x] full on-chain allowance inventory/revoke sweep from settings
 - [x] dashboard/agents/approvals nav routes point Settings & Security to `/settings`.
