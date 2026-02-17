@@ -2822,8 +2822,13 @@ Limitations / notes:
 - `/agents/:id` uses a dashboard-aligned visual shell with:
   - left sidebar navigation (`Dashboard`, `Explore`, `Approvals Center`, `Settings & Security`),
   - sticky topbar with breadcrumb context, chain selector, and global theme toggle,
-  - hero row, KPI strip, tabs, left-main and right-rail card grid.
-- Delivery is desktop-first; mobile full parity may land in a follow-up slice.
+  - hero row + KPI strip followed by a single continuous wallet workspace (no tab-primary navigation):
+    - wallet header/identity controls,
+    - assets + approvals module (global and per-token approvals inline),
+    - unified wallet activity timeline,
+    - approval history module,
+    - secondary operations modules below/alongside primary wallet stack.
+- Delivery is desktop-first with mobile ordering parity for wallet modules.
 
 3. Owner/viewer separation:
 - Viewer mode (no valid management session for agent) must not expose owner controls.
@@ -2843,7 +2848,7 @@ Limitations / notes:
   - outbound transfer policy fields,
   - pause/resume, revoke-all,
   - withdraw destination + withdraw request,
-  - limit-order review/cancel,
+  - limit-order review/cancel (or explicit placeholder if API wiring is unavailable in this layout pass),
   - audit visibility.
 
 6. Theme and vocabulary invariants:

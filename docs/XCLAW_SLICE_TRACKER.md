@@ -1310,7 +1310,7 @@ Goal:
 
 DoD:
 - [x] docs sync first: source-of-truth + roadmap + tracker + context/spec/tasks/acceptance aligned to Slice 73.
-- [x] `/agents/:id` is direct-replaced with new desktop-first layout (hero, KPI strip, tabs, two-column content, right rail).
+- [x] `/agents/:id` is direct-replaced with new desktop-first wallet-first layout (hero, KPI strip, single continuous wallet workspace, secondary modules demoted).
 - [x] existing APIs remain unchanged; owner operations continue using existing management routes.
 - [x] unsupported API surfaces render explicit placeholders/disabled controls (no speculative backend changes).
 - [x] viewer mode hides owner-only controls while preserving public profile observability.

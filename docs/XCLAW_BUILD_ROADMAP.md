@@ -2393,6 +2393,11 @@ Note:
 
 ### 73.2 Implementation
 - [x] Replace `/agents/:id` UI with dashboard-aligned shell and card system.
+- [x] Shift `/agents/:id` from tab-primary layout to wallet-first continuous workspace:
+  - [x] wallet controls/header + assets and approvals as primary module
+  - [x] unified wallet activity timeline (trades/transfers/deposits/approvals)
+  - [x] integrated approval history/actions in wallet context
+  - [x] secondary modules (copy/risk/ops/audit) demoted below primary wallet stack
 - [x] Preserve existing API integration for profile/trades/activity/management actions.
 - [x] Keep owner controls reachable (policy, approvals, transfer policy/approvals, limits, audit, withdraw/deposit, pause/resume, revoke-all).
 - [x] Enforce viewer lock behavior for owner-only controls.
