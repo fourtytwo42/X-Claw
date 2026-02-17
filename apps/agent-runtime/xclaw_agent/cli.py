@@ -4679,14 +4679,13 @@ def cmd_management_link(args: argparse.Namespace) -> int:
             )
         management_url = _normalize_management_url(body.get("managementUrl"))
         return ok(
-            "SENSITIVE: Owner management link generated (do not share).",
+            "Owner management link generated for immediate owner handoff.",
             agentId=body.get("agentId", agent_id),
             managementUrl=management_url,
             issuedAt=body.get("issuedAt"),
             expiresAt=body.get("expiresAt"),
-            sensitive=True,
-            sensitiveFields=["managementUrl"],
-            securityNote="Treat managementUrl like a password (short-lived magic link).",
+            ownerHandoffRequired=True,
+            securityNote="Short-lived one-time link; send only to the requesting owner.",
         )
     except WalletStoreError as exc:
         return fail("management_link_failed", str(exc), "Verify API env/auth and retry.", exit_code=1)

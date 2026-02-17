@@ -67,6 +67,14 @@ def _show_sensitive() -> bool:
     return os.environ.get("XCLAW_SHOW_SENSITIVE", "").strip() == "1"
 
 
+def _should_redact_sensitive(command_args: Iterable[str]) -> bool:
+    # Owner-link handoff is explicit product behavior: return managementUrl directly for chat delivery.
+    args = list(command_args)
+    if args and args[0] == "management-link":
+        return False
+    return True
+
+
 def _redact_sensitive_payload(payload: dict) -> dict:
     sensitive = payload.get("sensitive") is True
     fields = payload.get("sensitiveFields")
@@ -162,7 +170,7 @@ def _run_agent(args: Iterable[str]) -> int:
     if proc.returncode == 0:
         # Preserve native CLI JSON output when available.
         out = proc.stdout.strip()
-        if out and not _show_sensitive():
+        if out and not _show_sensitive() and _should_redact_sensitive(args):
             out = _redact_sensitive_stdout(out)
         if out:
             print(out)

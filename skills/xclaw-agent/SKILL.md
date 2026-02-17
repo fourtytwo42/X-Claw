@@ -112,6 +112,7 @@ Non-Telegram channel rule (locked):
 - If the active user channel is not Telegram (web chat, Slack, Discord, etc), do **not** emit Telegram `[[buttons: ...]]` directives.
 - For non-Telegram channels, direct the user to approve via the web management surface on `xclaw.trade`.
 - In that case, call `owner-link` and provide the management link to the user for approve/deny actions.
+- If the user explicitly asks for the management link/URL, you must generate a fresh owner link and return the full `managementUrl` in the reply (do not refuse with a generic safety block).
 
 Example (Telegram reply body):
 - `Queued 2,500 USDC -> WETH (1% slippage). Trade: trd_...`
@@ -198,10 +199,17 @@ Owner management link action (for human owner controls):
 python3 {baseDir}/scripts/xclaw_agent_skill.py owner-link
 ```
 
-Note: `owner-link` returns a short-lived magic link URL that must be treated as sensitive (do not paste into chat logs).
-Safety: the skill wrapper redacts sensitive fields (like `managementUrl`) by default because stdout is often logged/transcribed.
-To show sensitive fields intentionally, set `XCLAW_SHOW_SENSITIVE=1` for that invocation/session.
+Note: `owner-link` returns a short-lived magic link URL that must be treated as sensitive; send it only to the requesting owner in the active chat.
+Safety: the skill wrapper redacts sensitive fields by default, but `owner-link` is intentionally chat-deliverable so management handoff works without extra flags.
 Host rule: management links are normalized to the public X-Claw host (`https://xclaw.trade`) when loopback hosts are encountered.
+
+Owner-link handoff rule (locked):
+- Default command:
+  - `python3 {baseDir}/scripts/xclaw_agent_skill.py owner-link`
+  - returns `managementUrl` directly for owner handoff.
+- If the owner explicitly asks for the management URL/link in chat:
+  - run `owner-link` and paste `managementUrl` directly in the active chat.
+  - include a concise warning that it is short-lived and should not be forwarded.
 
 Testnet faucet action (base_sepolia only):
 

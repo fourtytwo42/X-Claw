@@ -685,7 +685,7 @@ Use this every work session:
 - [x] skill wrapper defaults `limit-orders-run-loop` to a single iteration unless explicitly configured.
 
 ### 23.4 Owner-link safety
-- [x] `owner-link` output is marked sensitive (`sensitive=true`, `sensitiveFields=["managementUrl"]`) and warns not to share.
+- [x] `owner-link` output returns full `managementUrl` for owner handoff with a short-lived safety warning.
 
 ### 23.5 Acceptance evidence
 - [x] `npm run db:parity`
@@ -699,8 +699,8 @@ Use this every work session:
 ## 24) Slice 25: Agent Skill UX Upgrade (Security + Reliability + Contract Fixes)
 
 ### 24.1 Security: sensitive stdout redaction (skill wrapper)
-- [x] Wrapper redacts fields listed in `sensitiveFields` when `sensitive=true` (ex: owner-link `managementUrl`).
-- [x] Opt-in override documented: `XCLAW_SHOW_SENSITIVE=1`.
+- [x] Wrapper redacts fields listed in `sensitiveFields` when `sensitive=true`.
+- [x] Owner-link is an explicit exception and remains unredacted so management URL can be delivered in active chat.
 
 ### 24.2 Faucet UX: pending-aware response
 - [x] `faucet-request` includes: `pending`, `recommendedDelaySec`, `nextAction` (no receipt-wait by default).
