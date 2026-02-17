@@ -49,13 +49,19 @@
   color: var(--text-muted, #aab8d3);
   display: grid;
   place-items: center;
-  min-height: 42px;
+  min-height: 52px;
   padding: 0.58rem 0.35rem;
 }
 
 .linkItem svg {
-  width: 18px;
-  height: 18px;
+  width: 27px;
+  height: 27px;
+}
+
+.linkItem :global(.agent-shortcut-badge) {
+  width: 33px;
+  height: 33px;
+  font-size: 1.08rem;
 }
 
 .linkLabel {
