@@ -329,6 +329,18 @@
   align-items: center;
 }
 
+.agentAvatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 1px solid var(--explore-border);
+  display: grid;
+  place-items: center;
+  font-size: 0.8rem;
+  font-weight: 700;
+  flex: 0 0 28px;
+}
+
 .titleRow h3 {
   margin: 0;
   font-size: 1.16rem;

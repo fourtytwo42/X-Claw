@@ -9,6 +9,7 @@ import { PrimaryNav } from '@/components/primary-nav';
 import { PublicStatusBadge } from '@/components/public-status-badge';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { useDashboardChainKey } from '@/lib/active-chain';
+import { getAgentAvatarPalette, getAgentInitial } from '@/lib/agent-avatar-color';
 import {
   badgeLabel,
   normalizeAgents,
@@ -646,12 +647,25 @@ export default function ExplorePage() {
     const owner = ownerContext.phase === 'ready';
     const copyRel = copySubscriptionForLeader(item.agentId);
     const canEditProfile = owner && myAgentSet.has(item.agentId);
+    const avatarPalette = getAgentAvatarPalette(item.agentId);
+    const avatarInitial = getAgentInitial(item.agentName, item.agentId);
 
     return (
       <article key={item.agentId} className={styles.agentCard}>
         <div className={styles.cardHeader}>
           <div>
             <div className={styles.titleRow}>
+              <span
+                className={styles.agentAvatar}
+                style={{
+                  backgroundColor: avatarPalette.backgroundColor,
+                  borderColor: avatarPalette.borderColor,
+                  color: avatarPalette.textColor
+                }}
+                aria-hidden="true"
+              >
+                {avatarInitial}
+              </span>
               <h3>
                 <Link href={`/agents/${encodeURIComponent(item.agentId)}`}>{item.agentName}</Link>
               </h3>
