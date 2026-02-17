@@ -138,6 +138,30 @@ function Ensure-Cast {
   throw "cast is unavailable. Install Foundry for Windows and ensure cast is on PATH, then rerun."
 }
 
+function Resolve-XclawAgentBin {
+  $homeLauncherDir = Join-Path $HOME ".xclaw-agent\\bin"
+  if (Test-Path $homeLauncherDir) {
+    $env:PATH = "$homeLauncherDir;$($env:PATH)"
+  }
+
+  $configured = Get-OpenClawConfigValue "skills.entries.xclaw-agent.env.XCLAW_AGENT_RUNTIME_BIN"
+  if ($configured -and (Test-Path $configured)) {
+    return $configured
+  }
+
+  $cmd = Get-Command xclaw-agent -ErrorAction SilentlyContinue
+  if ($cmd) {
+    return $cmd.Source
+  }
+
+  $workspaceBin = Join-Path $env:XCLAW_WORKDIR "apps\\agent-runtime\\bin\\xclaw-agent"
+  if (Test-Path $workspaceBin) {
+    return $workspaceBin
+  }
+
+  throw "xclaw-agent launcher not found after setup. Expected ~/.xclaw-agent/bin or apps/agent-runtime/bin."
+}
+
 function Write-PassphraseBackup {
   param([string]$BackupPath, [string]$Passphrase)
   if ([string]::IsNullOrWhiteSpace($BackupPath) -or [string]::IsNullOrWhiteSpace($Passphrase)) {
@@ -293,6 +317,8 @@ try {
 
     Write-Host "[xclaw] running setup_agent_skill.py"
     Invoke-Python "skills/xclaw-agent/scripts/setup_agent_skill.py"
+    $xclawAgentBin = Resolve-XclawAgentBin
+    Write-Host "[xclaw] using runtime launcher: $xclawAgentBin"
 
     Write-Host "[xclaw] configuring OpenClaw skill env defaults"
     Set-OpenClawConfigSafe "skills.entries.xclaw-agent.env.XCLAW_API_BASE_URL" "$($env:XCLAW_API_BASE_URL)"
@@ -354,7 +380,7 @@ try {
       Write-Host "[xclaw] wallet already exists; keeping existing wallet"
     } else {
       Write-Host "[xclaw] first install detected; creating wallet"
-      & xclaw-agent wallet create --chain "$($env:XCLAW_DEFAULT_CHAIN)" --json | Out-Null
+      & $xclawAgentBin wallet create --chain "$($env:XCLAW_DEFAULT_CHAIN)" --json | Out-Null
     }
 
     Write-Host "[xclaw] wallet address"
@@ -369,7 +395,7 @@ try {
 
       $walletHealthJson = ""
       try {
-        $walletHealthJson = & xclaw-agent wallet health --chain "$($env:XCLAW_DEFAULT_CHAIN)" --json
+        $walletHealthJson = & $xclawAgentBin wallet health --chain "$($env:XCLAW_DEFAULT_CHAIN)" --json
       } catch {
         $walletHealthJson = ""
       }
@@ -382,7 +408,7 @@ try {
           Set-OpenClawConfigSafe "skills.entries.xclaw-agent.env.XCLAW_WALLET_PASSPHRASE" "$($env:XCLAW_WALLET_PASSPHRASE)"
         }
         try {
-          $walletHealthJson = & xclaw-agent wallet health --chain "$($env:XCLAW_DEFAULT_CHAIN)" --json
+          $walletHealthJson = & $xclawAgentBin wallet health --chain "$($env:XCLAW_DEFAULT_CHAIN)" --json
         } catch {
           $walletHealthJson = ""
         }

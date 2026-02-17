@@ -105,6 +105,32 @@ ensure_cast
 echo "[xclaw] running setup_agent_skill.py"
 python3 skills/xclaw-agent/scripts/setup_agent_skill.py
 
+resolve_xclaw_agent_bin() {
+  export PATH="$HOME/.xclaw-agent/bin:$PATH"
+  local configured
+  configured="$(openclaw config get skills.entries.xclaw-agent.env.XCLAW_AGENT_RUNTIME_BIN 2>/dev/null | tail -n1 | sed -E 's/^\"(.*)\"$/\\1/' || true)"
+  if [ -n "$configured" ] && [ -x "$configured" ]; then
+    echo "$configured"
+    return 0
+  fi
+  if command -v xclaw-agent >/dev/null 2>&1; then
+    command -v xclaw-agent
+    return 0
+  fi
+  if [ -x "$XCLAW_WORKDIR/apps/agent-runtime/bin/xclaw-agent" ]; then
+    echo "$XCLAW_WORKDIR/apps/agent-runtime/bin/xclaw-agent"
+    return 0
+  fi
+  return 1
+}
+
+if ! XCLAW_AGENT_BIN="$(resolve_xclaw_agent_bin)"; then
+  echo "[xclaw] unable to resolve xclaw-agent launcher after setup"
+  echo "[xclaw] expected launcher in ~/.xclaw-agent/bin or apps/agent-runtime/bin"
+  exit 1
+fi
+echo "[xclaw] using runtime launcher: $XCLAW_AGENT_BIN"
+
 echo "[xclaw] configuring OpenClaw skill env defaults"
 openclaw config set skills.entries.xclaw-agent.env.XCLAW_API_BASE_URL "$XCLAW_API_BASE_URL" || true
 openclaw config set skills.entries.xclaw-agent.env.XCLAW_DEFAULT_CHAIN "$XCLAW_DEFAULT_CHAIN" || true
@@ -260,7 +286,7 @@ if [ "$wallet_exists" = "1" ]; then
 else
   echo "[xclaw] first install detected; creating wallet"
   # Create wallet via runtime CLI (signing boundary stays local).
-  xclaw-agent wallet create --chain "$XCLAW_DEFAULT_CHAIN" --json >/dev/null
+  "$XCLAW_AGENT_BIN" wallet create --chain "$XCLAW_DEFAULT_CHAIN" --json >/dev/null
 fi
 
 runtime_platform="linux"
@@ -291,7 +317,7 @@ if [ "$wallet_exists" = "1" ]; then
   fi
 
   set +e
-  wallet_health_json="$(xclaw-agent wallet health --chain "$XCLAW_DEFAULT_CHAIN" --json 2>/dev/null)"
+  wallet_health_json="$("$XCLAW_AGENT_BIN" wallet health --chain "$XCLAW_DEFAULT_CHAIN" --json 2>/dev/null)"
   wallet_health_ok="$(printf "%s" "$wallet_health_json" | python3 -c 'import json,sys\ns=sys.stdin.read().strip()\ntry:\n d=json.loads(s) if s else {}\n print(\"1\" if d.get(\"ok\") else \"0\")\nexcept Exception:\n print(\"0\")')"
   wallet_integrity_checked="$(printf "%s" "$wallet_health_json" | python3 -c 'import json,sys\ns=sys.stdin.read().strip()\ntry:\n d=json.loads(s) if s else {}\n print(\"1\" if d.get(\"integrityChecked\") else \"0\")\nexcept Exception:\n print(\"0\")')"
   set -e
@@ -303,7 +329,7 @@ if [ "$wallet_exists" = "1" ]; then
       export XCLAW_WALLET_PASSPHRASE="$recovered"
       openclaw config set skills.entries.xclaw-agent.env.XCLAW_WALLET_PASSPHRASE "$XCLAW_WALLET_PASSPHRASE" >/dev/null 2>&1 || true
       set +e
-      wallet_health_json="$(xclaw-agent wallet health --chain "$XCLAW_DEFAULT_CHAIN" --json 2>/dev/null)"
+      wallet_health_json="$("$XCLAW_AGENT_BIN" wallet health --chain "$XCLAW_DEFAULT_CHAIN" --json 2>/dev/null)"
       wallet_health_ok="$(printf "%s" "$wallet_health_json" | python3 -c 'import json,sys\ns=sys.stdin.read().strip()\ntry:\n d=json.loads(s) if s else {}\n print(\"1\" if d.get(\"ok\") else \"0\")\nexcept Exception:\n print(\"0\")')"
       wallet_integrity_checked="$(printf "%s" "$wallet_health_json" | python3 -c 'import json,sys\ns=sys.stdin.read().strip()\ntry:\n d=json.loads(s) if s else {}\n print(\"1\" if d.get(\"integrityChecked\") else \"0\")\nexcept Exception:\n print(\"0\")')"
       set -e
