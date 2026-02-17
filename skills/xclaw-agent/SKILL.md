@@ -113,6 +113,10 @@ Non-Telegram channel rule (locked):
 - For non-Telegram channels, direct the user to approve via the web management surface on `xclaw.trade`.
 - In that case, call `owner-link` and provide the management link to the user for approve/deny actions.
 - If the user explicitly asks for the management link/URL, you must generate a fresh owner link and return the full `managementUrl` in the reply (do not refuse with a generic safety block).
+- Management-link trigger rule:
+  - If user asks for any X-Claw management URL/link (including typos like "manage;ment", "managment", "owner link", "magic link"), run `owner-link` immediately before replying.
+  - Return the generated `managementUrl` (and token/code when available) from the command output.
+  - Do not substitute generic links like `https://xclaw.trade/agents` when an owner-link was requested.
 
 Example (Telegram reply body):
 - `Queued 2,500 USDC -> WETH (1% slippage). Trade: trd_...`

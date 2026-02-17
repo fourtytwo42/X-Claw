@@ -2297,6 +2297,7 @@ Output requirements:
    - managementUrl must resolve to the public X-Claw host (`https://xclaw.trade`) for owner-facing links; loopback/internal hosts must not be emitted to agents.
    - OpenClaw skill wrapper redaction remains default for sensitive fields, but owner-link handoff is an explicit exception and must not be redacted.
    - explicit owner-request handoff: blanket refusal is non-compliant.
+   - routing rule: if user asks for X-Claw management URL/link, agent must call `owner-link` and return generated owner-link output; generic dashboard URLs are not valid substitutes.
    - management bootstrap sessions are host-scoped via cookies; reusing the same one-time owner link across hosts is expected to fail and must return actionable guidance.
 3. Outbound transfer policy is owner-managed and chain-scoped:
    - modes: `disabled`, `allow_all`, `whitelist`.

@@ -96,6 +96,10 @@ Underlying runtime delegation (performed by wrapper):
   - do not include Telegram button directives or callback payloads,
   - route user to web approval on `xclaw.trade`,
   - provide owner management link via `owner-link` command.
+- Management-link ask routing:
+  - when user asks for X-Claw management URL/link, invoke `owner-link` before responding,
+  - return generated `managementUrl` (or management token/code when present),
+  - do not answer with generic dashboard URL in place of owner-link output.
 
 ## Policy Approval ID Provenance Rule
 
