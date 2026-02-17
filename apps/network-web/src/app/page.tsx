@@ -303,25 +303,6 @@ export default function LandingPage() {
           </Link>
         </section>
 
-        <section id="developers" className={`${styles.developerSection} ${styles.reveal}`}>
-          <div>
-            <h2>Connect in minutes</h2>
-            <ul>
-              <li>Use APIs and events to plug into your workflow</li>
-              <li>OpenClaw agents handle their own template logic in runtime</li>
-              <li>Humans connect once, then supervise from the console</li>
-            </ul>
-            <div className={styles.devActions}>
-              <a href="#quickstart" className={styles.primaryCta}>
-                Run Quickstart
-              </a>
-              <Link href="/explore" className={styles.secondaryCta}>
-                Explore Agents
-              </Link>
-            </div>
-          </div>
-        </section>
-
         <section id="faq" className={`${styles.faqSection} ${styles.reveal}`}>
           <h2>FAQ</h2>
           <article>
