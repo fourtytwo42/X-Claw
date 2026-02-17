@@ -40,7 +40,9 @@ Use this skill to operate a local X-Claw agent runtime safely.
 - `XCLAW_X402_DEFAULT_NETWORK` (optional; defaults to `base_sepolia` for `request-x402-payment`)
 - `XCLAW_X402_DEFAULT_FACILITATOR` (optional; defaults to `cdp`)
 - `XCLAW_X402_DEFAULT_AMOUNT_ATOMIC` (optional; defaults to `0.01`)
-- `XCLAW_X402_DEFAULT_TTL_SECONDS` (optional; defaults to `1800` for `request-x402-payment`)
+- `XCLAW_X402_DEFAULT_ASSET_KIND` (optional; `native|erc20`, defaults to `native`)
+- `XCLAW_X402_DEFAULT_ASSET_SYMBOL` (optional; for `erc20`, for example `USDC` or `WETH`)
+- `XCLAW_X402_DEFAULT_ASSET_ADDRESS` (optional; for `erc20`, canonical token address)
 
 ## Optional Environment (Reliability)
 
@@ -238,9 +240,6 @@ x402 payment actions:
 
 ```bash
 python3 {baseDir}/scripts/xclaw_agent_skill.py request-x402-payment
-python3 {baseDir}/scripts/xclaw_agent_skill.py x402-serve-start <network> <facilitator> <amount_atomic> [ttl_seconds]
-python3 {baseDir}/scripts/xclaw_agent_skill.py x402-serve-status
-python3 {baseDir}/scripts/xclaw_agent_skill.py x402-serve-stop
 python3 {baseDir}/scripts/xclaw_agent_skill.py x402-pay <url> <network> <facilitator> <amount_atomic>
 python3 {baseDir}/scripts/xclaw_agent_skill.py x402-pay-resume <approval_id>
 python3 {baseDir}/scripts/xclaw_agent_skill.py x402-pay-decide <approval_id> <approve|deny>
@@ -250,8 +249,8 @@ python3 {baseDir}/scripts/xclaw_agent_skill.py x402-networks
 ```
 
 x402 runtime contract:
-- `x402-serve-start` defaults to a 30-minute TTL (`1800` seconds) when `[ttl_seconds]` is omitted.
-- `request-x402-payment` auto-starts receive endpoint and returns `paymentUrl`, `network`, `facilitator`, `amount`, `ttlSeconds`, `expiresAt`, `timeLimitNotice`.
+- `request-x402-payment` creates a hosted receive request URL on `xclaw.trade` and returns `paymentUrl`, `network`, `facilitator`, `assetKind`, `assetSymbol`, `amountAtomic`, `timeLimitNotice`.
+- receive URLs are website-hosted; no local tunnel/serve command path is used by the skill.
 - x402 payment approvals use `xfr_...` IDs with statuses: `proposed`, `approval_pending`, `approved`, `rejected`, `executing`, `filled`, `failed`.
 - Slice 79 enables `base_sepolia` and `base`; `kite_ai_testnet`/`kite_ai_mainnet` remain disabled by default.
 

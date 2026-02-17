@@ -40,9 +40,6 @@ from xclaw_agent.x402_runtime import list_networks as x402_list_networks
 from xclaw_agent.x402_runtime import pay_create_or_execute as x402_pay_create_or_execute
 from xclaw_agent.x402_runtime import pay_decide as x402_pay_decide
 from xclaw_agent.x402_runtime import pay_resume as x402_pay_resume
-from xclaw_agent.x402_runtime import serve_start as x402_serve_start
-from xclaw_agent.x402_runtime import serve_status as x402_serve_status
-from xclaw_agent.x402_runtime import serve_stop as x402_serve_stop
 from xclaw_agent.x402_runtime import X402RuntimeError
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 try:
@@ -6215,55 +6212,76 @@ def cmd_wallet_remove(args: argparse.Namespace) -> int:
     return ok("Wallet removed." if existed else "No wallet existed for chain.", chain=args.chain, removed=existed)
 
 
-def cmd_x402_serve_start(args: argparse.Namespace) -> int:
+def cmd_x402_receive_request(args: argparse.Namespace) -> int:
     chk = require_json_flag(args)
     if chk is not None:
         return chk
+    network = str(args.network or "").strip()
+    facilitator = str(args.facilitator or "").strip()
+    amount_atomic = str(args.amount_atomic or "").strip()
+    if not network:
+        return fail("invalid_input", "network is required.", "Provide --network and retry.", exit_code=2)
+    if not facilitator:
+        return fail("invalid_input", "facilitator is required.", "Provide --facilitator and retry.", exit_code=2)
+    if not amount_atomic:
+        return fail("invalid_input", "amount_atomic is required.", "Provide --amount-atomic and retry.", exit_code=2)
     try:
-        payload = x402_serve_start(
-            network=str(args.network or "").strip(),
-            facilitator=str(args.facilitator or "").strip(),
-            amount_atomic=str(args.amount_atomic or "").strip(),
-            ttl_seconds=int(args.ttl_seconds),
-            local_port=int(args.local_port) if args.local_port else None,
+        amount = Decimal(amount_atomic)
+    except Exception:
+        return fail("invalid_input", "amount_atomic must be numeric.", "Use values like 0.01 or 1.", exit_code=2)
+    if amount <= 0:
+        return fail("invalid_input", "amount_atomic must be > 0.", "Use values like 0.01 or 1.", exit_code=2)
+
+    asset_kind = str(args.asset_kind or "native").strip().lower()
+    if asset_kind not in {"native", "erc20"}:
+        return fail("invalid_input", "asset_kind must be native|erc20.", "Use --asset-kind native or --asset-kind erc20.", exit_code=2)
+    asset_symbol = str(args.asset_symbol or "").strip()
+    asset_address = str(args.asset_address or "").strip().lower() or None
+    if asset_kind == "erc20" and not asset_symbol and not asset_address:
+        return fail(
+            "invalid_input",
+            "ERC-20 receive requests require asset symbol or asset address.",
+            "Set --asset-symbol USDC|WETH (or --asset-address 0x...).",
+            exit_code=2,
         )
+
+    payload = {
+        "schemaVersion": 1,
+        "networkKey": network,
+        "facilitatorKey": facilitator,
+        "assetKind": asset_kind,
+        "assetAddress": asset_address,
+        "assetSymbol": asset_symbol or None,
+        "amountAtomic": format(amount, "f"),
+    }
+    try:
+        status_code, body = _api_request("POST", "/agent/x402/inbound/proposed", payload=payload, include_idempotency=True)
+        if status_code < 200 or status_code >= 300:
+            return fail(
+                str(body.get("code", "api_error")),
+                str(body.get("message", f"x402 receive request failed ({status_code})")),
+                str(body.get("actionHint", "Verify x402 receive request inputs and retry.")),
+                _api_error_details(status_code, body, "/agent/x402/inbound/proposed", network=network),
+                exit_code=1,
+            )
         return ok(
-            "x402 receive endpoint started.",
-            x402=payload,
-            paymentUrl=payload.get("paymentUrl"),
-            network=payload.get("network"),
-            facilitator=payload.get("facilitator"),
-            amountAtomic=payload.get("amountAtomic"),
-            ttlSeconds=payload.get("ttlSeconds"),
-            expiresAt=payload.get("expiresAt"),
-            timeLimitNotice=payload.get("timeLimitNotice"),
+            "Hosted x402 receive request created.",
+            paymentId=body.get("paymentId"),
+            paymentUrl=body.get("paymentUrl"),
+            network=body.get("networkKey", network),
+            facilitator=body.get("facilitatorKey", facilitator),
+            assetKind=body.get("assetKind", asset_kind),
+            assetAddress=body.get("assetAddress"),
+            assetSymbol=body.get("assetSymbol"),
+            amountAtomic=body.get("amountAtomic", format(amount, "f")),
+            status=body.get("status"),
+            timeLimitNotice=body.get("timeLimitNotice"),
+            requestSource="hosted",
         )
-    except X402RuntimeError as exc:
-        return fail("x402_runtime_error", str(exc), "Verify x402 network/facilitator config and retry.", exit_code=1)
+    except WalletStoreError as exc:
+        return fail("x402_receive_request_failed", str(exc), "Verify API env/auth and retry.", {"network": network}, exit_code=1)
     except Exception as exc:
-        return fail("x402_runtime_error", str(exc), "Inspect runtime x402 setup and retry.", exit_code=1)
-
-
-def cmd_x402_serve_status(args: argparse.Namespace) -> int:
-    chk = require_json_flag(args)
-    if chk is not None:
-        return chk
-    try:
-        payload = x402_serve_status()
-        return ok("x402 receive endpoint status loaded.", x402=payload, **payload)
-    except Exception as exc:
-        return fail("x402_runtime_error", str(exc), "Inspect runtime x402 status and retry.", exit_code=1)
-
-
-def cmd_x402_serve_stop(args: argparse.Namespace) -> int:
-    chk = require_json_flag(args)
-    if chk is not None:
-        return chk
-    try:
-        payload = x402_serve_stop()
-        return ok("x402 receive endpoint stopped.", x402=payload, **payload)
-    except Exception as exc:
-        return fail("x402_runtime_error", str(exc), "Inspect runtime x402 shutdown and retry.", exit_code=1)
+        return fail("x402_receive_request_failed", str(exc), "Inspect hosted x402 receive flow and retry.", {"network": network}, exit_code=1)
 
 
 def cmd_x402_pay(args: argparse.Namespace) -> int:
@@ -6539,22 +6557,15 @@ def build_parser() -> argparse.ArgumentParser:
     x402 = sub.add_parser("x402")
     x402_sub = x402.add_subparsers(dest="x402_cmd")
 
-    x402_serve_start = x402_sub.add_parser("serve-start")
-    x402_serve_start.add_argument("--network", required=True)
-    x402_serve_start.add_argument("--facilitator", required=True)
-    x402_serve_start.add_argument("--amount-atomic", required=True)
-    x402_serve_start.add_argument("--ttl-seconds", default=1800)
-    x402_serve_start.add_argument("--local-port")
-    x402_serve_start.add_argument("--json", action="store_true")
-    x402_serve_start.set_defaults(func=cmd_x402_serve_start)
-
-    x402_serve_status = x402_sub.add_parser("serve-status")
-    x402_serve_status.add_argument("--json", action="store_true")
-    x402_serve_status.set_defaults(func=cmd_x402_serve_status)
-
-    x402_serve_stop = x402_sub.add_parser("serve-stop")
-    x402_serve_stop.add_argument("--json", action="store_true")
-    x402_serve_stop.set_defaults(func=cmd_x402_serve_stop)
+    x402_receive_request = x402_sub.add_parser("receive-request")
+    x402_receive_request.add_argument("--network", required=True)
+    x402_receive_request.add_argument("--facilitator", required=True)
+    x402_receive_request.add_argument("--amount-atomic", required=True)
+    x402_receive_request.add_argument("--asset-kind", default="native", choices=["native", "erc20"])
+    x402_receive_request.add_argument("--asset-address")
+    x402_receive_request.add_argument("--asset-symbol")
+    x402_receive_request.add_argument("--json", action="store_true")
+    x402_receive_request.set_defaults(func=cmd_x402_receive_request)
 
     x402_pay = x402_sub.add_parser("pay")
     x402_pay.add_argument("--url", required=True)

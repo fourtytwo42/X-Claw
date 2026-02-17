@@ -28,6 +28,15 @@ Issue mapping: `#30`
 
 ---
 
+## Hosted x402 Receive Delta Acceptance (Current)
+
+- `request-x402-payment` maps to hosted receive request creation (`xclaw-agent x402 receive-request ...`) and no longer starts local serve/tunnel.
+- runtime parser no longer exposes `x402 serve-start|serve-status|serve-stop`.
+- setup script no longer installs or reports `cloudflaredPath`.
+- new API contract exists for agent-auth receive request creation:
+  - `POST /api/v1/agent/x402/inbound/proposed`
+  - schema: `agent-x402-inbound-proposed-request.schema.json`
+
 # Slice 80 Acceptance Evidence
 
 Date (UTC): 2026-02-17

@@ -211,46 +211,33 @@ The following non-wallet commands are part of the same Python-first wrapper cont
 
 The following x402 commands are part of the same Python-first wrapper contract and are relied on by automated agents:
 
-1. `x402-serve-start <network> <facilitator> <amount_atomic>`
-- delegates to runtime `xclaw-agent x402 serve-start --network <key> --facilitator <key> --amount-atomic <value> --json`.
-- optional wrapper arg `[ttl_seconds]` maps to runtime `--ttl-seconds <value>`.
-- runtime default TTL is `1800` seconds when not provided.
-- returns `paymentUrl`, `network`, `facilitator`, `amountAtomic`, `ttlSeconds`, `expiresAt`, `timeLimitNotice` and lifecycle details.
+1. `request-x402-payment`
+- delegates to runtime `xclaw-agent x402 receive-request --network <key> --facilitator <key> --amount-atomic <value> [--asset-kind <native|erc20>] [--asset-symbol <symbol>] [--asset-address <0x...>] --json`.
+- creates hosted receive URL records on website endpoint `/api/v1/agent/x402/inbound/proposed`.
+- returns `paymentId`, `paymentUrl`, `network`, `facilitator`, `assetKind`, `assetSymbol`, `amountAtomic`, `status`.
 
-2. `x402-serve-status`
-- delegates to runtime `xclaw-agent x402 serve-status --json`.
-- returns current local endpoint/tunnel state (`running|stopped`, pids, url, timestamps) plus expiration fields (`expiresAt`, `expired`).
-
-3. `x402-serve-stop`
-- delegates to runtime `xclaw-agent x402 serve-stop --json`.
-- terminates local endpoint + tunnel process state idempotently.
-
-4. `x402-pay <url> <network> <facilitator> <amount_atomic>`
+2. `x402-pay <url> <network> <facilitator> <amount_atomic>`
 - delegates to runtime `xclaw-agent x402 pay --url <url> --network <key> --facilitator <key> --amount-atomic <value> --json`.
 - if policy mode is `per_payment`, returns queued approval with `approvalId: xfr_...` and `status: approval_pending`.
 - if policy mode is `auto`, executes immediately and returns terminal status.
 - runtime mirrors x402 outbound lifecycle to server read model (`/agent/x402/outbound/mirror`) and transfer-approval mirror (`approvalSource: x402`).
 
-5. `x402-pay-resume <approval_id>`
+3. `x402-pay-resume <approval_id>`
 - delegates to runtime `xclaw-agent x402 pay-resume --approval-id <xfr_id> --json`.
 - resumes execution for approved x402 payment approvals.
 
-6. `x402-pay-decide <approval_id> <approve|deny>`
+4. `x402-pay-decide <approval_id> <approve|deny>`
 - delegates to runtime `xclaw-agent x402 pay-decide --approval-id <xfr_id> --decision <approve|deny> --json`.
 - `approve` continues execution; `deny` transitions to terminal `rejected`.
 
-7. `x402-policy-get <network>`
+5. `x402-policy-get <network>`
 - delegates to runtime `xclaw-agent x402 policy-get --network <key> --json`.
 - returns local policy (`payApprovalMode`, `maxAmountAtomic`, `allowedHosts`).
 
-8. `x402-policy-set <network> <auto|per_payment> [max_amount_atomic] [allowed_host ...]`
+6. `x402-policy-set <network> <auto|per_payment> [max_amount_atomic] [allowed_host ...]`
 - delegates to runtime `xclaw-agent x402 policy-set --network <key> --mode <auto|per_payment> ... --json`.
 - persists local x402 policy state.
 
-9. `x402-networks`
+7. `x402-networks`
 - delegates to runtime `xclaw-agent x402 networks --json`.
 - returns configured x402 network/facilitator map and enabled/disabled flags.
-
-10. `request-x402-payment`
-- wrapper shortcut command that auto-starts x402 receive endpoint and returns shareable payment metadata.
-- response includes `paymentUrl`, `network`, `facilitator`, `amount`, `ttlSeconds`, `expiresAt`, `timeLimitNotice`.

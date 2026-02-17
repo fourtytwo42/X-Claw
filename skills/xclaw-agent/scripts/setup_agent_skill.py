@@ -9,15 +9,12 @@ import shutil
 import stat
 import subprocess
 import sys
-import tempfile
-import urllib.request
 from pathlib import Path
 from typing import Optional
 
 APP_DIR = Path.home() / ".xclaw-agent"
 POLICY_FILE = APP_DIR / "policy.json"
 PATCHER = Path(__file__).resolve().parent / "openclaw_gateway_patch.py"
-CLOUDFLARED_VERSION = os.environ.get("XCLAW_CLOUDFLARED_VERSION", "2026.2.1")
 
 
 def run(cmd: list[str], check: bool = True, capture: bool = True) -> subprocess.CompletedProcess[str]:
@@ -166,66 +163,6 @@ def ensure_launcher(workspace: Path, openclaw_bin: Path) -> Path:
     raise RuntimeError("Unable to create xclaw-agent launcher. " + "; ".join(write_errors))
 
 
-def _cloudflared_download_url(version: str) -> str:
-    machine = (
-        os.environ.get("PROCESSOR_ARCHITECTURE", "").lower()
-        if os.name == "nt"
-        else (os.uname().machine.lower() if hasattr(os, "uname") else "amd64")
-    )
-    if machine in {"x86_64", "amd64"}:
-        arch = "amd64"
-    elif machine in {"arm64", "aarch64"}:
-        arch = "arm64"
-    else:
-        arch = "amd64"
-
-    if os.name == "nt":
-        return f"https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-{arch}.exe"
-    sysname = os.uname().sysname.lower() if hasattr(os, "uname") else "linux"
-    if "darwin" in sysname:
-        return f"https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-darwin-{arch}.tgz"
-    return f"https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-{arch}"
-
-
-def ensure_cloudflared() -> Path:
-    existing = shutil.which("cloudflared")
-    if existing:
-        return Path(existing)
-
-    managed_bin = APP_DIR / "bin"
-    managed_bin.mkdir(parents=True, exist_ok=True)
-    if os.name != "nt":
-        os.chmod(managed_bin, 0o700)
-    managed = managed_bin / ("cloudflared.exe" if os.name == "nt" else "cloudflared")
-    if managed.exists() and os.access(managed, os.X_OK):
-        os.environ["PATH"] = f"{managed_bin}:{os.environ.get('PATH', '')}"
-        return managed
-
-    if os.environ.get("XCLAW_ALLOW_CLOUDFLARED_DOWNLOAD", "1").strip().lower() in {"0", "false", "no"}:
-        raise RuntimeError("cloudflared is missing and auto-download is disabled (XCLAW_ALLOW_CLOUDFLARED_DOWNLOAD=0).")
-
-    url = _cloudflared_download_url(CLOUDFLARED_VERSION)
-    with tempfile.NamedTemporaryFile(delete=False) as tmp:
-        tmp_path = Path(tmp.name)
-    try:
-        with urllib.request.urlopen(url, timeout=30) as resp:
-            data = resp.read()
-        tmp_path.write_bytes(data)
-        if url.endswith(".tgz"):
-            raise RuntimeError("Downloaded cloudflared archive requires manual extraction on macOS; install cloudflared and re-run setup.")
-        shutil.move(str(tmp_path), str(managed))
-    finally:
-        if tmp_path.exists():
-            try:
-                tmp_path.unlink()
-            except OSError:
-                pass
-    if os.name != "nt":
-        os.chmod(managed, 0o755)
-    os.environ["PATH"] = f"{managed_bin}:{os.environ.get('PATH', '')}"
-    return managed
-
-
 def ensure_runtime_bin_env(launcher_path: Path) -> None:
     cfg = Path.home() / ".openclaw" / "openclaw.json"
     if not cfg.exists():
@@ -313,7 +250,6 @@ def main() -> int:
         openclaw_bin = ensure_openclaw(workspace)
         managed_skill = ensure_managed_skill_copy(workspace)
         launcher = ensure_launcher(workspace, openclaw_bin)
-        cloudflared = ensure_cloudflared()
         ensure_runtime_bin_env(launcher)
         ensure_default_policy_file(os.environ.get("XCLAW_DEFAULT_CHAIN", "base_sepolia"))
         # Portable Telegram approvals: patch OpenClaw gateway bundle idempotently.
@@ -341,7 +277,6 @@ def main() -> int:
         "launcher": str(launcher),
         "managedSkillPath": str(managed_skill),
         "openclawPath": str(openclaw_bin),
-        "cloudflaredPath": str(cloudflared),
         "python": versions["python"],
         "openclaw": versions["openclaw"],
     }

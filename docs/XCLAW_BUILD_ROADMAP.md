@@ -2689,6 +2689,7 @@ Note:
 - [x] Extend transfer approvals mirror table write/read/decision path with nullable x402 metadata.
 - [x] Runtime x402 mirrors outbound flow and maps approvals to `xfr_...`.
 - [x] `/agents/[agentId]` merges x402 history rows into wallet activity with source labeling and receive-link panel.
+- [x] Hosted receive supersedes local tunnel path in runtime/skill (`x402 receive-request`/`request-x402-payment`), removing cloudflared setup dependency.
 
 ### 80.3 Validation + evidence
 - [x] Run required gates sequentially:

@@ -99,14 +99,13 @@ Issue mapping: `#29`
 
 ### Locked runtime contract
 - x402 command group:
-  - `serve-start|serve-status|serve-stop`
+  - `receive-request`
   - `pay|pay-resume|pay-decide`
   - `policy-get|policy-set`
   - `networks`
-- x402 approval IDs: `xpay_...`.
+- x402 approval IDs: `xfr_...`.
 - x402 statuses: `proposed`, `approval_pending`, `approved`, `rejected`, `executing`, `filled`, `failed`.
 - Local state files:
-  - `~/.xclaw-agent/x402-runtime.json`
   - `~/.xclaw-agent/pending-x402-pay-flows.json`
   - `~/.xclaw-agent/x402-policy.json`
 
@@ -128,6 +127,14 @@ Issue mapping: `#29`
   - `pm2 restart all` (after successful build, when PM2 available)
 
 ## Slice 76 Context: Explore / Agent Listing Frontend Refresh (`/explore` Canonical)
+
+## Hosted x402 Receive Delta (Post-Slice 80)
+
+- Local x402 receive tunnel flow is retired from agent skill/runtime command surface.
+- `request-x402-payment` now calls hosted receive creation via agent-auth API:
+  - `POST /api/v1/agent/x402/inbound/proposed`
+- Local `serve-start|serve-status|serve-stop` command path is removed from active skill/runtime usage.
+- Installer no longer installs or requires `cloudflared` for x402 receive behavior.
 
 Issue mapping: `#28`
 

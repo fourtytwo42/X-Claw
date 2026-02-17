@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "networkKey",
+    "facilitatorKey",
+    "assetKind",
+    "amountAtomic"
+  ],
+  "properties": {
+    "schemaVersion": { "type": "integer", "const": 1 },
+    "networkKey": { "type": "string", "minLength": 1 },
+    "facilitatorKey": { "type": "string", "minLength": 1 },
+    "assetKind": { "type": "string", "enum": ["native", "erc20"] },
+    "assetAddress": { "type": ["string", "null"], "pattern": "^0x[a-fA-F0-9]{40}$" },
+    "assetSymbol": { "type": ["string", "null"], "maxLength": 16 },
+    "amountAtomic": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?$" }
+  }
+}

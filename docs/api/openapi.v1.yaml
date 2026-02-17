@@ -246,6 +246,24 @@ paths:
           $ref: '#/components/responses/ErrorResponse'
         '401':
           $ref: '#/components/responses/ErrorResponse'
+  /api/v1/agent/x402/inbound/proposed:
+    post:
+      summary: Create a hosted x402 inbound receive request URL (agent-auth).
+      security:
+        - agentBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentX402InboundProposedRequest'
+      responses:
+        '200':
+          description: x402 inbound receive request created.
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
   /api/v1/agent/trade-usage:
     post:
       summary: Report UTC-day trade usage deltas for authenticated agent (idempotent).
@@ -2403,6 +2421,28 @@ components:
           type: string
           format: date-time
           nullable: true
+    AgentX402InboundProposedRequest:
+      type: object
+      required: [schemaVersion, networkKey, facilitatorKey, assetKind, amountAtomic]
+      properties:
+        schemaVersion:
+          type: integer
+          const: 1
+        networkKey:
+          type: string
+        facilitatorKey:
+          type: string
+        assetKind:
+          type: string
+          enum: [native, erc20]
+        assetAddress:
+          type: string
+          nullable: true
+        assetSymbol:
+          type: string
+          nullable: true
+        amountAtomic:
+          type: string
     AgentTransferPolicyMirrorRequest:
       type: object
       required: [agentId, chainKey, transferPolicy]

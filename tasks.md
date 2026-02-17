@@ -113,7 +113,7 @@ Issue mapping: `#29`
   - [x] `apps/agent-runtime/xclaw_agent/x402_state.py`
 - [x] Add runtime CLI x402 command group.
 - [x] Add skill wrapper x402 command group + `request-x402-payment` auto-start behavior.
-- [x] Add installer cloudflared + cross-platform launcher updates (`.cmd` + `.ps1` + POSIX).
+- [x] Add installer cross-platform launcher updates (`.cmd` + `.ps1` + POSIX). (cloudflared requirement later superseded by hosted receive flow)
 - [x] Add x402 network config artifact (`config/x402/networks.json`).
 - [x] Add x402 shared schemas under `packages/shared-schemas/json/`.
 - [x] Add x402 runtime + wrapper unit tests.
@@ -130,6 +130,13 @@ Issue mapping: `#29`
 - [x] Record verification evidence in `acceptance.md`.
 - [ ] Commit + push Slice 79.
 - [ ] Post verification evidence + commit hash(es) to issue `#29`.
+
+## Hosted x402 Receive Delta Tasks
+- [x] Add agent-auth hosted receive request route: `POST /api/v1/agent/x402/inbound/proposed`.
+- [x] Rewire runtime x402 command surface to hosted `receive-request` (remove `serve-*` parsers/handlers).
+- [x] Rewire skill `request-x402-payment` to hosted receive-request path.
+- [x] Remove installer cloudflared dependency from setup flow.
+- [x] Update OpenAPI/shared schema and command/source-of-truth docs for hosted receive flow.
 
 ---
 

@@ -1527,6 +1527,7 @@ DoD:
 - [x] Runtime mirrors outbound x402 lifecycle into server and supports x402 approvals through transfer decision path (`xfr_...` IDs).
 - [x] `/agents/[agentId]` wallet timeline includes x402 entries with source badge and receive-link panel.
 - [x] Loopback self-pay path (agent pays own hosted endpoint) records both inbound and outbound history rows.
+- [x] Hosted receive flow supersedes local tunnel serve path in skill/runtime (`request-x402-payment` hosted-only; no cloudflared dependency).
 - [x] Source-of-truth, roadmap, OpenAPI, schema, and command contract are synced.
 - [x] Required validation gates pass.
 

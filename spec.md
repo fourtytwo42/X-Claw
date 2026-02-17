@@ -58,34 +58,37 @@ Implement hosted x402 receive/payment visibility in `apps/network-web` and keep 
 # Slice 79 Spec: Agent-Skill x402 Send/Receive Runtime (No Webapp Integration Yet)
 
 ## Goal
-Implement a Python-first x402 runtime surface for agent receive/pay flows with local approval controls and Cloudflare Quick Tunnel bootstrap, without integrating network-web APIs in this slice.
+Implement Python-first x402 runtime/skill pay flows with hosted website receive URL creation (no local tunnel/cloudflared path).
 
 ## Success Criteria
 1. Runtime exposes x402 command group:
-   - `serve-start|serve-status|serve-stop`
+   - `receive-request`
    - `pay|pay-resume|pay-decide`
    - `policy-get|policy-set`
    - `networks`
-2. Skill wrapper exposes corresponding `x402-*` commands plus `request-x402-payment` auto-start shortcut.
+2. Skill wrapper exposes corresponding `x402-*` commands plus `request-x402-payment` hosted receive shortcut.
 3. Runtime payment approvals use deterministic `xfr_...` IDs and locked statuses:
    - `proposed`, `approval_pending`, `approved`, `rejected`, `executing`, `filled`, `failed`.
 4. Local state files exist and are used:
-   - `~/.xclaw-agent/x402-runtime.json`
    - `~/.xclaw-agent/pending-x402-pay-flows.json`
    - `~/.xclaw-agent/x402-policy.json`
 5. x402 network config enforces enabled networks (`base_sepolia`, `base`) and fails closed for disabled networks (`kite_ai_testnet`, `kite_ai_mainnet`).
-6. Installer generates POSIX + Windows (`.cmd` and `.ps1`) launchers and ensures cloudflared availability without introducing Node/npm runtime dependency for skill commands.
+6. Installer generates POSIX + Windows (`.cmd` and `.ps1`) launchers and does not require cloudflared for receive setup.
 
 ## Non-Goals
-1. No `apps/network-web` API route integration.
-2. No OpenAPI route additions for x402 server-side integration.
-3. No Kite network enablement in active runtime behavior for this slice.
+1. No server-side wallet custody changes.
+2. No Kite network enablement in active runtime behavior for this slice.
 
 ## Constraints / Safety
 1. Keep wallet signing/settlement local in agent runtime only.
 2. No private key export in skill/runtime output.
 3. Validate URL/network/facilitator inputs and fail closed on invalid values.
 4. Preserve Python-first runtime separation for agent/OpenClaw surface.
+
+## Hosted Receive Delta
+1. Local tunnel receive bootstrap is removed from runtime/skill surface.
+2. `request-x402-payment` creates hosted receive requests through website API.
+3. Installer has no `cloudflared` dependency for x402 receive flow.
 
 ## Acceptance Checks
 - `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`

@@ -1188,9 +1188,6 @@ The skill wrapper commands below are required (JSON output contract):
 - `python3 scripts/xclaw_agent_skill.py wallet-balance`
 - `python3 scripts/xclaw_agent_skill.py wallet-token-balance <token_address>`
 - `python3 scripts/xclaw_agent_skill.py request-x402-payment`
-- `python3 scripts/xclaw_agent_skill.py x402-serve-start <network> <facilitator> <amount_atomic>`
-- `python3 scripts/xclaw_agent_skill.py x402-serve-status`
-- `python3 scripts/xclaw_agent_skill.py x402-serve-stop`
 - `python3 scripts/xclaw_agent_skill.py x402-pay <url> <network> <facilitator> <amount_atomic>`
 - `python3 scripts/xclaw_agent_skill.py x402-pay-resume <approval_id>`
 - `python3 scripts/xclaw_agent_skill.py x402-pay-decide <approval_id> <approve|deny>`
@@ -1233,9 +1230,7 @@ Delegated runtime CLI commands that must exist:
 - `xclaw-agent wallet send --to <address> --amount-wei <amount_wei> --chain <chain_key> --json`
 - `xclaw-agent wallet balance --chain <chain_key> --json`
 - `xclaw-agent wallet token-balance --token <token_address> --chain <chain_key> --json`
-- `xclaw-agent x402 serve-start --network <network> --facilitator <facilitator> --amount-atomic <amount_atomic> --json`
-- `xclaw-agent x402 serve-status --json`
-- `xclaw-agent x402 serve-stop --json`
+- `xclaw-agent x402 receive-request --network <network> --facilitator <facilitator> --amount-atomic <amount_atomic> [--asset-kind <native|erc20>] [--asset-symbol <symbol>] [--asset-address <0x...>] --json`
 - `xclaw-agent x402 pay --url <url> --network <network> --facilitator <facilitator> --amount-atomic <amount_atomic> --json`
 - `xclaw-agent x402 pay-resume --approval-id <approval_id> --json`
 - `xclaw-agent x402 pay-decide --approval-id <approval_id> --decision <approve|deny> --json`
@@ -3091,16 +3086,13 @@ Limitations / notes:
 - Agent wallet keys remain local; no key export to server/web or skill output.
 
 3. Runtime command surface (required):
-- `xclaw-agent x402 serve-start --network <key> --facilitator <key> --amount-atomic <value> --json`
-- `xclaw-agent x402 serve-status --json`
-- `xclaw-agent x402 serve-stop --json`
+- `xclaw-agent x402 receive-request --network <key> --facilitator <key> --amount-atomic <value> [--asset-kind <native|erc20>] [--asset-symbol <symbol>] [--asset-address <0x...>] --json`
 - `xclaw-agent x402 pay --url <https://...> --network <key> --facilitator <key> --amount-atomic <value> --json`
 - `xclaw-agent x402 pay-resume --approval-id <xfr_id> --json`
 - `xclaw-agent x402 pay-decide --approval-id <xfr_id> --decision <approve|deny> --json`
 - `xclaw-agent x402 policy-get --network <key> --json`
 - `xclaw-agent x402 policy-set --network <key> --mode <auto|per_payment> [--max-amount-atomic <value>] [--allowed-host <host>] --json`
 - `xclaw-agent x402 networks --json`
-- `xclaw-agent x402 serve-start` accepts optional `--ttl-seconds <value>` and defaults to `1800` seconds when omitted.
 
 4. x402 approval lifecycle:
 - Runtime-canonical x402 payment approvals use `xfr_...` IDs.
@@ -3109,14 +3101,13 @@ Limitations / notes:
 - Approval gating is local-policy controlled (`auto` vs `per_payment`) and must include deterministic deny/approve terminal behavior.
 
 5. Local runtime state artifacts:
-- `~/.xclaw-agent/x402-runtime.json` tracks receive endpoint + tunnel lifecycle.
 - `~/.xclaw-agent/pending-x402-pay-flows.json` tracks `xfr_...` approvals and execution state.
 - `~/.xclaw-agent/x402-policy.json` tracks local x402 pay policy (`payApprovalMode`, `maxAmountAtomic`, `allowedHosts`) per network.
 
-6. Receive endpoint + tunnel behavior:
-- Runtime provides local x402 HTTP endpoint and machine-readable metadata for payment requests.
-- Runtime manages Cloudflare Quick Tunnel lifecycle and returns shareable `paymentUrl`.
-- Tunnel bootstrap is for low-friction bootstrap/dev usage; no production SLA assumption is implied.
+6. Receive endpoint behavior:
+- Receive payment URLs are hosted by website endpoints (`/api/v1/x402/pay/{agentId}/{linkToken}`).
+- Runtime/skill creates hosted receive requests via agent-auth API (`/api/v1/agent/x402/inbound/proposed`).
+- No local tunnel/cloudflared dependency is part of the skill/runtime receive path.
 
 7. Multi-network contract for Slice 79:
 - x402 network/facilitator config artifact is runtime-consumed from `config/x402/networks.json`.
@@ -3130,23 +3121,19 @@ Limitations / notes:
 
 8. Skill wrapper contract additions:
 - Required wrapper commands:
-  - `x402-serve-start`, `x402-serve-status`, `x402-serve-stop`
+  - `request-x402-payment` (hosted receive URL creation shortcut)
   - `x402-pay`, `x402-pay-resume`, `x402-pay-decide`
   - `x402-policy-get`, `x402-policy-set`
   - `x402-networks`
-  - `request-x402-payment` (auto-start shortcut)
-- `request-x402-payment` must auto-start receive endpoint and return:
-  - `paymentUrl`, `network`, `facilitator`, `amount`, `ttlSeconds`, `expiresAt`, `timeLimitNotice`.
-- Payment links default to a 30-minute lifetime (`ttlSeconds=1800`) unless caller overrides TTL.
-- Agent responses that provide x402 payment URLs must include expiration guidance via `timeLimitNotice`.
-- Runtime enforcement: once `expiresAt` is reached, receive endpoint must reject payment path with `payment_expired`.
-- `x402 serve-status` includes `expired` boolean for lifecycle orchestration.
+- `request-x402-payment` must return hosted receive metadata:
+  - `paymentId`, `paymentUrl`, `network`, `facilitator`, `assetKind`, `assetSymbol`, `amountAtomic`, `status`, `timeLimitNotice`.
+- Hosted receive links are durable until owner deletion; no runtime TTL timer is required.
 
 9. Installer portability requirements:
 - Setup script must generate OS-native launcher artifacts:
   - POSIX shell wrapper on Linux/macOS,
   - `.cmd` and `.ps1` launchers on Windows.
-- Setup script must ensure `cloudflared` is available via OS-aware install/download path without adding Node/npm runtime dependency to skill command execution.
+- Setup script must not require `cloudflared` for x402 receive behavior.
 
 ## 68) Slice 80 Hosted x402 Web Contract (Locked)
 
