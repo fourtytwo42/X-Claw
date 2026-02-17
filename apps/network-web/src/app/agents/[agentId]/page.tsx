@@ -1536,9 +1536,9 @@ export default function AgentPublicProfilePage() {
                 </div>
               </div>
             </div>
-            <div className={styles.headerApprovalControl}>
-              <span className={styles.globalApprovalLabel}>Approve all</span>
-              {isOwner ? (
+            {isOwner ? (
+              <div className={styles.headerApprovalControl}>
+                <span className={styles.globalApprovalLabel}>Approve all</span>
                 <label className={styles.iosToggle} title="Allow all trades without per-trade approval.">
                   <input
                     type="checkbox"
@@ -1557,10 +1557,8 @@ export default function AgentPublicProfilePage() {
                   />
                   <span className={styles.iosSlider} />
                 </label>
-              ) : (
-                <span className={styles.muted}>{policyApprovalMode === 'auto' ? 'Enabled' : 'Disabled'}</span>
-              )}
-            </div>
+              </div>
+            ) : null}
 
           </div>
 
@@ -1646,25 +1644,26 @@ export default function AgentPublicProfilePage() {
                     <span className={styles.walletTokenMetricLabel}>Balance</span>
                     <span className={styles.walletTokenAmount}>{formatWalletHoldingAmount(holding)}</span>
                   </div>
-                  <div className={`${styles.walletTokenMetricColumn} ${styles.tokenApprovalControl}`} onClick={(event) => event.stopPropagation()}>
-                    <span className={styles.walletTokenMetricLabel}>Approval</span>
-                    <label className={styles.iosToggle} title="Allow this token without per-trade approval.">
-                      <input
-                        type="checkbox"
-                        checked={isTokenPreapproved(holding.token)}
-                        disabled={!isOwner}
-                        onChange={(event) => {
-                          const enabled = event.target.checked;
-                          const allowedTokens = nextAllowedTokensForSymbol(holding.token, enabled);
-                          void runManagementAction(
-                            () => managementPost('/api/v1/management/policy/update', buildPolicyUpdatePayload({ allowedTokens })).then(() => Promise.resolve()),
-                            `${enabled ? 'Added' : 'Removed'} ${holding.token} preapproval.`
-                          );
-                        }}
-                      />
-                      <span className={styles.iosSlider} />
-                    </label>
-                  </div>
+                  {isOwner ? (
+                    <div className={`${styles.walletTokenMetricColumn} ${styles.tokenApprovalControl}`} onClick={(event) => event.stopPropagation()}>
+                      <span className={styles.walletTokenMetricLabel}>Approval</span>
+                      <label className={styles.iosToggle} title="Allow this token without per-trade approval.">
+                        <input
+                          type="checkbox"
+                          checked={isTokenPreapproved(holding.token)}
+                          onChange={(event) => {
+                            const enabled = event.target.checked;
+                            const allowedTokens = nextAllowedTokensForSymbol(holding.token, enabled);
+                            void runManagementAction(
+                              () => managementPost('/api/v1/management/policy/update', buildPolicyUpdatePayload({ allowedTokens })).then(() => Promise.resolve()),
+                              `${enabled ? 'Added' : 'Removed'} ${holding.token} preapproval.`
+                            );
+                          }}
+                        />
+                        <span className={styles.iosSlider} />
+                      </label>
+                    </div>
+                  ) : null}
                 </div>
               </div>
             ))}
