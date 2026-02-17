@@ -9,13 +9,14 @@
   display: grid;
   grid-template-rows: auto 1fr auto;
   gap: 0.65rem;
-  padding: 0.8rem 0.6rem;
+  padding: 0.8rem 0.45rem;
 }
 
 .logo {
-  width: 100%;
+  width: 58px;
   height: 44px;
   border-radius: 10px;
+  margin: 0 auto;
   display: grid;
   place-items: center;
   border: 1px solid color-mix(in srgb, var(--accent, #3b82f6) 45%, var(--line, #22304d));
@@ -39,23 +40,19 @@
   border: 1px solid transparent;
   border-radius: 12px;
   color: var(--text-muted, #aab8d3);
-  display: flex;
-  align-items: center;
-  gap: 0.55rem;
-  min-height: 44px;
-  padding: 0.52rem 0.58rem;
+  display: grid;
+  place-items: center;
+  min-height: 42px;
+  padding: 0.58rem 0.35rem;
 }
 
 .linkItem svg {
   width: 18px;
   height: 18px;
-  flex: 0 0 auto;
 }
 
 .linkLabel {
-  font-size: 0.84rem;
-  line-height: 1;
-  white-space: nowrap;
+  display: none;
 }
 
 .linkItem:hover {
@@ -203,7 +200,7 @@
 
 @media (max-width: 1080px) {
   .navRoot {
-    width: 200px;
+    width: 82px;
   }
 }
 

@@ -75,17 +75,11 @@ export function PrimaryNav({ className, desktopExtra, mobileMoreContent }: Prima
                 title={item.label}
               >
                 <SidebarIcon name={item.icon} />
-                <span className={styles.linkLabel}>{item.label}</span>
               </Link>
             );
           })}
 
-          <ActiveAgentSidebarLink
-            itemClassName={styles.linkItem}
-            activeClassName={styles.linkItemActive}
-            showLabel
-            labelClassName={styles.linkLabel}
-          />
+          <ActiveAgentSidebarLink itemClassName={styles.linkItem} activeClassName={styles.linkItemActive} />
 
           {SECONDARY_ITEMS.map((item) => {
             const active = isActivePath(pathname, item.href);
@@ -98,7 +92,6 @@ export function PrimaryNav({ className, desktopExtra, mobileMoreContent }: Prima
                 title={item.label}
               >
                 <SidebarIcon name={item.icon} />
-                <span className={styles.linkLabel}>{item.label}</span>
               </Link>
             );
           })}
