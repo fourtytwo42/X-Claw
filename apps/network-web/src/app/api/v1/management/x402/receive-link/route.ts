@@ -21,7 +21,27 @@ function buildOrigin(req: NextRequest): string {
   if (explicit) {
     return explicit.replace(/\/$/, '');
   }
-  return req.nextUrl.origin.replace(/\/$/, '');
+  const forwardedHost = req.headers.get('x-forwarded-host')?.trim();
+  const forwardedProto = req.headers.get('x-forwarded-proto')?.trim();
+  if (forwardedHost) {
+    const proto = forwardedProto && (forwardedProto === 'http' || forwardedProto === 'https') ? forwardedProto : 'https';
+    return `${proto}://${forwardedHost}`.replace(/\/$/, '');
+  }
+
+  const hostHeader = req.headers.get('host')?.trim();
+  if (hostHeader && hostHeader !== '0.0.0.0' && hostHeader !== '127.0.0.1' && hostHeader !== 'localhost') {
+    return `https://${hostHeader}`.replace(/\/$/, '');
+  }
+
+  const fallback = req.nextUrl.origin.replace(/\/$/, '');
+  if (
+    fallback.includes('0.0.0.0') ||
+    fallback.includes('127.0.0.1') ||
+    fallback.includes('localhost')
+  ) {
+    return 'https://xclaw.trade';
+  }
+  return fallback;
 }
 
 function parseAmountAtomic(value: unknown): string | null {
