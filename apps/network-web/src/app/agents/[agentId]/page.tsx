@@ -392,16 +392,16 @@ function policyApprovalLabel(item: { request_type: string; token_address: string
   const map = tokenSymbolByAddress(chainTokens);
 
   if (item.request_type === 'global_approval_enable') {
-    return 'Turn on auto-approve for all trades';
+    return 'Turn on approve for all trades';
   }
   if (item.request_type === 'global_approval_disable') {
-    return 'Turn off auto-approve for all trades';
+    return 'Turn off approve for all trades';
   }
   if (item.request_type === 'token_preapprove_add') {
     if (!item.token_address) {
-      return 'Auto-approve token';
+      return 'Approve token';
     }
-    return `Auto-approve ${map.get(item.token_address.toLowerCase()) ?? shortenAddress(item.token_address)}`;
+    return `Approve ${map.get(item.token_address.toLowerCase()) ?? shortenAddress(item.token_address)}`;
   }
   if (item.request_type === 'token_preapprove_remove') {
     if (!item.token_address) {
@@ -1858,7 +1858,7 @@ export default function AgentPublicProfilePage() {
             </div>
             {isOwner ? (
               <div className={styles.headerApprovalControl}>
-                <span className={styles.globalApprovalLabel}>Auto-approve trades</span>
+                <span className={styles.globalApprovalLabel}>Approve trades</span>
                 <label className={styles.iosToggle} title="When on, this agent can trade without asking every time.">
                   <input
                     type="checkbox"
@@ -1871,7 +1871,7 @@ export default function AgentPublicProfilePage() {
                           managementPost('/api/v1/management/policy/update', buildPolicyUpdatePayload({ approvalMode: nextMode })).then(() =>
                             Promise.resolve()
                           ),
-                        `Auto-approve is now ${nextMode === 'auto' ? 'on' : 'off'}.`
+                        `Approve is now ${nextMode === 'auto' ? 'on' : 'off'}.`
                       );
                     }}
                   />
@@ -1976,7 +1976,7 @@ export default function AgentPublicProfilePage() {
                             const allowedTokens = nextAllowedTokensForSymbol(holding.token, enabled);
                             void runManagementAction(
                               () => managementPost('/api/v1/management/policy/update', buildPolicyUpdatePayload({ allowedTokens })).then(() => Promise.resolve()),
-                              `${enabled ? 'Enabled' : 'Disabled'} auto-approve for ${holding.token}.`
+                              `${enabled ? 'Enabled' : 'Disabled'} approve for ${holding.token}.`
                             );
                           }}
                         />
