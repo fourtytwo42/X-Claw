@@ -140,6 +140,7 @@ function storeIds(key: string, ids: string[]) {
     return;
   }
   window.localStorage.setItem(key, JSON.stringify(Array.from(new Set(ids))));
+  window.dispatchEvent(new Event('xclaw:favorites-updated'));
 }
 
 function splitCsv(value: string): string[] {

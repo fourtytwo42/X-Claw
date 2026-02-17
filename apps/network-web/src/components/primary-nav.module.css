@@ -73,6 +73,33 @@
   background: color-mix(in srgb, var(--accent, #3b82f6) 16%, transparent);
 }
 
+.bookmarkItemWrap {
+  position: relative;
+}
+
+.bookmarkRemoveBtn {
+  position: absolute;
+  top: -0.22rem;
+  right: -0.12rem;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--line, #22304d);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg-elev, #111a2e) 96%, transparent);
+  color: var(--text-muted, #aab8d3);
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+
+.bookmarkRemoveBtn:hover {
+  color: #ff7f7f;
+  border-color: #ff7f7f;
+}
+
 .desktopExtra {
   display: grid;
   gap: 0.42rem;
