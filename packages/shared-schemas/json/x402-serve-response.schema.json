@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "X402ServeResponse",
+  "type": "object",
+  "required": ["ok", "code", "message", "x402"],
+  "properties": {
+    "ok": { "type": "boolean" },
+    "code": { "type": "string" },
+    "message": { "type": "string" },
+    "x402": {
+      "type": "object",
+      "required": ["status"],
+      "properties": {
+        "status": { "type": "string", "enum": ["running", "stopped"] },
+        "network": { "type": ["string", "null"] },
+        "facilitator": { "type": ["string", "null"] },
+        "amountAtomic": { "type": ["string", "null"] },
+        "paymentUrl": { "type": ["string", "null"] },
+        "expiresAt": { "type": ["string", "null"] }
+      }
+    }
+  },
+  "additionalProperties": true
+}

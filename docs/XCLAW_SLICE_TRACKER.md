@@ -7,6 +7,7 @@ Rules:
 - Mark a slice complete only when all DoD checks pass.
 - Do not start next slice until current slice is marked complete.
 - If behavior changes, update source-of-truth + artifacts in the same slice.
+- Sequencing note: Slice 69-77 entries marked `[!]` are documentation/evidence blockers, not implementation-absence blockers. Their code paths are implemented; issue-mapping/screenshot evidence remains pending.
 
 Status legend:
 - [ ] not started
@@ -1427,7 +1428,7 @@ Blocker:
 
 ## Slice 77: Agent Wallet Page MetaMask-Style Full-Screen Refactor (`/agents/:id`)
 Status: [!]
-Issue: #29 (to be created / mapped)
+Issue: pending mapping (legacy placeholder)
 
 Goal:
 - Reframe `/agents/:id` as a MetaMask-style full-screen wallet experience, remove transfer/outbound policy editor clutter, and preserve existing owner/viewer controls and API contracts.
@@ -1468,3 +1469,38 @@ DoD:
 
 Blocker:
 - Issue mapping and screenshot evidence post pending.
+
+---
+
+## Slice 79: Agent-Skill x402 Send/Receive Runtime (No Webapp Integration Yet)
+Status: [x]
+Issue: #29
+
+Goal:
+- Add Python-first x402 receive/pay runtime + skill command surface with runtime-canonical payment approvals (`xpay_...`) and Cloudflare tunnel bootstrap, without integrating network-web APIs in this slice.
+
+DoD:
+- [x] docs sync first: source-of-truth + roadmap + tracker + wallet command contract + context/spec/tasks/acceptance aligned to Slice 79.
+- [x] runtime adds x402 command group:
+  - [x] `x402 serve-start|serve-status|serve-stop`
+  - [x] `x402 pay|pay-resume|pay-decide`
+  - [x] `x402 policy-get|policy-set`
+  - [x] `x402 networks`
+- [x] x402 pay approval lifecycle uses deterministic `xpay_...` IDs and statuses:
+  - [x] `proposed|approval_pending|approved|rejected|executing|filled|failed`
+- [x] local x402 state files implemented:
+  - [x] `~/.xclaw-agent/x402-runtime.json`
+  - [x] `~/.xclaw-agent/pending-x402-pay-flows.json`
+- [x] local x402 policy file implemented:
+  - [x] `~/.xclaw-agent/x402-policy.json` (`auto|per_payment`, max amount, host allowlist)
+- [x] cloudflared tunnel manager implemented and installer ensures cloudflared availability (Linux/macOS/Windows paths).
+- [x] skill wrapper adds:
+  - [x] `x402-serve-start|x402-serve-status|x402-serve-stop`
+  - [x] `x402-pay|x402-pay-resume|x402-pay-decide`
+  - [x] `x402-policy-get|x402-policy-set`
+  - [x] `x402-networks`
+  - [x] `request-x402-payment` auto-start shortcut returning `paymentUrl/network/facilitator/amount/expiresAt`
+- [x] x402 network config artifact added with:
+  - [x] enabled: `base_sepolia`, `base`
+  - [x] disabled by default: `kite_ai_testnet`, `kite_ai_mainnet`
+- [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.

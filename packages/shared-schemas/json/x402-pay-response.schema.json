@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "X402PayResponse",
+  "type": "object",
+  "required": ["ok", "code", "message"],
+  "properties": {
+    "ok": { "type": "boolean" },
+    "code": { "type": "string" },
+    "message": { "type": "string" },
+    "approval": { "$ref": "./x402-payment-approval.schema.json" },
+    "queuedMessage": { "type": ["string", "null"] }
+  },
+  "additionalProperties": true
+}

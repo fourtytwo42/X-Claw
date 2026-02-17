@@ -1,7 +1,50 @@
+# Slice 79 Tasks: Agent-Skill x402 Send/Receive Runtime (No Webapp Integration Yet)
+
+Active slice: `Slice 79: Agent-Skill x402 Send/Receive Runtime`
+Issue mapping: `#29`
+
+## Checklist
+- [x] Pre-flight lock: objective + acceptance checks + touched-file allowlist defined before edits.
+- [x] Docs sync first:
+  - [x] `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - [x] `docs/XCLAW_SLICE_TRACKER.md`
+  - [x] `docs/XCLAW_BUILD_ROADMAP.md`
+  - [x] `docs/api/WALLET_COMMAND_CONTRACT.md`
+  - [x] `docs/CONTEXT_PACK.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+- [x] Add runtime x402 modules:
+  - [x] `apps/agent-runtime/xclaw_agent/x402_runtime.py`
+  - [x] `apps/agent-runtime/xclaw_agent/x402_tunnel.py`
+  - [x] `apps/agent-runtime/xclaw_agent/x402_policy.py`
+  - [x] `apps/agent-runtime/xclaw_agent/x402_state.py`
+- [x] Add runtime CLI x402 command group.
+- [x] Add skill wrapper x402 command group + `request-x402-payment` auto-start behavior.
+- [x] Add installer cloudflared + cross-platform launcher updates (`.cmd` + `.ps1` + POSIX).
+- [x] Add x402 network config artifact (`config/x402/networks.json`).
+- [x] Add x402 shared schemas under `packages/shared-schemas/json/`.
+- [x] Add x402 runtime + wrapper unit tests.
+- [x] Run required gates:
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_x402_runtime.py -v`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_x402_skill_wrapper.py -v`
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `pm2 restart all` (after successful build, when PM2 available)
+- [x] Record verification evidence in `acceptance.md`.
+- [ ] Commit + push Slice 79.
+- [ ] Post verification evidence + commit hash(es) to issue `#29`.
+
+---
+
 # Slice 77 Tasks: Agent Wallet Page iPhone/MetaMask-Style Refactor (`/agents/:id`)
 
 Active slice: `Slice 77: Agent Wallet Page iPhone/MetaMask-Style Refactor`
-Issue mapping: `#29` (to be created / mapped)
+Issue mapping: `pending mapping (legacy placeholder)`
 
 ## Checklist
 - [x] Pre-flight lock: objective + acceptance checks + touched-file allowlist defined before edits.

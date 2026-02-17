@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "X402RuntimeState",
+  "type": "object",
+  "required": ["schemaVersion", "serve"],
+  "properties": {
+    "schemaVersion": { "type": "integer", "const": 1 },
+    "serve": {
+      "type": "object",
+      "required": ["status", "updatedAt"],
+      "properties": {
+        "status": { "type": "string", "enum": ["running", "stopped"] },
+        "network": { "type": ["string", "null"] },
+        "facilitator": { "type": ["string", "null"] },
+        "amountAtomic": { "type": ["string", "null"] },
+        "resourcePath": { "type": ["string", "null"] },
+        "localPort": { "type": ["integer", "null"] },
+        "serverPid": { "type": ["integer", "null"] },
+        "tunnelPid": { "type": ["integer", "null"] },
+        "paymentUrl": { "type": ["string", "null"] },
+        "expiresAt": { "type": ["string", "null"] },
+        "startedAt": { "type": ["string", "null"] },
+        "updatedAt": { "type": "string" }
+      }
+    }
+  },
+  "additionalProperties": true
+}

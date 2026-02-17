@@ -1,5 +1,72 @@
 # X-Claw Context Pack
 
+## Slice 79 Context: Agent-Skill x402 Send/Receive Runtime (No Webapp Integration)
+
+Issue mapping: `#29`
+
+### Objective + scope lock
+- Objective: implement Python-first x402 receive/pay runtime + skill surfaces, including local approval lifecycle (`xpay_...`), tunnel management, and installer portability.
+- Scope guard honored: no `apps/network-web` route/API integration in this slice.
+
+### Expected touched files (Slice 79 allowlist)
+- Runtime/skill:
+  - `apps/agent-runtime/xclaw_agent/cli.py`
+  - `apps/agent-runtime/xclaw_agent/x402_runtime.py`
+  - `apps/agent-runtime/xclaw_agent/x402_tunnel.py`
+  - `apps/agent-runtime/xclaw_agent/x402_policy.py`
+  - `apps/agent-runtime/xclaw_agent/x402_state.py`
+  - `apps/agent-runtime/tests/test_x402_runtime.py`
+  - `apps/agent-runtime/tests/test_x402_skill_wrapper.py`
+  - `skills/xclaw-agent/scripts/xclaw_agent_skill.py`
+  - `skills/xclaw-agent/scripts/setup_agent_skill.py`
+  - `skills/xclaw-agent/SKILL.md`
+  - `skills/xclaw-agent/references/commands.md`
+- Contracts/config/docs:
+  - `config/x402/networks.json`
+  - `packages/shared-schemas/json/x402-runtime-state.schema.json`
+  - `packages/shared-schemas/json/x402-serve-response.schema.json`
+  - `packages/shared-schemas/json/x402-pay-request.schema.json`
+  - `packages/shared-schemas/json/x402-pay-response.schema.json`
+  - `packages/shared-schemas/json/x402-payment-approval.schema.json`
+  - `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - `docs/XCLAW_SLICE_TRACKER.md`
+  - `docs/XCLAW_BUILD_ROADMAP.md`
+  - `docs/api/WALLET_COMMAND_CONTRACT.md`
+  - `docs/CONTEXT_PACK.md`
+  - `spec.md`
+  - `tasks.md`
+  - `acceptance.md`
+
+### Locked runtime contract
+- x402 command group:
+  - `serve-start|serve-status|serve-stop`
+  - `pay|pay-resume|pay-decide`
+  - `policy-get|policy-set`
+  - `networks`
+- x402 approval IDs: `xpay_...`.
+- x402 statuses: `proposed`, `approval_pending`, `approved`, `rejected`, `executing`, `filled`, `failed`.
+- Local state files:
+  - `~/.xclaw-agent/x402-runtime.json`
+  - `~/.xclaw-agent/pending-x402-pay-flows.json`
+  - `~/.xclaw-agent/x402-policy.json`
+
+### Network rollout lock
+- Enabled now: `base_sepolia`, `base`.
+- Disabled by default: `kite_ai_testnet`, `kite_ai_mainnet`.
+
+### Verification plan
+- Runtime tests:
+  - `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+  - `python3 -m unittest apps/agent-runtime/tests/test_x402_runtime.py -v`
+  - `python3 -m unittest apps/agent-runtime/tests/test_x402_skill_wrapper.py -v`
+- Required gates:
+  - `npm run db:parity`
+  - `npm run seed:reset`
+  - `npm run seed:load`
+  - `npm run seed:verify`
+  - `npm run build`
+  - `pm2 restart all` (after successful build, when PM2 available)
+
 ## Slice 76 Context: Explore / Agent Listing Frontend Refresh (`/explore` Canonical)
 
 Issue mapping: `#28`

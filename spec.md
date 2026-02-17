@@ -1,3 +1,48 @@
+# Slice 79 Spec: Agent-Skill x402 Send/Receive Runtime (No Webapp Integration Yet)
+
+## Goal
+Implement a Python-first x402 runtime surface for agent receive/pay flows with local approval controls and Cloudflare Quick Tunnel bootstrap, without integrating network-web APIs in this slice.
+
+## Success Criteria
+1. Runtime exposes x402 command group:
+   - `serve-start|serve-status|serve-stop`
+   - `pay|pay-resume|pay-decide`
+   - `policy-get|policy-set`
+   - `networks`
+2. Skill wrapper exposes corresponding `x402-*` commands plus `request-x402-payment` auto-start shortcut.
+3. Runtime payment approvals use deterministic `xpay_...` IDs and locked statuses:
+   - `proposed`, `approval_pending`, `approved`, `rejected`, `executing`, `filled`, `failed`.
+4. Local state files exist and are used:
+   - `~/.xclaw-agent/x402-runtime.json`
+   - `~/.xclaw-agent/pending-x402-pay-flows.json`
+   - `~/.xclaw-agent/x402-policy.json`
+5. x402 network config enforces enabled networks (`base_sepolia`, `base`) and fails closed for disabled networks (`kite_ai_testnet`, `kite_ai_mainnet`).
+6. Installer generates POSIX + Windows (`.cmd` and `.ps1`) launchers and ensures cloudflared availability without introducing Node/npm runtime dependency for skill commands.
+
+## Non-Goals
+1. No `apps/network-web` API route integration.
+2. No OpenAPI route additions for x402 server-side integration.
+3. No Kite network enablement in active runtime behavior for this slice.
+
+## Constraints / Safety
+1. Keep wallet signing/settlement local in agent runtime only.
+2. No private key export in skill/runtime output.
+3. Validate URL/network/facilitator inputs and fail closed on invalid values.
+4. Preserve Python-first runtime separation for agent/OpenClaw surface.
+
+## Acceptance Checks
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- `python3 -m unittest apps/agent-runtime/tests/test_x402_runtime.py -v`
+- `python3 -m unittest apps/agent-runtime/tests/test_x402_skill_wrapper.py -v`
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `pm2 restart all` (after successful build, when PM2 is available)
+
+---
+
 # Slice 77 Spec: Agent Wallet Page iPhone/MetaMask-Style Refactor (`/agents/:id`)
 
 ## Goal

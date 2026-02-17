@@ -33,6 +33,16 @@ from typing import Any
 
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from xclaw_agent.x402_policy import get_policy as x402_get_policy
+from xclaw_agent.x402_policy import set_policy as x402_set_policy
+from xclaw_agent.x402_runtime import list_networks as x402_list_networks
+from xclaw_agent.x402_runtime import pay_create_or_execute as x402_pay_create_or_execute
+from xclaw_agent.x402_runtime import pay_decide as x402_pay_decide
+from xclaw_agent.x402_runtime import pay_resume as x402_pay_resume
+from xclaw_agent.x402_runtime import serve_start as x402_serve_start
+from xclaw_agent.x402_runtime import serve_status as x402_serve_status
+from xclaw_agent.x402_runtime import serve_stop as x402_serve_stop
+from xclaw_agent.x402_runtime import X402RuntimeError
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 try:
     from argon2.low_level import Type, hash_secret_raw
@@ -6102,6 +6112,167 @@ def cmd_wallet_remove(args: argparse.Namespace) -> int:
     return ok("Wallet removed." if existed else "No wallet existed for chain.", chain=args.chain, removed=existed)
 
 
+def cmd_x402_serve_start(args: argparse.Namespace) -> int:
+    chk = require_json_flag(args)
+    if chk is not None:
+        return chk
+    try:
+        payload = x402_serve_start(
+            network=str(args.network or "").strip(),
+            facilitator=str(args.facilitator or "").strip(),
+            amount_atomic=str(args.amount_atomic or "").strip(),
+            ttl_seconds=int(args.ttl_seconds),
+            local_port=int(args.local_port) if args.local_port else None,
+        )
+        return ok(
+            "x402 receive endpoint started.",
+            x402=payload,
+            paymentUrl=payload.get("paymentUrl"),
+            network=payload.get("network"),
+            facilitator=payload.get("facilitator"),
+            amountAtomic=payload.get("amountAtomic"),
+            expiresAt=payload.get("expiresAt"),
+        )
+    except X402RuntimeError as exc:
+        return fail("x402_runtime_error", str(exc), "Verify x402 network/facilitator config and retry.", exit_code=1)
+    except Exception as exc:
+        return fail("x402_runtime_error", str(exc), "Inspect runtime x402 setup and retry.", exit_code=1)
+
+
+def cmd_x402_serve_status(args: argparse.Namespace) -> int:
+    chk = require_json_flag(args)
+    if chk is not None:
+        return chk
+    try:
+        payload = x402_serve_status()
+        return ok("x402 receive endpoint status loaded.", x402=payload, **payload)
+    except Exception as exc:
+        return fail("x402_runtime_error", str(exc), "Inspect runtime x402 status and retry.", exit_code=1)
+
+
+def cmd_x402_serve_stop(args: argparse.Namespace) -> int:
+    chk = require_json_flag(args)
+    if chk is not None:
+        return chk
+    try:
+        payload = x402_serve_stop()
+        return ok("x402 receive endpoint stopped.", x402=payload, **payload)
+    except Exception as exc:
+        return fail("x402_runtime_error", str(exc), "Inspect runtime x402 shutdown and retry.", exit_code=1)
+
+
+def cmd_x402_pay(args: argparse.Namespace) -> int:
+    chk = require_json_flag(args)
+    if chk is not None:
+        return chk
+    try:
+        payload = x402_pay_create_or_execute(
+            url=str(args.url or "").strip(),
+            network=str(args.network or "").strip(),
+            facilitator=str(args.facilitator or "").strip(),
+            amount_atomic=str(args.amount_atomic or "").strip(),
+            memo=str(args.memo or "").strip() or None,
+        )
+        if not bool(payload.get("ok", False)):
+            emit(payload)
+            return 1
+        return emit(payload)
+    except X402RuntimeError as exc:
+        return fail("x402_runtime_error", str(exc), "Verify x402 pay inputs and retry.", exit_code=1)
+    except Exception as exc:
+        return fail("x402_runtime_error", str(exc), "Inspect runtime x402 pay flow and retry.", exit_code=1)
+
+
+def cmd_x402_pay_resume(args: argparse.Namespace) -> int:
+    chk = require_json_flag(args)
+    if chk is not None:
+        return chk
+    approval_id = str(args.approval_id or "").strip()
+    if not approval_id:
+        return fail("invalid_input", "approval_id is required.", "Provide --approval-id xpay_... and retry.", exit_code=2)
+    try:
+        payload = x402_pay_resume(approval_id)
+        return ok("x402 payment resume processed.", approval=payload)
+    except X402RuntimeError as exc:
+        return fail("x402_runtime_error", str(exc), "Use a valid pending approved xpay_... id and retry.", exit_code=1)
+    except Exception as exc:
+        return fail("x402_runtime_error", str(exc), "Inspect runtime x402 pay resume flow and retry.", exit_code=1)
+
+
+def cmd_x402_pay_decide(args: argparse.Namespace) -> int:
+    chk = require_json_flag(args)
+    if chk is not None:
+        return chk
+    approval_id = str(args.approval_id or "").strip()
+    decision = str(args.decision or "").strip().lower()
+    if not approval_id:
+        return fail("invalid_input", "approval_id is required.", "Provide --approval-id xpay_... and retry.", exit_code=2)
+    if decision not in {"approve", "deny"}:
+        return fail("invalid_input", "decision must be approve|deny.", "Use --decision approve or --decision deny.", exit_code=2)
+    try:
+        payload = x402_pay_decide(approval_id, decision, str(args.reason_message or "").strip() or None)
+        return ok("x402 payment decision applied.", approval=payload)
+    except X402RuntimeError as exc:
+        return fail("x402_runtime_error", str(exc), "Use a valid pending xpay_... id and retry.", exit_code=1)
+    except Exception as exc:
+        return fail("x402_runtime_error", str(exc), "Inspect runtime x402 pay decision flow and retry.", exit_code=1)
+
+
+def cmd_x402_policy_get(args: argparse.Namespace) -> int:
+    chk = require_json_flag(args)
+    if chk is not None:
+        return chk
+    network = str(args.network or "").strip()
+    if not network:
+        return fail("invalid_input", "network is required.", "Provide --network and retry.", exit_code=2)
+    try:
+        policy = x402_get_policy(network)
+        return ok("x402 pay policy loaded.", network=network, x402Policy=policy)
+    except Exception as exc:
+        return fail("x402_runtime_error", str(exc), "Inspect x402 pay policy state and retry.", exit_code=1)
+
+
+def cmd_x402_policy_set(args: argparse.Namespace) -> int:
+    chk = require_json_flag(args)
+    if chk is not None:
+        return chk
+    network = str(args.network or "").strip()
+    mode = str(args.mode or "").strip().lower()
+    if not network:
+        return fail("invalid_input", "network is required.", "Provide --network and retry.", exit_code=2)
+    if mode not in {"auto", "per_payment"}:
+        return fail("invalid_input", "mode must be auto|per_payment.", "Use --mode auto or --mode per_payment.", exit_code=2)
+    allowed_hosts: list[str] = []
+    for host in list(args.allowed_host or []):
+        if not isinstance(host, str):
+            continue
+        normalized = host.strip().lower()
+        if normalized:
+            allowed_hosts.append(normalized)
+    payload = {
+        "payApprovalMode": mode,
+        "maxAmountAtomic": str(args.max_amount_atomic).strip() if args.max_amount_atomic is not None else None,
+        "allowedHosts": allowed_hosts,
+        "updatedAt": utc_now(),
+    }
+    try:
+        policy = x402_set_policy(network, payload)
+        return ok("x402 pay policy saved.", network=network, x402Policy=policy)
+    except Exception as exc:
+        return fail("x402_runtime_error", str(exc), "Inspect x402 pay policy input and retry.", exit_code=1)
+
+
+def cmd_x402_networks(args: argparse.Namespace) -> int:
+    chk = require_json_flag(args)
+    if chk is not None:
+        return chk
+    try:
+        payload = x402_list_networks()
+        return ok("x402 networks loaded.", x402Networks=payload.get("networks"), defaultNetwork=payload.get("defaultNetwork"))
+    except Exception as exc:
+        return fail("x402_runtime_error", str(exc), "Inspect config/x402/networks.json and retry.", exit_code=1)
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="xclaw-agent", add_help=True)
     sub = p.add_subparsers(dest="top")
@@ -6252,6 +6423,64 @@ def build_parser() -> argparse.ArgumentParser:
     faucet_request.add_argument("--chain", required=True)
     faucet_request.add_argument("--json", action="store_true")
     faucet_request.set_defaults(func=cmd_faucet_request)
+
+    x402 = sub.add_parser("x402")
+    x402_sub = x402.add_subparsers(dest="x402_cmd")
+
+    x402_serve_start = x402_sub.add_parser("serve-start")
+    x402_serve_start.add_argument("--network", required=True)
+    x402_serve_start.add_argument("--facilitator", required=True)
+    x402_serve_start.add_argument("--amount-atomic", required=True)
+    x402_serve_start.add_argument("--ttl-seconds", default=3600)
+    x402_serve_start.add_argument("--local-port")
+    x402_serve_start.add_argument("--json", action="store_true")
+    x402_serve_start.set_defaults(func=cmd_x402_serve_start)
+
+    x402_serve_status = x402_sub.add_parser("serve-status")
+    x402_serve_status.add_argument("--json", action="store_true")
+    x402_serve_status.set_defaults(func=cmd_x402_serve_status)
+
+    x402_serve_stop = x402_sub.add_parser("serve-stop")
+    x402_serve_stop.add_argument("--json", action="store_true")
+    x402_serve_stop.set_defaults(func=cmd_x402_serve_stop)
+
+    x402_pay = x402_sub.add_parser("pay")
+    x402_pay.add_argument("--url", required=True)
+    x402_pay.add_argument("--network", required=True)
+    x402_pay.add_argument("--facilitator", required=True)
+    x402_pay.add_argument("--amount-atomic", required=True)
+    x402_pay.add_argument("--memo")
+    x402_pay.add_argument("--json", action="store_true")
+    x402_pay.set_defaults(func=cmd_x402_pay)
+
+    x402_pay_resume = x402_sub.add_parser("pay-resume")
+    x402_pay_resume.add_argument("--approval-id", required=True)
+    x402_pay_resume.add_argument("--json", action="store_true")
+    x402_pay_resume.set_defaults(func=cmd_x402_pay_resume)
+
+    x402_pay_decide = x402_sub.add_parser("pay-decide")
+    x402_pay_decide.add_argument("--approval-id", required=True)
+    x402_pay_decide.add_argument("--decision", required=True, choices=["approve", "deny"])
+    x402_pay_decide.add_argument("--reason-message")
+    x402_pay_decide.add_argument("--json", action="store_true")
+    x402_pay_decide.set_defaults(func=cmd_x402_pay_decide)
+
+    x402_policy_get = x402_sub.add_parser("policy-get")
+    x402_policy_get.add_argument("--network", required=True)
+    x402_policy_get.add_argument("--json", action="store_true")
+    x402_policy_get.set_defaults(func=cmd_x402_policy_get)
+
+    x402_policy_set = x402_sub.add_parser("policy-set")
+    x402_policy_set.add_argument("--network", required=True)
+    x402_policy_set.add_argument("--mode", required=True, choices=["auto", "per_payment"])
+    x402_policy_set.add_argument("--max-amount-atomic")
+    x402_policy_set.add_argument("--allowed-host", action="append", default=[])
+    x402_policy_set.add_argument("--json", action="store_true")
+    x402_policy_set.set_defaults(func=cmd_x402_policy_set)
+
+    x402_networks = x402_sub.add_parser("networks")
+    x402_networks.add_argument("--json", action="store_true")
+    x402_networks.set_defaults(func=cmd_x402_networks)
 
     limit_orders = sub.add_parser("limit-orders")
     limit_orders_sub = limit_orders.add_subparsers(dest="limit_orders_cmd")

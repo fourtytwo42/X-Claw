@@ -2615,3 +2615,57 @@ Note:
   - [x] `npm run seed:verify`
   - [x] `npm run build`
   - [x] `pm2 restart all` (after successful build; not parallel)
+
+---
+
+## 79) Slice 79: Agent-Skill x402 Send/Receive Runtime (No Webapp Integration Yet)
+
+### 79.1 Canonical/doc sync
+- [x] Add Slice 79 goal/DoD + issue mapping to `docs/XCLAW_SLICE_TRACKER.md`.
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` with locked x402 runtime/skill contract and network rollout constraints.
+- [x] Update `docs/api/WALLET_COMMAND_CONTRACT.md` for x402 command extensions.
+- [x] Update handoff/process artifacts:
+  - [x] `docs/CONTEXT_PACK.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+
+### 79.2 Implementation
+- [x] Add runtime x402 modules:
+  - [x] `apps/agent-runtime/xclaw_agent/x402_runtime.py`
+  - [x] `apps/agent-runtime/xclaw_agent/x402_tunnel.py`
+  - [x] `apps/agent-runtime/xclaw_agent/x402_policy.py`
+  - [x] `apps/agent-runtime/xclaw_agent/x402_state.py`
+- [x] Add runtime CLI command group `x402`:
+  - [x] `serve-start|serve-status|serve-stop`
+  - [x] `pay|pay-resume|pay-decide`
+  - [x] `policy-get|policy-set`
+  - [x] `networks`
+- [x] Add skill wrapper x402 commands + `request-x402-payment` auto-start path.
+- [x] Add installer x402 portability updates:
+  - [x] Windows `.cmd` + `.ps1` launcher generation
+  - [x] cloudflared install/resolve path for Linux/macOS/Windows
+- [x] Add x402 config artifact: `config/x402/networks.json` (`base_sepolia/base enabled`, `kite_* disabled`).
+- [x] Add schema artifacts:
+  - [x] `packages/shared-schemas/json/x402-runtime-state.schema.json`
+  - [x] `packages/shared-schemas/json/x402-serve-response.schema.json`
+  - [x] `packages/shared-schemas/json/x402-pay-request.schema.json`
+  - [x] `packages/shared-schemas/json/x402-pay-response.schema.json`
+  - [x] `packages/shared-schemas/json/x402-payment-approval.schema.json`
+
+### 79.3 Validation + evidence
+- [x] Run required gates sequentially:
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_x402_runtime.py -v`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_x402_skill_wrapper.py -v`
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `pm2 restart all` (after successful build; when PM2 is available)
+- [x] Record functional verification evidence:
+  - [x] `x402 serve-start` returns shareable `paymentUrl`.
+  - [x] `x402 pay` approval-required path returns `xpay_...` + `approval_pending`.
+  - [x] `x402 pay-decide approve` resumes once and yields terminal result.
+  - [x] `x402 pay-decide deny` yields terminal `rejected` with no execution.

@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "X402PaymentApproval",
+  "type": "object",
+  "required": ["approvalId", "status", "network", "facilitator", "url", "amountAtomic", "createdAt", "updatedAt"],
+  "properties": {
+    "approvalId": { "type": "string", "pattern": "^xpay_[a-f0-9]+$" },
+    "status": { "type": "string", "enum": ["proposed", "approval_pending", "approved", "rejected", "executing", "filled", "failed"] },
+    "network": { "type": "string" },
+    "facilitator": { "type": "string" },
+    "url": { "type": "string" },
+    "amountAtomic": { "type": "string" },
+    "memo": { "type": ["string", "null"] },
+    "reasonCode": { "type": ["string", "null"] },
+    "reasonMessage": { "type": ["string", "null"] },
+    "createdAt": { "type": "string" },
+    "updatedAt": { "type": "string" },
+    "terminalAt": { "type": ["string", "null"] }
+  },
+  "additionalProperties": true
+}

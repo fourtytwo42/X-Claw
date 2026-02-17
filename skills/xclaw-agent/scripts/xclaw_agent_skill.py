@@ -135,6 +135,53 @@ def _require_env(*keys: str) -> Optional[int]:
     )
 
 
+def _maybe_autostart_x402_serve() -> Optional[dict]:
+    if os.environ.get("XCLAW_X402_AUTOSTART", "1").strip().lower() in {"0", "false", "no"}:
+        return None
+    binary = _resolve_agent_binary()
+    if not binary:
+        return None
+    network = os.environ.get("XCLAW_X402_DEFAULT_NETWORK", os.environ.get("XCLAW_DEFAULT_CHAIN", "base_sepolia")).strip()
+    facilitator = os.environ.get("XCLAW_X402_DEFAULT_FACILITATOR", "cdp").strip()
+    amount = os.environ.get("XCLAW_X402_DEFAULT_AMOUNT_ATOMIC", "0.01").strip()
+    ttl = os.environ.get("XCLAW_X402_DEFAULT_TTL_SECONDS", "3600").strip()
+    cmd = [
+        binary,
+        "x402",
+        "serve-start",
+        "--network",
+        network,
+        "--facilitator",
+        facilitator,
+        "--amount-atomic",
+        amount,
+        "--ttl-seconds",
+        ttl,
+        "--json",
+    ]
+    try:
+        proc = subprocess.run(cmd, text=True, capture_output=True, timeout=30)
+        raw = (proc.stdout or "").strip()
+        if not raw:
+            return None
+        payload = json.loads(raw)
+        if isinstance(payload, dict) and payload.get("ok") is True:
+            x402 = payload.get("x402") if isinstance(payload.get("x402"), dict) else {}
+            return {
+                "ok": True,
+                "code": "ok",
+                "message": "x402 payment request endpoint started.",
+                "paymentUrl": x402.get("paymentUrl") or payload.get("paymentUrl"),
+                "network": x402.get("network") or payload.get("network"),
+                "facilitator": x402.get("facilitator") or payload.get("facilitator"),
+                "amount": x402.get("amountAtomic") or payload.get("amountAtomic"),
+                "expiresAt": x402.get("expiresAt") or payload.get("expiresAt"),
+            }
+    except Exception:
+        return None
+    return None
+
+
 def _run_agent(args: Iterable[str]) -> int:
     binary = _resolve_agent_binary()
     if not binary:
@@ -216,7 +263,7 @@ def main(argv: List[str]) -> int:
         return _err(
             "usage",
             "Missing command.",
-            "Use one of: status, dashboard, intents-poll, approval-check, trade-exec, trade-spot, trade-resume, transfer-resume, transfer-decide, transfer-policy-get, transfer-policy-set, report-send, chat-poll, chat-post, username-set, owner-link, faucet-request, limit-orders-create, limit-orders-cancel, limit-orders-list, limit-orders-run-once, limit-orders-run-loop, wallet-health, wallet-address, wallet-sign-challenge, wallet-send, wallet-send-token, wallet-balance, wallet-token-balance",
+            "Use one of: status, dashboard, intents-poll, approval-check, trade-exec, trade-spot, trade-resume, transfer-resume, transfer-decide, transfer-policy-get, transfer-policy-set, report-send, chat-poll, chat-post, username-set, owner-link, faucet-request, x402-serve-start, x402-serve-status, x402-serve-stop, x402-pay, x402-pay-resume, x402-pay-decide, x402-policy-get, x402-policy-set, x402-networks, request-x402-payment, limit-orders-create, limit-orders-cancel, limit-orders-list, limit-orders-run-once, limit-orders-run-loop, wallet-health, wallet-address, wallet-sign-challenge, wallet-send, wallet-send-token, wallet-balance, wallet-token-balance",
             exit_code=2,
         )
 
@@ -259,11 +306,25 @@ def main(argv: List[str]) -> int:
         "wallet-balance",
         "wallet-token-balance",
     }
+    x402_commands = {
+        "x402-serve-start",
+        "x402-serve-status",
+        "x402-serve-stop",
+        "x402-pay",
+        "x402-pay-resume",
+        "x402-pay-decide",
+        "x402-policy-get",
+        "x402-policy-set",
+        "x402-networks",
+        "request-x402-payment",
+    }
 
     if cmd in api_commands:
         env_required = _require_env("XCLAW_API_BASE_URL", "XCLAW_AGENT_API_KEY", "XCLAW_DEFAULT_CHAIN")
     elif cmd in wallet_commands:
         env_required = _require_env("XCLAW_DEFAULT_CHAIN")
+    elif cmd in x402_commands:
+        env_required = None
     else:
         env_required = None
 
@@ -443,6 +504,115 @@ def main(argv: List[str]) -> int:
     if cmd == "faucet-request":
         return _run_agent(["faucet-request", "--chain", chain, "--json"])
 
+    if cmd == "request-x402-payment":
+        started = _maybe_autostart_x402_serve()
+        if started is not None:
+            _print_json(started)
+            return 0
+        return _err(
+            "x402_start_failed",
+            "Unable to start x402 payment request endpoint automatically.",
+            "Set XCLAW_X402_DEFAULT_NETWORK/XCLAW_X402_DEFAULT_FACILITATOR and retry request-x402-payment.",
+            exit_code=1,
+        )
+
+    if cmd == "x402-serve-start":
+        if len(argv) < 5:
+            return _err(
+                "usage",
+                "x402-serve-start requires <network> <facilitator> <amount_atomic>",
+                "usage: x402-serve-start <network> <facilitator> <amount_atomic>",
+                exit_code=2,
+            )
+        return _run_agent(
+            [
+                "x402",
+                "serve-start",
+                "--network",
+                argv[2],
+                "--facilitator",
+                argv[3],
+                "--amount-atomic",
+                argv[4],
+                "--json",
+            ]
+        )
+
+    if cmd == "x402-serve-status":
+        return _run_agent(["x402", "serve-status", "--json"])
+
+    if cmd == "x402-serve-stop":
+        return _run_agent(["x402", "serve-stop", "--json"])
+
+    if cmd == "x402-pay":
+        if len(argv) < 6:
+            return _err(
+                "usage",
+                "x402-pay requires <url> <network> <facilitator> <amount_atomic>",
+                "usage: x402-pay <url> <network> <facilitator> <amount_atomic>",
+                exit_code=2,
+            )
+        return _run_agent(
+            [
+                "x402",
+                "pay",
+                "--url",
+                argv[2],
+                "--network",
+                argv[3],
+                "--facilitator",
+                argv[4],
+                "--amount-atomic",
+                argv[5],
+                "--json",
+            ]
+        )
+
+    if cmd == "x402-pay-resume":
+        if len(argv) < 3:
+            return _err("usage", "x402-pay-resume requires <approval_id>", "usage: x402-pay-resume <approval_id>", exit_code=2)
+        return _run_agent(["x402", "pay-resume", "--approval-id", argv[2], "--json"])
+
+    if cmd == "x402-pay-decide":
+        if len(argv) < 4:
+            return _err(
+                "usage",
+                "x402-pay-decide requires <approval_id> <approve|deny>",
+                "usage: x402-pay-decide <approval_id> <approve|deny>",
+                exit_code=2,
+            )
+        decision = argv[3].strip().lower()
+        if decision not in {"approve", "deny"}:
+            return _err("invalid_input", "decision must be approve or deny.", "usage: x402-pay-decide <approval_id> <approve|deny>", exit_code=2)
+        return _run_agent(["x402", "pay-decide", "--approval-id", argv[2], "--decision", decision, "--json"])
+
+    if cmd == "x402-policy-get":
+        if len(argv) < 3:
+            return _err("usage", "x402-policy-get requires <network>", "usage: x402-policy-get <network>", exit_code=2)
+        return _run_agent(["x402", "policy-get", "--network", argv[2], "--json"])
+
+    if cmd == "x402-policy-set":
+        if len(argv) < 4:
+            return _err(
+                "usage",
+                "x402-policy-set requires <network> <auto|per_payment> [max_amount_atomic] [allowed_host ...]",
+                "usage: x402-policy-set <network> <auto|per_payment> [max_amount_atomic] [allowed_host ...]",
+                exit_code=2,
+            )
+        mode = argv[3].strip().lower()
+        if mode not in {"auto", "per_payment"}:
+            return _err("invalid_input", "mode must be auto or per_payment.", exit_code=2)
+        args = ["x402", "policy-set", "--network", argv[2], "--mode", mode]
+        if len(argv) >= 5 and argv[4].strip():
+            args.extend(["--max-amount-atomic", argv[4].strip()])
+        for host in argv[5:]:
+            args.extend(["--allowed-host", host])
+        args.append("--json")
+        return _run_agent(args)
+
+    if cmd == "x402-networks":
+        return _run_agent(["x402", "networks", "--json"])
+
     if cmd == "wallet-health":
         return _run_agent(["wallet", "health", "--chain", chain, "--json"])
 
@@ -600,12 +770,12 @@ def main(argv: List[str]) -> int:
             args.append("--sync")
         return _run_agent(args)
 
-        return _err(
-            "unknown_command",
-            f"Unknown command: {cmd}",
-            "Use one of: status, dashboard, intents-poll, approval-check, trade-exec, trade-spot, trade-resume, transfer-resume, transfer-decide, transfer-policy-get, transfer-policy-set, report-send, chat-poll, chat-post, username-set, owner-link, faucet-request, limit-orders-create, limit-orders-cancel, limit-orders-list, limit-orders-run-once, limit-orders-run-loop, wallet-health, wallet-address, wallet-sign-challenge, wallet-send, wallet-send-token, wallet-balance, wallet-token-balance",
-            exit_code=2,
-        )
+    return _err(
+        "unknown_command",
+        f"Unknown command: {cmd}",
+        "Use one of: status, dashboard, intents-poll, approval-check, trade-exec, trade-spot, trade-resume, transfer-resume, transfer-decide, transfer-policy-get, transfer-policy-set, report-send, chat-poll, chat-post, username-set, owner-link, faucet-request, x402-serve-start, x402-serve-status, x402-serve-stop, x402-pay, x402-pay-resume, x402-pay-decide, x402-policy-get, x402-policy-set, x402-networks, request-x402-payment, limit-orders-create, limit-orders-cancel, limit-orders-list, limit-orders-run-once, limit-orders-run-loop, wallet-health, wallet-address, wallet-sign-challenge, wallet-send, wallet-send-token, wallet-balance, wallet-token-balance",
+        exit_code=2,
+    )
 
 
 if __name__ == "__main__":

@@ -1,8 +1,73 @@
+# Slice 79 Acceptance Evidence
+
+Date (UTC): 2026-02-17
+Active slice: `Slice 79: Agent-Skill x402 Send/Receive Runtime`
+Issue mapping: `#29`
+
+## Objective + Scope Lock
+- Objective: add Python-first x402 receive/pay runtime + skill command surfaces with local `xpay_...` approval lifecycle and cloudflared tunnel bootstrap.
+- Scope guard honored: no `apps/network-web` integration in this slice.
+
+## File-Level Evidence (Slice 79)
+- Runtime/skill:
+  - `apps/agent-runtime/xclaw_agent/cli.py`
+  - `apps/agent-runtime/xclaw_agent/x402_runtime.py`
+  - `apps/agent-runtime/xclaw_agent/x402_tunnel.py`
+  - `apps/agent-runtime/xclaw_agent/x402_policy.py`
+  - `apps/agent-runtime/xclaw_agent/x402_state.py`
+  - `apps/agent-runtime/tests/test_x402_runtime.py`
+  - `apps/agent-runtime/tests/test_x402_skill_wrapper.py`
+  - `skills/xclaw-agent/scripts/xclaw_agent_skill.py`
+  - `skills/xclaw-agent/scripts/setup_agent_skill.py`
+  - `skills/xclaw-agent/SKILL.md`
+  - `skills/xclaw-agent/references/commands.md`
+- Contracts/config/docs:
+  - `config/x402/networks.json`
+  - `packages/shared-schemas/json/x402-runtime-state.schema.json`
+  - `packages/shared-schemas/json/x402-serve-response.schema.json`
+  - `packages/shared-schemas/json/x402-pay-request.schema.json`
+  - `packages/shared-schemas/json/x402-pay-response.schema.json`
+  - `packages/shared-schemas/json/x402-payment-approval.schema.json`
+  - `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - `docs/XCLAW_SLICE_TRACKER.md`
+  - `docs/XCLAW_BUILD_ROADMAP.md`
+  - `docs/api/WALLET_COMMAND_CONTRACT.md`
+  - `docs/CONTEXT_PACK.md`
+  - `spec.md`
+  - `tasks.md`
+  - `acceptance.md`
+
+## Required Validation Commands and Outcomes
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS (`Ran 59 tests`, `OK`)
+- `python3 -m unittest apps/agent-runtime/tests/test_x402_runtime.py -v` -> PASS (`Ran 5 tests`, `OK`)
+- `python3 -m unittest apps/agent-runtime/tests/test_x402_skill_wrapper.py -v` -> PASS (`Ran 3 tests`, `OK`)
+- `npm run db:parity` -> PASS (`ok: true`)
+- `npm run seed:reset` -> PASS (`ok: true`)
+- `npm run seed:load` -> PASS (scenarios loaded; totals `agents=6`, `trades=11`)
+- `npm run seed:verify` -> PASS (`ok: true`)
+- `npm run build` -> PASS (Next.js production build completed)
+- `pm2 restart all` (after build success) -> PASS (`xclaw-web` restarted and online)
+
+## Functional Verification Notes
+- `x402 networks --json` shows:
+  - enabled: `base_sepolia`, `base`
+  - disabled: `kite_ai_testnet`, `kite_ai_mainnet`
+- `x402 serve-start --network base_sepolia --facilitator cdp --amount-atomic 1 --json` returned shareable `paymentUrl` and running state with tunnel/server pids.
+- `x402 pay --url <paymentUrl> --network base_sepolia --facilitator cdp --amount-atomic 1 --json` returned:
+  - `approvalId: xpay_...`
+  - `status: approval_pending`
+  - queued message with deterministic approval fields.
+- `x402 pay-decide --approval-id <xpay_id> --decision approve --json` resumed once and produced terminal result (`status: failed`, HTTP 530 challenge unresolved in this environment).
+- `x402 pay-decide --approval-id <xpay_id> --decision deny --reason-message \"owner denied\" --json` produced terminal `status: rejected` with `reasonCode: approval_rejected`.
+- `x402 serve-stop --json` converged runtime state to `stopped`.
+
+---
+
 # Slice 77 Acceptance Evidence
 
 Date (UTC): 2026-02-17
 Active slice: `Slice 77: Agent Wallet Page iPhone/MetaMask-Style Refactor`
-Issue mapping: `#29` (to be created / mapped)
+Issue mapping: `pending mapping (legacy placeholder)`
 
 ## Objective + Scope Lock
 - Objective: convert `/agents/:id` to a wallet-native iPhone/MetaMask-style management page while preserving sidebar shell, and remove policy editor surfaces (`Secondary Operations`, transfer/outbound policy editors).

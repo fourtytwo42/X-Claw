@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "defaultNetwork": "base_sepolia",
+  "networks": {
+    "base_sepolia": {
+      "enabled": true,
+      "displayName": "Base Sepolia",
+      "chainId": 84532,
+      "facilitators": {
+        "cdp": {
+          "type": "cdp",
+          "baseUrl": "https://api.cdp.coinbase.com",
+          "notes": "x402 facilitator path for Base/Base Sepolia"
+        }
+      }
+    },
+    "base": {
+      "enabled": true,
+      "displayName": "Base",
+      "chainId": 8453,
+      "facilitators": {
+        "cdp": {
+          "type": "cdp",
+          "baseUrl": "https://api.cdp.coinbase.com",
+          "notes": "x402 facilitator path for Base mainnet"
+        }
+      }
+    },
+    "kite_ai_testnet": {
+      "enabled": false,
+      "displayName": "Kite AI Testnet",
+      "chainId": null,
+      "facilitators": {
+        "kite": {
+          "type": "kite",
+          "baseUrl": "https://docs.gokite.ai",
+          "notes": "Disabled by default until explicit source-of-truth promotion"
+        }
+      }
+    },
+    "kite_ai_mainnet": {
+      "enabled": false,
+      "displayName": "Kite AI Mainnet",
+      "chainId": null,
+      "facilitators": {
+        "kite": {
+          "type": "kite",
+          "baseUrl": "https://docs.gokite.ai",
+          "notes": "Disabled by default until explicit source-of-truth promotion"
+        }
+      }
+    }
+  }
+}
