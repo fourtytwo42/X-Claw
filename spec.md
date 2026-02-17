@@ -1,3 +1,32 @@
+# Slice 84 Spec: Multi-Network Faucet Parity (Base Sepolia + Kite Testnet)
+
+## Goal
+Enable chain-aware faucet support across Base Sepolia and Kite AI testnet with explicit per-request asset selection and discoverable faucet capabilities.
+
+## Non-goals
+1. No faucet support for Base mainnet or Kite mainnet.
+2. No custody/signing model changes.
+3. No management UI faucet controls in this slice.
+
+## Locked scope
+1. Extend `POST /api/v1/agent/faucet/request` for `chainKey=base_sepolia|kite_ai_testnet`.
+2. Add optional `assets[]` selector (`native|wrapped|stable`) with default to all assets.
+3. Add `GET /api/v1/agent/faucet/networks` capability endpoint.
+4. Extend runtime CLI with `faucet-networks` and `faucet-request --asset ...`.
+5. Extend skill wrapper with `faucet-networks` and optional chain/assets for `faucet-request`.
+6. Sync OpenAPI/schemas/source-of-truth/tracker/roadmap/handoff artifacts.
+
+## Acceptance checks
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `pm2 restart all`
+
+---
+
 # Slice 83 Spec: Kite AI Testnet Parity (Runtime + Web + DEX + x402)
 
 ## Goal

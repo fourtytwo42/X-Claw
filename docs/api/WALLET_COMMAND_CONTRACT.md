@@ -182,28 +182,32 @@ The following non-wallet commands are part of the same Python-first wrapper cont
 
 2. `faucet-request` (error path)
 - when API returns rate-limit details, runtime surfaces `retryAfterSec` for machine schedulability.
+- supports chain-aware selectable assets via `--asset native|wrapped|stable` and returns resolved `requestedAssets`/`fulfilledAssets`.
 
-3. `limit-orders-run-loop`
+3. `faucet-networks`
+- returns supported faucet chains and per-chain asset capability metadata for agent-side tool routing.
+
+4. `limit-orders-run-loop`
 - emits exactly one JSON object per invocation (no multiple JSON lines).
 - in JSON mode, `--iterations 0` is rejected with `code=invalid_input`.
 
-4. `trade-spot`
+5. `trade-spot`
 - retains exact gas wei values (`...GasCostWei`) and includes:
   - `totalGasCostEthExact` (numeric string),
   - `totalGasCostEthPretty` (display string),
   - `totalGasCostEth` (compat alias of exact).
 
-5. `trade-resume`
+6. `trade-resume`
 - internal orchestration command used for single-trigger Telegram spot approvals.
 - delegates to runtime `approvals resume-spot --trade-id <id> --chain <key> --json`.
 - returns JSON with `tradeId`, `chain`, `status`, and execution fields (for example `txHash`) when available.
 
-6. `transfer-resume`
+7. `transfer-resume`
 - internal orchestration command used for single-trigger transfer approvals.
 - delegates to runtime `approvals resume-transfer --approval-id <xfr_id> --chain <key> --json`.
 - returns JSON with terminal transfer fields (`status`, `approvalId`, `txHash` when available).
 
-7. `transfer-decide`
+8. `transfer-decide`
 - internal orchestration command used by Telegram/web callback flows.
 - delegates to runtime `approvals decide-transfer --approval-id <xfr_id> --decision <approve|deny> --chain <key> --json`.
 - `approve` path continues execution; `deny` path marks transfer `rejected`.

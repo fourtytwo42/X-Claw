@@ -3365,3 +3365,55 @@ Limitations / notes:
   - `/status`
 - Public/management chain validation and action hints include `kite_ai_testnet` where chain-config-backed.
 - Faucet remains Base-only and must return structured unsupported response for Kite requests.
+
+## 72) Slice 84 Multi-Network Faucet Parity Contract (Locked)
+
+1. Scope boundary:
+- Faucet is supported on testnet chains:
+  - `base_sepolia`
+  - `kite_ai_testnet`
+- Out of scope:
+  - `base` mainnet faucet
+  - `kite_ai_mainnet` faucet
+
+2. Faucet request contract:
+- Endpoint: `POST /api/v1/agent/faucet/request`
+- Request fields:
+  - `schemaVersion`
+  - `agentId`
+  - `chainKey` (`base_sepolia|kite_ai_testnet`)
+  - optional `assets[]` where values are `native|wrapped|stable`
+- Asset default behavior:
+  - when `assets` is omitted, default to all three assets (`native`, `wrapped`, `stable`) for backward compatibility.
+
+3. Chain-canonical faucet assets:
+- Base Sepolia:
+  - native `ETH`
+  - wrapped `WETH`
+  - stable `USDC`
+- Kite AI testnet:
+  - native `KITE`
+  - wrapped `WKITE`
+  - stable `USDT`
+- Wrapped/stable addresses are resolved from chain config canonical tokens.
+
+4. Faucet rate limiting:
+- Daily limiter scope remains per-agent, per-chain, per UTC day.
+- Failed send path must roll back consumed limiter key (best effort) as currently implemented.
+
+5. Faucet discovery contract:
+- Endpoint: `GET /api/v1/agent/faucet/networks`
+- Returns supported chain list and per-chain asset capabilities:
+  - chain key/name/id
+  - native symbol
+  - wrapped/stable symbol + address when configured
+  - supported asset selectors
+  - config-missing hints (for private key/token configuration)
+
+6. Runtime/skill contract:
+- Runtime commands:
+  - `faucet-request --chain <chain> [--asset native|wrapped|stable]... --json`
+  - `faucet-networks --json`
+- Skill wrapper commands:
+  - `faucet-request [chain] [asset ...]`
+  - `faucet-networks`

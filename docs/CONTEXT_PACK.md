@@ -1,5 +1,36 @@
 # X-Claw Context Pack
 
+## Slice 84 Context: Multi-Network Faucet Parity (Base Sepolia + Kite Testnet)
+
+Issue mapping: `#34`
+
+### Objective + scope lock
+- Objective: add chain-aware faucet parity with selectable assets across `base_sepolia` and `kite_ai_testnet`.
+- Scope guard: testnet-only faucet, no custody changes, no web management faucet UI.
+
+### Expected touched files (Slice 84 allowlist)
+- API:
+  - `apps/network-web/src/app/api/v1/agent/faucet/request/route.ts`
+  - `apps/network-web/src/app/api/v1/agent/faucet/networks/route.ts`
+- Runtime/skill:
+  - `apps/agent-runtime/xclaw_agent/cli.py`
+  - `apps/agent-runtime/tests/test_trade_path.py`
+  - `skills/xclaw-agent/scripts/xclaw_agent_skill.py`
+  - `skills/xclaw-agent/SKILL.md`
+  - `skills/xclaw-agent/references/commands.md`
+- Contracts/docs:
+  - `docs/api/openapi.v1.yaml`
+  - `packages/shared-schemas/json/agent-faucet-request.schema.json`
+  - `packages/shared-schemas/json/agent-faucet-response.schema.json`
+  - `packages/shared-schemas/json/agent-faucet-networks-response.schema.json`
+  - `docs/api/WALLET_COMMAND_CONTRACT.md`
+  - `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - `docs/XCLAW_SLICE_TRACKER.md`
+  - `docs/XCLAW_BUILD_ROADMAP.md`
+  - `spec.md`
+  - `tasks.md`
+  - `acceptance.md`
+
 ## Slice 83 Context: Kite AI Testnet Parity (Runtime + Web + DEX + x402)
 
 Issue mapping: `#33`

@@ -236,14 +236,19 @@ Owner-link handoff rule (locked):
   - run `owner-link` and paste `managementUrl` directly in the active chat.
   - include a concise warning that it is short-lived and should not be forwarded.
 
-Testnet faucet action (base_sepolia only):
+Testnet faucet actions:
 
 ```bash
 python3 {baseDir}/scripts/xclaw_agent_skill.py faucet-request
+python3 {baseDir}/scripts/xclaw_agent_skill.py faucet-request kite_ai_testnet native wrapped stable
+python3 {baseDir}/scripts/xclaw_agent_skill.py faucet-networks
 ```
 
 Faucet policy:
-- Drip amount is fixed to `0.02 ETH`.
+- Supported faucet chains: `base_sepolia`, `kite_ai_testnet`.
+- Base assets: `ETH`, `WETH`, `USDC`.
+- Kite assets: `KITE`, `WKITE`, `USDT`.
+- Drip amount is fixed for each asset type in base units.
 - Agents can request faucet funds at most once per UTC day.
 - Faucet transactions may take 1-2 blocks to settle; immediately running `dashboard` may not reflect updated balances.
 - The faucet response includes `pending`, `recommendedDelaySec`, and `nextAction` guidance.

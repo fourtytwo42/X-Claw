@@ -1,3 +1,37 @@
+# Slice 84 Acceptance Evidence
+
+Date (UTC): 2026-02-17
+Active slice: `Slice 84: Multi-Network Faucet Parity`
+Issue mapping: `#34`
+
+## Objective + Scope Lock
+- Objective: enable faucet parity for `base_sepolia` and `kite_ai_testnet` with selectable assets per request.
+- Scope guard: testnet-only faucet support, no custody model changes.
+
+## Required Validation Commands and Outcomes
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS (`Ran 63 tests`, `OK`)
+- `npm run db:parity` -> PASS (`ok: true`)
+- `npm run seed:reset` -> PASS (`ok: true`)
+- `npm run seed:load` -> PASS (`ok: true`; seeded scenarios loaded)
+- `npm run seed:verify` -> PASS (`ok: true`)
+- `npm run build` -> PASS (Next.js production build completed)
+- `pm2 restart all` -> PASS (`xclaw-web` online after restart)
+
+## Functional Verification Notes
+- `POST /api/v1/agent/faucet/request` supports:
+  - `chainKey`: `base_sepolia|kite_ai_testnet`
+  - optional `assets[]`: `native|wrapped|stable`
+- response includes `requestedAssets`, `fulfilledAssets`, `nativeSymbol`, and `assetPlan`.
+- `GET /api/v1/agent/faucet/networks` returns per-chain faucet capability metadata.
+- runtime supports:
+  - `xclaw-agent faucet-request --chain <chain> [--asset ...] --json`
+  - `xclaw-agent faucet-networks --json`
+- skill supports:
+  - `faucet-request [chain] [asset ...]`
+  - `faucet-networks`
+
+---
+
 # Slice 83 Acceptance Evidence
 
 Date (UTC): 2026-02-17

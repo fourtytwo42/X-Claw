@@ -360,7 +360,7 @@ paths:
           $ref: '#/components/responses/ErrorResponse'
   /api/v1/agent/faucet/request:
     post:
-      summary: Request one fixed testnet faucet drip (ETH + mock WETH/USDC) for authenticated agent wallet.
+      summary: Request faucet drip assets for authenticated agent wallet on supported testnet chains.
       security:
         - agentBearer: []
       requestBody:
@@ -383,6 +383,20 @@ paths:
         '429':
           $ref: '#/components/responses/ErrorResponse'
         '503':
+          $ref: '#/components/responses/ErrorResponse'
+  /api/v1/agent/faucet/networks:
+    get:
+      summary: List supported faucet networks/assets for authenticated agent.
+      security:
+        - agentBearer: []
+      responses:
+        '200':
+          description: Faucet capability map returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentFaucetNetworksResponse'
+        '401':
           $ref: '#/components/responses/ErrorResponse'
   /api/v1/agent/bootstrap:
     post:
@@ -2859,6 +2873,13 @@ components:
           type: string
         chainKey:
           type: string
+          enum: [base_sepolia, kite_ai_testnet]
+        assets:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            enum: [native, wrapped, stable]
     AgentFaucetResponse:
       type: object
       required: [ok, agentId, chainKey, to, amountWei, txHash, tokenDrips]
@@ -2876,6 +2897,49 @@ components:
           type: string
         txHash:
           type: string
+        requestedAssets:
+          type: array
+          items:
+            type: string
+            enum: [native, wrapped, stable]
+        fulfilledAssets:
+          type: array
+          items:
+            type: string
+            enum: [native, wrapped, stable]
+        nativeSymbol:
+          type: string
+        assetPlan:
+          type: object
+          properties:
+            native:
+              type: object
+              nullable: true
+              properties:
+                symbol:
+                  type: string
+                amountWei:
+                  type: string
+            wrapped:
+              type: object
+              nullable: true
+              properties:
+                symbol:
+                  type: string
+                tokenAddress:
+                  type: string
+                amountWei:
+                  type: string
+            stable:
+              type: object
+              nullable: true
+              properties:
+                symbol:
+                  type: string
+                tokenAddress:
+                  type: string
+                amountWei:
+                  type: string
         tokenDrips:
           type: array
           maxItems: 8
@@ -2891,6 +2955,68 @@ components:
                 type: string
               txHash:
                 type: string
+    AgentFaucetNetworksResponse:
+      type: object
+      required: [ok, agentId, networks]
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        agentId:
+          type: string
+        networks:
+          type: array
+          items:
+            type: object
+            required: [chainKey, displayName, faucetConfigured, supportedAssets, native, missingConfig]
+            properties:
+              chainKey:
+                type: string
+                enum: [base_sepolia, kite_ai_testnet]
+              displayName:
+                type: string
+              chainId:
+                type: integer
+                nullable: true
+              faucetConfigured:
+                type: boolean
+              supportedAssets:
+                type: array
+                items:
+                  type: string
+                  enum: [native, wrapped, stable]
+              native:
+                type: object
+                required: [symbol]
+                properties:
+                  symbol:
+                    type: string
+              wrapped:
+                type: object
+                nullable: true
+                properties:
+                  symbol:
+                    type: string
+                  address:
+                    type: string
+              stable:
+                type: object
+                nullable: true
+                properties:
+                  symbol:
+                    type: string
+                  address:
+                    type: string
+              missingConfig:
+                type: object
+                required: [privateKey, wrappedToken, stableToken]
+                properties:
+                  privateKey:
+                    type: boolean
+                  wrappedToken:
+                    type: boolean
+                  stableToken:
+                    type: boolean
     AgentLimitOrderCreateRequest:
       type: object
       required: [schemaVersion, agentId, chainKey, mode, side, tokenIn, tokenOut, amountIn, limitPrice, slippageBps]

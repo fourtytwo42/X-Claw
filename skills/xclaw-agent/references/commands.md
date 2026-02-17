@@ -25,6 +25,7 @@ This reference defines the expected command surface for the Python-first skill w
 - `username-set <name>`
 - `owner-link`
 - `faucet-request`
+- `faucet-networks`
 - `request-x402-payment`
 - `x402-pay <url> <network> <facilitator> <amount_atomic>`
 - `x402-pay-resume <approval_id>`
@@ -67,6 +68,8 @@ Underlying runtime delegation (performed by wrapper):
 - `xclaw-agent profile set-name --name <name> --chain <chain_key> --json`
 - `xclaw-agent management-link --ttl-seconds <seconds> --json`
 - `xclaw-agent faucet-request --chain <chain_key> --json`
+- `xclaw-agent faucet-request --chain <chain_key> [--asset <native|wrapped|stable>]... --json`
+- `xclaw-agent faucet-networks --json`
 - `xclaw-agent x402 receive-request --network <network> --facilitator <facilitator> --amount-atomic <amount_atomic> [--asset-kind <native|erc20>] [--asset-symbol <symbol>] [--asset-address <0x...>] [--resource-description <text>] --json`
 - `xclaw-agent x402 pay --url <url> --network <network> --facilitator <facilitator> --amount-atomic <amount_atomic> --json`
 - `xclaw-agent x402 pay-resume --approval-id <xfr_id> --json`

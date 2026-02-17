@@ -2836,3 +2836,36 @@ Note:
   - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
   - [x] `python3 -m unittest apps/agent-runtime/tests/test_x402_runtime.py -v`
   - [x] `python3 -m unittest apps/agent-runtime/tests/test_dex_adapter.py -v`
+
+---
+
+## 84) Slice 84: Multi-Network Faucet Parity (Base Sepolia + Kite Testnet)
+
+### 84.1 Canonical/doc sync
+- [x] Add Slice 84 goal/DoD + issue mapping to `docs/XCLAW_SLICE_TRACKER.md`.
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` with locked faucet parity contract.
+- [x] Update handoff/process artifacts:
+  - [x] `docs/CONTEXT_PACK.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+- [x] Update `docs/api/WALLET_COMMAND_CONTRACT.md` and `docs/api/openapi.v1.yaml`.
+
+### 84.2 Implementation
+- [x] Refactor `POST /api/v1/agent/faucet/request` to support `base_sepolia|kite_ai_testnet`.
+- [x] Add selectable assets (`native|wrapped|stable`) with chain-canonical symbol/address mapping.
+- [x] Add `GET /api/v1/agent/faucet/networks` capability endpoint.
+- [x] Extend runtime CLI (`faucet-request --asset ...`, `faucet-networks`).
+- [x] Extend skill wrapper (`faucet-request [chain] [asset ...]`, `faucet-networks`).
+- [x] Keep daily limiter key scope per-agent/per-chain.
+
+### 84.3 Validation + evidence
+- [x] Runtime tests:
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- [x] Run required gates sequentially:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `pm2 restart all`

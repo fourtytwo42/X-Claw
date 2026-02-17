@@ -214,7 +214,7 @@ class TradePathRuntimeTests(unittest.TestCase):
         self.assertEqual(code, 1)
 
     def test_faucet_request_success(self) -> None:
-        args = argparse.Namespace(chain="base_sepolia", json=True)
+        args = argparse.Namespace(chain="base_sepolia", asset=[], json=True)
         with mock.patch.object(cli, "_resolve_api_key", return_value="xak1.ag_1.sig.payload"), mock.patch.object(
             cli, "_resolve_agent_id", return_value="ag_1"
         ), mock.patch.object(
@@ -227,6 +227,44 @@ class TradePathRuntimeTests(unittest.TestCase):
         self.assertEqual(payload.get("pending"), True)
         self.assertIsInstance(payload.get("recommendedDelaySec"), int)
         self.assertIsInstance(payload.get("nextAction"), str)
+
+    def test_faucet_request_with_assets_passes_payload(self) -> None:
+        args = argparse.Namespace(chain="kite_ai_testnet", asset=["native", "stable"], json=True)
+        captured: dict[str, object] = {}
+
+        def fake_api_request(method: str, path: str, payload=None, include_idempotency=False):
+            captured["method"] = method
+            captured["path"] = path
+            captured["payload"] = payload
+            captured["include_idempotency"] = include_idempotency
+            return 200, {"amountWei": "20000000000000000", "txHash": "0x" + "cd" * 32, "requestedAssets": ["native", "stable"]}
+
+        with mock.patch.object(cli, "_resolve_api_key", return_value="xak1.ag_1.sig.payload"), mock.patch.object(
+            cli, "_resolve_agent_id", return_value="ag_1"
+        ), mock.patch.object(cli, "_api_request", side_effect=fake_api_request):
+            payload = self._run_and_parse_stdout(lambda: cli.cmd_faucet_request(args))
+
+        self.assertTrue(payload.get("ok"))
+        request_payload = captured.get("payload")
+        self.assertIsInstance(request_payload, dict)
+        self.assertEqual((request_payload or {}).get("chainKey"), "kite_ai_testnet")
+        self.assertEqual((request_payload or {}).get("assets"), ["native", "stable"])
+
+    def test_faucet_networks_success(self) -> None:
+        args = argparse.Namespace(json=True)
+        with mock.patch.object(cli, "_resolve_api_key", return_value="xak1.ag_1.sig.payload"), mock.patch.object(
+            cli, "_resolve_agent_id", return_value="ag_1"
+        ), mock.patch.object(
+            cli,
+            "_api_request",
+            return_value=(
+                200,
+                {"networks": [{"chainKey": "base_sepolia"}, {"chainKey": "kite_ai_testnet"}]},
+            ),
+        ):
+            payload = self._run_and_parse_stdout(lambda: cli.cmd_faucet_networks(args))
+        self.assertTrue(payload.get("ok"))
+        self.assertEqual(payload.get("count"), 2)
 
     def test_status_includes_agent_name_best_effort(self) -> None:
         args = argparse.Namespace(json=True)
@@ -1016,7 +1054,7 @@ class TradePathRuntimeTests(unittest.TestCase):
         self.assertEqual(called.args[2], "0x" + "22" * 20)
 
     def test_faucet_request_daily_limited(self) -> None:
-        args = argparse.Namespace(chain="base_sepolia", json=True)
+        args = argparse.Namespace(chain="base_sepolia", asset=[], json=True)
         with mock.patch.object(cli, "_resolve_api_key", return_value="xak1.ag_1.sig.payload"), mock.patch.object(
             cli, "_resolve_agent_id", return_value="ag_1"
         ), mock.patch.object(

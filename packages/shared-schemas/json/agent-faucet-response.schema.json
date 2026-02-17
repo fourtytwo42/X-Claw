@@ -10,6 +10,47 @@
     "to": { "type": "string", "minLength": 1 },
     "amountWei": { "type": "string", "minLength": 1 },
     "txHash": { "type": "string", "minLength": 1 },
+    "requestedAssets": {
+      "type": "array",
+      "items": { "type": "string", "enum": ["native", "wrapped", "stable"] }
+    },
+    "fulfilledAssets": {
+      "type": "array",
+      "items": { "type": "string", "enum": ["native", "wrapped", "stable"] }
+    },
+    "nativeSymbol": { "type": "string", "minLength": 1 },
+    "assetPlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "native": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "properties": {
+            "symbol": { "type": "string", "minLength": 1 },
+            "amountWei": { "type": "string", "minLength": 1 }
+          }
+        },
+        "wrapped": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "properties": {
+            "symbol": { "type": "string", "minLength": 1 },
+            "tokenAddress": { "type": "string", "minLength": 1 },
+            "amountWei": { "type": "string", "minLength": 1 }
+          }
+        },
+        "stable": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "properties": {
+            "symbol": { "type": "string", "minLength": 1 },
+            "tokenAddress": { "type": "string", "minLength": 1 },
+            "amountWei": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
     "tokenDrips": {
       "type": "array",
       "maxItems": 8,
@@ -27,4 +68,3 @@
     }
   }
 }
-

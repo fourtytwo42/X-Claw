@@ -4924,6 +4924,13 @@ def cmd_faucet_request(args: argparse.Namespace) -> int:
             "agentId": agent_id,
             "chainKey": args.chain,
         }
+        requested_assets: list[str] = []
+        for asset in list(getattr(args, "asset", []) or []):
+            normalized = str(asset or "").strip().lower()
+            if normalized in {"native", "wrapped", "stable"} and normalized not in requested_assets:
+                requested_assets.append(normalized)
+        if requested_assets:
+            payload["assets"] = requested_assets
         status_code, body = _api_request("POST", "/agent/faucet/request", payload=payload, include_idempotency=True)
         if status_code < 200 or status_code >= 300:
             retry_after_sec: int | None = None
@@ -4959,6 +4966,10 @@ def cmd_faucet_request(args: argparse.Namespace) -> int:
             txHash=body.get("txHash"),
             to=body.get("to"),
             tokenDrips=token_drips,
+            requestedAssets=body.get("requestedAssets"),
+            fulfilledAssets=body.get("fulfilledAssets"),
+            nativeSymbol=body.get("nativeSymbol"),
+            assetPlan=body.get("assetPlan"),
             pending=True,
             recommendedDelaySec=20,
             nextAction="Wait ~1-2 blocks, then run dashboard. Balances may not update immediately after tx submission.",
@@ -4967,6 +4978,39 @@ def cmd_faucet_request(args: argparse.Namespace) -> int:
         return fail("faucet_request_failed", str(exc), "Verify API env/auth and retry.", {"chain": args.chain}, exit_code=1)
     except Exception as exc:
         return fail("faucet_request_failed", str(exc), "Inspect runtime faucet request path and retry.", {"chain": args.chain}, exit_code=1)
+
+
+def cmd_faucet_networks(args: argparse.Namespace) -> int:
+    chk = require_json_flag(args)
+    if chk is not None:
+        return chk
+    try:
+        api_key = _resolve_api_key()
+        agent_id = _resolve_agent_id(api_key)
+        if not agent_id:
+            return fail(
+                "auth_invalid",
+                "Agent id could not be resolved for faucet networks.",
+                "Set XCLAW_AGENT_ID or use signed agent token format.",
+                exit_code=1,
+            )
+        status_code, body = _api_request("GET", f"/agent/faucet/networks?agentId={urllib.parse.quote(agent_id)}")
+        if status_code < 200 or status_code >= 300:
+            return fail(
+                str(body.get("code", "api_error")),
+                str(body.get("message", f"faucet networks request failed ({status_code})")),
+                str(body.get("actionHint", "Retry later or check faucet availability.")),
+                _api_error_details(status_code, body, "/agent/faucet/networks"),
+                exit_code=1,
+            )
+        networks = body.get("networks")
+        if not isinstance(networks, list):
+            networks = []
+        return ok("Faucet networks fetched.", agentId=agent_id, count=len(networks), networks=networks)
+    except WalletStoreError as exc:
+        return fail("faucet_networks_failed", str(exc), "Verify API env/auth and retry.", exit_code=1)
+    except Exception as exc:
+        return fail("faucet_networks_failed", str(exc), "Inspect runtime faucet networks path and retry.", exit_code=1)
 
 
 def _fetch_native_balance_wei(chain: str, address: str) -> str:
@@ -6668,8 +6712,13 @@ def build_parser() -> argparse.ArgumentParser:
 
     faucet_request = sub.add_parser("faucet-request")
     faucet_request.add_argument("--chain", required=True)
+    faucet_request.add_argument("--asset", action="append", default=[])
     faucet_request.add_argument("--json", action="store_true")
     faucet_request.set_defaults(func=cmd_faucet_request)
+
+    faucet_networks = sub.add_parser("faucet-networks")
+    faucet_networks.add_argument("--json", action="store_true")
+    faucet_networks.set_defaults(func=cmd_faucet_networks)
 
     x402 = sub.add_parser("x402")
     x402_sub = x402.add_subparsers(dest="x402_cmd")

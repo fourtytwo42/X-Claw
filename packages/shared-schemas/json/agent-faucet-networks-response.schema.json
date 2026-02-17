@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["ok", "agentId", "networks"],
+  "properties": {
+    "ok": { "type": "boolean", "const": true },
+    "agentId": { "type": "string", "minLength": 1 },
+    "networks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["chainKey", "displayName", "faucetConfigured", "supportedAssets", "native", "missingConfig"],
+        "properties": {
+          "chainKey": { "type": "string", "enum": ["base_sepolia", "kite_ai_testnet"] },
+          "displayName": { "type": "string", "minLength": 1 },
+          "chainId": { "type": ["integer", "null"] },
+          "faucetConfigured": { "type": "boolean" },
+          "supportedAssets": {
+            "type": "array",
+            "items": { "type": "string", "enum": ["native", "wrapped", "stable"] }
+          },
+          "native": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["symbol"],
+            "properties": {
+              "symbol": { "type": "string", "minLength": 1 }
+            }
+          },
+          "wrapped": {
+            "type": ["object", "null"],
+            "additionalProperties": false,
+            "properties": {
+              "symbol": { "type": "string", "minLength": 1 },
+              "address": { "type": "string", "minLength": 1 }
+            }
+          },
+          "stable": {
+            "type": ["object", "null"],
+            "additionalProperties": false,
+            "properties": {
+              "symbol": { "type": "string", "minLength": 1 },
+              "address": { "type": "string", "minLength": 1 }
+            }
+          },
+          "missingConfig": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["privateKey", "wrappedToken", "stableToken"],
+            "properties": {
+              "privateKey": { "type": "boolean" },
+              "wrappedToken": { "type": "boolean" },
+              "stableToken": { "type": "boolean" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

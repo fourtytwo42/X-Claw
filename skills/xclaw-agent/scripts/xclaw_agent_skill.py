@@ -248,7 +248,7 @@ def main(argv: List[str]) -> int:
         return _err(
             "usage",
             "Missing command.",
-            "Use one of: status, dashboard, intents-poll, approval-check, trade-exec, trade-spot, trade-resume, transfer-resume, transfer-decide, transfer-policy-get, transfer-policy-set, report-send, chat-poll, chat-post, tracked-list, tracked-trades, username-set, owner-link, faucet-request, x402-pay, x402-pay-resume, x402-pay-decide, x402-policy-get, x402-policy-set, x402-networks, request-x402-payment, limit-orders-create, limit-orders-cancel, limit-orders-list, limit-orders-run-once, limit-orders-run-loop, wallet-health, wallet-address, wallet-sign-challenge, wallet-send, wallet-send-token, wallet-balance, wallet-token-balance",
+            "Use one of: status, dashboard, intents-poll, approval-check, trade-exec, trade-spot, trade-resume, transfer-resume, transfer-decide, transfer-policy-get, transfer-policy-set, report-send, chat-poll, chat-post, tracked-list, tracked-trades, username-set, owner-link, faucet-request, faucet-networks, x402-pay, x402-pay-resume, x402-pay-decide, x402-policy-get, x402-policy-set, x402-networks, request-x402-payment, limit-orders-create, limit-orders-cancel, limit-orders-list, limit-orders-run-once, limit-orders-run-loop, wallet-health, wallet-address, wallet-sign-challenge, wallet-send, wallet-send-token, wallet-balance, wallet-token-balance",
             exit_code=2,
         )
 
@@ -278,6 +278,7 @@ def main(argv: List[str]) -> int:
         "username-set",
         "owner-link",
         "faucet-request",
+        "faucet-networks",
         "limit-orders-create",
         "limit-orders-cancel",
         "limit-orders-list",
@@ -499,7 +500,29 @@ def main(argv: List[str]) -> int:
         return _run_agent(args)
 
     if cmd == "faucet-request":
-        return _run_agent(["faucet-request", "--chain", chain, "--json"])
+        request_chain = chain
+        assets = argv[2:]
+        if assets:
+            first = str(assets[0] or "").strip().lower()
+            if first in {"base_sepolia", "kite_ai_testnet"}:
+                request_chain = first
+                assets = assets[1:]
+        args = ["faucet-request", "--chain", request_chain]
+        for asset in assets:
+            normalized = str(asset or "").strip().lower()
+            if normalized not in {"native", "wrapped", "stable"}:
+                return _err(
+                    "invalid_input",
+                    "faucet-request asset must be native|wrapped|stable.",
+                    "usage: faucet-request [chain] [native] [wrapped] [stable]",
+                    exit_code=2,
+                )
+            args.extend(["--asset", normalized])
+        args.append("--json")
+        return _run_agent(args)
+
+    if cmd == "faucet-networks":
+        return _run_agent(["faucet-networks", "--json"])
 
     if cmd == "request-x402-payment":
         memo = " ".join(argv[2:]).strip() if len(argv) > 2 else ""
@@ -734,7 +757,7 @@ def main(argv: List[str]) -> int:
     return _err(
         "unknown_command",
         f"Unknown command: {cmd}",
-        "Use one of: status, dashboard, intents-poll, approval-check, trade-exec, trade-spot, trade-resume, transfer-resume, transfer-decide, transfer-policy-get, transfer-policy-set, report-send, chat-poll, chat-post, tracked-list, tracked-trades, username-set, owner-link, faucet-request, x402-pay, x402-pay-resume, x402-pay-decide, x402-policy-get, x402-policy-set, x402-networks, request-x402-payment, limit-orders-create, limit-orders-cancel, limit-orders-list, limit-orders-run-once, limit-orders-run-loop, wallet-health, wallet-address, wallet-sign-challenge, wallet-send, wallet-send-token, wallet-balance, wallet-token-balance",
+        "Use one of: status, dashboard, intents-poll, approval-check, trade-exec, trade-spot, trade-resume, transfer-resume, transfer-decide, transfer-policy-get, transfer-policy-set, report-send, chat-poll, chat-post, tracked-list, tracked-trades, username-set, owner-link, faucet-request, faucet-networks, x402-pay, x402-pay-resume, x402-pay-decide, x402-policy-get, x402-policy-set, x402-networks, request-x402-payment, limit-orders-create, limit-orders-cancel, limit-orders-list, limit-orders-run-once, limit-orders-run-loop, wallet-health, wallet-address, wallet-sign-challenge, wallet-send, wallet-send-token, wallet-balance, wallet-token-balance",
         exit_code=2,
     )
 

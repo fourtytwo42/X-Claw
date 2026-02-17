@@ -1,3 +1,32 @@
+# Slice 84 Tasks: Multi-Network Faucet Parity (Base Sepolia + Kite Testnet)
+
+Active slice: `Slice 84: Multi-Network Faucet Parity`
+Issue mapping: `#34`
+
+## 1) Canonical sync
+- [x] Add Slice 84 tracker + roadmap entries with issue mapping.
+- [x] Update source-of-truth with locked faucet parity contract.
+- [x] Update context/spec/tasks/acceptance artifacts.
+- [x] Update wallet command contract + OpenAPI + schemas.
+
+## 2) Implementation
+- [x] Refactor `POST /api/v1/agent/faucet/request` for chain allowlist and asset selection.
+- [x] Add `GET /api/v1/agent/faucet/networks` endpoint.
+- [x] Extend runtime `faucet-request --asset ...` and add `faucet-networks`.
+- [x] Extend skill `faucet-request [chain] [asset ...]` and add `faucet-networks`.
+- [x] Keep per-agent/per-chain limiter semantics.
+
+## 3) Validation
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+
+---
+
 # Slice 83 Tasks: Kite AI Testnet Parity (Runtime + Web + DEX + x402)
 
 Active slice: `Slice 83: Kite AI Testnet Parity`

@@ -1602,3 +1602,22 @@ DoD:
 - [x] management/public API chain validation and action hints include `kite_ai_testnet`.
 - [x] Base-only faucet behavior preserved with structured unsupported response for Kite.
 - [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all` (sequential), plus runtime Kite/x402 tests.
+
+---
+
+## Slice 84: Multi-Network Faucet Parity (Base Sepolia + Kite Testnet)
+Status: [x]
+Issue: #34
+
+Goal:
+- Extend faucet flows so agents can request assets on both Base Sepolia and Kite AI testnet with explicit per-request asset selection.
+
+DoD:
+- [x] docs sync first: source-of-truth + roadmap + tracker + wallet contract + context/spec/tasks/acceptance aligned to Slice 84.
+- [x] `POST /api/v1/agent/faucet/request` supports `chainKey=base_sepolia|kite_ai_testnet` and `assets[]` (`native|wrapped|stable`).
+- [x] faucet request resolves canonical wrapped/stable tokens from chain config and emits chain-canonical symbols (`ETH/WETH/USDC`, `KITE/WKITE/USDT`).
+- [x] per-agent per-chain daily limiter behavior retained.
+- [x] new `GET /api/v1/agent/faucet/networks` returns supported networks + asset capability metadata.
+- [x] runtime CLI adds `faucet-networks` and extends `faucet-request --asset ...`.
+- [x] skill wrapper adds `faucet-networks` and supports optional `faucet-request [chain] [asset ...]`.
+- [x] required gates pass: runtime tests, `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all` (sequential).
