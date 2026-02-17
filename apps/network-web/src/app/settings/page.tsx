@@ -222,6 +222,7 @@ function inferDeviceLabel(): string {
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<TabKey>('access');
   const [ownerContext, setOwnerContext] = useState<OwnerContext>({ phase: 'loading' });
+  const [managedAgentNames, setManagedAgentNames] = useState<Record<string, string>>({});
   const [preferences, setPreferences] = useState<PreferencesState>(DEFAULT_PREFERENCES);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -303,6 +304,48 @@ export default function SettingsPage() {
   const lastActive = useMemo(() => new Date().toLocaleString('en-US', { timeZone: 'UTC' }), []);
 
   const activeAgentId = ownerContext.phase === 'ready' ? ownerContext.activeAgentId : null;
+  const activeAgentName = activeAgentId ? managedAgentNames[activeAgentId] || 'this agent' : 'this agent';
+
+  function managedAgentLabel(agentId: string): string {
+    return managedAgentNames[agentId] || 'Unnamed Agent';
+  }
+
+  useEffect(() => {
+    if (ownerContext.phase !== 'ready') {
+      setManagedAgentNames({});
+      return;
+    }
+
+    const managedAgents = ownerContext.managedAgents;
+    let cancelled = false;
+    async function loadManagedAgentNames() {
+      const names: Record<string, string> = {};
+      await Promise.all(
+        managedAgents.map(async (agentId) => {
+          try {
+            const response = await fetch(`/api/v1/public/agents/${encodeURIComponent(agentId)}`, { cache: 'no-store' });
+            if (!response.ok) {
+              names[agentId] = 'Unnamed Agent';
+              return;
+            }
+            const payload = (await response.json()) as { agent?: { agent_name?: string | null } };
+            names[agentId] = payload.agent?.agent_name?.trim() || 'Unnamed Agent';
+          } catch {
+            names[agentId] = 'Unnamed Agent';
+          }
+        })
+      );
+
+      if (!cancelled) {
+        setManagedAgentNames(names);
+      }
+    }
+
+    void loadManagedAgentNames();
+    return () => {
+      cancelled = true;
+    };
+  }, [ownerContext]);
 
   async function onAddAccess(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -311,7 +354,7 @@ export default function SettingsPage() {
 
     const parsed = parseManagementLink(linkInput);
     if (!parsed) {
-      setError('Invalid key link format. Paste a full /agents/{agentId}?token=... URL.');
+      setError('This link format looks wrong. Paste the full agent key link URL.');
       return;
     }
 
@@ -323,7 +366,7 @@ export default function SettingsPage() {
       storeManagedAgentIds(nextAgents);
       setOwnerContext({ phase: 'ready', activeAgentId: parsed.agentId, managedAgents: nextAgents });
       setLinkInput('');
-      setNotice(`Access granted on this device for ${parsed.agentId}.`);
+      setNotice('Access added on this device.');
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'Failed to add access.');
     } finally {
@@ -354,10 +397,10 @@ export default function SettingsPage() {
 
     const confirmLabel =
       action === 'pause'
-        ? 'Pause this active agent on this device session?'
+        ? `Pause ${activeAgentName}?`
         : action === 'resume'
-          ? 'Resume this active agent on this device session?'
-          : 'Revoke all management sessions for this active agent?';
+          ? `Resume ${activeAgentName}?`
+          : `Sign out all sessions for ${activeAgentName}?`;
 
     if (!window.confirm(confirmLabel)) {
       return;
@@ -370,15 +413,15 @@ export default function SettingsPage() {
     try {
       if (action === 'pause') {
         await postJson('/api/v1/management/pause', { agentId: activeAgentId });
-        setNotice(`Agent ${activeAgentId} paused.`);
+        setNotice(`${activeAgentName} paused.`);
       } else if (action === 'resume') {
         await postJson('/api/v1/management/resume', { agentId: activeAgentId });
-        setNotice(`Agent ${activeAgentId} resumed.`);
+        setNotice(`${activeAgentName} resumed.`);
       } else {
         await postJson('/api/v1/management/revoke-all', { agentId: activeAgentId });
         storeManagedAgentIds([]);
         setOwnerContext({ phase: 'none' });
-        setNotice('Revoked all management sessions for the active agent. Local access has been cleared.');
+        setNotice('Signed out all management sessions for this device.');
       }
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'Failed to execute action.');
@@ -395,7 +438,7 @@ export default function SettingsPage() {
         <header className={styles.topbar}>
           <div>
             <h1 className={styles.title}>Settings &amp; Security</h1>
-            <p className={styles.subtitle}>Device-level access and safety preferences. There are no user accounts.</p>
+            <p className={styles.subtitle}>Manage device access and safety settings. There are no usernames or passwords.</p>
           </div>
           <div className={styles.topbarControls}>
             <ChainHeaderControl className={styles.chainControl} id="settings-chain-select" />
@@ -422,7 +465,7 @@ export default function SettingsPage() {
           <div className={styles.panelGrid}>
             <section className={styles.card}>
               <h2>This Device</h2>
-              <p className={styles.muted}>Device access is managed via secure cookies in this browser.</p>
+              <p className={styles.muted}>Access is stored in secure browser cookies on this device.</p>
               <div className={styles.kvList}>
                 <div>
                   <span>Device label</span>
@@ -434,19 +477,19 @@ export default function SettingsPage() {
                 </div>
                 <div>
                   <span>Access persistence</span>
-                  <strong>Persists in this browser until cleared or revoked.</strong>
+                  <strong>Stays active in this browser until you clear or revoke it.</strong>
                 </div>
               </div>
               <button type="button" onClick={() => void onClearLocalAccess()} disabled={pendingAction === 'clear-access'}>
                 Clear local access
               </button>
-              <p className={styles.helper}>Clearing access removes local control only. On-chain allowances are unchanged.</p>
+              <p className={styles.helper}>This only removes browser access. It does not change on-chain approvals.</p>
             </section>
 
             <section className={styles.card}>
               <h2>Agents You Can Control</h2>
-              <p className={styles.muted}>Access is device-scoped. Multi-agent verification and per-agent removal are placeholder-only in v1.</p>
-              {ownerContext.phase === 'loading' ? <p className={styles.helper}>Loading access context...</p> : null}
+              <p className={styles.muted}>These are the agents this browser can manage.</p>
+              {ownerContext.phase === 'loading' ? <p className={styles.helper}>Loading your agent access...</p> : null}
               {ownerContext.phase === 'error' ? <p className={styles.warningInline}>{ownerContext.message}</p> : null}
               {ownerContext.phase === 'none' ? <p className={styles.helper}>No agent access found on this device.</p> : null}
               {ownerContext.phase === 'ready' ? (
@@ -454,8 +497,8 @@ export default function SettingsPage() {
                   {ownerContext.managedAgents.map((agentId) => (
                     <article key={agentId} className={styles.agentRow}>
                       <div>
-                        <strong>{agentId}</strong>
-                        <p>Owner Access · Granted via key link</p>
+                        <strong>{managedAgentLabel(agentId)}</strong>
+                        <p>Owner access granted by key link</p>
                       </div>
                       <div className={styles.agentActions}>
                         <Link href={`/agents/${encodeURIComponent(agentId)}`}>Open</Link>
@@ -471,19 +514,19 @@ export default function SettingsPage() {
 
             <section className={styles.card}>
               <h2>Add Agent Access</h2>
-              <p className={styles.muted}>Paste a full key link. Treat key links as sensitive credentials.</p>
+              <p className={styles.muted}>Paste a full key link. Keep these links private.</p>
               <form className={styles.inlineForm} onSubmit={(event) => void onAddAccess(event)}>
                 <input
                   value={linkInput}
                   onChange={(event) => setLinkInput(event.target.value)}
-                  placeholder="https://.../agents/{agentId}?token=..."
+                  placeholder="https://.../agents/.../?token=..."
                   aria-label="Paste agent key link"
                 />
                 <button type="submit" disabled={pendingAction === 'add-access'}>
                   Add Access
                 </button>
               </form>
-              <p className={styles.helper}>Primary flow remains opening the key link directly in this browser.</p>
+              <p className={styles.helper}>Tip: You can also open the key link directly in this browser.</p>
             </section>
           </div>
         ) : null}
@@ -492,7 +535,7 @@ export default function SettingsPage() {
           <div className={styles.panelGrid}>
             <section className={styles.card}>
               <h2>Approval Defaults</h2>
-              <p className={styles.muted}>These are local defaults for this device and do not directly mutate agent policy until actioned elsewhere.</p>
+              <p className={styles.muted}>These are default safety choices for this device.</p>
 
               <div className={styles.radioGroup}>
                 <label>
@@ -501,7 +544,7 @@ export default function SettingsPage() {
                     checked={preferences.approvalPosture === 'per_trade'}
                     onChange={() => setPreferences((current) => ({ ...current, approvalPosture: 'per_trade' }))}
                   />
-                  Per-trade approvals (recommended)
+                  Ask every trade (recommended)
                 </label>
                 <label>
                   <input
@@ -509,7 +552,7 @@ export default function SettingsPage() {
                     checked={preferences.approvalPosture === 'allowlist'}
                     onChange={() => setPreferences((current) => ({ ...current, approvalPosture: 'allowlist' }))}
                   />
-                  Token allowlist first
+                  Allowlisted tokens first
                 </label>
                 <label>
                   <input
@@ -517,7 +560,7 @@ export default function SettingsPage() {
                     checked={preferences.approvalPosture === 'global_allowed'}
                     onChange={() => setPreferences((current) => ({ ...current, approvalPosture: 'global_allowed' }))}
                   />
-                  Global approval allowed (advanced)
+                  Allow broad approvals (advanced)
                 </label>
               </div>
 
@@ -546,13 +589,13 @@ export default function SettingsPage() {
                     checked={preferences.showSpenderDiffBeforeSigning}
                     onChange={(event) => setPreferences((current) => ({ ...current, showSpenderDiffBeforeSigning: event.target.checked }))}
                   />
-                  Always show spender + allowance diff before signing
+                  Always show spender and allowance changes before signing
                 </label>
               </div>
             </section>
 
             <section className={styles.card}>
-              <h2>Auto-Lock / Safety</h2>
+              <h2>Auto-Lock and Safety</h2>
               <div className={styles.inlineForm}>
                 <label htmlFor="settings-autolock">Auto-lock approvals after idle</label>
                 <select
@@ -586,7 +629,7 @@ export default function SettingsPage() {
                     checked={preferences.extraConfirmForDanger}
                     onChange={(event) => setPreferences((current) => ({ ...current, extraConfirmForDanger: event.target.checked }))}
                   />
-                  Hide high-risk actions behind extra confirmation
+                  Add an extra confirmation step for high-risk actions
                 </label>
               </div>
             </section>
@@ -603,7 +646,7 @@ export default function SettingsPage() {
                   Store favorites locally on this device
                 </label>
               </div>
-              <p className={styles.helper}>Agent access list is stored locally to improve device UX continuity.</p>
+              <p className={styles.helper}>Your agent list is stored locally to keep this device experience consistent.</p>
             </section>
           </div>
         ) : null}
@@ -612,13 +655,13 @@ export default function SettingsPage() {
           <div className={styles.panelGrid}>
             <section className={`${styles.card} ${styles.dangerCard}`}>
               <h2>Emergency Controls</h2>
-              <p className={styles.muted}>These actions apply to the active session agent only in v1.</p>
+              <p className={styles.muted}>These actions apply only to the currently selected agent.</p>
               <div className={styles.actionRow}>
                 <button type="button" onClick={() => void onDangerAction('pause')} disabled={!activeAgentId || pendingAction === 'pause'}>
-                  Pause Active Agent
+                  Pause Selected Agent
                 </button>
                 <button type="button" onClick={() => void onDangerAction('resume')} disabled={!activeAgentId || pendingAction === 'resume'}>
-                  Resume Active Agent
+                  Resume Selected Agent
                 </button>
                 <button
                   type="button"
@@ -626,16 +669,16 @@ export default function SettingsPage() {
                   onClick={() => void onDangerAction('revoke-all')}
                   disabled={!activeAgentId || pendingAction === 'revoke-all'}
                 >
-                  Revoke All Sessions
+                  Sign Out All Sessions
                 </button>
               </div>
               <p className={styles.helper}>
-                Global panic controls for all owned agents and on-chain allowance sweep require dedicated aggregation APIs and are placeholder-only.
+                Global emergency controls for all agents are not available yet.
               </p>
             </section>
 
             <section className={`${styles.card} ${styles.dangerCard}`}>
-              <h2>Global Panic Controls (Placeholder)</h2>
+              <h2>Global Emergency Controls (Coming Soon)</h2>
               <div className={styles.actionRow}>
                 <button type="button" disabled={!SETTINGS_SECURITY_CAPABILITIES.globalPanicActions}>
                   Pause All Owned Agents
@@ -647,7 +690,7 @@ export default function SettingsPage() {
                   Disable All Copy Trading
                 </button>
               </div>
-              <p className={styles.helper}>Use per-agent controls today from `/agents/:id` and `/approvals` until global APIs are available.</p>
+              <p className={styles.helper}>For now, use per-agent controls from the agent page and approvals page.</p>
             </section>
           </div>
         ) : null}

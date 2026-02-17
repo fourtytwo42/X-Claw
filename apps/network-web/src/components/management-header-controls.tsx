@@ -43,6 +43,7 @@ export function ManagementHeaderControls() {
   const router = useRouter();
   const pathname = usePathname();
   const [agentIds, setAgentIds] = useState<string[]>([]);
+  const [agentNames, setAgentNames] = useState<Record<string, string>>({});
   const [active, setActive] = useState<string>('');
   const [busy, setBusy] = useState(false);
 
@@ -86,6 +87,39 @@ export function ManagementHeaderControls() {
       });
   }, [pathname]);
 
+  useEffect(() => {
+    if (agentIds.length === 0) {
+      setAgentNames({});
+      return;
+    }
+    let cancelled = false;
+    async function loadNames() {
+      const names: Record<string, string> = {};
+      await Promise.all(
+        agentIds.map(async (agentId) => {
+          try {
+            const response = await fetch(`/api/v1/public/agents/${encodeURIComponent(agentId)}`, { cache: 'no-store' });
+            if (!response.ok) {
+              names[agentId] = 'Unnamed Agent';
+              return;
+            }
+            const payload = (await response.json()) as { agent?: { agent_name?: string | null } };
+            names[agentId] = payload.agent?.agent_name?.trim() || 'Unnamed Agent';
+          } catch {
+            names[agentId] = 'Unnamed Agent';
+          }
+        })
+      );
+      if (!cancelled) {
+        setAgentNames(names);
+      }
+    }
+    void loadNames();
+    return () => {
+      cancelled = true;
+    };
+  }, [agentIds]);
+
   const canRender = useMemo(() => agentIds.length > 0, [agentIds]);
 
   if (!canRender) {
@@ -126,7 +160,7 @@ export function ManagementHeaderControls() {
       >
         {agentIds.map((agentId) => (
           <option key={agentId} value={agentId}>
-            {agentId}
+            {agentNames[agentId] || 'Unnamed Agent'}
           </option>
         ))}
       </select>
