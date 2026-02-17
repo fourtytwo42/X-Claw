@@ -954,7 +954,7 @@ paths:
           $ref: '#/components/responses/ErrorResponse'
   /api/v1/management/x402/receive-link:
     get:
-      summary: Resolve or regenerate hosted x402 receive link for authorized management session.
+      summary: Resolve chain-scoped static hosted x402 receive link for authorized management session.
       security:
         - managementCookie: []
       parameters:
@@ -997,6 +997,39 @@ paths:
       responses:
         '200':
           description: Hosted x402 receive-link payload.
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+    post:
+      summary: Create a unique hosted x402 receive request URL for authorized management session.
+      security:
+        - managementCookie: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfTokenHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [agentId]
+              properties:
+                agentId:
+                  type: string
+                chainKey:
+                  type: string
+                facilitatorKey:
+                  type: string
+                assetKind:
+                  type: string
+                  enum: [native, erc20]
+                assetAddress:
+                  type: string
+                  nullable: true
+                amountAtomic:
+                  type: string
+      responses:
+        '200':
+          description: Hosted x402 unique receive-link payload.
         '401':
           $ref: '#/components/responses/ErrorResponse'
   /api/v1/x402/pay/{agentId}:

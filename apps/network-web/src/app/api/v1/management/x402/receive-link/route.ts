@@ -1,9 +1,12 @@
+import crypto from 'node:crypto';
+
 import type { NextRequest } from 'next/server';
 
 import { dbQuery } from '@/lib/db';
 import { errorResponse, internalErrorResponse, successResponse } from '@/lib/errors';
+import { parseJsonBody } from '@/lib/http';
 import { makeId } from '@/lib/ids';
-import { requireManagementSession } from '@/lib/management-auth';
+import { requireManagementSession, requireManagementWriteAuth } from '@/lib/management-auth';
 import { getRequestId } from '@/lib/request-id';
 
 export const runtime = 'nodejs';
@@ -18,6 +21,17 @@ function buildOrigin(req: NextRequest): string {
     return explicit.replace(/\/$/, '');
   }
   return req.nextUrl.origin.replace(/\/$/, '');
+}
+
+function parseAmountAtomic(value: unknown): string | null {
+  const raw = String(value ?? '').trim();
+  if (!raw) {
+    return null;
+  }
+  if (!/^[0-9]+(\.[0-9]+)?$/.test(raw)) {
+    return null;
+  }
+  return raw;
 }
 
 export async function GET(req: NextRequest) {
@@ -86,6 +100,7 @@ export async function GET(req: NextRequest) {
       where agent_id = $1
         and direction = 'inbound'
         and network_key = $2
+        and link_token is null
         and status in ('proposed', 'executing')
       order by created_at desc
       limit 1
@@ -137,6 +152,7 @@ export async function GET(req: NextRequest) {
           asset_address,
           amount_atomic,
           payment_url,
+          link_token,
           expires_at,
           created_at,
           updated_at,
@@ -165,6 +181,108 @@ export async function GET(req: NextRequest) {
         expiresAt: null,
         timeLimitNotice: 'This payment link does not expire.',
         status
+      },
+      200,
+      requestId
+    );
+  } catch {
+    return internalErrorResponse(requestId);
+  }
+}
+
+type CreateReceiveRequestBody = {
+  agentId?: string;
+  chainKey?: string;
+  facilitatorKey?: string;
+  assetKind?: 'native' | 'erc20';
+  assetAddress?: string | null;
+  amountAtomic?: string;
+};
+
+export async function POST(req: NextRequest) {
+  const requestId = getRequestId(req);
+  try {
+    const parsed = await parseJsonBody(req, requestId);
+    if (!parsed.ok) {
+      return parsed.response;
+    }
+    const body = (parsed.body ?? {}) as CreateReceiveRequestBody;
+    const agentId = String(body.agentId ?? '').trim();
+    if (!agentId) {
+      return errorResponse(
+        400,
+        { code: 'payload_invalid', message: 'agentId is required.', actionHint: 'Provide agentId in request body.' },
+        requestId
+      );
+    }
+
+    const auth = await requireManagementWriteAuth(req, requestId, agentId);
+    if (!auth.ok) {
+      return auth.response;
+    }
+
+    const chainKey = String(body.chainKey ?? 'base_sepolia').trim() || 'base_sepolia';
+    const facilitatorKey = String(body.facilitatorKey ?? 'cdp').trim() || 'cdp';
+    const assetKind = body.assetKind === 'erc20' ? 'erc20' : 'native';
+    const assetAddress = assetKind === 'erc20' ? String(body.assetAddress ?? '').trim() || null : null;
+    const amountAtomic = parseAmountAtomic(body.amountAtomic ?? '0.01');
+    if (!amountAtomic) {
+      return errorResponse(
+        400,
+        {
+          code: 'payload_invalid',
+          message: 'amountAtomic must be a positive numeric string.',
+          actionHint: 'Use values like 0.01 or 1.'
+        },
+        requestId
+      );
+    }
+
+    const paymentId = makeId('xpm');
+    const linkToken = crypto.randomBytes(10).toString('hex');
+    const paymentUrl = `${buildOrigin(req)}/api/v1/x402/pay/${encodeURIComponent(agentId)}/${encodeURIComponent(linkToken)}`;
+    await dbQuery(
+      `
+      insert into agent_x402_payment_mirror (
+        payment_id,
+        agent_id,
+        direction,
+        status,
+        network_key,
+        facilitator_key,
+        asset_kind,
+        asset_address,
+        amount_atomic,
+        payment_url,
+        link_token,
+        expires_at,
+        created_at,
+        updated_at,
+        terminal_at
+      ) values (
+        $1, $2, 'inbound', 'proposed', $3, $4, $5, $6, $7::numeric, $8, $9, null, now(), now(), null
+      )
+      `,
+      [paymentId, agentId, chainKey, facilitatorKey, assetKind, assetAddress, amountAtomic, paymentUrl, linkToken]
+    );
+
+    return successResponse(
+      {
+        ok: true,
+        agentId,
+        chainKey,
+        paymentId,
+        networkKey: chainKey,
+        facilitatorKey,
+        assetKind,
+        assetAddress,
+        amountAtomic,
+        paymentUrl,
+        linkToken,
+        ttlSeconds: null,
+        expiresAt: null,
+        timeLimitNotice: 'This payment link does not expire.',
+        status: 'proposed'
       },
       200,
       requestId

@@ -3165,6 +3165,12 @@ Limitations / notes:
 - Management route provides receive URL metadata:
   - `GET /api/v1/management/x402/receive-link?agentId=...&chainKey=...`
   - response includes `paymentUrl` and non-expiring metadata (`ttlSeconds=null`, `expiresAt=null`, static-link notice).
+ - Management request creation route:
+  - `POST /api/v1/management/x402/receive-link`
+  - creates a unique, non-expiring receive request URL (`/api/v1/x402/pay/{agentId}/{linkToken}`) per request.
+  - request amount is owner-configurable per request (`amountAtomic`).
+  - multiple active inbound requests are supported concurrently.
+  - chain selection must follow the active universal chain selector context on `/agents/[agentId]`.
 
 3. Outbound x402 mirror contract:
 - Agent runtime remains initiator for outbound x402 send execution/signing.

@@ -115,6 +115,7 @@ type X402ReceiveLinkPayload = {
   assetKind: 'native' | 'erc20';
   assetAddress: string | null;
   amountAtomic: string;
+  linkToken?: string | null;
   ttlSeconds: number | null;
   paymentUrl: string;
   expiresAt: string | null;
@@ -306,6 +307,7 @@ export default function AgentPublicProfilePage() {
   const [depositData, setDepositData] = useState<DepositPayload | null>(null);
   const [x402Payments, setX402Payments] = useState<X402PaymentsPayload | null>(null);
   const [x402ReceiveLink, setX402ReceiveLink] = useState<X402ReceiveLinkPayload | null>(null);
+  const [x402RequestAmount, setX402RequestAmount] = useState('0.01');
   const [limitOrders, setLimitOrders] = useState<LimitOrderItem[]>([]);
   const [copySubscriptions, setCopySubscriptions] = useState<CopySubscription[]>([]);
   const [vaultAddressCopied, setVaultAddressCopied] = useState(false);
@@ -984,6 +986,13 @@ export default function AgentPublicProfilePage() {
   ]);
 
   const selectedWalletTokenSet = useMemo(() => new Set(selectedWalletTokens), [selectedWalletTokens]);
+  const activeInboundX402Requests = useMemo(
+    () =>
+      (x402Payments?.queue ?? [])
+        .filter((row) => row.direction === 'inbound' && (row.status === 'proposed' || row.status === 'executing'))
+        .sort((left, right) => Number(new Date(right.created_at)) - Number(new Date(left.created_at))),
+    [x402Payments?.queue]
+  );
 
   const filteredWalletTimeline = useMemo(() => {
     const tokenFiltered =
@@ -1990,25 +1999,18 @@ export default function AgentPublicProfilePage() {
           <aside className={styles.sideColumn}>
             <article className={`${styles.card} ${styles.walletCard}`}>
               <div className={`${styles.cardHeader} ${styles.walletCardHeader}`}>
-                <h3>x402 Receive Link</h3>
-                <span>{x402ReceiveLink?.status ?? 'loading'}</span>
+                <h3>x402 Receive Requests</h3>
+                <span>{activeInboundX402Requests.length} active</span>
               </div>
               {x402ReceiveLink ? (
                 <>
                   <div className={styles.muted}>Network: {x402ReceiveLink.networkKey}</div>
                   <div className={styles.muted}>Facilitator: {x402ReceiveLink.facilitatorKey}</div>
-                  <div className={styles.muted}>
-                    Amount: {x402ReceiveLink.amountAtomic} ({x402ReceiveLink.assetKind})
-                  </div>
-                  {x402ReceiveLink.expiresAt ? (
-                    <div className={styles.muted}>Expires: {formatUtc(x402ReceiveLink.expiresAt)} UTC</div>
-                  ) : (
-                    <div className={styles.muted}>Expires: never (static link)</div>
-                  )}
-                  <div className={styles.muted}>{x402ReceiveLink.timeLimitNotice}</div>
+                  <div className={styles.muted}>Asset: {x402ReceiveLink.assetKind}</div>
+                  <div className={styles.muted}>Chain scope: {activeChainLabel}</div>
                   <div className={styles.inlineActions}>
-                    <button type="button" onClick={() => void copyToClipboard(x402ReceiveLink.paymentUrl, 'x402 receive link copied.')}>
-                      Copy Link
+                    <button type="button" onClick={() => void copyToClipboard(x402ReceiveLink.paymentUrl, 'x402 static receive link copied.')}>
+                      Copy Static Link
                     </button>
                     <button
                       type="button"
@@ -2027,6 +2029,64 @@ export default function AgentPublicProfilePage() {
                       Refresh
                     </button>
                   </div>
+                  {isOwner ? (
+                    <>
+                      <div className={styles.inlineActions} style={{ marginTop: '0.45rem' }}>
+                        <input
+                          value={x402RequestAmount}
+                          onChange={(event) => setX402RequestAmount(event.target.value)}
+                          placeholder="Amount (e.g. 0.01)"
+                          inputMode="decimal"
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void runManagementAction(
+                              async () => {
+                                const created = (await managementPost('/api/v1/management/x402/receive-link', {
+                                  agentId,
+                                  chainKey: activeChainKey,
+                                  amountAtomic: x402RequestAmount.trim() || '0.01',
+                                  assetKind: x402ReceiveLink.assetKind,
+                                  facilitatorKey: x402ReceiveLink.facilitatorKey
+                                })) as X402ReceiveLinkPayload;
+                                if (created.paymentUrl) {
+                                  await copyToClipboard(created.paymentUrl, 'x402 request URL copied.');
+                                }
+                              },
+                              'x402 request URL created.'
+                            )
+                          }
+                        >
+                          Request URL
+                        </button>
+                      </div>
+                      <div className={styles.muted}>Each request creates a unique link URL for this chain.</div>
+                    </>
+                  ) : null}
+                  <div className={styles.muted} style={{ marginTop: '0.55rem' }}>
+                    Active request links
+                  </div>
+                  {activeInboundX402Requests.length === 0 ? <div className={styles.muted}>No active requests.</div> : null}
+                  {activeInboundX402Requests.slice(0, 8).map((request) => (
+                    <div key={request.payment_id} className={styles.railQueueRow}>
+                      <div>
+                        <div className={styles.listTitle}>
+                          {request.amount_atomic} ({request.asset_kind}) · {request.status}
+                        </div>
+                        <div className={styles.muted}>{formatUtc(request.created_at)} UTC</div>
+                      </div>
+                      <div className={styles.inlineActions}>
+                        <button
+                          type="button"
+                          onClick={() => void copyToClipboard(request.payment_url ?? '', `x402 URL copied (${request.payment_id}).`)}
+                          disabled={!request.payment_url}
+                        >
+                          Copy URL
+                        </button>
+                      </div>
+                    </div>
+                  ))}
                 </>
               ) : (
                 <p className={styles.muted}>Receive link unavailable.</p>

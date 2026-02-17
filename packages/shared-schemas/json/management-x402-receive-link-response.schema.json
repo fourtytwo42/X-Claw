@@ -28,6 +28,7 @@
     "assetKind": { "type": "string", "enum": ["native", "erc20"] },
     "assetAddress": { "type": ["string", "null"] },
     "amountAtomic": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?$" },
+    "linkToken": { "type": ["string", "null"] },
     "ttlSeconds": { "type": ["integer", "null"], "minimum": 60 },
     "paymentUrl": { "type": "string", "format": "uri" },
     "expiresAt": { "type": ["string", "null"], "format": "date-time" },
