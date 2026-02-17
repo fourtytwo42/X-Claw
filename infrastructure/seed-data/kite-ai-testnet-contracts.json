@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "chainKey": "kite_ai_testnet",
+  "chainId": 2368,
+  "capturedAt": "2026-02-17T00:00:00.000Z",
+  "rpc": "https://rpc-testnet.gokite.ai/",
+  "explorer": "https://testnet.kitescan.ai",
+  "contracts": {
+    "factory": "0x147f235Dde1adcB00Ef8E2D10D98fEd9a091284D",
+    "router": "0x402f35e11cC6E89E80EFF4205956716aCd94be04",
+    "wrappedNative": "0x3bC8f037691Ce1d28c0bB224BD33563b49F99dE8",
+    "usdt": "0x0fF5393387ad2f9f691FD6Fd28e07E3969e27e63",
+    "wkiteUsdtPair": "0xbd02d7A6C782013514ad6e59fC3C6C684A460848"
+  },
+  "notes": [
+    "Router/factory queried via RPC and matched expected pair routing path.",
+    "Slice 83 locks these constants for Kite AI testnet parity."
+  ]
+}

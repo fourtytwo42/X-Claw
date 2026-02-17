@@ -9,7 +9,7 @@ import { rememberManagedAgent } from '@/components/management-header-controls';
 import { PrimaryNav } from '@/components/primary-nav';
 import { PublicStatusBadge } from '@/components/public-status-badge';
 import { ThemeToggle } from '@/components/theme-toggle';
-import { useActiveChainKey } from '@/lib/active-chain';
+import { nativeSymbolForChainKey, useActiveChainKey } from '@/lib/active-chain';
 import { getAgentAvatarPalette, getAgentInitial } from '@/lib/agent-avatar-color';
 import {
   buildHoldings,
@@ -468,6 +468,7 @@ export default function AgentPublicProfilePage() {
   const agentId = params.agentId;
   const bootstrapToken = searchParams.get('token')?.trim() ?? '';
   const [activeChainKey, , activeChainLabel] = useActiveChainKey();
+  const activeNativeSymbol = useMemo(() => nativeSymbolForChainKey(activeChainKey), [activeChainKey]);
   const avatarPalette = useMemo(() => getAgentAvatarPalette(agentId), [agentId]);
 
   const [bootstrapState, setBootstrapState] = useState<BootstrapState>({ phase: 'ready' });
@@ -1032,10 +1033,10 @@ export default function AgentPublicProfilePage() {
     const nativeHolding =
       holdings.find((holding) => {
         const symbol = holding.token.trim().toUpperCase();
-        return symbol === 'ETH' || symbol === 'NATIVE';
+        return symbol === activeNativeSymbol.toUpperCase() || symbol === 'NATIVE';
       }) ?? null;
     const nativeBalance = nativeHolding ? formatUnitsTruncated(nativeHolding.amountRaw, nativeHolding.decimals, 6) : '0';
-    const opts: Array<{ label: string; value: string }> = [{ label: `${activeChainLabel} ETH (${nativeBalance})`, value: 'NATIVE' }];
+    const opts: Array<{ label: string; value: string }> = [{ label: `${activeChainLabel} ${activeNativeSymbol} (${nativeBalance})`, value: 'NATIVE' }];
     const seen = new Set<string>(['NATIVE']);
     for (const holding of holdings) {
       const symbol = holding.token.trim().toUpperCase();
@@ -1048,17 +1049,17 @@ export default function AgentPublicProfilePage() {
       }
     }
     return opts;
-  }, [holdings, activeChainLabel]);
+  }, [holdings, activeChainLabel, activeNativeSymbol]);
 
   const withdrawSelectedHolding = useMemo(() => {
     if (withdrawAsset === 'NATIVE') {
       return holdings.find((holding) => {
         const symbol = holding.token.trim().toUpperCase();
-        return symbol === 'ETH' || symbol === 'NATIVE';
+        return symbol === activeNativeSymbol.toUpperCase() || symbol === 'NATIVE';
       }) ?? null;
     }
     return holdings.find((holding) => holding.token.trim().toUpperCase() === withdrawAsset.trim().toUpperCase()) ?? null;
-  }, [holdings, withdrawAsset]);
+  }, [holdings, withdrawAsset, activeNativeSymbol]);
 
   const withdrawMaxAmount = useMemo(() => {
     if (!withdrawSelectedHolding) {
@@ -1220,9 +1221,9 @@ export default function AgentPublicProfilePage() {
 
     if (management.phase === 'ready') {
       for (const payment of x402Payments?.history ?? []) {
-        const symbol = normalizeTokenSelectionSymbol(payment.asset_symbol || (payment.asset_kind === 'native' ? 'ETH' : 'TOKEN'));
+        const symbol = normalizeTokenSelectionSymbol(payment.asset_symbol || (payment.asset_kind === 'native' ? activeNativeSymbol : 'TOKEN'));
         const directionLabel = payment.direction === 'inbound' ? 'Received' : 'Sent';
-        const titleToken = payment.asset_symbol || (payment.asset_kind === 'native' ? `${activeChainLabel} ETH` : 'Token');
+        const titleToken = payment.asset_symbol || (payment.asset_kind === 'native' ? `${activeChainLabel} ${activeNativeSymbol}` : 'Token');
         items.push({
           id: `x402-${payment.payment_id}`,
           at: payment.terminal_at ?? payment.updated_at ?? payment.created_at,
@@ -1237,8 +1238,8 @@ export default function AgentPublicProfilePage() {
         });
       }
       for (const item of management.data.transferApprovalsHistory ?? []) {
-        const transferTokenLabel = item.transfer_type === 'native' ? `${activeChainLabel} ETH` : item.token_symbol ?? 'Token';
-        const transferSymbol = item.transfer_type === 'native' ? 'ETH' : normalizeTokenSelectionSymbol(item.token_symbol);
+        const transferTokenLabel = item.transfer_type === 'native' ? `${activeChainLabel} ${activeNativeSymbol}` : item.token_symbol ?? 'Token';
+        const transferSymbol = item.transfer_type === 'native' ? activeNativeSymbol : normalizeTokenSelectionSymbol(item.token_symbol);
         const transferDecimals =
           item.transfer_type === 'native' ? 18 : (tokenDecimalsBySymbol.get(normalizeTokenSelectionSymbol(item.token_symbol)) ?? 18);
         const transferAmount = formatHumanAmount(item.amount_wei, transferTokenLabel, transferDecimals);
@@ -1259,8 +1260,8 @@ export default function AgentPublicProfilePage() {
         });
       }
       for (const item of management.data.transferApprovalsQueue ?? []) {
-        const transferTokenLabel = item.transfer_type === 'native' ? `${activeChainLabel} ETH` : item.token_symbol ?? 'Token';
-        const transferSymbol = item.transfer_type === 'native' ? 'ETH' : normalizeTokenSelectionSymbol(item.token_symbol);
+        const transferTokenLabel = item.transfer_type === 'native' ? `${activeChainLabel} ${activeNativeSymbol}` : item.token_symbol ?? 'Token';
+        const transferSymbol = item.transfer_type === 'native' ? activeNativeSymbol : normalizeTokenSelectionSymbol(item.token_symbol);
         const transferDecimals =
           item.transfer_type === 'native' ? 18 : (tokenDecimalsBySymbol.get(normalizeTokenSelectionSymbol(item.token_symbol)) ?? 18);
         const transferAmount = formatHumanAmount(item.amount_wei, transferTokenLabel, transferDecimals);
@@ -1443,7 +1444,7 @@ export default function AgentPublicProfilePage() {
       });
     }
     for (const item of management.data.transferApprovalsQueue ?? []) {
-      const transferSymbol = item.transfer_type === 'native' ? 'ETH' : normalizeTokenSelectionSymbol(item.token_symbol);
+      const transferSymbol = item.transfer_type === 'native' ? activeNativeSymbol : normalizeTokenSelectionSymbol(item.token_symbol);
       rows.push({
         id: `transfer-pending-${item.approval_id}`,
         at: item.created_at,
@@ -1461,7 +1462,7 @@ export default function AgentPublicProfilePage() {
       });
     }
     for (const item of management.data.transferApprovalsHistory ?? []) {
-      const transferSymbol = item.transfer_type === 'native' ? 'ETH' : normalizeTokenSelectionSymbol(item.token_symbol);
+      const transferSymbol = item.transfer_type === 'native' ? activeNativeSymbol : normalizeTokenSelectionSymbol(item.token_symbol);
       rows.push({
         id: `transfer-history-${item.approval_id}`,
         at: item.terminal_at ?? item.decided_at ?? item.created_at,
@@ -1533,7 +1534,7 @@ export default function AgentPublicProfilePage() {
       return '—';
     }
     return `${((filledTrades / total) * 100).toFixed(1)}%`;
-  }, [filledTrades, trades]);
+  }, [activeNativeSymbol, filledTrades, trades]);
 
   const status = profile?.agent.public_status;
   const isPaused =
@@ -1542,8 +1543,9 @@ export default function AgentPublicProfilePage() {
     selectedWalletTokens.length === 0 ? 'All tokens' : `${selectedWalletTokens.join(', ')} selected`;
   const displayWalletTokenLabel = (token: string): string => {
     const normalized = normalizeTokenSelectionSymbol(token);
-    if (normalized === 'ETH') {
-      return `${activeChainLabel} ETH`;
+    const upperNative = activeNativeSymbol.toUpperCase();
+    if (normalized === 'ETH' || normalized === upperNative || normalized.endsWith(` ${upperNative}`)) {
+      return `${activeChainLabel} ${activeNativeSymbol}`;
     }
     return token;
   };
@@ -2383,7 +2385,7 @@ export default function AgentPublicProfilePage() {
                       <div>
                         <div className={styles.listTitle}>
                           {request.amount_atomic} (
-                          {request.asset_kind === 'native' ? `${activeChainLabel} ETH` : (request.asset_symbol ?? 'Token')}) ·{' '}
+                          {request.asset_kind === 'native' ? `${activeChainLabel} ${activeNativeSymbol}` : (request.asset_symbol ?? 'Token')}) ·{' '}
                           {displayStatusLabel(request.status)}
                         </div>
                         <div className={styles.muted}>{formatUtc(request.created_at)} UTC</div>

@@ -2,11 +2,12 @@
 
 import { useEffect, useMemo, useState } from 'react';
 
-export type ChainKey = 'base_sepolia' | 'hardhat_local';
+export type ChainKey = 'base_sepolia' | 'kite_ai_testnet' | 'hardhat_local';
 export type DashboardChainKey = 'all' | ChainKey;
 
 export const CHAIN_OPTIONS: Array<{ key: ChainKey; label: string }> = [
   { key: 'base_sepolia', label: 'Base Sepolia' },
+  { key: 'kite_ai_testnet', label: 'Kite AI Testnet' },
   { key: 'hardhat_local', label: 'Hardhat Local' }
 ];
 
@@ -15,13 +16,17 @@ export const DASHBOARD_CHAIN_OPTIONS: Array<{ key: DashboardChainKey; label: str
   ...CHAIN_OPTIONS
 ];
 
+export function nativeSymbolForChainKey(chainKey: ChainKey): string {
+  return chainKey === 'kite_ai_testnet' ? 'KITE' : 'ETH';
+}
+
 const STORAGE_KEY = 'xclaw_chain_key';
 const DASHBOARD_STORAGE_KEY = 'xclaw_dashboard_chain_key';
 const EVENT_NAME = 'xclaw:chain_changed';
 const DASHBOARD_EVENT_NAME = 'xclaw:dashboard_chain_changed';
 
 function isChainKey(value: unknown): value is ChainKey {
-  return value === 'base_sepolia' || value === 'hardhat_local';
+  return value === 'base_sepolia' || value === 'kite_ai_testnet' || value === 'hardhat_local';
 }
 
 function isDashboardChainKey(value: unknown): value is DashboardChainKey {

@@ -2800,3 +2800,39 @@ Note:
 - [x] Runtime tests:
   - [x] `python3 -m unittest apps/agent-runtime/tests/test_tracked_runtime.py -v`
   - [x] `python3 -m unittest apps/agent-runtime/tests/test_x402_skill_wrapper.py -v`
+
+---
+
+## 83) Slice 83: Kite AI Testnet Parity (Runtime + Web + DEX + x402)
+
+### 83.1 Canonical/doc sync
+- [x] Add Slice 83 goal/DoD + issue mapping to `docs/XCLAW_SLICE_TRACKER.md`.
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` with locked Kite testnet parity contract.
+- [x] Update handoff/process artifacts:
+  - [x] `docs/CONTEXT_PACK.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+- [x] Update `docs/api/WALLET_COMMAND_CONTRACT.md` and `docs/api/openapi.v1.yaml` for chain examples/contracts.
+
+### 83.2 Implementation
+- [x] Add `config/chains/kite_ai_testnet.json` with locked chain/rpc/explorer/router/factory/token constants.
+- [x] Enable Kite testnet in `config/x402/networks.json` and keep `kite_ai_mainnet` disabled.
+- [x] Add runtime DEX adapter abstraction (`UniswapV2RouterAdapter`, `KiteTesseractAdapter`) and route selection by chain.
+- [x] Ensure runtime wallet/trade/limit/tracked/x402 command families accept `kite_ai_testnet`.
+- [x] Ensure web chain selector includes `Kite AI Testnet` and status provider probes include it.
+- [x] Ensure API validation/hints include `kite_ai_testnet` where chain-config-backed.
+- [x] Keep faucet endpoint Base-only with structured unsupported response for Kite.
+
+### 83.3 Validation + evidence
+- [x] Run required gates sequentially:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `pm2 restart all`
+- [x] Runtime tests:
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_x402_runtime.py -v`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_dex_adapter.py -v`

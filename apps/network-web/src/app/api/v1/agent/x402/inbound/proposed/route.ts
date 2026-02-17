@@ -34,7 +34,7 @@ type AgentX402InboundProposedRequest = {
 type ResolvedAsset = {
   assetKind: 'native' | 'erc20';
   assetAddress: string | null;
-  assetSymbol: 'ETH' | 'USDC' | 'WETH';
+  assetSymbol: 'ETH' | 'KITE' | 'USDC' | 'WETH' | 'WKITE' | 'USDT';
 };
 
 function parseAmountAtomic(value: unknown): string | null {
@@ -84,7 +84,8 @@ function resolveSupportedAsset(
   const assetKind = assetKindRaw === 'erc20' ? 'erc20' : 'native';
   const symbol = String(assetSymbolRaw ?? '').trim().toUpperCase();
   if (assetKind === 'native') {
-    return { assetKind: 'native', assetAddress: null, assetSymbol: 'ETH' };
+    const nativeSymbol = chainKey === 'kite_ai_testnet' ? 'KITE' : 'ETH';
+    return { assetKind: 'native', assetAddress: null, assetSymbol: nativeSymbol };
   }
 
   const bySymbol = new Map<string, string>();
@@ -93,14 +94,14 @@ function resolveSupportedAsset(
       continue;
     }
     const normalized = tokenSymbol.trim().toUpperCase();
-    if (normalized === 'USDC' || normalized === 'WETH') {
+    if (normalized === 'USDC' || normalized === 'WETH' || normalized === 'WKITE' || normalized === 'USDT') {
       bySymbol.set(normalized, tokenAddress.toLowerCase());
     }
   }
 
   const requestedAddress = String(assetAddressRaw ?? '').trim().toLowerCase();
   if (symbol && bySymbol.has(symbol)) {
-    return { assetKind: 'erc20', assetAddress: bySymbol.get(symbol) ?? null, assetSymbol: symbol as 'USDC' | 'WETH' };
+    return { assetKind: 'erc20', assetAddress: bySymbol.get(symbol) ?? null, assetSymbol: symbol as ResolvedAsset['assetSymbol'] };
   }
   if (requestedAddress) {
     for (const [knownSymbol, knownAddress] of bySymbol.entries()) {
@@ -172,7 +173,10 @@ export async function POST(req: NextRequest) {
         {
           code: 'payload_invalid',
           message: 'Unsupported x402 asset for selected chain.',
-          actionHint: 'Use ETH, USDC, or WETH on supported chain configuration.'
+          actionHint:
+            body.networkKey === 'kite_ai_testnet'
+              ? 'Use KITE, WKITE, or USDT on Kite AI Testnet.'
+              : 'Use ETH, USDC, or WETH on supported chain configuration.'
         },
         requestId
       );

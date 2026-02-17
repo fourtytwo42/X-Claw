@@ -1,3 +1,34 @@
+# Slice 83 Acceptance Evidence
+
+Date (UTC): 2026-02-17
+Active slice: `Slice 83: Kite AI Testnet Parity`
+Issue mapping: `#33`
+
+## Objective + Scope Lock
+- Objective: add Kite AI testnet as first-class chain parity for runtime/web/x402 metadata without custody model changes.
+- Scope guard: Base Sepolia behavior preserved; `kite_ai_mainnet` remains disabled.
+
+## Required Validation Commands and Outcomes
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS (`Ran 61 tests`, `OK`)
+- `python3 -m unittest apps/agent-runtime/tests/test_x402_runtime.py -v` -> PASS (`Ran 5 tests`, `OK`)
+- `python3 -m unittest apps/agent-runtime/tests/test_dex_adapter.py -v` -> PASS (`Ran 2 tests`, `OK`)
+- `npm run db:parity` -> PASS (`ok: true`)
+- `npm run seed:reset` -> PASS (`ok: true`)
+- `npm run seed:load` -> PASS (`ok: true`; totals `agents=6`, `trades=11`)
+- `npm run seed:verify` -> PASS (`ok: true`)
+- `npm run build` -> PASS (Next.js production build completed)
+- `pm2 restart all` -> PASS (`xclaw-web` online after restart)
+
+## Functional Verification Notes
+- `config/chains/kite_ai_testnet.json` added with locked chain/rpc/explorer/router/factory/token constants.
+- Runtime DEX adapter selection added with explicit Kite adapter path.
+- `config/x402/networks.json` now enables `kite_ai_testnet` and keeps `kite_ai_mainnet` disabled.
+- Web chain options include `Kite AI Testnet` and status provider probes include Kite.
+- Public/management chain validation hints updated to include Kite.
+- Hosted x402 receive request asset allowlist expanded to include `KITE`, `WKITE`, `USDT` for Kite chain.
+
+---
+
 # Slice 81 Acceptance Evidence
 
 Date (UTC): 2026-02-17

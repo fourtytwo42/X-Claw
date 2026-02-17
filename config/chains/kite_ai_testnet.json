@@ -1,0 +1,58 @@
+{
+  "chainKey": "kite_ai_testnet",
+  "chainId": 2368,
+  "displayName": "Kite AI Testnet",
+  "nativeCurrency": {
+    "name": "KITE",
+    "symbol": "KITE",
+    "decimals": 18
+  },
+  "explorerBaseUrl": "https://testnet.kitescan.ai",
+  "rpc": {
+    "primary": "https://rpc-testnet.gokite.ai/",
+    "fallback": null
+  },
+  "coreContracts": {
+    "dex": "tesseract_univ2",
+    "deploymentStatus": "deployed",
+    "factory": "0x147f235Dde1adcB00Ef8E2D10D98fEd9a091284D",
+    "dexRouter": "0x402f35e11cC6E89E80EFF4205956716aCd94be04",
+    "router": "0x402f35e11cC6E89E80EFF4205956716aCd94be04",
+    "quoter": null,
+    "escrow": null,
+    "escrowAbiVersion": null,
+    "notes": "Slice 83: Kite AI Testnet routing through verified UniswapV2Router02 compatible router."
+  },
+  "canonicalTokens": {
+    "WKITE": "0x3bC8f037691Ce1d28c0bB224BD33563b49F99dE8",
+    "USDT": "0x0fF5393387ad2f9f691FD6Fd28e07E3969e27e63"
+  },
+  "updatedAt": "2026-02-17T23:10:00.000Z",
+  "version": 1,
+  "sources": {
+    "rpcEndpoints": [
+      "https://docs.gokite.ai/kite-chain/1-getting-started/network-information"
+    ],
+    "dexContracts": [
+      "https://testnet.kitescan.ai/address/0x402f35e11cC6E89E80EFF4205956716aCd94be04",
+      "https://testnet.kitescan.ai/address/0x147f235Dde1adcB00Ef8E2D10D98fEd9a091284D",
+      "https://testnet.kitescan.ai/address/0xbd02d7A6C782013514ad6e59fC3C6C684A460848"
+    ],
+    "tokenAddresses": [
+      "https://testnet.kitescan.ai/token/0x3bC8f037691Ce1d28c0bB224BD33563b49F99dE8",
+      "https://testnet.kitescan.ai/token/0x0fF5393387ad2f9f691FD6Fd28e07E3969e27e63"
+    ]
+  },
+  "verification": {
+    "verifiedAt": "2026-02-17T23:10:00.000Z",
+    "verifiedViaRpc": true,
+    "verifiedChainIdHex": "0x940",
+    "verifiedContractCodePresent": {
+      "WKITE": true,
+      "USDT": true,
+      "factory": true,
+      "dexRouter": true,
+      "router": true
+    }
+  }
+}

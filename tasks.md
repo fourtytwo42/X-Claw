@@ -1,3 +1,41 @@
+# Slice 83 Tasks: Kite AI Testnet Parity (Runtime + Web + DEX + x402)
+
+Active slice: `Slice 83: Kite AI Testnet Parity`
+Issue mapping: `#33`
+
+## 1) Canonical sync
+- [x] Add Slice 83 tracker + roadmap entries with issue mapping.
+- [x] Update source-of-truth with locked Kite parity contract.
+- [x] Update context/spec/tasks/acceptance artifacts.
+- [x] Update wallet command contract + OpenAPI chain examples.
+
+## 2) Runtime and config
+- [x] Add `config/chains/kite_ai_testnet.json`.
+- [x] Add `infrastructure/seed-data/kite-ai-testnet-contracts.json`.
+- [x] Enable Kite testnet in `config/x402/networks.json` (mainnet disabled).
+- [x] Add runtime DEX adapter module and wire trade quote/swap path through adapter selection.
+- [x] Remove Base-only runtime wording where chain-neutral behavior is expected.
+
+## 3) Web/API parity
+- [x] Add Kite option to active chain selector options.
+- [x] Make status provider probes include Kite chain.
+- [x] Update public/management action hints and chain validation paths to include Kite.
+- [x] Keep faucet endpoint Base-only with clear unsupported response on Kite.
+- [x] Ensure x402 receive request asset validation includes Kite assets (`KITE`, `WKITE`, `USDT`).
+
+## 4) Tests and validation
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_x402_runtime.py -v`
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_dex_adapter.py -v`
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+
+---
+
 # Slice 81 Tasks: Explore v2 Full Flush (No Placeholders)
 
 Active slice: `Slice 81: Explore v2 Full Flush (No Placeholders)`

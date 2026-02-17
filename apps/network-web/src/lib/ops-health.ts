@@ -51,7 +51,7 @@ type ChainConfig = {
 };
 
 const HEARTBEAT_MISS_THRESHOLD_SECONDS = 180;
-const STATUS_PROVIDER_CHAIN_KEYS = new Set(['base_sepolia']);
+const STATUS_PROVIDER_CHAIN_KEYS = new Set(['base_sepolia', 'kite_ai_testnet']);
 
 function nowIso(): string {
   return new Date().toISOString();

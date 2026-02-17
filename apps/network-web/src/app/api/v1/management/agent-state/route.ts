@@ -152,7 +152,7 @@ export async function GET(req: NextRequest) {
         {
           code: 'payload_invalid',
           message: 'Invalid chainKey query parameter value.',
-          actionHint: 'Provide a supported chainKey (for example base_sepolia).',
+          actionHint: 'Provide a supported chainKey (for example base_sepolia or kite_ai_testnet).',
           details: { chainKey }
         },
         requestId

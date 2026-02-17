@@ -4,6 +4,12 @@ import path from 'node:path';
 export type ChainConfig = {
   chainKey: string;
   chainId?: number;
+  displayName?: string;
+  nativeCurrency?: {
+    name?: string;
+    symbol?: string;
+    decimals?: number;
+  } | null;
   explorerBaseUrl?: string | null;
   rpc?: {
     primary?: string | null;
@@ -57,4 +63,16 @@ export function chainRpcUrl(chainKey: string): string | null {
   }
 
   return null;
+}
+
+export function chainDisplayName(chainKey: string): string {
+  return getChainConfig(chainKey)?.displayName ?? chainKey;
+}
+
+export function chainNativeSymbol(chainKey: string): string {
+  const symbol = getChainConfig(chainKey)?.nativeCurrency?.symbol;
+  if (typeof symbol === 'string' && symbol.trim()) {
+    return symbol.trim();
+  }
+  return chainKey === 'kite_ai_testnet' ? 'KITE' : 'ETH';
 }

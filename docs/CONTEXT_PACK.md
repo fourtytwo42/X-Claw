@@ -1,5 +1,61 @@
 # X-Claw Context Pack
 
+## Slice 83 Context: Kite AI Testnet Parity (Runtime + Web + DEX + x402)
+
+Issue mapping: `#33`
+
+### Objective + scope lock
+- Objective: add `kite_ai_testnet` as first-class chain parity across runtime + web + x402 metadata while preserving Base behavior.
+- Scope guard: no web custody changes; signing remains agent-local.
+
+### Expected touched files (Slice 83 allowlist)
+- Config/artifacts:
+  - `config/chains/kite_ai_testnet.json`
+  - `config/x402/networks.json`
+  - `infrastructure/seed-data/kite-ai-testnet-contracts.json`
+- Runtime:
+  - `apps/agent-runtime/xclaw_agent/dex_adapter.py`
+  - `apps/agent-runtime/xclaw_agent/cli.py`
+  - `apps/agent-runtime/tests/test_dex_adapter.py`
+  - `apps/agent-runtime/tests/test_x402_runtime.py`
+- Web/API:
+  - `apps/network-web/src/lib/active-chain.ts`
+  - `apps/network-web/src/lib/chains.ts`
+  - `apps/network-web/src/lib/ops-health.ts`
+  - `apps/network-web/src/components/primary-nav.tsx`
+  - `apps/network-web/src/app/agents/[agentId]/page.tsx`
+  - `apps/network-web/src/app/api/v1/public/agents/route.ts`
+  - `apps/network-web/src/app/api/v1/public/leaderboard/route.ts`
+  - `apps/network-web/src/app/api/v1/management/agent-state/route.ts`
+  - `apps/network-web/src/app/api/v1/management/chains/update/route.ts`
+  - `apps/network-web/src/app/api/v1/management/approval-channels/update/route.ts`
+  - `apps/network-web/src/app/api/v1/agent/approvals/prompt/route.ts`
+  - `apps/network-web/src/app/api/v1/agent/policy-approvals/proposed/route.ts`
+  - `apps/network-web/src/app/api/v1/management/x402/receive-link/route.ts`
+  - `apps/network-web/src/app/api/v1/agent/x402/inbound/proposed/route.ts`
+- Canonical docs/contracts:
+  - `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - `docs/XCLAW_SLICE_TRACKER.md`
+  - `docs/XCLAW_BUILD_ROADMAP.md`
+  - `docs/api/openapi.v1.yaml`
+  - `docs/api/WALLET_COMMAND_CONTRACT.md`
+  - `spec.md`
+  - `tasks.md`
+  - `acceptance.md`
+
+### Verification plan
+- Runtime tests:
+  - `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+  - `python3 -m unittest apps/agent-runtime/tests/test_x402_runtime.py -v`
+  - `python3 -m unittest apps/agent-runtime/tests/test_dex_adapter.py -v`
+- Required gates:
+  - `npm run db:parity`
+  - `npm run seed:reset`
+  - `npm run seed:load`
+  - `npm run seed:verify`
+  - `npm run build`
+  - `pm2 restart all` (after successful build; sequential)
+
 ## Slice 81 Context: Explore v2 Full Flush (No Placeholders)
 
 Issue mapping: `#30`

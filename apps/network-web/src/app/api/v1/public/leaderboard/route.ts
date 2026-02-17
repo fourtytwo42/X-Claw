@@ -1,5 +1,6 @@
 import type { NextRequest } from 'next/server';
 
+import { getChainConfig } from '@/lib/chains';
 import { dbQuery } from '@/lib/db';
 import { errorResponse, internalErrorResponse, successResponse } from '@/lib/errors';
 import { LEADERBOARD_CACHE_PREFIX, LEADERBOARD_CACHE_TTL_SEC } from '@/lib/metrics';
@@ -62,6 +63,17 @@ export async function GET(req: NextRequest) {
           code: 'payload_invalid',
           message: 'Invalid mode query value.',
           actionHint: 'Use one of: mock, real, all.'
+        },
+        requestId
+      );
+    }
+    if (chain !== 'all' && !getChainConfig(chain)) {
+      return errorResponse(
+        400,
+        {
+          code: 'payload_invalid',
+          message: 'Invalid chain query value.',
+          actionHint: 'Use one of: all, base_sepolia, kite_ai_testnet, hardhat_local.'
         },
         requestId
       );

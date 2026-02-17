@@ -27,14 +27,17 @@
       }
     },
     "kite_ai_testnet": {
-      "enabled": false,
+      "enabled": true,
       "displayName": "Kite AI Testnet",
-      "chainId": null,
+      "chainId": 2368,
       "facilitators": {
         "kite": {
           "type": "kite",
-          "baseUrl": "https://docs.gokite.ai",
-          "notes": "Disabled by default until explicit source-of-truth promotion"
+          "baseUrl": "https://facilitator.pieverse.io",
+          "verifyPath": "/v2/verify",
+          "settlePath": "/v2/settle",
+          "networkAliases": ["kite-testnet", "eip155:2368"],
+          "notes": "Kite x402 testnet facilitator"
         }
       }
     },

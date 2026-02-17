@@ -43,13 +43,13 @@ class X402RuntimeTests(unittest.TestCase):
         payload = json.loads(raw) if raw else {}
         return code, payload
 
-    def test_list_networks_includes_base_and_kite_disabled(self) -> None:
+    def test_list_networks_includes_base_and_kite_enabled(self) -> None:
         payload = x402_runtime.list_networks()
         items = {item.get("network"): item for item in payload.get("networks", [])}
         self.assertIn("base_sepolia", items)
         self.assertIn("base", items)
         self.assertIn("kite_ai_testnet", items)
-        self.assertFalse(bool(items["kite_ai_testnet"].get("enabled")))
+        self.assertTrue(bool(items["kite_ai_testnet"].get("enabled")))
 
     def test_pay_creates_approval_pending_under_per_payment_policy(self) -> None:
         with self._with_temp_home() as home:

@@ -41,6 +41,7 @@ from xclaw_agent.x402_runtime import pay_create_or_execute as x402_pay_create_or
 from xclaw_agent.x402_runtime import pay_decide as x402_pay_decide
 from xclaw_agent.x402_runtime import pay_resume as x402_pay_resume
 from xclaw_agent.x402_runtime import X402RuntimeError
+from xclaw_agent.dex_adapter import build_dex_adapter, DexAdapterError
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 try:
     from argon2.low_level import Type, hash_secret_raw
@@ -2012,10 +2013,10 @@ def _transfer_amount_display(
     try:
         amount_int = int(str(amount_wei).strip())
     except Exception:
-        return str(amount_wei), str(token_symbol or ("ETH" if transfer_type == "native" else "TOKEN"))
+        return str(amount_wei), str(token_symbol or ("NATIVE" if transfer_type == "native" else "TOKEN"))
     if amount_int < 0:
         amount_int = 0
-    unit = "ETH" if transfer_type == "native" else (str(token_symbol or "TOKEN").strip() or "TOKEN")
+    unit = "NATIVE" if transfer_type == "native" else (str(token_symbol or "TOKEN").strip() or "TOKEN")
     decimals = 18
     if transfer_type == "token":
         try:
@@ -2034,7 +2035,7 @@ def _execute_pending_transfer_flow(flow: dict[str, Any]) -> dict[str, Any]:
     amount_wei = str(flow.get("amountWei") or "0").strip()
     to_address = str(flow.get("toAddress") or "").strip()
     token_address = str(flow.get("tokenAddress") or "").strip().lower() if transfer_type == "token" else None
-    token_symbol = str(flow.get("tokenSymbol") or ("ETH" if transfer_type == "native" else "TOKEN")).strip()
+    token_symbol = str(flow.get("tokenSymbol") or ("NATIVE" if transfer_type == "native" else "TOKEN")).strip()
     token_decimals_raw = flow.get("tokenDecimals", 18 if transfer_type == "native" else None)
     token_decimals: int | None
     try:
@@ -2908,7 +2909,7 @@ def cmd_approvals_decide_transfer(args: argparse.Namespace) -> int:
     status = str(flow.get("status") or "")
     chain = str(args.chain or flow.get("chainKey") or "").strip()
     flow_transfer_type = str(flow.get("transferType") or "native").strip().lower()
-    flow_token_symbol = str(flow.get("tokenSymbol") or ("ETH" if flow_transfer_type == "native" else "TOKEN")).strip()
+    flow_token_symbol = str(flow.get("tokenSymbol") or ("NATIVE" if flow_transfer_type == "native" else "TOKEN")).strip()
     flow_token_decimals_raw = flow.get("tokenDecimals", 18 if flow_transfer_type == "native" else None)
     try:
         flow_token_decimals = int(flow_token_decimals_raw) if flow_token_decimals_raw is not None else None
@@ -3389,28 +3390,18 @@ def _quote_router_price(chain: str, token_in: str, token_out: str) -> Decimal:
     token_out_decimals = int(token_out_meta.get("decimals", 18))
 
     one_token_out_units = str(10**token_out_decimals)
-    proc = _run_subprocess(
-        [
-            cast_bin,
-            "call",
-            "--rpc-url",
-            rpc_url,
-            router,
-            "getAmountsOut(uint256,address[])(uint256[])",
-            one_token_out_units,
-            f"[{token_out},{token_in}]",
-        ],
-        timeout_sec=_cast_call_timeout_sec(),
-        kind="cast_call",
-    )
-    if proc.returncode != 0:
-        stderr = (proc.stderr or "").strip()
-        stdout = (proc.stdout or "").strip()
-        raise WalletStoreError(stderr or stdout or "cast call getAmountsOut failed.")
-
-    # Output is amounts[]; final element is token_in units for 1 token_out.
-    token_in_units = _parse_uint_from_cast_output(proc.stdout)
-    return Decimal(token_in_units) / (Decimal(10) ** Decimal(token_in_decimals))
+    adapter = build_dex_adapter(chain, cast_bin, rpc_url, router)
+    try:
+        return adapter.quote_token_in_per_one_token_out(
+            token_out_decimals=token_out_decimals,
+            token_in_decimals=token_in_decimals,
+            token_out=token_out,
+            token_in=token_in,
+            run_call=lambda cmd: _run_subprocess(cmd, timeout_sec=_cast_call_timeout_sec(), kind="cast_call"),
+            parse_uint=_parse_uint_from_cast_output,
+        )
+    except DexAdapterError as exc:
+        raise WalletStoreError(str(exc)) from exc
 
 
 def _limit_order_triggered(side: str, current_price: Decimal, limit_price: Decimal) -> bool:
@@ -3631,16 +3622,17 @@ def _router_get_amount_out(chain: str, amount_in_units: str, token_in: str, toke
     cast_bin = _require_cast_bin()
     router = _require_chain_contract_address(chain, "router")
     rpc_url = _chain_rpc_url(chain)
-    proc = _run_subprocess(
-        [cast_bin, "call", "--rpc-url", rpc_url, router, "getAmountsOut(uint256,address[])(uint256[])", amount_in_units, f"[{token_in},{token_out}]"],
-        timeout_sec=_cast_call_timeout_sec(),
-        kind="cast_call",
-    )
-    if proc.returncode != 0:
-        stderr = (proc.stderr or "").strip()
-        stdout = (proc.stdout or "").strip()
-        raise WalletStoreError(stderr or stdout or "cast call getAmountsOut failed.")
-    return int(_parse_uint_from_cast_output(proc.stdout))
+    adapter = build_dex_adapter(chain, cast_bin, rpc_url, router)
+    try:
+        return adapter.get_amount_out(
+            amount_in_units=amount_in_units,
+            token_in=token_in,
+            token_out=token_out,
+            run_call=lambda cmd: _run_subprocess(cmd, timeout_sec=_cast_call_timeout_sec(), kind="cast_call"),
+            parse_uint=_parse_uint_from_cast_output,
+        )
+    except DexAdapterError as exc:
+        raise WalletStoreError(str(exc)) from exc
 
 
 def cmd_trade_spot(args: argparse.Namespace) -> int:
@@ -4428,7 +4420,7 @@ def cmd_trade_execute(args: argparse.Namespace) -> int:
             return fail(
                 "unsupported_mode",
                 "Mock mode is deprecated for runtime trade execution.",
-                "Execute network trades only on base_sepolia (`mode=real`).",
+                "Execute network trades with mode=real on a configured chain.",
                 {"tradeId": args.intent, "mode": mode, "supportedMode": "real", "chain": args.chain},
                 exit_code=1,
             )
@@ -5040,6 +5032,16 @@ def _canonical_token_map(chain: str) -> dict[str, str]:
     return out
 
 
+def _native_symbol_for_chain(chain: str) -> str:
+    cfg = _load_chain_config(chain)
+    native = cfg.get("nativeCurrency")
+    if isinstance(native, dict):
+        symbol = native.get("symbol")
+        if isinstance(symbol, str) and symbol.strip():
+            return symbol.strip().upper()
+    return "ETH"
+
+
 def _fetch_wallet_holdings(chain: str) -> dict[str, Any]:
     store = load_wallet_store()
     _, wallet = _chain_wallet(store, chain)
@@ -5072,7 +5074,7 @@ def _fetch_wallet_holdings(chain: str) -> dict[str, Any]:
     return {
         "address": address,
         "native": {
-            "symbol": "ETH",
+            "symbol": _native_symbol_for_chain(chain),
             "balanceWei": native_balance_wei,
             "balance": native_balance_eth,
             "balancePretty": _format_units_pretty(int(native_balance_wei), 18),
@@ -5350,7 +5352,7 @@ def cmd_limit_orders_create(args: argparse.Namespace) -> int:
             return fail(
                 "unsupported_mode",
                 "Mock mode is deprecated for limit orders.",
-                "Use network mode (`real`) on base_sepolia.",
+                "Use network mode (`real`) on a configured chain.",
                 {"mode": args.mode, "supportedMode": "real", "chain": args.chain},
                 exit_code=1,
             )
@@ -5976,7 +5978,8 @@ def cmd_wallet_send(args: argparse.Namespace) -> int:
         outbound_eval = _evaluate_outbound_transfer_policy(chain, args.to)
 
         approval_required, transfer_policy = _transfer_requires_approval(chain, "native", None)
-        amount_human, amount_unit = _transfer_amount_display(str(args.amount_wei), "native", "ETH", 18)
+        native_symbol = _native_symbol_for_chain(chain)
+        amount_human, amount_unit = _transfer_amount_display(str(args.amount_wei), "native", native_symbol, 18)
         amount_display = f"{amount_human} {amount_unit}"
         if not bool(outbound_eval.get("allowed")):
             approval_required = True
@@ -5987,7 +5990,7 @@ def cmd_wallet_send(args: argparse.Namespace) -> int:
             "status": "approval_pending" if approval_required else "approved",
             "transferType": "native",
             "tokenAddress": None,
-            "tokenSymbol": "ETH",
+            "tokenSymbol": native_symbol,
             "tokenDecimals": 18,
             "toAddress": args.to.lower(),
             "amountWei": str(args.amount_wei),
@@ -6008,7 +6011,7 @@ def cmd_wallet_send(args: argparse.Namespace) -> int:
             queued_message = (
                 "Approval required (transfer)\n\n"
                 "Request: Send native token\n"
-                f"Amount: {amount_display} ({args.amount_wei} wei)\n"
+                f"Amount: {amount_display} ({args.amount_wei} base units)\n"
                 f"To: {args.to.lower()}\n"
                 f"Chain: {chain}\n"
                 f"Approval ID: {approval_id}\n"
@@ -6215,7 +6218,7 @@ def cmd_wallet_balance(args: argparse.Namespace) -> int:
             balanceWei=str(parsed),
             balanceEth=_format_units(int(parsed), 18),
             decimals=18,
-            symbol="ETH",
+            symbol=_native_symbol_for_chain(chain),
         )
     except WalletSecurityError as exc:
         return fail("unsafe_permissions", str(exc), "Restrict permissions to owner-only (0700/0600) and retry.", {"chain": chain}, exit_code=1)
@@ -6338,7 +6341,7 @@ def cmd_x402_receive_request(args: argparse.Namespace) -> int:
         return fail(
             "invalid_input",
             "ERC-20 receive requests require asset symbol or asset address.",
-            "Set --asset-symbol USDC|WETH (or --asset-address 0x...).",
+            "Set --asset-symbol (USDC|WETH|WKITE|USDT) or --asset-address 0x....",
             exit_code=2,
         )
 

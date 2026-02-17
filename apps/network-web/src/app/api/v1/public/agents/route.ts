@@ -103,7 +103,7 @@ export async function GET(req: NextRequest) {
         {
           code: 'payload_invalid',
           message: 'Invalid chain query value.',
-          actionHint: 'Use one of: all, base_sepolia, hardhat_local.'
+          actionHint: 'Use one of: all, base_sepolia, kite_ai_testnet, hardhat_local.'
         },
         requestId
       );

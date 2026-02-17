@@ -1,3 +1,35 @@
+# Slice 83 Spec: Kite AI Testnet Parity (Runtime + Web + DEX + x402)
+
+## Goal
+Enable `kite_ai_testnet` as a first-class chain option across runtime and web so agents can perform wallet, trade, limit-order, tracked-agent, and hosted x402 metadata flows with parity to Base Sepolia.
+
+## Non-goals
+1. No custody changes (private keys stay agent-local).
+2. No `kite_ai_mainnet` enablement in this slice.
+3. No faucet expansion beyond Base Sepolia.
+
+## Locked scope
+1. Add chain config `config/chains/kite_ai_testnet.json` with locked RPC/explorer/DEX/token constants.
+2. Enable `kite_ai_testnet` in `config/x402/networks.json`; keep `kite_ai_mainnet` disabled.
+3. Add runtime DEX adapter abstraction with Kite adapter selection by chain.
+4. Ensure runtime command families accept `--chain kite_ai_testnet`.
+5. Ensure web chain selectors include `Kite AI Testnet`.
+6. Ensure chain validation/hints include Kite where chain-config-backed.
+7. Preserve existing Base behavior and Base-only faucet response semantics.
+
+## Acceptance checks
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- `python3 -m unittest apps/agent-runtime/tests/test_x402_runtime.py -v`
+- `python3 -m unittest apps/agent-runtime/tests/test_dex_adapter.py -v`
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `pm2 restart all`
+
+---
+
 # Slice 81 Spec: Explore v2 Full Flush (No Placeholders)
 
 ## Goal

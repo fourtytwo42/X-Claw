@@ -8,6 +8,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ActiveAgentSidebarLink } from '@/components/active-agent-sidebar-link';
 import { MobileMoreSheet } from '@/components/mobile-more-sheet';
 import { SidebarIcon } from '@/components/sidebar-icons';
+import { getStoredChainKey } from '@/lib/active-chain';
 import { getAgentAvatarPalette, getAgentInitial } from '@/lib/agent-avatar-color';
 
 import styles from './primary-nav.module.css';
@@ -102,7 +103,7 @@ export function PrimaryNav({ className, desktopExtra, mobileMoreContent }: Prima
             }
             setActiveManagedAgentId(activeAgentId);
             const trackedResponse = await fetch(
-              `/api/v1/management/tracked-agents?agentId=${encodeURIComponent(activeAgentId)}&chainKey=base_sepolia`,
+              `/api/v1/management/tracked-agents?agentId=${encodeURIComponent(activeAgentId)}&chainKey=${encodeURIComponent(getStoredChainKey())}`,
               { credentials: 'same-origin', cache: 'no-store' }
             );
             if (!trackedResponse.ok) {

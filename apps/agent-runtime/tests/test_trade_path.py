@@ -1574,12 +1574,12 @@ class TradePathRuntimeTests(unittest.TestCase):
             )
         self.assertEqual(code, 0)
 
-    def test_x402_serve_start_parser_default_ttl_is_1800(self) -> None:
+    def test_x402_receive_request_parser_defaults(self) -> None:
         parser = cli.build_parser()
         args = parser.parse_args(
             [
                 "x402",
-                "serve-start",
+                "receive-request",
                 "--network",
                 "base_sepolia",
                 "--facilitator",
@@ -1589,7 +1589,7 @@ class TradePathRuntimeTests(unittest.TestCase):
                 "--json",
             ]
         )
-        self.assertEqual(int(args.ttl_seconds), 1800)
+        self.assertEqual(str(args.asset_kind), "native")
 
     def test_limit_orders_sync_success(self) -> None:
         args = argparse.Namespace(chain="hardhat_local", json=True)

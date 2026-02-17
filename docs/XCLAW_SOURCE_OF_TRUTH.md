@@ -3308,3 +3308,60 @@ Limitations / notes:
   - `tracked-list`
   - `tracked-trades [tracked_agent_id] [limit]`
 - Product guidance: tracked agents are idea flow only; no automatic copy execution.
+
+## 71) Slice 83 Kite AI Testnet Parity Contract (Locked)
+
+1. Scope boundary:
+- Add `kite_ai_testnet` chain parity across runtime + web/API + hosted x402 metadata flows.
+- Preserve existing Base Sepolia behavior; no custody model changes.
+- `kite_ai_mainnet` remains defined but disabled in this slice.
+
+2. Locked chain constants:
+- `chainKey`: `kite_ai_testnet`
+- `chainId`: `2368`
+- RPC: `https://rpc-testnet.gokite.ai/`
+- Explorer: `https://testnet.kitescan.ai`
+- DEX router: `0x402f35e11cC6E89E80EFF4205956716aCd94be04`
+- DEX factory: `0x147f235Dde1adcB00Ef8E2D10D98fEd9a091284D`
+- Wrapped native (`WKITE`): `0x3bC8f037691Ce1d28c0bB224BD33563b49F99dE8`
+- `USDT`: `0x0fF5393387ad2f9f691FD6Fd28e07E3969e27e63`
+- `WKITE/USDT` pair: `0xbd02d7A6C782013514ad6e59fC3C6C684A460848`
+
+3. Runtime DEX contract:
+- Runtime uses adapter selection by chain:
+  - `UniswapV2RouterAdapter` for existing Base/Hardhat style chains.
+  - `KiteTesseractAdapter` for `kite_ai_testnet`.
+- Current Kite adapter path is router-ABI compatible with `getAmountsOut` and `swapExactTokensForTokens`.
+- Approval, execution, retry, and terminal status semantics remain unchanged across chains.
+
+4. Runtime/skill chain contract:
+- Existing command families must accept `--chain kite_ai_testnet` where chain-config-backed:
+  - wallet
+  - trade spot/execute
+  - limit orders
+  - tracked list/trades
+  - transfer policy/approvals
+  - dashboard outputs
+- Installer default chain remains `base_sepolia`; Kite is additive/selectable.
+
+5. Hosted x402 parity contract:
+- `config/x402/networks.json` enables `kite_ai_testnet` with facilitator:
+  - base URL: `https://facilitator.pieverse.io`
+  - verify path: `/v2/verify`
+  - settle path: `/v2/settle`
+  - aliases include `kite-testnet` and `eip155:2368`
+- Hosted receive request assets for Kite include:
+  - native `KITE`
+  - ERC-20 `WKITE`
+  - ERC-20 `USDT`
+- `kite_ai_mainnet` remains disabled in this slice.
+
+6. Web/API parity contract:
+- Chain selectors include `Kite AI Testnet` on:
+  - `/dashboard`
+  - `/explore`
+  - `/approvals`
+  - `/agents/[agentId]`
+  - `/status`
+- Public/management chain validation and action hints include `kite_ai_testnet` where chain-config-backed.
+- Faucet remains Base-only and must return structured unsupported response for Kite requests.

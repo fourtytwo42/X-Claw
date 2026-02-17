@@ -1582,3 +1582,23 @@ DoD:
 - [x] runtime `dashboard` includes tracked summary; runtime CLI adds `tracked list` and `tracked trades`; skill wrapper adds `tracked-list` and `tracked-trades`.
 - [x] copy subscription APIs remain available but are marked deprecated in OpenAPI for transition compatibility.
 - [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all` (sequential), runtime tracked tests.
+
+---
+
+## Slice 83: Kite AI Testnet Parity (Runtime + Web + DEX + x402)
+Status: [x]
+Issue: #33
+
+Goal:
+- Add `kite_ai_testnet` as a first-class chain option across runtime + web with DEX/x402 parity while preserving existing Base Sepolia behavior.
+
+DoD:
+- [x] docs sync first: source-of-truth + roadmap + tracker + wallet contract + context/spec/tasks/acceptance aligned to Slice 83.
+- [x] lock chain/config constants for `kite_ai_testnet` (`chainId=2368`, rpc/explorer, router/factory, canonical tokens).
+- [x] runtime adds DEX adapter selection for Kite (`KiteTesseractAdapter`) and keeps Base path under existing router adapter semantics.
+- [x] runtime/skill chain surfaces support `--chain kite_ai_testnet` for wallet/trade/limit/tracked/x402 command families.
+- [x] x402 config enables `kite_ai_testnet` with facilitator `https://facilitator.pieverse.io` (`/v2/verify`, `/v2/settle`), while keeping `kite_ai_mainnet` disabled.
+- [x] web chain selectors include `Kite AI Testnet` across dashboard/explore/approvals/agents/status.
+- [x] management/public API chain validation and action hints include `kite_ai_testnet`.
+- [x] Base-only faucet behavior preserved with structured unsupported response for Kite.
+- [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all` (sequential), plus runtime Kite/x402 tests.

@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
         {
           code: 'payload_invalid',
           message: 'Invalid chainKey value.',
-          actionHint: 'Use a supported chain key (for example base_sepolia).',
+          actionHint: 'Use a supported chain key (for example base_sepolia or kite_ai_testnet).',
           details: { chainKey: body.chainKey }
         },
         requestId

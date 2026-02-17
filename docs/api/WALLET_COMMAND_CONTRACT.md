@@ -27,6 +27,7 @@ Required wallet commands:
 Notes:
 - `chain` is sourced from `XCLAW_DEFAULT_CHAIN`.
 - `wallet-send` uses base-unit amount for deterministic automation.
+- Supported chain keys for this contract include `base_sepolia`, `kite_ai_testnet`, and `hardhat_local` (where configured).
 
 ## 2) Delegated Runtime Commands
 
