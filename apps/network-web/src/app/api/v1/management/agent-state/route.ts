@@ -111,11 +111,8 @@ function isMissingPolicySnapshotChainKey(error: unknown): boolean {
     return false;
   }
   const code = 'code' in error ? String((error as { code?: unknown }).code ?? '') : '';
-  if (code !== '42703') {
-    return false;
-  }
   const message = 'message' in error ? String((error as { message?: unknown }).message ?? '') : '';
-  return message.includes('chain_key') && message.includes('agent_policy_snapshots');
+  return code === '42703' || message.includes('chain_key');
 }
 
 export async function GET(req: NextRequest) {
