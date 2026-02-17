@@ -12,8 +12,7 @@
 }
 
 .header {
-  position: sticky;
-  top: 0;
+  position: relative;
   z-index: 50;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
