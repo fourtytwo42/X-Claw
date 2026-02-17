@@ -33,7 +33,14 @@
 .linkList {
   display: flex;
   flex-direction: column;
+  height: 100%;
   gap: 0.42rem;
+}
+
+.bottomLinks {
+  display: grid;
+  gap: 0.42rem;
+  margin-top: auto;
 }
 
 .linkItem {

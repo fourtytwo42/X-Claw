@@ -18,10 +18,10 @@ type PrimaryNavProps = {
 };
 
 type NavItem = {
-  id: 'dashboard' | 'explore' | 'approvals' | 'settings' | 'howto' | 'status';
+  id: 'dashboard' | 'explore' | 'approvals' | 'settings' | 'howto';
   href: string;
   label: string;
-  icon: 'dashboard' | 'explore' | 'approvals' | 'settings' | 'howto' | 'status';
+  icon: 'dashboard' | 'explore' | 'approvals' | 'settings' | 'howto';
 };
 
 const PRIMARY_ITEMS: NavItem[] = [
@@ -30,18 +30,14 @@ const PRIMARY_ITEMS: NavItem[] = [
   { id: 'approvals', href: '/approvals', label: 'Approvals', icon: 'approvals' }
 ];
 
-const SECONDARY_ITEMS: NavItem[] = [
+const BOTTOM_ITEMS: NavItem[] = [
   { id: 'settings', href: '/settings', label: 'Settings', icon: 'settings' },
-  { id: 'howto', href: '/how-to', label: 'How To', icon: 'howto' },
-  { id: 'status', href: '/status', label: 'Status', icon: 'status' }
+  { id: 'howto', href: '/how-to', label: 'How To', icon: 'howto' }
 ];
 
 function isActivePath(pathname: string, href: string): boolean {
   if (href === '/explore') {
     return pathname === '/explore' || pathname === '/agents';
-  }
-  if (href === '/status') {
-    return pathname === '/status';
   }
   return pathname === href;
 }
@@ -81,20 +77,22 @@ export function PrimaryNav({ className, desktopExtra, mobileMoreContent }: Prima
 
           <ActiveAgentSidebarLink itemClassName={styles.linkItem} activeClassName={styles.linkItemActive} />
 
-          {SECONDARY_ITEMS.map((item) => {
-            const active = isActivePath(pathname, item.href);
-            return (
-              <Link
-                key={item.id}
-                href={item.href}
-                className={`${styles.linkItem}${active ? ` ${styles.linkItemActive}` : ''}`}
-                aria-label={item.label}
-                title={item.label}
-              >
-                <SidebarIcon name={item.icon} />
-              </Link>
-            );
-          })}
+          <div className={styles.bottomLinks}>
+            {BOTTOM_ITEMS.map((item) => {
+              const active = isActivePath(pathname, item.href);
+              return (
+                <Link
+                  key={item.id}
+                  href={item.href}
+                  className={`${styles.linkItem}${active ? ` ${styles.linkItemActive}` : ''}`}
+                  aria-label={item.label}
+                  title={item.label}
+                >
+                  <SidebarIcon name={item.icon} />
+                </Link>
+              );
+            })}
+          </div>
         </nav>
 
         {desktopExtra ? <div className={styles.desktopExtra}>{desktopExtra}</div> : null}
@@ -133,7 +131,7 @@ export function PrimaryNav({ className, desktopExtra, mobileMoreContent }: Prima
 
       <MobileMoreSheet open={mobileMoreOpen} onClose={() => setMobileMoreOpen(false)}>
         <div className={styles.sheetLinks}>
-          {SECONDARY_ITEMS.map((item) => (
+          {BOTTOM_ITEMS.map((item) => (
             <Link key={`sheet-${item.id}`} href={item.href} className={styles.sheetLink}>
               <SidebarIcon name={item.icon} />
               <span>{item.label}</span>
