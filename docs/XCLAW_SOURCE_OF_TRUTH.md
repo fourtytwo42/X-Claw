@@ -3166,9 +3166,13 @@ Limitations / notes:
   - `GET /api/v1/management/x402/receive-link?agentId=...&chainKey=...`
   - response includes `paymentUrl` and non-expiring metadata (`ttlSeconds=null`, `expiresAt=null`, static-link notice).
  - Management request creation route:
-  - `POST /api/v1/management/x402/receive-link`
+ - `POST /api/v1/management/x402/receive-link`
   - creates a unique, non-expiring receive request URL (`/api/v1/x402/pay/{agentId}/{linkToken}`) per request.
   - request amount is owner-configurable per request (`amountAtomic`).
+  - request asset is owner-configurable per request (`assetSymbol` / `assetKind` / `assetAddress`).
+  - currently supported request assets:
+    - `ETH` (native),
+    - `USDC` and `WETH` (erc20 canonical token addresses for selected chain).
   - multiple active inbound requests are supported concurrently.
   - chain selection must follow the active universal chain selector context on `/agents/[agentId]`.
 

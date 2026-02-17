@@ -988,6 +988,12 @@ paths:
           schema:
             type: string
             nullable: true
+        - name: assetSymbol
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [ETH, USDC, WETH]
         - name: amountAtomic
           in: query
           required: false
@@ -1025,6 +1031,9 @@ paths:
                 assetAddress:
                   type: string
                   nullable: true
+                assetSymbol:
+                  type: string
+                  enum: [ETH, USDC, WETH]
                 amountAtomic:
                   type: string
       responses:

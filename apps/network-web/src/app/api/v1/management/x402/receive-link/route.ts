@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 
 import type { NextRequest } from 'next/server';
 
+import { getChainConfig } from '@/lib/chains';
 import { dbQuery } from '@/lib/db';
 import { errorResponse, internalErrorResponse, successResponse } from '@/lib/errors';
 import { parseJsonBody } from '@/lib/http';
@@ -34,6 +35,54 @@ function parseAmountAtomic(value: unknown): string | null {
   return raw;
 }
 
+type ResolvedAsset = {
+  assetKind: 'native' | 'erc20';
+  assetAddress: string | null;
+  assetSymbol: 'ETH' | 'USDC' | 'WETH';
+};
+
+function resolveSupportedAsset(
+  chainKey: string,
+  assetKindRaw: unknown,
+  assetAddressRaw: unknown,
+  assetSymbolRaw: unknown
+): ResolvedAsset | null {
+  const config = getChainConfig(chainKey);
+  if (!config) {
+    return null;
+  }
+  const canonicalTokens = config.canonicalTokens ?? {};
+  const assetKind = assetKindRaw === 'erc20' ? 'erc20' : 'native';
+  const symbol = String(assetSymbolRaw ?? '').trim().toUpperCase();
+  if (assetKind === 'native') {
+    return { assetKind: 'native', assetAddress: null, assetSymbol: 'ETH' };
+  }
+
+  const bySymbol = new Map<string, string>();
+  for (const [tokenSymbol, tokenAddress] of Object.entries(canonicalTokens)) {
+    if (!tokenAddress || typeof tokenAddress !== 'string') {
+      continue;
+    }
+    const normalized = tokenSymbol.trim().toUpperCase();
+    if (normalized === 'USDC' || normalized === 'WETH') {
+      bySymbol.set(normalized, tokenAddress.toLowerCase());
+    }
+  }
+
+  const requestedAddress = String(assetAddressRaw ?? '').trim().toLowerCase();
+  if (symbol && bySymbol.has(symbol)) {
+    return { assetKind: 'erc20', assetAddress: bySymbol.get(symbol) ?? null, assetSymbol: symbol as 'USDC' | 'WETH' };
+  }
+  if (requestedAddress) {
+    for (const [knownSymbol, knownAddress] of bySymbol.entries()) {
+      if (knownAddress === requestedAddress) {
+        return { assetKind: 'erc20', assetAddress: knownAddress, assetSymbol: knownSymbol as 'USDC' | 'WETH' };
+      }
+    }
+  }
+  return null;
+}
+
 export async function GET(req: NextRequest) {
   const requestId = getRequestId(req);
   try {
@@ -64,9 +113,23 @@ export async function GET(req: NextRequest) {
 
     const chainKey = req.nextUrl.searchParams.get('chainKey')?.trim() || 'base_sepolia';
     const facilitatorKey = req.nextUrl.searchParams.get('facilitatorKey')?.trim() || 'cdp';
-    const assetKind = req.nextUrl.searchParams.get('assetKind')?.trim() === 'erc20' ? 'erc20' : 'native';
-    const assetAddressRaw = req.nextUrl.searchParams.get('assetAddress')?.trim();
-    const assetAddress = assetKind === 'erc20' ? assetAddressRaw || null : null;
+    const resolvedAsset = resolveSupportedAsset(
+      chainKey,
+      req.nextUrl.searchParams.get('assetKind')?.trim(),
+      req.nextUrl.searchParams.get('assetAddress')?.trim(),
+      req.nextUrl.searchParams.get('assetSymbol')?.trim()
+    );
+    if (!resolvedAsset) {
+      return errorResponse(
+        400,
+        {
+          code: 'payload_invalid',
+          message: 'Unsupported x402 asset for selected chain.',
+          actionHint: 'Use ETH, USDC, or WETH on supported chain configuration.'
+        },
+        requestId
+      );
+    }
     const amountAtomic = req.nextUrl.searchParams.get('amountAtomic')?.trim() || '0.01';
     const active = await dbQuery<{
       payment_id: string;
@@ -74,6 +137,7 @@ export async function GET(req: NextRequest) {
       facilitator_key: string;
       asset_kind: 'native' | 'erc20';
       asset_address: string | null;
+      asset_symbol: string | null;
       amount_atomic: string;
       payment_url: string | null;
       link_token: string | null;
@@ -89,6 +153,7 @@ export async function GET(req: NextRequest) {
         facilitator_key,
         asset_kind::text,
         asset_address,
+        asset_symbol,
         amount_atomic::text,
         payment_url,
         link_token,
@@ -125,16 +190,26 @@ export async function GET(req: NextRequest) {
           facilitator_key = $1,
           asset_kind = $2,
           asset_address = $3,
-          amount_atomic = $4::numeric,
-          payment_url = $5,
+          asset_symbol = $4,
+          amount_atomic = $5::numeric,
+          payment_url = $6,
           reason_code = null,
           reason_message = null,
           expires_at = null,
-          updated_at = $6::timestamptz,
+          updated_at = $7::timestamptz,
           terminal_at = null
-        where payment_id = $7
+        where payment_id = $8
         `,
-        [facilitatorKey, assetKind, assetAddress, amountAtomic, paymentUrl, isoNow(), paymentId]
+        [
+          facilitatorKey,
+          resolvedAsset.assetKind,
+          resolvedAsset.assetAddress,
+          resolvedAsset.assetSymbol,
+          amountAtomic,
+          paymentUrl,
+          isoNow(),
+          paymentId
+        ]
       );
     } else {
       paymentId = makeId('xpm');
@@ -150,6 +225,7 @@ export async function GET(req: NextRequest) {
           facilitator_key,
           asset_kind,
           asset_address,
+          asset_symbol,
           amount_atomic,
           payment_url,
           link_token,
@@ -158,10 +234,22 @@ export async function GET(req: NextRequest) {
           updated_at,
           terminal_at
         ) values (
-          $1, $2, 'inbound', 'proposed', $3, $4, $5, $6, $7::numeric, $8, null, null, $9::timestamptz, $10::timestamptz, null
+          $1, $2, 'inbound', 'proposed', $3, $4, $5, $6, $7, $8::numeric, $9, null, null, $10::timestamptz, $11::timestamptz, null
         )
         `,
-        [paymentId, agentId, chainKey, facilitatorKey, assetKind, assetAddress, amountAtomic, paymentUrl, isoNow(), isoNow()]
+        [
+          paymentId,
+          agentId,
+          chainKey,
+          facilitatorKey,
+          resolvedAsset.assetKind,
+          resolvedAsset.assetAddress,
+          resolvedAsset.assetSymbol,
+          amountAtomic,
+          paymentUrl,
+          isoNow(),
+          isoNow()
+        ]
       );
     }
 
@@ -173,8 +261,9 @@ export async function GET(req: NextRequest) {
         paymentId,
         networkKey: chainKey,
         facilitatorKey,
-        assetKind,
-        assetAddress,
+        assetKind: resolvedAsset.assetKind,
+        assetAddress: resolvedAsset.assetAddress,
+        assetSymbol: resolvedAsset.assetSymbol,
         amountAtomic,
         paymentUrl,
         ttlSeconds: null,
@@ -196,6 +285,7 @@ type CreateReceiveRequestBody = {
   facilitatorKey?: string;
   assetKind?: 'native' | 'erc20';
   assetAddress?: string | null;
+  assetSymbol?: string;
   amountAtomic?: string;
 };
 
@@ -223,8 +313,18 @@ export async function POST(req: NextRequest) {
 
     const chainKey = String(body.chainKey ?? 'base_sepolia').trim() || 'base_sepolia';
     const facilitatorKey = String(body.facilitatorKey ?? 'cdp').trim() || 'cdp';
-    const assetKind = body.assetKind === 'erc20' ? 'erc20' : 'native';
-    const assetAddress = assetKind === 'erc20' ? String(body.assetAddress ?? '').trim() || null : null;
+    const resolvedAsset = resolveSupportedAsset(chainKey, body.assetKind, body.assetAddress, body.assetSymbol);
+    if (!resolvedAsset) {
+      return errorResponse(
+        400,
+        {
+          code: 'payload_invalid',
+          message: 'Unsupported x402 asset for selected chain.',
+          actionHint: 'Use ETH, USDC, or WETH on supported chain configuration.'
+        },
+        requestId
+      );
+    }
     const amountAtomic = parseAmountAtomic(body.amountAtomic ?? '0.01');
     if (!amountAtomic) {
       return errorResponse(
@@ -252,6 +352,7 @@ export async function POST(req: NextRequest) {
         facilitator_key,
         asset_kind,
         asset_address,
+        asset_symbol,
         amount_atomic,
         payment_url,
         link_token,
@@ -260,10 +361,21 @@ export async function POST(req: NextRequest) {
         updated_at,
         terminal_at
       ) values (
-        $1, $2, 'inbound', 'proposed', $3, $4, $5, $6, $7::numeric, $8, $9, null, now(), now(), null
+        $1, $2, 'inbound', 'proposed', $3, $4, $5, $6, $7, $8::numeric, $9, $10, null, now(), now(), null
       )
       `,
-      [paymentId, agentId, chainKey, facilitatorKey, assetKind, assetAddress, amountAtomic, paymentUrl, linkToken]
+      [
+        paymentId,
+        agentId,
+        chainKey,
+        facilitatorKey,
+        resolvedAsset.assetKind,
+        resolvedAsset.assetAddress,
+        resolvedAsset.assetSymbol,
+        amountAtomic,
+        paymentUrl,
+        linkToken
+      ]
     );
 
     return successResponse(
@@ -274,8 +386,9 @@ export async function POST(req: NextRequest) {
         paymentId,
         networkKey: chainKey,
         facilitatorKey,
-        assetKind,
-        assetAddress,
+        assetKind: resolvedAsset.assetKind,
+        assetAddress: resolvedAsset.assetAddress,
+        assetSymbol: resolvedAsset.assetSymbol,
         amountAtomic,
         paymentUrl,
         linkToken,
