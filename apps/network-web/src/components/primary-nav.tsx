@@ -157,63 +157,67 @@ export function PrimaryNav({ className, desktopExtra, mobileMoreContent }: Prima
         </Link>
 
         <nav className={styles.linkList} aria-label="Primary navigation">
-          {PRIMARY_ITEMS.map((item) => {
-            const active = isActivePath(pathname, item.href);
-            return (
-              <Link
-                key={item.id}
-                href={item.href}
-                className={`${styles.linkItem}${active ? ` ${styles.linkItemActive}` : ''}`}
-                aria-label={item.label}
-                title={item.label}
-              >
-                <SidebarIcon name={item.icon} />
-              </Link>
-            );
-          })}
-
-          <ActiveAgentSidebarLink itemClassName={styles.linkItem} activeClassName={styles.linkItemActive} />
-
-          {bookmarkedAgentIds.map((agentId) => {
-            const active = pathname === `/agents/${agentId}`;
-            const name = bookmarkedAgentNames[agentId] || 'Saved Agent';
-            const palette = getAgentAvatarPalette(agentId);
-            const initial = getAgentInitial(name, agentId);
-            return (
-              <div key={`saved-${agentId}`} className={styles.bookmarkItemWrap}>
+          <div className={styles.topLinks}>
+            {PRIMARY_ITEMS.map((item) => {
+              const active = isActivePath(pathname, item.href);
+              return (
                 <Link
-                  href={`/agents/${encodeURIComponent(agentId)}`}
+                  key={item.id}
+                  href={item.href}
                   className={`${styles.linkItem}${active ? ` ${styles.linkItemActive}` : ''}`}
-                  aria-label={`Saved: ${name}`}
-                  title={`Saved: ${name}`}
+                  aria-label={item.label}
+                  title={item.label}
                 >
-                  <span
-                    className="agent-shortcut-badge"
-                    style={{
-                      backgroundColor: palette.backgroundColor,
-                      borderColor: palette.borderColor,
-                      color: palette.textColor
+                  <SidebarIcon name={item.icon} />
+                </Link>
+              );
+            })}
+
+            <ActiveAgentSidebarLink itemClassName={styles.linkItem} activeClassName={styles.linkItemActive} />
+          </div>
+
+          <div className={styles.agentLinksScroller} aria-label="Saved agents">
+            {bookmarkedAgentIds.map((agentId) => {
+              const active = pathname === `/agents/${agentId}`;
+              const name = bookmarkedAgentNames[agentId] || 'Saved Agent';
+              const palette = getAgentAvatarPalette(agentId);
+              const initial = getAgentInitial(name, agentId);
+              return (
+                <div key={`saved-${agentId}`} className={styles.bookmarkItemWrap}>
+                  <Link
+                    href={`/agents/${encodeURIComponent(agentId)}`}
+                    className={`${styles.linkItem}${active ? ` ${styles.linkItemActive}` : ''}`}
+                    aria-label={`Saved: ${name}`}
+                    title={`Saved: ${name}`}
+                  >
+                    <span
+                      className="agent-shortcut-badge"
+                      style={{
+                        backgroundColor: palette.backgroundColor,
+                        borderColor: palette.borderColor,
+                        color: palette.textColor
+                      }}
+                    >
+                      {initial}
+                    </span>
+                  </Link>
+                  <button
+                    type="button"
+                    className={styles.bookmarkRemoveBtn}
+                    aria-label={`Remove saved agent ${name}`}
+                    title={`Remove ${name}`}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      removeBookmarkedAgent(agentId);
                     }}
                   >
-                    {initial}
-                  </span>
-                </Link>
-                <button
-                  type="button"
-                  className={styles.bookmarkRemoveBtn}
-                  aria-label={`Remove saved agent ${name}`}
-                  title={`Remove ${name}`}
-                  onClick={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    removeBookmarkedAgent(agentId);
-                  }}
-                >
-                  ×
-                </button>
-              </div>
-            );
-          })}
+                    ×
+                  </button>
+                </div>
+              );
+            })}
+          </div>
 
           <div className={styles.bottomLinks}>
             {BOTTOM_ITEMS.map((item) => {

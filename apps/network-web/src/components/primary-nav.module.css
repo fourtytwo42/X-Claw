@@ -1,15 +1,16 @@
 .navRoot {
   position: sticky;
-  top: 0.75rem;
+  top: 0;
   align-self: start;
-  height: calc(100vh - 1.5rem);
+  height: 100vh;
   border: 1px solid var(--line, #22304d);
-  border-radius: 22px;
+  border-radius: 0;
   background: linear-gradient(180deg, var(--bg-elev, #111a2e), var(--bg-elev-2, #0f172a));
   display: grid;
   grid-template-rows: auto 1fr auto;
   gap: 0.65rem;
   padding: 0.8rem 0.45rem;
+  overflow: hidden;
 }
 
 .logo {
@@ -35,12 +36,35 @@
   flex-direction: column;
   height: 100%;
   gap: 0.42rem;
+  min-height: 0;
+}
+
+.topLinks {
+  display: grid;
+  gap: 0.42rem;
+}
+
+.agentLinksScroller {
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: grid;
+  gap: 0.42rem;
+  padding-right: 0.08rem;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.agentLinksScroller::-webkit-scrollbar {
+  display: none;
 }
 
 .bottomLinks {
   display: grid;
   gap: 0.42rem;
   margin-top: auto;
+  padding-top: 0.2rem;
+  border-top: 1px solid color-mix(in srgb, var(--line, #22304d) 82%, transparent);
 }
 
 .linkItem {
