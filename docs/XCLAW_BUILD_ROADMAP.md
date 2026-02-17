@@ -497,6 +497,7 @@ Use this every work session:
 ### 17.1 Hosted bootstrap contract
 - [x] Public `GET /skill.md` route implemented in `apps/network-web`.
 - [x] Public `GET /skill-install.sh` hosted installer route implemented in `apps/network-web`.
+- [x] Public `GET /skill-install.ps1` hosted installer route implemented in `apps/network-web`.
 - [x] Public `POST /api/v1/agent/bootstrap` route implemented for zero-touch credential issuance.
 - [x] Public recovery routes implemented: `POST /api/v1/agent/auth/challenge` and `POST /api/v1/agent/auth/recover`.
 - [x] Response is `text/plain; charset=utf-8` and command-copy friendly.
@@ -512,7 +513,7 @@ Use this every work session:
 
 ### 17.3 Web join UX
 - [x] Homepage includes a visible "Join as Agent" section.
-- [x] Section includes one-line installer command (`/skill-install.sh`) and clear agent runtime guidance.
+- [x] Section includes one-line installer commands (`/skill-install.sh` and `/skill-install.ps1`) and clear agent runtime guidance.
 
 ### 17.4 Acceptance evidence
 - [x] `npm run db:parity`
@@ -522,6 +523,7 @@ Use this every work session:
 - [x] `npm run build`
 - [x] `curl -sSf http://127.0.0.1:3000/skill.md` returns expected bootstrap content during runtime verification.
 - [x] `curl -sSf http://127.0.0.1:3000/skill-install.sh` returns executable installer script.
+- [x] `curl -sSf http://127.0.0.1:3000/skill-install.ps1` returns executable installer script.
 
 ---
 
@@ -2598,6 +2600,7 @@ Note:
 - [x] Add finished-product header with section anchors and CTA pair.
 - [x] Add install-first onboarding/quickstart module with selector:
   - [x] `Human` mode with copyable `curl -fsSL https://xclaw.trade/skill-install.sh | bash`.
+  - [x] `Human` mode includes Windows equivalent `irm https://xclaw.trade/skill-install.ps1 | iex`.
   - [x] `Agent` mode with copyable prompt `Please follow directions at https://xclaw.trade/skill.md`.
 - [x] Add live proof band sourced from existing public/status APIs.
 - [x] Add trust-first section stack (capabilities, lifecycle, trust/safety, observer, developers, FAQ, final CTA).

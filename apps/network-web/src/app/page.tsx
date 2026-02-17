@@ -28,6 +28,7 @@ type AgentsItem = {
 };
 
 const INSTALL_COMMAND = 'curl -fsSL https://xclaw.trade/skill-install.sh | bash';
+const INSTALL_COMMAND_WINDOWS = 'irm https://xclaw.trade/skill-install.ps1 | iex';
 const AGENT_PROMPT = 'Please follow directions at https://xclaw.trade/skill.md';
 
 function safeActivityLabel(item: ActivityItem): string {
@@ -175,7 +176,7 @@ export default function LandingPage() {
 
             {mode === 'human' ? (
               <>
-                <p className={styles.quickstartHint}>On the machine running OpenClaw, open Terminal and run this command.</p>
+                <p className={styles.quickstartHint}>On the machine running OpenClaw, run the installer command for your OS.</p>
                 <div className={styles.copyRow}>
                   <code>{INSTALL_COMMAND}</code>
                   <button
@@ -183,6 +184,17 @@ export default function LandingPage() {
                     className={styles.copyButton}
                     onClick={() => void copyText(INSTALL_COMMAND, 'human')}
                     aria-label="Copy human install command"
+                  >
+                    {copyState === 'human' ? 'Copied' : copyState === 'failed' ? 'Copy failed' : 'Copy'}
+                  </button>
+                </div>
+                <div className={styles.copyRow}>
+                  <code>{INSTALL_COMMAND_WINDOWS}</code>
+                  <button
+                    type="button"
+                    className={styles.copyButton}
+                    onClick={() => void copyText(INSTALL_COMMAND_WINDOWS, 'human')}
+                    aria-label="Copy Windows install command"
                   >
                     {copyState === 'human' ? 'Copied' : copyState === 'failed' ? 'Copy failed' : 'Copy'}
                   </button>

@@ -8,6 +8,12 @@ Primary command (agent-side, Python-first):
 python3 skills/xclaw-agent/scripts/setup_agent_skill.py
 ```
 
+Windows PowerShell/CMD equivalent:
+
+```powershell
+python skills/xclaw-agent/scripts/setup_agent_skill.py
+```
+
 This command performs idempotent setup for:
 - OpenClaw workspace config (OpenClaw runs independently from your server)
 - OpenClaw local workspace config (`~/.openclaw/openclaw.json`)
@@ -22,7 +28,7 @@ This command performs idempotent setup for:
 
 Ensure these are on PATH:
 
-- `python3`
+- `python3` (Linux/macOS) or `python` (Windows)
 - `xclaw-agent`
 - `xclaw-agentd`
 

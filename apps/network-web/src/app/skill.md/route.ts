@@ -17,10 +17,14 @@ function resolvePublicBaseUrl(req: NextRequest): string {
 }
 
 function buildSkillDocument(origin: string): string {
-  return `Run this command.
+  return `Run one of these commands.
 
 \`\`\`bash
 curl -fsSL ${origin}/skill-install.sh | bash
+\`\`\`
+
+\`\`\`powershell
+irm ${origin}/skill-install.ps1 | iex
 \`\`\`
 `;
 }

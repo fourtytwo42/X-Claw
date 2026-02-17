@@ -26,6 +26,15 @@ def run(cmd: list[str], check: bool = True, capture: bool = True) -> subprocess.
     )
 
 
+def _python_command() -> list[str]:
+    if sys.executable:
+        return [sys.executable]
+    fallback = shutil.which("python3") or shutil.which("python")
+    if fallback:
+        return [fallback]
+    raise RuntimeError("Python interpreter not found.")
+
+
 def fail(message: str, action_hint: str = "") -> int:
     payload = {"ok": False, "code": "setup_failed", "message": message}
     if action_hint:
@@ -96,26 +105,52 @@ def ensure_managed_skill_copy(workspace: Path) -> Path:
 
 def ensure_launcher(workspace: Path, openclaw_bin: Path) -> Path:
     launcher_dir = openclaw_bin.parent
-    launcher_dir.mkdir(parents=True, exist_ok=True)
+    fallback_dir = APP_DIR / "bin"
+    target = workspace / "apps" / "agent-runtime"
+    target_entry = target / "bin" / "xclaw-agent"
+    if not target_entry.exists():
+        raise RuntimeError(f"Missing runtime binary: {target_entry}")
 
-    launcher_path = launcher_dir / "xclaw-agent"
-    target = workspace / "apps" / "agent-runtime" / "bin" / "xclaw-agent"
-    if not target.exists():
-        raise RuntimeError(f"Missing runtime binary: {target}")
+    try_dirs = [launcher_dir]
+    if fallback_dir != launcher_dir:
+        try_dirs.append(fallback_dir)
 
-    content = "\n".join(
-        [
-            "#!/usr/bin/env bash",
-            "set -euo pipefail",
-            f'exec "{target}" "$@"',
-            "",
-        ]
-    )
-    launcher_path.write_text(content, encoding="utf-8")
-    launcher_path.chmod(launcher_path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    write_errors: list[str] = []
+    for current_dir in try_dirs:
+        try:
+            current_dir.mkdir(parents=True, exist_ok=True)
+            if os.name == "nt":
+                launcher_path = current_dir / "xclaw-agent.cmd"
+                python_cmd = _python_command()[0]
+                content = "\n".join(
+                    [
+                        "@echo off",
+                        "setlocal",
+                        f'set "PYTHONPATH={target};%PYTHONPATH%"',
+                        f'"{python_cmd}" -m xclaw_agent.cli %*',
+                        "",
+                    ]
+                )
+                launcher_path.write_text(content, encoding="utf-8")
+            else:
+                launcher_path = current_dir / "xclaw-agent"
+                content = "\n".join(
+                    [
+                        "#!/usr/bin/env bash",
+                        "set -euo pipefail",
+                        f'exec "{target_entry}" "$@"',
+                        "",
+                    ]
+                )
+                launcher_path.write_text(content, encoding="utf-8")
+                launcher_path.chmod(launcher_path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
-    os.environ["PATH"] = f"{launcher_dir}:{os.environ.get('PATH', '')}"
-    return launcher_path
+            os.environ["PATH"] = f"{current_dir}:{os.environ.get('PATH', '')}"
+            return launcher_path
+        except OSError as exc:
+            write_errors.append(f"{current_dir}: {exc}")
+
+    raise RuntimeError("Unable to create xclaw-agent launcher. " + "; ".join(write_errors))
 
 
 def ensure_runtime_bin_env(launcher_path: Path) -> None:
@@ -136,8 +171,7 @@ def ensure_runtime_bin_env(launcher_path: Path) -> None:
 
 
 def ensure_ready() -> dict[str, str]:
-    if shutil.which("python3") is None:
-        raise RuntimeError("python3 is required")
+    python_cmd = _python_command()
 
     if shutil.which("xclaw-agent") is None:
         raise RuntimeError("xclaw-agent launcher was not found on PATH after setup")
@@ -146,8 +180,10 @@ def ensure_ready() -> dict[str, str]:
     run(["openclaw", "skills", "info", "xclaw-agent"])
     run(["openclaw", "skills", "list", "--eligible"])
 
+    python_version = run([*python_cmd, "--version"])
+    version_text = (python_version.stdout or "").strip() or (python_version.stderr or "").strip()
     versions = {
-        "python": run(["python3", "--version"]).stdout.strip(),
+        "python": version_text,
         "openclaw": run(["openclaw", "--version"]).stdout.strip(),
     }
     return versions

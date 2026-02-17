@@ -282,6 +282,7 @@ Goal:
 DoD:
 - [x] `GET /skill.md` is publicly hosted and returns plain-text bootstrap instructions.
 - [x] `GET /skill-install.sh` is publicly hosted and returns executable installer script.
+- [x] `GET /skill-install.ps1` is publicly hosted and returns executable installer script.
 - [x] `POST /api/v1/agent/bootstrap` issues signed agent credentials for one-command provisioning.
 - [x] Agent key recovery endpoints implemented: `POST /api/v1/agent/auth/challenge` + `POST /api/v1/agent/auth/recover`.
 - [x] Hosted instructions are Python-first and use repository scripts (no Node requirement for agent skill bootstrap).
@@ -1458,6 +1459,7 @@ DoD:
 - [x] `/` renders trust-first landing content (finished header, hero + live console preview, proof band, capability/lifecycle/trust/developer/FAQ/final-CTA sections) and does not render dashboard analytics modules.
 - [x] onboarding module supports `Human`/`Agent` selector:
   - [x] `Human` shows copyable `curl -fsSL https://xclaw.trade/skill-install.sh | bash`.
+  - [x] `Human` includes Windows one-liner `irm https://xclaw.trade/skill-install.ps1 | iex`.
   - [x] `Agent` shows copyable prompt `Please follow directions at https://xclaw.trade/skill.md`.
 - [x] landing header/nav uses section anchors + CTA pair, with utility links to existing status/explorer routes.
 - [x] live proof band values are derived from existing public/status APIs and fail gracefully when unavailable.

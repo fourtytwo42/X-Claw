@@ -551,6 +551,7 @@ Must show:
 - install-first onboarding near top with `Human` and `Agent` selector
 - copyable installer command:
   - `curl -fsSL https://xclaw.trade/skill-install.sh | bash`
+  - `irm https://xclaw.trade/skill-install.ps1 | iex`
 - agent guidance that runtime install uses the same command
 - links into operational routes (`/dashboard`, `/explore`, `/status`)
 
@@ -1243,13 +1244,14 @@ Runtime binary requirements for skill operation:
 ### 24.5 Installation and Loading Rules
 
 - Per-agent install path is `<workspace>/skills/xclaw-agent` (highest OpenClaw precedence).
-- One-command Python-first setup script is `python3 skills/xclaw-agent/scripts/setup_agent_skill.py`.
+- One-command Python-first setup script is `python3 skills/xclaw-agent/scripts/setup_agent_skill.py` (Linux/macOS) or `python skills/xclaw-agent/scripts/setup_agent_skill.py` (Windows).
 - Public hosted onboarding contract is `GET /skill.md` on the network-web host.
-- Hosted installer entrypoint is `GET /skill-install.sh` on the network-web host.
+- Hosted installer entrypoints are `GET /skill-install.sh` (Linux/macOS) and `GET /skill-install.ps1` (Windows) on the network-web host.
 - Setup script must ensure a default local wallet policy exists at `~/.xclaw-agent/policy.json` when missing (do not overwrite existing policy).
+- Setup script must install an OS-native `xclaw-agent` launcher (POSIX shell wrapper on Linux/macOS, `.cmd` launcher on Windows) without introducing Node/npm requirements for skill invocation.
 - Wallet passphrase is a required recovery secret: losing `XCLAW_WALLET_PASSPHRASE` permanently locks the local wallet (AES-GCM `InvalidTag` on decrypt). The installer must not print it, and must write an additional local encrypted backup at `~/.xclaw-agent/passphrase.backup.v1.json` to reduce accidental loss from config overwrites.
 - `GET /skill.md` must be plain text and include:
-  - one-line installer command (`curl -fsSL <host>/skill-install.sh | bash`),
+  - one-line installer commands (`curl -fsSL <host>/skill-install.sh | bash` and `irm <host>/skill-install.ps1 | iex`),
   - workspace bootstrap commands (clone/update repository/archive),
   - managed skill placement at `~/.openclaw/skills/xclaw-agent` for OpenClaw discovery across workspaces,
   - skill setup invocation (`setup_agent_skill.py`),
@@ -1977,7 +1979,7 @@ Required sections:
 
 3) Main content:
 - Install-first onboarding near top with `Human`/`Agent` mode selector
-- Human mode copy command: `curl -fsSL https://xclaw.trade/skill-install.sh | bash`
+- Human mode copy commands: `curl -fsSL https://xclaw.trade/skill-install.sh | bash` (Linux/macOS) and `irm https://xclaw.trade/skill-install.ps1 | iex` (Windows)
 - Agent mode guidance to use the same installer command in runtime terminal
 - product narrative copy sections focused on control/execution/transparency
 
@@ -3030,8 +3032,9 @@ Limitations / notes:
 - required selector with two modes:
   - `Human` (default),
   - `Agent`.
-- `Human` mode must show a single copyable command:
+- `Human` mode must show copyable installer command(s):
   - `curl -fsSL https://xclaw.trade/skill-install.sh | bash`
+  - `irm https://xclaw.trade/skill-install.ps1 | iex`
   - with explicit helper text instructing users to run it in terminal on the OpenClaw host.
 - `Agent` mode must show:
   - a copyable prompt line:
