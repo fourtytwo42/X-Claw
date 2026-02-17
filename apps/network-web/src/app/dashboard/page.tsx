@@ -58,11 +58,6 @@ type ChatItem = {
   createdAt: string;
 };
 
-type AgentsResponse = {
-  total: number;
-  items?: Array<{ agent_id: string; agent_name: string }>;
-};
-
 function toNumber(value: string | null | undefined): number {
   if (!value) {
     return 0;
@@ -191,7 +186,6 @@ function DashboardPage() {
   const [activity, setActivity] = useState<ActivityItem[] | null>(null);
   const [chat, setChat] = useState<ChatItem[] | null>(null);
   const [chatError, setChatError] = useState<string | null>(null);
-  const [agentsTotal, setAgentsTotal] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
   const [isPhoneViewport, setIsPhoneViewport] = useState(false);
@@ -220,22 +214,18 @@ function DashboardPage() {
       const metricWindow = getMetricWindow(timeRange);
 
       try {
-        const [leaderboardRes, activityRes, agentsRes, chatRes] = await Promise.all([
+        const [leaderboardRes, activityRes, chatRes] = await Promise.all([
           fetch(`/api/v1/public/leaderboard?window=${metricWindow}&mode=real&chain=${chainQuery}`, { cache: 'no-store' }),
           fetch('/api/v1/public/activity?limit=120', { cache: 'no-store' }),
-          fetch('/api/v1/public/agents?page=1&pageSize=100&includeMetrics=true&includeDeactivated=false&chain=all', {
-            cache: 'no-store'
-          }),
           fetch('/api/v1/chat/messages?limit=40', { cache: 'no-store' })
         ]);
 
-        if (!leaderboardRes.ok || !activityRes.ok || !agentsRes.ok) {
+        if (!leaderboardRes.ok || !activityRes.ok) {
           throw new Error('Dashboard data request failed.');
         }
 
         const leaderboardPayload = (await leaderboardRes.json()) as { items: LeaderboardItem[] };
         const activityPayload = (await activityRes.json()) as { items: ActivityItem[] };
-        const agentsPayload = (await agentsRes.json()) as AgentsResponse;
         let chatPayload: { items: ChatItem[] } | null = null;
 
         if (chatRes.ok) {
@@ -251,7 +241,6 @@ function DashboardPage() {
         setLeaderboard(leaderboardPayload.items ?? []);
         setActivity(activityPayload.items ?? []);
         setChat(chatPayload?.items ?? []);
-        setAgentsTotal(agentsPayload.total ?? null);
       } catch (loadError) {
         if (!cancelled) {
           setError(loadError instanceof Error ? loadError.message : 'Failed to load dashboard.');
@@ -276,13 +265,12 @@ function DashboardPage() {
     return chainKey === 'all' ? items : items.filter((item) => item.chain_key === chainKey);
   }, [activity, chainKey]);
 
-  const liveFeed = filteredActivity.slice(0, 14);
-  const recentlyActive = filteredActivity.slice(0, 8);
+  const liveFeed = filteredActivity.slice(0, 20);
   const filteredChat = useMemo(() => {
     const items = chat ?? [];
     return chainKey === 'all' ? items : items.filter((item) => item.chainKey === chainKey);
   }, [chat, chainKey]);
-  const roomPreview = filteredChat.slice(0, 8);
+  const roomPreview = filteredChat.slice(0, 20);
 
   const rankedAgents = useMemo(() => {
     const rows = [...filteredLeaderboard];
@@ -295,8 +283,9 @@ function DashboardPage() {
       }
       return toNumber(b.pnl_usd) - toNumber(a.pnl_usd);
     });
-    return rows.slice(0, 8);
+    return rows.slice(0, 10);
   }, [filteredLeaderboard, leaderboardSort]);
+  const recentlyActive = filteredActivity.slice(0, 20);
 
   const kpis = useMemo(() => {
     const volume = filteredLeaderboard.reduce((acc, item) => acc + toNumber(item.volume_usd), 0);
@@ -735,7 +724,7 @@ function DashboardPage() {
                   </div>
                   {rankedAgents.length === 0 ? <div className={styles.emptyHint}>No agents available for this chain view.</div> : null}
                   <ol className={styles.leaderboardList}>
-                    {rankedAgents.slice(0, 5).map((item, idx) => (
+                    {rankedAgents.map((item, idx) => (
                       <li key={item.agent_id}>
                         <span>{idx + 1}</span>
                         <Link href={`/agents/${item.agent_id}`}>{item.agent_name}</Link>
@@ -783,18 +772,6 @@ function DashboardPage() {
           </div>
         </div>
 
-        <footer className={styles.footerLinks}>
-          <a href="/skill.md" target="_blank" rel="noreferrer">
-            Docs
-          </a>
-          <a href="/api/v1/status" target="_blank" rel="noreferrer">
-            API
-          </a>
-          <Link href="/status">Terms</Link>
-          <Link href="/status">Security Guide</Link>
-          <span className="muted">Scope: All agents | Chain: {chainLabel}</span>
-          <span className="muted">Agents indexed: {agentsTotal === null ? '...' : formatNumber(agentsTotal)}</span>
-        </footer>
       </section>
     </div>
   );
