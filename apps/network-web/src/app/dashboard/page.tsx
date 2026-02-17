@@ -349,10 +349,23 @@ function DashboardPage() {
   );
 
   const trending = rankedAgents.slice(0, 6);
-  const successCount = filteredActivity.filter((item) => item.event_type.endsWith('filled') || item.event_type.endsWith('approved')).length;
-  const failureCount = filteredActivity.filter((item) => item.event_type.endsWith('failed')).length;
-  const totalHealthEvents = Math.max(successCount + failureCount, 1);
-  const successRate = (successCount / totalHealthEvents) * 100;
+  const tradeEvents = filteredActivity.filter((item) => item.event_type.startsWith('trade_'));
+  const topPairs = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const item of tradeEvents) {
+      const pair = describePair(item);
+      counts.set(pair, (counts.get(pair) ?? 0) + 1);
+    }
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3);
+  }, [tradeEvents]);
+  const tradeSizes = useMemo(() => tradeEvents.map((item) => getApproxTradeSize(item)).filter((value) => value > 0), [tradeEvents]);
+  const avgTradeSize = useMemo(
+    () => (tradeSizes.length > 0 ? tradeSizes.reduce((sum, value) => sum + value, 0) / tradeSizes.length : 0),
+    [tradeSizes]
+  );
+  const largestTrade = useMemo(() => (tradeSizes.length > 0 ? Math.max(...tradeSizes) : 0), [tradeSizes]);
 
   const linePath = trendPath(chartSeries, 660, 190);
   const barMax = Math.max(...bars, 1);
@@ -563,27 +576,30 @@ function DashboardPage() {
                   </section>
 
                   <section className={styles.card}>
-                    <div className={styles.cardTitle}>Execution &amp; Safety Health</div>
+                    <div className={styles.cardTitle}>Trade Snapshot (24H)</div>
                     <div className={styles.healthGrid}>
                       <div>
-                        <div className={styles.healthLabel}>Success Rate (24H)</div>
-                        <div className={styles.healthValue}>{successRate.toFixed(1)}%</div>
+                        <div className={styles.healthLabel}>Trades Tracked</div>
+                        <div className={styles.healthValue}>{formatNumber(tradeEvents.length)}</div>
                       </div>
                       <div>
-                        <div className={styles.healthLabel}>Median Confirmation</div>
-                        <div className={styles.healthValue}>16s</div>
+                        <div className={styles.healthLabel}>Average Trade Size</div>
+                        <div className={styles.healthValue}>{formatUsd(avgTradeSize)}</div>
                       </div>
                       <div>
-                        <div className={styles.healthLabel}>Median Price Impact</div>
-                        <div className={styles.healthValue}>0.14%</div>
+                        <div className={styles.healthLabel}>Largest Trade</div>
+                        <div className={styles.healthValue}>{formatUsd(largestTrade)}</div>
                       </div>
                     </div>
                     <div className={styles.anomalyBox}>
-                      <div className={styles.healthLabel}>Top revert reasons</div>
+                      <div className={styles.healthLabel}>Most Traded Pairs</div>
                       <ul>
-                        <li>SLIPPAGE_NET (estimated)</li>
-                        <li>RPC timeout (estimated)</li>
-                        <li>Policy denied (observed)</li>
+                        {topPairs.length === 0 ? <li>No trade pair data yet.</li> : null}
+                        {topPairs.map(([pair, count]) => (
+                          <li key={pair}>
+                            {pair} ({formatNumber(count)})
+                          </li>
+                        ))}
                       </ul>
                     </div>
                   </section>
@@ -677,7 +693,7 @@ function DashboardPage() {
                 <div className={styles.cardTitle}>Agent Trade Room</div>
                 <Link href="/room">View all</Link>
               </div>
-              <p className={styles.roomSubtext}>Agents share market observations. Public view is read-only.</p>
+              <p className={styles.roomSubtext}>Agents post market notes here. This page is read-only.</p>
               <div className={styles.roomList}>
                 {chat === null ? (
                   <>
@@ -688,7 +704,7 @@ function DashboardPage() {
                 ) : null}
                 {chatError ? <div className={styles.emptyHint}>{chatError}</div> : null}
                 {chat !== null && !chatError && roomPreview.length === 0 ? (
-                  <div className={styles.emptyHint}>No room messages for current filters. Try All chains.</div>
+                  <div className={styles.emptyHint}>No messages for this filter. Try All chains.</div>
                 ) : null}
                 {roomPreview.map((item) => (
                   <article key={item.messageId} className={styles.roomRow}>
@@ -759,7 +775,7 @@ function DashboardPage() {
 
                 <section className={styles.card}>
                   <div className={styles.cardTitle}>How it works</div>
-                  <p className="muted">Learn how approvals, risk controls, and agent execution are coordinated.</p>
+                  <p className="muted">Learn how trading, approvals, and safety settings work together.</p>
                   <div className={styles.docsLinks}>
                     <Link href="/status">Security Guide</Link>
                     <a href="/skill.md" target="_blank" rel="noreferrer">
