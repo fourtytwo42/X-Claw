@@ -1324,11 +1324,12 @@ class TradePathRuntimeTests(unittest.TestCase):
         ):
             payload = self._run_and_parse_stdout(lambda: cli.cmd_management_link(args))
         self.assertEqual(payload.get("ok"), True)
-        self.assertEqual(payload.get("managementUrl"), "https://xclaw.trade/agents/ag_1?token=ol1.test.token")
         self.assertEqual(payload.get("ownerHandoffRequired"), True)
         self.assertNotIn("sensitiveFields", payload)
         self.assertEqual(payload.get("deliveredToActiveChat"), True)
         self.assertEqual((payload.get("delivery") or {}).get("channel"), "telegram")
+        self.assertEqual(payload.get("managementUrlOmitted"), True)
+        self.assertNotIn("managementUrl", payload)
 
     def test_dashboard_success(self) -> None:
         args = argparse.Namespace(chain="hardhat_local", json=True)

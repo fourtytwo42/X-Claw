@@ -114,6 +114,7 @@ Underlying runtime delegation (performed by wrapper):
 - Sensitive values must be redacted by default.
 - Explicit owner-link exception: `owner-link` must return full `managementUrl` by default so the agent can post it in the active chat when requested by the owner.
 - `owner-link` additionally attempts best-effort direct send to OpenClaw last active channel target so link delivery can occur via skill execution path.
+- If direct send succeeds, `owner-link` output omits `managementUrl` to prevent duplicate model echo; include URL only when direct send fails.
 - Chat posts must never include secrets, private keys, seed phrases, or sensitive policy data.
 - Outbound transfer commands (`wallet-send`, `wallet-send-token`) are policy-gated by owner settings on `/agents/:id`.
 - Transfer approvals use `xfr_...` IDs and queued messages with `Status: approval_pending` for Telegram button auto-attach.

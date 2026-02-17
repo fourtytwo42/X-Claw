@@ -4716,17 +4716,23 @@ def cmd_management_link(args: argparse.Namespace) -> int:
             )
         management_url = _normalize_management_url(body.get("managementUrl"))
         delivery = _maybe_send_owner_link_to_active_chat(management_url, body.get("expiresAt"))
-        return ok(
-            "Owner management link generated for immediate owner handoff.",
-            agentId=body.get("agentId", agent_id),
-            managementUrl=management_url,
-            issuedAt=body.get("issuedAt"),
-            expiresAt=body.get("expiresAt"),
-            ownerHandoffRequired=True,
-            securityNote="Short-lived one-time link; send only to the requesting owner.",
-            deliveredToActiveChat=bool(delivery.get("sent")),
-            delivery=delivery,
-        )
+        delivered = bool(delivery.get("sent"))
+        payload: dict[str, Any] = {
+            "agentId": body.get("agentId", agent_id),
+            "issuedAt": body.get("issuedAt"),
+            "expiresAt": body.get("expiresAt"),
+            "ownerHandoffRequired": True,
+            "securityNote": "Short-lived one-time link; send only to the requesting owner.",
+            "deliveredToActiveChat": delivered,
+            "delivery": delivery,
+        }
+        if delivered:
+            payload["managementUrlOmitted"] = True
+            payload["nextAction"] = "Owner link was sent directly to active chat; do not echo link again."
+            return ok("Owner management link sent to active chat.", **payload)
+        payload["managementUrl"] = management_url
+        payload["nextAction"] = "Direct chat delivery failed; paste managementUrl to the requesting owner."
+        return ok("Owner management link generated (manual handoff required).", **payload)
     except WalletStoreError as exc:
         return fail("management_link_failed", str(exc), "Verify API env/auth and retry.", exit_code=1)
     except Exception as exc:
