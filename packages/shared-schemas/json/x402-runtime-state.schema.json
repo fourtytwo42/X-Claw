@@ -13,12 +13,14 @@
         "network": { "type": ["string", "null"] },
         "facilitator": { "type": ["string", "null"] },
         "amountAtomic": { "type": ["string", "null"] },
+        "ttlSeconds": { "type": ["integer", "null"] },
         "resourcePath": { "type": ["string", "null"] },
         "localPort": { "type": ["integer", "null"] },
         "serverPid": { "type": ["integer", "null"] },
         "tunnelPid": { "type": ["integer", "null"] },
         "paymentUrl": { "type": ["string", "null"] },
         "expiresAt": { "type": ["string", "null"] },
+        "timeLimitNotice": { "type": ["string", "null"] },
         "startedAt": { "type": ["string", "null"] },
         "updatedAt": { "type": "string" }
       }

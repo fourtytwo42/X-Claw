@@ -15,8 +15,11 @@
         "network": { "type": ["string", "null"] },
         "facilitator": { "type": ["string", "null"] },
         "amountAtomic": { "type": ["string", "null"] },
+        "ttlSeconds": { "type": ["integer", "null"] },
         "paymentUrl": { "type": ["string", "null"] },
-        "expiresAt": { "type": ["string", "null"] }
+        "expiresAt": { "type": ["string", "null"] },
+        "expired": { "type": "boolean" },
+        "timeLimitNotice": { "type": ["string", "null"] }
       }
     }
   },

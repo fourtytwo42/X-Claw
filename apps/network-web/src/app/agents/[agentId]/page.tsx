@@ -72,6 +72,53 @@ type WalletTimelineItem = {
   txHash: string | null;
   txExplorerUrl: string | null;
   tokenSymbols: string[];
+  source?: 'default' | 'x402';
+};
+
+type X402PaymentRow = {
+  payment_id: string;
+  approval_id: string | null;
+  direction: 'inbound' | 'outbound';
+  status: string;
+  network_key: string;
+  facilitator_key: string;
+  asset_kind: 'native' | 'erc20';
+  asset_address: string | null;
+  asset_symbol: string | null;
+  amount_atomic: string;
+  payment_url: string | null;
+  link_token: string | null;
+  tx_hash: string | null;
+  reason_code: string | null;
+  reason_message: string | null;
+  created_at: string;
+  updated_at: string;
+  terminal_at: string | null;
+};
+
+type X402PaymentsPayload = {
+  ok: boolean;
+  agentId: string;
+  chainKey: string;
+  queue: X402PaymentRow[];
+  history: X402PaymentRow[];
+};
+
+type X402ReceiveLinkPayload = {
+  ok: boolean;
+  agentId: string;
+  chainKey: string;
+  paymentId: string;
+  networkKey: string;
+  facilitatorKey: string;
+  assetKind: 'native' | 'erc20';
+  assetAddress: string | null;
+  amountAtomic: string;
+  ttlSeconds: number;
+  paymentUrl: string;
+  expiresAt: string;
+  timeLimitNotice: string;
+  status: string;
 };
 
 type ToastType = 'success' | 'error' | 'info';
@@ -255,6 +302,8 @@ export default function AgentPublicProfilePage() {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
   const [depositData, setDepositData] = useState<DepositPayload | null>(null);
+  const [x402Payments, setX402Payments] = useState<X402PaymentsPayload | null>(null);
+  const [x402ReceiveLink, setX402ReceiveLink] = useState<X402ReceiveLinkPayload | null>(null);
   const [limitOrders, setLimitOrders] = useState<LimitOrderItem[]>([]);
   const [copySubscriptions, setCopySubscriptions] = useState<CopySubscription[]>([]);
   const [vaultAddressCopied, setVaultAddressCopied] = useState(false);
@@ -372,6 +421,8 @@ export default function AgentPublicProfilePage() {
     if (managementRes.status === 401) {
       setManagement({ phase: 'unauthorized' });
       setDepositData(null);
+      setX402Payments(null);
+      setX402ReceiveLink(null);
       setLimitOrders([]);
       setCopySubscriptions([]);
       return;
@@ -417,13 +468,17 @@ export default function AgentPublicProfilePage() {
       }
     }
 
-    const [depositPayload, limitOrderPayload, copyPayload] = await Promise.all([
+    const [depositPayload, x402PaymentsPayload, x402ReceivePayload, limitOrderPayload, copyPayload] = await Promise.all([
       managementGet(`/api/v1/management/deposit?agentId=${encodeURIComponent(agentId)}&chainKey=${encodeURIComponent(activeChainKey)}`),
+      managementGet(`/api/v1/management/x402/payments?agentId=${encodeURIComponent(agentId)}&chainKey=${encodeURIComponent(activeChainKey)}`),
+      managementGet(`/api/v1/management/x402/receive-link?agentId=${encodeURIComponent(agentId)}&chainKey=${encodeURIComponent(activeChainKey)}`),
       managementGet(`/api/v1/management/limit-orders?agentId=${encodeURIComponent(agentId)}&limit=50`),
       managementGet('/api/v1/copy/subscriptions')
     ]);
 
     setDepositData(depositPayload as DepositPayload);
+    setX402Payments(x402PaymentsPayload as X402PaymentsPayload);
+    setX402ReceiveLink(x402ReceivePayload as X402ReceiveLinkPayload);
     setLimitOrders(((limitOrderPayload as { items?: LimitOrderItem[] }).items ?? []).filter(Boolean));
     setCopySubscriptions(((copyPayload as CopySubscriptionsGetPayload).items ?? []).filter(Boolean));
   }, [activeChainKey, agentId]);
@@ -797,6 +852,23 @@ export default function AgentPublicProfilePage() {
     }
 
     if (management.phase === 'ready') {
+      for (const payment of x402Payments?.history ?? []) {
+        const symbol = normalizeTokenSelectionSymbol(payment.asset_symbol || (payment.asset_kind === 'native' ? 'ETH' : 'TOKEN'));
+        const directionLabel = payment.direction === 'inbound' ? 'Received' : 'Sent';
+        const titleToken = payment.asset_symbol || (payment.asset_kind === 'native' ? `${activeChainLabel} ETH` : 'Token');
+        items.push({
+          id: `x402-${payment.payment_id}`,
+          at: payment.terminal_at ?? payment.updated_at ?? payment.created_at,
+          kind: payment.direction === 'inbound' ? 'deposits' : 'transfers',
+          title: `x402 ${directionLabel} ${formatDecimalText(payment.amount_atomic)} ${titleToken}`,
+          subtitle: `Status: ${payment.status}; Network: ${payment.network_key}; Facilitator: ${payment.facilitator_key}`,
+          status: payment.status,
+          txHash: payment.tx_hash ?? null,
+          txExplorerUrl: toTxExplorerUrl(payment.tx_hash),
+          tokenSymbols: symbol ? [symbol] : [],
+          source: 'x402'
+        });
+      }
       for (const item of management.data.transferApprovalsHistory ?? []) {
         const transferTokenLabel = item.transfer_type === 'native' ? `${activeChainLabel} ETH` : item.token_symbol ?? 'Token';
         const transferSymbol = item.transfer_type === 'native' ? 'ETH' : normalizeTokenSelectionSymbol(item.token_symbol);
@@ -807,12 +879,16 @@ export default function AgentPublicProfilePage() {
           id: `xfrh-${item.approval_id}`,
           at: item.terminal_at ?? item.decided_at ?? item.created_at,
           kind: 'transfers',
-          title: `${transferTokenLabel} transfer`,
-          subtitle: `To: ${item.to_address}; Amount: ${transferAmount}; Approved: ${transferApprovedState(item.status)}; Confirmations: ${item.confirmations ?? 'n/a'}`,
+          title: item.approval_source === 'x402' ? `x402 outbound approval` : `${transferTokenLabel} transfer`,
+          subtitle:
+            item.approval_source === 'x402'
+              ? `URL: ${item.x402_url ?? 'n/a'}; Amount: ${item.x402_amount_atomic ?? item.amount_wei}; Approved: ${transferApprovedState(item.status)}`
+              : `To: ${item.to_address}; Amount: ${transferAmount}; Approved: ${transferApprovedState(item.status)}; Confirmations: ${item.confirmations ?? 'n/a'}`,
           status: item.status,
           txHash: item.tx_hash ?? null,
           txExplorerUrl: toTxExplorerUrl(item.tx_hash),
-          tokenSymbols: transferSymbol ? [transferSymbol] : []
+          tokenSymbols: transferSymbol ? [transferSymbol] : [],
+          source: item.approval_source === 'x402' ? 'x402' : 'default'
         });
       }
       for (const item of management.data.transferApprovalsQueue ?? []) {
@@ -825,12 +901,16 @@ export default function AgentPublicProfilePage() {
           id: `xfrq-${item.approval_id}`,
           at: item.created_at,
           kind: 'transfers',
-          title: `Pending transfer approval`,
-          subtitle: `To: ${item.to_address}; Amount: ${transferAmount}; Approved: Pending; Confirmations: ${item.confirmations ?? 'n/a'}`,
+          title: item.approval_source === 'x402' ? 'Pending x402 approval' : 'Pending transfer approval',
+          subtitle:
+            item.approval_source === 'x402'
+              ? `URL: ${item.x402_url ?? 'n/a'}; Amount: ${item.x402_amount_atomic ?? item.amount_wei}; Approved: Pending`
+              : `To: ${item.to_address}; Amount: ${transferAmount}; Approved: Pending; Confirmations: ${item.confirmations ?? 'n/a'}`,
           status: item.status,
           txHash: null,
           txExplorerUrl: null,
-          tokenSymbols: transferSymbol ? [transferSymbol] : []
+          tokenSymbols: transferSymbol ? [transferSymbol] : [],
+          source: item.approval_source === 'x402' ? 'x402' : 'default'
         });
       }
       for (const item of management.data.policyApprovalsHistory ?? []) {
@@ -896,6 +976,7 @@ export default function AgentPublicProfilePage() {
     management,
     toTxExplorerUrl,
     tokenDecimalsBySymbol,
+    x402Payments?.history,
     trades,
     transferApprovedState
   ]);
@@ -992,9 +1073,12 @@ export default function AgentPublicProfilePage() {
       rows.push({
         id: `transfer-pending-${item.approval_id}`,
         at: item.created_at,
-        title: `Transfer to ${shortenAddress(item.to_address)}`,
+        title: item.approval_source === 'x402' ? 'x402 outbound payment' : `Transfer to ${shortenAddress(item.to_address)}`,
         status: item.status,
-        subtitle: `${item.amount_wei} wei`,
+        subtitle:
+          item.approval_source === 'x402'
+            ? `URL: ${item.x402_url ?? 'n/a'}; Amount: ${item.x402_amount_atomic ?? item.amount_wei}; Network: ${item.x402_network_key ?? item.chain_key}`
+            : `${item.amount_wei} wei`,
         type: 'transfer',
         tokenSymbols: transferSymbol ? [transferSymbol] : [],
         raw: item
@@ -1005,9 +1089,12 @@ export default function AgentPublicProfilePage() {
       rows.push({
         id: `transfer-history-${item.approval_id}`,
         at: item.terminal_at ?? item.decided_at ?? item.created_at,
-        title: `Transfer to ${shortenAddress(item.to_address)}`,
+        title: item.approval_source === 'x402' ? 'x402 outbound payment' : `Transfer to ${shortenAddress(item.to_address)}`,
         status: item.status,
-        subtitle: `${item.amount_wei} wei`,
+        subtitle:
+          item.approval_source === 'x402'
+            ? `URL: ${item.x402_url ?? 'n/a'}; Amount: ${item.x402_amount_atomic ?? item.amount_wei}; Network: ${item.x402_network_key ?? item.chain_key}`
+            : `${item.amount_wei} wei`,
         type: 'transfer',
         tokenSymbols: transferSymbol ? [transferSymbol] : [],
         raw: item
@@ -1572,6 +1659,7 @@ export default function AgentPublicProfilePage() {
                   <div>
                     <div className={styles.listTitle}>{row.title}</div>
                     <div className={styles.muted}>{row.subtitle}</div>
+                    {row.source === 'x402' ? <div className={styles.muted}>Source: x402</div> : null}
                     {row.txHash ? (
                       <div className={styles.muted}>
                         Tx:{' '}
@@ -1889,6 +1977,47 @@ export default function AgentPublicProfilePage() {
           </div>
 
           <aside className={styles.sideColumn}>
+            <article className={`${styles.card} ${styles.walletCard}`}>
+              <div className={`${styles.cardHeader} ${styles.walletCardHeader}`}>
+                <h3>x402 Receive Link</h3>
+                <span>{x402ReceiveLink?.status ?? 'loading'}</span>
+              </div>
+              {x402ReceiveLink ? (
+                <>
+                  <div className={styles.muted}>Network: {x402ReceiveLink.networkKey}</div>
+                  <div className={styles.muted}>Facilitator: {x402ReceiveLink.facilitatorKey}</div>
+                  <div className={styles.muted}>
+                    Amount: {x402ReceiveLink.amountAtomic} ({x402ReceiveLink.assetKind})
+                  </div>
+                  <div className={styles.muted}>Expires: {formatUtc(x402ReceiveLink.expiresAt)} UTC</div>
+                  <div className={styles.muted}>{x402ReceiveLink.timeLimitNotice}</div>
+                  <div className={styles.inlineActions}>
+                    <button type="button" onClick={() => void copyToClipboard(x402ReceiveLink.paymentUrl, 'x402 receive link copied.')}>
+                      Copy Link
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        void runManagementAction(
+                          async () => {
+                            const refreshed = (await managementGet(
+                              `/api/v1/management/x402/receive-link?agentId=${encodeURIComponent(agentId)}&chainKey=${encodeURIComponent(activeChainKey)}&ttlSeconds=${x402ReceiveLink.ttlSeconds}`
+                            )) as X402ReceiveLinkPayload;
+                            setX402ReceiveLink(refreshed);
+                          },
+                          'x402 receive link refreshed.'
+                        )
+                      }
+                    >
+                      Regenerate
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <p className={styles.muted}>Receive link unavailable.</p>
+              )}
+            </article>
+
             <article className={`${styles.card} ${styles.walletCard}`}>
             <div className={`${styles.cardHeader} ${styles.walletCardHeader}`}>
               <h3>Copy Trading</h3>

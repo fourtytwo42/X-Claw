@@ -192,6 +192,60 @@ paths:
           $ref: '#/components/responses/ErrorResponse'
         '401':
           $ref: '#/components/responses/ErrorResponse'
+  /api/v1/agent/x402/outbound/proposed:
+    post:
+      summary: Mirror runtime-proposed outbound x402 payment intent (agent-auth).
+      security:
+        - agentBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentX402OutboundProposedRequest'
+      responses:
+        '200':
+          description: x402 outbound proposed row accepted.
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+  /api/v1/agent/x402/outbound/mirror:
+    post:
+      summary: Mirror runtime lifecycle updates for outbound x402 payments (agent-auth).
+      security:
+        - agentBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentX402OutboundMirrorRequest'
+      responses:
+        '200':
+          description: x402 outbound mirror update accepted.
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+  /api/v1/agent/x402/inbound/mirror:
+    post:
+      summary: Mirror inbound hosted x402 lifecycle into server read model (agent-auth).
+      security:
+        - agentBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentX402InboundMirrorRequest'
+      responses:
+        '200':
+          description: x402 inbound mirror update accepted.
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
   /api/v1/agent/trade-usage:
     post:
       summary: Report UTC-day trade usage deltas for authenticated agent (idempotent).
@@ -876,6 +930,122 @@ paths:
           $ref: '#/components/responses/ErrorResponse'
         '409':
           $ref: '#/components/responses/ErrorResponse'
+  /api/v1/management/x402/payments:
+    get:
+      summary: List x402 inbound/outbound queue and history for authorized management session.
+      security:
+        - managementCookie: []
+      parameters:
+        - name: agentId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: chainKey
+          in: query
+          required: false
+          schema:
+            type: string
+            default: base_sepolia
+      responses:
+        '200':
+          description: x402 payment queue/history payload.
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+  /api/v1/management/x402/receive-link:
+    get:
+      summary: Resolve or regenerate hosted x402 receive link for authorized management session.
+      security:
+        - managementCookie: []
+      parameters:
+        - name: agentId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: chainKey
+          in: query
+          required: false
+          schema:
+            type: string
+            default: base_sepolia
+        - name: facilitatorKey
+          in: query
+          required: false
+          schema:
+            type: string
+            default: cdp
+        - name: assetKind
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [native, erc20]
+            default: native
+        - name: assetAddress
+          in: query
+          required: false
+          schema:
+            type: string
+            nullable: true
+        - name: amountAtomic
+          in: query
+          required: false
+          schema:
+            type: string
+            default: '0.01'
+        - name: ttlSeconds
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1800
+      responses:
+        '200':
+          description: Hosted x402 receive-link payload.
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+  /api/v1/x402/pay/{agentId}/{linkToken}:
+    get:
+      summary: Hosted x402 pay endpoint (challenge/settlement).
+      parameters:
+        - name: agentId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: linkToken
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Payment settled.
+        '402':
+          description: Payment required challenge.
+        '410':
+          description: Payment link expired.
+    post:
+      summary: Hosted x402 pay endpoint (challenge/settlement).
+      parameters:
+        - name: agentId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: linkToken
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Payment settled.
+        '402':
+          description: Payment required challenge.
+        '410':
+          description: Payment link expired.
   /api/v1/management/transfer-policy/update:
     post:
       summary: Update mirrored runtime transfer approval policy for active chain.
@@ -1875,6 +2045,9 @@ components:
           type: string
         chainKey:
           type: string
+        approvalSource:
+          type: string
+          enum: [transfer, x402]
         status:
           type: string
           enum: [proposed, approval_pending, approved, rejected, executing, filled, failed]
@@ -1913,6 +2086,28 @@ components:
           type: string
           enum: [normal, policy_override]
           nullable: true
+        x402Url:
+          type: string
+          nullable: true
+        x402NetworkKey:
+          type: string
+          nullable: true
+        x402FacilitatorKey:
+          type: string
+          nullable: true
+        x402AssetKind:
+          type: string
+          enum: [native, erc20]
+          nullable: true
+        x402AssetAddress:
+          type: string
+          nullable: true
+        x402AmountAtomic:
+          type: string
+          nullable: true
+        x402PaymentId:
+          type: string
+          nullable: true
         createdAt:
           type: string
           format: date-time
@@ -1923,6 +2118,112 @@ components:
           type: string
           format: date-time
           nullable: true
+        terminalAt:
+          type: string
+          format: date-time
+          nullable: true
+    AgentX402OutboundProposedRequest:
+      type: object
+      required: [schemaVersion, paymentId, approvalId, networkKey, facilitatorKey, status, assetKind, amountAtomic, url, createdAt, updatedAt]
+      properties:
+        schemaVersion:
+          type: integer
+          const: 1
+        paymentId:
+          type: string
+        approvalId:
+          type: string
+        networkKey:
+          type: string
+        facilitatorKey:
+          type: string
+        status:
+          type: string
+          enum: [proposed, approval_pending, approved, executing, filled, failed, rejected]
+        assetKind:
+          type: string
+          enum: [native, erc20]
+        assetAddress:
+          type: string
+          nullable: true
+        assetSymbol:
+          type: string
+          nullable: true
+        amountAtomic:
+          type: string
+        url:
+          type: string
+        txHash:
+          type: string
+          nullable: true
+        reasonCode:
+          type: string
+          nullable: true
+        reasonMessage:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        terminalAt:
+          type: string
+          format: date-time
+          nullable: true
+    AgentX402OutboundMirrorRequest:
+      allOf:
+        - $ref: '#/components/schemas/AgentX402OutboundProposedRequest'
+    AgentX402InboundMirrorRequest:
+      type: object
+      required: [schemaVersion, paymentId, networkKey, facilitatorKey, status, assetKind, amountAtomic, url, linkToken, expiresAt, createdAt, updatedAt]
+      properties:
+        schemaVersion:
+          type: integer
+          const: 1
+        paymentId:
+          type: string
+        networkKey:
+          type: string
+        facilitatorKey:
+          type: string
+        status:
+          type: string
+          enum: [proposed, executing, filled, failed, expired]
+        assetKind:
+          type: string
+          enum: [native, erc20]
+        assetAddress:
+          type: string
+          nullable: true
+        assetSymbol:
+          type: string
+          nullable: true
+        amountAtomic:
+          type: string
+        url:
+          type: string
+        linkToken:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        txHash:
+          type: string
+          nullable: true
+        reasonCode:
+          type: string
+          nullable: true
+        reasonMessage:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
         terminalAt:
           type: string
           format: date-time

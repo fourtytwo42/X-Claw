@@ -17,6 +17,7 @@
     "schemaVersion": { "type": "integer", "const": 1 },
     "approvalId": { "type": "string", "minLength": 1 },
     "chainKey": { "type": "string", "minLength": 1 },
+    "approvalSource": { "type": "string", "enum": ["transfer", "x402"] },
     "status": {
       "type": "string",
       "enum": ["proposed", "approval_pending", "approved", "rejected", "executing", "filled", "failed"]
@@ -39,6 +40,13 @@
       "type": ["string", "null"],
       "enum": ["normal", "policy_override", null]
     },
+    "x402Url": { "type": ["string", "null"], "format": "uri" },
+    "x402NetworkKey": { "type": ["string", "null"] },
+    "x402FacilitatorKey": { "type": ["string", "null"] },
+    "x402AssetKind": { "type": ["string", "null"], "enum": ["native", "erc20", null] },
+    "x402AssetAddress": { "type": ["string", "null"], "pattern": "^0x[a-fA-F0-9]{40}$" },
+    "x402AmountAtomic": { "type": ["string", "null"], "pattern": "^[0-9]+(\\.[0-9]+)?$" },
+    "x402PaymentId": { "type": ["string", "null"] },
     "createdAt": { "type": "string", "format": "date-time" },
     "updatedAt": { "type": "string", "format": "date-time" },
     "decidedAt": { "type": ["string", "null"], "format": "date-time" },

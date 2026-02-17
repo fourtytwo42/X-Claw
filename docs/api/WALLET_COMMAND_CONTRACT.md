@@ -213,11 +213,13 @@ The following x402 commands are part of the same Python-first wrapper contract a
 
 1. `x402-serve-start <network> <facilitator> <amount_atomic>`
 - delegates to runtime `xclaw-agent x402 serve-start --network <key> --facilitator <key> --amount-atomic <value> --json`.
-- returns `paymentUrl`, `network`, `facilitator`, `amountAtomic`, `expiresAt` and lifecycle details.
+- optional wrapper arg `[ttl_seconds]` maps to runtime `--ttl-seconds <value>`.
+- runtime default TTL is `1800` seconds when not provided.
+- returns `paymentUrl`, `network`, `facilitator`, `amountAtomic`, `ttlSeconds`, `expiresAt`, `timeLimitNotice` and lifecycle details.
 
 2. `x402-serve-status`
 - delegates to runtime `xclaw-agent x402 serve-status --json`.
-- returns current local endpoint/tunnel state (`running|stopped`, pids, url, timestamps).
+- returns current local endpoint/tunnel state (`running|stopped`, pids, url, timestamps) plus expiration fields (`expiresAt`, `expired`).
 
 3. `x402-serve-stop`
 - delegates to runtime `xclaw-agent x402 serve-stop --json`.
@@ -225,15 +227,16 @@ The following x402 commands are part of the same Python-first wrapper contract a
 
 4. `x402-pay <url> <network> <facilitator> <amount_atomic>`
 - delegates to runtime `xclaw-agent x402 pay --url <url> --network <key> --facilitator <key> --amount-atomic <value> --json`.
-- if policy mode is `per_payment`, returns queued approval with `approvalId: xpay_...` and `status: approval_pending`.
+- if policy mode is `per_payment`, returns queued approval with `approvalId: xfr_...` and `status: approval_pending`.
 - if policy mode is `auto`, executes immediately and returns terminal status.
+- runtime mirrors x402 outbound lifecycle to server read model (`/agent/x402/outbound/mirror`) and transfer-approval mirror (`approvalSource: x402`).
 
 5. `x402-pay-resume <approval_id>`
-- delegates to runtime `xclaw-agent x402 pay-resume --approval-id <xpay_id> --json`.
+- delegates to runtime `xclaw-agent x402 pay-resume --approval-id <xfr_id> --json`.
 - resumes execution for approved x402 payment approvals.
 
 6. `x402-pay-decide <approval_id> <approve|deny>`
-- delegates to runtime `xclaw-agent x402 pay-decide --approval-id <xpay_id> --decision <approve|deny> --json`.
+- delegates to runtime `xclaw-agent x402 pay-decide --approval-id <xfr_id> --decision <approve|deny> --json`.
 - `approve` continues execution; `deny` transitions to terminal `rejected`.
 
 7. `x402-policy-get <network>`
@@ -250,4 +253,4 @@ The following x402 commands are part of the same Python-first wrapper contract a
 
 10. `request-x402-payment`
 - wrapper shortcut command that auto-starts x402 receive endpoint and returns shareable payment metadata.
-- response includes `paymentUrl`, `network`, `facilitator`, `amount`, `expiresAt`.
+- response includes `paymentUrl`, `network`, `facilitator`, `amount`, `ttlSeconds`, `expiresAt`, `timeLimitNotice`.

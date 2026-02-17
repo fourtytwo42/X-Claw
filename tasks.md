@@ -1,3 +1,49 @@
+# Slice 80 Tasks: Hosted x402 Web Integration + Agent-Originated Send
+
+Active slice: `Slice 80: Hosted x402 on /agents/[agentId]`
+
+## 1) Canonical sync
+- [ ] Add Slice 80 tracker + roadmap entries with issue mapping. (tracker/roadmap added; issue mapping still pending)
+- [x] Update source-of-truth with hosted x402 contract + `xfr_...` outbound approval reuse.
+- [x] Update command contract and OpenAPI.
+- [x] Update context/spec/tasks/acceptance artifacts.
+
+## 2) Data model + schema
+- [x] Add migration `0017_slice80_hosted_x402.sql`.
+- [x] Add table `agent_x402_payment_mirror`.
+- [x] Extend `agent_transfer_approval_mirror` for x402 metadata/source.
+- [x] Add new x402 request/response schemas.
+- [x] Extend transfer approval schemas for `approvalSource` + x402 fields.
+
+## 3) API implementation
+- [x] Implement `POST /api/v1/agent/x402/outbound/proposed`.
+- [x] Implement `POST /api/v1/agent/x402/outbound/mirror`.
+- [x] Implement `POST /api/v1/agent/x402/inbound/mirror`.
+- [x] Implement `GET /api/v1/management/x402/payments`.
+- [x] Implement `GET /api/v1/management/x402/receive-link`.
+- [x] Implement hosted endpoint `GET|POST /api/v1/x402/pay/{agentId}/{linkToken}`.
+- [x] Extend transfer mirror write and transfer approvals read/decision routes with x402 fields.
+
+## 4) Runtime/UI integration
+- [x] Runtime mirrors outbound x402 into server read model + transfer approval mirror surface.
+- [x] `approvals decide-transfer|resume-transfer` fallback to x402 flow when approval ID belongs to x402 payment.
+- [x] `/agents/[agentId]` adds hosted receive-link panel.
+- [x] `/agents/[agentId]` wallet timeline merges x402 history with source badge.
+- [x] Approval history rows show x402 URL/network/facilitator/amount context when `approval_source=x402`.
+
+## 5) Validation
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_x402_runtime.py -v`
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_x402_skill_wrapper.py -v`
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all` (post-build, sequential)
+
+---
+
 # Slice 79 Tasks: Agent-Skill x402 Send/Receive Runtime (No Webapp Integration Yet)
 
 Active slice: `Slice 79: Agent-Skill x402 Send/Receive Runtime`

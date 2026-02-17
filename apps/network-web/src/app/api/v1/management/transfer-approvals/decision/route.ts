@@ -67,9 +67,9 @@ export async function POST(req: NextRequest) {
       return auth.response;
     }
 
-    const mirror = await dbQuery<{ chain_key: string; status: string }>(
+    const mirror = await dbQuery<{ chain_key: string; status: string; approval_source: 'transfer' | 'x402' }>(
       `
-      select chain_key, status::text
+      select chain_key, status::text, approval_source::text
       from agent_transfer_approval_mirror
       where approval_id = $1
         and agent_id = $2
@@ -91,6 +91,7 @@ export async function POST(req: NextRequest) {
 
     const chainKey = body.chainKey?.trim() || mirror.rows[0].chain_key;
     const currentStatus = mirror.rows[0].status;
+    const approvalSource = mirror.rows[0].approval_source || 'transfer';
     if (currentStatus !== 'approval_pending' && currentStatus !== 'approved') {
       return errorResponse(
         409,
@@ -114,23 +115,34 @@ export async function POST(req: NextRequest) {
     );
 
     const runtimeBin = resolveRuntimeBin();
-    const child = spawnSync(
-      runtimeBin,
-      [
-        'approvals',
-        'decide-transfer',
-        '--approval-id',
-        body.approvalId,
-        '--decision',
-        body.decision,
-        '--chain',
-        chainKey,
-        '--reason-message',
-        body.reasonMessage ?? '',
-        '--json'
-      ],
-      { encoding: 'utf8', timeout: 60_000 }
-    );
+    const runtimeArgs =
+      approvalSource === 'x402'
+        ? [
+            'x402',
+            'pay-decide',
+            '--approval-id',
+            body.approvalId,
+            '--decision',
+            body.decision === 'approve' ? 'approve' : 'deny',
+            '--reason-message',
+            body.reasonMessage ?? '',
+            '--json'
+          ]
+        : [
+            'approvals',
+            'decide-transfer',
+            '--approval-id',
+            body.approvalId,
+            '--decision',
+            body.decision,
+            '--chain',
+            chainKey,
+            '--reason-message',
+            body.reasonMessage ?? '',
+            '--json'
+          ];
+
+    const child = spawnSync(runtimeBin, runtimeArgs, { encoding: 'utf8', timeout: 60_000 });
 
     let runtimePayload: Record<string, unknown> | null = null;
     if (child.stdout) {
@@ -176,6 +188,8 @@ export async function POST(req: NextRequest) {
         JSON.stringify({ approvalId: body.approvalId, decision: body.decision, chainKey }),
         JSON.stringify({
           runtimeBin,
+          approvalSource,
+          runtimeArgs,
           runtimeExitStatus: child.status,
           runtimePayload,
           stderr: (child.stderr || '').slice(0, 1200),

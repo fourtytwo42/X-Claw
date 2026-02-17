@@ -844,6 +844,22 @@ class TradePathRuntimeTests(unittest.TestCase):
         self.assertIsNotNone(saved)
         self.assertEqual(str((saved or {}).get("status")), "rejected")
 
+    def test_approvals_decide_transfer_falls_back_to_x402_flow(self) -> None:
+        approval_id = "xfr_x402_1"
+        args = argparse.Namespace(approval_id=approval_id, decision="approve", reason_message=None, chain="base_sepolia", json=True)
+        with mock.patch.object(cli, "_get_pending_transfer_flow", return_value=None), mock.patch.object(
+            cli.x402_state, "get_pending_pay_flow", return_value={"approvalId": approval_id, "status": "approval_pending"}
+        ), mock.patch.object(
+            cli,
+            "x402_pay_decide",
+            return_value={"approvalId": approval_id, "status": "filled", "network": "base_sepolia", "facilitator": "cdp"},
+        ), mock.patch.object(cli, "_mirror_x402_outbound"):
+            payload = self._run_and_parse_stdout(lambda: cli.cmd_approvals_decide_transfer(args))
+        self.assertTrue(payload.get("ok"))
+        approval = payload.get("approval") or {}
+        self.assertEqual(approval.get("approvalId"), approval_id)
+        self.assertEqual(approval.get("status"), "filled")
+
     def test_execute_pending_transfer_flow_blocks_without_override_when_policy_now_blocked(self) -> None:
         flow = {
             "approvalId": "xfr_test_3",
@@ -1557,6 +1573,23 @@ class TradePathRuntimeTests(unittest.TestCase):
                 ]
             )
         self.assertEqual(code, 0)
+
+    def test_x402_serve_start_parser_default_ttl_is_1800(self) -> None:
+        parser = cli.build_parser()
+        args = parser.parse_args(
+            [
+                "x402",
+                "serve-start",
+                "--network",
+                "base_sepolia",
+                "--facilitator",
+                "cdp",
+                "--amount-atomic",
+                "1",
+                "--json",
+            ]
+        )
+        self.assertEqual(int(args.ttl_seconds), 1800)
 
     def test_limit_orders_sync_success(self) -> None:
         args = argparse.Namespace(chain="hardhat_local", json=True)

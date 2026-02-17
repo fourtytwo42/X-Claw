@@ -13,6 +13,7 @@ type AgentTransferApprovalsMirrorRequest = {
   schemaVersion: 1;
   approvalId: string;
   chainKey: string;
+  approvalSource?: 'transfer' | 'x402';
   status: 'proposed' | 'approval_pending' | 'approved' | 'rejected' | 'executing' | 'filled' | 'failed';
   transferType: 'native' | 'token';
   tokenAddress?: string | null;
@@ -26,6 +27,13 @@ type AgentTransferApprovalsMirrorRequest = {
   policyBlockReasonCode?: 'outbound_disabled' | 'destination_not_whitelisted' | null;
   policyBlockReasonMessage?: string | null;
   executionMode?: 'normal' | 'policy_override' | null;
+  x402Url?: string | null;
+  x402NetworkKey?: string | null;
+  x402FacilitatorKey?: string | null;
+  x402AssetKind?: 'native' | 'erc20' | null;
+  x402AssetAddress?: string | null;
+  x402AmountAtomic?: string | null;
+  x402PaymentId?: string | null;
   createdAt: string;
   updatedAt: string;
   decidedAt?: string | null;
@@ -68,6 +76,7 @@ export async function POST(req: NextRequest) {
         chain_key,
         status,
         transfer_type,
+        approval_source,
         token_address,
         token_symbol,
         to_address,
@@ -79,17 +88,25 @@ export async function POST(req: NextRequest) {
         policy_block_reason_code,
         policy_block_reason_message,
         execution_mode,
+        x402_url,
+        x402_network_key,
+        x402_facilitator_key,
+        x402_asset_kind,
+        x402_asset_address,
+        x402_amount_atomic,
+        x402_payment_id,
         created_at,
         updated_at,
         decided_at,
         terminal_at
       ) values (
-        $1, $2, $3, $4, $5, $6, $7, $8, $9::numeric, $10, $11, $12, $13, $14, $15, $16, $17::timestamptz, $18::timestamptz, $19::timestamptz, $20::timestamptz
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10::numeric, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23::numeric, $24, $25::timestamptz, $26::timestamptz, $27::timestamptz, $28::timestamptz
       )
       on conflict (approval_id)
       do update set
         status = excluded.status,
         transfer_type = excluded.transfer_type,
+        approval_source = excluded.approval_source,
         token_address = excluded.token_address,
         token_symbol = excluded.token_symbol,
         to_address = excluded.to_address,
@@ -101,6 +118,13 @@ export async function POST(req: NextRequest) {
         policy_block_reason_code = excluded.policy_block_reason_code,
         policy_block_reason_message = excluded.policy_block_reason_message,
         execution_mode = excluded.execution_mode,
+        x402_url = excluded.x402_url,
+        x402_network_key = excluded.x402_network_key,
+        x402_facilitator_key = excluded.x402_facilitator_key,
+        x402_asset_kind = excluded.x402_asset_kind,
+        x402_asset_address = excluded.x402_asset_address,
+        x402_amount_atomic = excluded.x402_amount_atomic,
+        x402_payment_id = excluded.x402_payment_id,
         updated_at = excluded.updated_at,
         decided_at = excluded.decided_at,
         terminal_at = excluded.terminal_at
@@ -111,6 +135,7 @@ export async function POST(req: NextRequest) {
         body.chainKey,
         body.status,
         body.transferType,
+        body.approvalSource ?? 'transfer',
         body.tokenAddress ?? null,
         body.tokenSymbol ?? null,
         body.toAddress.toLowerCase(),
@@ -122,6 +147,13 @@ export async function POST(req: NextRequest) {
         body.policyBlockReasonCode ?? null,
         body.policyBlockReasonMessage ?? null,
         body.executionMode ?? null,
+        body.x402Url ?? null,
+        body.x402NetworkKey ?? null,
+        body.x402FacilitatorKey ?? null,
+        body.x402AssetKind ?? null,
+        body.x402AssetAddress ?? null,
+        body.x402AmountAtomic ?? null,
+        body.x402PaymentId ?? null,
         body.createdAt,
         body.updatedAt,
         body.decidedAt ?? null,

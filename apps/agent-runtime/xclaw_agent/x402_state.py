@@ -134,4 +134,4 @@ def remove_pending_pay_flow(approval_id: str) -> None:
 
 
 def make_xpay_approval_id() -> str:
-    return f"xpay_{secrets.token_hex(10)}"
+    return f"xfr_{secrets.token_hex(10)}"

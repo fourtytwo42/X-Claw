@@ -144,7 +144,7 @@ def _maybe_autostart_x402_serve() -> Optional[dict]:
     network = os.environ.get("XCLAW_X402_DEFAULT_NETWORK", os.environ.get("XCLAW_DEFAULT_CHAIN", "base_sepolia")).strip()
     facilitator = os.environ.get("XCLAW_X402_DEFAULT_FACILITATOR", "cdp").strip()
     amount = os.environ.get("XCLAW_X402_DEFAULT_AMOUNT_ATOMIC", "0.01").strip()
-    ttl = os.environ.get("XCLAW_X402_DEFAULT_TTL_SECONDS", "3600").strip()
+    ttl = os.environ.get("XCLAW_X402_DEFAULT_TTL_SECONDS", "1800").strip()
     cmd = [
         binary,
         "x402",
@@ -170,12 +170,14 @@ def _maybe_autostart_x402_serve() -> Optional[dict]:
             return {
                 "ok": True,
                 "code": "ok",
-                "message": "x402 payment request endpoint started.",
+                "message": "x402 payment request endpoint started. Share promptly; the link expires at the stated time.",
                 "paymentUrl": x402.get("paymentUrl") or payload.get("paymentUrl"),
                 "network": x402.get("network") or payload.get("network"),
                 "facilitator": x402.get("facilitator") or payload.get("facilitator"),
                 "amount": x402.get("amountAtomic") or payload.get("amountAtomic"),
+                "ttlSeconds": x402.get("ttlSeconds") or payload.get("ttlSeconds"),
                 "expiresAt": x402.get("expiresAt") or payload.get("expiresAt"),
+                "timeLimitNotice": x402.get("timeLimitNotice") or payload.get("timeLimitNotice"),
             }
     except Exception:
         return None
@@ -521,21 +523,35 @@ def main(argv: List[str]) -> int:
             return _err(
                 "usage",
                 "x402-serve-start requires <network> <facilitator> <amount_atomic>",
-                "usage: x402-serve-start <network> <facilitator> <amount_atomic>",
+                "usage: x402-serve-start <network> <facilitator> <amount_atomic> [ttl_seconds]",
                 exit_code=2,
             )
+        ttl_override = argv[5].strip() if len(argv) >= 6 else ""
+        if ttl_override:
+            try:
+                int(ttl_override)
+            except ValueError:
+                return _err(
+                    "invalid_input",
+                    "ttl_seconds must be an integer value.",
+                    "usage: x402-serve-start <network> <facilitator> <amount_atomic> [ttl_seconds]",
+                    exit_code=2,
+                )
+        args = [
+            "x402",
+            "serve-start",
+            "--network",
+            argv[2],
+            "--facilitator",
+            argv[3],
+            "--amount-atomic",
+            argv[4],
+        ]
+        if ttl_override:
+            args.extend(["--ttl-seconds", ttl_override])
+        args.append("--json")
         return _run_agent(
-            [
-                "x402",
-                "serve-start",
-                "--network",
-                argv[2],
-                "--facilitator",
-                argv[3],
-                "--amount-atomic",
-                argv[4],
-                "--json",
-            ]
+            args
         )
 
     if cmd == "x402-serve-status":

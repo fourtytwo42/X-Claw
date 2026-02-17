@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["ok", "agentId", "chainKey", "queue", "history"],
+  "properties": {
+    "ok": { "type": "boolean", "const": true },
+    "agentId": { "type": "string", "minLength": 1 },
+    "chainKey": { "type": "string", "minLength": 1 },
+    "queue": {
+      "type": "array",
+      "items": { "$ref": "./x402-payment-approval.schema.json" }
+    },
+    "history": {
+      "type": "array",
+      "items": { "$ref": "./x402-payment-approval.schema.json" }
+    }
+  }
+}

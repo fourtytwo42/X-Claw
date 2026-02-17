@@ -77,7 +77,7 @@ class X402RuntimeTests(unittest.TestCase):
                 self.assertTrue(result.get("ok"))
                 self.assertEqual(result.get("code"), "approval_required")
                 approval = result.get("approval") or {}
-                self.assertTrue(str(approval.get("approvalId") or "").startswith("xpay_"))
+                self.assertTrue(str(approval.get("approvalId") or "").startswith("xfr_"))
                 self.assertEqual(approval.get("status"), "approval_pending")
 
     def test_pay_decide_deny_terminal(self) -> None:
@@ -154,6 +154,35 @@ class X402RuntimeTests(unittest.TestCase):
                 facilitator="cdp",
                 amount_atomic="1",
             )
+
+    def test_serve_start_defaults_to_1800_and_allows_override(self) -> None:
+        with self._with_temp_home() as home:
+            app_dir = pathlib.Path(home)
+            with ExitStack() as stack:
+                stack.enter_context(mock.patch.object(x402_state, "APP_DIR", app_dir))
+                stack.enter_context(mock.patch.object(x402_state, "X402_RUNTIME_FILE", app_dir / "x402-runtime.json"))
+                stack.enter_context(mock.patch.object(x402_runtime, "_find_free_port", return_value=19090))
+                stack.enter_context(mock.patch.object(x402_runtime, "serve_stop", return_value={"status": "stopped"}))
+                popen_mock = stack.enter_context(mock.patch.object(x402_runtime.subprocess, "Popen"))
+                popen_mock.return_value = mock.Mock(pid=12345)
+                stack.enter_context(
+                    mock.patch.object(
+                        x402_runtime.x402_tunnel,
+                        "start_quick_tunnel",
+                        return_value={"pid": 23456, "publicUrl": "https://demo.trycloudflare.com"},
+                    )
+                )
+
+                default_payload = x402_runtime.serve_start("base_sepolia", "cdp", "1")
+                self.assertEqual(default_payload.get("ttlSeconds"), 1800)
+                self.assertFalse(bool(default_payload.get("expired")))
+                self.assertIn("expires", str(default_payload.get("timeLimitNotice") or "").lower())
+                first_cmd = list(popen_mock.call_args_list[0].args[0])
+                self.assertIn("--expires-at", first_cmd)
+
+                override_payload = x402_runtime.serve_start("base_sepolia", "cdp", "1", ttl_seconds=7200)
+                self.assertEqual(override_payload.get("ttlSeconds"), 7200)
+                self.assertFalse(bool(override_payload.get("expired")))
 
 
 if __name__ == "__main__":

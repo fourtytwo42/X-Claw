@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "paymentId",
+    "approvalId",
+    "networkKey",
+    "facilitatorKey",
+    "status",
+    "assetKind",
+    "amountAtomic",
+    "url",
+    "createdAt",
+    "updatedAt"
+  ],
+  "properties": {
+    "schemaVersion": { "type": "integer", "const": 1 },
+    "paymentId": { "type": "string", "minLength": 1 },
+    "approvalId": { "type": "string", "minLength": 1 },
+    "networkKey": { "type": "string", "minLength": 1 },
+    "facilitatorKey": { "type": "string", "minLength": 1 },
+    "status": {
+      "type": "string",
+      "enum": ["proposed", "approval_pending", "approved", "executing", "filled", "failed", "rejected"]
+    },
+    "assetKind": { "type": "string", "enum": ["native", "erc20"] },
+    "assetAddress": { "type": ["string", "null"], "pattern": "^0x[a-fA-F0-9]{40}$" },
+    "assetSymbol": { "type": ["string", "null"] },
+    "amountAtomic": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?$" },
+    "url": { "type": "string", "format": "uri" },
+    "txHash": { "type": ["string", "null"], "pattern": "^0x[a-fA-F0-9]{64}$" },
+    "reasonCode": { "type": ["string", "null"] },
+    "reasonMessage": { "type": ["string", "null"] },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "updatedAt": { "type": "string", "format": "date-time" },
+    "terminalAt": { "type": ["string", "null"], "format": "date-time" }
+  }
+}

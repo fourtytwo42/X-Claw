@@ -32,16 +32,20 @@ class X402SkillWrapperTests(unittest.TestCase):
                 "network": "base_sepolia",
                 "facilitator": "cdp",
                 "amount": "1",
+                "ttlSeconds": 1800,
                 "expiresAt": "2026-02-18T00:00:00Z",
+                "timeLimitNotice": "Payment link expires in 1800 seconds (at 2026-02-18T00:00:00Z).",
             },
         ):
             code, payload = self._capture(["xclaw_agent_skill.py", "request-x402-payment"])
         self.assertEqual(code, 0)
         self.assertIsInstance(payload, dict)
         self.assertEqual(payload.get("paymentUrl"), "https://demo.trycloudflare.com/x402/pay/abc")
+        self.assertEqual(payload.get("ttlSeconds"), 1800)
+        self.assertIn("expires", str(payload.get("timeLimitNotice") or "").lower())
 
     def test_x402_pay_decide_rejects_invalid_decision(self) -> None:
-        code, payload = self._capture(["xclaw_agent_skill.py", "x402-pay-decide", "xpay_1", "maybe"])
+        code, payload = self._capture(["xclaw_agent_skill.py", "x402-pay-decide", "xfr_1", "maybe"])
         self.assertEqual(code, 2)
         self.assertIsInstance(payload, dict)
         self.assertEqual(payload.get("code"), "invalid_input")
@@ -51,6 +55,26 @@ class X402SkillWrapperTests(unittest.TestCase):
             code = skill.main(["xclaw_agent_skill.py", "x402-networks"])
         self.assertEqual(code, 0)
         run_mock.assert_called_once_with(["x402", "networks", "--json"])
+
+    def test_x402_serve_start_supports_ttl_override(self) -> None:
+        with mock.patch.object(skill, "_run_agent", return_value=0) as run_mock:
+            code = skill.main(["xclaw_agent_skill.py", "x402-serve-start", "base_sepolia", "cdp", "1", "7200"])
+        self.assertEqual(code, 0)
+        run_mock.assert_called_once_with(
+            [
+                "x402",
+                "serve-start",
+                "--network",
+                "base_sepolia",
+                "--facilitator",
+                "cdp",
+                "--amount-atomic",
+                "1",
+                "--ttl-seconds",
+                "7200",
+                "--json",
+            ]
+        )
 
 
 if __name__ == "__main__":

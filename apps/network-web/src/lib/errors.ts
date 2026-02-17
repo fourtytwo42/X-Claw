@@ -8,6 +8,8 @@ export type ApiErrorCode =
   | 'approval_required'
   | 'approval_expired'
   | 'approval_rejected'
+  | 'payment_required'
+  | 'payment_expired'
   | 'not_actionable'
   | 'policy_denied'
   | 'daily_usd_cap_exceeded'

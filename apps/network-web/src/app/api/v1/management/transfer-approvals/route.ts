@@ -106,6 +106,7 @@ export async function GET(req: NextRequest) {
         chain_key: string;
         status: string;
         transfer_type: 'native' | 'token';
+        approval_source: 'transfer' | 'x402';
         token_address: string | null;
         token_symbol: string | null;
         to_address: string;
@@ -114,6 +115,13 @@ export async function GET(req: NextRequest) {
         policy_block_reason_code: string | null;
         policy_block_reason_message: string | null;
         execution_mode: 'normal' | 'policy_override' | null;
+        x402_url: string | null;
+        x402_network_key: string | null;
+        x402_facilitator_key: string | null;
+        x402_asset_kind: 'native' | 'erc20' | null;
+        x402_asset_address: string | null;
+        x402_amount_atomic: string | null;
+        x402_payment_id: string | null;
         created_at: string;
       }>(
         `
@@ -122,6 +130,7 @@ export async function GET(req: NextRequest) {
           chain_key,
           status::text,
           transfer_type::text,
+          approval_source::text,
           token_address,
           token_symbol,
           to_address,
@@ -130,6 +139,13 @@ export async function GET(req: NextRequest) {
           policy_block_reason_code,
           policy_block_reason_message,
           execution_mode,
+          x402_url,
+          x402_network_key,
+          x402_facilitator_key,
+          x402_asset_kind::text,
+          x402_asset_address,
+          x402_amount_atomic::text,
+          x402_payment_id,
           created_at::text
         from agent_transfer_approval_mirror
         where agent_id = $1
@@ -145,6 +161,7 @@ export async function GET(req: NextRequest) {
         chain_key: string;
         status: string;
         transfer_type: 'native' | 'token';
+        approval_source: 'transfer' | 'x402';
         token_address: string | null;
         token_symbol: string | null;
         to_address: string;
@@ -155,6 +172,13 @@ export async function GET(req: NextRequest) {
         policy_block_reason_code: string | null;
         policy_block_reason_message: string | null;
         execution_mode: 'normal' | 'policy_override' | null;
+        x402_url: string | null;
+        x402_network_key: string | null;
+        x402_facilitator_key: string | null;
+        x402_asset_kind: 'native' | 'erc20' | null;
+        x402_asset_address: string | null;
+        x402_amount_atomic: string | null;
+        x402_payment_id: string | null;
         created_at: string;
         decided_at: string | null;
         terminal_at: string | null;
@@ -165,6 +189,7 @@ export async function GET(req: NextRequest) {
           chain_key,
           status::text,
           transfer_type::text,
+          approval_source::text,
           token_address,
           token_symbol,
           to_address,
@@ -175,6 +200,13 @@ export async function GET(req: NextRequest) {
           policy_block_reason_code,
           policy_block_reason_message,
           execution_mode,
+          x402_url,
+          x402_network_key,
+          x402_facilitator_key,
+          x402_asset_kind::text,
+          x402_asset_address,
+          x402_amount_atomic::text,
+          x402_payment_id,
           created_at::text,
           decided_at::text,
           terminal_at::text

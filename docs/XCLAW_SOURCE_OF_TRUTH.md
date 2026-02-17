@@ -3101,21 +3101,22 @@ Limitations / notes:
 - `xclaw-agent x402 serve-status --json`
 - `xclaw-agent x402 serve-stop --json`
 - `xclaw-agent x402 pay --url <https://...> --network <key> --facilitator <key> --amount-atomic <value> --json`
-- `xclaw-agent x402 pay-resume --approval-id <xpay_id> --json`
-- `xclaw-agent x402 pay-decide --approval-id <xpay_id> --decision <approve|deny> --json`
+- `xclaw-agent x402 pay-resume --approval-id <xfr_id> --json`
+- `xclaw-agent x402 pay-decide --approval-id <xfr_id> --decision <approve|deny> --json`
 - `xclaw-agent x402 policy-get --network <key> --json`
 - `xclaw-agent x402 policy-set --network <key> --mode <auto|per_payment> [--max-amount-atomic <value>] [--allowed-host <host>] --json`
 - `xclaw-agent x402 networks --json`
+- `xclaw-agent x402 serve-start` accepts optional `--ttl-seconds <value>` and defaults to `1800` seconds when omitted.
 
 4. x402 approval lifecycle:
-- Runtime-canonical x402 payment approvals use `xpay_...` IDs.
+- Runtime-canonical x402 payment approvals use `xfr_...` IDs.
 - Status vocabulary is locked:
   - `proposed`, `approval_pending`, `approved`, `rejected`, `executing`, `filled`, `failed`.
 - Approval gating is local-policy controlled (`auto` vs `per_payment`) and must include deterministic deny/approve terminal behavior.
 
 5. Local runtime state artifacts:
 - `~/.xclaw-agent/x402-runtime.json` tracks receive endpoint + tunnel lifecycle.
-- `~/.xclaw-agent/pending-x402-pay-flows.json` tracks `xpay_...` approvals and execution state.
+- `~/.xclaw-agent/pending-x402-pay-flows.json` tracks `xfr_...` approvals and execution state.
 - `~/.xclaw-agent/x402-policy.json` tracks local x402 pay policy (`payApprovalMode`, `maxAmountAtomic`, `allowedHosts`) per network.
 
 6. Receive endpoint + tunnel behavior:
@@ -3141,10 +3142,57 @@ Limitations / notes:
   - `x402-networks`
   - `request-x402-payment` (auto-start shortcut)
 - `request-x402-payment` must auto-start receive endpoint and return:
-  - `paymentUrl`, `network`, `facilitator`, `amount`, `expiresAt`.
+  - `paymentUrl`, `network`, `facilitator`, `amount`, `ttlSeconds`, `expiresAt`, `timeLimitNotice`.
+- Payment links default to a 30-minute lifetime (`ttlSeconds=1800`) unless caller overrides TTL.
+- Agent responses that provide x402 payment URLs must include expiration guidance via `timeLimitNotice`.
+- Runtime enforcement: once `expiresAt` is reached, receive endpoint must reject payment path with `payment_expired`.
+- `x402 serve-status` includes `expired` boolean for lifecycle orchestration.
 
 9. Installer portability requirements:
 - Setup script must generate OS-native launcher artifacts:
   - POSIX shell wrapper on Linux/macOS,
   - `.cmd` and `.ps1` launchers on Windows.
 - Setup script must ensure `cloudflared` is available via OS-aware install/download path without adding Node/npm runtime dependency to skill command execution.
+
+## 68) Slice 80 Hosted x402 Web Contract (Locked)
+
+1. Scope boundary:
+- Slice 80 adds hosted x402 receive/payment visibility to `apps/network-web` and keeps outbound x402 execution agent-originated.
+- Server/web remains non-custodial (no wallet private key material stored or exported).
+
+2. Hosted receive contract:
+- Hosted endpoint path:
+  - `GET|POST /api/v1/x402/pay/{agentId}/{linkToken}`
+- Hosted receive endpoint behavior:
+  - returns `402 payment_required` when payment header is missing,
+  - returns `200 payment_settled` when payment header challenge is satisfied,
+  - returns `410 payment_expired` when receive link is expired.
+- Management route provides receive URL metadata:
+  - `GET /api/v1/management/x402/receive-link?agentId=...&chainKey=...`
+  - response includes `paymentUrl`, `ttlSeconds`, `expiresAt`, `timeLimitNotice`.
+
+3. Outbound x402 mirror contract:
+- Agent runtime remains initiator for outbound x402 send execution/signing.
+- Runtime mirrors outbound x402 lifecycle to server read model via:
+  - `POST /api/v1/agent/x402/outbound/proposed`
+  - `POST /api/v1/agent/x402/outbound/mirror`
+- Outbound approvals exposed to web must reuse transfer approval queue surface with `approval_source=x402` and `xfr_...` IDs.
+
+4. Inbound/outbound read model contract:
+- Server-side read model table:
+  - `agent_x402_payment_mirror`
+- Transfer approval mirror extension fields:
+  - `approval_source`, `x402_url`, `x402_network_key`, `x402_facilitator_key`, `x402_asset_kind`, `x402_asset_address`, `x402_amount_atomic`, `x402_payment_id`.
+- Management read endpoint:
+  - `GET /api/v1/management/x402/payments`
+
+5. Agent page contract:
+- `/agents/[agentId]` must merge x402 rows into wallet activity timeline with source badge (`x402`).
+- Approval history remains canonical on existing card; x402-backed approvals render with x402 URL/network/facilitator/amount context.
+- Agent page must expose hosted receive link panel with copy + regenerate actions.
+
+6. Loopback contract:
+- Loopback self-pay is standard path (no dedicated sandbox mode flag):
+  - agent fetches hosted receive URL,
+  - agent pays same URL,
+  - system records both outbound and inbound x402 rows where correlation artifacts are available.

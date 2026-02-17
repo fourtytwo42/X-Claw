@@ -33,6 +33,7 @@ from typing import Any
 
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from xclaw_agent import x402_state
 from xclaw_agent.x402_policy import get_policy as x402_get_policy
 from xclaw_agent.x402_policy import set_policy as x402_set_policy
 from xclaw_agent.x402_runtime import list_networks as x402_list_networks
@@ -1904,6 +1905,86 @@ def _mirror_transfer_policy(chain: str, policy: dict[str, Any]) -> None:
         pass
 
 
+def _mirror_x402_outbound(flow: dict[str, Any]) -> None:
+    try:
+        approval_id = str(flow.get("approvalId") or "").strip()
+        network = str(flow.get("network") or "").strip()
+        facilitator = str(flow.get("facilitator") or "").strip()
+        url = str(flow.get("url") or "").strip()
+        amount_atomic = str(flow.get("amountAtomic") or "").strip()
+        if not approval_id or not network or not facilitator or not url or not amount_atomic:
+            return
+
+        payment_id = str(flow.get("paymentId") or "").strip() or f"xpm_{secrets.token_hex(10)}"
+        flow["paymentId"] = payment_id
+        payload = {
+            "schemaVersion": 1,
+            "paymentId": payment_id,
+            "approvalId": approval_id,
+            "networkKey": network,
+            "facilitatorKey": facilitator,
+            "status": str(flow.get("status") or "approval_pending"),
+            "assetKind": str(flow.get("assetKind") or "native"),
+            "assetAddress": flow.get("assetAddress"),
+            "assetSymbol": flow.get("assetSymbol"),
+            "amountAtomic": amount_atomic,
+            "url": url,
+            "txHash": flow.get("txHash"),
+            "reasonCode": flow.get("reasonCode"),
+            "reasonMessage": flow.get("reasonMessage"),
+            "createdAt": flow.get("createdAt") or utc_now(),
+            "updatedAt": flow.get("updatedAt") or utc_now(),
+            "terminalAt": flow.get("terminalAt"),
+        }
+        _api_request(
+            "POST",
+            "/agent/x402/outbound/mirror",
+            payload=payload,
+            include_idempotency=True,
+            idempotency_key=f"rt-x402-mirror-{approval_id}-{secrets.token_hex(8)}",
+        )
+
+        approval_payload = {
+            "schemaVersion": 1,
+            "approvalId": approval_id,
+            "chainKey": network,
+            "approvalSource": "x402",
+            "status": str(flow.get("status") or "approval_pending"),
+            "transferType": "native",
+            "tokenAddress": None,
+            "tokenSymbol": str(flow.get("assetSymbol") or "X402"),
+            "toAddress": "0x0000000000000000000000000000000000000000",
+            "amountWei": amount_atomic,
+            "txHash": flow.get("txHash"),
+            "reasonCode": flow.get("reasonCode"),
+            "reasonMessage": flow.get("reasonMessage"),
+            "policyBlockedAtCreate": False,
+            "policyBlockReasonCode": None,
+            "policyBlockReasonMessage": None,
+            "executionMode": "normal",
+            "x402Url": url,
+            "x402NetworkKey": network,
+            "x402FacilitatorKey": facilitator,
+            "x402AssetKind": str(flow.get("assetKind") or "native"),
+            "x402AssetAddress": flow.get("assetAddress"),
+            "x402AmountAtomic": amount_atomic,
+            "x402PaymentId": payment_id,
+            "createdAt": flow.get("createdAt") or utc_now(),
+            "updatedAt": flow.get("updatedAt") or utc_now(),
+            "decidedAt": flow.get("decidedAt"),
+            "terminalAt": flow.get("terminalAt"),
+        }
+        _api_request(
+            "POST",
+            "/agent/transfer-approvals/mirror",
+            payload=approval_payload,
+            include_idempotency=True,
+            idempotency_key=f"rt-x402-transfer-mirror-{approval_id}-{secrets.token_hex(8)}",
+        )
+    except Exception:
+        pass
+
+
 def _transfer_requires_approval(chain: str, transfer_type: str, token_address: str | None) -> tuple[bool, dict[str, Any]]:
     policy = _sync_transfer_policy_from_remote(chain)
     mode = str(policy.get("transferApprovalMode") or "per_transfer")
@@ -2752,6 +2833,17 @@ def cmd_approvals_resume_transfer(args: argparse.Namespace) -> int:
         return fail("invalid_input", "approval_id is required.", "Provide --approval-id xfr_... and retry.", exit_code=2)
     flow = _get_pending_transfer_flow(approval_id)
     if not flow:
+        x402_flow = x402_state.get_pending_pay_flow(approval_id)
+        if isinstance(x402_flow, dict):
+            try:
+                payload = x402_pay_resume(approval_id)
+                if isinstance(payload, dict):
+                    _mirror_x402_outbound(payload)
+                return ok("x402 payment resume processed.", approval=payload)
+            except X402RuntimeError as exc:
+                return fail("x402_runtime_error", str(exc), "Use a valid pending approved x402 approval id and retry.", exit_code=1)
+            except Exception as exc:
+                return fail("x402_runtime_error", str(exc), "Inspect runtime x402 pay resume flow and retry.", exit_code=1)
         return fail(
             "not_found",
             "Transfer approval flow was not found.",
@@ -2798,6 +2890,17 @@ def cmd_approvals_decide_transfer(args: argparse.Namespace) -> int:
 
     flow = _get_pending_transfer_flow(approval_id)
     if not flow:
+        x402_flow = x402_state.get_pending_pay_flow(approval_id)
+        if isinstance(x402_flow, dict):
+            try:
+                payload = x402_pay_decide(approval_id, decision, str(args.reason_message or "").strip() or None)
+                if isinstance(payload, dict):
+                    _mirror_x402_outbound(payload)
+                return ok("x402 payment decision applied.", approval=payload)
+            except X402RuntimeError as exc:
+                return fail("x402_runtime_error", str(exc), "Use a valid pending x402 approval id and retry.", exit_code=1)
+            except Exception as exc:
+                return fail("x402_runtime_error", str(exc), "Inspect runtime x402 pay decision flow and retry.", exit_code=1)
         return fail(
             "not_found",
             "Transfer approval flow was not found.",
@@ -6131,7 +6234,9 @@ def cmd_x402_serve_start(args: argparse.Namespace) -> int:
             network=payload.get("network"),
             facilitator=payload.get("facilitator"),
             amountAtomic=payload.get("amountAtomic"),
+            ttlSeconds=payload.get("ttlSeconds"),
             expiresAt=payload.get("expiresAt"),
+            timeLimitNotice=payload.get("timeLimitNotice"),
         )
     except X402RuntimeError as exc:
         return fail("x402_runtime_error", str(exc), "Verify x402 network/facilitator config and retry.", exit_code=1)
@@ -6176,6 +6281,9 @@ def cmd_x402_pay(args: argparse.Namespace) -> int:
         if not bool(payload.get("ok", False)):
             emit(payload)
             return 1
+        approval = payload.get("approval")
+        if isinstance(approval, dict):
+            _mirror_x402_outbound(approval)
         return emit(payload)
     except X402RuntimeError as exc:
         return fail("x402_runtime_error", str(exc), "Verify x402 pay inputs and retry.", exit_code=1)
@@ -6189,12 +6297,14 @@ def cmd_x402_pay_resume(args: argparse.Namespace) -> int:
         return chk
     approval_id = str(args.approval_id or "").strip()
     if not approval_id:
-        return fail("invalid_input", "approval_id is required.", "Provide --approval-id xpay_... and retry.", exit_code=2)
+        return fail("invalid_input", "approval_id is required.", "Provide --approval-id xfr_... and retry.", exit_code=2)
     try:
         payload = x402_pay_resume(approval_id)
+        if isinstance(payload, dict):
+            _mirror_x402_outbound(payload)
         return ok("x402 payment resume processed.", approval=payload)
     except X402RuntimeError as exc:
-        return fail("x402_runtime_error", str(exc), "Use a valid pending approved xpay_... id and retry.", exit_code=1)
+        return fail("x402_runtime_error", str(exc), "Use a valid pending approved xfr_... id and retry.", exit_code=1)
     except Exception as exc:
         return fail("x402_runtime_error", str(exc), "Inspect runtime x402 pay resume flow and retry.", exit_code=1)
 
@@ -6206,14 +6316,16 @@ def cmd_x402_pay_decide(args: argparse.Namespace) -> int:
     approval_id = str(args.approval_id or "").strip()
     decision = str(args.decision or "").strip().lower()
     if not approval_id:
-        return fail("invalid_input", "approval_id is required.", "Provide --approval-id xpay_... and retry.", exit_code=2)
+        return fail("invalid_input", "approval_id is required.", "Provide --approval-id xfr_... and retry.", exit_code=2)
     if decision not in {"approve", "deny"}:
         return fail("invalid_input", "decision must be approve|deny.", "Use --decision approve or --decision deny.", exit_code=2)
     try:
         payload = x402_pay_decide(approval_id, decision, str(args.reason_message or "").strip() or None)
+        if isinstance(payload, dict):
+            _mirror_x402_outbound(payload)
         return ok("x402 payment decision applied.", approval=payload)
     except X402RuntimeError as exc:
-        return fail("x402_runtime_error", str(exc), "Use a valid pending xpay_... id and retry.", exit_code=1)
+        return fail("x402_runtime_error", str(exc), "Use a valid pending xfr_... id and retry.", exit_code=1)
     except Exception as exc:
         return fail("x402_runtime_error", str(exc), "Inspect runtime x402 pay decision flow and retry.", exit_code=1)
 
@@ -6431,7 +6543,7 @@ def build_parser() -> argparse.ArgumentParser:
     x402_serve_start.add_argument("--network", required=True)
     x402_serve_start.add_argument("--facilitator", required=True)
     x402_serve_start.add_argument("--amount-atomic", required=True)
-    x402_serve_start.add_argument("--ttl-seconds", default=3600)
+    x402_serve_start.add_argument("--ttl-seconds", default=1800)
     x402_serve_start.add_argument("--local-port")
     x402_serve_start.add_argument("--json", action="store_true")
     x402_serve_start.set_defaults(func=cmd_x402_serve_start)

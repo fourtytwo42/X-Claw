@@ -24,7 +24,7 @@ This reference defines the expected command surface for the Python-first skill w
 - `owner-link`
 - `faucet-request`
 - `request-x402-payment`
-- `x402-serve-start <network> <facilitator> <amount_atomic>`
+- `x402-serve-start <network> <facilitator> <amount_atomic> [ttl_seconds]`
 - `x402-serve-status`
 - `x402-serve-stop`
 - `x402-pay <url> <network> <facilitator> <amount_atomic>`
@@ -66,12 +66,12 @@ Underlying runtime delegation (performed by wrapper):
 - `xclaw-agent profile set-name --name <name> --chain <chain_key> --json`
 - `xclaw-agent management-link --ttl-seconds <seconds> --json`
 - `xclaw-agent faucet-request --chain <chain_key> --json`
-- `xclaw-agent x402 serve-start --network <network> --facilitator <facilitator> --amount-atomic <amount_atomic> --json`
+- `xclaw-agent x402 serve-start --network <network> --facilitator <facilitator> --amount-atomic <amount_atomic> [--ttl-seconds <seconds>] --json`
 - `xclaw-agent x402 serve-status --json`
 - `xclaw-agent x402 serve-stop --json`
 - `xclaw-agent x402 pay --url <url> --network <network> --facilitator <facilitator> --amount-atomic <amount_atomic> --json`
-- `xclaw-agent x402 pay-resume --approval-id <xpay_id> --json`
-- `xclaw-agent x402 pay-decide --approval-id <xpay_id> --decision <approve|deny> --json`
+- `xclaw-agent x402 pay-resume --approval-id <xfr_id> --json`
+- `xclaw-agent x402 pay-decide --approval-id <xfr_id> --decision <approve|deny> --json`
 - `xclaw-agent x402 policy-get --network <network> --json`
 - `xclaw-agent x402 policy-set --network <network> --mode <auto|per_payment> [--max-amount-atomic <value>] [--allowed-host <host>] --json`
 - `xclaw-agent x402 networks --json`
@@ -137,4 +137,6 @@ Underlying runtime delegation (performed by wrapper):
 - Chat posts must never include secrets, private keys, seed phrases, or sensitive policy data.
 - Outbound transfer commands (`wallet-send`, `wallet-send-token`) are policy-gated by owner settings on `/agents/:id`.
 - Transfer approvals use `xfr_...` IDs and queued messages with `Status: approval_pending` for Telegram button auto-attach.
-- x402 payment approvals use `xpay_...` IDs and deterministic statuses (`proposed|approval_pending|approved|rejected|executing|filled|failed`).
+- x402 payment approvals use `xfr_...` IDs and deterministic statuses (`proposed|approval_pending|approved|rejected|executing|filled|failed`).
+- x402 payment links default to `ttlSeconds=1800` unless overridden; payment-link responses include `expiresAt` and `timeLimitNotice`.
+- x402 serve-status responses include `expired` so agents can detect and rotate stale payment links.

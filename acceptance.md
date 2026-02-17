@@ -1,3 +1,36 @@
+# Slice 80 Acceptance Evidence
+
+Date (UTC): 2026-02-17
+Active slice: `Slice 80: Hosted x402 on /agents/[agentId]`
+Issue mapping: `pending`
+
+## Objective + Scope Lock
+- Objective: implement hosted x402 receive endpoint/read model in network-web while keeping outbound x402 execution agent-originated.
+- Scope guard: no server custody of agent wallet private keys.
+
+## Required Validation Commands and Outcomes
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS (`Ran 61 tests`, `OK`)
+- `python3 -m unittest apps/agent-runtime/tests/test_x402_runtime.py -v` -> PASS (`Ran 6 tests`, `OK`)
+- `python3 -m unittest apps/agent-runtime/tests/test_x402_skill_wrapper.py -v` -> PASS (`Ran 4 tests`, `OK`)
+- `npm run db:parity` -> PASS (`ok: true`; includes `0017_slice80_hosted_x402.sql`)
+- `npm run seed:reset` -> PASS (`ok: true`)
+- `npm run seed:load` -> PASS (`ok: true`; totals `agents=6`, `trades=11`)
+- `npm run seed:verify` -> PASS (`ok: true`)
+- `npm run build` -> PASS (Next.js production build completed; x402 routes compiled)
+- `pm2 restart all` -> PASS (`xclaw-web` restarted and `online`)
+
+## Functional Verification Notes
+- hosted endpoint `GET|POST /api/v1/x402/pay/{agentId}/{linkToken}` implemented with:
+  - `402 payment_required` when `X-Payment` header is missing,
+  - `200 payment_settled` on accepted payment header,
+  - `410 payment_expired` after TTL expiry.
+- outbound x402 mirror persists to `agent_x402_payment_mirror` and also mirrors to `agent_transfer_approval_mirror` with `approval_source='x402'`.
+- management decision route reuses existing approval endpoint and dispatches x402 decisions through runtime `x402 pay-decide` when `approval_source='x402'`.
+- `/agents/[agentId]` timeline merges x402 rows with `source: x402` badge; approval history renders x402 metadata (URL/network/facilitator/amount).
+- `/agents/[agentId]` wallet side panel includes hosted x402 receive-link metadata and copy/regenerate controls.
+
+---
+
 # Slice 79 Acceptance Evidence
 
 Date (UTC): 2026-02-17
@@ -5,7 +38,7 @@ Active slice: `Slice 79: Agent-Skill x402 Send/Receive Runtime`
 Issue mapping: `#29`
 
 ## Objective + Scope Lock
-- Objective: add Python-first x402 receive/pay runtime + skill command surfaces with local `xpay_...` approval lifecycle and cloudflared tunnel bootstrap.
+- Objective: add Python-first x402 receive/pay runtime + skill command surfaces with local `xfr_...` approval lifecycle and cloudflared tunnel bootstrap.
 - Scope guard honored: no `apps/network-web` integration in this slice.
 
 ## File-Level Evidence (Slice 79)
@@ -38,9 +71,9 @@ Issue mapping: `#29`
   - `acceptance.md`
 
 ## Required Validation Commands and Outcomes
-- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS (`Ran 59 tests`, `OK`)
-- `python3 -m unittest apps/agent-runtime/tests/test_x402_runtime.py -v` -> PASS (`Ran 5 tests`, `OK`)
-- `python3 -m unittest apps/agent-runtime/tests/test_x402_skill_wrapper.py -v` -> PASS (`Ran 3 tests`, `OK`)
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS (`Ran 60 tests`, `OK`)
+- `python3 -m unittest apps/agent-runtime/tests/test_x402_runtime.py -v` -> PASS (`Ran 6 tests`, `OK`)
+- `python3 -m unittest apps/agent-runtime/tests/test_x402_skill_wrapper.py -v` -> PASS (`Ran 4 tests`, `OK`)
 - `npm run db:parity` -> PASS (`ok: true`)
 - `npm run seed:reset` -> PASS (`ok: true`)
 - `npm run seed:load` -> PASS (scenarios loaded; totals `agents=6`, `trades=11`)
@@ -53,12 +86,16 @@ Issue mapping: `#29`
   - enabled: `base_sepolia`, `base`
   - disabled: `kite_ai_testnet`, `kite_ai_mainnet`
 - `x402 serve-start --network base_sepolia --facilitator cdp --amount-atomic 1 --json` returned shareable `paymentUrl` and running state with tunnel/server pids.
+- `x402 serve-start` now defaults to `ttlSeconds=1800` (30 minutes) when TTL is omitted.
+- `x402-serve-start <network> <facilitator> <amount_atomic> [ttl_seconds]` supports explicit TTL override pass-through to runtime.
+- Runtime worker now enforces timeout: payment path returns `payment_expired` after `expiresAt` and serve-status reports `expired`.
 - `x402 pay --url <paymentUrl> --network base_sepolia --facilitator cdp --amount-atomic 1 --json` returned:
-  - `approvalId: xpay_...`
+  - `approvalId: xfr_...`
   - `status: approval_pending`
   - queued message with deterministic approval fields.
-- `x402 pay-decide --approval-id <xpay_id> --decision approve --json` resumed once and produced terminal result (`status: failed`, HTTP 530 challenge unresolved in this environment).
-- `x402 pay-decide --approval-id <xpay_id> --decision deny --reason-message \"owner denied\" --json` produced terminal `status: rejected` with `reasonCode: approval_rejected`.
+- `request-x402-payment` response includes payer-visible expiration fields: `ttlSeconds`, `expiresAt`, `timeLimitNotice`.
+- `x402 pay-decide --approval-id <xfr_id> --decision approve --json` resumed once and produced terminal result (`status: failed`, HTTP 530 challenge unresolved in this environment).
+- `x402 pay-decide --approval-id <xfr_id> --decision deny --reason-message \"owner denied\" --json` produced terminal `status: rejected` with `reasonCode: approval_rejected`.
 - `x402 serve-stop --json` converged runtime state to `stopped`.
 
 ---

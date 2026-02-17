@@ -144,23 +144,34 @@ def _is_url(value: str) -> bool:
     return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
 
 
+def _is_expired(expires_at: str | None) -> bool:
+    parsed = _parse_iso(expires_at)
+    if parsed is None:
+        return False
+    return datetime.now(timezone.utc) >= parsed
+
+
 def serve_status() -> dict[str, Any]:
     state = x402_state.load_runtime_state()
     serve = state.get("serve") if isinstance(state.get("serve"), dict) else {}
     server_alive = _is_process_alive(serve.get("serverPid"))
     tunnel_alive = _is_process_alive(serve.get("tunnelPid"))
     status = "running" if server_alive and tunnel_alive else "stopped"
+    expires_at = serve.get("expiresAt")
     return {
         "status": status,
         "network": serve.get("network"),
         "facilitator": serve.get("facilitator"),
         "amountAtomic": serve.get("amountAtomic"),
+        "ttlSeconds": serve.get("ttlSeconds"),
         "localPort": serve.get("localPort"),
         "serverPid": serve.get("serverPid"),
         "tunnelPid": serve.get("tunnelPid"),
         "paymentUrl": serve.get("paymentUrl"),
         "resourcePath": serve.get("resourcePath"),
-        "expiresAt": serve.get("expiresAt"),
+        "expiresAt": expires_at,
+        "expired": _is_expired(expires_at),
+        "timeLimitNotice": serve.get("timeLimitNotice"),
         "startedAt": serve.get("startedAt"),
         "updatedAt": serve.get("updatedAt"),
     }
@@ -177,12 +188,14 @@ def serve_stop() -> dict[str, Any]:
         "network": None,
         "facilitator": None,
         "amountAtomic": None,
+        "ttlSeconds": None,
         "resourcePath": None,
         "localPort": None,
         "serverPid": None,
         "tunnelPid": None,
         "paymentUrl": None,
         "expiresAt": None,
+        "timeLimitNotice": None,
         "startedAt": None,
         "updatedAt": utc_now(),
     }
@@ -190,7 +203,7 @@ def serve_stop() -> dict[str, Any]:
     return serve_status()
 
 
-def serve_start(network: str, facilitator: str, amount_atomic: str, ttl_seconds: int = 3600, local_port: int | None = None) -> dict[str, Any]:
+def serve_start(network: str, facilitator: str, amount_atomic: str, ttl_seconds: int = 1800, local_port: int | None = None) -> dict[str, Any]:
     resolved = _resolve_network(network, facilitator)
     amount = _require_amount_atomic(amount_atomic)
 
@@ -199,6 +212,11 @@ def serve_start(network: str, facilitator: str, amount_atomic: str, ttl_seconds:
 
     port = int(local_port or _find_free_port())
     resource_path = _resource_path()
+    now = datetime.now(timezone.utc)
+    ttl_final = max(60, int(ttl_seconds))
+    expires_at = (now + timedelta(seconds=ttl_final)).isoformat()
+    time_limit_notice = f"Payment link expires in {ttl_final} seconds (at {expires_at})."
+
     worker_cmd = [
         sys.executable,
         "-m",
@@ -214,15 +232,14 @@ def serve_start(network: str, facilitator: str, amount_atomic: str, ttl_seconds:
         amount,
         "--resource-path",
         resource_path,
+        "--expires-at",
+        expires_at,
     ]
     worker = subprocess.Popen(worker_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     tunnel = x402_tunnel.start_quick_tunnel(port)
     public_url = str(tunnel.get("publicUrl") or "").rstrip("/")
     payment_url = f"{public_url}{resource_path}"
-
-    now = datetime.now(timezone.utc)
-    expires_at = (now + timedelta(seconds=max(60, int(ttl_seconds)))).isoformat()
 
     state = x402_state.load_runtime_state()
     state["serve"] = {
@@ -231,12 +248,14 @@ def serve_start(network: str, facilitator: str, amount_atomic: str, ttl_seconds:
         "facilitator": facilitator,
         "facilitatorConfig": resolved.get("facilitatorConfig"),
         "amountAtomic": amount,
+        "ttlSeconds": ttl_final,
         "resourcePath": resource_path,
         "localPort": port,
         "serverPid": worker.pid,
         "tunnelPid": tunnel.get("pid"),
         "paymentUrl": payment_url,
         "expiresAt": expires_at,
+        "timeLimitNotice": time_limit_notice,
         "startedAt": now.isoformat(),
         "updatedAt": now.isoformat(),
     }
@@ -405,6 +424,7 @@ def serve_worker_main(argv: list[str]) -> int:
     parser.add_argument("--facilitator", required=True)
     parser.add_argument("--amount-atomic", required=True)
     parser.add_argument("--resource-path", required=True)
+    parser.add_argument("--expires-at", required=True)
     args = parser.parse_args(argv)
 
     port = int(args.port)
@@ -412,6 +432,7 @@ def serve_worker_main(argv: list[str]) -> int:
     facilitator = str(args.facilitator)
     amount_atomic = str(args.amount_atomic)
     resource_path = str(args.resource_path)
+    expires_at = str(args.expires_at)
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, format: str, *args: Any) -> None:  # noqa: A003
@@ -435,11 +456,27 @@ def serve_worker_main(argv: list[str]) -> int:
                         "facilitator": facilitator,
                         "amountAtomic": amount_atomic,
                         "resourcePath": resource_path,
+                        "expiresAt": expires_at,
+                        "expired": _is_expired(expires_at),
                     },
                 )
                 return
 
             if self.path == resource_path:
+                if _is_expired(expires_at):
+                    self._json(
+                        410,
+                        {
+                            "ok": False,
+                            "code": "payment_expired",
+                            "network": network,
+                            "facilitator": facilitator,
+                            "amountAtomic": amount_atomic,
+                            "resourcePath": resource_path,
+                            "expiresAt": expires_at,
+                        },
+                    )
+                    return
                 payment_header = self.headers.get("X-Payment")
                 if payment_header:
                     self._json(

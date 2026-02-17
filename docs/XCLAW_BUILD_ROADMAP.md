@@ -2666,6 +2666,43 @@ Note:
   - [x] `pm2 restart all` (after successful build; when PM2 is available)
 - [x] Record functional verification evidence:
   - [x] `x402 serve-start` returns shareable `paymentUrl`.
-  - [x] `x402 pay` approval-required path returns `xpay_...` + `approval_pending`.
+  - [x] `x402 pay` approval-required path returns `xfr_...` + `approval_pending`.
   - [x] `x402 pay-decide approve` resumes once and yields terminal result.
   - [x] `x402 pay-decide deny` yields terminal `rejected` with no execution.
+
+---
+
+## 80) Slice 80: Hosted x402 on `/agents/[agentId]` + Agent-Originated Send + Loopback Self-Pay
+
+### 80.1 Canonical/doc sync
+- [ ] Add Slice 80 goal/DoD + issue mapping to `docs/XCLAW_SLICE_TRACKER.md`.
+- [ ] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` with hosted x402 contract (server receive endpoint + agent-originated outbound send + loopback path).
+- [ ] Update `docs/api/WALLET_COMMAND_CONTRACT.md` for x402 outbound mirror obligations and `xfr_...` approval reuse.
+- [ ] Update `docs/api/openapi.v1.yaml` and shared schema artifacts for new x402 routes.
+- [ ] Update handoff artifacts (`docs/CONTEXT_PACK.md`, `spec.md`, `tasks.md`, `acceptance.md`).
+
+### 80.2 Implementation
+- [ ] Add migration: `infrastructure/migrations/0017_slice80_hosted_x402.sql`.
+- [ ] Add x402 API surfaces under `apps/network-web/src/app/api/v1/agent/x402/*`.
+- [ ] Add management x402 read/receive-link surfaces under `apps/network-web/src/app/api/v1/management/x402/*`.
+- [ ] Add hosted payer endpoint: `apps/network-web/src/app/api/v1/x402/pay/[agentId]/[linkToken]/route.ts`.
+- [ ] Extend transfer approvals mirror table write/read/decision path with nullable x402 metadata.
+- [ ] Runtime x402 mirrors outbound flow and maps approvals to `xfr_...`.
+- [ ] `/agents/[agentId]` merges x402 history rows into wallet activity with source labeling and receive-link panel.
+
+### 80.3 Validation + evidence
+- [ ] Run required gates sequentially:
+  - [ ] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+  - [ ] `python3 -m unittest apps/agent-runtime/tests/test_x402_runtime.py -v`
+  - [ ] `python3 -m unittest apps/agent-runtime/tests/test_x402_skill_wrapper.py -v`
+  - [ ] `npm run db:parity`
+  - [ ] `npm run seed:reset`
+  - [ ] `npm run seed:load`
+  - [ ] `npm run seed:verify`
+  - [ ] `npm run build`
+  - [ ] `pm2 restart all` (after successful build; not parallel)
+- [ ] Record evidence:
+  - [ ] hosted x402 endpoint returns `402` before payment.
+  - [ ] hosted x402 endpoint returns `200` after payment and `410` when expired.
+  - [ ] outbound approval-required x402 appears in transfer approvals queue as `approval_source=x402`.
+  - [ ] loopback self-pay records both outbound and inbound rows.

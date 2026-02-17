@@ -1477,7 +1477,7 @@ Status: [x]
 Issue: #29
 
 Goal:
-- Add Python-first x402 receive/pay runtime + skill command surface with runtime-canonical payment approvals (`xpay_...`) and Cloudflare tunnel bootstrap, without integrating network-web APIs in this slice.
+- Add Python-first x402 receive/pay runtime + skill command surface with runtime-canonical payment approvals (`xfr_...`) and Cloudflare tunnel bootstrap, without integrating network-web APIs in this slice.
 
 DoD:
 - [x] docs sync first: source-of-truth + roadmap + tracker + wallet command contract + context/spec/tasks/acceptance aligned to Slice 79.
@@ -1486,7 +1486,7 @@ DoD:
   - [x] `x402 pay|pay-resume|pay-decide`
   - [x] `x402 policy-get|policy-set`
   - [x] `x402 networks`
-- [x] x402 pay approval lifecycle uses deterministic `xpay_...` IDs and statuses:
+- [x] x402 pay approval lifecycle uses deterministic `xfr_...` IDs and statuses:
   - [x] `proposed|approval_pending|approved|rejected|executing|filled|failed`
 - [x] local x402 state files implemented:
   - [x] `~/.xclaw-agent/x402-runtime.json`
@@ -1504,3 +1504,28 @@ DoD:
   - [x] enabled: `base_sepolia`, `base`
   - [x] disabled by default: `kite_ai_testnet`, `kite_ai_mainnet`
 - [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, runtime tests.
+
+---
+
+## Slice 80: Hosted x402 on `/agents/[agentId]` + Agent-Originated Send + Loopback Self-Pay
+Status: [~]
+Issue: pending
+
+Goal:
+- Add hosted x402 receive endpoints in network-web and merge x402 send/receive visibility into `/agents/[agentId]` while keeping outbound x402 execution agent-originated.
+
+DoD:
+- [ ] Add server x402 read model table + indexes (`agent_x402_payment_mirror`) and extend `agent_transfer_approval_mirror` with x402 metadata/source fields.
+- [ ] Add API routes:
+  - [ ] `POST /api/v1/agent/x402/outbound/proposed`
+  - [ ] `POST /api/v1/agent/x402/outbound/mirror`
+  - [ ] `POST /api/v1/agent/x402/inbound/mirror`
+  - [ ] `GET /api/v1/management/x402/payments`
+  - [ ] `GET /api/v1/management/x402/receive-link`
+  - [ ] `GET|POST /api/v1/x402/pay/{agentId}/{linkToken}`
+- [ ] Extend transfer-approval mirror and management transfer approval read/decision flows for `approval_source=x402`.
+- [ ] Runtime mirrors outbound x402 lifecycle into server and supports x402 approvals through transfer decision path (`xfr_...` IDs).
+- [ ] `/agents/[agentId]` wallet timeline includes x402 entries with source badge and receive-link panel.
+- [ ] Loopback self-pay path (agent pays own hosted endpoint) records both inbound and outbound history rows.
+- [ ] Source-of-truth, roadmap, OpenAPI, schema, and command contract are synced.
+- [ ] Required validation gates pass.

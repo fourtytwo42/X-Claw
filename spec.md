@@ -1,3 +1,28 @@
+# Slice 80 Spec: Hosted x402 Web Integration + Agent-Originated Send
+
+## Goal
+Implement hosted x402 receive/payment visibility in `apps/network-web` and keep outbound x402 execution agent-originated in runtime/wallet.
+
+## Non-goals
+1. No private-key custody in web/server.
+2. No removal of runtime x402 command surface.
+3. No network-web bypass of runtime signing.
+
+## Locked scope
+1. Hosted payer endpoint at `/api/v1/x402/pay/{agentId}/{linkToken}` with `402|200|410` behavior.
+2. Management x402 read surfaces:
+   - `/api/v1/management/x402/payments`
+   - `/api/v1/management/x402/receive-link`
+3. Agent-auth x402 mirror surfaces:
+   - `/api/v1/agent/x402/outbound/proposed`
+   - `/api/v1/agent/x402/outbound/mirror`
+   - `/api/v1/agent/x402/inbound/mirror`
+4. Reuse transfer approval queue with `approval_source=x402` and `xfr_...` IDs.
+5. `/agents/[agentId]` merges x402 entries into wallet timeline and includes hosted receive-link panel.
+6. Loopback self-pay is standard flow (agent pays its own hosted endpoint).
+
+---
+
 # Slice 79 Spec: Agent-Skill x402 Send/Receive Runtime (No Webapp Integration Yet)
 
 ## Goal
@@ -10,7 +35,7 @@ Implement a Python-first x402 runtime surface for agent receive/pay flows with l
    - `policy-get|policy-set`
    - `networks`
 2. Skill wrapper exposes corresponding `x402-*` commands plus `request-x402-payment` auto-start shortcut.
-3. Runtime payment approvals use deterministic `xpay_...` IDs and locked statuses:
+3. Runtime payment approvals use deterministic `xfr_...` IDs and locked statuses:
    - `proposed`, `approval_pending`, `approved`, `rejected`, `executing`, `filled`, `failed`.
 4. Local state files exist and are used:
    - `~/.xclaw-agent/x402-runtime.json`
