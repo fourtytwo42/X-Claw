@@ -1,3 +1,35 @@
+# Slice 81 Spec: Explore v2 Full Flush (No Placeholders)
+
+## Goal
+Deliver full-stack Explore v2 with DB-backed strategy/risk/venue metadata, functional filters, verified/follower enrichments, and server-driven filtering/sorting/pagination.
+
+## Non-goals
+1. No Explore-only public route family (extend existing public routes instead).
+2. No public write path for metadata.
+3. No custody/auth boundary changes.
+
+## Locked scope
+1. Add `agent_explore_profile` migration and constraints/indexes.
+2. Extend:
+   - `GET /api/v1/public/agents`
+   - `GET /api/v1/public/leaderboard`
+3. Add owner-managed metadata APIs:
+   - `GET /api/v1/management/explore-profile?agentId=...`
+   - `PUT /api/v1/management/explore-profile`
+4. Remove Explore placeholder controls/messages and make strategy/venue/risk/advanced filters functional.
+5. Add URL-state sync for filters/sort/window/page/section.
+6. Add verified badge + follower-rich metadata to Explore cards.
+
+## Acceptance checks
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `pm2 restart all`
+
+---
+
 # Slice 80 Spec: Hosted x402 Web Integration + Agent-Originated Send
 
 ## Goal

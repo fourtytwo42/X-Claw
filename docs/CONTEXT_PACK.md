@@ -1,5 +1,65 @@
 # X-Claw Context Pack
 
+## Slice 81 Context: Explore v2 Full Flush (No Placeholders)
+
+Issue mapping: `#30`
+
+### Objective + scope lock
+- Objective: remove Explore placeholders and deliver full-stack Explore v2 with DB-backed strategy/risk/venue metadata, enriched verified/follower fields, and server-driven filtering/sorting/pagination.
+- Scope guard honored: extend existing public routes (`/api/v1/public/agents`, `/api/v1/public/leaderboard`) and add owner-managed explore-profile routes; no Explore-only public route family.
+
+### Expected touched files (Slice 81 allowlist)
+- DB/contracts:
+  - `infrastructure/migrations/0018_slice81_explore_v2.sql`
+  - `packages/shared-schemas/json/management-explore-profile-request.schema.json`
+  - `packages/shared-schemas/json/management-explore-profile-response.schema.json`
+  - `packages/shared-schemas/json/public-agents-response.schema.json`
+  - `packages/shared-schemas/json/public-leaderboard-response.schema.json`
+- API:
+  - `apps/network-web/src/app/api/v1/public/agents/route.ts`
+  - `apps/network-web/src/app/api/v1/public/leaderboard/route.ts`
+  - `apps/network-web/src/app/api/v1/management/explore-profile/route.ts`
+- Web/UI:
+  - `apps/network-web/src/app/explore/page.tsx`
+  - `apps/network-web/src/app/explore/page.module.css`
+  - `apps/network-web/src/app/agents/page.tsx`
+  - `apps/network-web/src/lib/explore-page-view-model.ts`
+  - `apps/network-web/src/lib/explore-page-capabilities.ts`
+- Canonical docs/process:
+  - `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - `docs/XCLAW_SLICE_TRACKER.md`
+  - `docs/XCLAW_BUILD_ROADMAP.md`
+  - `docs/api/openapi.v1.yaml`
+  - `docs/CONTEXT_PACK.md`
+  - `spec.md`
+  - `tasks.md`
+  - `acceptance.md`
+
+### Locked implementation contract
+- Add `agent_explore_profile` metadata authority table (owner-managed values only).
+- Public route extensions:
+  - filters: `strategy`, `venue`, `riskTier`, `minFollowers`, `minVolumeUsd`, `activeWithinHours`, `verifiedOnly`.
+  - sort: include `followers`.
+  - row enrichments: `exploreProfile`, `verified`, `followerMeta`.
+- Management metadata routes:
+  - `GET /api/v1/management/explore-profile?agentId=...`
+  - `PUT /api/v1/management/explore-profile`
+- Explore UI:
+  - functional strategy/venue/risk controls,
+  - functional advanced drawer,
+  - verified badge + follower metadata,
+  - URL-state deep-link sync,
+  - `/explore` canonical and `/agents` alias preserved.
+
+### Verification plan
+- Required gates:
+  - `npm run db:parity`
+  - `npm run seed:reset`
+  - `npm run seed:load`
+  - `npm run seed:verify`
+  - `npm run build`
+  - `pm2 restart all` (after successful build; sequential)
+
 ## Slice 79 Context: Agent-Skill x402 Send/Receive Runtime (No Webapp Integration)
 
 Issue mapping: `#29`

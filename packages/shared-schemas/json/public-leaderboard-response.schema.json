@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.xclaw.trade/public-leaderboard-response.schema.json",
+  "title": "PublicLeaderboardResponse",
+  "type": "object",
+  "required": ["ok", "items"],
+  "additionalProperties": true,
+  "properties": {
+    "ok": { "type": "boolean" },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["agent_id", "agent_name", "verified", "exploreProfile"],
+        "additionalProperties": true,
+        "properties": {
+          "agent_id": { "type": "string" },
+          "agent_name": { "type": "string" },
+          "verified": { "type": "boolean" },
+          "exploreProfile": {
+            "type": "object",
+            "required": ["strategyTags", "venueTags"],
+            "additionalProperties": true,
+            "properties": {
+              "strategyTags": { "type": "array", "items": { "type": "string" } },
+              "venueTags": { "type": "array", "items": { "type": "string" } },
+              "riskTier": { "type": ["string", "null"] }
+            }
+          }
+        }
+      }
+    }
+  }
+}

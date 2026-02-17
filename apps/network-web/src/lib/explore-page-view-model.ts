@@ -1,5 +1,7 @@
 import { shortenAddress } from '@/lib/public-format';
 
+export type ExploreRiskTier = 'low' | 'medium' | 'high' | 'very_high';
+
 export type ExploreAgent = {
   agentId: string;
   agentName: string;
@@ -14,24 +16,21 @@ export type ExploreAgent = {
   volumeUsd: string | null;
   tradesCount: number | null;
   followersCount: number | null;
+  verified: boolean;
+  exploreProfile: {
+    strategyTags: string[];
+    venueTags: string[];
+    riskTier: ExploreRiskTier | null;
+    descriptionShort: string | null;
+  };
+  followerMeta: {
+    followersCount: number;
+    copyEnabledFollowers: number;
+    followerRankPercentile: string | null;
+  };
 };
 
-export type ExploreSort = 'pnl' | 'volume' | 'winrate' | 'recent' | 'name';
-
-export type LeaderboardMetric = {
-  pnlUsd: string | null;
-  volumeUsd: string | null;
-  returnPct: string | null;
-  followersCount: number | null;
-};
-
-function toNumber(value: string | number | null | undefined): number {
-  if (value === null || value === undefined) {
-    return Number.NEGATIVE_INFINITY;
-  }
-  const parsed = typeof value === 'number' ? value : Number(value);
-  return Number.isFinite(parsed) ? parsed : Number.NEGATIVE_INFINITY;
-}
+export type ExploreSort = 'pnl' | 'volume' | 'winrate' | 'recent' | 'name' | 'followers';
 
 export function normalizeAgents(
   payload: Array<{
@@ -51,11 +50,23 @@ export function normalizeAgents(
           followers_count: number | null;
         }
       | null;
-  }>,
-  leaderboard: Map<string, LeaderboardMetric>
+    exploreProfile?: {
+      strategyTags?: string[];
+      venueTags?: string[];
+      riskTier?: ExploreRiskTier | null;
+      descriptionShort?: string | null;
+    } | null;
+    verified?: boolean;
+    followerMeta?: {
+      followersCount?: number | null;
+      copyEnabledFollowers?: number | null;
+      followerRankPercentile?: string | null;
+    } | null;
+  }>
 ): ExploreAgent[] {
   return payload.map((item) => {
-    const metric = leaderboard.get(item.agent_id);
+    const followerCount = Number(item.followerMeta?.followersCount ?? item.latestMetrics?.followers_count ?? 0);
+    const copyEnabledFollowers = Number(item.followerMeta?.copyEnabledFollowers ?? 0);
     return {
       agentId: item.agent_id,
       agentName: item.agent_name,
@@ -65,53 +76,24 @@ export function normalizeAgents(
       walletAddress: item.wallet?.address ?? null,
       lastActivityAt: item.last_activity_at,
       lastHeartbeatAt: item.last_heartbeat_at,
-      pnlUsd: metric?.pnlUsd ?? item.latestMetrics?.pnl_usd ?? null,
-      returnPct: metric?.returnPct ?? item.latestMetrics?.return_pct ?? null,
-      volumeUsd: metric?.volumeUsd ?? item.latestMetrics?.volume_usd ?? null,
+      pnlUsd: item.latestMetrics?.pnl_usd ?? null,
+      returnPct: item.latestMetrics?.return_pct ?? null,
+      volumeUsd: item.latestMetrics?.volume_usd ?? null,
       tradesCount: item.latestMetrics?.trades_count ?? null,
-      followersCount: metric?.followersCount ?? item.latestMetrics?.followers_count ?? null
+      followersCount: item.latestMetrics?.followers_count ?? followerCount,
+      verified: Boolean(item.verified),
+      exploreProfile: {
+        strategyTags: item.exploreProfile?.strategyTags ?? [],
+        venueTags: item.exploreProfile?.venueTags ?? [],
+        riskTier: item.exploreProfile?.riskTier ?? null,
+        descriptionShort: item.exploreProfile?.descriptionShort ?? null
+      },
+      followerMeta: {
+        followersCount: Number.isFinite(followerCount) ? followerCount : 0,
+        copyEnabledFollowers: Number.isFinite(copyEnabledFollowers) ? copyEnabledFollowers : 0,
+        followerRankPercentile: item.followerMeta?.followerRankPercentile ?? null
+      }
     };
-  });
-}
-
-export function sortAgents(items: ExploreAgent[], sort: ExploreSort): ExploreAgent[] {
-  const out = [...items];
-  out.sort((left, right) => {
-    if (sort === 'name') {
-      return left.agentName.localeCompare(right.agentName);
-    }
-    if (sort === 'recent') {
-      return new Date(right.lastActivityAt ?? 0).getTime() - new Date(left.lastActivityAt ?? 0).getTime();
-    }
-    if (sort === 'volume') {
-      return toNumber(right.volumeUsd) - toNumber(left.volumeUsd);
-    }
-    if (sort === 'winrate') {
-      return toNumber(right.returnPct) - toNumber(left.returnPct);
-    }
-    return toNumber(right.pnlUsd) - toNumber(left.pnlUsd);
-  });
-  return out;
-}
-
-export function filterByStatus(items: ExploreAgent[], status: 'all' | string): ExploreAgent[] {
-  if (status === 'all') {
-    return items;
-  }
-  return items.filter((item) => item.publicStatus === status);
-}
-
-export function searchAgents(items: ExploreAgent[], query: string): ExploreAgent[] {
-  const normalized = query.trim().toLowerCase();
-  if (!normalized) {
-    return items;
-  }
-
-  return items.filter((item) => {
-    const chainText = item.chainKey ?? '';
-    const walletText = item.walletAddress ?? '';
-    const target = `${item.agentName} ${item.agentId} ${item.runtimePlatform} ${chainText} ${walletText}`.toLowerCase();
-    return target.includes(normalized);
   });
 }
 

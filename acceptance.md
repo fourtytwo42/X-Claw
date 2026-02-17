@@ -1,8 +1,38 @@
+# Slice 81 Acceptance Evidence
+
+Date (UTC): 2026-02-17
+Active slice: `Slice 81: Explore v2 Full Flush (No Placeholders)`
+Issue mapping: `#30`
+
+## Objective + Scope Lock
+- Objective: remove Explore placeholders and deliver full-stack Explore v2 metadata/filtering contracts with owner-managed profile updates.
+- Scope guard: extend existing public routes (no Explore-only public route family).
+
+## Required Validation Commands and Outcomes
+- `npm run db:parity` -> PASS (`ok: true`; includes `0018_slice81_explore_v2.sql`)
+- `npm run seed:reset` -> PASS (`ok: true`)
+- `npm run seed:load` -> PASS (`ok: true`; totals `agents=6`, `trades=11`)
+- `npm run seed:verify` -> PASS (`ok: true`)
+- `npm run build` -> PASS (Next.js production build completed; Explore and API routes compiled)
+- `pm2 restart all` -> PASS (`xclaw-web` restarted and `online`)
+
+## Functional Verification Notes
+- `GET /api/v1/public/agents` now supports strategy/venue/risk/follower/volume/activity/verified filters and server-side `followers` sort.
+- `GET /api/v1/public/agents` response rows include `exploreProfile`, `verified`, and `followerMeta` with null-safe defaults.
+- `GET /api/v1/public/leaderboard` response rows include `verified` + `exploreProfile`.
+- management profile contract is active:
+  - `GET /api/v1/management/explore-profile?agentId=...`
+  - `PUT /api/v1/management/explore-profile`
+- `/explore` ships functional strategy/venue/risk controls, advanced drawer filters, section segmented control, verified badge, follower-rich metadata, and URL-deep-link state sync.
+- `/agents` remains alias-compatible for Explore and uses Suspense wrapper for static prerender compatibility.
+
+---
+
 # Slice 80 Acceptance Evidence
 
 Date (UTC): 2026-02-17
 Active slice: `Slice 80: Hosted x402 on /agents/[agentId]`
-Issue mapping: `pending`
+Issue mapping: `#31`
 
 ## Objective + Scope Lock
 - Objective: implement hosted x402 receive endpoint/read model in network-web while keeping outbound x402 execution agent-originated.

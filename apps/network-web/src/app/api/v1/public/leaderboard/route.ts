@@ -13,19 +13,17 @@ function parseBoolean(value: string | null, fallback: boolean): boolean {
   if (value === null || value === '') {
     return fallback;
   }
-
   if (value === 'true' || value === '1') {
     return true;
   }
   if (value === 'false' || value === '0') {
     return false;
   }
-
   return fallback;
 }
 
 function cacheKey(window: string, mode: string, chain: string, includeDeactivated: boolean): string {
-  return `${LEADERBOARD_CACHE_PREFIX}${window}:${mode}:${chain}:${includeDeactivated ? '1' : '0'}`;
+  return `${LEADERBOARD_CACHE_PREFIX}${window}:${mode}:${chain}:${includeDeactivated ? '1' : '0'}:explorev2`;
 }
 
 export async function GET(req: NextRequest) {
@@ -42,6 +40,8 @@ export async function GET(req: NextRequest) {
     const mode: 'real' = 'real';
     const chain = req.nextUrl.searchParams.get('chain') ?? 'all';
     const includeDeactivated = parseBoolean(req.nextUrl.searchParams.get('includeDeactivated'), false);
+    const verifiedRecencyHours = Number.parseInt(process.env.EXPLORE_VERIFIED_RECENCY_HOURS ?? '72', 10);
+    const verifiedHours = Number.isFinite(verifiedRecencyHours) && verifiedRecencyHours > 0 ? verifiedRecencyHours : 72;
 
     if (!['24h', '7d', '30d', 'all'].includes(window)) {
       return errorResponse(
@@ -107,6 +107,10 @@ export async function GET(req: NextRequest) {
       stale: boolean;
       degraded_reason: string | null;
       snapshot_at: string;
+      strategy_tags: string[] | null;
+      venue_tags: string[] | null;
+      risk_tier: string | null;
+      verified: boolean;
     }>(
       `
       with ranked as (
@@ -149,9 +153,34 @@ export async function GET(req: NextRequest) {
         r.followers_count,
         r.stale,
         r.degraded_reason,
-        r.snapshot_at
+        r.snapshot_at,
+        coalesce(profile.strategy_tags, '[]'::jsonb) as strategy_tags,
+        coalesce(profile.venue_tags, '[]'::jsonb) as venue_tags,
+        profile.risk_tier,
+        (
+          a.public_status = 'active'
+          and wallet.address is not null
+          and coalesce(greatest(events.last_heartbeat_at, events.last_activity_at), '-infinity'::timestamptz)
+              >= (now() - ($5::int * interval '1 hour'))
+        ) as verified
       from ranked r
       inner join agents a on a.agent_id = r.agent_id
+      left join agent_explore_profile profile on profile.agent_id = a.agent_id
+      left join lateral (
+        select aw.address
+        from agent_wallets aw
+        where aw.agent_id = a.agent_id
+          and ($3 = 'all' or aw.chain_key = $3)
+        order by case when aw.chain_key = $3 then 0 else 1 end, aw.chain_key asc
+        limit 1
+      ) wallet on true
+      left join lateral (
+        select
+          max(ev.created_at) as last_activity_at,
+          max(ev.created_at) filter (where ev.event_type = 'heartbeat') as last_heartbeat_at
+        from agent_events ev
+        where ev.agent_id = a.agent_id
+      ) events on true
       where r.rn = 1
         and ($4::boolean = true or a.public_status <> 'deactivated')
       order by
@@ -160,10 +189,17 @@ export async function GET(req: NextRequest) {
         a.created_at asc
       limit 200
       `,
-      [window, mode, chain, includeDeactivated]
+      [window, mode, chain, includeDeactivated, verifiedHours]
     );
 
-    const items = rows.rows;
+    const items = rows.rows.map((row) => ({
+      ...row,
+      exploreProfile: {
+        strategyTags: row.strategy_tags ?? [],
+        venueTags: row.venue_tags ?? [],
+        riskTier: row.risk_tier
+      }
+    }));
 
     try {
       const redis = await getRedisClient();

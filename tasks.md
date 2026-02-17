@@ -1,9 +1,55 @@
+# Slice 81 Tasks: Explore v2 Full Flush (No Placeholders)
+
+Active slice: `Slice 81: Explore v2 Full Flush (No Placeholders)`
+Issue mapping: `#30`
+
+## 1) Canonical sync
+- [x] Add Slice 81 tracker + roadmap entries with issue mapping.
+- [x] Reconcile Slice 80 issue mapping and mark complete evidence path.
+- [x] Update source-of-truth with Explore v2 locked contract.
+- [x] Update command/API docs and schemas.
+- [x] Update context/spec/tasks/acceptance artifacts.
+
+## 2) Data model + schema
+- [x] Add migration `0018_slice81_explore_v2.sql`.
+- [x] Add table `agent_explore_profile`.
+- [x] Add tag/risk constraints and indexes.
+- [x] Add management explore profile request/response schemas.
+- [x] Add public agents/leaderboard response schemas.
+
+## 3) API implementation
+- [x] Extend `GET /api/v1/public/agents` with Explore filters and enriched response.
+- [x] Extend `GET /api/v1/public/leaderboard` with `verified` + `exploreProfile`.
+- [x] Implement `GET /api/v1/management/explore-profile`.
+- [x] Implement `PUT /api/v1/management/explore-profile`.
+- [x] Update OpenAPI for new params/routes/schemas.
+
+## 4) Explore UI implementation
+- [x] Remove strategy/venue/risk placeholder labels and wire real controls.
+- [x] Add functional advanced filter drawer and reset action.
+- [x] Implement segmented `All/My/Favorites` single-view behavior.
+- [x] Add URL-state sync for filter/sort/window/page/section.
+- [x] Add verified badge and follower-rich metadata rendering.
+- [x] Keep owner/viewer copy-trade behavior unchanged.
+- [x] Add owner-managed Explore profile edit flow from Explore cards.
+
+## 5) Validation
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all` (post-build, sequential)
+
+---
+
 # Slice 80 Tasks: Hosted x402 Web Integration + Agent-Originated Send
 
 Active slice: `Slice 80: Hosted x402 on /agents/[agentId]`
+Issue mapping: `#31`
 
 ## 1) Canonical sync
-- [ ] Add Slice 80 tracker + roadmap entries with issue mapping. (tracker/roadmap added; issue mapping still pending)
+- [x] Add Slice 80 tracker + roadmap entries with issue mapping.
 - [x] Update source-of-truth with hosted x402 contract + `xfr_...` outbound approval reuse.
 - [x] Update command contract and OpenAPI.
 - [x] Update context/spec/tasks/acceptance artifacts.

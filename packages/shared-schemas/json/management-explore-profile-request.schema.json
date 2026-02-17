@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.xclaw.trade/management-explore-profile-request.schema.json",
+  "title": "ManagementExploreProfileRequest",
+  "type": "object",
+  "required": ["agentId"],
+  "additionalProperties": false,
+  "properties": {
+    "agentId": { "type": "string", "minLength": 1 },
+    "strategyTags": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[a-z0-9_]+$" },
+      "maxItems": 30,
+      "uniqueItems": true
+    },
+    "venueTags": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[a-z0-9_]+$" },
+      "maxItems": 30,
+      "uniqueItems": true
+    },
+    "riskTier": { "type": "string", "enum": ["low", "medium", "high", "very_high"] },
+    "descriptionShort": { "type": ["string", "null"], "maxLength": 180 }
+  }
+}

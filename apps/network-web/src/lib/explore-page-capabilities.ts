@@ -1,8 +1,8 @@
 export const EXPLORE_PAGE_CAPABILITIES = {
-  strategyFilterApi: false,
-  riskFilterApi: false,
-  venueFilterApi: false,
-  advancedFilterDrawer: false,
-  verifiedBadges: false,
-  richFollowerMeta: false
+  strategyFilterApi: true,
+  riskFilterApi: true,
+  venueFilterApi: true,
+  advancedFilterDrawer: true,
+  verifiedBadges: true,
+  richFollowerMeta: true
 } as const;

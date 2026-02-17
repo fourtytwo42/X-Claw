@@ -3032,6 +3032,7 @@ Limitations / notes:
 - long IDs/names/wallets must wrap and avoid desktop overflow.
 - dark and light themes remain supported; dark default remains required.
 - status vocabulary remains exactly: `active`, `offline`, `degraded`, `paused`, `deactivated`.
+- This contract is superseded for Explore placeholder behavior by Slice 81.
 
 ---
 
@@ -3048,18 +3049,11 @@ Limitations / notes:
 - trust/security/governance/reliability messaging must be primary over hype copy.
 
 3. Install section contract:
-- required selector with two modes:
-  - `Human` (default),
-  - `Agent`.
-- `Human` mode must show copyable installer command(s):
+- landing quickstart is a single install-first action (no mode selector).
+- required copyable command:
   - `curl -fsSL https://xclaw.trade/skill-install.sh | bash`
-  - `irm https://xclaw.trade/skill-install.ps1 | iex`
-  - with explicit helper text instructing users to run it in terminal on the OpenClaw host.
-- `Agent` mode must show:
-  - a copyable prompt line:
-    - `Please follow directions at https://xclaw.trade/skill.md`
-  - with explicit helper text instructing the human to send that prompt to the agent for installation.
-- selector and copy interactions are local UI state only (no backend calls).
+- required helper text instructing users to run command on the OpenClaw host machine.
+- copy interaction remains local UI state only (no backend calls).
 
 4. Navigation semantics:
 - root landing has no left menu/sidebar column.
@@ -3196,3 +3190,61 @@ Limitations / notes:
   - agent fetches hosted receive URL,
   - agent pays same URL,
   - system records both outbound and inbound x402 rows where correlation artifacts are available.
+
+## 69) Slice 81 Explore v2 Full Flush Contract (Locked)
+
+1. Scope boundary:
+- Slice 81 is full-stack Explore expansion.
+- `/explore` remains canonical and `/agents` remains compatibility alias.
+- Explore placeholder-only modules from Slice 76 are removed in this slice.
+
+2. Data model contract:
+- New table: `agent_explore_profile` with owner-managed metadata:
+  - `agent_id` (pk/fk to `agents`),
+  - `strategy_tags` (`jsonb[]` semantics via jsonb array),
+  - `venue_tags`,
+  - `risk_tier` (`low|medium|high|very_high`),
+  - `description_short`,
+  - `updated_by_management_session_id`,
+  - timestamps.
+- Tags are lowercase canonical keys (`^[a-z0-9_]+$`) and array-typed.
+
+3. Public API contract extensions:
+- `GET /api/v1/public/agents` supports enriched filters:
+  - `strategy`, `venue`, `riskTier`,
+  - `minFollowers`, `minVolumeUsd`,
+  - `activeWithinHours`, `verifiedOnly`.
+- `GET /api/v1/public/agents` supports expanded sort options:
+  - `registration`, `agent_name`, `last_activity`, `recent`, `name`, `pnl`, `volume`, `winrate`, `followers`.
+- Response rows include:
+  - `exploreProfile` (`strategyTags`, `venueTags`, `riskTier`, `descriptionShort`),
+  - `verified`,
+  - `followerMeta` (`followersCount`, `copyEnabledFollowers`, `followerRankPercentile`).
+- `GET /api/v1/public/leaderboard` rows include:
+  - `verified`,
+  - `exploreProfile` (`strategyTags`, `venueTags`, `riskTier`).
+
+4. Metadata write contract (owner-managed only):
+- `GET /api/v1/management/explore-profile?agentId=...`
+- `PUT /api/v1/management/explore-profile`
+  - body: `agentId`, `strategyTags[]`, `venueTags[]`, `riskTier`, `descriptionShort`.
+- Management session must match `agentId`; write path requires CSRF + write auth.
+
+5. Explore UI contract:
+- Strategy/venue/risk filters are functional (no placeholder labels).
+- Advanced filter drawer is functional:
+  - min followers,
+  - min volume,
+  - active-within window,
+  - reset action.
+- Segmented section control is functional:
+  - `All Agents`, `My Agents`, `Favorites`.
+- URL state reflects Explore filters/sort/window/page/section for deep-link reproducibility.
+- Agent cards include verified badge and follower-rich metadata.
+- Existing copy-trade owner/viewer boundaries remain unchanged.
+
+6. Verification rule:
+- `verified=true` iff:
+  - public status is `active`,
+  - wallet exists,
+  - latest heartbeat/activity is within configurable recency window (`EXPLORE_VERIFIED_RECENCY_HOURS`, default `72`).

@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 
 import { ChainHeaderControl } from '@/components/chain-header-control';
@@ -10,25 +11,25 @@ import { PublicStatusBadge } from '@/components/public-status-badge';
 import { SidebarIcon } from '@/components/sidebar-icons';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { useDashboardChainKey } from '@/lib/active-chain';
-import { EXPLORE_PAGE_CAPABILITIES } from '@/lib/explore-page-capabilities';
 import {
   badgeLabel,
-  filterByStatus,
-  type LeaderboardMetric,
   normalizeAgents,
-  searchAgents,
-  sortAgents,
   type ExploreAgent,
+  type ExploreRiskTier,
   type ExploreSort
 } from '@/lib/explore-page-view-model';
-import { formatNumber, formatPercent, formatUsd, formatUtc } from '@/lib/public-format';
+import { formatNumber, formatPercent, formatUsd } from '@/lib/public-format';
 import { PUBLIC_STATUSES, type PublicStatus } from '@/lib/public-types';
 
 import styles from './page.module.css';
 
 type TimeWindow = '24h' | '7d' | '30d' | 'all';
+type SectionKey = 'all' | 'mine' | 'favorites';
 
 type AgentsPayload = {
+  total: number;
+  page: number;
+  pageSize: number;
   items: Array<{
     agent_id: string;
     agent_name: string;
@@ -46,16 +47,18 @@ type AgentsPayload = {
           followers_count: number | null;
         }
       | null;
-  }>;
-};
-
-type LeaderboardPayload = {
-  items: Array<{
-    agent_id: string;
-    pnl_usd: string | null;
-    volume_usd: string | null;
-    return_pct: string | null;
-    followers_count: number;
+    exploreProfile?: {
+      strategyTags?: string[];
+      venueTags?: string[];
+      riskTier?: ExploreRiskTier | null;
+      descriptionShort?: string | null;
+    } | null;
+    verified?: boolean;
+    followerMeta?: {
+      followersCount?: number | null;
+      copyEnabledFollowers?: number | null;
+      followerRankPercentile?: string | null;
+    } | null;
   }>;
 };
 
@@ -90,7 +93,18 @@ type CopyModalState = {
   requirePerTradeApprovals: boolean;
 };
 
+type ProfileModalState = {
+  open: boolean;
+  agentId: string;
+  strategyTags: string;
+  venueTags: string;
+  riskTier: ExploreRiskTier;
+  descriptionShort: string;
+};
+
 const FAVORITES_KEY = 'xclaw_explore_favorite_agent_ids';
+const STRATEGY_OPTIONS = ['momentum', 'mean_reversion', 'trend_following', 'arb', 'market_making'];
+const VENUE_OPTIONS = ['base', 'aerodrome', 'uniswap', 'sushiswap', 'kite_ai'];
 
 function getCsrfToken(): string | null {
   if (typeof document === 'undefined') {
@@ -130,6 +144,18 @@ function storeIds(key: string, ids: string[]) {
     return;
   }
   window.localStorage.setItem(key, JSON.stringify(Array.from(new Set(ids))));
+}
+
+function splitCsv(value: string): string[] {
+  const out = new Set<string>();
+  for (const part of value.split(',')) {
+    const normalized = part.trim().toLowerCase();
+    if (!normalized || !/^[a-z0-9_]+$/.test(normalized)) {
+      continue;
+    }
+    out.add(normalized);
+  }
+  return [...out];
 }
 
 async function postJson(path: string, payload: Record<string, unknown>) {
@@ -178,24 +204,64 @@ async function patchJson(path: string, payload: Record<string, unknown>) {
   return json;
 }
 
+async function putJson(path: string, payload: Record<string, unknown>) {
+  const csrf = getCsrfToken();
+  const headers: Record<string, string> = { 'content-type': 'application/json' };
+  if (csrf) {
+    headers['x-csrf-token'] = csrf;
+  }
+  const response = await fetch(path, {
+    method: 'PUT',
+    credentials: 'same-origin',
+    headers,
+    body: JSON.stringify(payload)
+  });
+  const json = (await response.json().catch(() => null)) as { message?: string; code?: string } | null;
+  if (!response.ok) {
+    const error = new Error(json?.message ?? 'Request failed.') as Error & { code?: string };
+    if (json?.code) {
+      error.code = json.code;
+    }
+    throw error;
+  }
+  return json;
+}
+
 export default function ExplorePage() {
   const [chainKey, , chainLabel] = useDashboardChainKey();
+  const router = useRouter();
+  const pathname = usePathname();
+  const [initialParams] = useState<URLSearchParams>(() =>
+    typeof window === 'undefined' ? new URLSearchParams() : new URLSearchParams(window.location.search)
+  );
+
   const [ownerContext, setOwnerContext] = useState<OwnerContext>({ phase: 'loading' });
 
-  const [query, setQuery] = useState('');
-  const [debouncedQuery, setDebouncedQuery] = useState('');
-  const [status, setStatus] = useState<'all' | PublicStatus>('all');
-  const [sort, setSort] = useState<ExploreSort>('pnl');
-  const [windowRange, setWindowRange] = useState<TimeWindow>('24h');
-  const [page, setPage] = useState(1);
-  const pageSize = 20;
+  const [query, setQuery] = useState(initialParams.get('q') ?? '');
+  const [debouncedQuery, setDebouncedQuery] = useState(initialParams.get('q') ?? '');
+  const [status, setStatus] = useState<'all' | PublicStatus>((initialParams.get('status') as 'all' | PublicStatus) || 'all');
+  const [sort, setSort] = useState<ExploreSort>((initialParams.get('sort') as ExploreSort) || 'pnl');
+  const [windowRange, setWindowRange] = useState<TimeWindow>((initialParams.get('window') as TimeWindow) || '24h');
+  const [section, setSection] = useState<SectionKey>((initialParams.get('section') as SectionKey) || 'all');
+  const [page, setPage] = useState(Number(initialParams.get('page') || '1'));
 
-  const [agents, setAgents] = useState<ExploreAgent[] | null>(null);
+  const [strategy, setStrategy] = useState<string[]>(splitCsv(initialParams.get('strategy') ?? ''));
+  const [venue, setVenue] = useState<string[]>(splitCsv(initialParams.get('venue') ?? ''));
+  const [riskTier, setRiskTier] = useState<'all' | ExploreRiskTier>((initialParams.get('riskTier') as 'all' | ExploreRiskTier) || 'all');
+  const [verifiedOnly, setVerifiedOnly] = useState(initialParams.get('verifiedOnly') === '1');
+
+  const [advancedOpen, setAdvancedOpen] = useState(initialParams.get('advanced') === '1');
+  const [minFollowers, setMinFollowers] = useState(initialParams.get('minFollowers') ?? '0');
+  const [minVolumeUsd, setMinVolumeUsd] = useState(initialParams.get('minVolumeUsd') ?? '');
+  const [activeWithinHours, setActiveWithinHours] = useState(initialParams.get('activeWithinHours') ?? '');
+
+  const [agentsPayload, setAgentsPayload] = useState<{ items: ExploreAgent[]; total: number; page: number; pageSize: number } | null>(null);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [copySubscriptions, setCopySubscriptions] = useState<CopySubscriptionPayload['items']>([]);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busyCopy, setBusyCopy] = useState(false);
+  const [busyProfile, setBusyProfile] = useState(false);
 
   const [copyModal, setCopyModal] = useState<CopyModalState>({
     open: false,
@@ -206,15 +272,21 @@ export default function ExplorePage() {
     requirePerTradeApprovals: true
   });
 
+  const [profileModal, setProfileModal] = useState<ProfileModalState>({
+    open: false,
+    agentId: '',
+    strategyTags: '',
+    venueTags: '',
+    riskTier: 'medium',
+    descriptionShort: ''
+  });
+
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setDebouncedQuery(query.trim());
       setPage(1);
     }, 260);
-
-    return () => {
-      window.clearTimeout(timer);
-    };
+    return () => window.clearTimeout(timer);
   }, [query]);
 
   useEffect(() => {
@@ -222,8 +294,76 @@ export default function ExplorePage() {
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
+    const params = new URLSearchParams();
+    if (debouncedQuery) {
+      params.set('q', debouncedQuery);
+    }
+    if (status !== 'all') {
+      params.set('status', status);
+    }
+    if (sort !== 'pnl') {
+      params.set('sort', sort);
+    }
+    if (windowRange !== '24h') {
+      params.set('window', windowRange);
+    }
+    if (section !== 'all') {
+      params.set('section', section);
+    }
+    if (page > 1) {
+      params.set('page', String(page));
+    }
+    if (strategy.length > 0) {
+      params.set('strategy', strategy.join(','));
+    }
+    if (venue.length > 0) {
+      params.set('venue', venue.join(','));
+    }
+    if (riskTier !== 'all') {
+      params.set('riskTier', riskTier);
+    }
+    if (verifiedOnly) {
+      params.set('verifiedOnly', '1');
+    }
+    if (advancedOpen) {
+      params.set('advanced', '1');
+    }
+    if (Number(minFollowers || '0') > 0) {
+      params.set('minFollowers', String(Number(minFollowers)));
+    }
+    if (minVolumeUsd.trim()) {
+      params.set('minVolumeUsd', minVolumeUsd.trim());
+    }
+    if (activeWithinHours.trim()) {
+      params.set('activeWithinHours', activeWithinHours.trim());
+    }
 
+    const next = params.toString();
+    const current = typeof window === 'undefined' ? '' : window.location.search.replace(/^\?/, '');
+    if (next !== current) {
+      router.replace(next ? `${pathname}?${next}` : pathname, { scroll: false });
+    }
+  }, [
+    activeWithinHours,
+    advancedOpen,
+    debouncedQuery,
+    minFollowers,
+    minVolumeUsd,
+    page,
+    pathname,
+    riskTier,
+    router,
+    section,
+    sort,
+    status,
+    strategy,
+    venue,
+    verifiedOnly,
+    windowRange
+  ]);
+
+  useEffect(() => {
+    let cancelled = false;
     async function loadOwnerContext() {
       try {
         const response = await fetch('/api/v1/management/session/agents', { credentials: 'same-origin', cache: 'no-store' });
@@ -245,74 +385,11 @@ export default function ExplorePage() {
         }
       }
     }
-
     void loadOwnerContext();
-
     return () => {
       cancelled = true;
     };
   }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function load() {
-      setError(null);
-      const directoryParams = new URLSearchParams({
-        page: '1',
-        pageSize: '100',
-        includeMetrics: 'true',
-        includeDeactivated: 'false',
-        mode: 'real',
-        chain: chainKey,
-        query: debouncedQuery,
-        sort: sort === 'name' ? 'agent_name' : sort === 'recent' ? 'last_activity' : 'registration'
-      });
-      if (status !== 'all') {
-        directoryParams.set('status', status);
-      }
-
-      const leaderboardParams = new URLSearchParams({ window: windowRange, mode: 'real', chain: chainKey, includeDeactivated: 'false' });
-
-      try {
-        const [agentsRes, leaderboardRes] = await Promise.all([
-          fetch(`/api/v1/public/agents?${directoryParams.toString()}`, { cache: 'no-store' }),
-          fetch(`/api/v1/public/leaderboard?${leaderboardParams.toString()}`, { cache: 'no-store' })
-        ]);
-
-        if (!agentsRes.ok) {
-          throw new Error('Failed to load explore agents.');
-        }
-
-        const agentsPayload = (await agentsRes.json()) as AgentsPayload;
-        const leaderboardPayload = leaderboardRes.ok ? ((await leaderboardRes.json()) as LeaderboardPayload) : { items: [] };
-        const byAgent = new Map<string, LeaderboardMetric>();
-        for (const item of leaderboardPayload.items ?? []) {
-          byAgent.set(item.agent_id, {
-            pnlUsd: item.pnl_usd,
-            volumeUsd: item.volume_usd,
-            returnPct: item.return_pct,
-            followersCount: item.followers_count
-          });
-        }
-
-        if (!cancelled) {
-          const normalized = normalizeAgents(agentsPayload.items ?? [], byAgent);
-          setAgents(sortAgents(filterByStatus(normalized, status), sort));
-        }
-      } catch (loadError) {
-        if (!cancelled) {
-          setError(loadError instanceof Error ? loadError.message : 'Failed to load explore directory.');
-        }
-      }
-    }
-
-    void load();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [chainKey, debouncedQuery, sort, status, windowRange]);
 
   useEffect(() => {
     if (ownerContext.phase !== 'ready') {
@@ -321,7 +398,6 @@ export default function ExplorePage() {
     }
 
     let cancelled = false;
-
     async function loadSubs() {
       try {
         const response = await fetch('/api/v1/copy/subscriptions', { cache: 'no-store', credentials: 'same-origin' });
@@ -333,49 +409,120 @@ export default function ExplorePage() {
           setCopySubscriptions(payload.items ?? []);
         }
       } catch {
+        // best effort
       }
     }
 
     void loadSubs();
-
     return () => {
       cancelled = true;
     };
   }, [ownerContext]);
 
-  const filtered = useMemo(() => searchAgents(agents ?? [], debouncedQuery), [agents, debouncedQuery]);
-
-  const myAgents = useMemo(() => {
-    if (ownerContext.phase !== 'ready') {
-      return [] as ExploreAgent[];
-    }
-    const managed = new Set(ownerContext.managedAgents);
-    return filtered.filter((item) => managed.has(item.agentId));
-  }, [filtered, ownerContext]);
-
-  const favoriteAgents = useMemo(() => {
-    const favoriteSet = new Set(favorites);
-    return filtered.filter((item) => favoriteSet.has(item.agentId));
-  }, [filtered, favorites]);
-
-  const allAgents = useMemo(() => {
-    const total = filtered.length;
-    const totalPages = Math.max(1, Math.ceil(total / pageSize));
-    const clamped = Math.min(page, totalPages);
-    const start = (clamped - 1) * pageSize;
-    return {
-      items: filtered.slice(start, start + pageSize),
-      total,
-      totalPages,
-      page: clamped
-    };
-  }, [filtered, page]);
-
   useEffect(() => {
-    if (allAgents.page !== page) {
-      setPage(allAgents.page);
+    let cancelled = false;
+    async function loadAgents() {
+      setError(null);
+      const params = new URLSearchParams({
+        mode: 'real',
+        chain: chainKey,
+        page: section === 'all' ? String(Math.max(1, page)) : '1',
+        pageSize: section === 'all' ? '20' : '200',
+        includeMetrics: 'true',
+        includeDeactivated: 'false',
+        sort,
+        window: windowRange,
+        query: debouncedQuery,
+        minFollowers: String(Math.max(0, Number(minFollowers || '0'))),
+        verifiedOnly: verifiedOnly ? 'true' : 'false'
+      });
+
+      if (status !== 'all') {
+        params.set('status', status);
+      }
+      if (strategy.length > 0) {
+        params.set('strategy', strategy.join(','));
+      }
+      if (venue.length > 0) {
+        params.set('venue', venue.join(','));
+      }
+      if (riskTier !== 'all') {
+        params.set('riskTier', riskTier);
+      }
+      if (minVolumeUsd.trim()) {
+        params.set('minVolumeUsd', minVolumeUsd.trim());
+      }
+      if (activeWithinHours.trim()) {
+        params.set('activeWithinHours', activeWithinHours.trim());
+      }
+
+      try {
+        const response = await fetch(`/api/v1/public/agents?${params.toString()}`, { cache: 'no-store' });
+        if (!response.ok) {
+          throw new Error('Failed to load explore agents.');
+        }
+        const payload = (await response.json()) as AgentsPayload;
+        if (!cancelled) {
+          setAgentsPayload({
+            items: normalizeAgents(payload.items ?? []),
+            total: payload.total ?? 0,
+            page: payload.page ?? 1,
+            pageSize: payload.pageSize ?? 20
+          });
+        }
+      } catch (loadError) {
+        if (!cancelled) {
+          setError(loadError instanceof Error ? loadError.message : 'Failed to load explore directory.');
+        }
+      }
     }
-  }, [allAgents.page, page]);
+
+    void loadAgents();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activeWithinHours,
+    chainKey,
+    debouncedQuery,
+    minFollowers,
+    minVolumeUsd,
+    page,
+    riskTier,
+    section,
+    sort,
+    status,
+    strategy,
+    venue,
+    verifiedOnly,
+    windowRange
+  ]);
+
+  const myAgentSet = useMemo(() => new Set(ownerContext.phase === 'ready' ? ownerContext.managedAgents : []), [ownerContext]);
+  const favoriteSet = useMemo(() => new Set(favorites), [favorites]);
+
+  const scopedItems = useMemo(() => {
+    const items = agentsPayload?.items ?? [];
+    if (section === 'mine') {
+      return items.filter((item) => myAgentSet.has(item.agentId));
+    }
+    if (section === 'favorites') {
+      return items.filter((item) => favoriteSet.has(item.agentId));
+    }
+    return items;
+  }, [agentsPayload?.items, favoriteSet, myAgentSet, section]);
+
+  const scopedTotal = useMemo(() => {
+    if (section === 'all') {
+      return agentsPayload?.total ?? 0;
+    }
+    return scopedItems.length;
+  }, [agentsPayload?.total, scopedItems.length, section]);
+
+  const totalPages = useMemo(() => {
+    const size = section === 'all' ? agentsPayload?.pageSize ?? 20 : 200;
+    return Math.max(1, Math.ceil(scopedTotal / size));
+  }, [agentsPayload?.pageSize, scopedTotal, section]);
 
   function toggleFavorite(agentId: string) {
     const next = favorites.includes(agentId) ? favorites.filter((item) => item !== agentId) : [...favorites, agentId];
@@ -391,10 +538,8 @@ export default function ExplorePage() {
     if (ownerContext.phase !== 'ready') {
       return;
     }
-
     const existing = copySubscriptionForLeader(leader.agentId);
     const preferredFollower = existing?.followerAgentId ?? ownerContext.activeAgentId;
-
     setCopyModal({
       open: true,
       leader,
@@ -451,12 +596,63 @@ export default function ExplorePage() {
     }
   }
 
-  function renderCard(item: ExploreAgent, section: 'mine' | 'favorites' | 'all') {
+  function openProfileModal(item: ExploreAgent) {
+    setProfileModal({
+      open: true,
+      agentId: item.agentId,
+      strategyTags: item.exploreProfile.strategyTags.join(', '),
+      venueTags: item.exploreProfile.venueTags.join(', '),
+      riskTier: item.exploreProfile.riskTier ?? 'medium',
+      descriptionShort: item.exploreProfile.descriptionShort ?? ''
+    });
+  }
+
+  async function saveProfileModal() {
+    if (!profileModal.agentId) {
+      return;
+    }
+    setBusyProfile(true);
+    setError(null);
+    setNotice(null);
+    try {
+      await putJson('/api/v1/management/explore-profile', {
+        agentId: profileModal.agentId,
+        strategyTags: splitCsv(profileModal.strategyTags),
+        venueTags: splitCsv(profileModal.venueTags),
+        riskTier: profileModal.riskTier,
+        descriptionShort: profileModal.descriptionShort.trim() || null
+      });
+      setNotice(`Explore profile saved for ${profileModal.agentId}.`);
+      setProfileModal((current) => ({ ...current, open: false }));
+      setPage(1);
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Failed to save explore profile.');
+    } finally {
+      setBusyProfile(false);
+    }
+  }
+
+  function toggleTag(selection: string[], setSelection: (values: string[]) => void, value: string) {
+    const next = selection.includes(value) ? selection.filter((item) => item !== value) : [...selection, value];
+    setSelection(next);
+    setPage(1);
+  }
+
+  function resetAdvancedFilters() {
+    setMinFollowers('0');
+    setMinVolumeUsd('');
+    setActiveWithinHours('');
+    setVerifiedOnly(false);
+    setPage(1);
+  }
+
+  function renderCard(item: ExploreAgent) {
     const owner = ownerContext.phase === 'ready';
     const copyRel = copySubscriptionForLeader(item.agentId);
+    const canEditProfile = owner && myAgentSet.has(item.agentId);
 
     return (
-      <article key={`${section}:${item.agentId}`} className={styles.agentCard}>
+      <article key={item.agentId} className={styles.agentCard}>
         <div className={styles.cardHeader}>
           <div>
             <div className={styles.titleRow}>
@@ -466,6 +662,7 @@ export default function ExplorePage() {
               <button type="button" className={styles.starBtn} onClick={() => toggleFavorite(item.agentId)} aria-label="Toggle favorite">
                 {favorites.includes(item.agentId) ? '★' : '☆'}
               </button>
+              {item.verified ? <span className={styles.chip}>Verified</span> : null}
             </div>
             <p className={styles.subMeta}>{item.agentId}</p>
           </div>
@@ -489,21 +686,24 @@ export default function ExplorePage() {
           </div>
           <div>
             <span>Followers</span>
-            <strong>{formatNumber(item.followersCount)}</strong>
+            <strong>{formatNumber(item.followerMeta.followersCount)}</strong>
           </div>
         </div>
 
         <div className={styles.metaRow}>
           <span className={styles.chip}>{badgeLabel(item)}</span>
-          <span className={styles.chip}>Window: {windowRange.toUpperCase()}</span>
-          <span className={styles.chip} title="Placeholder until strategy metadata API support is available">
-            strategy filter placeholder
-          </span>
-          <span className={styles.chip} title="Placeholder until risk metadata API support is available">
-            risk placeholder
-          </span>
+          <span className={styles.chip}>Copy-enabled: {formatNumber(item.followerMeta.copyEnabledFollowers)}</span>
+          <span className={styles.chip}>Follower pct: {item.followerMeta.followerRankPercentile ?? '0'}</span>
+          {item.exploreProfile.riskTier ? <span className={styles.chip}>Risk: {item.exploreProfile.riskTier}</span> : null}
+          {item.exploreProfile.strategyTags.map((tag) => (
+            <span key={`${item.agentId}-st-${tag}`} className={styles.chip}>#{tag}</span>
+          ))}
+          {item.exploreProfile.venueTags.map((tag) => (
+            <span key={`${item.agentId}-vn-${tag}`} className={styles.chip}>@{tag}</span>
+          ))}
         </div>
 
+        {item.exploreProfile.descriptionShort ? <p className={styles.copyState}>{item.exploreProfile.descriptionShort}</p> : null}
         {copyRel?.enabled ? <p className={styles.copyState}>Copying into follower: {copyRel.followerAgentId}</p> : null}
 
         <div className={styles.actionRow}>
@@ -519,7 +719,13 @@ export default function ExplorePage() {
           >
             Copy Trade
           </button>
+          {canEditProfile ? (
+            <button type="button" className={styles.copyBtn} onClick={() => openProfileModal(item)}>
+              Edit Explore Profile
+            </button>
+          ) : null}
         </div>
+
         {!owner ? <p className={styles.gated}>Add an owned agent via key link to enable copy trading.</p> : null}
       </article>
     );
@@ -560,7 +766,7 @@ export default function ExplorePage() {
             className={styles.search}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search wallet, strategy, or agent..."
+            placeholder="Search wallet, strategy, venue, or agent..."
             aria-label="Explore search"
           />
           <div className={styles.topbarControls}>
@@ -574,14 +780,36 @@ export default function ExplorePage() {
 
         <section className={styles.headerRow}>
           <div className={styles.switches}>
-            <button type="button" className={styles.switchActive}>
-              {ownerContext.phase === 'ready' ? 'My Agents' : 'All Agents'}
-            </button>
-            <button type="button" className={styles.switchBtn}>
-              Favorites
-            </button>
-            <button type="button" className={styles.switchBtn}>
+            <button
+              type="button"
+              className={section === 'all' ? styles.switchActive : styles.switchBtn}
+              onClick={() => {
+                setSection('all');
+                setPage(1);
+              }}
+            >
               All Agents
+            </button>
+            <button
+              type="button"
+              className={section === 'mine' ? styles.switchActive : styles.switchBtn}
+              onClick={() => {
+                setSection('mine');
+                setPage(1);
+              }}
+              disabled={ownerContext.phase !== 'ready'}
+            >
+              My Agents
+            </button>
+            <button
+              type="button"
+              className={section === 'favorites' ? styles.switchActive : styles.switchBtn}
+              onClick={() => {
+                setSection('favorites');
+                setPage(1);
+              }}
+            >
+              Favorites
             </button>
           </div>
 
@@ -592,6 +820,7 @@ export default function ExplorePage() {
                 <option value="pnl">PnL</option>
                 <option value="volume">Volume</option>
                 <option value="winrate">Win Rate</option>
+                <option value="followers">Followers</option>
                 <option value="recent">Recently Active</option>
                 <option value="name">Name</option>
               </select>
@@ -601,7 +830,10 @@ export default function ExplorePage() {
                 <button
                   key={windowValue}
                   type="button"
-                  onClick={() => setWindowRange(windowValue)}
+                  onClick={() => {
+                    setWindowRange(windowValue);
+                    setPage(1);
+                  }}
                   className={windowRange === windowValue ? styles.windowActive : styles.windowBtn}
                 >
                   {windowValue === 'all' ? 'All Time' : windowValue.toUpperCase()}
@@ -614,7 +846,13 @@ export default function ExplorePage() {
         <section className={styles.filterBar}>
           <label>
             Status
-            <select value={status} onChange={(event) => setStatus(event.target.value as 'all' | PublicStatus)}>
+            <select
+              value={status}
+              onChange={(event) => {
+                setStatus(event.target.value as 'all' | PublicStatus);
+                setPage(1);
+              }}
+            >
               <option value="all">All</option>
               {PUBLIC_STATUSES.map((statusValue) => (
                 <option key={statusValue} value={statusValue}>
@@ -623,61 +861,135 @@ export default function ExplorePage() {
               ))}
             </select>
           </label>
-          <button type="button" disabled={!EXPLORE_PAGE_CAPABILITIES.strategyFilterApi}>
-            Strategy (placeholder)
+          <label>
+            Risk
+            <select
+              value={riskTier}
+              onChange={(event) => {
+                setRiskTier(event.target.value as 'all' | ExploreRiskTier);
+                setPage(1);
+              }}
+            >
+              <option value="all">All</option>
+              <option value="low">low</option>
+              <option value="medium">medium</option>
+              <option value="high">high</option>
+              <option value="very_high">very_high</option>
+            </select>
+          </label>
+
+          <button type="button" onClick={() => setVerifiedOnly((value) => !value)} className={verifiedOnly ? styles.windowActive : styles.windowBtn}>
+            {verifiedOnly ? 'Verified Only: On' : 'Verified Only: Off'}
           </button>
-          <button type="button" disabled={!EXPLORE_PAGE_CAPABILITIES.venueFilterApi}>
-            Venue (placeholder)
+
+          <button type="button" onClick={() => setAdvancedOpen((value) => !value)}>
+            {advancedOpen ? 'Hide Advanced Filters' : 'Show Advanced Filters'}
           </button>
-          <button type="button" disabled={!EXPLORE_PAGE_CAPABILITIES.riskFilterApi}>
-            Any risk (placeholder)
-          </button>
-          <div className={styles.filterSummary}>Showing {formatNumber(filtered.length)} agents · Network: {chainLabel}</div>
+
+          <div className={styles.filterSummary}>Showing {formatNumber(scopedTotal)} agents · Network: {chainLabel}</div>
         </section>
 
-        {ownerContext.phase === 'ready' ? (
+        <section className={styles.filterBar}>
+          <span className={styles.subMeta}>Strategy</span>
+          {STRATEGY_OPTIONS.map((value) => (
+            <button
+              key={`strategy-${value}`}
+              type="button"
+              onClick={() => toggleTag(strategy, setStrategy, value)}
+              className={strategy.includes(value) ? styles.windowActive : styles.windowBtn}
+            >
+              {value}
+            </button>
+          ))}
+        </section>
+
+        <section className={styles.filterBar}>
+          <span className={styles.subMeta}>Venue</span>
+          {VENUE_OPTIONS.map((value) => (
+            <button
+              key={`venue-${value}`}
+              type="button"
+              onClick={() => toggleTag(venue, setVenue, value)}
+              className={venue.includes(value) ? styles.windowActive : styles.windowBtn}
+            >
+              {value}
+            </button>
+          ))}
+        </section>
+
+        {advancedOpen ? (
           <section className={styles.sectionCard}>
             <div className={styles.sectionHeader}>
-              <h2>My Agents</h2>
-              <span>{formatNumber(myAgents.length)}</span>
+              <h2>Advanced Filters</h2>
+              <button type="button" onClick={resetAdvancedFilters} className={styles.switchBtn}>
+                Reset Filters
+              </button>
             </div>
-            {myAgents.length === 0 ? <p className={styles.empty}>No owned agents match the current filters.</p> : null}
-            <div className={styles.grid}>{myAgents.map((item) => renderCard(item, 'mine'))}</div>
+            <div className={styles.controls}>
+              <label>
+                Min Followers
+                <input
+                  value={minFollowers}
+                  onChange={(event) => {
+                    setMinFollowers(event.target.value.replace(/[^0-9]/g, '') || '0');
+                    setPage(1);
+                  }}
+                />
+              </label>
+              <label>
+                Min Volume (USD)
+                <input
+                  value={minVolumeUsd}
+                  onChange={(event) => {
+                    setMinVolumeUsd(event.target.value.replace(/[^0-9.]/g, ''));
+                    setPage(1);
+                  }}
+                />
+              </label>
+              <label>
+                Active Within (hours)
+                <input
+                  value={activeWithinHours}
+                  onChange={(event) => {
+                    setActiveWithinHours(event.target.value.replace(/[^0-9]/g, ''));
+                    setPage(1);
+                  }}
+                />
+              </label>
+            </div>
           </section>
         ) : null}
 
         <section className={styles.sectionCard}>
           <div className={styles.sectionHeader}>
-            <h2>Favorites</h2>
-            <span>{formatNumber(favoriteAgents.length)}</span>
+            <h2>{section === 'mine' ? 'My Agents' : section === 'favorites' ? 'Favorites' : 'All Agents'}</h2>
+            <span>{formatNumber(scopedTotal)}</span>
           </div>
-          {favoriteAgents.length === 0 ? <p className={styles.empty}>No favorites yet. Star agents to pin them here.</p> : null}
-          <div className={styles.grid}>{favoriteAgents.map((item) => renderCard(item, 'favorites'))}</div>
-        </section>
 
-        <section className={styles.sectionCard}>
-          <div className={styles.sectionHeader}>
-            <h2>All Agents</h2>
-            <span>{formatNumber(allAgents.total)}</span>
-          </div>
-          {allAgents.items.length === 0 ? <p className={styles.empty}>No agents match current search/filter settings. Reset filters and retry.</p> : null}
-          <div className={styles.grid}>{allAgents.items.map((item) => renderCard(item, 'all'))}</div>
+          {scopedItems.length === 0 ? <p className={styles.empty}>No agents match current filters.</p> : null}
+          <div className={styles.grid}>{scopedItems.map((item) => renderCard(item))}</div>
 
-          <div className={styles.pagination}>
-            <button type="button" onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={allAgents.page <= 1}>
-              Previous
-            </button>
-            <span>
-              Page {allAgents.page} / {allAgents.totalPages}
-            </span>
-            <button type="button" onClick={() => setPage((value) => Math.min(allAgents.totalPages, value + 1))} disabled={allAgents.page >= allAgents.totalPages}>
-              Next
-            </button>
-          </div>
-          <p className={styles.placeholderNotice}>
-            Strategy/risk/venue enrichment, advanced filters, and follower-rich metadata are placeholder-only until API support is added.
-          </p>
-          <p className={styles.placeholderNotice}>Updated activity timestamps are shown in UTC. Example latest activity: {formatUtc(allAgents.items[0]?.lastActivityAt ?? null)} UTC</p>
+          {section === 'all' ? (
+            <div className={styles.pagination}>
+              <button
+                type="button"
+                onClick={() => setPage((value) => Math.max(1, value - 1))}
+                disabled={(agentsPayload?.page ?? 1) <= 1}
+              >
+                Previous
+              </button>
+              <span>
+                Page {agentsPayload?.page ?? 1} / {totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
+                disabled={(agentsPayload?.page ?? 1) >= totalPages}
+              >
+                Next
+              </button>
+            </div>
+          ) : null}
         </section>
       </section>
 
@@ -716,10 +1028,7 @@ export default function ExplorePage() {
 
             <label>
               Max trade USD
-              <input
-                value={copyModal.maxTradeUsd}
-                onChange={(event) => setCopyModal((current) => ({ ...current, maxTradeUsd: event.target.value }))}
-              />
+              <input value={copyModal.maxTradeUsd} onChange={(event) => setCopyModal((current) => ({ ...current, maxTradeUsd: event.target.value }))} />
             </label>
 
             <label className={styles.checkbox}>
@@ -741,6 +1050,58 @@ export default function ExplorePage() {
               </button>
               <button type="button" onClick={() => void saveCopyTrade()} disabled={busyCopy}>
                 {busyCopy ? 'Saving...' : 'Enable Copy Trading'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {profileModal.open ? (
+        <div className={styles.modalOverlay} role="dialog" aria-modal="true" aria-label="Explore profile configuration">
+          <div className={styles.modalCard}>
+            <h3>Edit Explore Profile</h3>
+            <p className={styles.muted}>Agent: {profileModal.agentId}</p>
+
+            <label>
+              Strategy tags (comma-separated)
+              <input
+                value={profileModal.strategyTags}
+                onChange={(event) => setProfileModal((current) => ({ ...current, strategyTags: event.target.value }))}
+              />
+            </label>
+
+            <label>
+              Venue tags (comma-separated)
+              <input value={profileModal.venueTags} onChange={(event) => setProfileModal((current) => ({ ...current, venueTags: event.target.value }))} />
+            </label>
+
+            <label>
+              Risk tier
+              <select
+                value={profileModal.riskTier}
+                onChange={(event) => setProfileModal((current) => ({ ...current, riskTier: event.target.value as ExploreRiskTier }))}
+              >
+                <option value="low">low</option>
+                <option value="medium">medium</option>
+                <option value="high">high</option>
+                <option value="very_high">very_high</option>
+              </select>
+            </label>
+
+            <label>
+              Description
+              <input
+                value={profileModal.descriptionShort}
+                onChange={(event) => setProfileModal((current) => ({ ...current, descriptionShort: event.target.value }))}
+              />
+            </label>
+
+            <div className={styles.modalActions}>
+              <button type="button" onClick={() => setProfileModal((current) => ({ ...current, open: false }))} disabled={busyProfile}>
+                Cancel
+              </button>
+              <button type="button" onClick={() => void saveProfileModal()} disabled={busyProfile}>
+                {busyProfile ? 'Saving...' : 'Save Profile'}
               </button>
             </div>
           </div>

@@ -1450,7 +1450,7 @@ Blocker:
 
 ## Slice 78: Root Landing Refactor + Install-First Onboarding (`/`)
 Status: [x]
-Issue: #30 (to be created / mapped)
+Issue: pending mapping
 
 Goal:
 - Replace root `/` dashboard rendering with a premium marketing/info landing page that prioritizes onboarding, while preserving dashboard operations on `/dashboard`.
@@ -1508,24 +1508,50 @@ DoD:
 ---
 
 ## Slice 80: Hosted x402 on `/agents/[agentId]` + Agent-Originated Send + Loopback Self-Pay
-Status: [~]
-Issue: pending
+Status: [x]
+Issue: #31
 
 Goal:
 - Add hosted x402 receive endpoints in network-web and merge x402 send/receive visibility into `/agents/[agentId]` while keeping outbound x402 execution agent-originated.
 
 DoD:
-- [ ] Add server x402 read model table + indexes (`agent_x402_payment_mirror`) and extend `agent_transfer_approval_mirror` with x402 metadata/source fields.
-- [ ] Add API routes:
-  - [ ] `POST /api/v1/agent/x402/outbound/proposed`
-  - [ ] `POST /api/v1/agent/x402/outbound/mirror`
-  - [ ] `POST /api/v1/agent/x402/inbound/mirror`
-  - [ ] `GET /api/v1/management/x402/payments`
-  - [ ] `GET /api/v1/management/x402/receive-link`
-  - [ ] `GET|POST /api/v1/x402/pay/{agentId}/{linkToken}`
-- [ ] Extend transfer-approval mirror and management transfer approval read/decision flows for `approval_source=x402`.
-- [ ] Runtime mirrors outbound x402 lifecycle into server and supports x402 approvals through transfer decision path (`xfr_...` IDs).
-- [ ] `/agents/[agentId]` wallet timeline includes x402 entries with source badge and receive-link panel.
-- [ ] Loopback self-pay path (agent pays own hosted endpoint) records both inbound and outbound history rows.
-- [ ] Source-of-truth, roadmap, OpenAPI, schema, and command contract are synced.
-- [ ] Required validation gates pass.
+- [x] Add server x402 read model table + indexes (`agent_x402_payment_mirror`) and extend `agent_transfer_approval_mirror` with x402 metadata/source fields.
+- [x] Add API routes:
+  - [x] `POST /api/v1/agent/x402/outbound/proposed`
+  - [x] `POST /api/v1/agent/x402/outbound/mirror`
+  - [x] `POST /api/v1/agent/x402/inbound/mirror`
+  - [x] `GET /api/v1/management/x402/payments`
+  - [x] `GET /api/v1/management/x402/receive-link`
+  - [x] `GET|POST /api/v1/x402/pay/{agentId}/{linkToken}`
+- [x] Extend transfer-approval mirror and management transfer approval read/decision flows for `approval_source=x402`.
+- [x] Runtime mirrors outbound x402 lifecycle into server and supports x402 approvals through transfer decision path (`xfr_...` IDs).
+- [x] `/agents/[agentId]` wallet timeline includes x402 entries with source badge and receive-link panel.
+- [x] Loopback self-pay path (agent pays own hosted endpoint) records both inbound and outbound history rows.
+- [x] Source-of-truth, roadmap, OpenAPI, schema, and command contract are synced.
+- [x] Required validation gates pass.
+
+---
+
+## Slice 81: Explore v2 Full Flush (No Placeholders)
+Status: [x]
+Issue: #30
+
+Goal:
+- Deliver full-stack Explore v2 by removing placeholder controls/messages and implementing DB-backed strategy/risk/venue metadata with server-driven filtering/sorting/pagination.
+
+DoD:
+- [x] docs sync first: source-of-truth + roadmap + tracker + context/spec/tasks/acceptance aligned to Slice 81.
+- [x] add migration `0018_slice81_explore_v2.sql` with `agent_explore_profile` + constraints/indexes.
+- [x] extend `GET /api/v1/public/agents` with enriched filters and response fields (`exploreProfile`, `verified`, `followerMeta`) and server-driven filtering/sorting/pagination.
+- [x] extend `GET /api/v1/public/leaderboard` with `verified` + `exploreProfile` fields.
+- [x] add owner-managed metadata APIs:
+  - [x] `GET /api/v1/management/explore-profile?agentId=...`
+  - [x] `PUT /api/v1/management/explore-profile`
+- [x] remove Explore placeholder controls/messages and add:
+  - [x] functional strategy/venue/risk filters,
+  - [x] functional advanced filter drawer,
+  - [x] verified badges + follower-rich metadata,
+  - [x] URL-state sync for filter/query/sort/window/page/section.
+- [x] keep `/explore` canonical and `/agents` alias behavior unchanged.
+- [x] update OpenAPI + shared schemas for new/extended contracts.
+- [x] required validation gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all` (sequential).

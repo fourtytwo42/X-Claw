@@ -2675,34 +2675,82 @@ Note:
 ## 80) Slice 80: Hosted x402 on `/agents/[agentId]` + Agent-Originated Send + Loopback Self-Pay
 
 ### 80.1 Canonical/doc sync
-- [ ] Add Slice 80 goal/DoD + issue mapping to `docs/XCLAW_SLICE_TRACKER.md`.
-- [ ] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` with hosted x402 contract (server receive endpoint + agent-originated outbound send + loopback path).
-- [ ] Update `docs/api/WALLET_COMMAND_CONTRACT.md` for x402 outbound mirror obligations and `xfr_...` approval reuse.
-- [ ] Update `docs/api/openapi.v1.yaml` and shared schema artifacts for new x402 routes.
-- [ ] Update handoff artifacts (`docs/CONTEXT_PACK.md`, `spec.md`, `tasks.md`, `acceptance.md`).
+- [x] Add Slice 80 goal/DoD + issue mapping to `docs/XCLAW_SLICE_TRACKER.md`.
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` with hosted x402 contract (server receive endpoint + agent-originated outbound send + loopback path).
+- [x] Update `docs/api/WALLET_COMMAND_CONTRACT.md` for x402 outbound mirror obligations and `xfr_...` approval reuse.
+- [x] Update `docs/api/openapi.v1.yaml` and shared schema artifacts for new x402 routes.
+- [x] Update handoff artifacts (`docs/CONTEXT_PACK.md`, `spec.md`, `tasks.md`, `acceptance.md`).
 
 ### 80.2 Implementation
-- [ ] Add migration: `infrastructure/migrations/0017_slice80_hosted_x402.sql`.
-- [ ] Add x402 API surfaces under `apps/network-web/src/app/api/v1/agent/x402/*`.
-- [ ] Add management x402 read/receive-link surfaces under `apps/network-web/src/app/api/v1/management/x402/*`.
-- [ ] Add hosted payer endpoint: `apps/network-web/src/app/api/v1/x402/pay/[agentId]/[linkToken]/route.ts`.
-- [ ] Extend transfer approvals mirror table write/read/decision path with nullable x402 metadata.
-- [ ] Runtime x402 mirrors outbound flow and maps approvals to `xfr_...`.
-- [ ] `/agents/[agentId]` merges x402 history rows into wallet activity with source labeling and receive-link panel.
+- [x] Add migration: `infrastructure/migrations/0017_slice80_hosted_x402.sql`.
+- [x] Add x402 API surfaces under `apps/network-web/src/app/api/v1/agent/x402/*`.
+- [x] Add management x402 read/receive-link surfaces under `apps/network-web/src/app/api/v1/management/x402/*`.
+- [x] Add hosted payer endpoint: `apps/network-web/src/app/api/v1/x402/pay/[agentId]/[linkToken]/route.ts`.
+- [x] Extend transfer approvals mirror table write/read/decision path with nullable x402 metadata.
+- [x] Runtime x402 mirrors outbound flow and maps approvals to `xfr_...`.
+- [x] `/agents/[agentId]` merges x402 history rows into wallet activity with source labeling and receive-link panel.
 
 ### 80.3 Validation + evidence
-- [ ] Run required gates sequentially:
-  - [ ] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
-  - [ ] `python3 -m unittest apps/agent-runtime/tests/test_x402_runtime.py -v`
-  - [ ] `python3 -m unittest apps/agent-runtime/tests/test_x402_skill_wrapper.py -v`
-  - [ ] `npm run db:parity`
-  - [ ] `npm run seed:reset`
-  - [ ] `npm run seed:load`
-  - [ ] `npm run seed:verify`
-  - [ ] `npm run build`
-  - [ ] `pm2 restart all` (after successful build; not parallel)
-- [ ] Record evidence:
-  - [ ] hosted x402 endpoint returns `402` before payment.
-  - [ ] hosted x402 endpoint returns `200` after payment and `410` when expired.
-  - [ ] outbound approval-required x402 appears in transfer approvals queue as `approval_source=x402`.
-  - [ ] loopback self-pay records both outbound and inbound rows.
+- [x] Run required gates sequentially:
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_x402_runtime.py -v`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_x402_skill_wrapper.py -v`
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `pm2 restart all` (after successful build; not parallel)
+- [x] Record evidence:
+  - [x] hosted x402 endpoint returns `402` before payment.
+  - [x] hosted x402 endpoint returns `200` after payment and `410` when expired.
+  - [x] outbound approval-required x402 appears in transfer approvals queue as `approval_source=x402`.
+  - [x] loopback self-pay records both outbound and inbound rows.
+
+---
+
+## 81) Slice 81: Explore v2 Full Flush (No Placeholders)
+
+### 81.1 Canonical/doc sync
+- [x] Add Slice 81 goal/DoD + issue mapping to `docs/XCLAW_SLICE_TRACKER.md`.
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` with locked Slice 81 Explore v2 contract.
+- [x] Update handoff/process artifacts:
+  - [x] `docs/CONTEXT_PACK.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+- [x] Update OpenAPI and shared schemas for Explore v2 route/field additions.
+
+### 81.2 Implementation
+- [x] Add migration `infrastructure/migrations/0018_slice81_explore_v2.sql` with `agent_explore_profile` + constraints/indexes.
+- [x] Extend `GET /api/v1/public/agents` with:
+  - [x] strategy/venue/risk/minFollowers/minVolume/activeWithin/verified filters
+  - [x] server-driven sorting/pagination with added `followers` sort
+  - [x] `exploreProfile`, `verified`, `followerMeta` response fields
+- [x] Extend `GET /api/v1/public/leaderboard` with `verified` and `exploreProfile`.
+- [x] Add owner-managed Explore profile routes:
+  - [x] `GET /api/v1/management/explore-profile`
+  - [x] `PUT /api/v1/management/explore-profile`
+- [x] Replace Explore placeholders with functional controls:
+  - [x] strategy multi-select
+  - [x] venue multi-select
+  - [x] risk select
+  - [x] verified-only toggle
+  - [x] advanced filter drawer
+  - [x] segmented section control
+  - [x] URL-state synchronization
+  - [x] verified badges + follower-rich card metadata
+
+### 81.3 Validation + evidence
+- [x] Run required gates sequentially:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `pm2 restart all` (after successful build; not parallel)
+- [x] Record evidence:
+  - [x] no Explore placeholder labels/messages remain for strategy/risk/venue/advanced/follower enrichments
+  - [x] functional URL-deep-link filter replay
+  - [x] owner-managed Explore profile edit reflects on public Explore cards
+  - [x] owner/viewer copy-trade gating remains intact

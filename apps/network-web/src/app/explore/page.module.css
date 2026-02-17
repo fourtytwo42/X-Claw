@@ -238,6 +238,7 @@
 }
 
 .controls select,
+.controls input,
 .filterBar select,
 .modalCard select,
 .modalCard input {
@@ -246,6 +247,11 @@
   background: var(--explore-surface);
   color: var(--explore-text);
   padding: 0.4rem 0.52rem;
+}
+
+.statusWrap {
+  display: inline-flex;
+  align-items: center;
 }
 
 .windowButtons {
