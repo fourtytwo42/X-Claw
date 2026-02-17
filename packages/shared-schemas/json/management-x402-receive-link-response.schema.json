@@ -28,9 +28,9 @@
     "assetKind": { "type": "string", "enum": ["native", "erc20"] },
     "assetAddress": { "type": ["string", "null"] },
     "amountAtomic": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?$" },
-    "ttlSeconds": { "type": "integer", "minimum": 60 },
+    "ttlSeconds": { "type": ["integer", "null"], "minimum": 60 },
     "paymentUrl": { "type": "string", "format": "uri" },
-    "expiresAt": { "type": "string", "format": "date-time" },
+    "expiresAt": { "type": ["string", "null"], "format": "date-time" },
     "timeLimitNotice": { "type": "string", "minLength": 1 },
     "status": { "type": "string", "enum": ["proposed", "executing", "filled", "failed", "expired"] }
   }

@@ -994,20 +994,41 @@ paths:
           schema:
             type: string
             default: '0.01'
-        - name: ttlSeconds
-          in: query
-          required: false
-          schema:
-            type: integer
-            default: 1800
       responses:
         '200':
           description: Hosted x402 receive-link payload.
         '401':
           $ref: '#/components/responses/ErrorResponse'
+  /api/v1/x402/pay/{agentId}:
+    get:
+      summary: Hosted x402 pay endpoint (challenge/settlement, static agent link).
+      parameters:
+        - name: agentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Payment settled.
+        '402':
+          description: Payment required challenge.
+    post:
+      summary: Hosted x402 pay endpoint (challenge/settlement, static agent link).
+      parameters:
+        - name: agentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Payment settled.
+        '402':
+          description: Payment required challenge.
   /api/v1/x402/pay/{agentId}/{linkToken}:
     get:
-      summary: Hosted x402 pay endpoint (challenge/settlement).
+      summary: Hosted x402 pay endpoint (legacy tokenized challenge/settlement).
       parameters:
         - name: agentId
           in: path
@@ -1024,10 +1045,8 @@ paths:
           description: Payment settled.
         '402':
           description: Payment required challenge.
-        '410':
-          description: Payment link expired.
     post:
-      summary: Hosted x402 pay endpoint (challenge/settlement).
+      summary: Hosted x402 pay endpoint (legacy tokenized challenge/settlement).
       parameters:
         - name: agentId
           in: path
@@ -1044,8 +1063,6 @@ paths:
           description: Payment settled.
         '402':
           description: Payment required challenge.
-        '410':
-          description: Payment link expired.
   /api/v1/management/transfer-policy/update:
     post:
       summary: Update mirrored runtime transfer approval policy for active chain.

@@ -3156,14 +3156,15 @@ Limitations / notes:
 
 2. Hosted receive contract:
 - Hosted endpoint path:
-  - `GET|POST /api/v1/x402/pay/{agentId}/{linkToken}`
+  - `GET|POST /api/v1/x402/pay/{agentId}` (canonical static link)
+  - `GET|POST /api/v1/x402/pay/{agentId}/{linkToken}` (legacy compatibility path)
 - Hosted receive endpoint behavior:
   - returns `402 payment_required` when payment header is missing,
   - returns `200 payment_settled` when payment header challenge is satisfied,
-  - returns `410 payment_expired` when receive link is expired.
+  - hosted receive links do not expire.
 - Management route provides receive URL metadata:
   - `GET /api/v1/management/x402/receive-link?agentId=...&chainKey=...`
-  - response includes `paymentUrl`, `ttlSeconds`, `expiresAt`, `timeLimitNotice`.
+  - response includes `paymentUrl` and non-expiring metadata (`ttlSeconds=null`, `expiresAt=null`, static-link notice).
 
 3. Outbound x402 mirror contract:
 - Agent runtime remains initiator for outbound x402 send execution/signing.

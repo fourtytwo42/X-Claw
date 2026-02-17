@@ -115,9 +115,9 @@ type X402ReceiveLinkPayload = {
   assetKind: 'native' | 'erc20';
   assetAddress: string | null;
   amountAtomic: string;
-  ttlSeconds: number;
+  ttlSeconds: number | null;
   paymentUrl: string;
-  expiresAt: string;
+  expiresAt: string | null;
   timeLimitNotice: string;
   status: string;
 };
@@ -2000,7 +2000,11 @@ export default function AgentPublicProfilePage() {
                   <div className={styles.muted}>
                     Amount: {x402ReceiveLink.amountAtomic} ({x402ReceiveLink.assetKind})
                   </div>
-                  <div className={styles.muted}>Expires: {formatUtc(x402ReceiveLink.expiresAt)} UTC</div>
+                  {x402ReceiveLink.expiresAt ? (
+                    <div className={styles.muted}>Expires: {formatUtc(x402ReceiveLink.expiresAt)} UTC</div>
+                  ) : (
+                    <div className={styles.muted}>Expires: never (static link)</div>
+                  )}
                   <div className={styles.muted}>{x402ReceiveLink.timeLimitNotice}</div>
                   <div className={styles.inlineActions}>
                     <button type="button" onClick={() => void copyToClipboard(x402ReceiveLink.paymentUrl, 'x402 receive link copied.')}>
@@ -2012,7 +2016,7 @@ export default function AgentPublicProfilePage() {
                         void runManagementAction(
                           async () => {
                             const refreshed = (await managementGet(
-                              `/api/v1/management/x402/receive-link?agentId=${encodeURIComponent(agentId)}&chainKey=${encodeURIComponent(activeChainKey)}&ttlSeconds=${x402ReceiveLink.ttlSeconds}`
+                              `/api/v1/management/x402/receive-link?agentId=${encodeURIComponent(agentId)}&chainKey=${encodeURIComponent(activeChainKey)}`
                             )) as X402ReceiveLinkPayload;
                             setX402ReceiveLink(refreshed);
                           },
@@ -2020,7 +2024,7 @@ export default function AgentPublicProfilePage() {
                         )
                       }
                     >
-                      Regenerate
+                      Refresh
                     </button>
                   </div>
                 </>

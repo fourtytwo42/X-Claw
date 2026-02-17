@@ -1,5 +1,3 @@
-import crypto from 'node:crypto';
-
 import type { NextRequest } from 'next/server';
 
 import { dbQuery } from '@/lib/db';
@@ -56,12 +54,6 @@ export async function GET(req: NextRequest) {
     const assetAddressRaw = req.nextUrl.searchParams.get('assetAddress')?.trim();
     const assetAddress = assetKind === 'erc20' ? assetAddressRaw || null : null;
     const amountAtomic = req.nextUrl.searchParams.get('amountAtomic')?.trim() || '0.01';
-    const ttlRaw = req.nextUrl.searchParams.get('ttlSeconds')?.trim();
-    const ttlSecondsParsed = Number(ttlRaw || '1800');
-    const ttlSeconds = Number.isFinite(ttlSecondsParsed) ? Math.max(60, Math.floor(ttlSecondsParsed)) : 1800;
-    const now = new Date();
-    const expiresAt = new Date(now.getTime() + ttlSeconds * 1000).toISOString();
-
     const active = await dbQuery<{
       payment_id: string;
       network_key: string;
@@ -103,14 +95,13 @@ export async function GET(req: NextRequest) {
 
     const origin = buildOrigin(req);
     let paymentId: string;
-    let linkToken: string;
     let paymentUrl: string;
     let status: string;
+    const staticPath = `/api/v1/x402/pay/${encodeURIComponent(agentId)}`;
+    paymentUrl = `${origin}${staticPath}`;
 
-    if ((active.rowCount ?? 0) > 0 && active.rows[0].link_token && active.rows[0].payment_url) {
+    if ((active.rowCount ?? 0) > 0 && active.rows[0].payment_url) {
       paymentId = active.rows[0].payment_id;
-      linkToken = String(active.rows[0].link_token);
-      paymentUrl = String(active.rows[0].payment_url);
       status = active.rows[0].status;
       await dbQuery(
         `
@@ -120,19 +111,18 @@ export async function GET(req: NextRequest) {
           asset_kind = $2,
           asset_address = $3,
           amount_atomic = $4::numeric,
+          payment_url = $5,
           reason_code = null,
           reason_message = null,
-          expires_at = $5::timestamptz,
+          expires_at = null,
           updated_at = $6::timestamptz,
           terminal_at = null
         where payment_id = $7
         `,
-        [facilitatorKey, assetKind, assetAddress, amountAtomic, expiresAt, isoNow(), paymentId]
+        [facilitatorKey, assetKind, assetAddress, amountAtomic, paymentUrl, isoNow(), paymentId]
       );
     } else {
       paymentId = makeId('xpm');
-      linkToken = crypto.randomBytes(10).toString('hex');
-      paymentUrl = `${origin}/api/v1/x402/pay/${encodeURIComponent(agentId)}/${encodeURIComponent(linkToken)}`;
       status = 'proposed';
       await dbQuery(
         `
@@ -147,16 +137,15 @@ export async function GET(req: NextRequest) {
           asset_address,
           amount_atomic,
           payment_url,
-          link_token,
           expires_at,
           created_at,
           updated_at,
           terminal_at
         ) values (
-          $1, $2, 'inbound', 'proposed', $3, $4, $5, $6, $7::numeric, $8, $9, $10::timestamptz, $11::timestamptz, $12::timestamptz, null
+          $1, $2, 'inbound', 'proposed', $3, $4, $5, $6, $7::numeric, $8, null, null, $9::timestamptz, $10::timestamptz, null
         )
         `,
-        [paymentId, agentId, chainKey, facilitatorKey, assetKind, assetAddress, amountAtomic, paymentUrl, linkToken, expiresAt, isoNow(), isoNow()]
+        [paymentId, agentId, chainKey, facilitatorKey, assetKind, assetAddress, amountAtomic, paymentUrl, isoNow(), isoNow()]
       );
     }
 
@@ -171,10 +160,10 @@ export async function GET(req: NextRequest) {
         assetKind,
         assetAddress,
         amountAtomic,
-        ttlSeconds,
         paymentUrl,
-        expiresAt,
-        timeLimitNotice: `Payment link expires in ${ttlSeconds} seconds (at ${expiresAt}).`,
+        ttlSeconds: null,
+        expiresAt: null,
+        timeLimitNotice: 'This payment link does not expire.',
         status
       },
       200,

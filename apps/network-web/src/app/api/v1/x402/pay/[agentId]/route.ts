@@ -2,17 +2,18 @@ import type { NextRequest } from 'next/server';
 
 import { dbQuery } from '@/lib/db';
 import { errorResponse, internalErrorResponse, successResponse } from '@/lib/errors';
+import { makeId } from '@/lib/ids';
 import { getRequestId } from '@/lib/request-id';
 
 export const runtime = 'nodejs';
 
 type RouteParams = {
-  params: Promise<{ agentId: string; linkToken: string }>;
+  params: Promise<{ agentId: string }>;
 };
 
-async function handle(req: NextRequest, params: { agentId: string; linkToken: string }) {
+async function handle(req: NextRequest, params: { agentId: string }) {
   const requestId = getRequestId(req);
-  const { agentId, linkToken } = params;
+  const { agentId } = params;
   try {
     const row = await dbQuery<{
       payment_id: string;
@@ -23,7 +24,6 @@ async function handle(req: NextRequest, params: { agentId: string; linkToken: st
       asset_address: string | null;
       amount_atomic: string;
       payment_url: string | null;
-      expires_at: string | null;
       tx_hash: string | null;
     }>(
       `
@@ -36,22 +36,22 @@ async function handle(req: NextRequest, params: { agentId: string; linkToken: st
         asset_address,
         amount_atomic::text,
         payment_url,
-        expires_at::text,
         tx_hash
       from agent_x402_payment_mirror
       where agent_id = $1
         and direction = 'inbound'
-        and link_token = $2
-      order by created_at desc
+      order by
+        case when status in ('proposed', 'executing') then 0 else 1 end asc,
+        created_at desc
       limit 1
       `,
-      [agentId, linkToken]
+      [agentId]
     );
 
     if ((row.rowCount ?? 0) === 0) {
       return errorResponse(
         404,
-        { code: 'payload_invalid', message: 'Unknown x402 payment link.', actionHint: 'Request a fresh payment link.' },
+        { code: 'payload_invalid', message: 'Unknown x402 payment link.', actionHint: 'Request the agent receive link first.' },
         requestId
       );
     }
@@ -72,7 +72,7 @@ async function handle(req: NextRequest, params: { agentId: string; linkToken: st
             amountAtomic: payment.amount_atomic,
             requiredHeader: 'X-Payment',
             paymentUrl: payment.payment_url,
-            expiresAt: payment.expires_at
+            expiresAt: null
           }
         },
         requestId
@@ -81,25 +81,50 @@ async function handle(req: NextRequest, params: { agentId: string; linkToken: st
 
     const txHashHeader = req.headers.get('x-tx-hash');
     const txHash = txHashHeader && /^0x[a-fA-F0-9]{64}$/.test(txHashHeader) ? txHashHeader : null;
+    const settledPaymentId = makeId('xpm');
     await dbQuery(
       `
-      update agent_x402_payment_mirror
-      set status = 'filled',
-          tx_hash = coalesce($1, tx_hash),
-          reason_code = null,
-          reason_message = null,
-          updated_at = now(),
-          terminal_at = now()
-      where payment_id = $2
+      insert into agent_x402_payment_mirror (
+        payment_id,
+        agent_id,
+        direction,
+        status,
+        network_key,
+        facilitator_key,
+        asset_kind,
+        asset_address,
+        amount_atomic,
+        payment_url,
+        link_token,
+        expires_at,
+        tx_hash,
+        reason_code,
+        reason_message,
+        created_at,
+        updated_at,
+        terminal_at
+      ) values (
+        $1, $2, 'inbound', 'filled', $3, $4, $5, $6, $7::numeric, $8, null, null, $9, null, null, now(), now(), now()
+      )
       `,
-      [txHash, payment.payment_id]
+      [
+        settledPaymentId,
+        agentId,
+        payment.network_key,
+        payment.facilitator_key,
+        payment.asset_kind,
+        payment.asset_address,
+        payment.amount_atomic,
+        payment.payment_url,
+        txHash
+      ]
     );
 
     return successResponse(
       {
         ok: true,
         code: 'payment_settled',
-        paymentId: payment.payment_id,
+        paymentId: settledPaymentId,
         networkKey: payment.network_key,
         facilitatorKey: payment.facilitator_key,
         amountAtomic: payment.amount_atomic,
