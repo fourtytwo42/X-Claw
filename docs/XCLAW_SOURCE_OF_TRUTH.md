@@ -3391,10 +3391,18 @@ Limitations / notes:
   - native `ETH`
   - wrapped `WETH`
   - stable `USDC`
+  - drip amounts:
+    - native `0.02 ETH`
+    - wrapped `10 WETH`
+    - stable `20000 USDC`
 - Kite AI testnet:
   - native `KITE`
   - wrapped `WKITE`
   - stable `USDT`
+  - drip amounts:
+    - native `0.05 KITE`
+    - wrapped `0.05 WKITE`
+    - stable `0.10 USDT`
 - Wrapped/stable addresses are resolved from chain config canonical tokens.
 
 4. Faucet rate limiting:

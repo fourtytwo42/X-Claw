@@ -26,9 +26,13 @@ type AgentFaucetRequest = {
 const SUPPORTED_FAUCET_CHAINS = new Set(['base_sepolia', 'kite_ai_testnet']);
 const DEFAULT_ASSETS: FaucetAssetKey[] = ['native', 'wrapped', 'stable'];
 
-const DRIP_NATIVE_WEI = '20000000000000000'; // 0.02 native token
-const DRIP_WRAPPED_WEI = '10000000000000000000'; // 10.0 wrapped token (base units)
-const DRIP_STABLE_WEI = '20000000000000000000000'; // 20000.0 stable token (base units)
+const BASE_DRIP_NATIVE_WEI = '20000000000000000'; // 0.02 ETH
+const BASE_DRIP_WRAPPED_WEI = '10000000000000000000'; // 10 WETH
+const BASE_DRIP_STABLE_WEI = '20000000000000000000000'; // 20000 USDC
+
+const KITE_DRIP_NATIVE_WEI = '50000000000000000'; // 0.05 KITE
+const KITE_DRIP_WRAPPED_WEI = '50000000000000000'; // 0.05 WKITE
+const KITE_DRIP_STABLE_WEI = '100000000000000000'; // 0.10 USDT
 
 const GAS_BUFFER_MULTIPLIER_BPS = 12000; // 1.2x
 
@@ -117,6 +121,21 @@ function resolveStableToken(chainKey: string): { symbol: string; address: string
   }
   const symbol = (tokens.USDC ? 'USDC' : 'USDT') as string;
   return { symbol, address: stable };
+}
+
+function resolveDripAmounts(chainKey: string): { nativeWei: string; wrappedWei: string; stableWei: string } {
+  if (chainKey === 'kite_ai_testnet') {
+    return {
+      nativeWei: KITE_DRIP_NATIVE_WEI,
+      wrappedWei: KITE_DRIP_WRAPPED_WEI,
+      stableWei: KITE_DRIP_STABLE_WEI,
+    };
+  }
+  return {
+    nativeWei: BASE_DRIP_NATIVE_WEI,
+    wrappedWei: BASE_DRIP_WRAPPED_WEI,
+    stableWei: BASE_DRIP_STABLE_WEI,
+  };
 }
 
 export async function POST(req: NextRequest) {
@@ -299,9 +318,10 @@ export async function POST(req: NextRequest) {
     const signer = new Wallet(faucetPrivateKey, provider);
 
     const nativeSymbol = chainKey === 'kite_ai_testnet' ? 'KITE' : 'ETH';
-    const dripNative = BigInt(DRIP_NATIVE_WEI);
-    const dripWrapped = BigInt(DRIP_WRAPPED_WEI);
-    const dripStable = BigInt(DRIP_STABLE_WEI);
+    const dripAmounts = resolveDripAmounts(chainKey);
+    const dripNative = BigInt(dripAmounts.nativeWei);
+    const dripWrapped = BigInt(dripAmounts.wrappedWei);
+    const dripStable = BigInt(dripAmounts.stableWei);
 
     const wrapped = wrappedToken ? new Contract(wrappedToken.address, ERC20_ABI, signer) : null;
     const stable = stableToken ? new Contract(stableToken.address, ERC20_ABI, signer) : null;
@@ -434,18 +454,18 @@ export async function POST(req: NextRequest) {
 
     const tokenDrips: Array<{ token: string; tokenAddress: string; amountWei: string; txHash: string }> = [];
     if (wrapped && txByAsset.wrapped) {
-      tokenDrips.push({
-        token: wrappedToken?.symbol || 'WRAPPED',
-        tokenAddress: wrappedToken?.address || '',
-        amountWei: DRIP_WRAPPED_WEI,
-        txHash: txByAsset.wrapped,
-      });
+        tokenDrips.push({
+          token: wrappedToken?.symbol || 'WRAPPED',
+          tokenAddress: wrappedToken?.address || '',
+          amountWei: dripAmounts.wrappedWei,
+          txHash: txByAsset.wrapped,
+        });
     }
     if (stable && txByAsset.stable) {
       tokenDrips.push({
         token: stableToken?.symbol || 'STABLE',
         tokenAddress: stableToken?.address || '',
-        amountWei: DRIP_STABLE_WEI,
+        amountWei: dripAmounts.stableWei,
         txHash: txByAsset.stable,
       });
     }
@@ -455,7 +475,7 @@ export async function POST(req: NextRequest) {
         ok: true,
         agentId: auth.agentId,
         chainKey,
-        amountWei: requestedAssets.includes('native') ? DRIP_NATIVE_WEI : '0',
+        amountWei: requestedAssets.includes('native') ? dripAmounts.nativeWei : '0',
         to: trimmedRecipient,
         txHash: primaryTxHash,
         tokenDrips,
@@ -463,9 +483,9 @@ export async function POST(req: NextRequest) {
         fulfilledAssets,
         nativeSymbol,
         assetPlan: {
-          native: requestedAssets.includes('native') ? { symbol: nativeSymbol, amountWei: DRIP_NATIVE_WEI } : null,
-          wrapped: wrappedToken ? { symbol: wrappedToken.symbol, tokenAddress: wrappedToken.address, amountWei: DRIP_WRAPPED_WEI } : null,
-          stable: stableToken ? { symbol: stableToken.symbol, tokenAddress: stableToken.address, amountWei: DRIP_STABLE_WEI } : null,
+          native: requestedAssets.includes('native') ? { symbol: nativeSymbol, amountWei: dripAmounts.nativeWei } : null,
+          wrapped: wrappedToken ? { symbol: wrappedToken.symbol, tokenAddress: wrappedToken.address, amountWei: dripAmounts.wrappedWei } : null,
+          stable: stableToken ? { symbol: stableToken.symbol, tokenAddress: stableToken.address, amountWei: dripAmounts.stableWei } : null,
         },
       },
       200,
