@@ -256,6 +256,7 @@ export default function ExplorePage() {
   const [agentsPayload, setAgentsPayload] = useState<{ items: ExploreAgent[]; total: number; page: number; pageSize: number } | null>(null);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [copySubscriptions, setCopySubscriptions] = useState<CopySubscriptionPayload['items']>([]);
+  const [managedAgentNames, setManagedAgentNames] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busyCopy, setBusyCopy] = useState(false);
@@ -418,6 +419,40 @@ export default function ExplorePage() {
   }, [ownerContext]);
 
   useEffect(() => {
+    if (ownerContext.phase !== 'ready') {
+      setManagedAgentNames({});
+      return;
+    }
+    const managedAgents = ownerContext.managedAgents;
+    let cancelled = false;
+    async function loadManagedAgentNames() {
+      const names: Record<string, string> = {};
+      await Promise.all(
+        managedAgents.map(async (agentId) => {
+          try {
+            const response = await fetch(`/api/v1/public/agents/${encodeURIComponent(agentId)}`, { cache: 'no-store' });
+            if (!response.ok) {
+              names[agentId] = agentId;
+              return;
+            }
+            const payload = (await response.json()) as { agent?: { agent_name?: string | null } };
+            names[agentId] = payload.agent?.agent_name?.trim() || agentId;
+          } catch {
+            names[agentId] = agentId;
+          }
+        })
+      );
+      if (!cancelled) {
+        setManagedAgentNames(names);
+      }
+    }
+    void loadManagedAgentNames();
+    return () => {
+      cancelled = true;
+    };
+  }, [ownerContext]);
+
+  useEffect(() => {
     let cancelled = false;
     async function loadAgents() {
       setError(null);
@@ -532,6 +567,10 @@ export default function ExplorePage() {
     return (copySubscriptions ?? []).find((item) => item.leaderAgentId === leaderAgentId);
   }
 
+  function managedAgentLabel(agentId: string): string {
+    return managedAgentNames[agentId] || agentId;
+  }
+
   function openCopyModal(leader: ExploreAgent) {
     if (ownerContext.phase !== 'ready') {
       return;
@@ -585,7 +624,9 @@ export default function ExplorePage() {
         setCopySubscriptions(refreshed.items ?? []);
       }
 
-      setNotice(`Copy relationship saved: ${copyModal.followerAgentId} now follows ${copyModal.leader.agentId}.`);
+      setNotice(
+        `Copy trading is on: ${managedAgentLabel(copyModal.followerAgentId)} now copies ${copyModal.leader.agentName}.`
+      );
       setCopyModal((current) => ({ ...current, open: false, leader: null }));
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'Failed to save copy relationship.');
@@ -702,7 +743,7 @@ export default function ExplorePage() {
         </div>
 
         {item.exploreProfile.descriptionShort ? <p className={styles.copyState}>{item.exploreProfile.descriptionShort}</p> : null}
-        {copyRel?.enabled ? <p className={styles.copyState}>Copying into follower: {copyRel.followerAgentId}</p> : null}
+        {copyRel?.enabled ? <p className={styles.copyState}>Copied by: {managedAgentLabel(copyRel.followerAgentId)}</p> : null}
 
         <div className={styles.actionRow}>
           <Link href={`/agents/${encodeURIComponent(item.agentId)}`} className={styles.viewBtn}>
@@ -970,38 +1011,38 @@ export default function ExplorePage() {
       {copyModal.open && copyModal.leader ? (
         <div className={styles.modalOverlay} role="dialog" aria-modal="true" aria-label="Copy trade configuration">
           <div className={styles.modalCard}>
-            <h3>Copy this agent into...</h3>
-            <p className={styles.muted}>Leader: {copyModal.leader.agentName}</p>
+            <h3>Set Up Copy Trading</h3>
+            <p className={styles.muted}>Agent to copy from: {copyModal.leader.agentName}</p>
 
             <label>
-              Destination agent
+              Your agent that will copy trades
               <select
                 value={copyModal.followerAgentId}
                 onChange={(event) => setCopyModal((current) => ({ ...current, followerAgentId: event.target.value }))}
               >
                 {(ownerContext.phase === 'ready' ? ownerContext.managedAgents : []).map((agentId) => (
                   <option key={agentId} value={agentId}>
-                    {agentId}
+                    {managedAgentLabel(agentId)}
                   </option>
                 ))}
               </select>
             </label>
 
             <label>
-              Scale (bps)
+              Copy amount
               <select
                 value={copyModal.scaleBps}
                 onChange={(event) => setCopyModal((current) => ({ ...current, scaleBps: Number(event.target.value) || 10000 }))}
               >
-                <option value={2500}>0.25x</option>
-                <option value={5000}>0.5x</option>
-                <option value={10000}>1.0x</option>
-                <option value={20000}>2.0x</option>
+                <option value={2500}>25% of each trade</option>
+                <option value={5000}>50% of each trade</option>
+                <option value={10000}>100% (same size)</option>
+                <option value={20000}>200% (double size)</option>
               </select>
             </label>
 
             <label>
-              Max trade USD
+              Max trade size (USD)
               <input value={copyModal.maxTradeUsd} onChange={(event) => setCopyModal((current) => ({ ...current, maxTradeUsd: event.target.value }))} />
             </label>
 
@@ -1011,7 +1052,7 @@ export default function ExplorePage() {
                 checked={copyModal.requirePerTradeApprovals}
                 onChange={(event) => setCopyModal((current) => ({ ...current, requirePerTradeApprovals: event.target.checked }))}
               />
-              Require per-trade approvals (device default hint)
+              Ask for approval before each copied trade
             </label>
 
             <div className={styles.modalActions}>
@@ -1023,7 +1064,7 @@ export default function ExplorePage() {
                 Cancel
               </button>
               <button type="button" onClick={() => void saveCopyTrade()} disabled={busyCopy}>
-                {busyCopy ? 'Saving...' : 'Enable Copy Trading'}
+                {busyCopy ? 'Saving...' : 'Start Copying'}
               </button>
             </div>
           </div>
