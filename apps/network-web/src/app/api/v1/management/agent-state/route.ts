@@ -106,6 +106,18 @@ function isMissingTrackedSchema(error: unknown): boolean {
   );
 }
 
+function isMissingPolicySnapshotChainKey(error: unknown): boolean {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+  const code = 'code' in error ? String((error as { code?: unknown }).code ?? '') : '';
+  if (code !== '42703') {
+    return false;
+  }
+  const message = 'message' in error ? String((error as { message?: unknown }).message ?? '') : '';
+  return message.includes('chain_key') && message.includes('agent_policy_snapshots');
+}
+
 export async function GET(req: NextRequest) {
   const requestId = getRequestId(req);
 
@@ -290,7 +302,40 @@ export async function GET(req: NextRequest) {
         limit 1
         `,
         [agentId, chainKey]
-      ),
+      ).catch((error) => {
+        if (!isMissingPolicySnapshotChainKey(error)) {
+          throw error;
+        }
+        return dbQuery<{
+          mode: 'mock' | 'real';
+          approval_mode: 'per_trade' | 'auto';
+          max_trade_usd: string | null;
+          max_daily_usd: string | null;
+          allowed_tokens: string[];
+          daily_cap_usd_enabled: boolean;
+          daily_trade_cap_enabled: boolean;
+          max_daily_trade_count: string | null;
+          created_at: string;
+        }>(
+          `
+          select
+            mode,
+            approval_mode,
+            max_trade_usd::text,
+            max_daily_usd::text,
+            allowed_tokens,
+            daily_cap_usd_enabled,
+            daily_trade_cap_enabled,
+            max_daily_trade_count::text,
+            created_at::text
+          from agent_policy_snapshots
+          where agent_id = $1
+          order by created_at desc
+          limit 1
+          `,
+          [agentId]
+        );
+      }),
       dbQuery<{
         audit_id: string;
         action_type: string;
