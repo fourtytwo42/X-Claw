@@ -1310,7 +1310,7 @@ Goal:
 
 DoD:
 - [x] docs sync first: source-of-truth + roadmap + tracker + context/spec/tasks/acceptance aligned to Slice 73.
-- [x] `/agents/:id` is direct-replaced with MetaMask-style full-screen wallet layout (no dashboard sidebar shell), compact KPI chips, and single continuous wallet workspace.
+- [x] `/agents/:id` is direct-replaced with sidebar-preserved wallet-native layout, compact KPI chips, and single continuous wallet workspace.
 - [x] existing APIs remain unchanged; owner operations continue using existing management routes.
 - [x] unsupported API surfaces render explicit placeholders/disabled controls (no speculative backend changes).
 - [x] viewer mode hides owner-only controls while preserving public profile observability.
@@ -1433,7 +1433,7 @@ Goal:
 
 DoD:
 - [x] docs sync first: source-of-truth + roadmap + tracker + context/spec/tasks/acceptance aligned to Slice 77.
-- [x] `/agents/:id` no longer uses dashboard sidebar shell framing; chain selector + theme remain in compact utility bar.
+- [x] `/agents/:id` preserves the left sidebar shell and keeps chain selector + per-agent chain trading toggle + theme in compact utility bar.
 - [x] wallet-first module order present: header + compact KPI chips + assets/approvals + activity + approval history + withdraw + copy + limit orders + audit.
 - [x] `Secondary Operations` section removed.
 - [x] transfer/outbound policy editor controls removed from `/agents/:id` while transfer approval actions/history remain in approvals surfaces.

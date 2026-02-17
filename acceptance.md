@@ -1,11 +1,11 @@
 # Slice 77 Acceptance Evidence
 
 Date (UTC): 2026-02-17
-Active slice: `Slice 77: Agent Wallet Page MetaMask-Style Full-Screen Refactor`
+Active slice: `Slice 77: Agent Wallet Page iPhone/MetaMask-Style Refactor`
 Issue mapping: `#29` (to be created / mapped)
 
 ## Objective + Scope Lock
-- Objective: convert `/agents/:id` to a MetaMask-style full-screen wallet management page and remove policy editor surfaces (`Secondary Operations`, transfer/outbound policy editors).
+- Objective: convert `/agents/:id` to a wallet-native iPhone/MetaMask-style management page while preserving sidebar shell, and remove policy editor surfaces (`Secondary Operations`, transfer/outbound policy editors).
 - Scope guard honored: frontend-led refactor with existing management/public APIs preserved.
 
 ## File-Level Evidence (Slice 77)
@@ -28,7 +28,7 @@ Issue mapping: `#29` (to be created / mapped)
 - `npm run build` -> PASS (Next.js production build completed for `/agents/[agentId]` refactor)
 
 ## Functional Verification Notes
-- `/agents/:id` no longer renders dashboard sidebar/topbar shell framing.
+- `/agents/:id` preserves dashboard sidebar shell framing while using wallet-native internal composition.
 - Wallet-first section order is present with compact KPI chips and continuous card stack.
 - `Secondary Operations` and transfer policy editor controls removed.
 - Approval action surfaces remain in Approval History module.

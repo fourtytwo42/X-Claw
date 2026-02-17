@@ -200,6 +200,16 @@
   background: var(--agent-surface);
 }
 
+.walletCard {
+  border-color: color-mix(in srgb, var(--agent-border) 92%, var(--agent-accent));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 8%, transparent);
+}
+
+.walletCardHeader {
+  padding-bottom: 0.38rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--agent-border) 90%, transparent);
+}
+
 .walletHeaderCard {
   margin-top: 0.8rem;
   padding: 0.85rem;
@@ -255,11 +265,31 @@
   font-size: 0.83rem;
 }
 
+.accountMetaChips {
+  margin-top: 0.44rem;
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.walletChip {
+  border: 1px solid color-mix(in srgb, var(--agent-border) 92%, transparent);
+  border-radius: 999px;
+  padding: 0.14rem 0.48rem;
+  color: var(--agent-muted);
+  font-size: 0.74rem;
+}
+
 .globalApprovalRow {
   margin-top: 0.48rem;
   display: inline-flex;
   align-items: center;
   gap: 0.55rem;
+}
+
+.walletToggleRow {
+  width: 100%;
+  justify-content: space-between;
 }
 
 .globalApprovalLabel {
@@ -278,6 +308,7 @@
   display: inline-block;
   width: 46px;
   height: 28px;
+  flex: 0 0 auto;
 }
 
 .iosToggle input {
@@ -290,7 +321,7 @@
   position: absolute;
   inset: 0;
   cursor: pointer;
-  background: color-mix(in srgb, var(--agent-muted) 42%, transparent);
+  background: color-mix(in srgb, var(--agent-muted) 72%, var(--agent-surface));
   border: 1px solid var(--agent-border);
   border-radius: 999px;
   transition: background 0.18s ease;
@@ -317,11 +348,20 @@
   transform: translateX(18px);
 }
 
+.iosToggle input:disabled + .iosSlider {
+  opacity: 0.72;
+}
+
 .walletActions {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
   align-items: center;
+}
+
+.walletActionRow {
+  padding-top: 0.4rem;
+  border-top: 1px solid color-mix(in srgb, var(--agent-border) 92%, transparent);
 }
 
 .addressCopyButton {
@@ -483,6 +523,24 @@
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
+}
+
+.walletTokenTitleRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.approvedChip {
+  border: 1px solid color-mix(in srgb, var(--agent-ok) 62%, var(--agent-border));
+  background: color-mix(in srgb, var(--agent-ok) 14%, transparent);
+  color: color-mix(in srgb, var(--agent-ok) 86%, var(--agent-text));
+  border-radius: 999px;
+  padding: 0.08rem 0.42rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
 }
 
 .statusChip {

@@ -1,10 +1,10 @@
-# Slice 77 Spec: Agent Wallet Page MetaMask-Style Full-Screen Refactor (`/agents/:id`)
+# Slice 77 Spec: Agent Wallet Page iPhone/MetaMask-Style Refactor (`/agents/:id`)
 
 ## Goal
-Refactor `/agents/:id` into a MetaMask-style full-screen wallet experience (no dashboard sidebar shell), preserving owner/viewer boundaries and existing API contracts.
+Refactor `/agents/:id` into a wallet-native iPhone/MetaMask-style experience while preserving the dashboard sidebar shell, owner/viewer boundaries, and existing API contracts.
 
 ## Success Criteria
-1. `/agents/:id` no longer uses dashboard sidebar shell framing.
+1. `/agents/:id` preserves dashboard sidebar shell framing.
 2. Page is wallet-first with compact utility bar, wallet header, and KPI chip row.
 3. Core sections render in wallet workflow order:
    - Assets & Approvals

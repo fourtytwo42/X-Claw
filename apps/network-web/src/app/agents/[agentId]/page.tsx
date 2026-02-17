@@ -915,6 +915,135 @@ export default function AgentPublicProfilePage() {
   const status = profile?.agent.public_status;
   const isPaused =
     (management.phase === 'ready' ? management.data.agent.publicStatus : profile?.agent.public_status) === 'paused';
+  const selectedTokenSummary =
+    selectedWalletTokens.length === 0 ? 'All tokens' : `${selectedWalletTokens.join(', ')} selected`;
+  const displayWalletTokenLabel = (token: string): string => {
+    const normalized = normalizeTokenSelectionSymbol(token);
+    if (normalized === 'ETH') {
+      return `${activeChainLabel} ETH`;
+    }
+    return token;
+  };
+
+  const renderUtilityBar = () => (
+    <header className={styles.utilityBar}>
+      <div className={styles.utilityLabel}>Agent Wallet</div>
+      <div className={styles.utilityControls}>
+        <ChainHeaderControl />
+        {isOwner ? (
+          <label className={styles.utilityChainToggle}>
+            <span>{activeChainLabel} Trading</span>
+            <span className={styles.utilityChainToggleControl}>
+              <input
+                type="checkbox"
+                checked={agentChainEnabled}
+                disabled={agentChainToggleBusy}
+                onChange={(event) => {
+                  void runAgentChainToggle(event.target.checked);
+                }}
+              />
+              <span className={styles.iosSlider} />
+            </span>
+          </label>
+        ) : null}
+        <ThemeToggle className={styles.themeButton} />
+      </div>
+    </header>
+  );
+
+  const renderKpiStrip = () => (
+    <section className={styles.kpiStrip}>
+      <article className={`${styles.kpiChip} ${styles.walletCard}`}>
+        <div className={styles.kpiLabel}>Lifetime PnL</div>
+        <div className={styles.kpiValueCompact}>{formatUsd(profile?.latestMetrics?.pnl_usd ?? null)}</div>
+      </article>
+      <article className={`${styles.kpiChip} ${styles.walletCard}`}>
+        <div className={styles.kpiLabel}>24h Volume</div>
+        <div className={styles.kpiValueCompact}>{formatUsd(profile?.latestMetrics?.volume_usd ?? null)}</div>
+      </article>
+      <article className={`${styles.kpiChip} ${styles.walletCard}`}>
+        <div className={styles.kpiLabel}>Win Rate</div>
+        <div className={styles.kpiValueCompact}>{winRate}</div>
+      </article>
+      <article className={`${styles.kpiChip} ${styles.walletCard}`}>
+        <div className={styles.kpiLabel}>Fees Paid</div>
+        <div className={styles.kpiValueCompact}>—</div>
+      </article>
+    </section>
+  );
+
+  const renderWithdrawModal = () => {
+    if (!withdrawCardOpen) {
+      return null;
+    }
+    return (
+      <div className={styles.withdrawModalBackdrop} onClick={() => setWithdrawCardOpen(false)} role="presentation">
+        <article id="withdraw" className={styles.withdrawModalCard} onClick={(event) => event.stopPropagation()}>
+          <div className={styles.withdrawModalHeader}>
+            <div className={styles.withdrawModalTitle}>
+              <h2>Withdraw</h2>
+              <span className={styles.withdrawChainBadge}>{activeChainLabel}</span>
+            </div>
+            <label className={styles.withdrawHeaderAsset}>
+              <span>Asset</span>
+              <select value={withdrawAsset} onChange={(event) => setWithdrawAsset(event.target.value)}>
+                {withdrawAssetOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button type="button" className={styles.withdrawCloseButton} onClick={() => setWithdrawCardOpen(false)}>
+              Close
+            </button>
+          </div>
+          <div className={`${styles.formGrid} ${styles.withdrawModalForm}`}>
+            <label>
+              Withdraw destination
+              <input value={withdrawDestination} onChange={(event) => setWithdrawDestination(event.target.value)} />
+            </label>
+            <label>
+              Withdraw amount
+              <div className={styles.amountInputWrap}>
+                <input value={withdrawAmount} onChange={(event) => setWithdrawAmount(event.target.value)} />
+                <button
+                  type="button"
+                  className={styles.withdrawMaxButton}
+                  disabled={!withdrawMaxAmount}
+                  onClick={() => setWithdrawAmount(withdrawMaxAmount || '0')}
+                >
+                  Max
+                </button>
+              </div>
+            </label>
+          </div>
+          <div className={`${styles.toggleRow} ${styles.withdrawModalActions}`}>
+            <button
+              type="button"
+              className={styles.withdrawSubmitButton}
+              disabled={!isOwner || !withdrawDestination.trim() || !withdrawAmount.trim()}
+              onClick={() =>
+                void runManagementAction(
+                  () =>
+                    managementPost('/api/v1/management/withdraw', {
+                      agentId,
+                      chainKey: activeChainKey,
+                      asset: withdrawAsset,
+                      amount: withdrawAmount,
+                      destination: withdrawDestination
+                    }).then(() => Promise.resolve()),
+                  'Withdraw request submitted.'
+                )
+              }
+            >
+              Submit Withdraw
+            </button>
+          </div>
+        </article>
+      </div>
+    );
+  };
 
   if (bootstrapState.phase === 'bootstrapping') {
     return <main className={styles.loadingPage}>Validating management token...</main>;
@@ -954,35 +1083,13 @@ export default function AgentPublicProfilePage() {
       </aside>
 
       <section className={styles.surface}>
-        <header className={styles.utilityBar}>
-          <div className={styles.utilityLabel}>Agent Wallet</div>
-          <div className={styles.utilityControls}>
-            <ChainHeaderControl />
-            {isOwner ? (
-              <label className={styles.utilityChainToggle}>
-                <span>{activeChainLabel} Trading</span>
-                <span className={styles.utilityChainToggleControl}>
-                  <input
-                    type="checkbox"
-                    checked={agentChainEnabled}
-                    disabled={agentChainToggleBusy}
-                    onChange={(event) => {
-                      void runAgentChainToggle(event.target.checked);
-                    }}
-                  />
-                  <span className={styles.iosSlider} />
-                </span>
-              </label>
-            ) : null}
-            <ThemeToggle className={styles.themeButton} />
-          </div>
-        </header>
+        {renderUtilityBar()}
 
         {error ? <p className={styles.warningBanner}>{error}</p> : null}
         {managementNotice ? <p className={styles.successBanner}>{managementNotice}</p> : null}
         {managementError ? <p className={styles.warningBanner}>{managementError}</p> : null}
 
-        <section className={styles.walletHeaderCard}>
+        <section className={`${styles.walletHeaderCard} ${styles.walletCard}`}>
           <div className={styles.walletHeaderTop}>
             <div className={styles.walletIdentity}>
               <div className={styles.avatar}>{(profile?.agent.agent_name ?? 'A').slice(0, 1).toUpperCase()}</div>
@@ -992,15 +1099,22 @@ export default function AgentPublicProfilePage() {
                 {status && isPublicStatus(status) ? <PublicStatusBadge status={status} /> : null}
                 {!status ? <span className={styles.muted}>status unavailable</span> : null}
               </div>
-                <div className={styles.walletMeta}>
-                <span>{profile?.agent.runtime_platform ?? 'runtime unavailable'}</span>
-                <span>Chain: {activeChainLabel}</span>
-                  <span>Vault: {activeWallet ? shortenAddress(activeWallet.address) : '—'}</span>
+                <div className={styles.accountMetaChips}>
+                  <span className={styles.walletChip}>{profile?.agent.runtime_platform ?? 'runtime unavailable'}</span>
+                  <span className={styles.walletChip}>Chain: {activeChainLabel}</span>
+                  <span className={styles.walletChip}>Vault: {activeWallet ? shortenAddress(activeWallet.address) : '—'}</span>
                 </div>
-                <div className={styles.globalApprovalRow}>
-                  <span className={styles.globalApprovalLabel}>Approve all</span>
+                <div className={`${styles.globalApprovalRow} ${styles.walletToggleRow}`}>
+                  <div>
+                    <span className={styles.globalApprovalLabel}>Approve all</span>
+                    <div className={styles.globalApprovalHint}>
+                      {policyApprovalMode === 'auto'
+                        ? 'Enabled: the agent can trade freely.'
+                        : 'Disabled: trades require approval unless token is preapproved.'}
+                    </div>
+                  </div>
                   {isOwner ? (
-                    <label className={styles.iosToggle}>
+                    <label className={styles.iosToggle} title="Allow all trades without per-trade approval.">
                       <input
                         type="checkbox"
                         checked={policyApprovalMode === 'auto'}
@@ -1021,11 +1135,6 @@ export default function AgentPublicProfilePage() {
                   ) : (
                     <span className={styles.muted}>{policyApprovalMode === 'auto' ? 'Enabled' : 'Disabled'}</span>
                   )}
-                </div>
-                <div className={styles.globalApprovalHint}>
-                  {policyApprovalMode === 'auto'
-                    ? 'Enabled: the agent can trade freely.'
-                    : 'Disabled: trades require approval unless token is preapproved.'}
                 </div>
               </div>
             </div>
@@ -1070,7 +1179,7 @@ export default function AgentPublicProfilePage() {
             ) : null}
           </div>
 
-          <div className={styles.walletActions}>
+          <div className={`${styles.walletActions} ${styles.walletActionRow}`}>
             {isOwner && management.phase === 'ready' ? (
               <>
                 <button
@@ -1125,101 +1234,20 @@ export default function AgentPublicProfilePage() {
           </div>
         </section>
 
-        <section className={styles.kpiStrip}>
-          <article className={styles.kpiChip}>
-            <div className={styles.kpiLabel}>Lifetime PnL</div>
-            <div className={styles.kpiValueCompact}>{formatUsd(profile?.latestMetrics?.pnl_usd ?? null)}</div>
-          </article>
-          <article className={styles.kpiChip}>
-            <div className={styles.kpiLabel}>24h Volume</div>
-            <div className={styles.kpiValueCompact}>{formatUsd(profile?.latestMetrics?.volume_usd ?? null)}</div>
-          </article>
-          <article className={styles.kpiChip}>
-            <div className={styles.kpiLabel}>Win Rate</div>
-            <div className={styles.kpiValueCompact}>{winRate}</div>
-          </article>
-          <article className={styles.kpiChip}>
-            <div className={styles.kpiLabel}>Fees Paid</div>
-            <div className={styles.kpiValueCompact}>—</div>
-          </article>
-        </section>
+        {renderKpiStrip()}
 
-        {withdrawCardOpen ? (
-          <div className={styles.withdrawModalBackdrop} onClick={() => setWithdrawCardOpen(false)} role="presentation">
-            <article id="withdraw" className={styles.withdrawModalCard} onClick={(event) => event.stopPropagation()}>
-              <div className={styles.withdrawModalHeader}>
-                <div className={styles.withdrawModalTitle}>
-                  <h2>Withdraw</h2>
-                  <span className={styles.withdrawChainBadge}>{activeChainLabel}</span>
-                </div>
-                <label className={styles.withdrawHeaderAsset}>
-                  <span>Asset</span>
-                  <select value={withdrawAsset} onChange={(event) => setWithdrawAsset(event.target.value)}>
-                    {withdrawAssetOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <button type="button" className={styles.withdrawCloseButton} onClick={() => setWithdrawCardOpen(false)}>
-                  Close
-                </button>
-              </div>
-              <div className={`${styles.formGrid} ${styles.withdrawModalForm}`}>
-                <label>
-                  Withdraw destination
-                  <input value={withdrawDestination} onChange={(event) => setWithdrawDestination(event.target.value)} />
-                </label>
-                <label>
-                  Withdraw amount
-                  <div className={styles.amountInputWrap}>
-                    <input value={withdrawAmount} onChange={(event) => setWithdrawAmount(event.target.value)} />
-                    <button
-                      type="button"
-                      className={styles.withdrawMaxButton}
-                      disabled={!withdrawMaxAmount}
-                      onClick={() => setWithdrawAmount(withdrawMaxAmount || '0')}
-                    >
-                      Max
-                    </button>
-                  </div>
-                </label>
-              </div>
-              <div className={`${styles.toggleRow} ${styles.withdrawModalActions}`}>
-                <button
-                  type="button"
-                  className={styles.withdrawSubmitButton}
-                  disabled={!isOwner || !withdrawDestination.trim() || !withdrawAmount.trim()}
-                  onClick={() =>
-                    void runManagementAction(
-                      () =>
-                        managementPost('/api/v1/management/withdraw', {
-                          agentId,
-                          chainKey: activeChainKey,
-                          asset: withdrawAsset,
-                          amount: withdrawAmount,
-                          destination: withdrawDestination
-                        }).then(() => Promise.resolve()),
-                      'Withdraw request submitted.'
-                    )
-                  }
-                >
-                  Submit Withdraw
-                </button>
-              </div>
-            </article>
-          </div>
-        ) : null}
+        {renderWithdrawModal()}
 
         <div className={styles.contentGrid}>
           <div className={styles.mainColumn}>
-            <article className={styles.card}>
-            <div className={styles.cardHeader}>
+            <article className={`${styles.card} ${styles.walletCard}`}>
+            <div className={`${styles.cardHeader} ${styles.walletCardHeader}`}>
               <h2>Wallet</h2>
+              <span className={styles.muted}>{selectedTokenSummary}</span>
             </div>
             {!isOwner ? <p className={styles.muted}>Viewer mode: approval controls are read-only.</p> : null}
             {holdings.length === 0 ? <p className={styles.muted}>No balances detected for this chain.</p> : null}
+            <p className={styles.muted}>Click a token to filter Activity and Approval History. Hold Ctrl/Cmd for multi-select.</p>
             {holdings.map((holding) => (
               <div
                 key={holding.token}
@@ -1247,12 +1275,15 @@ export default function AgentPublicProfilePage() {
                 title="Click to filter by token. Hold Ctrl/Cmd for multi-select."
               >
                 <div>
-                  <div className={styles.listTitle}>{holding.token}</div>
+                  <div className={styles.walletTokenTitleRow}>
+                    <div className={styles.listTitle}>{displayWalletTokenLabel(holding.token)}</div>
+                    {isTokenPreapproved(holding.token) ? <span className={styles.approvedChip}>Approved</span> : null}
+                  </div>
                 </div>
                 <div className={styles.listMeta}>
                   <span>{formatUnitsTruncated(holding.amountRaw, holding.decimals, 6)}</span>
                   <div className={styles.tokenApprovalControl} onClick={(event) => event.stopPropagation()}>
-                    <label className={styles.iosToggle}>
+                    <label className={styles.iosToggle} title="Allow this token without per-trade approval.">
                       <input
                         type="checkbox"
                         checked={isTokenPreapproved(holding.token)}
@@ -1268,15 +1299,14 @@ export default function AgentPublicProfilePage() {
                       />
                       <span className={styles.iosSlider} />
                     </label>
-                    <span className={styles.muted}>{isTokenPreapproved(holding.token) ? 'Approved' : 'Not approved'}</span>
                   </div>
                 </div>
               </div>
             ))}
           </article>
 
-            <article className={styles.card}>
-            <div className={styles.cardHeader}>
+            <article className={`${styles.card} ${styles.walletCard}`}>
+            <div className={`${styles.cardHeader} ${styles.walletCardHeader}`}>
               <h2>Wallet Activity</h2>
               <span className={styles.muted}>All wallet-impact events</span>
             </div>
@@ -1316,8 +1346,8 @@ export default function AgentPublicProfilePage() {
             </div>
           </article>
 
-            <article id="approval-history" className={styles.card}>
-            <div className={styles.cardHeader}>
+            <article id="approval-history" className={`${styles.card} ${styles.walletCard}`}>
+            <div className={`${styles.cardHeader} ${styles.walletCardHeader}`}>
               <h2>Approval History</h2>
               <span className={styles.muted}>Trade, policy, and transfer approvals</span>
             </div>
@@ -1501,8 +1531,8 @@ export default function AgentPublicProfilePage() {
             ))}
           </article>
 
-            <article className={styles.card}>
-              <div className={styles.cardHeader}>
+            <article className={`${styles.card} ${styles.walletCard}`}>
+              <div className={`${styles.cardHeader} ${styles.walletCardHeader}`}>
                 <h3>Management Audit Log</h3>
                 <span>{management.phase === 'ready' ? management.data.auditLog.length : '—'}</span>
               </div>
@@ -1523,8 +1553,8 @@ export default function AgentPublicProfilePage() {
           </div>
 
           <aside className={styles.sideColumn}>
-            <article className={styles.card}>
-            <div className={styles.cardHeader}>
+            <article className={`${styles.card} ${styles.walletCard}`}>
+            <div className={`${styles.cardHeader} ${styles.walletCardHeader}`}>
               <h3>Copy Trading</h3>
               <span>{isOwner ? `${copySubscriptions.length} relationships` : 'viewer'}</span>
             </div>
@@ -1575,8 +1605,8 @@ export default function AgentPublicProfilePage() {
             ) : null}
           </article>
 
-            <article className={styles.card}>
-            <div className={styles.cardHeader}>
+            <article className={`${styles.card} ${styles.walletCard}`}>
+            <div className={`${styles.cardHeader} ${styles.walletCardHeader}`}>
               <h3>Limit Orders</h3>
               <span>{isOwner ? `${limitOrders.length} loaded` : 'viewer'}</span>
             </div>

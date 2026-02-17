@@ -2398,8 +2398,8 @@ Note:
   - [x] unified wallet activity timeline (trades/transfers/deposits/approvals)
   - [x] integrated approval history/actions in wallet context
   - [x] secondary modules (copy/risk/ops/audit) demoted below primary wallet stack
-- [x] Finalize `/agents/:id` as MetaMask-style full-screen wallet shell:
-  - [x] remove dashboard sidebar shell framing from this route
+- [x] Finalize `/agents/:id` as sidebar-preserved wallet-native shell:
+  - [x] keep dashboard sidebar shell framing on this route
   - [x] keep compact KPI chips under wallet header
   - [x] remove `Secondary Operations` and transfer/outbound policy editor controls
   - [x] keep copy relationships as list/delete only with create flow directed to `/explore`
@@ -2550,7 +2550,7 @@ Note:
 
 ### 77.1 Canonical/doc sync
 - [x] Add Slice 77 goal/DoD + issue mapping to `docs/XCLAW_SLICE_TRACKER.md`.
-- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` Slice 73 contract for MetaMask-style full-screen wallet shell.
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` Slice 73 contract for sidebar-preserved wallet-native shell.
 - [x] Update handoff/process artifacts:
   - [x] `docs/CONTEXT_PACK.md`
   - [x] `spec.md`
@@ -2558,7 +2558,7 @@ Note:
   - [x] `acceptance.md`
 
 ### 77.2 Implementation
-- [x] Refactor `/agents/:id` from dashboard shell framing to full-screen wallet shell.
+- [x] Refactor `/agents/:id` into wallet-native composition while preserving dashboard sidebar framing.
 - [x] Keep chain selector + theme toggle in compact utility bar.
 - [x] Keep compact KPI chip row below wallet header.
 - [x] Recompose wallet-first stack:

@@ -1,6 +1,6 @@
-# Slice 77 Tasks: Agent Wallet Page MetaMask-Style Full-Screen Refactor (`/agents/:id`)
+# Slice 77 Tasks: Agent Wallet Page iPhone/MetaMask-Style Refactor (`/agents/:id`)
 
-Active slice: `Slice 77: Agent Wallet Page MetaMask-Style Full-Screen Refactor`
+Active slice: `Slice 77: Agent Wallet Page iPhone/MetaMask-Style Refactor`
 Issue mapping: `#29` (to be created / mapped)
 
 ## Checklist
@@ -12,7 +12,7 @@ Issue mapping: `#29` (to be created / mapped)
   - [x] `spec.md`
   - [x] `tasks.md`
   - [x] `acceptance.md`
-- [x] Refactor `/agents/:id` shell from dashboard-framed to MetaMask-style full-screen wallet layout.
+- [x] Refactor `/agents/:id` to wallet-native composition while preserving dashboard sidebar shell.
 - [x] Keep chain selector + theme toggle in compact utility bar.
 - [x] Recompose module order to wallet-first stack.
 - [x] Remove `Secondary Operations`.
@@ -21,7 +21,7 @@ Issue mapping: `#29` (to be created / mapped)
 - [x] Keep withdraw destination/asset/amount/max/submit flow.
 - [x] Keep copy relationships list/delete only with create guidance to `/explore`.
 - [x] Keep limit-order review/cancel and audit log visibility.
-- [x] Rewrite route CSS for new full-screen wallet layout with light/dark responsiveness.
+- [x] Rewrite route CSS for wallet-native card grammar with light/dark responsiveness.
 - [ ] Run required gates:
   - [x] `npm run db:parity`
   - [x] `npm run seed:reset`

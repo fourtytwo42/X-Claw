@@ -2821,8 +2821,9 @@ Limitations / notes:
 - No backend/API/schema/migration contract changes are allowed in this slice.
 
 2. UX/layout contract:
-- `/agents/:id` uses a MetaMask-style full-screen wallet shell (no dashboard sidebar shell) with:
-  - compact utility bar containing chain selector and global theme toggle,
+- `/agents/:id` uses a sidebar-preserved wallet-native shell with:
+  - left sidebar navigation (`Dashboard`, `Explore`, `Approvals Center`, `Settings & Security`),
+  - compact utility bar containing chain selector, per-agent chain trading toggle, and global theme toggle,
   - wallet header/identity controls with copyable wallet address and owner quick actions,
   - compact KPI chip row (wallet context preserved, analytics de-emphasized),
   - single continuous wallet workspace (no tab-primary navigation):
