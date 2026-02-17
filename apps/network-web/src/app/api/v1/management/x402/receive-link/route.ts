@@ -1,4 +1,5 @@
 import type { NextRequest } from 'next/server';
+import crypto from 'node:crypto';
 
 import { getChainConfig } from '@/lib/chains';
 import { dbQuery } from '@/lib/db';
@@ -186,7 +187,6 @@ export async function GET(req: NextRequest) {
       where agent_id = $1
         and direction = 'inbound'
         and network_key = $2
-        and link_token is null
         and status in ('proposed', 'executing')
       order by created_at desc
       limit 1
@@ -196,14 +196,15 @@ export async function GET(req: NextRequest) {
 
     const origin = buildOrigin(req);
     let paymentId: string;
+    let linkToken: string;
     let paymentUrl: string;
     let status: string;
     let resourceDescription: string | null = null;
-    const staticPath = `/api/v1/x402/pay/${encodeURIComponent(agentId)}`;
-    paymentUrl = `${origin}${staticPath}`;
 
-    if ((active.rowCount ?? 0) > 0 && active.rows[0].payment_url) {
+    if ((active.rowCount ?? 0) > 0) {
       paymentId = active.rows[0].payment_id;
+      linkToken = String(active.rows[0].link_token ?? '').trim() || crypto.randomBytes(10).toString('hex');
+      paymentUrl = `${origin}/api/v1/x402/pay/${encodeURIComponent(agentId)}/${encodeURIComponent(linkToken)}`;
       status = active.rows[0].status;
       resourceDescription = active.rows[0].resource_description;
       await dbQuery(
@@ -216,12 +217,13 @@ export async function GET(req: NextRequest) {
           asset_symbol = $4,
           amount_atomic = $5::numeric,
           payment_url = $6,
+          link_token = $7,
           reason_code = null,
           reason_message = null,
           expires_at = null,
-          updated_at = $7::timestamptz,
+          updated_at = $8::timestamptz,
           terminal_at = null
-        where payment_id = $8
+        where payment_id = $9
         `,
         [
           facilitatorKey,
@@ -230,12 +232,15 @@ export async function GET(req: NextRequest) {
           resolvedAsset.assetSymbol,
           amountAtomic,
           paymentUrl,
+          linkToken,
           isoNow(),
           paymentId
         ]
       );
     } else {
       paymentId = makeId('xpm');
+      linkToken = crypto.randomBytes(10).toString('hex');
+      paymentUrl = `${origin}/api/v1/x402/pay/${encodeURIComponent(agentId)}/${encodeURIComponent(linkToken)}`;
       status = 'proposed';
       await dbQuery(
         `
@@ -257,7 +262,7 @@ export async function GET(req: NextRequest) {
           updated_at,
           terminal_at
         ) values (
-          $1, $2, 'inbound', 'proposed', $3, $4, $5, $6, $7, $8::numeric, $9, null, null, $10::timestamptz, $11::timestamptz, null
+          $1, $2, 'inbound', 'proposed', $3, $4, $5, $6, $7, $8::numeric, $9, $10, null, $11::timestamptz, $12::timestamptz, null
         )
         `,
         [
@@ -270,6 +275,7 @@ export async function GET(req: NextRequest) {
           resolvedAsset.assetSymbol,
           amountAtomic,
           paymentUrl,
+          linkToken,
           isoNow(),
           isoNow()
         ]

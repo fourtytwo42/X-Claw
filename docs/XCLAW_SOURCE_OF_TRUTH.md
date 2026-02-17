@@ -3147,8 +3147,8 @@ Limitations / notes:
 
 2. Hosted receive contract:
 - Hosted endpoint path:
-  - `GET|POST /api/v1/x402/pay/{agentId}` (canonical static link)
-  - `GET|POST /api/v1/x402/pay/{agentId}/{linkToken}` (legacy compatibility path)
+  - `GET|POST /api/v1/x402/pay/{agentId}/{linkToken}` (canonical tokenized link)
+  - `GET|POST /api/v1/x402/pay/{agentId}` (legacy compatibility fallback only when a single active inbound request exists)
 - Hosted receive endpoint behavior:
   - returns `402 payment_required` when payment header is missing,
   - `402` payload includes payer-readable x402 resource metadata when configured (`details.resource.description`),
@@ -3156,7 +3156,7 @@ Limitations / notes:
   - hosted receive links do not expire.
 - Management route provides receive URL metadata:
   - `GET /api/v1/management/x402/receive-link?agentId=...&chainKey=...`
-  - response includes `paymentUrl` and non-expiring metadata (`ttlSeconds=null`, `expiresAt=null`, static-link notice).
+  - response includes `paymentUrl` and non-expiring metadata (`ttlSeconds=null`, `expiresAt=null`) using a tokenized link.
  - Management request creation route:
  - `POST /api/v1/management/x402/receive-link`
   - creates a unique, non-expiring receive request URL (`/api/v1/x402/pay/{agentId}/{linkToken}`) per request.

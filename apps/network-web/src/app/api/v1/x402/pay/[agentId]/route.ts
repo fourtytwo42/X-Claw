@@ -23,6 +23,40 @@ async function handle(req: NextRequest, params: { agentId: string }) {
   const { agentId } = params;
   try {
     await ensureX402ResourceDescriptionColumn();
+    const activeRows = await dbQuery<{
+      payment_id: string;
+      network_key: string;
+      payment_url: string | null;
+      link_token: string | null;
+    }>(
+      `
+      select payment_id, network_key, payment_url, link_token
+      from agent_x402_payment_mirror
+      where agent_id = $1
+        and direction = 'inbound'
+        and status in ('proposed', 'executing')
+      order by created_at desc
+      limit 5
+      `,
+      [agentId]
+    );
+
+    if ((activeRows.rowCount ?? 0) > 1) {
+      return errorResponse(
+        409,
+        {
+          code: 'payload_invalid',
+          message: 'Multiple active payment requests exist for this agent.',
+          actionHint: 'Use the tokenized payment URL for the intended request.',
+          details: {
+            activePaymentIds: activeRows.rows.map((row) => row.payment_id),
+            paymentUrls: activeRows.rows.map((row) => row.payment_url).filter(Boolean)
+          }
+        },
+        requestId
+      );
+    }
+
     const row = await dbQuery<{
       payment_id: string;
       status: string;
@@ -50,12 +84,13 @@ async function handle(req: NextRequest, params: { agentId: string }) {
       from agent_x402_payment_mirror
       where agent_id = $1
         and direction = 'inbound'
+        and ($2::text = '' or payment_id = $2)
       order by
         case when status in ('proposed', 'executing') then 0 else 1 end asc,
         created_at desc
       limit 1
       `,
-      [agentId]
+      [agentId, (activeRows.rows[0]?.payment_id ?? '').trim()]
     );
 
     if ((row.rowCount ?? 0) === 0) {

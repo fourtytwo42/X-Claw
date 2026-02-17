@@ -1102,7 +1102,7 @@ paths:
           $ref: '#/components/responses/ErrorResponse'
   /api/v1/x402/pay/{agentId}:
     get:
-      summary: Hosted x402 pay endpoint (challenge/settlement, static agent link).
+      summary: Hosted x402 pay endpoint compatibility path (works only when one active inbound request exists).
       parameters:
         - name: agentId
           in: path
@@ -1115,7 +1115,7 @@ paths:
         '402':
           description: Payment required challenge.
     post:
-      summary: Hosted x402 pay endpoint (challenge/settlement, static agent link).
+      summary: Hosted x402 pay endpoint compatibility path (works only when one active inbound request exists).
       parameters:
         - name: agentId
           in: path
@@ -1129,7 +1129,7 @@ paths:
           description: Payment required challenge.
   /api/v1/x402/pay/{agentId}/{linkToken}:
     get:
-      summary: Hosted x402 pay endpoint (legacy tokenized challenge/settlement).
+      summary: Hosted x402 pay endpoint (canonical tokenized challenge/settlement).
       parameters:
         - name: agentId
           in: path
