@@ -103,6 +103,10 @@ type ProfileModalState = {
 const FAVORITES_KEY = 'xclaw_explore_favorite_agent_ids';
 const STRATEGY_OPTIONS = ['momentum', 'mean_reversion', 'trend_following', 'arb', 'market_making'];
 const VENUE_OPTIONS = ['base', 'aerodrome', 'uniswap', 'sushiswap', 'kite_ai'];
+const LABEL_OVERRIDES: Record<string, string> = {
+  arb: 'Arbitrage',
+  kite_ai: 'Kite AI'
+};
 
 function getCsrfToken(): string | null {
   if (typeof document === 'undefined') {
@@ -154,6 +158,19 @@ function splitCsv(value: string): string[] {
     out.add(normalized);
   }
   return [...out];
+}
+
+function humanizeKeyLabel(value: string): string {
+  const normalized = value.trim().toLowerCase();
+  const override = LABEL_OVERRIDES[normalized];
+  if (override) {
+    return override;
+  }
+  return normalized
+    .split('_')
+    .filter((part) => part.length > 0)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
 }
 
 async function postJson(path: string, payload: Record<string, unknown>) {
@@ -661,7 +678,7 @@ export default function ExplorePage() {
         riskTier: profileModal.riskTier,
         descriptionShort: profileModal.descriptionShort.trim() || null
       });
-      setNotice(`Explore profile saved for ${profileModal.agentId}.`);
+      setNotice('Explore profile saved.');
       setProfileModal((current) => ({ ...current, open: false }));
       setPage(1);
     } catch (saveError) {
@@ -703,7 +720,6 @@ export default function ExplorePage() {
               </button>
               {item.verified ? <span className={styles.chip}>Verified</span> : null}
             </div>
-            <p className={styles.subMeta}>{item.agentId}</p>
           </div>
           <div className={styles.statusWrap}>
             <PublicStatusBadge status={(item.publicStatus as PublicStatus) || 'offline'} />
@@ -733,12 +749,12 @@ export default function ExplorePage() {
           <span className={styles.chip}>{badgeLabel(item)}</span>
           <span className={styles.chip}>Active Copiers: {formatNumber(item.followerMeta.copyEnabledFollowers)}</span>
           <span className={styles.chip}>Follower Rank: {item.followerMeta.followerRankPercentile ?? '0'}</span>
-          {item.exploreProfile.riskTier ? <span className={styles.chip}>Risk: {item.exploreProfile.riskTier}</span> : null}
+          {item.exploreProfile.riskTier ? <span className={styles.chip}>Risk: {humanizeKeyLabel(item.exploreProfile.riskTier)}</span> : null}
           {item.exploreProfile.strategyTags.map((tag) => (
-            <span key={`${item.agentId}-st-${tag}`} className={styles.chip}>#{tag}</span>
+            <span key={`${item.agentId}-st-${tag}`} className={styles.chip}>{humanizeKeyLabel(tag)}</span>
           ))}
           {item.exploreProfile.venueTags.map((tag) => (
-            <span key={`${item.agentId}-vn-${tag}`} className={styles.chip}>@{tag}</span>
+            <span key={`${item.agentId}-vn-${tag}`} className={styles.chip}>{humanizeKeyLabel(tag)}</span>
           ))}
         </div>
 
@@ -916,7 +932,7 @@ export default function ExplorePage() {
               onClick={() => toggleTag(strategy, setStrategy, value)}
               className={strategy.includes(value) ? styles.windowActive : styles.windowBtn}
             >
-              {value}
+              {humanizeKeyLabel(value)}
             </button>
           ))}
         </section>
@@ -930,7 +946,7 @@ export default function ExplorePage() {
               onClick={() => toggleTag(venue, setVenue, value)}
               className={venue.includes(value) ? styles.windowActive : styles.windowBtn}
             >
-              {value}
+              {humanizeKeyLabel(value)}
             </button>
           ))}
         </section>
@@ -1079,7 +1095,7 @@ export default function ExplorePage() {
         <div className={styles.modalOverlay} role="dialog" aria-modal="true" aria-label="Explore profile configuration">
           <div className={styles.modalCard}>
             <h3>Edit Explore Profile</h3>
-            <p className={styles.muted}>Agent: {profileModal.agentId}</p>
+            <p className={styles.muted}>Edit how this agent appears on Explore.</p>
 
             <label>
               Strategy tags (comma-separated)
@@ -1100,10 +1116,10 @@ export default function ExplorePage() {
                 value={profileModal.riskTier}
                 onChange={(event) => setProfileModal((current) => ({ ...current, riskTier: event.target.value as ExploreRiskTier }))}
               >
-                <option value="low">low</option>
-                <option value="medium">medium</option>
-                <option value="high">high</option>
-                <option value="very_high">very_high</option>
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="very_high">Very High</option>
               </select>
             </label>
 
