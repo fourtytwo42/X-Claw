@@ -70,6 +70,7 @@ export function ActiveAgentSidebarLink({ itemClassName, activeClassName }: Activ
     }
     return agentName || agentId;
   }, [agentId, agentName]);
+  const avatarPalette = useMemo(() => getAgentAvatarPalette(agentId || 'unassigned-agent'), [agentId]);
 
   if (!agentId) {
     return null;
@@ -78,7 +79,6 @@ export function ActiveAgentSidebarLink({ itemClassName, activeClassName }: Activ
   const isActive = pathname === `/agents/${agentId}`;
   const className = isActive && activeClassName ? `${itemClassName} ${activeClassName}` : itemClassName;
   const initial = getAgentInitial(agentName, agentId);
-  const avatarPalette = useMemo(() => getAgentAvatarPalette(agentId), [agentId]);
 
   return (
     <Link href={`/agents/${encodeURIComponent(agentId)}`} className={className} aria-label={title} title={title}>
