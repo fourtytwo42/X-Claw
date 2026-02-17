@@ -25,6 +25,22 @@ function normalizeChainKey(raw: string | null): string {
   return trimmed || 'base_sepolia';
 }
 
+function isMissingTrackedSchema(error: unknown): boolean {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+  const code = 'code' in error ? String((error as { code?: unknown }).code ?? '') : '';
+  if (code === '42P01' || code === '42703') {
+    return true;
+  }
+  const message = 'message' in error ? String((error as { message?: unknown }).message ?? '') : '';
+  return (
+    message.includes('agent_tracked_agents') ||
+    message.includes('last_activity_at') ||
+    message.includes('last_heartbeat_at')
+  );
+}
+
 async function readTrackedAgents(agentId: string, chainKey: string) {
   const result = await dbQuery<{
     tracking_id: string;
@@ -48,8 +64,8 @@ async function readTrackedAgents(agentId: string, chainKey: string) {
       a.agent_name,
       a.public_status::text,
       aw.address as wallet_address,
-      a.last_activity_at::text,
-      a.last_heartbeat_at::text,
+      null::text as last_activity_at,
+      null::text as last_heartbeat_at,
       ps.pnl_usd::text as metrics_pnl_usd,
       ps.return_pct::text as metrics_return_pct,
       ps.volume_usd::text as metrics_volume_usd,
@@ -136,9 +152,18 @@ export async function GET(req: NextRequest) {
     }
 
     const chainKey = normalizeChainKey(req.nextUrl.searchParams.get('chainKey'));
-    const items = await readTrackedAgents(agentId, chainKey);
+    const items = await readTrackedAgents(agentId, chainKey).catch((error) => {
+      if (isMissingTrackedSchema(error)) {
+        return [];
+      }
+      throw error;
+    });
     return successResponse({ ok: true, agentId, chainKey, items }, 200, requestId);
-  } catch {
+  } catch (error) {
+    console.error('[management/tracked-agents] unhandled error', {
+      requestId,
+      error: error instanceof Error ? error.message : String(error)
+    });
     return internalErrorResponse(requestId);
   }
 }
@@ -214,7 +239,11 @@ export async function POST(req: NextRequest) {
     );
 
     return successResponse({ ok: true, agentId: body.agentId, trackedAgentId: body.trackedAgentId }, 200, requestId);
-  } catch {
+  } catch (error) {
+    console.error('[management/tracked-agents] create failed', {
+      requestId,
+      error: error instanceof Error ? error.message : String(error)
+    });
     return internalErrorResponse(requestId);
   }
 }
@@ -256,7 +285,11 @@ export async function DELETE(req: NextRequest) {
     );
 
     return successResponse({ ok: true, agentId: body.agentId, trackedAgentId: body.trackedAgentId, removed: (removed.rowCount ?? 0) > 0 }, 200, requestId);
-  } catch {
+  } catch (error) {
+    console.error('[management/tracked-agents] delete failed', {
+      requestId,
+      error: error instanceof Error ? error.message : String(error)
+    });
     return internalErrorResponse(requestId);
   }
 }

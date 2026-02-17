@@ -231,17 +231,6 @@ export async function bootstrapManagementSession(input: BootstrapInput): Promise
       };
     }
 
-    await client.query(
-      `
-      update management_tokens
-      set status = 'rotated',
-          rotated_at = now(),
-          updated_at = now()
-      where token_id = $1
-      `,
-      [row.token_id]
-    );
-
     const sessionCountResult = await client.query<{ total: string }>(
       'select count(*)::text as total from management_sessions where agent_id = $1',
       [input.agentId]

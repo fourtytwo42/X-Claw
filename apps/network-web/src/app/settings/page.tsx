@@ -36,6 +36,7 @@ type PreferencesState = {
 
 const PREFERENCES_STORAGE_KEY = 'xclaw_settings_security_preferences_v1';
 const MANAGED_AGENT_IDS_KEY = 'xclaw_managed_agent_ids';
+const MANAGED_AGENT_TOKENS_KEY = 'xclaw_managed_agent_tokens';
 
 const DEFAULT_PREFERENCES: PreferencesState = {
   approvalPosture: 'per_trade',
@@ -86,6 +87,39 @@ function storeManagedAgentIds(agentIds: string[]) {
     return;
   }
   window.localStorage.setItem(MANAGED_AGENT_IDS_KEY, JSON.stringify(Array.from(new Set(agentIds))));
+}
+
+function parseStoredManagedAgentTokens(): Record<string, string> {
+  if (typeof window === 'undefined') {
+    return {};
+  }
+  try {
+    const raw = window.localStorage.getItem(MANAGED_AGENT_TOKENS_KEY);
+    if (!raw) {
+      return {};
+    }
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return {};
+    }
+    const out: Record<string, string> = {};
+    for (const [agentId, token] of Object.entries(parsed)) {
+      if (typeof agentId !== 'string' || !agentId.trim() || typeof token !== 'string' || !token.trim()) {
+        continue;
+      }
+      out[agentId.trim()] = token.trim();
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+function storeManagedAgentTokens(tokens: Record<string, string>) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  window.localStorage.setItem(MANAGED_AGENT_TOKENS_KEY, JSON.stringify(tokens));
 }
 
 function loadPreferences(): PreferencesState {
@@ -358,6 +392,9 @@ export default function SettingsPage() {
       rememberManagedAgent(parsed.agentId);
       const nextAgents = Array.from(new Set([...parseStoredManagedAgentIds(), parsed.agentId]));
       storeManagedAgentIds(nextAgents);
+      const tokens = parseStoredManagedAgentTokens();
+      tokens[parsed.agentId] = parsed.token;
+      storeManagedAgentTokens(tokens);
       setOwnerContext({ phase: 'ready', activeAgentId: parsed.agentId, managedAgents: nextAgents });
       setLinkInput('');
       setNotice('Access added on this device.');
@@ -375,6 +412,7 @@ export default function SettingsPage() {
     try {
       await postJson('/api/v1/management/logout', {});
       storeManagedAgentIds([]);
+      storeManagedAgentTokens({});
       setOwnerContext({ phase: 'none' });
       setNotice('Local access cleared on this device. On-chain approvals are unchanged.');
     } catch (requestError) {
@@ -404,6 +442,9 @@ export default function SettingsPage() {
     try {
       const nextStoredAgents = parseStoredManagedAgentIds().filter((id) => id !== agentId);
       storeManagedAgentIds(nextStoredAgents);
+      const tokens = parseStoredManagedAgentTokens();
+      delete tokens[agentId];
+      storeManagedAgentTokens(tokens);
       setManagedAgentNames((current) => {
         const copy = { ...current };
         delete copy[agentId];

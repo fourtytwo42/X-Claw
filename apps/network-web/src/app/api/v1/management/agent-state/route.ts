@@ -90,6 +90,22 @@ function isMissingTransferMirrorSchema(error: unknown): boolean {
   );
 }
 
+function isMissingTrackedSchema(error: unknown): boolean {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+  const code = 'code' in error ? String((error as { code?: unknown }).code ?? '') : '';
+  if (code === '42P01' || code === '42703') {
+    return true;
+  }
+  const message = 'message' in error ? String((error as { message?: unknown }).message ?? '') : '';
+  return (
+    message.includes('agent_tracked_agents') ||
+    message.includes('last_activity_at') ||
+    message.includes('last_heartbeat_at')
+  );
+}
+
 export async function GET(req: NextRequest) {
   const requestId = getRequestId(req);
 
@@ -118,7 +134,11 @@ export async function GET(req: NextRequest) {
         {
           code: 'auth_invalid',
           message: 'Management session is not authorized for this agent.',
-          actionHint: 'Use the matching agent session for this route.'
+          actionHint: 'Use the matching agent session for this route.',
+          details: {
+            requestedAgentId: agentId,
+            sessionAgentId: auth.session.agentId
+          }
         },
         requestId
       );
@@ -297,7 +317,12 @@ export async function GET(req: NextRequest) {
         limit 1
         `,
         [agentId, chainKey]
-      ),
+      ).catch((error) => {
+        if (isMissingTrackedSchema(error)) {
+          return { rowCount: 0, rows: [] };
+        }
+        throw error;
+      }),
       dbQuery<{
         utc_day: string;
         daily_spend_usd: string;
@@ -475,8 +500,8 @@ export async function GET(req: NextRequest) {
           a.agent_name,
           a.public_status::text,
           aw.address as wallet_address,
-          a.last_activity_at::text,
-          a.last_heartbeat_at::text,
+          null::text as last_activity_at,
+          null::text as last_heartbeat_at,
           ps.pnl_usd::text as metrics_pnl_usd,
           ps.return_pct::text as metrics_return_pct,
           ps.volume_usd::text as metrics_volume_usd,
@@ -508,7 +533,12 @@ export async function GET(req: NextRequest) {
         limit 100
         `,
         [agentId, chainKey]
-      ),
+      ).catch((error) => {
+        if (isMissingTrackedSchema(error)) {
+          return { rowCount: 0, rows: [] };
+        }
+        throw error;
+      }),
       dbQuery<{
         trade_id: string;
         tracked_agent_id: string;
@@ -551,7 +581,12 @@ export async function GET(req: NextRequest) {
         limit 20
         `,
         [agentId, chainKey]
-      )
+      ).catch((error) => {
+        if (isMissingTrackedSchema(error)) {
+          return { rowCount: 0, rows: [] };
+        }
+        throw error;
+      })
     ]);
 
     if (agent.rowCount === 0) {

@@ -12,6 +12,22 @@ function normalizeChainKey(raw: string | null): string {
   return trimmed || 'base_sepolia';
 }
 
+function isMissingTrackedSchema(error: unknown): boolean {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+  const code = 'code' in error ? String((error as { code?: unknown }).code ?? '') : '';
+  if (code === '42P01' || code === '42703') {
+    return true;
+  }
+  const message = 'message' in error ? String((error as { message?: unknown }).message ?? '') : '';
+  return (
+    message.includes('agent_tracked_agents') ||
+    message.includes('last_activity_at') ||
+    message.includes('last_heartbeat_at')
+  );
+}
+
 export async function GET(req: NextRequest) {
   const requestId = getRequestId(req);
   try {
@@ -43,8 +59,8 @@ export async function GET(req: NextRequest) {
         a.agent_name,
         a.public_status::text,
         aw.address as wallet_address,
-        a.last_activity_at::text,
-        a.last_heartbeat_at::text,
+        null::text as last_activity_at,
+        null::text as last_heartbeat_at,
         ps.pnl_usd::text as metrics_pnl_usd,
         ps.return_pct::text as metrics_return_pct,
         ps.volume_usd::text as metrics_volume_usd,
@@ -75,7 +91,12 @@ export async function GET(req: NextRequest) {
       order by ata.created_at desc
       `,
       [auth.agentId, chainKey]
-    );
+    ).catch((error) => {
+      if (isMissingTrackedSchema(error)) {
+        return { rows: [], rowCount: 0 };
+      }
+      throw error;
+    });
 
     return successResponse(
       {
@@ -109,7 +130,11 @@ export async function GET(req: NextRequest) {
       200,
       requestId
     );
-  } catch {
+  } catch (error) {
+    console.error('[agent/tracked-agents] unhandled error', {
+      requestId,
+      error: error instanceof Error ? error.message : String(error)
+    });
     return internalErrorResponse(requestId);
   }
 }

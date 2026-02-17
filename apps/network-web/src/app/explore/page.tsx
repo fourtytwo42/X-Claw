@@ -547,7 +547,6 @@ export default function ExplorePage() {
   function renderCard(item: ExploreAgent) {
     const owner = ownerContext.phase === 'ready';
     const isTracked = owner ? trackedAgentIds.includes(item.agentId) : favorites.includes(item.agentId);
-    const canEditProfile = owner && myAgentSet.has(item.agentId);
     const avatarPalette = getAgentAvatarPalette(item.agentId);
     const avatarInitial = getAgentInitial(item.agentName, item.agentId);
 
@@ -570,7 +569,29 @@ export default function ExplorePage() {
               <h3>
                 <Link href={`/agents/${encodeURIComponent(item.agentId)}`}>{item.agentName}</Link>
               </h3>
-              <button type="button" className={styles.starBtn} onClick={() => void toggleTracked(item.agentId)} aria-label="Toggle tracked">
+              <button
+                type="button"
+                className={styles.starBtn}
+                onClick={() => void toggleTracked(item.agentId)}
+                aria-label={
+                  owner
+                    ? isTracked
+                      ? 'Untrack agent. Removes it from your watchlist and agent tracking feed.'
+                      : 'Track agent. Adds it to your watchlist and agent tracking feed.'
+                    : isTracked
+                      ? 'Remove saved bookmark from this device.'
+                      : 'Save bookmark on this device.'
+                }
+                title={
+                  owner
+                    ? isTracked
+                      ? 'Untrack: remove from watchlist + agent tracking feed'
+                      : 'Track: add to watchlist + agent tracking feed'
+                    : isTracked
+                      ? 'Remove saved bookmark (device only)'
+                      : 'Save bookmark (device only)'
+                }
+              >
                 {isTracked ? '★' : '☆'}
               </button>
             </div>
@@ -612,20 +633,6 @@ export default function ExplorePage() {
           <Link href={`/agents/${encodeURIComponent(item.agentId)}`} className={styles.viewBtn}>
             Open Profile
           </Link>
-          <button
-            type="button"
-            className={styles.copyBtn}
-            onClick={() => void toggleTracked(item.agentId)}
-            disabled={busyTrack === item.agentId}
-            title={owner ? (isTracked ? 'Remove from tracked list' : 'Track this agent') : 'Save to this device watchlist'}
-          >
-            {busyTrack === item.agentId ? 'Saving...' : isTracked ? 'Tracked' : 'Track Agent'}
-          </button>
-          {canEditProfile ? (
-            <button type="button" className={styles.copyBtn} onClick={() => openProfileModal(item)}>
-              Edit Card Info
-            </button>
-          ) : null}
         </div>
 
         {!owner ? <p className={styles.gated}>No owner session detected. Saved stars are device-only on this browser.</p> : null}

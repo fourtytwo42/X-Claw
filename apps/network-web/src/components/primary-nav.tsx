@@ -196,6 +196,12 @@ export function PrimaryNav({ className, desktopExtra, mobileMoreContent }: Prima
   }, [pathname]);
 
   const mobileAgentActive = useMemo(() => /^\/agents\/[A-Za-z0-9_-]+$/.test(pathname), [pathname]);
+  const visibleBookmarkedAgentIds = useMemo(() => {
+    if (!activeManagedAgentId) {
+      return bookmarkedAgentIds;
+    }
+    return bookmarkedAgentIds.filter((agentId) => agentId !== activeManagedAgentId);
+  }, [activeManagedAgentId, bookmarkedAgentIds]);
 
   function removeBookmarkedAgent(agentId: string) {
     if (typeof window === 'undefined') {
@@ -263,7 +269,7 @@ export function PrimaryNav({ className, desktopExtra, mobileMoreContent }: Prima
           </div>
 
           <div className={styles.agentLinksScroller} aria-label="Saved agents">
-            {bookmarkedAgentIds.map((agentId) => {
+            {visibleBookmarkedAgentIds.map((agentId) => {
               const active = pathname === `/agents/${agentId}`;
               const name = bookmarkedAgentNames[agentId] || 'Saved Agent';
               const palette = getAgentAvatarPalette(agentId);

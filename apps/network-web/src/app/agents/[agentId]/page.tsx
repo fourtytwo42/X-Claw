@@ -66,6 +66,11 @@ type TrackedAgentsGetPayload = {
   items: TrackedAgent[];
 };
 
+type SessionAgentsPayload = {
+  managedAgents?: string[];
+  activeAgentId?: string;
+};
+
 type WalletActivityFilter = 'all' | 'trades' | 'transfers' | 'approvals' | 'deposits';
 type ApprovalStatusFilter = 'all' | 'pending' | 'approved' | 'rejected';
 
@@ -144,6 +149,9 @@ type ToastItem = {
   type: ToastType;
 };
 
+const FAVORITES_KEY = 'xclaw_explore_favorite_agent_ids';
+const MANAGED_AGENT_TOKENS_KEY = 'xclaw_managed_agent_tokens';
+
 function getCsrfToken(): string | null {
   if (typeof document === 'undefined') {
     return null;
@@ -156,6 +164,89 @@ function getCsrfToken(): string | null {
     return null;
   }
   return decodeURIComponent(raw.split('=')[1] ?? '');
+}
+
+function parseStoredIds(key: string): string[] {
+  if (typeof window === 'undefined') {
+    return [];
+  }
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) {
+      return [];
+    }
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed.filter((item): item is string => typeof item === 'string' && item.length > 0);
+  } catch {
+    return [];
+  }
+}
+
+function storeIds(key: string, ids: string[]) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  window.localStorage.setItem(key, JSON.stringify(Array.from(new Set(ids))));
+  window.dispatchEvent(new Event('xclaw:favorites-updated'));
+}
+
+function parseStoredManagedAgentTokens(): Record<string, string> {
+  if (typeof window === 'undefined') {
+    return {};
+  }
+  try {
+    const raw = window.localStorage.getItem(MANAGED_AGENT_TOKENS_KEY);
+    if (!raw) {
+      return {};
+    }
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return {};
+    }
+    const out: Record<string, string> = {};
+    for (const [agentId, token] of Object.entries(parsed)) {
+      if (typeof agentId !== 'string' || !agentId.trim() || typeof token !== 'string' || !token.trim()) {
+        continue;
+      }
+      out[agentId.trim()] = token.trim();
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+function rememberManagedAgentToken(agentId: string, token: string) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  const normalizedAgentId = String(agentId).trim();
+  const normalizedToken = String(token).trim();
+  if (!normalizedAgentId || !normalizedToken) {
+    return;
+  }
+  const current = parseStoredManagedAgentTokens();
+  current[normalizedAgentId] = normalizedToken;
+  window.localStorage.setItem(MANAGED_AGENT_TOKENS_KEY, JSON.stringify(current));
+}
+
+function forgetManagedAgentToken(agentId: string) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  const normalizedAgentId = String(agentId).trim();
+  if (!normalizedAgentId) {
+    return;
+  }
+  const current = parseStoredManagedAgentTokens();
+  if (!current[normalizedAgentId]) {
+    return;
+  }
+  delete current[normalizedAgentId];
+  window.localStorage.setItem(MANAGED_AGENT_TOKENS_KEY, JSON.stringify(current));
 }
 
 async function managementPost(path: string, payload: Record<string, unknown>) {
@@ -271,6 +362,16 @@ async function bootstrapSession(
   return { ok: true };
 }
 
+async function selectManagementSession(agentId: string, token: string): Promise<boolean> {
+  const response = await fetch('/api/v1/management/session/select', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    credentials: 'same-origin',
+    body: JSON.stringify({ agentId, token })
+  });
+  return response.ok;
+}
+
 function usagePercent(current: number, maxRaw: string, enabled: boolean): number {
   if (!enabled) {
     return 0;
@@ -371,6 +472,7 @@ export default function AgentPublicProfilePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const agentId = params.agentId;
+  const bootstrapToken = searchParams.get('token')?.trim() ?? '';
   const [activeChainKey, , activeChainLabel] = useActiveChainKey();
   const avatarPalette = useMemo(() => getAgentAvatarPalette(agentId), [agentId]);
 
@@ -425,8 +527,58 @@ export default function AgentPublicProfilePage() {
   const [policyAllowedTokens, setPolicyAllowedTokens] = useState<string[]>([]);
   const toastIdRef = useRef(0);
   const toastTimersRef = useRef<Map<number, number>>(new Map());
+  const [viewerTracked, setViewerTracked] = useState(false);
+  const [viewerTrackingBusy, setViewerTrackingBusy] = useState(false);
+  const [viewerTrackingContext, setViewerTrackingContext] = useState<{ mode: 'local' } | { mode: 'server'; activeAgentId: string }>({
+    mode: 'local'
+  });
 
   const isOwner = management.phase === 'ready';
+
+  const refreshViewerTracked = useCallback(async () => {
+    if (!agentId || isOwner) {
+      return;
+    }
+
+    const localIds = parseStoredIds(FAVORITES_KEY);
+    setViewerTracked(localIds.includes(agentId));
+    setViewerTrackingContext({ mode: 'local' });
+
+    try {
+      const sessionResponse = await fetch('/api/v1/management/session/agents', {
+        credentials: 'same-origin',
+        cache: 'no-store'
+      });
+      if (!sessionResponse.ok) {
+        return;
+      }
+      const sessionPayload = (await sessionResponse.json()) as SessionAgentsPayload;
+      const activeManagedAgentId = String(sessionPayload.activeAgentId ?? '').trim();
+      if (!activeManagedAgentId) {
+        return;
+      }
+      const trackedResponse = await fetch(
+        `/api/v1/management/tracked-agents?agentId=${encodeURIComponent(activeManagedAgentId)}&chainKey=${encodeURIComponent(activeChainKey)}`,
+        {
+          credentials: 'same-origin',
+          cache: 'no-store'
+        }
+      );
+      if (!trackedResponse.ok) {
+        return;
+      }
+      const trackedPayload = (await trackedResponse.json()) as {
+        items?: Array<{ trackedAgentId?: string }>;
+      };
+      const ids = Array.isArray(trackedPayload.items)
+        ? trackedPayload.items.map((item) => String(item?.trackedAgentId ?? '').trim()).filter((item) => item.length > 0)
+        : [];
+      setViewerTracked(ids.includes(agentId));
+      setViewerTrackingContext({ mode: 'server', activeAgentId: activeManagedAgentId });
+    } catch {
+      // local fallback is already applied
+    }
+  }, [activeChainKey, agentId, isOwner]);
 
   function dismissToast(id: number) {
     const timer = toastTimersRef.current.get(id);
@@ -444,19 +596,54 @@ export default function AgentPublicProfilePage() {
     toastTimersRef.current.set(id, timer);
   }
 
+  async function toggleViewerTracked() {
+    if (isOwner || !agentId || viewerTrackingBusy) {
+      return;
+    }
+
+    setViewerTrackingBusy(true);
+    const nextTracked = !viewerTracked;
+    try {
+      if (viewerTrackingContext.mode === 'server') {
+        if (nextTracked) {
+          await managementPost('/api/v1/management/tracked-agents', {
+            agentId: viewerTrackingContext.activeAgentId,
+            trackedAgentId: agentId
+          });
+        } else {
+          await managementDelete('/api/v1/management/tracked-agents', {
+            agentId: viewerTrackingContext.activeAgentId,
+            trackedAgentId: agentId
+          });
+        }
+        setViewerTracked(nextTracked);
+        window.dispatchEvent(new Event('xclaw:favorites-updated'));
+      } else {
+        const current = parseStoredIds(FAVORITES_KEY);
+        const next = nextTracked ? Array.from(new Set([...current, agentId])) : current.filter((item) => item !== agentId);
+        storeIds(FAVORITES_KEY, next);
+        setViewerTracked(nextTracked);
+      }
+      showToast(nextTracked ? 'Agent saved for tracking.' : 'Agent removed from tracking.', 'success');
+    } catch (toggleError) {
+      showToast(toggleError instanceof Error ? toggleError.message : 'Failed to update tracked state.', 'error', 3200);
+    } finally {
+      setViewerTrackingBusy(false);
+    }
+  }
+
   useEffect(() => {
     if (!agentId) {
       return;
     }
 
-    const token = searchParams.get('token');
-    if (!token) {
+    if (!bootstrapToken) {
       setBootstrapState({ phase: 'ready' });
       return;
     }
 
     setBootstrapState({ phase: 'bootstrapping' });
-    void bootstrapSession(agentId, token).then((result) => {
+    void bootstrapSession(agentId, bootstrapToken).then((result) => {
       if (!result.ok) {
         setBootstrapState({
           phase: 'error',
@@ -467,11 +654,12 @@ export default function AgentPublicProfilePage() {
         return;
       }
 
+      rememberManagedAgentToken(agentId, bootstrapToken);
       rememberManagedAgent(agentId);
       router.replace(`/agents/${agentId}`);
       setBootstrapState({ phase: 'ready' });
     });
-  }, [agentId, router, searchParams]);
+  }, [agentId, bootstrapToken, router]);
 
   const loadPublicData = useCallback(async () => {
     const [profileRes, tradesRes, activityRes] = await Promise.all([
@@ -494,15 +682,93 @@ export default function AgentPublicProfilePage() {
   }, [agentId]);
 
   const loadManagementData = useCallback(async () => {
-    const managementRes = await fetch(
-      `/api/v1/management/agent-state?agentId=${encodeURIComponent(agentId)}&chainKey=${encodeURIComponent(activeChainKey)}`,
-      {
-        cache: 'no-store',
-        credentials: 'same-origin'
-      }
-    );
+    async function fetchManagementState() {
+      return fetch(
+        `/api/v1/management/agent-state?agentId=${encodeURIComponent(agentId)}&chainKey=${encodeURIComponent(activeChainKey)}`,
+        {
+          cache: 'no-store',
+          credentials: 'same-origin'
+        }
+      );
+    }
+
+    let managementRes = await fetchManagementState();
 
     if (managementRes.status === 401) {
+      const candidateTokens = Array.from(new Set([bootstrapToken, parseStoredManagedAgentTokens()[agentId]].filter((item) => Boolean(item))));
+      for (const candidateToken of candidateTokens) {
+        const restored = await selectManagementSession(agentId, candidateToken);
+        if (!restored) {
+          continue;
+        }
+        rememberManagedAgentToken(agentId, candidateToken);
+        managementRes = await fetchManagementState();
+        if (managementRes.status !== 401) {
+          break;
+        }
+      }
+    }
+
+    if (managementRes.status === 401) {
+      const storedToken = parseStoredManagedAgentTokens()[agentId];
+      if (storedToken) {
+        const restored = await selectManagementSession(agentId, storedToken);
+        if (restored) {
+          managementRes = await fetchManagementState();
+        } else {
+          forgetManagedAgentToken(agentId);
+        }
+      }
+    }
+
+    if (managementRes.status === 401) {
+      let authMessage = 'Management session is missing, expired, or scoped to a different agent.';
+      let authDetails: Record<string, unknown> | null = null;
+      try {
+        const payload = (await managementRes.json()) as {
+          message?: string;
+          actionHint?: string;
+          details?: Record<string, unknown>;
+        };
+        if (payload?.message) {
+          authMessage = payload.message;
+        }
+        if (payload?.details && typeof payload.details === 'object') {
+          authDetails = payload.details;
+        }
+      } catch {
+        // keep fallback message
+      }
+
+      let sessionAgentId = '';
+      try {
+        const sessionRes = await fetch('/api/v1/management/session/agents', {
+          credentials: 'same-origin',
+          cache: 'no-store'
+        });
+        if (sessionRes.ok) {
+          const sessionPayload = (await sessionRes.json()) as { activeAgentId?: string };
+          sessionAgentId = String(sessionPayload.activeAgentId ?? '').trim();
+        }
+      } catch {
+        // best effort only
+      }
+
+      const expectedFromDetails = String(authDetails?.requestedAgentId ?? '').trim();
+      const sessionFromDetails = String(authDetails?.sessionAgentId ?? '').trim();
+      const expectedAgentId = expectedFromDetails || agentId;
+      const activeAgent = sessionFromDetails || sessionAgentId || 'none';
+      const debugMessage = `Owner session mismatch. Expected ${expectedAgentId}, active session ${activeAgent}. Re-open the exact owner link for this agent.`;
+      console.warn('[agents-page] management unauthorized', {
+        agentId,
+        bootstrapTokenPresent: Boolean(bootstrapToken),
+        storedTokenPresent: Boolean(parseStoredManagedAgentTokens()[agentId]),
+        activeChainKey,
+        authMessage,
+        authDetails,
+        sessionAgentId
+      });
+      setError(debugMessage);
       setManagement({ phase: 'unauthorized' });
       setDepositData(null);
       setX402Payments(null);
@@ -565,7 +831,7 @@ export default function AgentPublicProfilePage() {
     setX402ReceiveLink(x402ReceivePayload as X402ReceiveLinkPayload);
     setLimitOrders(((limitOrderPayload as { items?: LimitOrderItem[] }).items ?? []).filter(Boolean));
     setTrackedAgents(((trackedPayload as TrackedAgentsGetPayload).items ?? []).filter(Boolean));
-  }, [activeChainKey, agentId]);
+  }, [activeChainKey, agentId, bootstrapToken]);
 
   const refreshAll = useCallback(async (options?: { showLoading?: boolean }) => {
     const showLoading = options?.showLoading ?? true;
@@ -610,6 +876,32 @@ export default function AgentPublicProfilePage() {
       window.clearInterval(intervalId);
     };
   }, [management.phase, agentId, refreshAll]);
+
+  useEffect(() => {
+    if (!agentId || isOwner) {
+      setViewerTracked(false);
+      setViewerTrackingContext({ mode: 'local' });
+      return;
+    }
+
+    void refreshViewerTracked();
+
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === FAVORITES_KEY) {
+        void refreshViewerTracked();
+      }
+    };
+    const onFavoritesUpdated = () => {
+      void refreshViewerTracked();
+    };
+
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('xclaw:favorites-updated', onFavoritesUpdated);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('xclaw:favorites-updated', onFavoritesUpdated);
+    };
+  }, [agentId, isOwner, refreshViewerTracked]);
 
   async function runManagementAction(action: () => Promise<void>, successMessage: string) {
     try {
@@ -1552,10 +1844,38 @@ export default function AgentPublicProfilePage() {
               </div>
               <div>
                 <div className={styles.walletTitleRow}>
-                <h1>{profile?.agent.agent_name ?? 'Loading agent...'}</h1>
-                {status && isPublicStatus(status) ? <PublicStatusBadge status={status} /> : null}
-                {!status ? <span className={styles.muted}>Status unavailable</span> : null}
-              </div>
+                  <h1>{profile?.agent.agent_name ?? 'Loading agent...'}</h1>
+                  {!isOwner ? (
+                    <button
+                      type="button"
+                      className={styles.agentTrackStar}
+                      onClick={() => void toggleViewerTracked()}
+                      aria-label={
+                        viewerTrackingContext.mode === 'server'
+                          ? viewerTracked
+                            ? 'Untrack agent. Removes it from your watchlist and agent tracking feed.'
+                            : 'Track agent. Adds it to your watchlist and agent tracking feed.'
+                          : viewerTracked
+                            ? 'Remove saved bookmark from this device.'
+                            : 'Save bookmark on this device.'
+                      }
+                      title={
+                        viewerTrackingContext.mode === 'server'
+                          ? viewerTracked
+                            ? 'Untrack: remove from watchlist + agent tracking feed'
+                            : 'Track: add to watchlist + agent tracking feed'
+                          : viewerTracked
+                            ? 'Remove saved bookmark (device only)'
+                            : 'Save bookmark (device only)'
+                      }
+                      disabled={viewerTrackingBusy}
+                    >
+                      {viewerTracked ? '★' : '☆'}
+                    </button>
+                  ) : null}
+                  {status && isPublicStatus(status) ? <PublicStatusBadge status={status} /> : null}
+                  {!status ? <span className={styles.muted}>Status unavailable</span> : null}
+                </div>
                 <div className={styles.accountMetaChips}>
                   <span className={styles.walletChip}>Chain: {activeChainLabel}</span>
                   <span className={styles.walletChip}>Wallet: {activeWallet ? shortenAddress(activeWallet.address) : '—'}</span>

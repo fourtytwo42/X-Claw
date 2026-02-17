@@ -340,6 +340,26 @@
   line-height: 1.05;
 }
 
+.agentTrackStar {
+  border: 0;
+  background: transparent;
+  color: var(--agent-accent);
+  font-size: 1.18rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.08rem 0.2rem;
+  border-radius: 999px;
+}
+
+.agentTrackStar:hover {
+  background: color-mix(in srgb, var(--agent-accent) 14%, transparent);
+}
+
+.agentTrackStar:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
 .walletMeta {
   margin-top: 0.44rem;
   display: flex;

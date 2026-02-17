@@ -64,7 +64,7 @@ export function ActiveAgentSidebarLink({ itemClassName, activeClassName, showLab
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [pathname]);
 
   const title = useMemo(() => {
     if (!agentId) {
