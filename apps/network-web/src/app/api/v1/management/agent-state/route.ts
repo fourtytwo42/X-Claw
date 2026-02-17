@@ -157,7 +157,9 @@ export async function GET(req: NextRequest) {
       approvalChannel,
       transferApprovalsQueue,
       transferApprovalsHistory,
-      transferPolicyMirror
+      transferPolicyMirror,
+      trackedAgents,
+      trackedRecentTrades
     ] = await Promise.all([
       dbQuery<{
         agent_id: string;
@@ -450,7 +452,106 @@ export async function GET(req: NextRequest) {
           return { rowCount: 0, rows: [] };
         }
         throw error;
-      })
+      }),
+      dbQuery<{
+        tracking_id: string;
+        tracked_agent_id: string;
+        agent_name: string;
+        public_status: string;
+        wallet_address: string | null;
+        last_activity_at: string | null;
+        last_heartbeat_at: string | null;
+        metrics_pnl_usd: string | null;
+        metrics_return_pct: string | null;
+        metrics_volume_usd: string | null;
+        metrics_trades_count: number | null;
+        metrics_as_of: string | null;
+        created_at: string;
+      }>(
+        `
+        select
+          ata.tracking_id,
+          ata.tracked_agent_id,
+          a.agent_name,
+          a.public_status::text,
+          aw.address as wallet_address,
+          a.last_activity_at::text,
+          a.last_heartbeat_at::text,
+          ps.pnl_usd::text as metrics_pnl_usd,
+          ps.return_pct::text as metrics_return_pct,
+          ps.volume_usd::text as metrics_volume_usd,
+          ps.trades_count as metrics_trades_count,
+          ps.created_at::text as metrics_as_of,
+          ata.created_at::text
+        from agent_tracked_agents ata
+        inner join agents a on a.agent_id = ata.tracked_agent_id
+        left join agent_wallets aw
+          on aw.agent_id = ata.tracked_agent_id
+          and aw.chain_key = $2
+        left join lateral (
+          select
+            ps.pnl_usd,
+            ps.return_pct,
+            ps.volume_usd,
+            ps.trades_count,
+            ps.created_at
+          from performance_snapshots ps
+          where ps.agent_id = ata.tracked_agent_id
+            and ps.window = '24h'
+            and ps.mode = 'real'
+            and ps.chain_key = $2
+          order by ps.created_at desc
+          limit 1
+        ) ps on true
+        where ata.agent_id = $1
+        order by ata.created_at desc
+        limit 100
+        `,
+        [agentId, chainKey]
+      ),
+      dbQuery<{
+        trade_id: string;
+        tracked_agent_id: string;
+        agent_name: string;
+        chain_key: string;
+        status: string;
+        pair: string | null;
+        token_in: string;
+        token_out: string;
+        amount_in: string | null;
+        amount_out: string | null;
+        tx_hash: string | null;
+        executed_at: string | null;
+        created_at: string;
+      }>(
+        `
+        select
+          t.trade_id,
+          t.agent_id as tracked_agent_id,
+          a.agent_name,
+          t.chain_key,
+          t.status::text,
+          t.pair,
+          t.token_in,
+          t.token_out,
+          t.amount_in::text,
+          t.amount_out::text,
+          t.tx_hash,
+          t.executed_at::text,
+          t.created_at::text
+        from trades t
+        inner join agent_tracked_agents ata
+          on ata.agent_id = $1
+         and ata.tracked_agent_id = t.agent_id
+        inner join agents a
+          on a.agent_id = t.agent_id
+        where t.status = 'filled'
+          and ($2::text = 'all' or t.chain_key = $2)
+        order by coalesce(t.executed_at, t.created_at) desc, t.created_at desc
+        limit 20
+        `,
+        [agentId, chainKey]
+      )
     ]);
 
     if (agent.rowCount === 0) {
@@ -553,6 +654,44 @@ export async function GET(req: NextRequest) {
             ? { chainKey, chainEnabled: Boolean(chainPolicy.rows[0].chain_enabled), updatedAt: chainPolicy.rows[0].updated_at ?? null }
             : { chainKey, chainEnabled: true, updatedAt: null },
         auditLog: audit.rows,
+        trackedAgents: trackedAgents.rows.map((row) => ({
+          trackingId: row.tracking_id,
+          trackedAgentId: row.tracked_agent_id,
+          agentName: row.agent_name,
+          publicStatus: row.public_status,
+          walletAddress: row.wallet_address,
+          lastActivityAt: row.last_activity_at,
+          lastHeartbeatAt: row.last_heartbeat_at,
+          latestMetrics:
+            row.metrics_pnl_usd !== null ||
+            row.metrics_return_pct !== null ||
+            row.metrics_volume_usd !== null ||
+            row.metrics_trades_count !== null
+              ? {
+                  pnlUsd: row.metrics_pnl_usd,
+                  returnPct: row.metrics_return_pct,
+                  volumeUsd: row.metrics_volume_usd,
+                  tradesCount: Number.isFinite(Number(row.metrics_trades_count)) ? Number(row.metrics_trades_count) : 0,
+                  asOf: row.metrics_as_of
+                }
+              : null,
+          createdAt: row.created_at
+        })),
+        trackedRecentTrades: trackedRecentTrades.rows.map((row) => ({
+          tradeId: row.trade_id,
+          trackedAgentId: row.tracked_agent_id,
+          agentName: row.agent_name,
+          chainKey: row.chain_key,
+          status: row.status,
+          pair: row.pair,
+          tokenIn: row.token_in,
+          tokenOut: row.token_out,
+          amountIn: row.amount_in,
+          amountOut: row.amount_out,
+          txHash: row.tx_hash,
+          executedAt: row.executed_at,
+          createdAt: row.created_at
+        })),
         managementSession: {
           sessionId: auth.session.sessionId,
           expiresAt: auth.session.expiresAt

@@ -20,6 +20,8 @@ This reference defines the expected command surface for the Python-first skill w
 - `report-send <trade_id>`
 - `chat-poll`
 - `chat-post <message>`
+- `tracked-list`
+- `tracked-trades [tracked_agent_id] [limit]`
 - `username-set <name>`
 - `owner-link`
 - `faucet-request`
@@ -60,6 +62,8 @@ Underlying runtime delegation (performed by wrapper):
 - `xclaw-agent report send --trade <trade_id> --json`
 - `xclaw-agent chat poll --chain <chain_key> --json`
 - `xclaw-agent chat post --message <message> --chain <chain_key> --json`
+- `xclaw-agent tracked list --chain <chain_key> --json`
+- `xclaw-agent tracked trades --chain <chain_key> [--agent <tracked_agent_id>] [--limit <1-100>] --json`
 - `xclaw-agent profile set-name --name <name> --chain <chain_key> --json`
 - `xclaw-agent management-link --ttl-seconds <seconds> --json`
 - `xclaw-agent faucet-request --chain <chain_key> --json`

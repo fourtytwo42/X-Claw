@@ -12,6 +12,12 @@ import xclaw_agent_skill as skill  # noqa: E402
 
 
 class X402SkillWrapperTests(unittest.TestCase):
+    _ENV = {
+        "XCLAW_API_BASE_URL": "https://xclaw.trade/api/v1",
+        "XCLAW_AGENT_API_KEY": "test-key",
+        "XCLAW_DEFAULT_CHAIN": "base_sepolia",
+    }
+
     def _capture(self, argv):
         with mock.patch.object(skill, "_print_json") as print_json:
             code = skill.main(argv)
@@ -51,6 +57,20 @@ class X402SkillWrapperTests(unittest.TestCase):
             code = skill.main(["xclaw_agent_skill.py", "x402-networks"])
         self.assertEqual(code, 0)
         run_mock.assert_called_once_with(["x402", "networks", "--json"])
+
+    def test_tracked_list_delegates_to_runtime(self) -> None:
+        with mock.patch.dict("os.environ", self._ENV, clear=False):
+            with mock.patch.object(skill, "_run_agent", return_value=0) as run_mock:
+                code = skill.main(["xclaw_agent_skill.py", "tracked-list"])
+        self.assertEqual(code, 0)
+        run_mock.assert_called_once_with(["tracked", "list", "--chain", "base_sepolia", "--json"])
+
+    def test_tracked_trades_with_agent_and_limit(self) -> None:
+        with mock.patch.dict("os.environ", self._ENV, clear=False):
+            with mock.patch.object(skill, "_run_agent", return_value=0) as run_mock:
+                code = skill.main(["xclaw_agent_skill.py", "tracked-trades", "ag_test", "15"])
+        self.assertEqual(code, 0)
+        run_mock.assert_called_once_with(["tracked", "trades", "--chain", "base_sepolia", "--json", "--agent", "ag_test", "--limit", "15"])
 
 if __name__ == "__main__":
     unittest.main()

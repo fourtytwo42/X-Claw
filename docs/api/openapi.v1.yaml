@@ -1688,7 +1688,9 @@ paths:
           $ref: '#/components/responses/ErrorResponse'
   /api/v1/copy/subscriptions:
     post:
+      deprecated: true
       summary: Create copy subscription.
+      description: Deprecated in Slice 82. Kept for compatibility during track-not-copy transition.
       security:
         - managementCookie: []
       requestBody:
@@ -1703,7 +1705,9 @@ paths:
         '400':
           $ref: '#/components/responses/ErrorResponse'
     get:
+      deprecated: true
       summary: List copy subscriptions.
+      description: Deprecated in Slice 82. Kept for compatibility during track-not-copy transition.
       security:
         - managementCookie: []
       responses:
@@ -1711,7 +1715,9 @@ paths:
           description: Subscription list.
   /api/v1/copy/subscriptions/{subscriptionId}:
     patch:
+      deprecated: true
       summary: Update copy subscription.
+      description: Deprecated in Slice 82. Kept for compatibility during track-not-copy transition.
       security:
         - managementCookie: []
       parameters:
@@ -1728,7 +1734,9 @@ paths:
         '404':
           $ref: '#/components/responses/ErrorResponse'
     delete:
+      deprecated: true
       summary: Delete copy subscription.
+      description: Deprecated in Slice 82. Kept for compatibility during track-not-copy transition.
       security:
         - managementCookie: []
       parameters:
@@ -1737,6 +1745,136 @@ paths:
         '200':
           description: Subscription deleted.
         '404':
+          $ref: '#/components/responses/ErrorResponse'
+  /api/v1/management/tracked-agents:
+    get:
+      summary: List tracked agents for authorized management session.
+      security:
+        - managementCookie: []
+      parameters:
+        - name: agentId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: chainKey
+          in: query
+          required: false
+          schema:
+            type: string
+            default: base_sepolia
+      responses:
+        '200':
+          description: Tracked-agent list payload.
+    post:
+      summary: Add one tracked agent for authorized management session.
+      security:
+        - managementCookie: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfTokenHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ManagementTrackedAgentsUpsertRequest'
+      responses:
+        '200':
+          description: Tracked-agent relation created or already present.
+    delete:
+      summary: Remove one tracked agent for authorized management session.
+      security:
+        - managementCookie: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfTokenHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ManagementTrackedAgentsDeleteRequest'
+      responses:
+        '200':
+          description: Tracked-agent relation removed.
+  /api/v1/management/tracked-trades:
+    get:
+      summary: List recent filled trades from tracked agents for authorized management session.
+      security:
+        - managementCookie: []
+      parameters:
+        - name: agentId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: chainKey
+          in: query
+          required: false
+          schema:
+            type: string
+            default: base_sepolia
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: trackedAgentId
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Tracked-trade list payload.
+  /api/v1/agent/tracked-agents:
+    get:
+      summary: List tracked agents for authenticated agent runtime.
+      security:
+        - agentBearer: []
+      parameters:
+        - name: chainKey
+          in: query
+          required: false
+          schema:
+            type: string
+            default: base_sepolia
+      responses:
+        '200':
+          description: Agent tracked-agent list payload.
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+  /api/v1/agent/tracked-trades:
+    get:
+      summary: List recent filled trades from tracked agents for authenticated runtime.
+      security:
+        - agentBearer: []
+      parameters:
+        - name: chainKey
+          in: query
+          required: false
+          schema:
+            type: string
+            default: base_sepolia
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: trackedAgentId
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Agent tracked-trade list payload.
+        '401':
           $ref: '#/components/responses/ErrorResponse'
 components:
   parameters:
@@ -2824,6 +2962,22 @@ components:
           type: string
         token:
           type: string
+    ManagementTrackedAgentsUpsertRequest:
+      type: object
+      required: [agentId, trackedAgentId]
+      properties:
+        agentId:
+          type: string
+        trackedAgentId:
+          type: string
+    ManagementTrackedAgentsDeleteRequest:
+      type: object
+      required: [agentId, trackedAgentId]
+      properties:
+        agentId:
+          type: string
+        trackedAgentId:
+          type: string
     CopySubscriptionCreateRequest:
       type: object
       required: [leaderAgentId, followerAgentId, enabled, scaleBps, maxTradeUsd]
@@ -3014,12 +3168,13 @@ components:
                     nullable: true
               followerMeta:
                 type: object
-                required: [followersCount, copyEnabledFollowers]
+                required: [followersCount]
                 properties:
                   followersCount:
                     type: integer
                   copyEnabledFollowers:
                     type: integer
+                    nullable: true
                   followerRankPercentile:
                     type: string
                     nullable: true

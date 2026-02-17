@@ -4714,6 +4714,69 @@ def cmd_chat_post(args: argparse.Namespace) -> int:
         return fail("chat_post_failed", str(exc), "Inspect runtime chat post path and retry.", {"chain": args.chain}, exit_code=1)
 
 
+def cmd_tracked_list(args: argparse.Namespace) -> int:
+    chk = require_json_flag(args)
+    if chk is not None:
+        return chk
+    try:
+        chain = str(args.chain).strip()
+        path = f"/agent/tracked-agents?chainKey={urllib.parse.quote(chain)}"
+        status_code, body = _api_request("GET", path)
+        if status_code < 200 or status_code >= 300:
+            return fail(
+                str(body.get("code", "tracked_list_failed")),
+                str(body.get("message", f"tracked agents read failed ({status_code})")),
+                str(body.get("actionHint", "Verify API auth and tracked-agents availability, then retry.")),
+                _api_error_details(status_code, body, path, chain=chain),
+                exit_code=1,
+            )
+        items = body.get("items")
+        if not isinstance(items, list):
+            items = []
+        return ok("Tracked agents loaded.", chain=chain, count=len(items), items=[item for item in items if isinstance(item, dict)])
+    except WalletStoreError as exc:
+        return fail("tracked_list_failed", str(exc), "Verify API env/auth and retry.", {"chain": args.chain}, exit_code=1)
+    except Exception as exc:
+        return fail("tracked_list_failed", str(exc), "Inspect runtime tracked-agents path and retry.", {"chain": args.chain}, exit_code=1)
+
+
+def cmd_tracked_trades(args: argparse.Namespace) -> int:
+    chk = require_json_flag(args)
+    if chk is not None:
+        return chk
+    try:
+        chain = str(args.chain).strip()
+        limit_raw = str(args.limit).strip()
+        if not re.fullmatch(r"[0-9]+", limit_raw):
+            return fail("invalid_input", "limit must be an integer.", "Use --limit <1-100>.", {"limit": args.limit}, exit_code=2)
+        limit = int(limit_raw)
+        if limit < 1 or limit > 100:
+            return fail("invalid_input", "limit must be between 1 and 100.", "Use --limit <1-100>.", {"limit": limit}, exit_code=2)
+
+        path = f"/agent/tracked-trades?chainKey={urllib.parse.quote(chain)}&limit={limit}"
+        tracked_agent_id = str(args.agent or "").strip()
+        if tracked_agent_id:
+            path += f"&trackedAgentId={urllib.parse.quote(tracked_agent_id)}"
+
+        status_code, body = _api_request("GET", path)
+        if status_code < 200 or status_code >= 300:
+            return fail(
+                str(body.get("code", "tracked_trades_failed")),
+                str(body.get("message", f"tracked trades read failed ({status_code})")),
+                str(body.get("actionHint", "Verify API auth and tracked-trades availability, then retry.")),
+                _api_error_details(status_code, body, path, chain=chain),
+                exit_code=1,
+            )
+        items = body.get("items")
+        if not isinstance(items, list):
+            items = []
+        return ok("Tracked trades loaded.", chain=chain, count=len(items), items=[item for item in items if isinstance(item, dict)])
+    except WalletStoreError as exc:
+        return fail("tracked_trades_failed", str(exc), "Verify API env/auth and retry.", {"chain": args.chain}, exit_code=1)
+    except Exception as exc:
+        return fail("tracked_trades_failed", str(exc), "Inspect runtime tracked-trades path and retry.", {"chain": args.chain}, exit_code=1)
+
+
 def _runtime_platform_name() -> str:
     platform_value = sys.platform.lower()
     if platform_value.startswith("win"):
@@ -5045,6 +5108,8 @@ def cmd_dashboard(args: argparse.Namespace) -> int:
         pending_intents: list[dict[str, Any]] = []
         open_orders: list[dict[str, Any]] = []
         recent_room_messages: list[dict[str, Any]] = []
+        tracked_agents: list[dict[str, Any]] = []
+        tracked_recent_trades: list[dict[str, Any]] = []
 
         profile_status, profile_body = _api_request("GET", f"/public/agents/{agent_escaped}")
         if 200 <= profile_status < 300:
@@ -5121,6 +5186,36 @@ def cmd_dashboard(args: argparse.Namespace) -> int:
                 }
             )
 
+        tracked_agents_status, tracked_agents_body = _api_request("GET", f"/agent/tracked-agents?chainKey={chain_escaped}")
+        if 200 <= tracked_agents_status < 300:
+            items = tracked_agents_body.get("items")
+            if isinstance(items, list):
+                tracked_agents = [item for item in items if isinstance(item, dict)]
+        else:
+            section_errors.append(
+                {
+                    "section": "trackedAgents",
+                    "code": str(tracked_agents_body.get("code", "api_error")),
+                    "message": str(tracked_agents_body.get("message", f"tracked agents read failed ({tracked_agents_status})")),
+                    "requestId": str(tracked_agents_body.get("requestId") or ""),
+                }
+            )
+
+        tracked_trades_status, tracked_trades_body = _api_request("GET", f"/agent/tracked-trades?chainKey={chain_escaped}&limit=20")
+        if 200 <= tracked_trades_status < 300:
+            items = tracked_trades_body.get("items")
+            if isinstance(items, list):
+                tracked_recent_trades = [item for item in items if isinstance(item, dict)]
+        else:
+            section_errors.append(
+                {
+                    "section": "trackedRecentTrades",
+                    "code": str(tracked_trades_body.get("code", "api_error")),
+                    "message": str(tracked_trades_body.get("message", f"tracked trades read failed ({tracked_trades_status})")),
+                    "requestId": str(tracked_trades_body.get("requestId") or ""),
+                }
+            )
+
         holdings: dict[str, Any] | None = None
         try:
             holdings = _fetch_wallet_holdings(args.chain)
@@ -5138,6 +5233,8 @@ def cmd_dashboard(args: argparse.Namespace) -> int:
             openOrders=open_orders,
             recentTrades=recent_trades,
             recentRoomMessages=recent_room_messages,
+            trackedAgents=tracked_agents,
+            trackedRecentTrades=tracked_recent_trades,
             sectionErrors=section_errors,
         )
     except WalletStoreError as exc:
@@ -6536,6 +6633,21 @@ def build_parser() -> argparse.ArgumentParser:
     chat_post.add_argument("--tags")
     chat_post.add_argument("--json", action="store_true")
     chat_post.set_defaults(func=cmd_chat_post)
+
+    tracked = sub.add_parser("tracked")
+    tracked_sub = tracked.add_subparsers(dest="tracked_cmd")
+
+    tracked_list = tracked_sub.add_parser("list")
+    tracked_list.add_argument("--chain", required=True)
+    tracked_list.add_argument("--json", action="store_true")
+    tracked_list.set_defaults(func=cmd_tracked_list)
+
+    tracked_trades = tracked_sub.add_parser("trades")
+    tracked_trades.add_argument("--chain", required=True)
+    tracked_trades.add_argument("--agent")
+    tracked_trades.add_argument("--limit", default="20")
+    tracked_trades.add_argument("--json", action="store_true")
+    tracked_trades.set_defaults(func=cmd_tracked_trades)
 
     profile = sub.add_parser("profile")
     profile_sub = profile.add_subparsers(dest="profile_cmd")

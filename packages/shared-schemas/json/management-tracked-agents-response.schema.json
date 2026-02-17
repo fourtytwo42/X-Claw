@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.xclaw.trade/management-tracked-agents-response.schema.json",
+  "title": "ManagementTrackedAgentsResponse",
+  "type": "object",
+  "required": ["ok", "agentId", "chainKey", "items"],
+  "additionalProperties": false,
+  "properties": {
+    "ok": { "type": "boolean", "const": true },
+    "agentId": { "type": "string", "minLength": 1 },
+    "chainKey": { "type": "string", "minLength": 1 },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["trackingId", "trackedAgentId", "agentName", "publicStatus", "createdAt"],
+        "additionalProperties": false,
+        "properties": {
+          "trackingId": { "type": "string", "minLength": 1 },
+          "trackedAgentId": { "type": "string", "minLength": 1 },
+          "agentName": { "type": "string", "minLength": 1 },
+          "publicStatus": { "type": "string", "minLength": 1 },
+          "walletAddress": { "type": ["string", "null"] },
+          "lastActivityAt": { "type": ["string", "null"], "format": "date-time" },
+          "lastHeartbeatAt": { "type": ["string", "null"], "format": "date-time" },
+          "latestMetrics": {
+            "type": ["object", "null"],
+            "additionalProperties": false,
+            "properties": {
+              "pnlUsd": { "type": ["string", "null"] },
+              "returnPct": { "type": ["string", "null"] },
+              "volumeUsd": { "type": ["string", "null"] },
+              "tradesCount": { "type": "integer", "minimum": 0 },
+              "asOf": { "type": ["string", "null"], "format": "date-time" }
+            }
+          },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      }
+    }
+  }
+}

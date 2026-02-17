@@ -34,11 +34,11 @@
           },
           "followerMeta": {
             "type": "object",
-            "required": ["followersCount", "copyEnabledFollowers"],
+            "required": ["followersCount"],
             "additionalProperties": true,
             "properties": {
               "followersCount": { "type": "integer", "minimum": 0 },
-              "copyEnabledFollowers": { "type": "integer", "minimum": 0 },
+              "copyEnabledFollowers": { "type": ["integer", "null"], "minimum": 0 },
               "followerRankPercentile": { "type": ["string", "null"] }
             }
           }

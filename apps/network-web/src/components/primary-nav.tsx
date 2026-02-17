@@ -44,6 +44,20 @@ const BOTTOM_ITEMS: NavItem[] = [
   { id: 'howto', href: '/how-to', label: 'How To', icon: 'howto' }
 ];
 
+function getCsrfToken(): string | null {
+  if (typeof document === 'undefined') {
+    return null;
+  }
+  const raw = document.cookie
+    .split(';')
+    .map((part) => part.trim())
+    .find((part) => part.startsWith('xclaw_csrf='));
+  if (!raw) {
+    return null;
+  }
+  return decodeURIComponent(raw.split('=')[1] ?? '');
+}
+
 function isActivePath(pathname: string, href: string): boolean {
   if (href === '/explore') {
     return pathname === '/explore' || pathname === '/agents';
@@ -56,6 +70,8 @@ export function PrimaryNav({ className, desktopExtra, mobileMoreContent }: Prima
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
   const [bookmarkedAgentIds, setBookmarkedAgentIds] = useState<string[]>([]);
   const [bookmarkedAgentNames, setBookmarkedAgentNames] = useState<Record<string, string>>({});
+  const [activeManagedAgentId, setActiveManagedAgentId] = useState<string | null>(null);
+  const [usingServerTracked, setUsingServerTracked] = useState(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -64,19 +80,63 @@ export function PrimaryNav({ className, desktopExtra, mobileMoreContent }: Prima
     const load = () => {
       try {
         const raw = window.localStorage.getItem(FAVORITES_KEY);
-        if (!raw) {
-          setBookmarkedAgentIds([]);
-          return;
-        }
-        const parsed = JSON.parse(raw) as unknown;
-        if (!Array.isArray(parsed)) {
-          setBookmarkedAgentIds([]);
-          return;
-        }
-        const ids = parsed.filter((item): item is string => typeof item === 'string' && item.length > 0);
-        setBookmarkedAgentIds(Array.from(new Set(ids)));
+        const parsed = raw ? (JSON.parse(raw) as unknown) : [];
+        const localIds = Array.isArray(parsed)
+          ? Array.from(new Set(parsed.filter((item): item is string => typeof item === 'string' && item.length > 0)))
+          : [];
+        setBookmarkedAgentIds(localIds);
+        setUsingServerTracked(false);
+
+        void fetch('/api/v1/management/session/agents', { credentials: 'same-origin', cache: 'no-store' })
+          .then(async (response) => {
+            if (!response.ok) {
+              return null;
+            }
+            return (await response.json()) as { activeAgentId?: string };
+          })
+          .then(async (payload) => {
+            const activeAgentId = String(payload?.activeAgentId ?? '').trim();
+            if (!activeAgentId) {
+              setActiveManagedAgentId(null);
+              return;
+            }
+            setActiveManagedAgentId(activeAgentId);
+            const trackedResponse = await fetch(
+              `/api/v1/management/tracked-agents?agentId=${encodeURIComponent(activeAgentId)}&chainKey=base_sepolia`,
+              { credentials: 'same-origin', cache: 'no-store' }
+            );
+            if (!trackedResponse.ok) {
+              return;
+            }
+            const trackedPayload = (await trackedResponse.json()) as {
+              items?: Array<{ trackedAgentId?: string; agentName?: string | null }>;
+            };
+            const items = Array.isArray(trackedPayload.items) ? trackedPayload.items : [];
+            const ids = Array.from(
+              new Set(
+                items
+                  .map((item) => String(item?.trackedAgentId ?? '').trim())
+                  .filter((item) => item.length > 0)
+              )
+            );
+            const names: Record<string, string> = {};
+            for (const item of items) {
+              const id = String(item?.trackedAgentId ?? '').trim();
+              if (!id) {
+                continue;
+              }
+              names[id] = String(item?.agentName ?? 'Tracked Agent').trim() || 'Tracked Agent';
+            }
+            setBookmarkedAgentIds(ids);
+            setBookmarkedAgentNames(names);
+            setUsingServerTracked(true);
+          })
+          .catch(() => {
+            // local fallback only
+          });
       } catch {
         setBookmarkedAgentIds([]);
+        setUsingServerTracked(false);
       }
     };
 
@@ -96,6 +156,9 @@ export function PrimaryNav({ className, desktopExtra, mobileMoreContent }: Prima
   }, []);
 
   useEffect(() => {
+    if (usingServerTracked) {
+      return;
+    }
     if (bookmarkedAgentIds.length === 0) {
       setBookmarkedAgentNames({});
       return;
@@ -126,7 +189,7 @@ export function PrimaryNav({ className, desktopExtra, mobileMoreContent }: Prima
     return () => {
       cancelled = true;
     };
-  }, [bookmarkedAgentIds]);
+  }, [bookmarkedAgentIds, usingServerTracked]);
 
   useEffect(() => {
     setMobileMoreOpen(false);
@@ -138,6 +201,29 @@ export function PrimaryNav({ className, desktopExtra, mobileMoreContent }: Prima
     if (typeof window === 'undefined') {
       return;
     }
+
+    if (usingServerTracked && activeManagedAgentId) {
+      const csrf = getCsrfToken();
+      void fetch('/api/v1/management/tracked-agents', {
+        method: 'DELETE',
+        credentials: 'same-origin',
+        headers: {
+          'content-type': 'application/json',
+          ...(csrf ? { 'x-csrf-token': csrf } : {})
+        },
+        body: JSON.stringify({ agentId: activeManagedAgentId, trackedAgentId: agentId })
+      }).then(() => {
+        setBookmarkedAgentIds((current) => current.filter((id) => id !== agentId));
+        setBookmarkedAgentNames((current) => {
+          const copy = { ...current };
+          delete copy[agentId];
+          return copy;
+        });
+        window.dispatchEvent(new Event('xclaw:favorites-updated'));
+      });
+      return;
+    }
+
     const next = bookmarkedAgentIds.filter((id) => id !== agentId);
     window.localStorage.setItem(FAVORITES_KEY, JSON.stringify(next));
     window.dispatchEvent(new Event('xclaw:favorites-updated'));

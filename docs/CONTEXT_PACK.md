@@ -960,3 +960,66 @@ Issue mapping: `#29` (to be created / mapped)
   - approval decisions + withdraw + copy delete + limit-order cancel + audit remain functional.
 
 ---
+
+---
+
+## Slice 82 Context: Track-Not-Copy Pivot (Saved Agents -> OpenClaw Watchlist)
+
+Issue mapping: `#32`
+
+### Objective + scope lock
+- Objective: pivot product surfaces from copy trading to tracked-agent monitoring with server-backed tracked relations per managed agent.
+- Scope guard honored: no removal of legacy copy backend paths in this slice; routes stay operational but are UI-hidden/deprecated.
+
+### Expected touched files (Slice 82 allowlist)
+- Docs/process:
+  - `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - `docs/XCLAW_SLICE_TRACKER.md`
+  - `docs/XCLAW_BUILD_ROADMAP.md`
+  - `docs/api/WALLET_COMMAND_CONTRACT.md`
+  - `docs/api/openapi.v1.yaml`
+  - `docs/CONTEXT_PACK.md`
+  - `spec.md`
+  - `tasks.md`
+  - `acceptance.md`
+- DB/schema:
+  - `infrastructure/migrations/0020_slice82_agent_tracking.sql`
+  - `packages/shared-schemas/json/management-tracked-agents-upsert-request.schema.json`
+  - `packages/shared-schemas/json/management-tracked-agents-delete-request.schema.json`
+  - `packages/shared-schemas/json/management-tracked-agents-response.schema.json`
+  - `packages/shared-schemas/json/management-tracked-trades-response.schema.json`
+  - `packages/shared-schemas/json/agent-tracked-agents-response.schema.json`
+  - `packages/shared-schemas/json/agent-tracked-trades-response.schema.json`
+- API/UI/runtime:
+  - `apps/network-web/src/app/api/v1/management/tracked-agents/route.ts`
+  - `apps/network-web/src/app/api/v1/management/tracked-trades/route.ts`
+  - `apps/network-web/src/app/api/v1/agent/tracked-agents/route.ts`
+  - `apps/network-web/src/app/api/v1/agent/tracked-trades/route.ts`
+  - `apps/network-web/src/app/api/v1/management/agent-state/route.ts`
+  - `apps/network-web/src/app/explore/page.tsx`
+  - `apps/network-web/src/app/agents/[agentId]/page.tsx`
+  - `apps/network-web/src/components/primary-nav.tsx`
+  - `apps/network-web/src/lib/agent-page-view-model.ts`
+  - `apps/agent-runtime/xclaw_agent/cli.py`
+  - `apps/agent-runtime/tests/test_tracked_runtime.py`
+  - `apps/agent-runtime/tests/test_x402_skill_wrapper.py`
+  - `skills/xclaw-agent/scripts/xclaw_agent_skill.py`
+  - `skills/xclaw-agent/SKILL.md`
+  - `skills/xclaw-agent/references/commands.md`
+
+### Verification Plan
+- Required gates:
+  - `npm run db:parity`
+  - `npm run seed:reset`
+  - `npm run seed:load`
+  - `npm run seed:verify`
+  - `npm run build`
+  - `pm2 restart all`
+- Runtime tests:
+  - `python3 -m unittest apps/agent-runtime/tests/test_tracked_runtime.py -v`
+  - `python3 -m unittest apps/agent-runtime/tests/test_x402_skill_wrapper.py -v`
+- Functional checks:
+  - Explore shows `Track Agent` CTA and no copy-trade modal.
+  - owner tracked agents persist server-side and reflect in left rail.
+  - `/agents/[agentId]` tracked panel lists/removes tracked agents and shows recent tracked filled trades.
+  - runtime `dashboard` includes tracked summaries.

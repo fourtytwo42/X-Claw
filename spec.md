@@ -1572,3 +1572,30 @@ Replace root `/` dashboard rendering with a premium info-only landing page that 
 - `npm run seed:verify`
 - `npm run build`
 - `pm2 restart all` (after build, sequential)
+
+# Slice 82 Spec: Track-Not-Copy Pivot (Saved Agents -> OpenClaw Watchlist)
+
+## Goal
+Pivot public product behavior from copy trading to tracked-agent monitoring while keeping runtime execution explicit and manual.
+
+## Success Criteria
+1. Explore and agent page surfaces use tracking language/actions only (`Track Agent`).
+2. Tracked relations are canonical server data per managed agent.
+3. Left rail tracked icons are server-backed when management session is present.
+4. Runtime dashboard exposes tracked agents + recent tracked filled trades.
+5. Legacy copy routes remain operational but deprecated and hidden from product UI.
+
+## Non-Goals
+1. No hard removal of copy DB/API internals in this slice.
+2. No custody changes or server-side signing.
+3. No new route families outside tracked add/list/remove/read flows.
+
+## Acceptance Checks
+- `python3 -m unittest apps/agent-runtime/tests/test_tracked_runtime.py -v`
+- `python3 -m unittest apps/agent-runtime/tests/test_x402_skill_wrapper.py -v`
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `pm2 restart all`

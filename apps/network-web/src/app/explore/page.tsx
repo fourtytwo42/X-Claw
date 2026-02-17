@@ -71,25 +71,13 @@ type OwnerContext =
   | { phase: 'none' }
   | { phase: 'ready'; managedAgents: string[]; activeAgentId: string };
 
-type CopySubscriptionPayload = {
+type TrackedAgentsPayload = {
   items?: Array<{
-    subscriptionId: string;
-    leaderAgentId: string;
-    followerAgentId: string;
-    enabled: boolean;
-    scaleBps: number;
-    maxTradeUsd: string;
-    allowedTokens: string[];
+    trackingId: string;
+    trackedAgentId: string;
+    agentName: string;
+    publicStatus: string;
   }>;
-};
-
-type CopyModalState = {
-  open: boolean;
-  leader: ExploreAgent | null;
-  followerAgentId: string;
-  scaleBps: number;
-  maxTradeUsd: string;
-  requirePerTradeApprovals: boolean;
 };
 
 type ProfileModalState = {
@@ -179,29 +167,6 @@ async function postJson(path: string, payload: Record<string, unknown>) {
   return json;
 }
 
-async function patchJson(path: string, payload: Record<string, unknown>) {
-  const csrf = getCsrfToken();
-  const headers: Record<string, string> = { 'content-type': 'application/json' };
-  if (csrf) {
-    headers['x-csrf-token'] = csrf;
-  }
-  const response = await fetch(path, {
-    method: 'PATCH',
-    credentials: 'same-origin',
-    headers,
-    body: JSON.stringify(payload)
-  });
-  const json = (await response.json().catch(() => null)) as { message?: string; code?: string } | null;
-  if (!response.ok) {
-    const error = new Error(json?.message ?? 'Request failed.') as Error & { code?: string };
-    if (json?.code) {
-      error.code = json.code;
-    }
-    throw error;
-  }
-  return json;
-}
-
 async function putJson(path: string, payload: Record<string, unknown>) {
   const csrf = getCsrfToken();
   const headers: Record<string, string> = { 'content-type': 'application/json' };
@@ -250,21 +215,11 @@ export default function ExplorePage() {
 
   const [agentsPayload, setAgentsPayload] = useState<{ items: ExploreAgent[]; total: number; page: number; pageSize: number } | null>(null);
   const [favorites, setFavorites] = useState<string[]>([]);
-  const [copySubscriptions, setCopySubscriptions] = useState<CopySubscriptionPayload['items']>([]);
-  const [managedAgentNames, setManagedAgentNames] = useState<Record<string, string>>({});
+  const [trackedAgentIds, setTrackedAgentIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [busyCopy, setBusyCopy] = useState(false);
+  const [busyTrack, setBusyTrack] = useState<string | null>(null);
   const [busyProfile, setBusyProfile] = useState(false);
-
-  const [copyModal, setCopyModal] = useState<CopyModalState>({
-    open: false,
-    leader: null,
-    followerAgentId: '',
-    scaleBps: 10000,
-    maxTradeUsd: '1000',
-    requirePerTradeApprovals: true
-  });
 
   const [profileModal, setProfileModal] = useState<ProfileModalState>({
     open: false,
@@ -371,65 +326,36 @@ export default function ExplorePage() {
 
   useEffect(() => {
     if (ownerContext.phase !== 'ready') {
-      setCopySubscriptions([]);
+      setTrackedAgentIds([]);
       return;
     }
+    const activeAgentId = ownerContext.activeAgentId;
 
     let cancelled = false;
-    async function loadSubs() {
+    async function loadTracked() {
       try {
-        const response = await fetch('/api/v1/copy/subscriptions', { cache: 'no-store', credentials: 'same-origin' });
+        const response = await fetch(
+          `/api/v1/management/tracked-agents?agentId=${encodeURIComponent(activeAgentId)}&chainKey=${encodeURIComponent(chainKey)}`,
+          { cache: 'no-store', credentials: 'same-origin' }
+        );
         if (!response.ok) {
           return;
         }
-        const payload = (await response.json()) as CopySubscriptionPayload;
+        const payload = (await response.json()) as TrackedAgentsPayload;
         if (!cancelled) {
-          setCopySubscriptions(payload.items ?? []);
+          const ids = (payload.items ?? []).map((item) => String(item.trackedAgentId || '')).filter((item) => item.length > 0);
+          setTrackedAgentIds(Array.from(new Set(ids)));
         }
       } catch {
         // best effort
       }
     }
 
-    void loadSubs();
+    void loadTracked();
     return () => {
       cancelled = true;
     };
-  }, [ownerContext]);
-
-  useEffect(() => {
-    if (ownerContext.phase !== 'ready') {
-      setManagedAgentNames({});
-      return;
-    }
-    const managedAgents = ownerContext.managedAgents;
-    let cancelled = false;
-    async function loadManagedAgentNames() {
-      const names: Record<string, string> = {};
-      await Promise.all(
-        managedAgents.map(async (agentId) => {
-          try {
-            const response = await fetch(`/api/v1/public/agents/${encodeURIComponent(agentId)}`, { cache: 'no-store' });
-            if (!response.ok) {
-              names[agentId] = agentId;
-              return;
-            }
-            const payload = (await response.json()) as { agent?: { agent_name?: string | null } };
-            names[agentId] = payload.agent?.agent_name?.trim() || agentId;
-          } catch {
-            names[agentId] = agentId;
-          }
-        })
-      );
-      if (!cancelled) {
-        setManagedAgentNames(names);
-      }
-    }
-    void loadManagedAgentNames();
-    return () => {
-      cancelled = true;
-    };
-  }, [ownerContext]);
+  }, [chainKey, ownerContext]);
 
   useEffect(() => {
     let cancelled = false;
@@ -498,6 +424,7 @@ export default function ExplorePage() {
 
   const myAgentSet = useMemo(() => new Set(ownerContext.phase === 'ready' ? ownerContext.managedAgents : []), [ownerContext]);
   const favoriteSet = useMemo(() => new Set(favorites), [favorites]);
+  const trackedSet = useMemo(() => new Set(trackedAgentIds), [trackedAgentIds]);
 
   const scopedItems = useMemo(() => {
     const items = agentsPayload?.items ?? [];
@@ -505,10 +432,13 @@ export default function ExplorePage() {
       return items.filter((item) => myAgentSet.has(item.agentId));
     }
     if (section === 'favorites') {
+      if (ownerContext.phase === 'ready') {
+        return items.filter((item) => trackedSet.has(item.agentId));
+      }
       return items.filter((item) => favoriteSet.has(item.agentId));
     }
     return items;
-  }, [agentsPayload?.items, favoriteSet, myAgentSet, section]);
+  }, [agentsPayload?.items, favoriteSet, myAgentSet, ownerContext.phase, section, trackedSet]);
 
   const scopedTotal = useMemo(() => {
     if (section === 'all') {
@@ -522,81 +452,52 @@ export default function ExplorePage() {
     return Math.max(1, Math.ceil(scopedTotal / size));
   }, [agentsPayload?.pageSize, scopedTotal, section]);
 
-  function toggleFavorite(agentId: string) {
-    const next = favorites.includes(agentId) ? favorites.filter((item) => item !== agentId) : [...favorites, agentId];
-    setFavorites(next);
-    storeIds(FAVORITES_KEY, next);
-  }
-
-  function copySubscriptionForLeader(leaderAgentId: string) {
-    return (copySubscriptions ?? []).find((item) => item.leaderAgentId === leaderAgentId);
-  }
-
-  function managedAgentLabel(agentId: string): string {
-    return managedAgentNames[agentId] || agentId;
-  }
-
-  function openCopyModal(leader: ExploreAgent) {
+  async function toggleTracked(agentId: string) {
     if (ownerContext.phase !== 'ready') {
-      return;
-    }
-    const existing = copySubscriptionForLeader(leader.agentId);
-    const preferredFollower = existing?.followerAgentId ?? ownerContext.activeAgentId;
-    setCopyModal({
-      open: true,
-      leader,
-      followerAgentId: preferredFollower,
-      scaleBps: existing?.scaleBps ?? 10000,
-      maxTradeUsd: existing?.maxTradeUsd ?? '1000',
-      requirePerTradeApprovals: true
-    });
-  }
-
-  async function saveCopyTrade() {
-    if (!copyModal.leader || ownerContext.phase !== 'ready') {
+      const next = favorites.includes(agentId) ? favorites.filter((item) => item !== agentId) : [...favorites, agentId];
+      setFavorites(next);
+      storeIds(FAVORITES_KEY, next);
       return;
     }
 
-    setBusyCopy(true);
+    setBusyTrack(agentId);
     setNotice(null);
     setError(null);
 
     try {
-      const existing = copySubscriptionForLeader(copyModal.leader.agentId);
-      const payload = {
-        leaderAgentId: copyModal.leader.agentId,
-        followerAgentId: copyModal.followerAgentId,
-        enabled: true,
-        scaleBps: copyModal.scaleBps,
-        maxTradeUsd: copyModal.maxTradeUsd,
-        allowedTokens: [] as string[]
-      };
-
-      if (existing && existing.subscriptionId) {
-        await patchJson(`/api/v1/copy/subscriptions/${encodeURIComponent(existing.subscriptionId)}`, {
-          enabled: true,
-          scaleBps: payload.scaleBps,
-          maxTradeUsd: payload.maxTradeUsd,
-          allowedTokens: payload.allowedTokens
+      const tracked = trackedAgentIds.includes(agentId);
+      if (tracked) {
+        await fetch('/api/v1/management/tracked-agents', {
+          method: 'DELETE',
+          credentials: 'same-origin',
+          headers: {
+            'content-type': 'application/json',
+            ...(getCsrfToken() ? { 'x-csrf-token': getCsrfToken() as string } : {})
+          },
+          body: JSON.stringify({ agentId: ownerContext.activeAgentId, trackedAgentId: agentId })
+        }).then(async (response) => {
+          if (!response.ok) {
+            const payload = (await response.json().catch(() => null)) as { message?: string } | null;
+            throw new Error(payload?.message ?? 'Failed to remove tracked agent.');
+          }
         });
+        setTrackedAgentIds((current) => current.filter((item) => item !== agentId));
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('xclaw:favorites-updated'));
+        }
+        setNotice('Agent removed from tracked list.');
       } else {
-        await postJson('/api/v1/copy/subscriptions', payload);
+        await postJson('/api/v1/management/tracked-agents', { agentId: ownerContext.activeAgentId, trackedAgentId: agentId });
+        setTrackedAgentIds((current) => Array.from(new Set([...current, agentId])));
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('xclaw:favorites-updated'));
+        }
+        setNotice('Agent added to tracked list.');
       }
-
-      const response = await fetch('/api/v1/copy/subscriptions', { cache: 'no-store', credentials: 'same-origin' });
-      if (response.ok) {
-        const refreshed = (await response.json()) as CopySubscriptionPayload;
-        setCopySubscriptions(refreshed.items ?? []);
-      }
-
-      setNotice(
-        `Copy trading is on: ${managedAgentLabel(copyModal.followerAgentId)} now copies ${copyModal.leader.agentName}.`
-      );
-      setCopyModal((current) => ({ ...current, open: false, leader: null }));
-    } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : 'Failed to save copy relationship.');
+    } catch (toggleError) {
+      setError(toggleError instanceof Error ? toggleError.message : 'Failed to update tracked agent list.');
     } finally {
-      setBusyCopy(false);
+      setBusyTrack(null);
     }
   }
 
@@ -645,7 +546,7 @@ export default function ExplorePage() {
 
   function renderCard(item: ExploreAgent) {
     const owner = ownerContext.phase === 'ready';
-    const copyRel = copySubscriptionForLeader(item.agentId);
+    const isTracked = owner ? trackedAgentIds.includes(item.agentId) : favorites.includes(item.agentId);
     const canEditProfile = owner && myAgentSet.has(item.agentId);
     const avatarPalette = getAgentAvatarPalette(item.agentId);
     const avatarInitial = getAgentInitial(item.agentName, item.agentId);
@@ -669,8 +570,8 @@ export default function ExplorePage() {
               <h3>
                 <Link href={`/agents/${encodeURIComponent(item.agentId)}`}>{item.agentName}</Link>
               </h3>
-              <button type="button" className={styles.starBtn} onClick={() => toggleFavorite(item.agentId)} aria-label="Toggle favorite">
-                {favorites.includes(item.agentId) ? '★' : '☆'}
+              <button type="button" className={styles.starBtn} onClick={() => void toggleTracked(item.agentId)} aria-label="Toggle tracked">
+                {isTracked ? '★' : '☆'}
               </button>
             </div>
           </div>
@@ -693,19 +594,19 @@ export default function ExplorePage() {
             <strong>{formatUsd(item.volumeUsd)}</strong>
           </div>
           <div>
-            <span>Followers</span>
-            <strong>{formatNumber(item.followerMeta.followersCount)}</strong>
+            <span>Trades</span>
+            <strong>{formatNumber(item.tradesCount)}</strong>
           </div>
         </div>
 
         <div className={styles.metaRow}>
           <span className={styles.chip}>{badgeLabel(item)}</span>
-          <span className={styles.chip}>Active Copiers: {formatNumber(item.followerMeta.copyEnabledFollowers)}</span>
-          <span className={styles.chip}>Follower Rank: {item.followerMeta.followerRankPercentile ?? '0'}</span>
+          <span className={styles.chip}>Status: {item.publicStatus}</span>
+          <span className={styles.chip}>Last Active: {item.lastActivityAt ? 'Recent' : 'Unknown'}</span>
         </div>
 
         {item.exploreProfile.descriptionShort ? <p className={styles.copyState}>{item.exploreProfile.descriptionShort}</p> : null}
-        {copyRel?.enabled ? <p className={styles.copyState}>You are copying this with: {managedAgentLabel(copyRel.followerAgentId)}</p> : null}
+        {isTracked ? <p className={styles.copyState}>Tracked for your watchlist.</p> : null}
 
         <div className={styles.actionRow}>
           <Link href={`/agents/${encodeURIComponent(item.agentId)}`} className={styles.viewBtn}>
@@ -714,11 +615,11 @@ export default function ExplorePage() {
           <button
             type="button"
             className={styles.copyBtn}
-            onClick={() => openCopyModal(item)}
-            disabled={!owner}
-            title={!owner ? 'Claim or connect an agent first to copy trades.' : 'Copy this agent'}
+            onClick={() => void toggleTracked(item.agentId)}
+            disabled={busyTrack === item.agentId}
+            title={owner ? (isTracked ? 'Remove from tracked list' : 'Track this agent') : 'Save to this device watchlist'}
           >
-            Copy Trade
+            {busyTrack === item.agentId ? 'Saving...' : isTracked ? 'Tracked' : 'Track Agent'}
           </button>
           {canEditProfile ? (
             <button type="button" className={styles.copyBtn} onClick={() => openProfileModal(item)}>
@@ -727,7 +628,7 @@ export default function ExplorePage() {
           ) : null}
         </div>
 
-        {!owner ? <p className={styles.gated}>Claim or connect an agent first to start copy trading.</p> : null}
+        {!owner ? <p className={styles.gated}>No owner session detected. Saved stars are device-only on this browser.</p> : null}
       </article>
     );
   }
@@ -752,7 +653,7 @@ export default function ExplorePage() {
           </div>
         </header>
         <p className={styles.helperText}>
-          Pick an agent, review performance, and start copy trading with clear limits before any money moves.
+          Track agents you trust, review what they trade, then decide your own trades with approvals.
         </p>
 
         {notice ? <p className={styles.successBanner}>{notice}</p> : null}
@@ -800,7 +701,6 @@ export default function ExplorePage() {
                 <option value="pnl">Profit (USD)</option>
                 <option value="volume">Volume (USD)</option>
                 <option value="winrate">Return %</option>
-                <option value="followers">Followers</option>
                 <option value="recent">Recently Active</option>
                 <option value="name">Name</option>
               </select>
@@ -858,16 +758,6 @@ export default function ExplorePage() {
             </div>
             <div className={styles.controls}>
               <label>
-                Min Followers
-                <input
-                  value={minFollowers}
-                  onChange={(event) => {
-                    setMinFollowers(event.target.value.replace(/[^0-9]/g, '') || '0');
-                    setPage(1);
-                  }}
-                />
-              </label>
-              <label>
                 Min Volume (USD)
                 <input
                   value={minVolumeUsd}
@@ -893,7 +783,15 @@ export default function ExplorePage() {
 
         <section className={styles.sectionCard}>
           <div className={styles.sectionHeader}>
-            <h2>{section === 'mine' ? 'My Agents' : section === 'favorites' ? 'Saved Agents' : 'All Agents'}</h2>
+            <h2>
+              {section === 'mine'
+                ? 'My Agents'
+                : section === 'favorites'
+                  ? ownerContext.phase === 'ready'
+                    ? 'Tracked Agents'
+                    : 'Saved Agents'
+                  : 'All Agents'}
+            </h2>
             <span>{formatNumber(scopedTotal)}</span>
           </div>
 
@@ -923,70 +821,6 @@ export default function ExplorePage() {
           ) : null}
         </section>
       </section>
-
-      {copyModal.open && copyModal.leader ? (
-        <div className={styles.modalOverlay} role="dialog" aria-modal="true" aria-label="Copy trade configuration">
-          <div className={styles.modalCard}>
-            <h3>Set Up Copy Trading</h3>
-            <p className={styles.muted}>You are copying: {copyModal.leader.agentName}</p>
-
-            <label>
-              Choose your agent (this one will place the copied trades)
-              <select
-                value={copyModal.followerAgentId}
-                onChange={(event) => setCopyModal((current) => ({ ...current, followerAgentId: event.target.value }))}
-              >
-                {(ownerContext.phase === 'ready' ? ownerContext.managedAgents : []).map((agentId) => (
-                  <option key={agentId} value={agentId}>
-                    {managedAgentLabel(agentId)}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label>
-              Copy amount
-              <select
-                value={copyModal.scaleBps}
-                onChange={(event) => setCopyModal((current) => ({ ...current, scaleBps: Number(event.target.value) || 10000 }))}
-              >
-                <option value={2500}>25% of each trade</option>
-                <option value={5000}>50% of each trade</option>
-                <option value={10000}>100% (same size)</option>
-                <option value={20000}>200% (double size)</option>
-              </select>
-            </label>
-
-            <label>
-              Max trade size (USD)
-              <input value={copyModal.maxTradeUsd} onChange={(event) => setCopyModal((current) => ({ ...current, maxTradeUsd: event.target.value }))} />
-            </label>
-            <p className={styles.muted}>Safety limit: copied trades above this amount will be skipped.</p>
-
-            <label className={styles.checkbox}>
-              <input
-                type="checkbox"
-                checked={copyModal.requirePerTradeApprovals}
-                onChange={(event) => setCopyModal((current) => ({ ...current, requirePerTradeApprovals: event.target.checked }))}
-              />
-              Ask for approval before each copied trade
-            </label>
-
-            <div className={styles.modalActions}>
-              <button
-                type="button"
-                onClick={() => setCopyModal((current) => ({ ...current, open: false, leader: null }))}
-                disabled={busyCopy}
-              >
-                Cancel
-              </button>
-              <button type="button" onClick={() => void saveCopyTrade()} disabled={busyCopy}>
-                {busyCopy ? 'Saving...' : 'Start Copying'}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
 
       {profileModal.open ? (
         <div className={styles.modalOverlay} role="dialog" aria-modal="true" aria-label="Explore profile configuration">

@@ -1556,3 +1556,29 @@ DoD:
 - [x] keep `/explore` canonical and `/agents` alias behavior unchanged.
 - [x] update OpenAPI + shared schemas for new/extended contracts.
 - [x] required validation gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all` (sequential).
+
+---
+
+## Slice 82: Track-Not-Copy Pivot (Saved Agents -> OpenClaw Watchlist)
+Status: [x]
+Issue: #32
+
+Goal:
+- Pivot product surfaces from copy trading to tracked-agent monitoring with server-backed tracked relations per managed agent.
+
+DoD:
+- [x] docs sync first: source-of-truth + roadmap + tracker + wallet contract + context/spec/tasks/acceptance aligned to Slice 82.
+- [x] migration adds `agent_tracked_agents` with uniqueness and self-track guard.
+- [x] management tracked APIs implemented:
+  - [x] `GET/POST/DELETE /api/v1/management/tracked-agents`
+  - [x] `GET /api/v1/management/tracked-trades`
+- [x] agent runtime tracked APIs implemented:
+  - [x] `GET /api/v1/agent/tracked-agents`
+  - [x] `GET /api/v1/agent/tracked-trades`
+- [x] `GET /api/v1/management/agent-state` extended with `trackedAgents` + `trackedRecentTrades`.
+- [x] Explore product surface uses `Track Agent` action and removes copy-trade modal/CTA.
+- [x] `/agents/[agentId]` uses tracked-agents module (list/remove + recent tracked filled trades) and removes copy-subscription module.
+- [x] left rail saved icons sync with server tracked agents for owner sessions; localStorage remains fallback when no session.
+- [x] runtime `dashboard` includes tracked summary; runtime CLI adds `tracked list` and `tracked trades`; skill wrapper adds `tracked-list` and `tracked-trades`.
+- [x] copy subscription APIs remain available but are marked deprecated in OpenAPI for transition compatibility.
+- [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all` (sequential), runtime tracked tests.

@@ -41,21 +41,29 @@ type ManagementViewState =
   | { phase: 'error'; message: string }
   | { phase: 'ready'; data: ManagementStatePayload };
 
-type CopySubscription = {
-  subscriptionId: string;
-  leaderAgentId: string;
-  followerAgentId: string;
-  enabled: boolean;
-  scaleBps: number;
-  maxTradeUsd: string | null;
-  allowedTokens: string[];
+type TrackedAgent = {
+  trackingId: string;
+  trackedAgentId: string;
+  agentName: string;
+  publicStatus: string;
+  walletAddress: string | null;
+  lastActivityAt: string | null;
+  lastHeartbeatAt: string | null;
+  latestMetrics: {
+    pnlUsd: string | null;
+    returnPct: string | null;
+    volumeUsd: string | null;
+    tradesCount: number;
+    asOf: string | null;
+  } | null;
   createdAt: string;
-  updatedAt: string;
 };
 
-type CopySubscriptionsGetPayload = {
+type TrackedAgentsGetPayload = {
   ok: boolean;
-  items: CopySubscription[];
+  agentId: string;
+  chainKey: string;
+  items: TrackedAgent[];
 };
 
 type WalletActivityFilter = 'all' | 'trades' | 'transfers' | 'approvals' | 'deposits';
@@ -381,7 +389,7 @@ export default function AgentPublicProfilePage() {
   const [x402RequestMemo, setX402RequestMemo] = useState('');
   const [x402RequestAssetSymbol, setX402RequestAssetSymbol] = useState<'ETH' | 'USDC' | 'WETH'>('ETH');
   const [limitOrders, setLimitOrders] = useState<LimitOrderItem[]>([]);
-  const [copySubscriptions, setCopySubscriptions] = useState<CopySubscription[]>([]);
+  const [trackedAgents, setTrackedAgents] = useState<TrackedAgent[]>([]);
   const [vaultAddressCopied, setVaultAddressCopied] = useState(false);
   const vaultCopyResetTimerRef = useRef<number | null>(null);
   const telegramAutoEnableInFlightRef = useRef<Set<string>>(new Set());
@@ -403,8 +411,8 @@ export default function AgentPublicProfilePage() {
   const [auditPage, setAuditPage] = useState(1);
   const [walletExpanded, setWalletExpanded] = useState(false);
   const [walletPage, setWalletPage] = useState(1);
-  const [copyExpanded, setCopyExpanded] = useState(false);
-  const [copyPage, setCopyPage] = useState(1);
+  const [trackedExpanded, setTrackedExpanded] = useState(false);
+  const [trackedPage, setTrackedPage] = useState(1);
   const [limitExpanded, setLimitExpanded] = useState(false);
   const [limitPage, setLimitPage] = useState(1);
 
@@ -500,7 +508,7 @@ export default function AgentPublicProfilePage() {
       setX402Payments(null);
       setX402ReceiveLink(null);
       setLimitOrders([]);
-      setCopySubscriptions([]);
+      setTrackedAgents([]);
       return;
     }
 
@@ -544,19 +552,19 @@ export default function AgentPublicProfilePage() {
       }
     }
 
-    const [depositPayload, x402PaymentsPayload, x402ReceivePayload, limitOrderPayload, copyPayload] = await Promise.all([
+    const [depositPayload, x402PaymentsPayload, x402ReceivePayload, limitOrderPayload, trackedPayload] = await Promise.all([
       managementGet(`/api/v1/management/deposit?agentId=${encodeURIComponent(agentId)}&chainKey=${encodeURIComponent(activeChainKey)}`),
       managementGet(`/api/v1/management/x402/payments?agentId=${encodeURIComponent(agentId)}&chainKey=${encodeURIComponent(activeChainKey)}`),
       managementGet(`/api/v1/management/x402/receive-link?agentId=${encodeURIComponent(agentId)}&chainKey=${encodeURIComponent(activeChainKey)}`),
       managementGet(`/api/v1/management/limit-orders?agentId=${encodeURIComponent(agentId)}&limit=50`),
-      managementGet('/api/v1/copy/subscriptions')
+      managementGet(`/api/v1/management/tracked-agents?agentId=${encodeURIComponent(agentId)}&chainKey=${encodeURIComponent(activeChainKey)}`)
     ]);
 
     setDepositData(depositPayload as DepositPayload);
     setX402Payments(x402PaymentsPayload as X402PaymentsPayload);
     setX402ReceiveLink(x402ReceivePayload as X402ReceiveLinkPayload);
     setLimitOrders(((limitOrderPayload as { items?: LimitOrderItem[] }).items ?? []).filter(Boolean));
-    setCopySubscriptions(((copyPayload as CopySubscriptionsGetPayload).items ?? []).filter(Boolean));
+    setTrackedAgents(((trackedPayload as TrackedAgentsGetPayload).items ?? []).filter(Boolean));
   }, [activeChainKey, agentId]);
 
   const refreshAll = useCallback(async (options?: { showLoading?: boolean }) => {
@@ -1299,15 +1307,15 @@ export default function AgentPublicProfilePage() {
     const start = (normalizedWalletPage - 1) * 10;
     return holdings.slice(start, start + 10);
   }, [holdings, normalizedWalletPage, walletExpanded]);
-  const copyTotalPages = copyExpanded ? Math.max(1, Math.ceil(copySubscriptions.length / 10)) : 1;
-  const normalizedCopyPage = Math.min(copyPage, copyTotalPages);
-  const visibleCopySubscriptions = useMemo(() => {
-    if (!copyExpanded) {
-      return copySubscriptions.slice(0, 3);
+  const trackedTotalPages = trackedExpanded ? Math.max(1, Math.ceil(trackedAgents.length / 10)) : 1;
+  const normalizedTrackedPage = Math.min(trackedPage, trackedTotalPages);
+  const visibleTrackedAgents = useMemo(() => {
+    if (!trackedExpanded) {
+      return trackedAgents.slice(0, 3);
     }
-    const start = (normalizedCopyPage - 1) * 10;
-    return copySubscriptions.slice(start, start + 10);
-  }, [copyExpanded, copySubscriptions, normalizedCopyPage]);
+    const start = (normalizedTrackedPage - 1) * 10;
+    return trackedAgents.slice(start, start + 10);
+  }, [normalizedTrackedPage, trackedAgents, trackedExpanded]);
   const limitTotalPages = limitExpanded ? Math.max(1, Math.ceil(limitOrders.length / 10)) : 1;
   const normalizedLimitPage = Math.min(limitPage, limitTotalPages);
   const visibleLimitOrders = useMemo(() => {
@@ -1317,6 +1325,7 @@ export default function AgentPublicProfilePage() {
     const start = (normalizedLimitPage - 1) * 10;
     return limitOrders.slice(start, start + 10);
   }, [limitExpanded, limitOrders, normalizedLimitPage]);
+  const trackedRecentTrades = management.phase === 'ready' ? management.data.trackedRecentTrades ?? [] : [];
 
   useEffect(() => {
     setWalletPage(1);
@@ -1327,8 +1336,8 @@ export default function AgentPublicProfilePage() {
   }, [walletActivityExpanded, walletActivityFilter, selectedWalletTokens, filteredWalletTimeline.length]);
 
   useEffect(() => {
-    setCopyPage(1);
-  }, [copyExpanded, copySubscriptions.length]);
+    setTrackedPage(1);
+  }, [trackedAgents.length, trackedExpanded]);
 
   useEffect(() => {
     setLimitPage(1);
@@ -2211,22 +2220,23 @@ export default function AgentPublicProfilePage() {
 
             <article className={`${styles.card} ${styles.walletCard}`}>
             <div className={`${styles.cardHeader} ${styles.walletCardHeader}`}>
-              <h3>Copy Trading</h3>
-              <span>{isOwner ? `${copySubscriptions.length} connections` : 'view only'}</span>
+              <h3>Tracked Agents</h3>
+              <span>{isOwner ? `${trackedAgents.length} tracked` : 'view only'}</span>
             </div>
-            {!isOwner ? <p className={styles.muted}>Only the owner can manage copy trading.</p> : null}
+            {!isOwner ? <p className={styles.muted}>Only the owner can manage tracked agents.</p> : null}
             <p className={styles.muted}>
-              Start copy trading from <Link href="/explore" className={styles.inlineLink}>Explore</Link>. This panel is for review and delete only.
+              Track agents from <Link href="/explore?section=saved" className={styles.inlineLink}>Explore</Link>. Use this list for ideas and manual trades.
             </p>
             {isOwner ? (
               <>
-                {copySubscriptions.length === 0 ? <p className={styles.muted}>No copy subscriptions configured.</p> : null}
-                {visibleCopySubscriptions.map((item) => (
-                  <div key={item.subscriptionId} className={styles.railQueueRow}>
+                {trackedAgents.length === 0 ? <p className={styles.muted}>No tracked agents yet.</p> : null}
+                {visibleTrackedAgents.map((item) => (
+                  <div key={item.trackingId} className={styles.railQueueRow}>
                     <div>
-                      <div className={styles.listTitle}>Source agent: {shortenHex(item.leaderAgentId, 6, 4)}</div>
+                      <div className={styles.listTitle}>{item.agentName}</div>
                       <div className={styles.muted}>
-                        {item.enabled ? 'Active' : 'Paused'} · size {(item.scaleBps / 10000).toFixed(2)}x · max {item.maxTradeUsd ?? '—'}
+                        {humanizeKeyLabel(item.publicStatus)} · PnL {formatUsd(item.latestMetrics?.pnlUsd ?? '0')} · Volume{' '}
+                        {formatUsd(item.latestMetrics?.volumeUsd ?? '0')}
                       </div>
                     </div>
                     <div className={styles.inlineActions}>
@@ -2235,49 +2245,37 @@ export default function AgentPublicProfilePage() {
                         className={styles.dangerButton}
                         onClick={() =>
                           void runManagementAction(
-                            () =>
-                              fetch(`/api/v1/copy/subscriptions/${encodeURIComponent(item.subscriptionId)}`, {
-                                method: 'DELETE',
-                                credentials: 'same-origin',
-                                headers: {
-                                  ...(getCsrfToken() ? { 'x-csrf-token': getCsrfToken() as string } : {})
-                                }
-                              }).then((res) => {
-                                if (!res.ok) {
-                                  throw new Error('Failed to delete copy subscription.');
-                                }
-                                return Promise.resolve();
-                              }),
-                            'Copy connection deleted.'
+                            () => managementDelete('/api/v1/management/tracked-agents', { agentId, trackedAgentId: item.trackedAgentId }).then(() => Promise.resolve()),
+                            'Tracked agent removed.'
                           )
                         }
                       >
-                        Delete
+                        Remove
                       </button>
                     </div>
                   </div>
                 ))}
-                {copySubscriptions.length > 3 ? (
+                {trackedAgents.length > 3 ? (
                   <div className={styles.paginationRow}>
-                    <button type="button" onClick={() => setCopyExpanded((current) => !current)}>
-                      {copyExpanded ? 'Show less' : 'Show more'}
+                    <button type="button" onClick={() => setTrackedExpanded((current) => !current)}>
+                      {trackedExpanded ? 'Show less' : 'Show more'}
                     </button>
-                    {copyExpanded && copySubscriptions.length > 10 ? (
+                    {trackedExpanded && trackedAgents.length > 10 ? (
                       <div className={styles.paginationControls}>
                         <button
                           type="button"
-                          onClick={() => setCopyPage((current) => Math.max(1, current - 1))}
-                          disabled={normalizedCopyPage <= 1}
+                          onClick={() => setTrackedPage((current) => Math.max(1, current - 1))}
+                          disabled={normalizedTrackedPage <= 1}
                         >
                           Prev
                         </button>
                         <span className={styles.muted}>
-                          Page {normalizedCopyPage} / {copyTotalPages}
+                          Page {normalizedTrackedPage} / {trackedTotalPages}
                         </span>
                         <button
                           type="button"
-                          onClick={() => setCopyPage((current) => Math.min(copyTotalPages, current + 1))}
-                          disabled={normalizedCopyPage >= copyTotalPages}
+                          onClick={() => setTrackedPage((current) => Math.min(trackedTotalPages, current + 1))}
+                          disabled={normalizedTrackedPage >= trackedTotalPages}
                         >
                           Next
                         </button>
@@ -2285,6 +2283,28 @@ export default function AgentPublicProfilePage() {
                     ) : null}
                   </div>
                 ) : null}
+                <div className={styles.muted} style={{ marginTop: '0.6rem' }}>Recent tracked trades</div>
+                {trackedRecentTrades.length === 0 ? <p className={styles.muted}>No recent filled trades from tracked agents.</p> : null}
+                {trackedRecentTrades.slice(0, 6).map((trade) => (
+                  <div key={trade.tradeId} className={styles.railQueueRow}>
+                    <div>
+                      <div className={styles.listTitle}>
+                        <Link href={`/agents/${encodeURIComponent(trade.trackedAgentId)}`} className={styles.inlineLink}>
+                          {trade.agentName}
+                        </Link>{' '}
+                        · {displayStatusLabel(trade.status)}
+                      </div>
+                      <div className={styles.muted}>
+                        {(trade.pair ?? `${trade.tokenIn} -> ${trade.tokenOut}`)} · {formatUtc(trade.createdAt)} UTC
+                      </div>
+                    </div>
+                    <div className={styles.inlineActions}>
+                      <Link href={`/agents/${encodeURIComponent(trade.trackedAgentId)}`} className={styles.inlineLink}>
+                        Open
+                      </Link>
+                    </div>
+                  </div>
+                ))}
               </>
             ) : null}
           </article>

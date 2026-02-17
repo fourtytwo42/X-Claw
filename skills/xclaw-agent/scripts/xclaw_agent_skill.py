@@ -248,7 +248,7 @@ def main(argv: List[str]) -> int:
         return _err(
             "usage",
             "Missing command.",
-            "Use one of: status, dashboard, intents-poll, approval-check, trade-exec, trade-spot, trade-resume, transfer-resume, transfer-decide, transfer-policy-get, transfer-policy-set, report-send, chat-poll, chat-post, username-set, owner-link, faucet-request, x402-pay, x402-pay-resume, x402-pay-decide, x402-policy-get, x402-policy-set, x402-networks, request-x402-payment, limit-orders-create, limit-orders-cancel, limit-orders-list, limit-orders-run-once, limit-orders-run-loop, wallet-health, wallet-address, wallet-sign-challenge, wallet-send, wallet-send-token, wallet-balance, wallet-token-balance",
+            "Use one of: status, dashboard, intents-poll, approval-check, trade-exec, trade-spot, trade-resume, transfer-resume, transfer-decide, transfer-policy-get, transfer-policy-set, report-send, chat-poll, chat-post, tracked-list, tracked-trades, username-set, owner-link, faucet-request, x402-pay, x402-pay-resume, x402-pay-decide, x402-policy-get, x402-policy-set, x402-networks, request-x402-payment, limit-orders-create, limit-orders-cancel, limit-orders-list, limit-orders-run-once, limit-orders-run-loop, wallet-health, wallet-address, wallet-sign-challenge, wallet-send, wallet-send-token, wallet-balance, wallet-token-balance",
             exit_code=2,
         )
 
@@ -273,6 +273,8 @@ def main(argv: List[str]) -> int:
         "report-send",
         "chat-poll",
         "chat-post",
+        "tracked-list",
+        "tracked-trades",
         "username-set",
         "owner-link",
         "faucet-request",
@@ -470,6 +472,19 @@ def main(argv: List[str]) -> int:
         if len(argv) < 3:
             return _err("usage", "chat-post requires <message>", "usage: chat-post <message>", exit_code=2)
         return _run_agent(["chat", "post", "--message", argv[2], "--chain", chain, "--json"])
+
+    if cmd == "tracked-list":
+        return _run_agent(["tracked", "list", "--chain", chain, "--json"])
+
+    if cmd == "tracked-trades":
+        args = ["tracked", "trades", "--chain", chain, "--json"]
+        if len(argv) >= 3 and str(argv[2]).strip():
+            args.extend(["--agent", str(argv[2]).strip()])
+        if len(argv) >= 4 and str(argv[3]).strip():
+            if not _is_uint_string(str(argv[3]).strip()):
+                return _err("invalid_input", "limit must be an integer.", "usage: tracked-trades [tracked_agent_id] [limit]", exit_code=2)
+            args.extend(["--limit", str(argv[3]).strip()])
+        return _run_agent(args)
 
     if cmd == "username-set":
         if len(argv) < 3:
@@ -719,7 +734,7 @@ def main(argv: List[str]) -> int:
     return _err(
         "unknown_command",
         f"Unknown command: {cmd}",
-        "Use one of: status, dashboard, intents-poll, approval-check, trade-exec, trade-spot, trade-resume, transfer-resume, transfer-decide, transfer-policy-get, transfer-policy-set, report-send, chat-poll, chat-post, username-set, owner-link, faucet-request, x402-pay, x402-pay-resume, x402-pay-decide, x402-policy-get, x402-policy-set, x402-networks, request-x402-payment, limit-orders-create, limit-orders-cancel, limit-orders-list, limit-orders-run-once, limit-orders-run-loop, wallet-health, wallet-address, wallet-sign-challenge, wallet-send, wallet-send-token, wallet-balance, wallet-token-balance",
+        "Use one of: status, dashboard, intents-poll, approval-check, trade-exec, trade-spot, trade-resume, transfer-resume, transfer-decide, transfer-policy-get, transfer-policy-set, report-send, chat-poll, chat-post, tracked-list, tracked-trades, username-set, owner-link, faucet-request, x402-pay, x402-pay-resume, x402-pay-decide, x402-policy-get, x402-policy-set, x402-networks, request-x402-payment, limit-orders-create, limit-orders-cancel, limit-orders-list, limit-orders-run-once, limit-orders-run-loop, wallet-health, wallet-address, wallet-sign-challenge, wallet-send, wallet-send-token, wallet-balance, wallet-token-balance",
         exit_code=2,
     )
 

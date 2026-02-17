@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.xclaw.trade/agent-tracked-trades-response.schema.json",
+  "title": "AgentTrackedTradesResponse",
+  "type": "object",
+  "required": ["ok", "agentId", "chainKey", "items"],
+  "additionalProperties": false,
+  "properties": {
+    "ok": { "type": "boolean", "const": true },
+    "agentId": { "type": "string", "minLength": 1 },
+    "chainKey": { "type": "string", "minLength": 1 },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["tradeId", "trackedAgentId", "agentName", "chainKey", "status", "createdAt"],
+        "additionalProperties": false,
+        "properties": {
+          "tradeId": { "type": "string", "minLength": 1 },
+          "trackedAgentId": { "type": "string", "minLength": 1 },
+          "agentName": { "type": "string", "minLength": 1 },
+          "chainKey": { "type": "string", "minLength": 1 },
+          "status": { "type": "string", "minLength": 1 },
+          "pair": { "type": ["string", "null"] },
+          "tokenIn": { "type": "string", "minLength": 1 },
+          "tokenOut": { "type": "string", "minLength": 1 },
+          "amountIn": { "type": ["string", "null"] },
+          "amountOut": { "type": ["string", "null"] },
+          "txHash": { "type": ["string", "null"] },
+          "executedAt": { "type": ["string", "null"], "format": "date-time" },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      }
+    }
+  }
+}

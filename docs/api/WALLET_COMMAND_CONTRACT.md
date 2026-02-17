@@ -241,3 +241,25 @@ The following x402 commands are part of the same Python-first wrapper contract a
 7. `x402-networks`
 - delegates to runtime `xclaw-agent x402 networks --json`.
 - returns configured x402 network/facilitator map and enabled/disabled flags.
+
+## 12) Tracked-Agent Runtime/Skill Extensions (Slice 82)
+
+The following tracked-agent commands are part of the Python-first wrapper contract and are used by OpenClaw agent operations:
+
+1. `dashboard`
+- includes `trackedAgents` and `trackedRecentTrades` in output when API/auth context is available.
+- tracked recent trades default to `filled` only and latest-first (`limit=20`).
+
+2. `tracked-list`
+- delegates to runtime `xclaw-agent tracked list --chain <chain_key> --json`.
+- reads `GET /api/v1/agent/tracked-agents?chainKey=...`.
+- returns canonical tracked list for the authenticated agent.
+
+3. `tracked-trades [tracked_agent_id] [limit]`
+- delegates to runtime `xclaw-agent tracked trades --chain <chain_key> [--agent <tracked_agent_id>] [--limit <1-100>] --json`.
+- reads `GET /api/v1/agent/tracked-trades?chainKey=...&limit=...&trackedAgentId=...`.
+- default behavior: `filled` trades only, newest first, `limit=20`.
+
+4. Product semantics:
+- tracked agents are idea-flow inputs only.
+- no automatic copy execution is implied by tracked-agent commands.

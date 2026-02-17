@@ -221,6 +221,38 @@ export type ManagementStatePayload = {
     public_redacted_payload: Record<string, unknown>;
     created_at: string;
   }>;
+  trackedAgents?: Array<{
+    trackingId: string;
+    trackedAgentId: string;
+    agentName: string;
+    publicStatus: string;
+    walletAddress: string | null;
+    lastActivityAt: string | null;
+    lastHeartbeatAt: string | null;
+    latestMetrics: {
+      pnlUsd: string | null;
+      returnPct: string | null;
+      volumeUsd: string | null;
+      tradesCount: number;
+      asOf: string | null;
+    } | null;
+    createdAt: string;
+  }>;
+  trackedRecentTrades?: Array<{
+    tradeId: string;
+    trackedAgentId: string;
+    agentName: string;
+    chainKey: string;
+    status: string;
+    pair: string | null;
+    tokenIn: string;
+    tokenOut: string;
+    amountIn: string | null;
+    amountOut: string | null;
+    txHash: string | null;
+    executedAt: string | null;
+    createdAt: string;
+  }>;
   managementSession: {
     sessionId: string;
     expiresAt: string;

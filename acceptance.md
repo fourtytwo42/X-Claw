@@ -4025,3 +4025,47 @@ Issue mapping: `#26` (`https://github.com/fourtytwo42/ETHDenver2026/issues/26`)
 - `npm run seed:verify` -> PASS (`ok: true`)
 - `npm run build` -> PASS (Next.js production build complete)
 - `pm2 restart all` -> PASS (`xclaw-web` online)
+
+---
+
+## Slice 82 Acceptance Evidence
+
+Date (UTC): 2026-02-17
+Active slice: `Slice 82: Track-Not-Copy Pivot (Saved Agents -> OpenClaw Watchlist)`
+Issue mapping: `#32` (`https://github.com/fourtytwo42/ETHDenver2026/issues/32`)
+
+### Objective + scope lock
+- Objective: replace copy-trade product surfaces with tracked-agent monitoring and expose tracked summaries to runtime.
+- Scope guard honored: copy backend APIs remain available for compatibility and are marked deprecated in OpenAPI.
+
+### File-level evidence
+- `infrastructure/migrations/0020_slice82_agent_tracking.sql`
+- `apps/network-web/src/app/api/v1/management/tracked-agents/route.ts`
+- `apps/network-web/src/app/api/v1/management/tracked-trades/route.ts`
+- `apps/network-web/src/app/api/v1/agent/tracked-agents/route.ts`
+- `apps/network-web/src/app/api/v1/agent/tracked-trades/route.ts`
+- `apps/network-web/src/app/api/v1/management/agent-state/route.ts`
+- `apps/network-web/src/app/explore/page.tsx`
+- `apps/network-web/src/app/agents/[agentId]/page.tsx`
+- `apps/network-web/src/components/primary-nav.tsx`
+- `apps/agent-runtime/xclaw_agent/cli.py`
+- `apps/agent-runtime/tests/test_tracked_runtime.py`
+- `skills/xclaw-agent/scripts/xclaw_agent_skill.py`
+- `docs/api/openapi.v1.yaml`
+- `docs/api/WALLET_COMMAND_CONTRACT.md`
+
+### Required gates
+- `python3 -m unittest apps/agent-runtime/tests/test_tracked_runtime.py -v` -> PASS (3 tests)
+- `python3 -m unittest apps/agent-runtime/tests/test_x402_skill_wrapper.py -v` -> PASS (5 tests)
+- `npm run db:parity` -> PASS (`ok: true`)
+- `npm run seed:reset` -> PASS
+- `npm run seed:load` -> PASS
+- `npm run seed:verify` -> PASS (`ok: true`)
+- `npm run build` -> PASS
+- `pm2 restart all` -> PASS (`xclaw-web` online)
+
+### Functional checks
+- Explore shows `Track Agent` CTA and no copy modal -> PASS (code-path verified)
+- tracked agent add/remove reflects in left rail icons -> PASS (code-path verified)
+- `/agents/[agentId]` tracked panel list/remove works -> PASS (code-path verified)
+- runtime `dashboard` includes `trackedAgents` + `trackedRecentTrades` -> PASS (unit/code-path verified)

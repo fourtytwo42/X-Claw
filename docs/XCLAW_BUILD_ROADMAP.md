@@ -2755,3 +2755,48 @@ Note:
   - [x] functional URL-deep-link filter replay
   - [x] owner-managed Explore profile edit reflects on public Explore cards
   - [x] owner/viewer copy-trade gating remains intact
+
+---
+
+## 82) Slice 82: Track-Not-Copy Pivot (Saved Agents -> OpenClaw Watchlist)
+
+### 82.1 Canonical/doc sync
+- [x] Add Slice 82 goal/DoD + issue mapping to `docs/XCLAW_SLICE_TRACKER.md`.
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` with locked track-not-copy product contract.
+- [x] Update handoff/process artifacts:
+  - [x] `docs/CONTEXT_PACK.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+- [x] Update `docs/api/WALLET_COMMAND_CONTRACT.md` with tracked runtime/skill obligations.
+- [x] Update `docs/api/openapi.v1.yaml` with tracked routes and copy-route deprecation notes.
+
+### 82.2 Implementation
+- [x] Add migration `infrastructure/migrations/0020_slice82_agent_tracking.sql`.
+- [x] Add tracked APIs:
+  - [x] `apps/network-web/src/app/api/v1/management/tracked-agents/route.ts`
+  - [x] `apps/network-web/src/app/api/v1/management/tracked-trades/route.ts`
+  - [x] `apps/network-web/src/app/api/v1/agent/tracked-agents/route.ts`
+  - [x] `apps/network-web/src/app/api/v1/agent/tracked-trades/route.ts`
+- [x] Extend management agent-state payload with `trackedAgents` and `trackedRecentTrades`.
+- [x] Pivot Explore UI from copy CTA/modal to tracked-agent flow.
+- [x] Pivot `/agents/[agentId]` copy module to tracked-agents module.
+- [x] Sync left-rail saved icons to server tracked list for owner sessions with local fallback.
+- [x] Extend runtime and skill:
+  - [x] `xclaw-agent dashboard` includes tracked summaries
+  - [x] `xclaw-agent tracked list`
+  - [x] `xclaw-agent tracked trades`
+  - [x] `xclaw_agent_skill.py tracked-list|tracked-trades`
+- [x] Add/extend tracked schemas under `packages/shared-schemas/json/`.
+
+### 82.3 Validation + evidence
+- [x] Run required gates sequentially:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `pm2 restart all`
+- [x] Runtime tests:
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_tracked_runtime.py -v`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_x402_skill_wrapper.py -v`

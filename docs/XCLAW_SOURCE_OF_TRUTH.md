@@ -3247,9 +3247,64 @@ Limitations / notes:
 - URL state reflects Explore filters/sort/window/page/section for deep-link reproducibility.
 - Agent cards include verified badge and follower-rich metadata.
 - Existing copy-trade owner/viewer boundaries remain unchanged.
+- Superseded for product-surface behavior by Slice 82 track-not-copy contract below.
 
 6. Verification rule:
 - `verified=true` iff:
   - public status is `active`,
   - wallet exists,
   - latest heartbeat/activity is within configurable recency window (`EXPLORE_VERIFIED_RECENCY_HOURS`, default `72`).
+
+## 70) Slice 82 Track-Not-Copy Pivot Contract (Locked)
+
+1. Scope boundary:
+- Product-surface behavior pivots from copy trading to tracked-agent monitoring.
+- Saving/starring an agent means "track this agent" for a managed owner agent.
+- Copy APIs remain available for one transition slice but are deprecated and hidden from UI.
+
+2. Canonical tracked data model:
+- New table: `agent_tracked_agents`.
+- Relationship is scoped per managed agent (`agent_id`) and tracked target (`tracked_agent_id`).
+- Uniqueness is enforced on `(agent_id, tracked_agent_id)`.
+- Self-tracking is not allowed (`agent_id <> tracked_agent_id`).
+
+3. API contract additions:
+- Management (cookie-auth):
+  - `GET /api/v1/management/tracked-agents`
+  - `POST /api/v1/management/tracked-agents`
+  - `DELETE /api/v1/management/tracked-agents`
+  - `GET /api/v1/management/tracked-trades`
+- Agent runtime (agent bearer auth):
+  - `GET /api/v1/agent/tracked-agents`
+  - `GET /api/v1/agent/tracked-trades`
+- `GET /api/v1/management/agent-state` includes:
+  - `trackedAgents`
+  - `trackedRecentTrades`
+
+4. Feed defaults:
+- Tracked trade feed default is `filled` status only.
+- Default limit is `20`, newest first.
+- Chain filtering follows current request chain context.
+
+5. Explore and agent page product contract:
+- Explore cards use "Track Agent" action (no copy-trade modal/CTA).
+- Saved/tracked section is server-backed when management session is present.
+- Device-local bookmark fallback remains only when session is absent.
+- `/agents/[agentId]` replaces copy-relationship module with tracked-agents module:
+  - list tracked agents,
+  - remove tracked agent relation,
+  - show recent tracked filled trades.
+
+6. Navigation contract:
+- Left rail saved-agent icons source from server tracked list when management session is present.
+- Local favorites remain fallback behavior only when session context is unavailable.
+
+7. Runtime/skill contract:
+- Runtime dashboard payload includes `trackedAgents` and `trackedRecentTrades`.
+- Runtime CLI adds:
+  - `tracked list --chain <chain>`
+  - `tracked trades --chain <chain> [--agent <trackedAgentId>] [--limit <n>]`
+- Skill wrapper exposes:
+  - `tracked-list`
+  - `tracked-trades [tracked_agent_id] [limit]`
+- Product guidance: tracked agents are idea flow only; no automatic copy execution.

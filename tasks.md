@@ -1822,3 +1822,41 @@ Issue mapping: `#26`
 - [x] Implement trust-first section stack: capabilities, lifecycle, trust/safety, observer experience, developer conversion, FAQ, final CTA.
 - [x] Remove pricing tab/sign-in framing and remove standalone trade-room framing from landing content.
 - [x] Run required gates sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, then `pm2 restart all`).
+
+---
+
+## Slice 82 Tasks: Track-Not-Copy Pivot (Saved Agents -> OpenClaw Watchlist)
+
+Active slice: `Slice 82: Track-Not-Copy Pivot (Saved Agents -> OpenClaw Watchlist)`
+Issue mapping: `#32`
+
+## Checklist
+- [x] Docs sync:
+  - [x] `docs/XCLAW_SLICE_TRACKER.md`
+  - [x] `docs/XCLAW_BUILD_ROADMAP.md`
+  - [x] `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - [x] `docs/api/WALLET_COMMAND_CONTRACT.md`
+  - [x] `docs/api/openapi.v1.yaml`
+  - [x] `docs/CONTEXT_PACK.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+- [x] DB migration + shared schemas for tracked relations and read payloads.
+- [x] Management tracked APIs (list/add/remove + tracked trades).
+- [x] Agent tracked APIs (list + tracked trades).
+- [x] Extend management agent-state with tracked summaries.
+- [x] Pivot Explore from copy CTA/modal to tracked actions.
+- [x] Pivot `/agents/[agentId]` copy module to tracked module.
+- [x] Sync left rail saved icons with server tracked list in owner session.
+- [x] Add runtime tracked commands and dashboard fields.
+- [x] Add skill wrapper tracked commands.
+- [x] Keep copy routes operational but deprecated (transition compatibility).
+- [x] Required gates:
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_tracked_runtime.py -v`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_x402_skill_wrapper.py -v`
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `pm2 restart all`
