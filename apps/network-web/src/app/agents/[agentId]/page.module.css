@@ -36,6 +36,9 @@
   color: var(--agent-text);
   width: 100%;
   max-width: 100%;
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr);
+  gap: 0.9rem;
 }
 
 :global(:root[data-theme='light']) .root {
@@ -60,6 +63,69 @@
   min-width: 0;
 }
 
+.sidebar {
+  position: sticky;
+  top: 0.75rem;
+  align-self: start;
+  height: calc(100vh - 1.5rem);
+  border: 1px solid var(--agent-border);
+  border-radius: 22px;
+  background: linear-gradient(180deg, var(--agent-surface), color-mix(in srgb, var(--agent-surface) 78%, transparent));
+  display: grid;
+  grid-template-rows: auto 1fr;
+  padding: 0.8rem 0.45rem;
+}
+
+.sidebarLogo {
+  width: 58px;
+  height: 44px;
+  border-radius: 10px;
+  margin: 0 auto 0.8rem;
+  display: grid;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--agent-accent) 45%, var(--agent-border));
+  background: color-mix(in srgb, var(--agent-accent) 10%, var(--agent-surface));
+  padding: 0.2rem;
+}
+
+.sidebarLogoImage {
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+
+.nav {
+  display: grid;
+  gap: 0.42rem;
+  align-content: start;
+}
+
+.navItem {
+  border: 1px solid transparent;
+  border-radius: 12px;
+  color: var(--agent-muted);
+  display: grid;
+  place-items: center;
+  padding: 0.58rem 0.35rem;
+  min-height: 42px;
+}
+
+.navItem svg {
+  width: 18px;
+  height: 18px;
+}
+
+.navItem:hover {
+  border-color: var(--agent-border);
+  color: var(--agent-text);
+}
+
+.navItemActive {
+  color: var(--agent-text);
+  border-color: color-mix(in srgb, var(--agent-accent) 55%, var(--agent-border));
+  background: color-mix(in srgb, var(--agent-accent) 16%, transparent);
+}
+
 .utilityBar {
   display: flex;
   justify-content: space-between;
@@ -80,6 +146,38 @@
   display: inline-flex;
   gap: 0.35rem;
   align-items: center;
+}
+
+.utilityChainToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
+  border: 1px solid var(--agent-border);
+  border-radius: 999px;
+  padding: 0.2rem 0.44rem;
+  color: var(--agent-muted);
+  font-size: 0.77rem;
+}
+
+.utilityChainToggleControl {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 24px;
+}
+
+.utilityChainToggleControl input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.utilityChainToggleControl input:checked + .iosSlider {
+  background: color-mix(in srgb, var(--agent-ok) 82%, var(--agent-accent));
+}
+
+.utilityChainToggleControl input:checked + .iosSlider::before {
+  transform: translateX(14px);
 }
 
 .themeButton {
@@ -157,22 +255,73 @@
   font-size: 0.83rem;
 }
 
+.globalApprovalRow {
+  margin-top: 0.48rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.globalApprovalLabel {
+  font-size: 0.84rem;
+  color: var(--agent-text);
+}
+
+.globalApprovalHint {
+  margin-top: 0.24rem;
+  color: var(--agent-muted);
+  font-size: 0.78rem;
+}
+
+.iosToggle {
+  position: relative;
+  display: inline-block;
+  width: 46px;
+  height: 28px;
+}
+
+.iosToggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.iosSlider {
+  position: absolute;
+  inset: 0;
+  cursor: pointer;
+  background: color-mix(in srgb, var(--agent-muted) 42%, transparent);
+  border: 1px solid var(--agent-border);
+  border-radius: 999px;
+  transition: background 0.18s ease;
+}
+
+.iosSlider::before {
+  content: '';
+  position: absolute;
+  height: 22px;
+  width: 22px;
+  left: 2px;
+  top: 2px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  transition: transform 0.18s ease;
+}
+
+.iosToggle input:checked + .iosSlider {
+  background: color-mix(in srgb, var(--agent-ok) 82%, var(--agent-accent));
+}
+
+.iosToggle input:checked + .iosSlider::before {
+  transform: translateX(18px);
+}
+
 .walletActions {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
   align-items: center;
-}
-
-.toggleLabel {
-  display: inline-flex;
-  gap: 0.35rem;
-  align-items: center;
-  color: var(--agent-muted);
-  font-size: 0.84rem;
-  padding: 0.2rem 0.35rem;
-  border: 1px solid var(--agent-border);
-  border-radius: 10px;
 }
 
 .addressCopyButton {
@@ -241,8 +390,16 @@
   line-height: 1.15;
 }
 
-.stack {
+.contentGrid {
   margin-top: 0.7rem;
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr);
+  gap: 0.75rem;
+  align-items: start;
+}
+
+.mainColumn,
+.sideColumn {
   display: grid;
   gap: 0.7rem;
 }
@@ -293,6 +450,15 @@
   align-items: center;
 }
 
+.selectedWalletRow {
+  border-color: color-mix(in srgb, var(--agent-accent) 66%, var(--agent-border));
+  background: color-mix(in srgb, var(--agent-accent) 14%, transparent);
+}
+
+.walletTokenRow {
+  cursor: pointer;
+}
+
 .listRow > div:first-child,
 .railQueueRow > div:first-child,
 .queueRow > div:first-child {
@@ -311,6 +477,12 @@
   justify-items: end;
   gap: 0.2rem;
   font-size: 0.78rem;
+}
+
+.tokenApprovalControl {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
 }
 
 .statusChip {
@@ -341,6 +513,158 @@
   gap: 0.7rem;
   flex-wrap: wrap;
   align-items: center;
+}
+
+.withdrawInline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.withdrawPreviewLabel {
+  max-width: 260px;
+  border: 1px solid var(--agent-border);
+  border-radius: 10px;
+  padding: 0.35rem 0.5rem;
+  color: var(--agent-muted);
+  font-size: 0.8rem;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.amountInputWrap {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.35rem;
+}
+
+.withdrawModalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background:
+    radial-gradient(circle at 20% 10%, color-mix(in srgb, var(--agent-accent) 20%, transparent), transparent 45%),
+    color-mix(in srgb, #000 52%, transparent);
+  backdrop-filter: blur(6px);
+}
+
+.withdrawModalCard {
+  width: min(620px, 94vw);
+  border: 1px solid var(--agent-border);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 85% 0%, color-mix(in srgb, var(--agent-accent) 16%, transparent), transparent 36%),
+    linear-gradient(160deg, color-mix(in srgb, var(--agent-surface) 96%, transparent), color-mix(in srgb, var(--agent-elevated) 78%, transparent));
+  box-shadow:
+    0 24px 48px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 color-mix(in srgb, #fff 10%, transparent);
+  padding: 1rem;
+}
+
+.withdrawModalHeader {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 0.6rem;
+  padding-bottom: 0.8rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--agent-border) 88%, transparent);
+}
+
+.withdrawModalTitle {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.withdrawModalTitle h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.withdrawChainBadge {
+  display: inline-flex;
+  width: fit-content;
+  border: 1px solid color-mix(in srgb, var(--agent-accent) 58%, var(--agent-border));
+  border-radius: 999px;
+  padding: 0.15rem 0.48rem;
+  color: var(--agent-accent);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.withdrawCloseButton {
+  margin-left: auto;
+  border: 1px solid var(--agent-border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--agent-surface) 88%, transparent);
+  color: var(--agent-text);
+  font: inherit;
+  cursor: pointer;
+  padding: 0.4rem 0.68rem;
+}
+
+.withdrawHeaderAsset {
+  margin-left: 0.35rem;
+  display: grid;
+  gap: 0.18rem;
+  color: var(--agent-muted);
+  font-size: 0.74rem;
+}
+
+.withdrawHeaderAsset select {
+  min-width: 220px;
+  height: 34px;
+  border: 1px solid color-mix(in srgb, var(--agent-accent) 44%, var(--agent-border));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--agent-surface) 90%, transparent);
+  color: var(--agent-text);
+  padding: 0.25rem 0.4rem;
+}
+
+.withdrawModalForm {
+  margin-top: 0.85rem;
+  padding: 0.8rem;
+  border: 1px solid color-mix(in srgb, var(--agent-border) 90%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--agent-elevated) 62%, transparent);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.withdrawModalForm input,
+.withdrawModalForm select {
+  height: 40px;
+}
+
+.withdrawModalActions {
+  margin-top: 0.7rem;
+  justify-content: flex-end;
+}
+
+.withdrawMaxButton {
+  border-color: color-mix(in srgb, var(--agent-accent) 60%, var(--agent-border)) !important;
+  background: color-mix(in srgb, var(--agent-accent) 14%, transparent) !important;
+  min-width: 56px;
+}
+
+.withdrawSubmitButton {
+  border-color: color-mix(in srgb, var(--agent-accent) 75%, var(--agent-border)) !important;
+  background: linear-gradient(
+    140deg,
+    color-mix(in srgb, var(--agent-accent) 82%, #1d4ed8),
+    color-mix(in srgb, var(--agent-accent) 72%, #1e40af)
+  ) !important;
+  color: #eff6ff !important;
+  font-weight: 600;
+  min-width: 170px;
+}
+
+.withdrawSubmitButton:disabled {
+  opacity: 0.52;
+  cursor: not-allowed;
 }
 
 .toggleRow label {
@@ -387,6 +711,19 @@
 .dangerButton {
   border-color: color-mix(in srgb, var(--agent-danger) 55%, var(--agent-border)) !important;
   color: var(--agent-danger) !important;
+}
+
+.iconOnlyButton {
+  width: 36px;
+  height: 36px;
+  padding: 0 !important;
+  display: inline-grid;
+  place-items: center;
+}
+
+.iconOnlyButton svg {
+  width: 16px;
+  height: 16px;
 }
 
 .card input,
@@ -440,8 +777,26 @@
 }
 
 @media (max-width: 1080px) {
+  .root {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sidebar {
+    position: static;
+    height: auto;
+    grid-template-rows: auto;
+  }
+
+  .nav {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
   .kpiStrip {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .contentGrid {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .formGrid {
@@ -460,6 +815,39 @@
 
   .formGrid {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .withdrawModalCard {
+    width: min(94vw, 520px);
+    padding: 0.8rem;
+  }
+
+  .withdrawModalForm {
+    padding: 0.65rem;
+  }
+
+  .withdrawModalHeader {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .withdrawHeaderAsset {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .withdrawHeaderAsset select {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .withdrawInline {
+    width: 100%;
+  }
+
+  .withdrawPreviewLabel {
+    max-width: none;
+    width: 100%;
   }
 
   .queueActions input {

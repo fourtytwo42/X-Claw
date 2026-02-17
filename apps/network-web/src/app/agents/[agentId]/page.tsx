@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
@@ -7,12 +8,14 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { ChainHeaderControl } from '@/components/chain-header-control';
 import { rememberManagedAgent } from '@/components/management-header-controls';
 import { PublicStatusBadge } from '@/components/public-status-badge';
+import { SidebarIcon } from '@/components/sidebar-icons';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { useActiveChainKey } from '@/lib/active-chain';
 import {
   buildActivityRows,
   buildHoldings,
   formatUnitsTruncated,
+  resolveTokenLabel,
   type ActivityPayload,
   type AgentProfilePayload,
   type DepositPayload,
@@ -65,6 +68,7 @@ type WalletTimelineItem = {
   subtitle: string;
   status: string;
   txHash: string | null;
+  tokenSymbols: string[];
 };
 
 function getCsrfToken(): string | null {
@@ -213,6 +217,39 @@ function policyApprovalLabel(item: { request_type: string; token_address: string
   return item.request_type;
 }
 
+function normalizeTokenSelectionSymbol(value: string | null | undefined): string {
+  const raw = String(value ?? '').trim();
+  if (!raw) {
+    return '';
+  }
+  const upper = raw.toUpperCase();
+  if (upper === 'NATIVE' || upper === 'ETH' || upper.endsWith(' ETH')) {
+    return 'ETH';
+  }
+  return upper;
+}
+
+function extractTokenSymbolsFromText(value: string): string[] {
+  const raw = String(value ?? '').trim();
+  if (!raw) {
+    return [];
+  }
+  if (raw.includes('->')) {
+    return raw
+      .split('->')
+      .map((part) => normalizeTokenSelectionSymbol(part))
+      .filter(Boolean);
+  }
+  if (raw.includes('/')) {
+    return raw
+      .split('/')
+      .map((part) => normalizeTokenSelectionSymbol(part))
+      .filter(Boolean);
+  }
+  const single = normalizeTokenSelectionSymbol(raw);
+  return single ? [single] : [];
+}
+
 export default function AgentPublicProfilePage() {
   const params = useParams<{ agentId: string }>();
   const router = useRouter();
@@ -232,9 +269,7 @@ export default function AgentPublicProfilePage() {
   const [depositData, setDepositData] = useState<DepositPayload | null>(null);
   const [limitOrders, setLimitOrders] = useState<LimitOrderItem[]>([]);
   const [copySubscriptions, setCopySubscriptions] = useState<CopySubscription[]>([]);
-  const [depositAddressCopied, setDepositAddressCopied] = useState(false);
   const [vaultAddressCopied, setVaultAddressCopied] = useState(false);
-  const depositCopyResetTimerRef = useRef<number | null>(null);
   const vaultCopyResetTimerRef = useRef<number | null>(null);
   const telegramAutoEnableInFlightRef = useRef<Set<string>>(new Set());
 
@@ -245,6 +280,10 @@ export default function AgentPublicProfilePage() {
   const [withdrawDestination, setWithdrawDestination] = useState('');
   const [withdrawAmount, setWithdrawAmount] = useState('0.1');
   const [withdrawAsset, setWithdrawAsset] = useState('NATIVE');
+  const [withdrawCardOpen, setWithdrawCardOpen] = useState(false);
+  const [agentChainEnabled, setAgentChainEnabled] = useState(true);
+  const [agentChainToggleBusy, setAgentChainToggleBusy] = useState(false);
+  const [selectedWalletTokens, setSelectedWalletTokens] = useState<string[]>([]);
 
   const [policyApprovalMode, setPolicyApprovalMode] = useState<'per_trade' | 'auto'>('per_trade');
   const [policyMaxTradeUsd, setPolicyMaxTradeUsd] = useState('50');
@@ -422,6 +461,36 @@ export default function AgentPublicProfilePage() {
     };
   }, [management.phase, agentId, refreshAll]);
 
+  useEffect(() => {
+    if (management.phase !== 'ready') {
+      return;
+    }
+    setAgentChainEnabled(Boolean(management.data.chainPolicy?.chainEnabled));
+  }, [management]);
+
+  async function runAgentChainToggle(nextEnabled: boolean) {
+    if (!isOwner || agentChainToggleBusy) {
+      return;
+    }
+    setAgentChainToggleBusy(true);
+    setManagementNotice(null);
+    setManagementError(null);
+    try {
+      await managementPost('/api/v1/management/chains/update', {
+        agentId,
+        chainKey: activeChainKey,
+        chainEnabled: nextEnabled
+      });
+      setAgentChainEnabled(nextEnabled);
+      setManagementNotice(`${nextEnabled ? 'Enabled' : 'Disabled'} ${activeChainLabel} trading for this agent.`);
+      await refreshAll({ showLoading: false });
+    } catch (error) {
+      setManagementError(error instanceof Error ? error.message : 'Failed to update chain trading setting.');
+    } finally {
+      setAgentChainToggleBusy(false);
+    }
+  }
+
   async function runManagementAction(action: () => Promise<void>, successMessage: string) {
     setManagementError(null);
     setManagementNotice(null);
@@ -448,9 +517,6 @@ export default function AgentPublicProfilePage() {
 
   useEffect(() => {
     return () => {
-      if (depositCopyResetTimerRef.current !== null) {
-        window.clearTimeout(depositCopyResetTimerRef.current);
-      }
       if (vaultCopyResetTimerRef.current !== null) {
         window.clearTimeout(vaultCopyResetTimerRef.current);
       }
@@ -471,6 +537,10 @@ export default function AgentPublicProfilePage() {
     }
     return out;
   }, [management]);
+  const chainTokenSymbolByAddress = useMemo(
+    () => tokenSymbolByAddress(management.phase === 'ready' ? management.data.chainTokens : undefined),
+    [management]
+  );
 
   const policyAllowedTokenSet = useMemo(
     () =>
@@ -535,6 +605,19 @@ export default function AgentPublicProfilePage() {
     [profile, activeChainKey]
   );
 
+  const preferredWithdrawDestination = useMemo(() => {
+    if (management.phase !== 'ready') {
+      return '';
+    }
+    return (
+      management.data.outboundTransfersPolicy.outboundWhitelistAddresses.find(
+        (address) => typeof address === 'string' && address.trim().length > 0
+      )?.trim() ?? ''
+    );
+  }, [management]);
+
+  const withdrawDestinationPreview = preferredWithdrawDestination ? shortenAddress(preferredWithdrawDestination) : '';
+
   const activeDepositChain = useMemo(
     () => depositData?.chains.find((chain) => chain.chainKey === activeChainKey) ?? depositData?.chains[0] ?? null,
     [depositData, activeChainKey]
@@ -542,7 +625,13 @@ export default function AgentPublicProfilePage() {
 
   const holdings = useMemo(() => buildHoldings(profile, depositData, activeChainKey), [profile, depositData, activeChainKey]);
   const withdrawAssetOptions = useMemo(() => {
-    const opts: Array<{ label: string; value: string }> = [{ label: 'ETH (Native)', value: 'NATIVE' }];
+    const nativeHolding =
+      holdings.find((holding) => {
+        const symbol = holding.token.trim().toUpperCase();
+        return symbol === 'ETH' || symbol === 'NATIVE';
+      }) ?? null;
+    const nativeBalance = nativeHolding ? formatUnitsTruncated(nativeHolding.amountRaw, nativeHolding.decimals, 6) : '0';
+    const opts: Array<{ label: string; value: string }> = [{ label: `${activeChainLabel} ETH (${nativeBalance})`, value: 'NATIVE' }];
     const seen = new Set<string>(['NATIVE']);
     for (const holding of holdings) {
       const symbol = holding.token.trim().toUpperCase();
@@ -551,11 +640,11 @@ export default function AgentPublicProfilePage() {
       }
       if (!seen.has(symbol)) {
         seen.add(symbol);
-        opts.push({ label: symbol, value: symbol });
+        opts.push({ label: `${symbol} (${formatUnitsTruncated(holding.amountRaw, holding.decimals, 6)})`, value: symbol });
       }
     }
     return opts;
-  }, [holdings]);
+  }, [holdings, activeChainLabel]);
 
   const withdrawSelectedHolding = useMemo(() => {
     if (withdrawAsset === 'NATIVE') {
@@ -573,6 +662,13 @@ export default function AgentPublicProfilePage() {
     }
     return formatUnitsTruncated(withdrawSelectedHolding.amountRaw, withdrawSelectedHolding.decimals, 18);
   }, [withdrawSelectedHolding]);
+
+  useEffect(() => {
+    if (!preferredWithdrawDestination) {
+      return;
+    }
+    setWithdrawDestination((current) => (current.trim().length === 0 ? preferredWithdrawDestination : current));
+  }, [preferredWithdrawDestination]);
   const activityRows = useMemo(
     () => buildActivityRows(trades, activity, management.phase === 'ready' ? management.data.chainTokens : undefined),
     [trades, activity, management]
@@ -580,6 +676,7 @@ export default function AgentPublicProfilePage() {
   const walletTimeline = useMemo(() => {
     const items: WalletTimelineItem[] = [];
     for (const row of activityRows) {
+      const pairTokens = Array.from(new Set([...extractTokenSymbolsFromText(row.title), ...extractTokenSymbolsFromText(row.subtitle)]));
       items.push({
         id: `act-${row.id}`,
         at: row.at,
@@ -587,11 +684,13 @@ export default function AgentPublicProfilePage() {
         title: row.title,
         subtitle: row.subtitle,
         status: row.status,
-        txHash: null
+        txHash: null,
+        tokenSymbols: pairTokens
       });
     }
 
     for (const deposit of activeDepositChain?.recentDeposits ?? []) {
+      const depositSymbol = normalizeTokenSelectionSymbol(deposit.token);
       items.push({
         id: `dep-${deposit.txHash}-${deposit.blockNumber}`,
         at: deposit.confirmedAt,
@@ -599,12 +698,14 @@ export default function AgentPublicProfilePage() {
         title: `Deposit ${deposit.amount} ${deposit.token}`,
         subtitle: `Block ${deposit.blockNumber}`,
         status: deposit.status || 'confirmed',
-        txHash: deposit.txHash ?? null
+        txHash: deposit.txHash ?? null,
+        tokenSymbols: depositSymbol ? [depositSymbol] : []
       });
     }
 
     if (management.phase === 'ready') {
       for (const item of management.data.transferApprovalsHistory ?? []) {
+        const transferSymbol = item.transfer_type === 'native' ? 'ETH' : normalizeTokenSelectionSymbol(item.token_symbol);
         items.push({
           id: `xfrh-${item.approval_id}`,
           at: item.terminal_at ?? item.decided_at ?? item.created_at,
@@ -612,10 +713,12 @@ export default function AgentPublicProfilePage() {
           title: `${item.transfer_type === 'native' ? 'ETH' : item.token_symbol ?? 'Token'} transfer`,
           subtitle: `${item.amount_wei} wei to ${shortenAddress(item.to_address)}`,
           status: item.status,
-          txHash: item.tx_hash
+          txHash: item.tx_hash,
+          tokenSymbols: transferSymbol ? [transferSymbol] : []
         });
       }
       for (const item of management.data.transferApprovalsQueue ?? []) {
+        const transferSymbol = item.transfer_type === 'native' ? 'ETH' : normalizeTokenSelectionSymbol(item.token_symbol);
         items.push({
           id: `xfrq-${item.approval_id}`,
           at: item.created_at,
@@ -623,10 +726,12 @@ export default function AgentPublicProfilePage() {
           title: `Pending transfer approval`,
           subtitle: `${item.amount_wei} wei to ${shortenAddress(item.to_address)}`,
           status: item.status,
-          txHash: null
+          txHash: null,
+          tokenSymbols: transferSymbol ? [transferSymbol] : []
         });
       }
       for (const item of management.data.policyApprovalsHistory ?? []) {
+        const policySymbol = item.token_address ? normalizeTokenSelectionSymbol(chainTokenSymbolByAddress.get(item.token_address.toLowerCase()) ?? '') : '';
         items.push({
           id: `polh-${item.request_id}`,
           at: item.decided_at ?? item.created_at,
@@ -634,10 +739,12 @@ export default function AgentPublicProfilePage() {
           title: policyApprovalLabel(item, management.data.chainTokens),
           subtitle: item.reason_message ? item.reason_message : 'Policy approval decision',
           status: item.status,
-          txHash: null
+          txHash: null,
+          tokenSymbols: policySymbol ? [policySymbol] : []
         });
       }
       for (const item of management.data.policyApprovalsQueue ?? []) {
+        const policySymbol = item.token_address ? normalizeTokenSelectionSymbol(chainTokenSymbolByAddress.get(item.token_address.toLowerCase()) ?? '') : '';
         items.push({
           id: `polq-${item.request_id}`,
           at: item.created_at,
@@ -645,10 +752,13 @@ export default function AgentPublicProfilePage() {
           title: policyApprovalLabel(item, management.data.chainTokens),
           subtitle: 'Pending policy approval',
           status: 'pending',
-          txHash: null
+          txHash: null,
+          tokenSymbols: policySymbol ? [policySymbol] : []
         });
       }
       for (const item of management.data.approvalsQueue) {
+        const tokenIn = normalizeTokenSelectionSymbol(resolveTokenLabel(item.token_in, chainTokenSymbolByAddress));
+        const tokenOut = normalizeTokenSelectionSymbol(resolveTokenLabel(item.token_out, chainTokenSymbolByAddress));
         items.push({
           id: `trdapp-${item.trade_id}`,
           at: item.created_at,
@@ -656,7 +766,8 @@ export default function AgentPublicProfilePage() {
           title: item.pair || `${item.token_in} -> ${item.token_out}`,
           subtitle: item.reason ?? 'Pending trade approval',
           status: 'pending',
-          txHash: null
+          txHash: null,
+          tokenSymbols: [tokenIn, tokenOut].filter(Boolean)
         });
       }
     }
@@ -667,21 +778,47 @@ export default function AgentPublicProfilePage() {
       return atB - atA;
     });
     return items;
-  }, [activityRows, activeDepositChain?.recentDeposits, management]);
+  }, [activityRows, activeDepositChain?.recentDeposits, chainTokenSymbolByAddress, management]);
+
+  const selectedWalletTokenSet = useMemo(() => new Set(selectedWalletTokens), [selectedWalletTokens]);
 
   const filteredWalletTimeline = useMemo(() => {
+    const tokenFiltered =
+      selectedWalletTokenSet.size === 0
+        ? walletTimeline
+        : walletTimeline.filter((item) => item.tokenSymbols.some((token) => selectedWalletTokenSet.has(token)));
     if (walletActivityFilter === 'all') {
-      return walletTimeline;
+      return tokenFiltered;
     }
-    return walletTimeline.filter((item) => item.kind === walletActivityFilter);
-  }, [walletActivityFilter, walletTimeline]);
+    return tokenFiltered.filter((item) => item.kind === walletActivityFilter);
+  }, [walletActivityFilter, walletTimeline, selectedWalletTokenSet]);
 
   const approvalHistoryItems = useMemo(() => {
     if (management.phase !== 'ready') {
-      return [] as Array<{ id: string; at: string; title: string; status: string; subtitle: string; type: 'trade' | 'policy' | 'transfer'; raw: any }>;
+      return [] as Array<{
+        id: string;
+        at: string;
+        title: string;
+        status: string;
+        subtitle: string;
+        type: 'trade' | 'policy' | 'transfer';
+        tokenSymbols: string[];
+        raw: any;
+      }>;
     }
-    const rows: Array<{ id: string; at: string; title: string; status: string; subtitle: string; type: 'trade' | 'policy' | 'transfer'; raw: any }> = [];
+    const rows: Array<{
+      id: string;
+      at: string;
+      title: string;
+      status: string;
+      subtitle: string;
+      type: 'trade' | 'policy' | 'transfer';
+      tokenSymbols: string[];
+      raw: any;
+    }> = [];
     for (const item of management.data.approvalsQueue) {
+      const tokenIn = normalizeTokenSelectionSymbol(resolveTokenLabel(item.token_in, chainTokenSymbolByAddress));
+      const tokenOut = normalizeTokenSelectionSymbol(resolveTokenLabel(item.token_out, chainTokenSymbolByAddress));
       rows.push({
         id: `trade-${item.trade_id}`,
         at: item.created_at,
@@ -689,10 +826,12 @@ export default function AgentPublicProfilePage() {
         status: 'pending',
         subtitle: item.reason ?? 'Pending trade approval',
         type: 'trade',
+        tokenSymbols: [tokenIn, tokenOut].filter(Boolean),
         raw: item
       });
     }
     for (const item of management.data.policyApprovalsQueue ?? []) {
+      const policySymbol = item.token_address ? normalizeTokenSelectionSymbol(chainTokenSymbolByAddress.get(item.token_address.toLowerCase()) ?? '') : '';
       rows.push({
         id: `policy-pending-${item.request_id}`,
         at: item.created_at,
@@ -700,10 +839,12 @@ export default function AgentPublicProfilePage() {
         status: 'pending',
         subtitle: 'Pending policy approval',
         type: 'policy',
+        tokenSymbols: policySymbol ? [policySymbol] : [],
         raw: item
       });
     }
     for (const item of management.data.policyApprovalsHistory ?? []) {
+      const policySymbol = item.token_address ? normalizeTokenSelectionSymbol(chainTokenSymbolByAddress.get(item.token_address.toLowerCase()) ?? '') : '';
       rows.push({
         id: `policy-history-${item.request_id}`,
         at: item.decided_at ?? item.created_at,
@@ -711,10 +852,12 @@ export default function AgentPublicProfilePage() {
         status: item.status,
         subtitle: item.reason_message || 'Policy approval history',
         type: 'policy',
+        tokenSymbols: policySymbol ? [policySymbol] : [],
         raw: item
       });
     }
     for (const item of management.data.transferApprovalsQueue ?? []) {
+      const transferSymbol = item.transfer_type === 'native' ? 'ETH' : normalizeTokenSelectionSymbol(item.token_symbol);
       rows.push({
         id: `transfer-pending-${item.approval_id}`,
         at: item.created_at,
@@ -722,10 +865,12 @@ export default function AgentPublicProfilePage() {
         status: item.status,
         subtitle: `${item.amount_wei} wei`,
         type: 'transfer',
+        tokenSymbols: transferSymbol ? [transferSymbol] : [],
         raw: item
       });
     }
     for (const item of management.data.transferApprovalsHistory ?? []) {
+      const transferSymbol = item.transfer_type === 'native' ? 'ETH' : normalizeTokenSelectionSymbol(item.token_symbol);
       rows.push({
         id: `transfer-history-${item.approval_id}`,
         at: item.terminal_at ?? item.decided_at ?? item.created_at,
@@ -733,25 +878,30 @@ export default function AgentPublicProfilePage() {
         status: item.status,
         subtitle: `${item.amount_wei} wei`,
         type: 'transfer',
+        tokenSymbols: transferSymbol ? [transferSymbol] : [],
         raw: item
       });
     }
     rows.sort((a, b) => Number(new Date(b.at).getTime()) - Number(new Date(a.at).getTime()));
     return rows;
-  }, [management]);
+  }, [management, chainTokenSymbolByAddress]);
 
   const filteredApprovalHistory = useMemo(() => {
+    const tokenFiltered =
+      selectedWalletTokenSet.size === 0
+        ? approvalHistoryItems
+        : approvalHistoryItems.filter((row) => row.tokenSymbols.some((token) => selectedWalletTokenSet.has(token)));
     if (approvalStatusFilter === 'all') {
-      return approvalHistoryItems;
+      return tokenFiltered;
     }
     if (approvalStatusFilter === 'pending') {
-      return approvalHistoryItems.filter((row) => row.status === 'pending' || row.status === 'approval_pending');
+      return tokenFiltered.filter((row) => row.status === 'pending' || row.status === 'approval_pending');
     }
     if (approvalStatusFilter === 'approved') {
-      return approvalHistoryItems.filter((row) => row.status === 'approved');
+      return tokenFiltered.filter((row) => row.status === 'approved');
     }
-    return approvalHistoryItems.filter((row) => row.status === 'rejected' || row.status === 'deny' || row.status === 'denied');
-  }, [approvalHistoryItems, approvalStatusFilter]);
+    return tokenFiltered.filter((row) => row.status === 'rejected' || row.status === 'deny' || row.status === 'denied');
+  }, [approvalHistoryItems, approvalStatusFilter, selectedWalletTokenSet]);
 
   const filledTrades = useMemo(() => (trades ?? []).filter((trade) => trade.status === 'filled').length, [trades]);
   const winRate = useMemo(() => {
@@ -763,6 +913,8 @@ export default function AgentPublicProfilePage() {
   }, [filledTrades, trades]);
 
   const status = profile?.agent.public_status;
+  const isPaused =
+    (management.phase === 'ready' ? management.data.agent.publicStatus : profile?.agent.public_status) === 'paused';
 
   if (bootstrapState.phase === 'bootstrapping') {
     return <main className={styles.loadingPage}>Validating management token...</main>;
@@ -781,11 +933,47 @@ export default function AgentPublicProfilePage() {
 
   return (
     <div className={styles.root}>
+      <aside className={styles.sidebar}>
+        <Link href="/dashboard" className={styles.sidebarLogo} aria-label="X-Claw dashboard">
+          <Image src="/X-Claw-Logo.png" alt="X-Claw" width={900} height={280} className={styles.sidebarLogoImage} priority />
+        </Link>
+        <nav className={styles.nav}>
+          <Link href="/dashboard" className={styles.navItem} aria-label="Dashboard" title="Dashboard">
+            <SidebarIcon name="dashboard" />
+          </Link>
+          <Link href="/explore" className={`${styles.navItem} ${styles.navItemActive}`} aria-label="Explore" title="Explore">
+            <SidebarIcon name="explore" />
+          </Link>
+          <Link href="/approvals" className={styles.navItem} aria-label="Approvals Center" title="Approvals Center">
+            <SidebarIcon name="approvals" />
+          </Link>
+          <Link href="/settings" className={styles.navItem} aria-label="Settings & Security" title="Settings & Security">
+            <SidebarIcon name="settings" />
+          </Link>
+        </nav>
+      </aside>
+
       <section className={styles.surface}>
         <header className={styles.utilityBar}>
           <div className={styles.utilityLabel}>Agent Wallet</div>
           <div className={styles.utilityControls}>
             <ChainHeaderControl />
+            {isOwner ? (
+              <label className={styles.utilityChainToggle}>
+                <span>{activeChainLabel} Trading</span>
+                <span className={styles.utilityChainToggleControl}>
+                  <input
+                    type="checkbox"
+                    checked={agentChainEnabled}
+                    disabled={agentChainToggleBusy}
+                    onChange={(event) => {
+                      void runAgentChainToggle(event.target.checked);
+                    }}
+                  />
+                  <span className={styles.iosSlider} />
+                </span>
+              </label>
+            ) : null}
             <ThemeToggle className={styles.themeButton} />
           </div>
         </header>
@@ -808,6 +996,36 @@ export default function AgentPublicProfilePage() {
                 <span>{profile?.agent.runtime_platform ?? 'runtime unavailable'}</span>
                 <span>Chain: {activeChainLabel}</span>
                   <span>Vault: {activeWallet ? shortenAddress(activeWallet.address) : '—'}</span>
+                </div>
+                <div className={styles.globalApprovalRow}>
+                  <span className={styles.globalApprovalLabel}>Approve all</span>
+                  {isOwner ? (
+                    <label className={styles.iosToggle}>
+                      <input
+                        type="checkbox"
+                        checked={policyApprovalMode === 'auto'}
+                        onChange={(event) => {
+                          const nextMode = event.target.checked ? 'auto' : 'per_trade';
+                          setPolicyApprovalMode(nextMode);
+                          void runManagementAction(
+                            () =>
+                              managementPost('/api/v1/management/policy/update', buildPolicyUpdatePayload({ approvalMode: nextMode })).then(() =>
+                                Promise.resolve()
+                              ),
+                            `Global approval ${nextMode === 'auto' ? 'enabled' : 'disabled'}.`
+                          );
+                        }}
+                      />
+                      <span className={styles.iosSlider} />
+                    </label>
+                  ) : (
+                    <span className={styles.muted}>{policyApprovalMode === 'auto' ? 'Enabled' : 'Disabled'}</span>
+                  )}
+                </div>
+                <div className={styles.globalApprovalHint}>
+                  {policyApprovalMode === 'auto'
+                    ? 'Enabled: the agent can trade freely.'
+                    : 'Disabled: trades require approval unless token is preapproved.'}
                 </div>
               </div>
             </div>
@@ -857,44 +1075,31 @@ export default function AgentPublicProfilePage() {
               <>
                 <button
                   type="button"
+                  className={styles.iconOnlyButton}
+                  aria-label={isPaused ? 'Play agent' : 'Pause agent'}
+                  title={isPaused ? 'Play agent' : 'Pause agent'}
                   onClick={() =>
                     void runManagementAction(
-                      () => managementPost('/api/v1/management/pause', { agentId }).then(() => Promise.resolve()),
-                      'Agent paused.'
+                      () =>
+                        managementPost(isPaused ? '/api/v1/management/resume' : '/api/v1/management/pause', { agentId }).then(() =>
+                          Promise.resolve()
+                        ),
+                      isPaused ? 'Agent resumed.' : 'Agent paused.'
                     )
                   }
                 >
-                  Pause
+                  {isPaused ? (
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                      <path d="M8 5.5v13l10-6.5-10-6.5Z" />
+                    </svg>
+                  ) : (
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                      <rect x="7" y="5.5" width="3.8" height="13" rx="0.9" />
+                      <rect x="13.2" y="5.5" width="3.8" height="13" rx="0.9" />
+                    </svg>
+                  )}
+                  <span className="sr-only">{isPaused ? 'Play' : 'Pause'}</span>
                 </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    void runManagementAction(
-                      () => managementPost('/api/v1/management/resume', { agentId }).then(() => Promise.resolve()),
-                      'Agent resumed.'
-                    )
-                  }
-                >
-                  Resume
-                </button>
-                <label className={styles.toggleLabel}>
-                  <input
-                    type="checkbox"
-                    checked={management.data.chainPolicy?.chainEnabled}
-                    onChange={(event) =>
-                      void runManagementAction(
-                        () =>
-                          managementPost('/api/v1/management/chains/update', {
-                            agentId,
-                            chainKey: activeChainKey,
-                            chainEnabled: event.target.checked
-                          }).then(() => Promise.resolve()),
-                        event.target.checked ? 'Chain access enabled.' : 'Chain access disabled.'
-                      )
-                    }
-                  />
-                  Chain enabled
-                </label>
                 <button
                   type="button"
                   className={styles.dangerButton}
@@ -907,6 +1112,12 @@ export default function AgentPublicProfilePage() {
                 >
                   Revoke All
                 </button>
+                <div className={styles.withdrawInline}>
+                  {withdrawDestinationPreview ? <span className={styles.withdrawPreviewLabel}>{withdrawDestinationPreview}</span> : null}
+                  <button type="button" onClick={() => setWithdrawCardOpen((current) => !current)}>
+                    {withdrawCardOpen ? 'Close Withdraw' : 'Withdraw'}
+                  </button>
+                </div>
               </>
             ) : (
               <p className={styles.muted}>Viewer mode: owner controls are locked.</p>
@@ -933,65 +1144,138 @@ export default function AgentPublicProfilePage() {
           </article>
         </section>
 
-        <div className={styles.stack}>
-          <article className={styles.card}>
-            <div className={styles.cardHeader}>
-              <h2>Assets &amp; Approvals</h2>
-              <span className={styles.muted}>{policyApprovalMode === 'auto' ? 'Global Approval: On' : 'Global Approval: Off'}</span>
-            </div>
-            {isOwner ? (
-              <div className={styles.toggleRow}>
+        {withdrawCardOpen ? (
+          <div className={styles.withdrawModalBackdrop} onClick={() => setWithdrawCardOpen(false)} role="presentation">
+            <article id="withdraw" className={styles.withdrawModalCard} onClick={(event) => event.stopPropagation()}>
+              <div className={styles.withdrawModalHeader}>
+                <div className={styles.withdrawModalTitle}>
+                  <h2>Withdraw</h2>
+                  <span className={styles.withdrawChainBadge}>{activeChainLabel}</span>
+                </div>
+                <label className={styles.withdrawHeaderAsset}>
+                  <span>Asset</span>
+                  <select value={withdrawAsset} onChange={(event) => setWithdrawAsset(event.target.value)}>
+                    {withdrawAssetOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button type="button" className={styles.withdrawCloseButton} onClick={() => setWithdrawCardOpen(false)}>
+                  Close
+                </button>
+              </div>
+              <div className={`${styles.formGrid} ${styles.withdrawModalForm}`}>
                 <label>
-                  <input
-                    type="checkbox"
-                    checked={policyApprovalMode === 'auto'}
-                    onChange={(event) => {
-                      const nextMode = event.target.checked ? 'auto' : 'per_trade';
-                      setPolicyApprovalMode(nextMode);
-                      void runManagementAction(
-                        () => managementPost('/api/v1/management/policy/update', buildPolicyUpdatePayload({ approvalMode: nextMode })).then(() => Promise.resolve()),
-                        `Global approval ${nextMode === 'auto' ? 'enabled' : 'disabled'}.`
-                      );
-                    }}
-                  />
-                  Approve all
+                  Withdraw destination
+                  <input value={withdrawDestination} onChange={(event) => setWithdrawDestination(event.target.value)} />
+                </label>
+                <label>
+                  Withdraw amount
+                  <div className={styles.amountInputWrap}>
+                    <input value={withdrawAmount} onChange={(event) => setWithdrawAmount(event.target.value)} />
+                    <button
+                      type="button"
+                      className={styles.withdrawMaxButton}
+                      disabled={!withdrawMaxAmount}
+                      onClick={() => setWithdrawAmount(withdrawMaxAmount || '0')}
+                    >
+                      Max
+                    </button>
+                  </div>
                 </label>
               </div>
-            ) : (
-              <p className={styles.muted}>Viewer mode: approval controls are read-only.</p>
-            )}
+              <div className={`${styles.toggleRow} ${styles.withdrawModalActions}`}>
+                <button
+                  type="button"
+                  className={styles.withdrawSubmitButton}
+                  disabled={!isOwner || !withdrawDestination.trim() || !withdrawAmount.trim()}
+                  onClick={() =>
+                    void runManagementAction(
+                      () =>
+                        managementPost('/api/v1/management/withdraw', {
+                          agentId,
+                          chainKey: activeChainKey,
+                          asset: withdrawAsset,
+                          amount: withdrawAmount,
+                          destination: withdrawDestination
+                        }).then(() => Promise.resolve()),
+                      'Withdraw request submitted.'
+                    )
+                  }
+                >
+                  Submit Withdraw
+                </button>
+              </div>
+            </article>
+          </div>
+        ) : null}
+
+        <div className={styles.contentGrid}>
+          <div className={styles.mainColumn}>
+            <article className={styles.card}>
+            <div className={styles.cardHeader}>
+              <h2>Wallet</h2>
+            </div>
+            {!isOwner ? <p className={styles.muted}>Viewer mode: approval controls are read-only.</p> : null}
             {holdings.length === 0 ? <p className={styles.muted}>No balances detected for this chain.</p> : null}
             {holdings.map((holding) => (
-              <div key={holding.token} className={styles.listRow}>
+              <div
+                key={holding.token}
+                className={`${styles.listRow} ${styles.walletTokenRow} ${selectedWalletTokenSet.has(normalizeTokenSelectionSymbol(holding.token)) ? styles.selectedWalletRow : ''}`}
+                onClick={(event) => {
+                  const symbol = normalizeTokenSelectionSymbol(holding.token);
+                  if (!symbol) {
+                    return;
+                  }
+                  const multi = event.ctrlKey || event.metaKey;
+                  setSelectedWalletTokens((current) => {
+                    const has = current.includes(symbol);
+                    if (multi) {
+                      if (has) {
+                        return current.filter((item) => item !== symbol);
+                      }
+                      return [...current, symbol];
+                    }
+                    if (has && current.length === 1) {
+                      return [];
+                    }
+                    return [symbol];
+                  });
+                }}
+                title="Click to filter by token. Hold Ctrl/Cmd for multi-select."
+              >
                 <div>
                   <div className={styles.listTitle}>{holding.token}</div>
-                  <div className={styles.muted}>Balance in vault wallet</div>
                 </div>
                 <div className={styles.listMeta}>
                   <span>{formatUnitsTruncated(holding.amountRaw, holding.decimals, 6)}</span>
-                  {isOwner ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const approved = isTokenPreapproved(holding.token);
-                        const allowedTokens = nextAllowedTokensForSymbol(holding.token, !approved);
-                        void runManagementAction(
-                          () => managementPost('/api/v1/management/policy/update', buildPolicyUpdatePayload({ allowedTokens })).then(() => Promise.resolve()),
-                          `${approved ? 'Removed' : 'Added'} ${holding.token} preapproval.`
-                        );
-                      }}
-                    >
-                      {isTokenPreapproved(holding.token) ? 'Preapproved' : 'Preapprove'}
-                    </button>
-                  ) : (
-                    <span className={styles.muted}>{isTokenPreapproved(holding.token) ? 'Preapproved' : 'Not preapproved'}</span>
-                  )}
+                  <div className={styles.tokenApprovalControl} onClick={(event) => event.stopPropagation()}>
+                    <label className={styles.iosToggle}>
+                      <input
+                        type="checkbox"
+                        checked={isTokenPreapproved(holding.token)}
+                        disabled={!isOwner}
+                        onChange={(event) => {
+                          const enabled = event.target.checked;
+                          const allowedTokens = nextAllowedTokensForSymbol(holding.token, enabled);
+                          void runManagementAction(
+                            () => managementPost('/api/v1/management/policy/update', buildPolicyUpdatePayload({ allowedTokens })).then(() => Promise.resolve()),
+                            `${enabled ? 'Added' : 'Removed'} ${holding.token} preapproval.`
+                          );
+                        }}
+                      />
+                      <span className={styles.iosSlider} />
+                    </label>
+                    <span className={styles.muted}>{isTokenPreapproved(holding.token) ? 'Approved' : 'Not approved'}</span>
+                  </div>
                 </div>
               </div>
             ))}
           </article>
 
-          <article className={styles.card}>
+            <article className={styles.card}>
             <div className={styles.cardHeader}>
               <h2>Wallet Activity</h2>
               <span className={styles.muted}>All wallet-impact events</span>
@@ -1032,7 +1316,7 @@ export default function AgentPublicProfilePage() {
             </div>
           </article>
 
-          <article id="approval-history" className={styles.card}>
+            <article id="approval-history" className={styles.card}>
             <div className={styles.cardHeader}>
               <h2>Approval History</h2>
               <span className={styles.muted}>Trade, policy, and transfer approvals</span>
@@ -1217,93 +1501,29 @@ export default function AgentPublicProfilePage() {
             ))}
           </article>
 
-          <article id="withdraw" className={styles.card}>
-            <div className={styles.cardHeader}>
-              <h2>Withdraw</h2>
-              <span className={styles.muted}>{activeChainLabel}</span>
-            </div>
-            {activeDepositChain?.depositAddress ? (
-              <button
-                type="button"
-                className={`${styles.addressCopyButton} ${depositAddressCopied ? styles.addressCopyButtonActive : ''}`}
-                onClick={() =>
-                  void copyToClipboard(activeDepositChain.depositAddress, 'Deposit address copied.', () => {
-                    setDepositAddressCopied(true);
-                    if (depositCopyResetTimerRef.current !== null) {
-                      window.clearTimeout(depositCopyResetTimerRef.current);
-                    }
-                    depositCopyResetTimerRef.current = window.setTimeout(() => {
-                      setDepositAddressCopied(false);
-                      depositCopyResetTimerRef.current = null;
-                    }, 1000);
-                  })
-                }
-                title="Copy full deposit address"
-              >
-                <span className={styles.addressCopyHeader}>
-                  <span className={styles.muted}>Deposit address</span>
-                  <span className={styles.copyIcon} aria-hidden="true">
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M9 9.75A2.25 2.25 0 0 1 11.25 7.5h6A2.25 2.25 0 0 1 19.5 9.75v6A2.25 2.25 0 0 1 17.25 18h-6A2.25 2.25 0 0 1 9 15.75v-6Z" stroke="currentColor" strokeWidth="1.5" />
-                      <path d="M15 7.5V6.75A2.25 2.25 0 0 0 12.75 4.5h-6A2.25 2.25 0 0 0 4.5 6.75v6A2.25 2.25 0 0 0 6.75 15H9" stroke="currentColor" strokeWidth="1.5" />
-                    </svg>
-                  </span>
-                </span>
-                <code className={styles.addressValue}>{activeDepositChain.depositAddress}</code>
-              </button>
-            ) : (
-              <p className={styles.muted}>Deposit address unavailable</p>
-            )}
-            <div className={styles.formGrid}>
-              <label>
-                Withdraw destination
-                <input value={withdrawDestination} onChange={(event) => setWithdrawDestination(event.target.value)} />
-              </label>
-              <label>
-                Asset
-                <select value={withdrawAsset} onChange={(event) => setWithdrawAsset(event.target.value)}>
-                  {withdrawAssetOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Withdraw amount
-                <input value={withdrawAmount} onChange={(event) => setWithdrawAmount(event.target.value)} />
-                <span className={styles.muted}>
-                  Available: {withdrawSelectedHolding ? formatUnitsTruncated(withdrawSelectedHolding.amountRaw, withdrawSelectedHolding.decimals, 6) : '—'}
-                </span>
-              </label>
-            </div>
-            <div className={styles.toggleRow}>
-              <button type="button" disabled={!withdrawMaxAmount} onClick={() => setWithdrawAmount(withdrawMaxAmount || '0')}>
-                Max
-              </button>
-              <button
-                type="button"
-                disabled={!isOwner || !withdrawDestination.trim() || !withdrawAmount.trim()}
-                onClick={() =>
-                  void runManagementAction(
-                    () =>
-                      managementPost('/api/v1/management/withdraw', {
-                        agentId,
-                        chainKey: activeChainKey,
-                        asset: withdrawAsset,
-                        amount: withdrawAmount,
-                        destination: withdrawDestination
-                      }).then(() => Promise.resolve()),
-                    'Withdraw request submitted.'
-                  )
-                }
-              >
-                Submit Withdraw
-              </button>
-            </div>
-          </article>
+            <article className={styles.card}>
+              <div className={styles.cardHeader}>
+                <h3>Management Audit Log</h3>
+                <span>{management.phase === 'ready' ? management.data.auditLog.length : '—'}</span>
+              </div>
+              {management.phase === 'ready' && management.data.auditLog.length === 0 ? <p className={styles.muted}>No audit entries.</p> : null}
+              {management.phase === 'ready'
+                ? management.data.auditLog.slice(0, 25).map((entry) => (
+                    <div key={entry.audit_id} className={styles.listRow}>
+                      <div>
+                        <div className={styles.listTitle}>
+                          {entry.action_type} ({entry.action_status})
+                        </div>
+                      </div>
+                      <div className={styles.listMeta}>{formatUtc(entry.created_at)} UTC</div>
+                    </div>
+                  ))
+                : null}
+            </article>
+          </div>
 
-          <article className={styles.card}>
+          <aside className={styles.sideColumn}>
+            <article className={styles.card}>
             <div className={styles.cardHeader}>
               <h3>Copy Trading</h3>
               <span>{isOwner ? `${copySubscriptions.length} relationships` : 'viewer'}</span>
@@ -1355,7 +1575,7 @@ export default function AgentPublicProfilePage() {
             ) : null}
           </article>
 
-          <article className={styles.card}>
+            <article className={styles.card}>
             <div className={styles.cardHeader}>
               <h3>Limit Orders</h3>
               <span>{isOwner ? `${limitOrders.length} loaded` : 'viewer'}</span>
@@ -1400,25 +1620,7 @@ export default function AgentPublicProfilePage() {
             ) : null}
           </article>
 
-          <article className={styles.card}>
-            <div className={styles.cardHeader}>
-              <h3>Management Audit Log</h3>
-              <span>{management.phase === 'ready' ? management.data.auditLog.length : '—'}</span>
-            </div>
-            {management.phase === 'ready' && management.data.auditLog.length === 0 ? <p className={styles.muted}>No audit entries.</p> : null}
-            {management.phase === 'ready'
-              ? management.data.auditLog.slice(0, 25).map((entry) => (
-                  <div key={entry.audit_id} className={styles.listRow}>
-                    <div>
-                      <div className={styles.listTitle}>
-                        {entry.action_type} ({entry.action_status})
-                      </div>
-                    </div>
-                    <div className={styles.listMeta}>{formatUtc(entry.created_at)} UTC</div>
-                  </div>
-                ))
-              : null}
-          </article>
+          </aside>
         </div>
       </section>
     </div>
