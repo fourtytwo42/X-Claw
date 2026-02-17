@@ -289,24 +289,24 @@ function policyApprovalLabel(item: { request_type: string; token_address: string
   const map = tokenSymbolByAddress(chainTokens);
 
   if (item.request_type === 'global_approval_enable') {
-    return 'Enable approve-all policy';
+    return 'Turn on auto-approve for all trades';
   }
   if (item.request_type === 'global_approval_disable') {
-    return 'Disable approve-all policy';
+    return 'Turn off auto-approve for all trades';
   }
   if (item.request_type === 'token_preapprove_add') {
     if (!item.token_address) {
-      return 'Preapprove token';
+      return 'Auto-approve token';
     }
-    return `Preapprove ${map.get(item.token_address.toLowerCase()) ?? shortenAddress(item.token_address)}`;
+    return `Auto-approve ${map.get(item.token_address.toLowerCase()) ?? shortenAddress(item.token_address)}`;
   }
   if (item.request_type === 'token_preapprove_remove') {
     if (!item.token_address) {
-      return 'Revoke preapproved token';
+      return 'Remove token auto-approval';
     }
-    return `Revoke ${map.get(item.token_address.toLowerCase()) ?? shortenAddress(item.token_address)}`;
+    return `Remove ${map.get(item.token_address.toLowerCase()) ?? shortenAddress(item.token_address)} auto-approval`;
   }
-  return item.request_type;
+  return humanizeKeyLabel(item.request_type);
 }
 
 function normalizeTokenSelectionSymbol(value: string | null | undefined): string {
@@ -319,6 +319,43 @@ function normalizeTokenSelectionSymbol(value: string | null | undefined): string
     return 'ETH';
   }
   return upper;
+}
+
+function humanizeKeyLabel(value: string | null | undefined): string {
+  const normalized = String(value ?? '').trim();
+  if (!normalized) {
+    return 'Unknown';
+  }
+  return normalized
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(' ')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(' ');
+}
+
+function displayStatusLabel(status: string | null | undefined): string {
+  const normalized = String(status ?? '').trim().toLowerCase();
+  if (!normalized) {
+    return 'Unknown';
+  }
+  const map: Record<string, string> = {
+    approval_pending: 'Waiting for approval',
+    pending: 'Pending',
+    approved: 'Approved',
+    rejected: 'Rejected',
+    denied: 'Denied',
+    deny: 'Denied',
+    filled: 'Completed',
+    executed: 'Completed',
+    executing: 'Processing',
+    failed: 'Failed',
+    proposed: 'Created',
+    open: 'Open',
+    triggered: 'Triggered'
+  };
+  return map[normalized] ?? humanizeKeyLabel(normalized);
 }
 
 export default function AgentPublicProfilePage() {
@@ -882,7 +919,7 @@ export default function AgentPublicProfilePage() {
         at: deposit.confirmedAt,
         kind: 'deposits',
         title: `Deposit ${depositAmount}`,
-        subtitle: `Status: ${deposit.status || 'confirmed'}; ${confirmationsText}; Block ${deposit.blockNumber}`,
+        subtitle: `Status: ${displayStatusLabel(deposit.status || 'confirmed')}; ${confirmationsText}; Block ${deposit.blockNumber}`,
         status: deposit.status || 'confirmed',
         txHash: deposit.txHash ?? null,
         txExplorerUrl: toTxExplorerUrl(deposit.txHash),
@@ -900,7 +937,7 @@ export default function AgentPublicProfilePage() {
           at: payment.terminal_at ?? payment.updated_at ?? payment.created_at,
           kind: payment.direction === 'inbound' ? 'deposits' : 'transfers',
           title: `x402 ${directionLabel} ${formatDecimalText(payment.amount_atomic)} ${titleToken}`,
-          subtitle: `Status: ${payment.status}; Network: ${payment.network_key}; Facilitator: ${payment.facilitator_key}`,
+          subtitle: `Status: ${displayStatusLabel(payment.status)}; Network: ${humanizeKeyLabel(payment.network_key)}; Facilitator: ${humanizeKeyLabel(payment.facilitator_key)}`,
           status: payment.status,
           txHash: payment.tx_hash ?? null,
           txExplorerUrl: toTxExplorerUrl(payment.tx_hash),
@@ -921,8 +958,8 @@ export default function AgentPublicProfilePage() {
           title: item.approval_source === 'x402' ? `x402 outbound approval` : `${transferTokenLabel} transfer`,
           subtitle:
             item.approval_source === 'x402'
-              ? `URL: ${item.x402_url ?? 'n/a'}; Amount: ${item.x402_amount_atomic ?? item.amount_wei}; Approved: ${transferApprovedState(item.status)}`
-              : `To: ${item.to_address}; Amount: ${transferAmount}; Approved: ${transferApprovedState(item.status)}; Confirmations: ${item.confirmations ?? 'n/a'}`,
+              ? `Payment link: ${item.x402_url ?? 'n/a'}; Amount: ${item.x402_amount_atomic ?? item.amount_wei}; Approved: ${transferApprovedState(item.status)}`
+              : `To: ${shortenAddress(item.to_address)}; Amount: ${transferAmount}; Approved: ${transferApprovedState(item.status)}; Confirmations: ${item.confirmations ?? 'n/a'}`,
           status: item.status,
           txHash: item.tx_hash ?? null,
           txExplorerUrl: toTxExplorerUrl(item.tx_hash),
@@ -943,8 +980,8 @@ export default function AgentPublicProfilePage() {
           title: item.approval_source === 'x402' ? 'Pending x402 approval' : 'Pending transfer approval',
           subtitle:
             item.approval_source === 'x402'
-              ? `URL: ${item.x402_url ?? 'n/a'}; Amount: ${item.x402_amount_atomic ?? item.amount_wei}; Approved: Pending`
-              : `To: ${item.to_address}; Amount: ${transferAmount}; Approved: Pending; Confirmations: ${item.confirmations ?? 'n/a'}`,
+              ? `Payment link: ${item.x402_url ?? 'n/a'}; Amount: ${item.x402_amount_atomic ?? item.amount_wei}; Approved: Pending`
+              : `To: ${shortenAddress(item.to_address)}; Amount: ${transferAmount}; Approved: Pending; Confirmations: ${item.confirmations ?? 'n/a'}`,
           status: item.status,
           txHash: null,
           txExplorerUrl: null,
@@ -973,7 +1010,7 @@ export default function AgentPublicProfilePage() {
           at: item.created_at,
           kind: 'approvals',
           title: policyApprovalLabel(item, management.data.chainTokens),
-          subtitle: 'Pending policy approval',
+          subtitle: 'Waiting for policy approval',
           status: 'pending',
           txHash: null,
           txExplorerUrl: null,
@@ -990,7 +1027,7 @@ export default function AgentPublicProfilePage() {
           at: item.created_at,
           kind: 'approvals',
           title: `${tokenInLabel} -> ${tokenOutLabel}`,
-          subtitle: item.reason ?? 'Pending trade approval',
+          subtitle: item.reason ?? 'Waiting for trade approval',
           status: 'pending',
           txHash: null,
           txExplorerUrl: null,
@@ -1099,7 +1136,7 @@ export default function AgentPublicProfilePage() {
         at: item.created_at,
         title: `${tokenInLabel} -> ${tokenOutLabel}`,
         status: 'pending',
-        subtitle: item.reason ?? 'Pending trade approval',
+        subtitle: item.reason ?? 'Waiting for trade approval',
         type: 'trade',
         tokenSymbols: [tokenIn, tokenOut].filter(Boolean),
         raw: item
@@ -1112,7 +1149,7 @@ export default function AgentPublicProfilePage() {
         at: item.created_at,
         title: policyApprovalLabel(item, management.data.chainTokens),
         status: 'pending',
-        subtitle: 'Pending policy approval',
+        subtitle: 'Waiting for policy approval',
         type: 'policy',
         tokenSymbols: policySymbol ? [policySymbol] : [],
         raw: item
@@ -1140,8 +1177,10 @@ export default function AgentPublicProfilePage() {
         status: item.status,
         subtitle:
           item.approval_source === 'x402'
-            ? `URL: ${item.x402_url ?? 'n/a'}; Amount: ${item.x402_amount_atomic ?? item.amount_wei}; Network: ${item.x402_network_key ?? item.chain_key}`
-            : `${item.amount_wei} wei`,
+            ? `Payment link: ${item.x402_url ?? 'n/a'}; Amount: ${item.x402_amount_atomic ?? item.amount_wei}; Network: ${humanizeKeyLabel(
+                item.x402_network_key ?? item.chain_key
+              )}`
+            : `Amount: ${item.amount_wei}`,
         type: 'transfer',
         tokenSymbols: transferSymbol ? [transferSymbol] : [],
         raw: item
@@ -1156,8 +1195,10 @@ export default function AgentPublicProfilePage() {
         status: item.status,
         subtitle:
           item.approval_source === 'x402'
-            ? `URL: ${item.x402_url ?? 'n/a'}; Amount: ${item.x402_amount_atomic ?? item.amount_wei}; Network: ${item.x402_network_key ?? item.chain_key}`
-            : `${item.amount_wei} wei`,
+            ? `Payment link: ${item.x402_url ?? 'n/a'}; Amount: ${item.x402_amount_atomic ?? item.amount_wei}; Network: ${humanizeKeyLabel(
+                item.x402_network_key ?? item.chain_key
+              )}`
+            : `Amount: ${item.amount_wei}`,
         type: 'transfer',
         tokenSymbols: transferSymbol ? [transferSymbol] : [],
         raw: item
@@ -1463,13 +1504,13 @@ export default function AgentPublicProfilePage() {
   };
 
   if (bootstrapState.phase === 'bootstrapping') {
-    return <main className={styles.loadingPage}>Validating management token...</main>;
+    return <main className={styles.loadingPage}>Checking your access...</main>;
   }
 
   if (bootstrapState.phase === 'error') {
     return (
       <main className={styles.errorPage}>
-        <h1>Management bootstrap failed</h1>
+        <h1>Could not open this management page</h1>
         <p>{bootstrapState.message}</p>
         {bootstrapState.code ? <p>Code: {bootstrapState.code}</p> : null}
         {bootstrapState.actionHint ? <p>{bootstrapState.actionHint}</p> : null}
@@ -1504,19 +1545,18 @@ export default function AgentPublicProfilePage() {
                 <div className={styles.walletTitleRow}>
                 <h1>{profile?.agent.agent_name ?? 'Loading agent...'}</h1>
                 {status && isPublicStatus(status) ? <PublicStatusBadge status={status} /> : null}
-                {!status ? <span className={styles.muted}>status unavailable</span> : null}
+                {!status ? <span className={styles.muted}>Status unavailable</span> : null}
               </div>
                 <div className={styles.accountMetaChips}>
-                  <span className={styles.walletChip}>{profile?.agent.runtime_platform ?? 'runtime unavailable'}</span>
                   <span className={styles.walletChip}>Chain: {activeChainLabel}</span>
-                  <span className={styles.walletChip}>Vault: {activeWallet ? shortenAddress(activeWallet.address) : '—'}</span>
+                  <span className={styles.walletChip}>Wallet: {activeWallet ? shortenAddress(activeWallet.address) : '—'}</span>
                 </div>
               </div>
             </div>
             {isOwner ? (
               <div className={styles.headerApprovalControl}>
-                <span className={styles.globalApprovalLabel}>Approve all</span>
-                <label className={styles.iosToggle} title="Allow all trades without per-trade approval.">
+                <span className={styles.globalApprovalLabel}>Auto-approve trades</span>
+                <label className={styles.iosToggle} title="When on, this agent can trade without asking every time.">
                   <input
                     type="checkbox"
                     checked={policyApprovalMode === 'auto'}
@@ -1528,7 +1568,7 @@ export default function AgentPublicProfilePage() {
                           managementPost('/api/v1/management/policy/update', buildPolicyUpdatePayload({ approvalMode: nextMode })).then(() =>
                             Promise.resolve()
                           ),
-                        `Global approval ${nextMode === 'auto' ? 'enabled' : 'disabled'}.`
+                        `Auto-approve is now ${nextMode === 'auto' ? 'on' : 'off'}.`
                       );
                     }}
                   />
@@ -1546,16 +1586,16 @@ export default function AgentPublicProfilePage() {
                   type="button"
                   className={styles.dangerButton}
                   onClick={() => {
-                    if (!window.confirm('Revoke all permissions for this agent? This cannot be undone.')) {
+                    if (!window.confirm('Turn off all auto-approvals for this agent?')) {
                       return;
                     }
                     void runManagementAction(
                       () => managementPost('/api/v1/management/revoke-all', { agentId }).then(() => Promise.resolve()),
-                      'Revoked all permissions for this agent.'
+                      'All auto-approvals turned off for this agent.'
                     );
                   }}
                 >
-                  Revoke All Permissions
+                  Turn Off Auto-Approvals
                 </button>
                 <div className={styles.withdrawInline}>
                   {withdrawDestinationPreview ? <span className={styles.withdrawPreviewLabel}>{withdrawDestinationPreview}</span> : null}
@@ -1565,7 +1605,7 @@ export default function AgentPublicProfilePage() {
                 </div>
               </>
             ) : (
-              <p className={styles.muted}>Viewer mode: owner controls are locked.</p>
+              <p className={styles.muted}>View-only mode: only the owner can change settings.</p>
             )}
           </div>
         </section>
@@ -1581,9 +1621,9 @@ export default function AgentPublicProfilePage() {
               <h2>Wallet</h2>
               <span className={styles.muted}>{selectedTokenSummary}</span>
             </div>
-            {!isOwner ? <p className={styles.muted}>Viewer mode: approval controls are read-only.</p> : null}
+            {!isOwner ? <p className={styles.muted}>View-only mode: approval controls are read-only.</p> : null}
             {holdings.length === 0 ? <p className={styles.muted}>No balances detected for this chain.</p> : null}
-            <p className={styles.muted}>Click a token to filter Activity and Approval History. Hold Ctrl/Cmd for multi-select.</p>
+            <p className={styles.muted}>Select a token to filter activity and approvals. Hold Ctrl/Cmd to select more than one.</p>
             {visibleWalletHoldings.map((holding) => (
               <div
                 key={holding.token}
@@ -1623,8 +1663,8 @@ export default function AgentPublicProfilePage() {
                   </div>
                   {isOwner ? (
                     <div className={`${styles.walletTokenMetricColumn} ${styles.tokenApprovalControl}`} onClick={(event) => event.stopPropagation()}>
-                      <span className={styles.walletTokenMetricLabel}>Approval</span>
-                      <label className={styles.iosToggle} title="Allow this token without per-trade approval.">
+                      <span className={styles.walletTokenMetricLabel}>Auto-Approve</span>
+                      <label className={styles.iosToggle} title="When on, this token can trade without asking each time.">
                         <input
                           type="checkbox"
                           checked={isTokenPreapproved(holding.token)}
@@ -1633,7 +1673,7 @@ export default function AgentPublicProfilePage() {
                             const allowedTokens = nextAllowedTokensForSymbol(holding.token, enabled);
                             void runManagementAction(
                               () => managementPost('/api/v1/management/policy/update', buildPolicyUpdatePayload({ allowedTokens })).then(() => Promise.resolve()),
-                              `${enabled ? 'Added' : 'Removed'} ${holding.token} preapproval.`
+                              `${enabled ? 'Enabled' : 'Disabled'} auto-approve for ${holding.token}.`
                             );
                           }}
                         />
@@ -1678,7 +1718,7 @@ export default function AgentPublicProfilePage() {
             <div className={`${styles.cardHeader} ${styles.walletCardHeader}`}>
               <h2>Wallet Activity</h2>
               <div className={styles.inlineActions}>
-                <span className={styles.muted}>All wallet-impact events</span>
+                <span className={styles.muted}>Trades, transfers, deposits, and approvals</span>
               </div>
             </div>
             <div className={styles.rangeButtons}>
@@ -1706,7 +1746,7 @@ export default function AgentPublicProfilePage() {
                   <div>
                     <div className={styles.listTitle}>{row.title}</div>
                     <div className={styles.muted}>{row.subtitle}</div>
-                    {row.source === 'x402' ? <div className={styles.muted}>Source: x402</div> : null}
+                    {row.source === 'x402' ? <div className={styles.muted}>Source: X402 payment</div> : null}
                     {row.txHash ? (
                       <div className={styles.muted}>
                         Tx:{' '}
@@ -1721,7 +1761,7 @@ export default function AgentPublicProfilePage() {
                     ) : null}
                   </div>
                   <div className={styles.listMeta}>
-                    <span className={styles.statusChip}>{row.status}</span>
+                    <span className={styles.statusChip}>{displayStatusLabel(row.status)}</span>
                     <span>{formatUtc(row.at)} UTC</span>
                   </div>
                 </div>
@@ -1759,9 +1799,9 @@ export default function AgentPublicProfilePage() {
 
             <article id="approval-history" className={`${styles.card} ${styles.walletCard}`}>
             <div className={`${styles.cardHeader} ${styles.walletCardHeader}`}>
-              <h2>Approval History</h2>
+              <h2>Approvals</h2>
               <div className={styles.inlineActions}>
-                <span className={styles.muted}>Trade, policy, and transfer approvals</span>
+                <span className={styles.muted}>Requests waiting for a decision and past decisions</span>
               </div>
             </div>
             <div className={styles.rangeButtons}>
@@ -1781,7 +1821,7 @@ export default function AgentPublicProfilePage() {
                 </button>
               ))}
             </div>
-            {!isOwner ? <p className={styles.muted}>Viewer mode: approval actions are locked.</p> : null}
+            {!isOwner ? <p className={styles.muted}>View-only mode: only the owner can approve or deny.</p> : null}
             {filteredApprovalHistory.length === 0 ? <p className={styles.muted}>No approvals in this filter.</p> : null}
             {visibleApprovalHistory.map((row) => (
                   <div key={row.id} className={styles.queueRow}>
@@ -1791,7 +1831,7 @@ export default function AgentPublicProfilePage() {
                       <div className={styles.muted}>{formatUtc(row.at)} UTC</div>
                     </div>
                     <div className={styles.queueActions}>
-                      <span className={styles.statusChip}>{row.status}</span>
+                      <span className={styles.statusChip}>{displayStatusLabel(row.status)}</span>
                       {isOwner && (row.status === 'pending' || row.status === 'approval_pending') && row.type === 'trade' ? (
                         <>
                           <input
@@ -1802,7 +1842,7 @@ export default function AgentPublicProfilePage() {
                                 [row.raw.trade_id]: event.target.value
                               }))
                             }
-                            placeholder="Rejection reason (optional)"
+                            placeholder="Reason (optional)"
                           />
                           <button
                             type="button"
@@ -1814,7 +1854,7 @@ export default function AgentPublicProfilePage() {
                                     tradeId: row.raw.trade_id,
                                     decision: 'approve'
                                   }).then(() => Promise.resolve()),
-                                `Approved ${row.raw.trade_id}`
+                                'Trade approved.'
                               )
                             }
                           >
@@ -1833,7 +1873,7 @@ export default function AgentPublicProfilePage() {
                                     reasonCode: 'approval_rejected',
                                     reasonMessage: (approvalRejectReasons[row.raw.trade_id] ?? '').trim() || 'Rejected by owner.'
                                   }).then(() => Promise.resolve()),
-                                `Rejected ${row.raw.trade_id}`
+                                'Trade rejected.'
                               )
                             }
                           >
@@ -1851,7 +1891,7 @@ export default function AgentPublicProfilePage() {
                                 [row.raw.request_id]: event.target.value
                               }))
                             }
-                            placeholder="Rejection reason (optional)"
+                            placeholder="Reason (optional)"
                           />
                           <button
                             type="button"
@@ -1863,7 +1903,7 @@ export default function AgentPublicProfilePage() {
                                     policyApprovalId: row.raw.request_id,
                                     decision: 'approve'
                                   }).then(() => Promise.resolve()),
-                                `Approved ${row.raw.request_id}`
+                                'Policy request approved.'
                               )
                             }
                           >
@@ -1881,7 +1921,7 @@ export default function AgentPublicProfilePage() {
                                     decision: 'reject',
                                     reasonMessage: (approvalRejectReasons[row.raw.request_id] ?? '').trim() || 'Rejected by owner.'
                                   }).then(() => Promise.resolve()),
-                                `Rejected ${row.raw.request_id}`
+                                'Policy request denied.'
                               )
                             }
                           >
@@ -1899,7 +1939,7 @@ export default function AgentPublicProfilePage() {
                                 [row.raw.approval_id]: event.target.value
                               }))
                             }
-                            placeholder="Rejection reason (optional)"
+                            placeholder="Reason (optional)"
                           />
                           <button
                             type="button"
@@ -1912,7 +1952,7 @@ export default function AgentPublicProfilePage() {
                                     decision: 'approve',
                                     chainKey: row.raw.chain_key
                                   }).then(() => Promise.resolve()),
-                                `Approved ${row.raw.approval_id}`
+                                'Transfer approved.'
                               )
                             }
                           >
@@ -1931,7 +1971,7 @@ export default function AgentPublicProfilePage() {
                                     chainKey: row.raw.chain_key,
                                     reasonMessage: (approvalRejectReasons[row.raw.approval_id] ?? '').trim() || 'Rejected by owner.'
                                   }).then(() => Promise.resolve()),
-                                `Denied ${row.raw.approval_id}`
+                                'Transfer denied.'
                               )
                             }
                           >
@@ -2031,9 +2071,9 @@ export default function AgentPublicProfilePage() {
               </div>
               {x402ReceiveLink ? (
                 <>
-                  <div className={styles.muted}>Network: {x402ReceiveLink.networkKey}</div>
-                  <div className={styles.muted}>Facilitator: {x402ReceiveLink.facilitatorKey}</div>
-                  <div className={styles.muted}>Asset: {x402ReceiveLink.assetKind}</div>
+                  <div className={styles.muted}>Network: {humanizeKeyLabel(x402ReceiveLink.networkKey)}</div>
+                  <div className={styles.muted}>Facilitator: {humanizeKeyLabel(x402ReceiveLink.facilitatorKey)}</div>
+                  <div className={styles.muted}>Asset Type: {humanizeKeyLabel(x402ReceiveLink.assetKind)}</div>
                   <div className={styles.muted}>Chain scope: {activeChainLabel}</div>
                   <div className={styles.inlineActions}>
                     <button
@@ -2046,7 +2086,7 @@ export default function AgentPublicProfilePage() {
                             )) as X402ReceiveLinkPayload;
                             setX402ReceiveLink(refreshed);
                           },
-                          'x402 receive link refreshed.'
+                          'Payment link settings refreshed.'
                         )
                       }
                     >
@@ -2097,18 +2137,18 @@ export default function AgentPublicProfilePage() {
                                   resourceDescription: x402RequestMemo.trim() || null
                                 })) as X402ReceiveLinkPayload;
                                 if (created.paymentUrl) {
-                                  await copyToClipboard(created.paymentUrl, 'x402 request URL copied.');
+                                  await copyToClipboard(created.paymentUrl, 'Payment link copied.');
                                 }
                                 setX402RequestMemo('');
                               },
-                              'x402 request URL created.'
+                              'Payment request link created.'
                             )
                           }
                         >
-                          Request URL
+                          Create Link
                         </button>
                       </div>
-                      <div className={styles.muted}>Each request creates a unique link URL for this chain and token.</div>
+                      <div className={styles.muted}>Each request creates a unique payment link for this chain and token.</div>
                     </>
                   ) : null}
                   <div className={styles.muted} style={{ marginTop: '0.55rem' }}>
@@ -2121,7 +2161,7 @@ export default function AgentPublicProfilePage() {
                         <div className={styles.listTitle}>
                           {request.amount_atomic} (
                           {request.asset_kind === 'native' ? `${activeChainLabel} ETH` : (request.asset_symbol ?? 'Token')}) ·{' '}
-                          {request.status}
+                          {displayStatusLabel(request.status)}
                         </div>
                         <div className={styles.muted}>{formatUtc(request.created_at)} UTC</div>
                         {request.resource_description ? <div className={styles.muted}>Memo: {request.resource_description}</div> : null}
@@ -2129,7 +2169,7 @@ export default function AgentPublicProfilePage() {
                       <div className={styles.inlineActions}>
                         <button
                           type="button"
-                          onClick={() => void copyToClipboard(request.payment_url ?? '', `x402 URL copied (${request.payment_id}).`)}
+                          onClick={() => void copyToClipboard(request.payment_url ?? '', 'Payment link copied.')}
                           disabled={!request.payment_url}
                         >
                           Copy URL
@@ -2147,7 +2187,7 @@ export default function AgentPublicProfilePage() {
                                     agentId,
                                     paymentId: request.payment_id
                                   }).then(() => Promise.resolve()),
-                                `Deleted x402 request ${request.payment_id}.`
+                                'Payment request deleted.'
                               )
                             }
                           >
@@ -2165,18 +2205,18 @@ export default function AgentPublicProfilePage() {
                   ))}
                 </>
               ) : (
-                <p className={styles.muted}>Receive link unavailable.</p>
+                <p className={styles.muted}>Payment link setup is unavailable right now.</p>
               )}
             </article>
 
             <article className={`${styles.card} ${styles.walletCard}`}>
             <div className={`${styles.cardHeader} ${styles.walletCardHeader}`}>
               <h3>Copy Trading</h3>
-              <span>{isOwner ? `${copySubscriptions.length} relationships` : 'viewer'}</span>
+              <span>{isOwner ? `${copySubscriptions.length} connections` : 'view only'}</span>
             </div>
-            {!isOwner ? <p className={styles.muted}>Copy relationships are owner-only.</p> : null}
+            {!isOwner ? <p className={styles.muted}>Only the owner can manage copy trading.</p> : null}
             <p className={styles.muted}>
-              Create copy relationships from <Link href="/explore" className={styles.inlineLink}>Explore</Link>. This panel is review and delete only.
+              Start copy trading from <Link href="/explore" className={styles.inlineLink}>Explore</Link>. This panel is for review and delete only.
             </p>
             {isOwner ? (
               <>
@@ -2184,9 +2224,9 @@ export default function AgentPublicProfilePage() {
                 {visibleCopySubscriptions.map((item) => (
                   <div key={item.subscriptionId} className={styles.railQueueRow}>
                     <div>
-                      <div className={styles.listTitle}>Leader: {item.leaderAgentId}</div>
+                      <div className={styles.listTitle}>Source agent: {shortenHex(item.leaderAgentId, 6, 4)}</div>
                       <div className={styles.muted}>
-                        {item.enabled ? 'active' : 'paused'} · scale {(item.scaleBps / 10000).toFixed(2)}x · max {item.maxTradeUsd ?? '—'}
+                        {item.enabled ? 'Active' : 'Paused'} · size {(item.scaleBps / 10000).toFixed(2)}x · max {item.maxTradeUsd ?? '—'}
                       </div>
                     </div>
                     <div className={styles.inlineActions}>
@@ -2208,7 +2248,7 @@ export default function AgentPublicProfilePage() {
                                 }
                                 return Promise.resolve();
                               }),
-                            `Deleted copy subscription ${item.subscriptionId}.`
+                            'Copy connection deleted.'
                           )
                         }
                       >
@@ -2252,9 +2292,9 @@ export default function AgentPublicProfilePage() {
             <article className={`${styles.card} ${styles.walletCard}`}>
             <div className={`${styles.cardHeader} ${styles.walletCardHeader}`}>
               <h3>Limit Orders</h3>
-              <span>{isOwner ? `${limitOrders.length} loaded` : 'viewer'}</span>
+              <span>{isOwner ? `${limitOrders.length} loaded` : 'view only'}</span>
             </div>
-            {!isOwner ? <p className={styles.muted}>Viewer mode cannot manage limit orders.</p> : null}
+            {!isOwner ? <p className={styles.muted}>Only the owner can manage limit orders.</p> : null}
             {isOwner ? (
               <>
                 {limitOrders.length === 0 ? <p className={styles.muted}>No open or recent limit orders.</p> : null}
@@ -2265,11 +2305,11 @@ export default function AgentPublicProfilePage() {
                         {order.tokenIn} {order.side === 'buy' ? '->' : 'to'} {order.tokenOut}
                       </div>
                       <div className={styles.muted}>
-                        {order.status} · amount {order.amountIn} · limit {order.limitPrice}
+                        {displayStatusLabel(order.status)} · amount {order.amountIn} · limit {order.limitPrice}
                       </div>
                     </div>
                     <div className={styles.inlineActions}>
-                      <span className={styles.statusChip}>{order.status}</span>
+                      <span className={styles.statusChip}>{displayStatusLabel(order.status)}</span>
                       {(order.status === 'open' || order.status === 'triggered') && (
                         <button
                           type="button"
@@ -2280,7 +2320,7 @@ export default function AgentPublicProfilePage() {
                                 managementPost(`/api/v1/management/limit-orders/${encodeURIComponent(order.orderId)}/cancel`, {
                                   agentId
                                 }).then(() => Promise.resolve()),
-                              `Cancelled limit order ${order.orderId}.`
+                              'Limit order canceled.'
                             )
                           }
                         >
