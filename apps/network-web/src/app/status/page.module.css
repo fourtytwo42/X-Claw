@@ -22,7 +22,7 @@
 
   min-height: calc(100vh - 2rem);
   display: grid;
-  grid-template-columns: 82px minmax(0, 1fr);
+  grid-template-columns: 210px minmax(0, 1fr);
   gap: 1rem;
   color: var(--status-text);
   max-width: 100%;
@@ -243,16 +243,6 @@
 @media (max-width: 900px) {
   .root {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .sidebar {
-    position: static;
-    height: auto;
-    grid-template-rows: auto;
-  }
-
-  .sidebarNav {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    padding-bottom: calc(5.2rem + env(safe-area-inset-bottom, 0px));
   }
 }

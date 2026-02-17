@@ -1,11 +1,7 @@
 'use client';
 
-import Image from 'next/image';
-import Link from 'next/link';
-
-import { ActiveAgentSidebarLink } from '@/components/active-agent-sidebar-link';
 import { ChainHeaderControl } from '@/components/chain-header-control';
-import { SidebarIcon } from '@/components/sidebar-icons';
+import { PrimaryNav } from '@/components/primary-nav';
 import { ThemeToggle } from '@/components/theme-toggle';
 
 import styles from './page.module.css';
@@ -13,31 +9,7 @@ import styles from './page.module.css';
 export default function HowToPage() {
   return (
     <div className={styles.root}>
-      <aside className={styles.sidebar}>
-        <Link href="/" className={styles.sidebarLogo} aria-label="X-Claw home">
-          <Image src="/X-Claw-Logo.png" alt="X-Claw" width={900} height={280} className={styles.sidebarLogoImage} priority />
-        </Link>
-        <nav className={styles.sidebarNav} aria-label="How To sections">
-          <Link className={styles.sidebarItem} href="/dashboard" aria-label="Dashboard" title="Dashboard">
-            <SidebarIcon name="dashboard" />
-          </Link>
-          <Link className={styles.sidebarItem} href="/explore" aria-label="Explore" title="Explore">
-            <SidebarIcon name="explore" />
-          </Link>
-          <Link className={styles.sidebarItem} href="/approvals" aria-label="Approvals Center" title="Approvals Center">
-            <SidebarIcon name="approvals" />
-          </Link>
-          <ActiveAgentSidebarLink itemClassName={styles.sidebarItem} />
-          <div style={{ marginTop: 'auto', display: 'grid', gap: '0.42rem' }}>
-            <Link className={styles.sidebarItem} href="/settings" aria-label="Settings & Security" title="Settings & Security">
-              <SidebarIcon name="settings" />
-            </Link>
-            <Link className={`${styles.sidebarItem} ${styles.sidebarItemActive}`} href="/how-to" aria-label="How To" title="How To">
-              <SidebarIcon name="howto" />
-            </Link>
-          </div>
-        </nav>
-      </aside>
+      <PrimaryNav />
 
       <section className={styles.mainSurface}>
         <header className={styles.topbar}>

@@ -1,15 +1,13 @@
 'use client';
 
-import Image from 'next/image';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 
 import { ChainHeaderControl } from '@/components/chain-header-control';
-import { ActiveAgentSidebarLink } from '@/components/active-agent-sidebar-link';
 import { rememberManagedAgent } from '@/components/management-header-controls';
+import { PrimaryNav } from '@/components/primary-nav';
 import { PublicStatusBadge } from '@/components/public-status-badge';
-import { SidebarIcon } from '@/components/sidebar-icons';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { useActiveChainKey } from '@/lib/active-chain';
 import { getAgentAvatarPalette, getAgentInitial } from '@/lib/agent-avatar-color';
@@ -1479,31 +1477,7 @@ export default function AgentPublicProfilePage() {
   return (
     <div className={styles.root}>
       {renderToasts()}
-      <aside className={styles.sidebar}>
-        <Link href="/" className={styles.sidebarLogo} aria-label="X-Claw home">
-          <Image src="/X-Claw-Logo.png" alt="X-Claw" width={900} height={280} className={styles.sidebarLogoImage} priority />
-        </Link>
-        <nav className={styles.nav}>
-          <Link href="/dashboard" className={styles.navItem} aria-label="Dashboard" title="Dashboard">
-            <SidebarIcon name="dashboard" />
-          </Link>
-          <Link href="/explore" className={styles.navItem} aria-label="Explore" title="Explore">
-            <SidebarIcon name="explore" />
-          </Link>
-          <Link href="/approvals" className={styles.navItem} aria-label="Approvals Center" title="Approvals Center">
-            <SidebarIcon name="approvals" />
-          </Link>
-          <ActiveAgentSidebarLink itemClassName={styles.navItem} activeClassName={styles.navItemActive} />
-          <div style={{ marginTop: 'auto', display: 'grid', gap: '0.42rem' }}>
-            <Link href="/settings" className={styles.navItem} aria-label="Settings & Security" title="Settings & Security">
-              <SidebarIcon name="settings" />
-            </Link>
-            <Link href="/how-to" className={styles.navItem} aria-label="How To" title="How To">
-              <SidebarIcon name="howto" />
-            </Link>
-          </div>
-        </nav>
-      </aside>
+      <PrimaryNav />
 
       <section className={styles.surface}>
         {renderUtilityBar()}

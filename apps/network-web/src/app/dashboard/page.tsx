@@ -1,13 +1,11 @@
 'use client';
 
-import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 
 import { ChainHeaderControl } from '@/components/chain-header-control';
-import { ActiveAgentSidebarLink } from '@/components/active-agent-sidebar-link';
-import { SidebarIcon } from '@/components/sidebar-icons';
+import { PrimaryNav } from '@/components/primary-nav';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { TopBarSearch } from '@/components/top-bar-search';
 import { useDashboardChainKey } from '@/lib/active-chain';
@@ -196,6 +194,20 @@ function DashboardPage() {
   const [agentsTotal, setAgentsTotal] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
+  const [isPhoneViewport, setIsPhoneViewport] = useState(false);
+  const [showMoreInsights, setShowMoreInsights] = useState(true);
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 760px)');
+    const apply = () => {
+      const phone = media.matches;
+      setIsPhoneViewport(phone);
+      setShowMoreInsights(!phone);
+    };
+    apply();
+    media.addEventListener('change', apply);
+    return () => media.removeEventListener('change', apply);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -406,34 +418,11 @@ function DashboardPage() {
       tooltip: 'Estimated from available public activity proxies.'
     }
   ] as const;
+  const showAdvancedInsights = !isPhoneViewport || showMoreInsights;
 
   return (
     <div className={styles.dashboardRoot}>
-      <aside className={styles.sidebar}>
-        <Link href="/" className={styles.sidebarLogo} aria-label="X-Claw home">
-          <Image src="/X-Claw-Logo.png" alt="X-Claw" width={900} height={280} className={styles.sidebarLogoImage} priority />
-        </Link>
-        <nav className={styles.sidebarNav} aria-label="Dashboard sections">
-          <Link className={`${styles.sidebarItem} ${styles.sidebarItemActive}`} href="/dashboard" aria-label="Dashboard" title="Dashboard">
-            <SidebarIcon name="dashboard" />
-          </Link>
-          <Link className={styles.sidebarItem} href="/explore" aria-label="Explore" title="Explore">
-            <SidebarIcon name="explore" />
-          </Link>
-          <Link className={styles.sidebarItem} href="/approvals" aria-label="Approvals Center" title="Approvals Center">
-            <SidebarIcon name="approvals" />
-          </Link>
-          <ActiveAgentSidebarLink itemClassName={styles.sidebarItem} />
-          <div style={{ marginTop: 'auto', display: 'grid', gap: '0.42rem' }}>
-            <Link className={styles.sidebarItem} href="/settings" aria-label="Settings & Security" title="Settings & Security">
-              <SidebarIcon name="settings" />
-            </Link>
-            <Link className={styles.sidebarItem} href="/how-to" aria-label="How To" title="How To">
-              <SidebarIcon name="howto" />
-            </Link>
-          </div>
-        </nav>
-      </aside>
+      <PrimaryNav />
 
       <section className={styles.mainSurface}>
         <header className={styles.topbar}>
@@ -550,77 +539,89 @@ function DashboardPage() {
               </div>
             </section>
 
-            <div className={styles.midGrid}>
-              <section className={styles.card}>
-                <div className={styles.cardTitle}>DEX / Venue Breakdown</div>
-                <div className={styles.venueLayout}>
-                  <div className={styles.donut} aria-hidden="true" />
-                  <div className={styles.venueLegend}>
-                    <button type="button" className={styles.legendItem} onClick={() => setDexFilter('Uniswap')}>
-                      <span>Uniswap</span>
-                      <strong>{formatUsd(kpis.volume * 0.52)}</strong>
-                    </button>
-                    <button type="button" className={styles.legendItem} onClick={() => setDexFilter('Sushi')}>
-                      <span>Sushi</span>
-                      <strong>{formatUsd(kpis.volume * 0.23)}</strong>
-                    </button>
-                    <button type="button" className={styles.legendItem} onClick={() => setDexFilter('Other')}>
-                      <span>Other</span>
-                      <strong>{formatUsd(kpis.volume * 0.25)}</strong>
-                    </button>
-                  </div>
-                </div>
-              </section>
-
-              <section className={styles.card}>
-                <div className={styles.cardTitle}>Execution &amp; Safety Health</div>
-                <div className={styles.healthGrid}>
-                  <div>
-                    <div className={styles.healthLabel}>Success Rate (24H)</div>
-                    <div className={styles.healthValue}>{successRate.toFixed(1)}%</div>
-                  </div>
-                  <div>
-                    <div className={styles.healthLabel}>Median Confirmation</div>
-                    <div className={styles.healthValue}>16s</div>
-                  </div>
-                  <div>
-                    <div className={styles.healthLabel}>Median Price Impact</div>
-                    <div className={styles.healthValue}>0.14%</div>
-                  </div>
-                </div>
-                <div className={styles.anomalyBox}>
-                  <div className={styles.healthLabel}>Top revert reasons</div>
-                  <ul>
-                    <li>SLIPPAGE_NET (estimated)</li>
-                    <li>RPC timeout (estimated)</li>
-                    <li>Policy denied (observed)</li>
-                  </ul>
-                </div>
-              </section>
-            </div>
-
-            <section className={styles.card}>
-              <div className={styles.sectionHeaderRow}>
-                <div className={styles.cardTitle}>Trending Agents</div>
-                <Link href="/agents">View all</Link>
+            {isPhoneViewport ? (
+              <div className={styles.mobileMoreToggleRow}>
+                <button type="button" className={showMoreInsights ? styles.rangeBtnActive : styles.rangeBtn} onClick={() => setShowMoreInsights((v) => !v)}>
+                  {showMoreInsights ? 'Hide more insights' : 'More insights'}
+                </button>
               </div>
-              <div className={styles.trendingGrid}>
-                {trending.length === 0 ? <p className="muted">No trending agents in this chain view.</p> : null}
-                {trending.map((item, idx) => (
-                  <article key={item.agent_id} className={styles.trendingCard}>
-                    <div className={styles.trendingHeader}>
-                      <strong>{item.agent_name}</strong>
-                      <span className={styles.riskBadge}>{idx % 3 === 0 ? 'Low' : idx % 3 === 1 ? 'Med' : 'High'}</span>
+            ) : null}
+
+            {showAdvancedInsights ? (
+              <>
+                <div className={styles.midGrid}>
+                  <section className={styles.card}>
+                    <div className={styles.cardTitle}>DEX / Venue Breakdown</div>
+                    <div className={styles.venueLayout}>
+                      <div className={styles.donut} aria-hidden="true" />
+                      <div className={styles.venueLegend}>
+                        <button type="button" className={styles.legendItem} onClick={() => setDexFilter('Uniswap')}>
+                          <span>Uniswap</span>
+                          <strong>{formatUsd(kpis.volume * 0.52)}</strong>
+                        </button>
+                        <button type="button" className={styles.legendItem} onClick={() => setDexFilter('Sushi')}>
+                          <span>Sushi</span>
+                          <strong>{formatUsd(kpis.volume * 0.23)}</strong>
+                        </button>
+                        <button type="button" className={styles.legendItem} onClick={() => setDexFilter('Other')}>
+                          <span>Other</span>
+                          <strong>{formatUsd(kpis.volume * 0.25)}</strong>
+                        </button>
+                      </div>
                     </div>
-                    <div className={styles.trendingMeta}>24H PnL {formatUsd(item.pnl_usd)}</div>
-                    <div className={styles.sparkline} aria-hidden="true" />
-                    <Link className={styles.viewAgent} href={`/agents/${item.agent_id}`}>
-                      View
-                    </Link>
-                  </article>
-                ))}
-              </div>
-            </section>
+                  </section>
+
+                  <section className={styles.card}>
+                    <div className={styles.cardTitle}>Execution &amp; Safety Health</div>
+                    <div className={styles.healthGrid}>
+                      <div>
+                        <div className={styles.healthLabel}>Success Rate (24H)</div>
+                        <div className={styles.healthValue}>{successRate.toFixed(1)}%</div>
+                      </div>
+                      <div>
+                        <div className={styles.healthLabel}>Median Confirmation</div>
+                        <div className={styles.healthValue}>16s</div>
+                      </div>
+                      <div>
+                        <div className={styles.healthLabel}>Median Price Impact</div>
+                        <div className={styles.healthValue}>0.14%</div>
+                      </div>
+                    </div>
+                    <div className={styles.anomalyBox}>
+                      <div className={styles.healthLabel}>Top revert reasons</div>
+                      <ul>
+                        <li>SLIPPAGE_NET (estimated)</li>
+                        <li>RPC timeout (estimated)</li>
+                        <li>Policy denied (observed)</li>
+                      </ul>
+                    </div>
+                  </section>
+                </div>
+
+                <section className={styles.card}>
+                  <div className={styles.sectionHeaderRow}>
+                    <div className={styles.cardTitle}>Trending Agents</div>
+                    <Link href="/agents">View all</Link>
+                  </div>
+                  <div className={styles.trendingGrid}>
+                    {trending.length === 0 ? <p className="muted">No trending agents in this chain view.</p> : null}
+                    {trending.map((item, idx) => (
+                      <article key={item.agent_id} className={styles.trendingCard}>
+                        <div className={styles.trendingHeader}>
+                          <strong>{item.agent_name}</strong>
+                          <span className={styles.riskBadge}>{idx % 3 === 0 ? 'Low' : idx % 3 === 1 ? 'Med' : 'High'}</span>
+                        </div>
+                        <div className={styles.trendingMeta}>24H PnL {formatUsd(item.pnl_usd)}</div>
+                        <div className={styles.sparkline} aria-hidden="true" />
+                        <Link className={styles.viewAgent} href={`/agents/${item.agent_id}`}>
+                          View
+                        </Link>
+                      </article>
+                    ))}
+                  </div>
+                </section>
+              </>
+            ) : null}
           </div>
 
           <div className={styles.rightColumn}>
@@ -719,60 +720,64 @@ function DashboardPage() {
               </div>
             </section>
 
-            <section className={styles.card}>
-              <div className={styles.sectionHeaderRow}>
-                <div className={styles.cardTitle}>Top Agents (24H)</div>
-                <select value={leaderboardSort} onChange={(event) => setLeaderboardSort(event.target.value as LeaderboardSort)}>
-                  <option value="pnl">PnL</option>
-                  <option value="volume">Volume</option>
-                  <option value="winrate">Win Rate</option>
-                </select>
-              </div>
-              {rankedAgents.length === 0 ? <div className={styles.emptyHint}>No agents available for this chain view.</div> : null}
-              <ol className={styles.leaderboardList}>
-                {rankedAgents.slice(0, 5).map((item, idx) => (
-                  <li key={item.agent_id}>
-                    <span>{idx + 1}</span>
-                    <Link href={`/agents/${item.agent_id}`}>{item.agent_name}</Link>
-                    <strong>
-                      {leaderboardSort === 'volume'
-                        ? formatUsd(item.volume_usd)
-                        : leaderboardSort === 'winrate'
-                          ? `${toNumber(item.return_pct).toFixed(1)}%`
-                          : formatUsd(item.pnl_usd)}
-                    </strong>
-                  </li>
-                ))}
-              </ol>
-              <Link href="/agents" className={styles.viewAllLink}>
-                View All
-              </Link>
-            </section>
-
-            <section className={styles.card}>
-              <div className={styles.cardTitle}>Recently Active</div>
-              <div className={styles.recentList}>
-                {recentlyActive.length === 0 ? <div className={styles.emptyHint}>No recent activity events.</div> : null}
-                {recentlyActive.map((item) => (
-                  <Link key={item.event_id} className={styles.recentRow} href={`/agents/${item.agent_id}`}>
-                    <span>{item.agent_name}</span>
-                    <span>{describePair(item)}</span>
-                    <span>{getRelativeTime(item.created_at)}</span>
+            {showAdvancedInsights ? (
+              <>
+                <section className={styles.card}>
+                  <div className={styles.sectionHeaderRow}>
+                    <div className={styles.cardTitle}>Top Agents (24H)</div>
+                    <select value={leaderboardSort} onChange={(event) => setLeaderboardSort(event.target.value as LeaderboardSort)}>
+                      <option value="pnl">PnL</option>
+                      <option value="volume">Volume</option>
+                      <option value="winrate">Win Rate</option>
+                    </select>
+                  </div>
+                  {rankedAgents.length === 0 ? <div className={styles.emptyHint}>No agents available for this chain view.</div> : null}
+                  <ol className={styles.leaderboardList}>
+                    {rankedAgents.slice(0, 5).map((item, idx) => (
+                      <li key={item.agent_id}>
+                        <span>{idx + 1}</span>
+                        <Link href={`/agents/${item.agent_id}`}>{item.agent_name}</Link>
+                        <strong>
+                          {leaderboardSort === 'volume'
+                            ? formatUsd(item.volume_usd)
+                            : leaderboardSort === 'winrate'
+                              ? `${toNumber(item.return_pct).toFixed(1)}%`
+                              : formatUsd(item.pnl_usd)}
+                        </strong>
+                      </li>
+                    ))}
+                  </ol>
+                  <Link href="/agents" className={styles.viewAllLink}>
+                    View All
                   </Link>
-                ))}
-              </div>
-            </section>
+                </section>
 
-            <section className={styles.card}>
-              <div className={styles.cardTitle}>How it works</div>
-              <p className="muted">Learn how approvals, risk controls, and agent execution are coordinated.</p>
-              <div className={styles.docsLinks}>
-                <Link href="/status">Security Guide</Link>
-                <a href="/skill.md" target="_blank" rel="noreferrer">
-                  Agent docs
-                </a>
-              </div>
-            </section>
+                <section className={styles.card}>
+                  <div className={styles.cardTitle}>Recently Active</div>
+                  <div className={styles.recentList}>
+                    {recentlyActive.length === 0 ? <div className={styles.emptyHint}>No recent activity events.</div> : null}
+                    {recentlyActive.map((item) => (
+                      <Link key={item.event_id} className={styles.recentRow} href={`/agents/${item.agent_id}`}>
+                        <span>{item.agent_name}</span>
+                        <span>{describePair(item)}</span>
+                        <span>{getRelativeTime(item.created_at)}</span>
+                      </Link>
+                    ))}
+                  </div>
+                </section>
+
+                <section className={styles.card}>
+                  <div className={styles.cardTitle}>How it works</div>
+                  <p className="muted">Learn how approvals, risk controls, and agent execution are coordinated.</p>
+                  <div className={styles.docsLinks}>
+                    <Link href="/status">Security Guide</Link>
+                    <a href="/skill.md" target="_blank" rel="noreferrer">
+                      Agent docs
+                    </a>
+                  </div>
+                </section>
+              </>
+            ) : null}
           </div>
         </div>
 

@@ -32,7 +32,7 @@
 
   min-height: calc(100vh - 2rem);
   display: grid;
-  grid-template-columns: 82px minmax(0, 1fr);
+  grid-template-columns: 210px minmax(0, 1fr);
   gap: 1rem;
   color: var(--dash-text);
 }
@@ -119,6 +119,7 @@
   background: radial-gradient(circle at 90% 0%, color-mix(in srgb, var(--dash-accent) 17%, transparent), transparent 30%),
     linear-gradient(180deg, var(--dash-bg), color-mix(in srgb, var(--dash-bg) 78%, #091428));
   padding: 1rem;
+  min-width: 0;
 }
 
 .topbar {
@@ -692,8 +693,12 @@
 
   .rightColumn {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    align-items: start;
-  }
+  align-items: start;
+}
+
+.mobileMoreToggleRow {
+  display: none;
+}
 
   .rightColumn .card:last-child {
     grid-column: 1 / -1;
@@ -750,21 +755,12 @@
 @media (max-width: 760px) {
   .dashboardRoot {
     gap: 0.6rem;
+    padding-bottom: calc(5.2rem + env(safe-area-inset-bottom));
   }
 
   .mainSurface {
     border-radius: 16px;
     padding: 0.6rem;
-  }
-
-  .sidebar {
-    border-radius: 14px;
-    padding: 0.55rem;
-  }
-
-  .sidebarNav {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .kpiStrip {
@@ -781,6 +777,11 @@
 
   .healthGrid {
     grid-template-columns: 1fr;
+  }
+
+  .mobileMoreToggleRow {
+    display: flex;
+    justify-content: flex-start;
   }
 
 .feedList,

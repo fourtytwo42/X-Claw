@@ -37,7 +37,7 @@
   width: 100%;
   max-width: 100%;
   display: grid;
-  grid-template-columns: 84px minmax(0, 1fr);
+  grid-template-columns: 210px minmax(0, 1fr);
   gap: 0.9rem;
   position: relative;
 }
@@ -602,8 +602,7 @@
 
 .listTitle {
   font-weight: 600;
-  overflow-wrap: anywhere;
-  word-break: break-word;
+  min-width: 0;
 }
 
 .listMeta {
@@ -622,7 +621,7 @@
 .walletTokenMeta {
   display: grid;
   grid-template-columns: 170px 84px;
-  width: 264px;
+  width: min(264px, 42vw);
   align-items: start;
   justify-items: start;
   justify-content: start;
@@ -658,6 +657,14 @@
   align-items: center;
   gap: 0.35rem;
   flex-wrap: wrap;
+  min-width: 0;
+}
+
+.walletTokenTitleRow .listTitle {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: min(42vw, 260px);
 }
 
 .approvedChip {
@@ -1028,6 +1035,10 @@
 }
 
 @media (max-width: 820px) {
+  .root {
+    padding-bottom: calc(5.2rem + env(safe-area-inset-bottom));
+  }
+
   .surface {
     padding: 0.8rem;
   }
@@ -1076,5 +1087,25 @@
   .queueActions input {
     min-width: 0;
     width: 100%;
+  }
+
+  .walletTokenRow {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.45rem;
+  }
+
+  .walletTokenMeta {
+    width: 100%;
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 0.45rem;
+  }
+
+  .walletTokenMetricColumn {
+    width: 100%;
+  }
+
+  .walletTokenTitleRow .listTitle {
+    max-width: 100%;
   }
 }

@@ -118,6 +118,24 @@ a {
   grid-template-rows: auto 1fr auto;
 }
 
+.primary-shell {
+  width: min(100vw, 1840px);
+  margin: 0 auto;
+  padding: 0.75rem;
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr);
+  gap: 1rem;
+}
+
+.primary-shell-content {
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bg) 84%, #091325 16%), var(--bg));
+  min-width: 0;
+  padding: 1rem;
+}
+
 .left-nav-shell {
   width: min(100vw, 1840px);
   margin: 0 auto;
@@ -1222,6 +1240,20 @@ th {
   .page-content-dashboard {
     width: min(100%, 100vw);
     padding: 0.5rem;
+    padding-bottom: calc(5.6rem + env(safe-area-inset-bottom));
+  }
+
+  .primary-shell {
+    width: min(100%, 100vw);
+    grid-template-columns: 1fr;
+    gap: 0.6rem;
+    padding: 0.5rem;
+    padding-bottom: calc(5.6rem + env(safe-area-inset-bottom));
+  }
+
+  .primary-shell-content {
+    border-radius: 16px;
+    padding: 0.6rem;
   }
 
   .left-nav-shell {

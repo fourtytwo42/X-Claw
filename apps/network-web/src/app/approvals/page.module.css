@@ -28,7 +28,7 @@
 
   min-height: calc(100vh - 2rem);
   display: grid;
-  grid-template-columns: 82px minmax(0, 1fr);
+  grid-template-columns: 210px minmax(0, 1fr);
   gap: 1rem;
   color: var(--approvals-text);
   max-width: 100%;
@@ -488,16 +488,7 @@
 @media (max-width: 1080px) {
   .root {
     grid-template-columns: 1fr;
-  }
-
-  .sidebar {
-    position: static;
-    height: auto;
-  }
-
-  .sidebarNav {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    padding-bottom: calc(5.2rem + env(safe-area-inset-bottom, 0px));
   }
 
   .summaryStrip {
