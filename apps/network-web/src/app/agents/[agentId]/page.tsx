@@ -199,6 +199,33 @@ async function managementGet(path: string) {
   return json;
 }
 
+async function managementDelete(path: string, payload: Record<string, unknown>) {
+  const csrf = getCsrfToken();
+  const headers: Record<string, string> = { 'content-type': 'application/json' };
+  if (csrf) {
+    headers['x-csrf-token'] = csrf;
+  }
+
+  const response = await fetch(path, {
+    method: 'DELETE',
+    credentials: 'same-origin',
+    headers,
+    body: JSON.stringify(payload)
+  });
+  const json = (await response.json().catch(() => null)) as { message?: string; code?: string; actionHint?: string } | null;
+  if (!response.ok) {
+    const error = new Error(json?.message ?? 'Management request failed.') as Error & { code?: string; actionHint?: string };
+    if (json?.code) {
+      error.code = json.code;
+    }
+    if (json?.actionHint) {
+      error.actionHint = json.actionHint;
+    }
+    throw error;
+  }
+  return json;
+}
+
 async function bootstrapSession(
   agentId: string,
   token: string
@@ -2108,7 +2135,9 @@ export default function AgentPublicProfilePage() {
                     <div key={request.payment_id} className={styles.railQueueRow}>
                       <div>
                         <div className={styles.listTitle}>
-                          {request.amount_atomic} ({request.asset_symbol ?? request.asset_kind}) · {request.status}
+                          {request.amount_atomic} (
+                          {request.asset_kind === 'native' ? `${activeChainLabel} ETH` : (request.asset_symbol ?? 'Token')}) ·{' '}
+                          {request.status}
                         </div>
                         <div className={styles.muted}>{formatUtc(request.created_at)} UTC</div>
                       </div>
@@ -2120,6 +2149,32 @@ export default function AgentPublicProfilePage() {
                         >
                           Copy URL
                         </button>
+                        {isOwner ? (
+                          <button
+                            type="button"
+                            className={`${styles.iconOnlyButton} ${styles.dangerButton}`}
+                            title="Delete request"
+                            aria-label={`Delete x402 request ${request.payment_id}`}
+                            onClick={() =>
+                              void runManagementAction(
+                                () =>
+                                  managementDelete('/api/v1/management/x402/receive-link', {
+                                    agentId,
+                                    paymentId: request.payment_id
+                                  }).then(() => Promise.resolve()),
+                                `Deleted x402 request ${request.payment_id}.`
+                              )
+                            }
+                          >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+                              <path d="M4 7h16" />
+                              <path d="M10 11v6" />
+                              <path d="M14 11v6" />
+                              <path d="M6 7l1 13h10l1-13" />
+                              <path d="M9 7V4h6v3" />
+                            </svg>
+                          </button>
+                        ) : null}
                       </div>
                     </div>
                   ))}

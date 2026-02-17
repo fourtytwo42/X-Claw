@@ -289,6 +289,11 @@ type CreateReceiveRequestBody = {
   amountAtomic?: string;
 };
 
+type DeleteReceiveRequestBody = {
+  agentId?: string;
+  paymentId?: string;
+};
+
 export async function POST(req: NextRequest) {
   const requestId = getRequestId(req);
   try {
@@ -396,6 +401,79 @@ export async function POST(req: NextRequest) {
         expiresAt: null,
         timeLimitNotice: 'This payment link does not expire.',
         status: 'proposed'
+      },
+      200,
+      requestId
+    );
+  } catch {
+    return internalErrorResponse(requestId);
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  const requestId = getRequestId(req);
+  try {
+    const parsed = await parseJsonBody(req, requestId);
+    if (!parsed.ok) {
+      return parsed.response;
+    }
+    const body = (parsed.body ?? {}) as DeleteReceiveRequestBody;
+    const agentId = String(body.agentId ?? '').trim();
+    const paymentId = String(body.paymentId ?? '').trim();
+    if (!agentId || !paymentId) {
+      return errorResponse(
+        400,
+        {
+          code: 'payload_invalid',
+          message: 'agentId and paymentId are required.',
+          actionHint: 'Provide both agentId and paymentId in request body.'
+        },
+        requestId
+      );
+    }
+
+    const auth = await requireManagementWriteAuth(req, requestId, agentId);
+    if (!auth.ok) {
+      return auth.response;
+    }
+
+    const updated = await dbQuery(
+      `
+      update agent_x402_payment_mirror
+      set
+        status = 'expired',
+        reason_code = 'request_deleted',
+        reason_message = 'Deleted by owner.',
+        updated_at = now(),
+        terminal_at = now()
+      where payment_id = $1
+        and agent_id = $2
+        and direction = 'inbound'
+        and status in ('proposed', 'executing')
+      returning payment_id
+      `,
+      [paymentId, agentId]
+    );
+
+    if ((updated.rowCount ?? 0) === 0) {
+      return errorResponse(
+        404,
+        {
+          code: 'payload_invalid',
+          message: 'Active x402 receive request not found.',
+          actionHint: 'Refresh receive requests and retry.'
+        },
+        requestId
+      );
+    }
+
+    return successResponse(
+      {
+        ok: true,
+        agentId,
+        paymentId,
+        status: 'expired',
+        message: 'x402 receive request removed from active queue.'
       },
       200,
       requestId

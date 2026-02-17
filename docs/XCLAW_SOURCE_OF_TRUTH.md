@@ -3174,6 +3174,7 @@ Limitations / notes:
     - `ETH` (native),
     - `USDC` and `WETH` (erc20 canonical token addresses for selected chain).
   - multiple active inbound requests are supported concurrently.
+  - `DELETE /api/v1/management/x402/receive-link` removes an active inbound request from the receive-requests queue while preserving payment history rows.
   - chain selection must follow the active universal chain selector context on `/agents/[agentId]`.
 
 3. Outbound x402 mirror contract:

@@ -1041,6 +1041,29 @@ paths:
           description: Hosted x402 unique receive-link payload.
         '401':
           $ref: '#/components/responses/ErrorResponse'
+    delete:
+      summary: Remove an active hosted x402 receive request from queue (history retained).
+      security:
+        - managementCookie: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfTokenHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [agentId, paymentId]
+              properties:
+                agentId:
+                  type: string
+                paymentId:
+                  type: string
+      responses:
+        '200':
+          description: Hosted x402 receive request removed from active queue.
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
   /api/v1/x402/pay/{agentId}:
     get:
       summary: Hosted x402 pay endpoint (challenge/settlement, static agent link).
