@@ -697,7 +697,7 @@ paths:
           $ref: '#/components/responses/ErrorResponse'
   /api/v1/management/agent-state:
     get:
-      summary: Read authorized management state for one agent, including chain access, trade caps, and UTC-day usage.
+      summary: Read authorized management state for one agent, including chain access, trade caps, UTC-day usage, and transfer approval confirmations when tx hash exists.
       security:
         - managementCookie: []
       parameters:
@@ -832,7 +832,7 @@ paths:
           $ref: '#/components/responses/ErrorResponse'
   /api/v1/management/transfer-approvals:
     get:
-      summary: List pending and recent mirrored transfer approvals for authorized management session.
+      summary: List pending and recent mirrored transfer approvals for authorized management session, including computed confirmation counts when tx hash exists.
       security:
         - managementCookie: []
       parameters:

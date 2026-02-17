@@ -42,6 +42,7 @@ export type ApprovalsCenterManagementState = {
     policy_block_reason_code: string | null;
     policy_block_reason_message: string | null;
     execution_mode: 'normal' | 'policy_override' | null;
+    confirmations?: number | null;
     created_at: string;
   }>;
   transferApprovalsHistory?: Array<{
@@ -59,6 +60,7 @@ export type ApprovalsCenterManagementState = {
     policy_block_reason_code: string | null;
     policy_block_reason_message: string | null;
     execution_mode: 'normal' | 'policy_override' | null;
+    confirmations?: number | null;
     created_at: string;
     decided_at: string | null;
     terminal_at: string | null;

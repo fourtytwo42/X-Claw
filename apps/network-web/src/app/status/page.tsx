@@ -1,8 +1,17 @@
 'use client';
 
+import Image from 'next/image';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
+import { ActiveAgentSidebarLink } from '@/components/active-agent-sidebar-link';
+import { ChainHeaderControl } from '@/components/chain-header-control';
+import { SidebarIcon } from '@/components/sidebar-icons';
+import { ThemeToggle } from '@/components/theme-toggle';
+import { useDashboardChainKey } from '@/lib/active-chain';
 import { formatUtc } from '@/lib/public-format';
+
+import styles from './page.module.css';
 
 type StatusPayload = {
   ok: boolean;
@@ -57,6 +66,7 @@ function statusTone(status: string): string {
 }
 
 export default function StatusPage() {
+  const [dashboardChainKey] = useDashboardChainKey();
   const [data, setData] = useState<StatusPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -92,93 +102,136 @@ export default function StatusPage() {
     };
   }, []);
 
+  const filteredProviders = (data?.providers ?? []).filter((provider) => dashboardChainKey === 'all' || provider.chainKey === dashboardChainKey);
+
   return (
-    <div>
-      <h1 className="section-title">Public Status</h1>
-      <p className="muted">Public-safe diagnostics for API, data dependencies, and chain provider health.</p>
+    <div className={styles.root}>
+      <aside className={styles.sidebar}>
+        <Link href="/" className={styles.sidebarLogo} aria-label="X-Claw home">
+          <Image src="/X-Claw-Logo.png" alt="X-Claw" width={900} height={280} className={styles.sidebarLogoImage} priority />
+        </Link>
+        <nav className={styles.sidebarNav} aria-label="Status sections">
+          <Link className={styles.sidebarItem} href="/dashboard" aria-label="Dashboard" title="Dashboard">
+            <SidebarIcon name="dashboard" />
+          </Link>
+          <Link className={styles.sidebarItem} href="/explore" aria-label="Explore" title="Explore">
+            <SidebarIcon name="explore" />
+          </Link>
+          <Link className={styles.sidebarItem} href="/approvals" aria-label="Approvals Center" title="Approvals Center">
+            <SidebarIcon name="approvals" />
+          </Link>
+          <ActiveAgentSidebarLink itemClassName={styles.sidebarItem} />
+          <div style={{ marginTop: 'auto', display: 'grid', gap: '0.42rem' }}>
+            <Link className={styles.sidebarItem} href="/settings" aria-label="Settings & Security" title="Settings & Security">
+              <SidebarIcon name="settings" />
+            </Link>
+            <Link className={styles.sidebarItem} href="/how-to" aria-label="How To" title="How To">
+              <SidebarIcon name="howto" />
+            </Link>
+          </div>
+        </nav>
+      </aside>
 
-      {error ? <p className="warning-banner">{error}</p> : null}
+      <section className={styles.mainSurface}>
+        <header className={styles.topbar}>
+          <div>
+            <h1 className={styles.title}>Public Status</h1>
+            <p className={styles.subtitle}>Public-safe diagnostics for API, data dependencies, and chain provider health.</p>
+          </div>
+          <div className={styles.topbarControls}>
+            <ChainHeaderControl includeAll className={styles.chainControl} id="status-chain-select" />
+            <ThemeToggle className={styles.topbarThemeToggle} />
+          </div>
+        </header>
 
-      <section className="panel status-overview">
-        <div>
-          <div className="muted">Overall status</div>
-          <div className={`kpi-value ${statusTone(data?.overallStatus ?? 'offline')}`}>{data?.overallStatus ?? 'loading...'}</div>
-        </div>
-        <div>
-          <div className="muted">Last updated (UTC)</div>
-          <div>{data ? formatUtc(data.generatedAtUtc) : '...'}</div>
-        </div>
-        <div>
-          <div className="muted">Request ID</div>
-          <code className="hard-wrap">{data?.requestId ?? '...'}</code>
-        </div>
-      </section>
+        {error ? <p className={styles.warningBanner}>{error}</p> : null}
 
-      <section className="panel">
-        <h2 className="section-title">Dependency Health</h2>
-        <div className="status-grid">
-          {(data?.dependencies ?? []).map((dep) => (
-            <article key={dep.name} className="management-card">
-              <h3>{dep.name.toUpperCase()}</h3>
-              <p className={statusTone(dep.status)}>{dep.status}</p>
-              <p className="muted">Latency: {dep.latencyMs === null ? 'n/a' : `${dep.latencyMs}ms`}</p>
-              <p className="muted">Checked: {formatUtc(dep.checkedAtUtc)} UTC</p>
-              {dep.detail ? <p className="muted">{dep.detail}</p> : null}
+        <section className={styles.card}>
+          <h2 className={styles.sectionTitle}>Overview</h2>
+          <div className={styles.statusOverview}>
+            <div>
+              <div className={styles.muted}>Overall status</div>
+              <div className={`${styles.kpiValue} ${statusTone(data?.overallStatus ?? 'offline')}`}>{data?.overallStatus ?? 'loading...'}</div>
+            </div>
+            <div>
+              <div className={styles.muted}>Last updated (UTC)</div>
+              <div>{data ? formatUtc(data.generatedAtUtc) : '...'}</div>
+            </div>
+            <div>
+              <div className={styles.muted}>Request ID</div>
+              <code className={styles.hardWrap}>{data?.requestId ?? '...'}</code>
+            </div>
+          </div>
+        </section>
+
+        <section className={styles.card}>
+          <h2 className={styles.sectionTitle}>Dependency Health</h2>
+          <div className={styles.statusGrid}>
+            {(data?.dependencies ?? []).map((dep) => (
+              <article key={dep.name} className={styles.managementCard}>
+                <h3>{dep.name.toUpperCase()}</h3>
+                <p className={statusTone(dep.status)}>{dep.status}</p>
+                <p className={styles.muted}>Latency: {dep.latencyMs === null ? 'n/a' : `${dep.latencyMs}ms`}</p>
+                <p className={styles.muted}>Checked: {formatUtc(dep.checkedAtUtc)} UTC</p>
+                {dep.detail ? <p className={styles.muted}>{dep.detail}</p> : null}
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className={styles.card}>
+          <h2 className={styles.sectionTitle}>Chain Provider Health</h2>
+          <div className={styles.statusGrid}>
+            {filteredProviders.map((provider) => (
+              <article key={`${provider.chainKey}_${provider.provider}`} className={styles.managementCard}>
+                <h3>{provider.chainKey}</h3>
+                <p className={styles.muted}>Provider: {provider.provider}</p>
+                <p className={statusTone(provider.status)}>{provider.status}</p>
+                <p className={styles.muted}>Latency: {provider.latencyMs === null ? 'n/a' : `${provider.latencyMs}ms`}</p>
+                <p className={styles.muted}>Checked: {formatUtc(provider.checkedAtUtc)} UTC</p>
+                {provider.detail ? <p className={styles.muted}>{provider.detail}</p> : null}
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className={styles.card}>
+          <h2 className={styles.sectionTitle}>Heartbeat and Queue Signals</h2>
+          <div className={styles.statusGrid}>
+            <article className={styles.managementCard}>
+              <h3>Agents</h3>
+              <p className={styles.muted}>Total: {data?.heartbeat.totalAgents ?? 0}</p>
+              <p className={styles.muted}>Active: {data?.heartbeat.activeAgents ?? 0}</p>
+              <p className={styles.muted}>Offline: {data?.heartbeat.offlineAgents ?? 0}</p>
+              <p className={styles.muted}>Degraded: {data?.heartbeat.degradedAgents ?? 0}</p>
+              <p className={styles.muted}>Heartbeat misses: {data?.heartbeat.heartbeatMisses ?? 0}</p>
             </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="panel">
-        <h2 className="section-title">Chain Provider Health</h2>
-        <div className="status-grid">
-          {(data?.providers ?? []).map((provider) => (
-            <article key={`${provider.chainKey}_${provider.provider}`} className="management-card">
-              <h3>{provider.chainKey}</h3>
-              <p className="muted">Provider: {provider.provider}</p>
-              <p className={statusTone(provider.status)}>{provider.status}</p>
-              <p className="muted">Latency: {provider.latencyMs === null ? 'n/a' : `${provider.latencyMs}ms`}</p>
-              <p className="muted">Checked: {formatUtc(provider.checkedAtUtc)} UTC</p>
-              {provider.detail ? <p className="muted">{provider.detail}</p> : null}
+            <article className={styles.managementCard}>
+              <h3>Queues</h3>
+              <p className={styles.muted}>Copy intent pending: {data?.queues.copyIntentPending ?? 0}</p>
+              <p className={styles.muted}>Approval pending trades: {data?.queues.approvalPendingTrades ?? 0}</p>
+              <p className={styles.muted}>Total depth: {data?.queues.totalDepth ?? 0}</p>
             </article>
-          ))}
-        </div>
-      </section>
+          </div>
+        </section>
 
-      <section className="panel">
-        <h2 className="section-title">Heartbeat and Queue Signals</h2>
-        <div className="status-grid">
-          <article className="management-card">
-            <h3>Agents</h3>
-            <p className="muted">Total: {data?.heartbeat.totalAgents ?? 0}</p>
-            <p className="muted">Active: {data?.heartbeat.activeAgents ?? 0}</p>
-            <p className="muted">Offline: {data?.heartbeat.offlineAgents ?? 0}</p>
-            <p className="muted">Degraded: {data?.heartbeat.degradedAgents ?? 0}</p>
-            <p className="muted">Heartbeat misses: {data?.heartbeat.heartbeatMisses ?? 0}</p>
-          </article>
-          <article className="management-card">
-            <h3>Queues</h3>
-            <p className="muted">Copy intent pending: {data?.queues.copyIntentPending ?? 0}</p>
-            <p className="muted">Approval pending trades: {data?.queues.approvalPendingTrades ?? 0}</p>
-            <p className="muted">Total depth: {data?.queues.totalDepth ?? 0}</p>
-          </article>
-        </div>
-      </section>
-
-      <section className="panel">
-        <h2 className="section-title">Incident Timeline</h2>
-        {(data?.incidents ?? []).length === 0 ? <p className="muted">No incidents recorded yet.</p> : null}
-        <div className="activity-list">
-          {(data?.incidents ?? []).map((incident) => (
-            <article key={incident.id} className="activity-item">
-              <div><strong>{incident.summary}</strong></div>
-              <div className="muted">Category: {incident.category}</div>
-              <div className="muted">Severity: {incident.severity}</div>
-              <div className="muted">{formatUtc(incident.atUtc)} UTC</div>
-              {incident.details ? <div className="muted">{incident.details}</div> : null}
-            </article>
-          ))}
-        </div>
+        <section className={styles.card}>
+          <h2 className={styles.sectionTitle}>Incident Timeline</h2>
+          {(data?.incidents ?? []).length === 0 ? <p className={styles.muted}>No incidents recorded yet.</p> : null}
+          <div className={styles.activityList}>
+            {(data?.incidents ?? []).map((incident) => (
+              <article key={incident.id} className={styles.activityItem}>
+                <div>
+                  <strong>{incident.summary}</strong>
+                </div>
+                <div className={styles.muted}>Category: {incident.category}</div>
+                <div className={styles.muted}>Severity: {incident.severity}</div>
+                <div className={styles.muted}>{formatUtc(incident.atUtc)} UTC</div>
+                {incident.details ? <div className={styles.muted}>{incident.details}</div> : null}
+              </article>
+            ))}
+          </div>
+        </section>
       </section>
     </div>
   );

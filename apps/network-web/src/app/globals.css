@@ -161,9 +161,10 @@ a {
 }
 
 .left-nav-links {
-  display: grid;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
   gap: 0.42rem;
-  align-content: start;
 }
 
 .left-nav-links a {
@@ -183,6 +184,19 @@ a {
 
 .left-nav-links a:hover {
   border-color: var(--line);
+  color: var(--text);
+}
+
+.agent-shortcut-badge {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  display: inline-grid;
+  place-items: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: color-mix(in srgb, var(--accent) 20%, var(--bg-elev-2));
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--line));
   color: var(--text);
 }
 
@@ -1228,6 +1242,7 @@ th {
   }
 
   .left-nav-links {
+    display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 

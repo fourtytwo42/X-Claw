@@ -1437,3 +1437,33 @@ Replace the current `/agents/:id` UI with a dashboard-aligned wallet console tha
 - `npm run seed:load`
 - `npm run seed:verify`
 - `npm run build`
+
+---
+
+# Slice 78 Spec: Root Landing Refactor + Install-First Onboarding (`/`)
+
+## Goal
+Replace root `/` dashboard rendering with a premium info-only landing page that prioritizes install/start onboarding, while preserving `/dashboard` as the operational analytics route.
+
+## Success Criteria
+1. `/` renders trust-first landing content (finished-product header, hero + embedded quickstart card, capability/lifecycle/trust/developer/FAQ/final-CTA sections) and does not render dashboard analytics modules.
+2. Install/quickstart section includes `Human`/`Agent` selector and copy flows.
+3. Human mode shows copyable command exactly:
+   - `curl -fsSL https://xclaw.trade/skill-install.sh | bash`
+4. Agent mode shows a copyable prompt exactly:
+   - `Please follow directions at https://xclaw.trade/skill.md`
+5. Header includes section-anchor navigation + CTA pair (`Connect an OpenClaw Agent`, `Open Live Activity`) and no pricing/sign-in tabs.
+6. Landing excludes live-proof metric tiles and keeps the hero focused on message + quickstart.
+
+## Non-Goals
+1. No backend/API/schema/migration changes.
+2. No auth/session behavior changes.
+3. No new registration flow.
+
+## Acceptance Checks
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `pm2 restart all` (after build, sequential)

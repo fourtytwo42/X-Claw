@@ -78,9 +78,10 @@
 }
 
 .sidebarNav {
-  display: grid;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
   gap: 0.42rem;
-  align-content: start;
 }
 
 .sidebarItem {
@@ -495,6 +496,7 @@
   }
 
   .sidebarNav {
+    display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 

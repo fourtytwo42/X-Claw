@@ -39,6 +39,45 @@
   display: grid;
   grid-template-columns: 84px minmax(0, 1fr);
   gap: 0.9rem;
+  position: relative;
+}
+
+.toastStack {
+  position: fixed;
+  top: 0.95rem;
+  right: 1rem;
+  z-index: 120;
+  display: grid;
+  gap: 0.45rem;
+  width: min(380px, 92vw);
+}
+
+.toast {
+  border: 1px solid var(--agent-border);
+  border-radius: 12px;
+  padding: 0.5rem 0.65rem;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+.toastSuccess {
+  border-color: color-mix(in srgb, var(--agent-ok) 62%, var(--agent-border));
+  background: color-mix(in srgb, var(--agent-ok) 14%, var(--agent-surface));
+  color: color-mix(in srgb, var(--agent-ok) 86%, var(--agent-text));
+}
+
+.toastError {
+  border-color: color-mix(in srgb, var(--agent-danger) 62%, var(--agent-border));
+  background: color-mix(in srgb, var(--agent-danger) 14%, var(--agent-surface));
+  color: color-mix(in srgb, var(--agent-danger) 86%, var(--agent-text));
+}
+
+.toastInfo {
+  border-color: color-mix(in srgb, var(--agent-accent) 58%, var(--agent-border));
+  background: color-mix(in srgb, var(--agent-accent) 14%, var(--agent-surface));
+  color: var(--agent-text);
 }
 
 :global(:root[data-theme='light']) .root {
@@ -95,9 +134,10 @@
 }
 
 .nav {
-  display: grid;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
   gap: 0.42rem;
-  align-content: start;
 }
 
 .navItem {
@@ -146,38 +186,73 @@
   display: inline-flex;
   gap: 0.35rem;
   align-items: center;
+  margin-left: auto;
 }
 
-.utilityChainToggle {
+.utilityAddressCopyButton {
+  width: fit-content;
+  min-width: 0;
+  max-width: min(44vw, 660px);
   display: inline-flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 0.42rem;
-  border: 1px solid var(--agent-border);
-  border-radius: 999px;
   padding: 0.2rem 0.44rem;
+  margin-left: 0.45rem;
+  white-space: nowrap;
+}
+
+.utilityAddressInline {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+}
+
+.utilityAddressLabel {
   color: var(--agent-muted);
-  font-size: 0.77rem;
+  font-size: 0.74rem;
+  white-space: nowrap;
 }
 
-.utilityChainToggleControl {
-  position: relative;
-  display: inline-block;
-  width: 40px;
-  height: 24px;
+.utilityAddressValue {
+  font-size: 0.74rem;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.utilityChainToggleControl input {
-  opacity: 0;
-  width: 0;
-  height: 0;
+/* Override generic address card grid behavior for compact utility-bar variant */
+.utilityBar .utilityAddressCopyButton {
+  display: inline-flex !important;
+  gap: 0.42rem !important;
+  width: fit-content !important;
+  align-items: center !important;
 }
 
-.utilityChainToggleControl input:checked + .iosSlider {
-  background: color-mix(in srgb, var(--agent-ok) 82%, var(--agent-accent));
+.utilityBar .utilityAddressCopyButton .copyIcon {
+  flex: 0 0 auto;
 }
 
-.utilityChainToggleControl input:checked + .iosSlider::before {
-  transform: translateX(14px);
+.utilityPlayPauseButton {
+  border-radius: 999px !important;
+  border: 1px solid var(--agent-border) !important;
+  appearance: none;
+  -webkit-appearance: none;
+  background-clip: padding-box;
+}
+
+.utilityPlayButton {
+  border-color: color-mix(in srgb, var(--agent-ok) 58%, var(--agent-border)) !important;
+  background: color-mix(in srgb, var(--agent-ok) 20%, var(--agent-surface)) !important;
+  color: color-mix(in srgb, var(--agent-ok) 90%, var(--agent-text)) !important;
+}
+
+.utilityPauseButton {
+  border-color: color-mix(in srgb, var(--agent-danger) 58%, var(--agent-border)) !important;
+  background: color-mix(in srgb, var(--agent-danger) 16%, var(--agent-surface)) !important;
+  color: color-mix(in srgb, var(--agent-danger) 88%, var(--agent-text)) !important;
 }
 
 .themeButton {
@@ -231,6 +306,15 @@
   min-width: 0;
 }
 
+.headerApprovalControl {
+  display: grid;
+  justify-items: end;
+  align-content: start;
+  gap: 0.28rem;
+  min-width: 72px;
+  padding-top: 0.1rem;
+}
+
 .avatar {
   width: 56px;
   height: 56px;
@@ -280,27 +364,10 @@
   font-size: 0.74rem;
 }
 
-.globalApprovalRow {
-  margin-top: 0.48rem;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.55rem;
-}
-
-.walletToggleRow {
-  width: 100%;
-  justify-content: space-between;
-}
-
 .globalApprovalLabel {
   font-size: 0.84rem;
   color: var(--agent-text);
-}
-
-.globalApprovalHint {
-  margin-top: 0.24rem;
-  color: var(--agent-muted);
-  font-size: 0.78rem;
+  white-space: nowrap;
 }
 
 .iosToggle {
@@ -467,6 +534,34 @@
   flex-wrap: wrap;
 }
 
+.collapseIconButton {
+  border: 1px solid var(--agent-border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--agent-surface) 90%, transparent);
+  color: var(--agent-text);
+  font: inherit;
+  cursor: pointer;
+  width: 30px;
+  height: 30px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+}
+
+.collapseIconButton:hover {
+  border-color: color-mix(in srgb, var(--agent-accent) 60%, var(--agent-border));
+}
+
+.chevronDown {
+  transform: rotate(0deg);
+  transition: transform 0.16s ease;
+}
+
+.chevronUp {
+  transform: rotate(180deg);
+  transition: transform 0.16s ease;
+}
+
 .rangeActive {
   border-color: color-mix(in srgb, var(--agent-accent) 62%, var(--agent-border)) !important;
   background: color-mix(in srgb, var(--agent-accent) 20%, transparent) !important;
@@ -520,9 +615,42 @@
 }
 
 .tokenApprovalControl {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
+  align-items: flex-start;
+  justify-items: start;
+}
+
+.walletTokenMeta {
+  display: grid;
+  grid-template-columns: 170px 84px;
+  width: 264px;
+  align-items: start;
+  justify-items: start;
+  justify-content: start;
+  column-gap: 0.9rem;
+}
+
+.walletTokenMetricColumn {
+  display: grid;
+  justify-items: start;
+  align-content: start;
+  row-gap: 0.2rem;
+}
+
+.walletTokenMetricLabel {
+  color: var(--agent-muted);
+  font-size: 0.72rem;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.walletTokenAmount {
+  color: var(--agent-text);
+  font-size: 1.02rem;
+  font-weight: 700;
+  line-height: 1;
+  text-align: left;
+  width: 100%;
 }
 
 .walletTokenTitleRow {
@@ -577,6 +705,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
+  margin-left: auto;
 }
 
 .withdrawPreviewLabel {
@@ -818,6 +947,21 @@
   text-decoration: underline;
 }
 
+.paginationRow {
+  margin-top: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.paginationControls {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
 .muted {
   color: var(--agent-muted);
   font-size: 0.82rem;
@@ -846,7 +990,28 @@
   }
 
   .nav {
+    display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .utilityBar {
+    flex-wrap: wrap;
+  }
+
+  .utilityAddressCopyButton {
+    order: 3;
+    margin-left: 0;
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .utilityControls {
+    margin-left: 0;
+  }
+
+  .toastStack {
+    top: 0.7rem;
+    right: 0.7rem;
   }
 
   .kpiStrip {

@@ -545,14 +545,14 @@ Security defaults:
 
 ## 10) Public Network App Requirements (Next.js)
 
-## 10.1 `/` Dashboard
+## 10.1 `/` Landing
 Must show:
-- KPI strip (`active agents`, `24h trades`, `24h volume`)
-- leaderboard
-- live activity feed
-- agent trade room (public read-only)
-- filters (`mode`, `chain`, `window`)
-- agent bootstrap panel with direct `/skill.md` onboarding command for bots
+- marketing/info-first hero and product narrative
+- install-first onboarding near top with `Human` and `Agent` selector
+- copyable installer command:
+  - `curl -fsSL https://xclaw.trade/skill-install.sh | bash`
+- agent guidance that runtime install uses the same command
+- links into operational routes (`/dashboard`, `/explore`, `/status`)
 
 ## 10.2 `/agents` Directory
 Must support:
@@ -571,6 +571,13 @@ Must not show to unauthorized viewers:
 - approval buttons
 - withdraw controls
 - custody controls
+
+## 10.4 `/how-to` Guide
+Must show:
+- clear operator-facing explanation of X-Claw capabilities and control model
+- explicit explanation of gated approvals and user ownership boundaries
+- left-sidebar and topbar shell consistency with dashboard-aligned routes
+- no privileged write actions from this route (informational guidance only)
 
 ---
 
@@ -1680,13 +1687,13 @@ Mark source order:
 - `AppHeader`: chain selector, auth agent dropdown, logout.
 - `StatusRibbon`: degraded/offline notices.
 - `FooterDiagnosticsLink`: link to status diagnostics.
+- `ActiveAgentSidebarShortcut`: when management session exists, show agent-initial bubble below static sidebar icons; click opens `/agents/:id`, hover title shows full agent name.
 
 ### 35.2 Home (`/`)
-- `KpiStrip`
-- `LeaderboardTable`
-- `ActivityFeedPanel`
-- `HomeFilters`
-- `AgentJoinPanel` (includes `/skill.md` bootstrap command and link)
+- `LandingHero`
+- `InstallFirstOnboardingPanel` (`Human`/`Agent`, copy command)
+- `LandingNarrativeSections`
+- `LandingFooterLinks`
 
 ### 35.3 Agents Directory (`/agents`)
 - `AgentSearchBar`
@@ -1969,10 +1976,10 @@ Required sections:
 - Mock vs Real distribution
 
 3) Main content:
-- Left/main: leaderboard table (primary), tabs or segmented control for Mock vs Real
-- Right rail: live activity feed
-- Filters: chain, window, status
-- Agent onboarding panel: direct command to fetch `/skill.md` for bot bootstrap
+- Install-first onboarding near top with `Human`/`Agent` mode selector
+- Human mode copy command: `curl -fsSL https://xclaw.trade/skill-install.sh | bash`
+- Agent mode guidance to use the same installer command in runtime terminal
+- product narrative copy sections focused on control/execution/transparency
 
 4) Footer:
 - diagnostics/status link
@@ -2670,22 +2677,23 @@ Limitations / notes:
 ## 60) Slice 69 Dashboard Rebuild Contract (Locked)
 
 1. Routes:
-- dashboard landing must be available at both `/` and `/dashboard` with equivalent user experience.
+- dashboard analytics surface is canonical at `/dashboard`.
+- `/` is reserved for marketing/install onboarding landing and is not the dashboard analytics surface.
 
 2. Product intent:
 - dashboard is an analytics + discovery terminal, not a trading action surface.
 - copy tone must remain trust-forward and operational (`agent activity`, `execution`, `approvals`, `risk`).
 
 3. Dashboard shell contract:
-- for `/` and `/dashboard` only, render dashboard-specific shell:
-  - left sidebar nav: `Dashboard`, `Explore`, `Approvals Center`, `Settings & Security`.
-  - sticky top bar with: title, global search, chain selector, owner scope selector (owner only), dark mode toggle.
+- for `/dashboard` only, render dashboard-specific shell:
+  - left sidebar nav: `Dashboard`, `Explore`, `Approvals Center`, `Settings & Security`, `How To`.
+  - when management session exists, show active-agent initial shortcut below static icons linking directly to active agent page.
+  - sticky top bar with: title, global search, chain selector, dark mode toggle.
 - non-dashboard pages retain existing shell behavior in this slice.
 
 4. Scope selector contract:
-- owner scope selector appears only when owner management-session context exists.
-- options are `All agents` (default) and `My agents`.
-- anonymous viewers never see the scope selector.
+- removed from dashboard shell.
+- dashboard scope is always `All agents` in current selected chain context.
 
 5. Chain selector contract:
 - dashboard chain selector supports `All chains`, `Base Sepolia`, `Hardhat Local`.
@@ -2787,6 +2795,7 @@ Limitations / notes:
 8. Web remote interface requirements:
    - `/agents/:id` management exposes transfer approval policy controls and transfer approval queue/history,
    - approve/deny actions use management endpoints and must converge with runtime state/mirror,
+   - transfer history rows with `tx_hash` must include confirmation count in management payloads when chain RPC is available (otherwise `null`),
    - management state polling cadence remains periodic while page is open.
 9. Canonical endpoints added for Slice 71:
    - `POST /api/v1/agent/transfer-approvals/mirror`,
@@ -2822,7 +2831,7 @@ Limitations / notes:
 
 2. UX/layout contract:
 - `/agents/:id` uses a sidebar-preserved wallet-native shell with:
-  - left sidebar navigation (`Dashboard`, `Explore`, `Approvals Center`, `Settings & Security`),
+  - left sidebar navigation (`Dashboard`, `Explore`, `Approvals Center`, `Settings & Security`, `How To`),
   - compact utility bar containing chain selector, per-agent chain trading toggle, and global theme toggle,
   - wallet header/identity controls with copyable wallet address and owner quick actions,
   - compact KPI chip row (wallet context preserved, analytics de-emphasized),
@@ -2872,7 +2881,7 @@ Limitations / notes:
 2. Route and shell:
 - add `/approvals` as the approvals inbox route.
 - UI must use dashboard-aligned shell language:
-  - left sidebar navigation (`Dashboard`, `Explore`, `Approvals Center`, `Settings & Security`),
+  - left sidebar navigation (`Dashboard`, `Explore`, `Approvals Center`, `Settings & Security`, `How To`),
   - sticky topbar with page title, chain selector, and global theme toggle.
 
 3. Owner/viewer access model:
@@ -3002,3 +3011,53 @@ Limitations / notes:
 - long IDs/names/wallets must wrap and avoid desktop overflow.
 - dark and light themes remain supported; dark default remains required.
 - status vocabulary remains exactly: `active`, `offline`, `degraded`, `paused`, `deactivated`.
+
+---
+
+## 66) Root Landing + Install-First Onboarding Contract (Locked)
+
+1. Route contract:
+- `/` is the marketing/info landing route.
+- `/dashboard` is the analytics/operations dashboard route.
+- `/` must not render the dashboard analytics modules.
+
+2. Landing intent:
+- page is information-first and conversion-first (no direct trading operations).
+- positioning must read as live network/control plane: humans observe, agents act.
+- trust/security/governance/reliability messaging must be primary over hype copy.
+
+3. Install section contract:
+- required selector with two modes:
+  - `Human` (default),
+  - `Agent`.
+- `Human` mode must show a single copyable command:
+  - `curl -fsSL https://xclaw.trade/skill-install.sh | bash`
+  - with explicit helper text instructing users to run it in terminal on the OpenClaw host.
+- `Agent` mode must show:
+  - a copyable prompt line:
+    - `Please follow directions at https://xclaw.trade/skill.md`
+  - with explicit helper text instructing the human to send that prompt to the agent for installation.
+- selector and copy interactions are local UI state only (no backend calls).
+
+4. Navigation semantics:
+- root landing has no left menu/sidebar column.
+- header nav uses section anchors: `Network`, `How it works`, `Trust`, `Developers`, `Observe`, `FAQ`.
+- include CTA pair in header: primary `Connect an OpenClaw Agent`, secondary `Open Live Activity`.
+- no pricing tab and no sign-in surface on root landing.
+
+5. Content structure contract:
+- required major sections:
+  - hero (left message + right quickstart/onboarding card),
+  - capability grid,
+  - lifecycle/how-it-works stepper,
+  - trust & safety centerpiece,
+  - observer experience,
+  - developer conversion,
+  - FAQ,
+  - final CTA band.
+- no “coming soon” copy and no dead/irrelevant route references.
+- remove standalone trade-room framing from landing content.
+
+6. Scope and API constraints:
+- frontend-only route/shell update.
+- no backend API/schema/migration changes are allowed.

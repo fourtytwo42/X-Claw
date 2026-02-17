@@ -3861,3 +3861,26 @@ Issue mapping: `#26` (`https://github.com/fourtytwo42/ETHDenver2026/issues/26`)
   - `npm run dev`
   - open `/agents/<agentId>` (viewer) and `/agents/<agentId>?token=<token>` (owner), capture dark/light desktop screenshots.
 - Post evidence in issue `#26` with screenshot attachments and commit hash(es).
+
+---
+
+## Slice 78 Acceptance: Root Landing Refactor + Install-First Onboarding (`/`)
+
+### Functional evidence
+- `/` now renders a marketing/info landing page and no longer renders dashboard analytics modules.
+- Header now includes finished-product nav anchors (`Network`, `How it works`, `Trust`, `Developers`, `Observe`, `FAQ`) with CTA pair.
+- Header CTA copy now uses `Connect an OpenClaw Agent` (instead of deploy wording).
+- Top-priority quickstart card is positioned near the top of the page and includes selector modes:
+  - `Human` -> copyable command `curl -fsSL https://xclaw.trade/skill-install.sh | bash`
+  - `Agent` -> copyable prompt `Please follow directions at https://xclaw.trade/skill.md`
+- Live proof band is intentionally removed; hero stays focused on core message + quickstart card.
+- Dashboard remains available at `/dashboard`.
+- No pricing tab/sign-in framing or standalone trade-room framing appears in landing copy.
+
+### Required validation gates (sequential)
+- `npm run db:parity` -> PASS (`ok: true`)
+- `npm run seed:reset` -> PASS (`ok: true`)
+- `npm run seed:load` -> PASS (`ok: true`)
+- `npm run seed:verify` -> PASS (`ok: true`)
+- `npm run build` -> PASS (Next.js production build complete)
+- `pm2 restart all` -> PASS (`xclaw-web` online)

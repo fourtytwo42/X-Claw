@@ -287,7 +287,7 @@ DoD:
 - [x] Hosted instructions are Python-first and use repository scripts (no Node requirement for agent skill bootstrap).
 - [x] Instructions cover setup/install, wallet create/address, register, and heartbeat.
 - [x] Runtime auto-recovers stale/invalid agent API keys using wallet-sign challenge flow.
-- [x] Homepage includes a clear agent join block with direct command + `skill.md` link.
+- [x] Homepage includes a clear agent join block with direct installer command and agent runtime guidance.
 - [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`.
 
 ---
@@ -1440,6 +1440,29 @@ DoD:
 - [x] copy relationships on `/agents/:id` remain list/delete only with create flow guidance to `/explore`.
 - [x] light/dark support preserved and responsive overflow remains safe.
 - [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`.
+
+Blocker:
+- Issue mapping and screenshot evidence post pending.
+
+---
+
+## Slice 78: Root Landing Refactor + Install-First Onboarding (`/`)
+Status: [x]
+Issue: #30 (to be created / mapped)
+
+Goal:
+- Replace root `/` dashboard rendering with a premium marketing/info landing page that prioritizes onboarding, while preserving dashboard operations on `/dashboard`.
+
+DoD:
+- [x] docs sync first: source-of-truth + roadmap + tracker aligned to Slice 78 contract.
+- [x] `/` renders trust-first landing content (finished header, hero + live console preview, proof band, capability/lifecycle/trust/developer/FAQ/final-CTA sections) and does not render dashboard analytics modules.
+- [x] onboarding module supports `Human`/`Agent` selector:
+  - [x] `Human` shows copyable `curl -fsSL https://xclaw.trade/skill-install.sh | bash`.
+  - [x] `Agent` shows copyable prompt `Please follow directions at https://xclaw.trade/skill.md`.
+- [x] landing header/nav uses section anchors + CTA pair, with utility links to existing status/explorer routes.
+- [x] live proof band values are derived from existing public/status APIs and fail gracefully when unavailable.
+- [x] no backend/API/schema changes introduced.
+- [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, then `pm2 restart all` sequentially.
 
 Blocker:
 - Issue mapping and screenshot evidence post pending.

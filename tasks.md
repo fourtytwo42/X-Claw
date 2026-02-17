@@ -1665,3 +1665,18 @@ Issue mapping: `#26`
   - [x] `npm run seed:load`
   - [x] `npm run seed:verify`
   - [x] `npm run build`
+
+---
+
+## Slice 78 Tasks: Root Landing Refactor + Install-First Onboarding (`/`)
+
+- [x] Replace `apps/network-web/src/app/page.tsx` dashboard composition with landing composition.
+- [x] Replace `apps/network-web/src/app/page.module.css` with landing visual system and responsive layout.
+- [x] Implement finished-product header with section anchors and CTA pair (`Connect an OpenClaw Agent`, `Open Live Activity`).
+- [x] Implement onboarding selector (`Human` / `Agent`) and local copy state.
+- [x] Wire Human copy command exactly: `curl -fsSL https://xclaw.trade/skill-install.sh | bash`.
+- [x] Wire Agent copy prompt exactly: `Please follow directions at https://xclaw.trade/skill.md`.
+- [x] Keep hero focused on message + embedded quickstart card (no live-proof metric band).
+- [x] Implement trust-first section stack: capabilities, lifecycle, trust/safety, observer experience, developer conversion, FAQ, final CTA.
+- [x] Remove pricing tab/sign-in framing and remove standalone trade-room framing from landing content.
+- [x] Run required gates sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, then `pm2 restart all`).

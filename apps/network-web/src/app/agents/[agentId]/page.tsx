@@ -6,14 +6,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 
 import { ChainHeaderControl } from '@/components/chain-header-control';
+import { ActiveAgentSidebarLink } from '@/components/active-agent-sidebar-link';
 import { rememberManagedAgent } from '@/components/management-header-controls';
 import { PublicStatusBadge } from '@/components/public-status-badge';
 import { SidebarIcon } from '@/components/sidebar-icons';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { useActiveChainKey } from '@/lib/active-chain';
 import {
-  buildActivityRows,
   buildHoldings,
+  formatActivityTitle,
+  formatDecimalText,
   formatUnitsTruncated,
   resolveTokenLabel,
   type ActivityPayload,
@@ -68,7 +70,15 @@ type WalletTimelineItem = {
   subtitle: string;
   status: string;
   txHash: string | null;
+  txExplorerUrl: string | null;
   tokenSymbols: string[];
+};
+
+type ToastType = 'success' | 'error' | 'info';
+type ToastItem = {
+  id: number;
+  message: string;
+  type: ToastType;
 };
 
 function getCsrfToken(): string | null {
@@ -229,27 +239,6 @@ function normalizeTokenSelectionSymbol(value: string | null | undefined): string
   return upper;
 }
 
-function extractTokenSymbolsFromText(value: string): string[] {
-  const raw = String(value ?? '').trim();
-  if (!raw) {
-    return [];
-  }
-  if (raw.includes('->')) {
-    return raw
-      .split('->')
-      .map((part) => normalizeTokenSelectionSymbol(part))
-      .filter(Boolean);
-  }
-  if (raw.includes('/')) {
-    return raw
-      .split('/')
-      .map((part) => normalizeTokenSelectionSymbol(part))
-      .filter(Boolean);
-  }
-  const single = normalizeTokenSelectionSymbol(raw);
-  return single ? [single] : [];
-}
-
 export default function AgentPublicProfilePage() {
   const params = useParams<{ agentId: string }>();
   const router = useRouter();
@@ -263,8 +252,7 @@ export default function AgentPublicProfilePage() {
   const [activity, setActivity] = useState<ActivityPayload['items'] | null>(null);
   const [management, setManagement] = useState<ManagementViewState>({ phase: 'loading' });
   const [error, setError] = useState<string | null>(null);
-  const [managementNotice, setManagementNotice] = useState<string | null>(null);
-  const [managementError, setManagementError] = useState<string | null>(null);
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
 
   const [depositData, setDepositData] = useState<DepositPayload | null>(null);
   const [limitOrders, setLimitOrders] = useState<LimitOrderItem[]>([]);
@@ -281,9 +269,19 @@ export default function AgentPublicProfilePage() {
   const [withdrawAmount, setWithdrawAmount] = useState('0.1');
   const [withdrawAsset, setWithdrawAsset] = useState('NATIVE');
   const [withdrawCardOpen, setWithdrawCardOpen] = useState(false);
-  const [agentChainEnabled, setAgentChainEnabled] = useState(true);
-  const [agentChainToggleBusy, setAgentChainToggleBusy] = useState(false);
   const [selectedWalletTokens, setSelectedWalletTokens] = useState<string[]>([]);
+  const [walletActivityExpanded, setWalletActivityExpanded] = useState(false);
+  const [walletActivityPage, setWalletActivityPage] = useState(1);
+  const [approvalHistoryExpanded, setApprovalHistoryExpanded] = useState(false);
+  const [approvalHistoryPage, setApprovalHistoryPage] = useState(1);
+  const [auditExpanded, setAuditExpanded] = useState(false);
+  const [auditPage, setAuditPage] = useState(1);
+  const [walletExpanded, setWalletExpanded] = useState(false);
+  const [walletPage, setWalletPage] = useState(1);
+  const [copyExpanded, setCopyExpanded] = useState(false);
+  const [copyPage, setCopyPage] = useState(1);
+  const [limitExpanded, setLimitExpanded] = useState(false);
+  const [limitPage, setLimitPage] = useState(1);
 
   const [policyApprovalMode, setPolicyApprovalMode] = useState<'per_trade' | 'auto'>('per_trade');
   const [policyMaxTradeUsd, setPolicyMaxTradeUsd] = useState('50');
@@ -292,8 +290,26 @@ export default function AgentPublicProfilePage() {
   const [policyDailyTradeCapEnabled, setPolicyDailyTradeCapEnabled] = useState(true);
   const [policyMaxDailyTradeCount, setPolicyMaxDailyTradeCount] = useState('0');
   const [policyAllowedTokens, setPolicyAllowedTokens] = useState<string[]>([]);
+  const toastIdRef = useRef(0);
+  const toastTimersRef = useRef<Map<number, number>>(new Map());
 
   const isOwner = management.phase === 'ready';
+
+  function dismissToast(id: number) {
+    const timer = toastTimersRef.current.get(id);
+    if (timer !== undefined) {
+      window.clearTimeout(timer);
+      toastTimersRef.current.delete(id);
+    }
+    setToasts((current) => current.filter((toast) => toast.id !== id));
+  }
+
+  function showToast(message: string, type: ToastType = 'info', durationMs = 2800) {
+    const id = ++toastIdRef.current;
+    setToasts((current) => [...current, { id, message, type }].slice(-4));
+    const timer = window.setTimeout(() => dismissToast(id), durationMs);
+    toastTimersRef.current.set(id, timer);
+  }
 
   useEffect(() => {
     if (!agentId) {
@@ -415,9 +431,6 @@ export default function AgentPublicProfilePage() {
   const refreshAll = useCallback(async (options?: { showLoading?: boolean }) => {
     const showLoading = options?.showLoading ?? true;
     setError(null);
-    if (showLoading) {
-      setManagementError(null);
-    }
     try {
       await loadPublicData();
     } catch (loadError) {
@@ -436,8 +449,6 @@ export default function AgentPublicProfilePage() {
           phase: 'error',
           message
         });
-      } else {
-        setManagementError(message);
       }
     }
   }, [loadManagementData, loadPublicData]);
@@ -461,57 +472,24 @@ export default function AgentPublicProfilePage() {
     };
   }, [management.phase, agentId, refreshAll]);
 
-  useEffect(() => {
-    if (management.phase !== 'ready') {
-      return;
-    }
-    setAgentChainEnabled(Boolean(management.data.chainPolicy?.chainEnabled));
-  }, [management]);
-
-  async function runAgentChainToggle(nextEnabled: boolean) {
-    if (!isOwner || agentChainToggleBusy) {
-      return;
-    }
-    setAgentChainToggleBusy(true);
-    setManagementNotice(null);
-    setManagementError(null);
-    try {
-      await managementPost('/api/v1/management/chains/update', {
-        agentId,
-        chainKey: activeChainKey,
-        chainEnabled: nextEnabled
-      });
-      setAgentChainEnabled(nextEnabled);
-      setManagementNotice(`${nextEnabled ? 'Enabled' : 'Disabled'} ${activeChainLabel} trading for this agent.`);
-      await refreshAll({ showLoading: false });
-    } catch (error) {
-      setManagementError(error instanceof Error ? error.message : 'Failed to update chain trading setting.');
-    } finally {
-      setAgentChainToggleBusy(false);
-    }
-  }
-
   async function runManagementAction(action: () => Promise<void>, successMessage: string) {
-    setManagementError(null);
-    setManagementNotice(null);
     try {
       await action();
-      setManagementNotice(successMessage);
+      showToast(successMessage, 'success');
       await refreshAll({ showLoading: false });
     } catch (actionError) {
-      setManagementError(actionError instanceof Error ? actionError.message : 'Management action failed.');
+      showToast(actionError instanceof Error ? actionError.message : 'Management action failed.', 'error', 3600);
       await refreshAll({ showLoading: false });
     }
   }
 
   async function copyToClipboard(value: string, successMessage: string, onSuccess?: () => void) {
-    setManagementError(null);
     try {
       await navigator.clipboard.writeText(value);
-      setManagementNotice(successMessage);
+      showToast(successMessage, 'success');
       onSuccess?.();
     } catch {
-      setManagementError('Copy failed. Copy the address manually.');
+      showToast('Copy failed. Copy the address manually.', 'error', 3200);
     }
   }
 
@@ -520,6 +498,10 @@ export default function AgentPublicProfilePage() {
       if (vaultCopyResetTimerRef.current !== null) {
         window.clearTimeout(vaultCopyResetTimerRef.current);
       }
+      for (const timer of toastTimersRef.current.values()) {
+        window.clearTimeout(timer);
+      }
+      toastTimersRef.current.clear();
     };
   }, []);
 
@@ -669,64 +651,185 @@ export default function AgentPublicProfilePage() {
     }
     setWithdrawDestination((current) => (current.trim().length === 0 ? preferredWithdrawDestination : current));
   }, [preferredWithdrawDestination]);
-  const activityRows = useMemo(
-    () => buildActivityRows(trades, activity, management.phase === 'ready' ? management.data.chainTokens : undefined),
-    [trades, activity, management]
+  const tokenDecimalsBySymbol = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const holding of holdings) {
+      const symbol = normalizeTokenSelectionSymbol(holding.token);
+      if (symbol) {
+        map.set(symbol, holding.decimals);
+      }
+    }
+    return map;
+  }, [holdings]);
+
+  const explorerTxBaseUrl = useMemo(() => {
+    const base = activeDepositChain?.explorerBaseUrl ?? null;
+    if (!base) {
+      return null;
+    }
+    return `${base.replace(/\/+$/, '')}/tx/`;
+  }, [activeDepositChain?.explorerBaseUrl]);
+
+  const toTxExplorerUrl = useCallback(
+    (txHash: string | null | undefined) => {
+      if (!txHash || !explorerTxBaseUrl) {
+        return null;
+      }
+      return `${explorerTxBaseUrl}${txHash}`;
+    },
+    [explorerTxBaseUrl]
   );
+
+  const formatHumanAmount = useCallback(
+    (amount: string | null | undefined, tokenLabel: string, decimalsHint?: number) => {
+      const normalized = normalizeTokenSelectionSymbol(tokenLabel);
+      if (!amount) {
+        return `— ${tokenLabel}`;
+      }
+
+      if (decimalsHint !== undefined) {
+        const units = formatUnitsTruncated(amount, decimalsHint, normalized === 'USDC' ? 2 : 6);
+        if (units === '—') {
+          return `— ${tokenLabel}`;
+        }
+        if (normalized === 'USDC') {
+          const numeric = Number(units);
+          if (Number.isFinite(numeric)) {
+            return `${new Intl.NumberFormat('en-US', {
+              style: 'currency',
+              currency: 'USD',
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2
+            }).format(numeric)} USDC`;
+          }
+        }
+        return `${formatDecimalText(units)} ${tokenLabel}`;
+      }
+
+      if (normalized === 'USDC') {
+        const numeric = Number(amount);
+        if (Number.isFinite(numeric)) {
+          return `${new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'USD',
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+          }).format(numeric)} USDC`;
+        }
+      }
+      return `${formatDecimalText(amount)} ${tokenLabel}`;
+    },
+    []
+  );
+
+  const transferApprovedState = useCallback((status: string) => {
+    const normalized = (status ?? '').toLowerCase();
+    if (normalized === 'approved' || normalized === 'filled' || normalized === 'executed') {
+      return 'Yes';
+    }
+    if (normalized === 'pending' || normalized === 'approval_pending') {
+      return 'Pending';
+    }
+    return 'No';
+  }, []);
+
   const walletTimeline = useMemo(() => {
     const items: WalletTimelineItem[] = [];
-    for (const row of activityRows) {
-      const pairTokens = Array.from(new Set([...extractTokenSymbolsFromText(row.title), ...extractTokenSymbolsFromText(row.subtitle)]));
+
+    for (const trade of trades ?? []) {
+      const tokenIn = resolveTokenLabel(trade.token_in, chainTokenSymbolByAddress);
+      const tokenOut = resolveTokenLabel(trade.token_out, chainTokenSymbolByAddress);
+      const normalizedIn = normalizeTokenSelectionSymbol(tokenIn);
+      const normalizedOut = normalizeTokenSelectionSymbol(tokenOut);
+      const tradedAmount = formatHumanAmount(trade.amount_in, tokenIn);
+      const gainedAmount = formatHumanAmount(trade.amount_out, tokenOut);
+      const reason = trade.reason ?? trade.reason_code ?? trade.reason_message;
       items.push({
-        id: `act-${row.id}`,
-        at: row.at,
+        id: `trd-${trade.trade_id}`,
+        at: trade.executed_at ?? trade.created_at,
         kind: 'trades',
-        title: row.title,
-        subtitle: row.subtitle,
-        status: row.status,
+        title: `${tokenIn} -> ${tokenOut}`,
+        subtitle: `Traded ${tradedAmount}; Received ${gainedAmount}${reason ? `; ${reason}` : ''}`,
+        status: trade.status,
+        txHash: trade.tx_hash ?? null,
+        txExplorerUrl: toTxExplorerUrl(trade.tx_hash),
+        tokenSymbols: [normalizedIn, normalizedOut].filter(Boolean)
+      });
+    }
+
+    for (const event of activity ?? []) {
+      if (event.event_type.startsWith('trade_')) {
+        continue;
+      }
+      const tokenIn = normalizeTokenSelectionSymbol(event.token_in_symbol);
+      const tokenOut = normalizeTokenSelectionSymbol(event.token_out_symbol);
+      const pair = event.pair_display ?? `${event.token_in_symbol ?? 'token'} / ${event.token_out_symbol ?? 'token'}`;
+      items.push({
+        id: `evt-${event.event_id}`,
+        at: event.created_at,
+        kind: event.event_type.startsWith('policy_') ? 'approvals' : 'trades',
+        title: formatActivityTitle(event.event_type),
+        subtitle: pair,
+        status: event.event_type,
         txHash: null,
-        tokenSymbols: pairTokens
+        txExplorerUrl: null,
+        tokenSymbols: [tokenIn, tokenOut].filter(Boolean)
       });
     }
 
     for (const deposit of activeDepositChain?.recentDeposits ?? []) {
       const depositSymbol = normalizeTokenSelectionSymbol(deposit.token);
+      const depositAmount = formatHumanAmount(deposit.amount, deposit.token);
+      const confirmationsText = activeDepositChain?.minConfirmations
+        ? `Confirmations: >= ${activeDepositChain.minConfirmations}`
+        : 'Confirmations: n/a';
       items.push({
         id: `dep-${deposit.txHash}-${deposit.blockNumber}`,
         at: deposit.confirmedAt,
         kind: 'deposits',
-        title: `Deposit ${deposit.amount} ${deposit.token}`,
-        subtitle: `Block ${deposit.blockNumber}`,
+        title: `Deposit ${depositAmount}`,
+        subtitle: `Status: ${deposit.status || 'confirmed'}; ${confirmationsText}; Block ${deposit.blockNumber}`,
         status: deposit.status || 'confirmed',
         txHash: deposit.txHash ?? null,
+        txExplorerUrl: toTxExplorerUrl(deposit.txHash),
         tokenSymbols: depositSymbol ? [depositSymbol] : []
       });
     }
 
     if (management.phase === 'ready') {
       for (const item of management.data.transferApprovalsHistory ?? []) {
+        const transferTokenLabel = item.transfer_type === 'native' ? `${activeChainLabel} ETH` : item.token_symbol ?? 'Token';
         const transferSymbol = item.transfer_type === 'native' ? 'ETH' : normalizeTokenSelectionSymbol(item.token_symbol);
+        const transferDecimals =
+          item.transfer_type === 'native' ? 18 : (tokenDecimalsBySymbol.get(normalizeTokenSelectionSymbol(item.token_symbol)) ?? 18);
+        const transferAmount = formatHumanAmount(item.amount_wei, transferTokenLabel, transferDecimals);
         items.push({
           id: `xfrh-${item.approval_id}`,
           at: item.terminal_at ?? item.decided_at ?? item.created_at,
           kind: 'transfers',
-          title: `${item.transfer_type === 'native' ? 'ETH' : item.token_symbol ?? 'Token'} transfer`,
-          subtitle: `${item.amount_wei} wei to ${shortenAddress(item.to_address)}`,
+          title: `${transferTokenLabel} transfer`,
+          subtitle: `To: ${item.to_address}; Amount: ${transferAmount}; Approved: ${transferApprovedState(item.status)}; Confirmations: ${item.confirmations ?? 'n/a'}`,
           status: item.status,
-          txHash: item.tx_hash,
+          txHash: item.tx_hash ?? null,
+          txExplorerUrl: toTxExplorerUrl(item.tx_hash),
           tokenSymbols: transferSymbol ? [transferSymbol] : []
         });
       }
       for (const item of management.data.transferApprovalsQueue ?? []) {
+        const transferTokenLabel = item.transfer_type === 'native' ? `${activeChainLabel} ETH` : item.token_symbol ?? 'Token';
         const transferSymbol = item.transfer_type === 'native' ? 'ETH' : normalizeTokenSelectionSymbol(item.token_symbol);
+        const transferDecimals =
+          item.transfer_type === 'native' ? 18 : (tokenDecimalsBySymbol.get(normalizeTokenSelectionSymbol(item.token_symbol)) ?? 18);
+        const transferAmount = formatHumanAmount(item.amount_wei, transferTokenLabel, transferDecimals);
         items.push({
           id: `xfrq-${item.approval_id}`,
           at: item.created_at,
           kind: 'transfers',
           title: `Pending transfer approval`,
-          subtitle: `${item.amount_wei} wei to ${shortenAddress(item.to_address)}`,
+          subtitle: `To: ${item.to_address}; Amount: ${transferAmount}; Approved: Pending; Confirmations: ${item.confirmations ?? 'n/a'}`,
           status: item.status,
           txHash: null,
+          txExplorerUrl: null,
           tokenSymbols: transferSymbol ? [transferSymbol] : []
         });
       }
@@ -740,6 +843,7 @@ export default function AgentPublicProfilePage() {
           subtitle: item.reason_message ? item.reason_message : 'Policy approval decision',
           status: item.status,
           txHash: null,
+          txExplorerUrl: null,
           tokenSymbols: policySymbol ? [policySymbol] : []
         });
       }
@@ -753,20 +857,24 @@ export default function AgentPublicProfilePage() {
           subtitle: 'Pending policy approval',
           status: 'pending',
           txHash: null,
+          txExplorerUrl: null,
           tokenSymbols: policySymbol ? [policySymbol] : []
         });
       }
       for (const item of management.data.approvalsQueue) {
-        const tokenIn = normalizeTokenSelectionSymbol(resolveTokenLabel(item.token_in, chainTokenSymbolByAddress));
-        const tokenOut = normalizeTokenSelectionSymbol(resolveTokenLabel(item.token_out, chainTokenSymbolByAddress));
+        const tokenInLabel = resolveTokenLabel(item.token_in, chainTokenSymbolByAddress);
+        const tokenOutLabel = resolveTokenLabel(item.token_out, chainTokenSymbolByAddress);
+        const tokenIn = normalizeTokenSelectionSymbol(tokenInLabel);
+        const tokenOut = normalizeTokenSelectionSymbol(tokenOutLabel);
         items.push({
           id: `trdapp-${item.trade_id}`,
           at: item.created_at,
           kind: 'approvals',
-          title: item.pair || `${item.token_in} -> ${item.token_out}`,
+          title: `${tokenInLabel} -> ${tokenOutLabel}`,
           subtitle: item.reason ?? 'Pending trade approval',
           status: 'pending',
           txHash: null,
+          txExplorerUrl: null,
           tokenSymbols: [tokenIn, tokenOut].filter(Boolean)
         });
       }
@@ -778,7 +886,19 @@ export default function AgentPublicProfilePage() {
       return atB - atA;
     });
     return items;
-  }, [activityRows, activeDepositChain?.recentDeposits, chainTokenSymbolByAddress, management]);
+  }, [
+    activeChainLabel,
+    activeDepositChain?.minConfirmations,
+    activeDepositChain?.recentDeposits,
+    activity,
+    chainTokenSymbolByAddress,
+    formatHumanAmount,
+    management,
+    toTxExplorerUrl,
+    tokenDecimalsBySymbol,
+    trades,
+    transferApprovedState
+  ]);
 
   const selectedWalletTokenSet = useMemo(() => new Set(selectedWalletTokens), [selectedWalletTokens]);
 
@@ -792,6 +912,15 @@ export default function AgentPublicProfilePage() {
     }
     return tokenFiltered.filter((item) => item.kind === walletActivityFilter);
   }, [walletActivityFilter, walletTimeline, selectedWalletTokenSet]);
+  const walletActivityTotalPages = walletActivityExpanded ? Math.max(1, Math.ceil(filteredWalletTimeline.length / 10)) : 1;
+  const normalizedWalletActivityPage = Math.min(walletActivityPage, walletActivityTotalPages);
+  const visibleWalletActivity = useMemo(() => {
+    if (!walletActivityExpanded) {
+      return filteredWalletTimeline.slice(0, 3);
+    }
+    const start = (normalizedWalletActivityPage - 1) * 10;
+    return filteredWalletTimeline.slice(start, start + 10);
+  }, [filteredWalletTimeline, normalizedWalletActivityPage, walletActivityExpanded]);
 
   const approvalHistoryItems = useMemo(() => {
     if (management.phase !== 'ready') {
@@ -817,12 +946,14 @@ export default function AgentPublicProfilePage() {
       raw: any;
     }> = [];
     for (const item of management.data.approvalsQueue) {
-      const tokenIn = normalizeTokenSelectionSymbol(resolveTokenLabel(item.token_in, chainTokenSymbolByAddress));
-      const tokenOut = normalizeTokenSelectionSymbol(resolveTokenLabel(item.token_out, chainTokenSymbolByAddress));
+      const tokenInLabel = resolveTokenLabel(item.token_in, chainTokenSymbolByAddress);
+      const tokenOutLabel = resolveTokenLabel(item.token_out, chainTokenSymbolByAddress);
+      const tokenIn = normalizeTokenSelectionSymbol(tokenInLabel);
+      const tokenOut = normalizeTokenSelectionSymbol(tokenOutLabel);
       rows.push({
         id: `trade-${item.trade_id}`,
         at: item.created_at,
-        title: item.pair || `${item.token_in} -> ${item.token_out}`,
+        title: `${tokenInLabel} -> ${tokenOutLabel}`,
         status: 'pending',
         subtitle: item.reason ?? 'Pending trade approval',
         type: 'trade',
@@ -902,6 +1033,33 @@ export default function AgentPublicProfilePage() {
     }
     return tokenFiltered.filter((row) => row.status === 'rejected' || row.status === 'deny' || row.status === 'denied');
   }, [approvalHistoryItems, approvalStatusFilter, selectedWalletTokenSet]);
+  const approvalHistoryTotalPages = approvalHistoryExpanded ? Math.max(1, Math.ceil(filteredApprovalHistory.length / 10)) : 1;
+  const normalizedApprovalHistoryPage = Math.min(approvalHistoryPage, approvalHistoryTotalPages);
+  const visibleApprovalHistory = useMemo(() => {
+    if (!approvalHistoryExpanded) {
+      return filteredApprovalHistory.slice(0, 3);
+    }
+    const start = (normalizedApprovalHistoryPage - 1) * 10;
+    return filteredApprovalHistory.slice(start, start + 10);
+  }, [approvalHistoryExpanded, filteredApprovalHistory, normalizedApprovalHistoryPage]);
+  const auditEntries = management.phase === 'ready' ? management.data.auditLog : [];
+  const auditTotalPages = auditExpanded ? Math.max(1, Math.ceil(auditEntries.length / 10)) : 1;
+  const normalizedAuditPage = Math.min(auditPage, auditTotalPages);
+  const visibleAuditEntries = useMemo(() => {
+    if (!auditExpanded) {
+      return auditEntries.slice(0, 3);
+    }
+    const start = (normalizedAuditPage - 1) * 10;
+    return auditEntries.slice(start, start + 10);
+  }, [auditEntries, auditExpanded, normalizedAuditPage]);
+
+  useEffect(() => {
+    setApprovalHistoryPage(1);
+  }, [approvalHistoryExpanded, approvalStatusFilter, selectedWalletTokens, filteredApprovalHistory.length]);
+
+  useEffect(() => {
+    setAuditPage(1);
+  }, [auditExpanded, auditEntries.length]);
 
   const filledTrades = useMemo(() => (trades ?? []).filter((trade) => trade.status === 'filled').length, [trades]);
   const winRate = useMemo(() => {
@@ -924,31 +1082,140 @@ export default function AgentPublicProfilePage() {
     }
     return token;
   };
+  const formatWalletHoldingAmount = (holding: { token: string; amountRaw: string; decimals: number }): string => {
+    const normalized = normalizeTokenSelectionSymbol(holding.token);
+    const base = formatUnitsTruncated(holding.amountRaw, holding.decimals, 6);
+    if (normalized === 'USDC') {
+      const numeric = Number(base);
+      if (Number.isFinite(numeric)) {
+        return new Intl.NumberFormat('en-US', {
+          style: 'currency',
+          currency: 'USD',
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2
+        }).format(numeric);
+      }
+      return `$${base}`;
+    }
+    return base;
+  };
+  const walletTotalPages = walletExpanded ? Math.max(1, Math.ceil(holdings.length / 10)) : 1;
+  const normalizedWalletPage = Math.min(walletPage, walletTotalPages);
+  const visibleWalletHoldings = useMemo(() => {
+    if (!walletExpanded) {
+      return holdings.slice(0, 3);
+    }
+    const start = (normalizedWalletPage - 1) * 10;
+    return holdings.slice(start, start + 10);
+  }, [holdings, normalizedWalletPage, walletExpanded]);
+  const copyTotalPages = copyExpanded ? Math.max(1, Math.ceil(copySubscriptions.length / 10)) : 1;
+  const normalizedCopyPage = Math.min(copyPage, copyTotalPages);
+  const visibleCopySubscriptions = useMemo(() => {
+    if (!copyExpanded) {
+      return copySubscriptions.slice(0, 3);
+    }
+    const start = (normalizedCopyPage - 1) * 10;
+    return copySubscriptions.slice(start, start + 10);
+  }, [copyExpanded, copySubscriptions, normalizedCopyPage]);
+  const limitTotalPages = limitExpanded ? Math.max(1, Math.ceil(limitOrders.length / 10)) : 1;
+  const normalizedLimitPage = Math.min(limitPage, limitTotalPages);
+  const visibleLimitOrders = useMemo(() => {
+    if (!limitExpanded) {
+      return limitOrders.slice(0, 3);
+    }
+    const start = (normalizedLimitPage - 1) * 10;
+    return limitOrders.slice(start, start + 10);
+  }, [limitExpanded, limitOrders, normalizedLimitPage]);
+
+  useEffect(() => {
+    setWalletPage(1);
+  }, [walletExpanded, holdings.length]);
+
+  useEffect(() => {
+    setWalletActivityPage(1);
+  }, [walletActivityExpanded, walletActivityFilter, selectedWalletTokens, filteredWalletTimeline.length]);
+
+  useEffect(() => {
+    setCopyPage(1);
+  }, [copyExpanded, copySubscriptions.length]);
+
+  useEffect(() => {
+    setLimitPage(1);
+  }, [limitExpanded, limitOrders.length]);
 
   const renderUtilityBar = () => (
     <header className={styles.utilityBar}>
       <div className={styles.utilityLabel}>Agent Wallet</div>
+      {activeWallet?.address ? (
+        <button
+          type="button"
+          className={`${styles.addressCopyButton} ${styles.utilityAddressCopyButton} ${vaultAddressCopied ? styles.addressCopyButtonActive : ''}`}
+          onClick={() =>
+            void copyToClipboard(activeWallet.address, 'Vault address copied.', () => {
+              setVaultAddressCopied(true);
+              if (vaultCopyResetTimerRef.current !== null) {
+                window.clearTimeout(vaultCopyResetTimerRef.current);
+              }
+              vaultCopyResetTimerRef.current = window.setTimeout(() => {
+                setVaultAddressCopied(false);
+                vaultCopyResetTimerRef.current = null;
+              }, 1000);
+            })
+          }
+          title="Copy full wallet address"
+        >
+          <span className={styles.utilityAddressInline}>
+            <code className={styles.utilityAddressValue}>{activeWallet.address}</code>
+          </span>
+          <span className={styles.copyIcon} aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M9 9.75A2.25 2.25 0 0 1 11.25 7.5h6A2.25 2.25 0 0 1 19.5 9.75v6A2.25 2.25 0 0 1 17.25 18h-6A2.25 2.25 0 0 1 9 15.75v-6Z" stroke="currentColor" strokeWidth="1.5" />
+              <path d="M15 7.5V6.75A2.25 2.25 0 0 0 12.75 4.5h-6A2.25 2.25 0 0 0 4.5 6.75v6A2.25 2.25 0 0 0 6.75 15H9" stroke="currentColor" strokeWidth="1.5" />
+            </svg>
+          </span>
+        </button>
+      ) : null}
       <div className={styles.utilityControls}>
         <ChainHeaderControl />
         {isOwner ? (
-          <label className={styles.utilityChainToggle}>
-            <span>{activeChainLabel} Trading</span>
-            <span className={styles.utilityChainToggleControl}>
-              <input
-                type="checkbox"
-                checked={agentChainEnabled}
-                disabled={agentChainToggleBusy}
-                onChange={(event) => {
-                  void runAgentChainToggle(event.target.checked);
-                }}
-              />
-              <span className={styles.iosSlider} />
-            </span>
-          </label>
+          <button
+            type="button"
+            className={`${styles.iconOnlyButton} ${styles.utilityPlayPauseButton} ${isPaused ? styles.utilityPlayButton : styles.utilityPauseButton}`}
+            aria-label={isPaused ? 'Play agent' : 'Pause agent'}
+            title={isPaused ? 'Play agent' : 'Pause agent'}
+            onClick={() =>
+              void runManagementAction(
+                () => managementPost(isPaused ? '/api/v1/management/resume' : '/api/v1/management/pause', { agentId }).then(() => Promise.resolve()),
+                isPaused ? 'Agent resumed.' : 'Agent paused.'
+              )
+            }
+          >
+            {isPaused ? (
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path d="M8 5.5v13l10-6.5-10-6.5Z" />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <rect x="7" y="5.5" width="3.8" height="13" rx="0.9" />
+                <rect x="13.2" y="5.5" width="3.8" height="13" rx="0.9" />
+              </svg>
+            )}
+            <span className="sr-only">{isPaused ? 'Play' : 'Pause'}</span>
+          </button>
         ) : null}
         <ThemeToggle className={styles.themeButton} />
       </div>
     </header>
+  );
+
+  const renderToasts = () => (
+    <div className={styles.toastStack} aria-live="polite" aria-atomic="false">
+      {toasts.map((toast) => (
+        <div key={toast.id} className={`${styles.toast} ${toast.type === 'success' ? styles.toastSuccess : toast.type === 'error' ? styles.toastError : styles.toastInfo}`}>
+          {toast.message}
+        </div>
+      ))}
+    </div>
   );
 
   const renderKpiStrip = () => (
@@ -1062,23 +1329,30 @@ export default function AgentPublicProfilePage() {
 
   return (
     <div className={styles.root}>
+      {renderToasts()}
       <aside className={styles.sidebar}>
-        <Link href="/dashboard" className={styles.sidebarLogo} aria-label="X-Claw dashboard">
+        <Link href="/" className={styles.sidebarLogo} aria-label="X-Claw home">
           <Image src="/X-Claw-Logo.png" alt="X-Claw" width={900} height={280} className={styles.sidebarLogoImage} priority />
         </Link>
         <nav className={styles.nav}>
           <Link href="/dashboard" className={styles.navItem} aria-label="Dashboard" title="Dashboard">
             <SidebarIcon name="dashboard" />
           </Link>
-          <Link href="/explore" className={`${styles.navItem} ${styles.navItemActive}`} aria-label="Explore" title="Explore">
+          <Link href="/explore" className={styles.navItem} aria-label="Explore" title="Explore">
             <SidebarIcon name="explore" />
           </Link>
           <Link href="/approvals" className={styles.navItem} aria-label="Approvals Center" title="Approvals Center">
             <SidebarIcon name="approvals" />
           </Link>
-          <Link href="/settings" className={styles.navItem} aria-label="Settings & Security" title="Settings & Security">
-            <SidebarIcon name="settings" />
-          </Link>
+          <ActiveAgentSidebarLink itemClassName={styles.navItem} activeClassName={styles.navItemActive} />
+          <div style={{ marginTop: 'auto', display: 'grid', gap: '0.42rem' }}>
+            <Link href="/settings" className={styles.navItem} aria-label="Settings & Security" title="Settings & Security">
+              <SidebarIcon name="settings" />
+            </Link>
+            <Link href="/how-to" className={styles.navItem} aria-label="How To" title="How To">
+              <SidebarIcon name="howto" />
+            </Link>
+          </div>
         </nav>
       </aside>
 
@@ -1086,8 +1360,6 @@ export default function AgentPublicProfilePage() {
         {renderUtilityBar()}
 
         {error ? <p className={styles.warningBanner}>{error}</p> : null}
-        {managementNotice ? <p className={styles.successBanner}>{managementNotice}</p> : null}
-        {managementError ? <p className={styles.warningBanner}>{managementError}</p> : null}
 
         <section className={`${styles.walletHeaderCard} ${styles.walletCard}`}>
           <div className={styles.walletHeaderTop}>
@@ -1104,79 +1376,34 @@ export default function AgentPublicProfilePage() {
                   <span className={styles.walletChip}>Chain: {activeChainLabel}</span>
                   <span className={styles.walletChip}>Vault: {activeWallet ? shortenAddress(activeWallet.address) : '—'}</span>
                 </div>
-                <div className={`${styles.globalApprovalRow} ${styles.walletToggleRow}`}>
-                  <div>
-                    <span className={styles.globalApprovalLabel}>Approve all</span>
-                    <div className={styles.globalApprovalHint}>
-                      {policyApprovalMode === 'auto'
-                        ? 'Enabled: the agent can trade freely.'
-                        : 'Disabled: trades require approval unless token is preapproved.'}
-                    </div>
-                  </div>
-                  {isOwner ? (
-                    <label className={styles.iosToggle} title="Allow all trades without per-trade approval.">
-                      <input
-                        type="checkbox"
-                        checked={policyApprovalMode === 'auto'}
-                        onChange={(event) => {
-                          const nextMode = event.target.checked ? 'auto' : 'per_trade';
-                          setPolicyApprovalMode(nextMode);
-                          void runManagementAction(
-                            () =>
-                              managementPost('/api/v1/management/policy/update', buildPolicyUpdatePayload({ approvalMode: nextMode })).then(() =>
-                                Promise.resolve()
-                              ),
-                            `Global approval ${nextMode === 'auto' ? 'enabled' : 'disabled'}.`
-                          );
-                        }}
-                      />
-                      <span className={styles.iosSlider} />
-                    </label>
-                  ) : (
-                    <span className={styles.muted}>{policyApprovalMode === 'auto' ? 'Enabled' : 'Disabled'}</span>
-                  )}
-                </div>
               </div>
             </div>
+            <div className={styles.headerApprovalControl}>
+              <span className={styles.globalApprovalLabel}>Approve all</span>
+              {isOwner ? (
+                <label className={styles.iosToggle} title="Allow all trades without per-trade approval.">
+                  <input
+                    type="checkbox"
+                    checked={policyApprovalMode === 'auto'}
+                    onChange={(event) => {
+                      const nextMode = event.target.checked ? 'auto' : 'per_trade';
+                      setPolicyApprovalMode(nextMode);
+                      void runManagementAction(
+                        () =>
+                          managementPost('/api/v1/management/policy/update', buildPolicyUpdatePayload({ approvalMode: nextMode })).then(() =>
+                            Promise.resolve()
+                          ),
+                        `Global approval ${nextMode === 'auto' ? 'enabled' : 'disabled'}.`
+                      );
+                    }}
+                  />
+                  <span className={styles.iosSlider} />
+                </label>
+              ) : (
+                <span className={styles.muted}>{policyApprovalMode === 'auto' ? 'Enabled' : 'Disabled'}</span>
+              )}
+            </div>
 
-            {activeWallet?.address ? (
-              <button
-                type="button"
-                className={`${styles.addressCopyButton} ${vaultAddressCopied ? styles.addressCopyButtonActive : ''}`}
-                onClick={() =>
-                  void copyToClipboard(activeWallet.address, 'Vault address copied.', () => {
-                    setVaultAddressCopied(true);
-                    if (vaultCopyResetTimerRef.current !== null) {
-                      window.clearTimeout(vaultCopyResetTimerRef.current);
-                    }
-                    vaultCopyResetTimerRef.current = window.setTimeout(() => {
-                      setVaultAddressCopied(false);
-                      vaultCopyResetTimerRef.current = null;
-                    }, 1000);
-                  })
-                }
-                title="Copy full vault address"
-              >
-                <span className={styles.addressCopyHeader}>
-                  <span className={styles.muted}>Wallet Address</span>
-                  <span className={styles.copyIcon} aria-hidden="true">
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path
-                        d="M9 9.75A2.25 2.25 0 0 1 11.25 7.5h6A2.25 2.25 0 0 1 19.5 9.75v6A2.25 2.25 0 0 1 17.25 18h-6A2.25 2.25 0 0 1 9 15.75v-6Z"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                      />
-                      <path
-                        d="M15 7.5V6.75A2.25 2.25 0 0 0 12.75 4.5h-6A2.25 2.25 0 0 0 4.5 6.75v6A2.25 2.25 0 0 0 6.75 15H9"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                      />
-                    </svg>
-                  </span>
-                </span>
-                <code className={styles.addressValue}>{activeWallet.address}</code>
-              </button>
-            ) : null}
           </div>
 
           <div className={`${styles.walletActions} ${styles.walletActionRow}`}>
@@ -1184,42 +1411,18 @@ export default function AgentPublicProfilePage() {
               <>
                 <button
                   type="button"
-                  className={styles.iconOnlyButton}
-                  aria-label={isPaused ? 'Play agent' : 'Pause agent'}
-                  title={isPaused ? 'Play agent' : 'Pause agent'}
-                  onClick={() =>
-                    void runManagementAction(
-                      () =>
-                        managementPost(isPaused ? '/api/v1/management/resume' : '/api/v1/management/pause', { agentId }).then(() =>
-                          Promise.resolve()
-                        ),
-                      isPaused ? 'Agent resumed.' : 'Agent paused.'
-                    )
-                  }
-                >
-                  {isPaused ? (
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                      <path d="M8 5.5v13l10-6.5-10-6.5Z" />
-                    </svg>
-                  ) : (
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                      <rect x="7" y="5.5" width="3.8" height="13" rx="0.9" />
-                      <rect x="13.2" y="5.5" width="3.8" height="13" rx="0.9" />
-                    </svg>
-                  )}
-                  <span className="sr-only">{isPaused ? 'Play' : 'Pause'}</span>
-                </button>
-                <button
-                  type="button"
                   className={styles.dangerButton}
-                  onClick={() =>
+                  onClick={() => {
+                    if (!window.confirm('Revoke all permissions for this agent? This cannot be undone.')) {
+                      return;
+                    }
                     void runManagementAction(
                       () => managementPost('/api/v1/management/revoke-all', { agentId }).then(() => Promise.resolve()),
-                      'Revoked management sessions and rotated owner token.'
-                    )
-                  }
+                      'Revoked all permissions for this agent.'
+                    );
+                  }}
                 >
-                  Revoke All
+                  Revoke All Permissions
                 </button>
                 <div className={styles.withdrawInline}>
                   {withdrawDestinationPreview ? <span className={styles.withdrawPreviewLabel}>{withdrawDestinationPreview}</span> : null}
@@ -1248,7 +1451,7 @@ export default function AgentPublicProfilePage() {
             {!isOwner ? <p className={styles.muted}>Viewer mode: approval controls are read-only.</p> : null}
             {holdings.length === 0 ? <p className={styles.muted}>No balances detected for this chain.</p> : null}
             <p className={styles.muted}>Click a token to filter Activity and Approval History. Hold Ctrl/Cmd for multi-select.</p>
-            {holdings.map((holding) => (
+            {visibleWalletHoldings.map((holding) => (
               <div
                 key={holding.token}
                 className={`${styles.listRow} ${styles.walletTokenRow} ${selectedWalletTokenSet.has(normalizeTokenSelectionSymbol(holding.token)) ? styles.selectedWalletRow : ''}`}
@@ -1280,9 +1483,13 @@ export default function AgentPublicProfilePage() {
                     {isTokenPreapproved(holding.token) ? <span className={styles.approvedChip}>Approved</span> : null}
                   </div>
                 </div>
-                <div className={styles.listMeta}>
-                  <span>{formatUnitsTruncated(holding.amountRaw, holding.decimals, 6)}</span>
-                  <div className={styles.tokenApprovalControl} onClick={(event) => event.stopPropagation()}>
+                <div className={styles.walletTokenMeta}>
+                  <div className={styles.walletTokenMetricColumn}>
+                    <span className={styles.walletTokenMetricLabel}>Balance</span>
+                    <span className={styles.walletTokenAmount}>{formatWalletHoldingAmount(holding)}</span>
+                  </div>
+                  <div className={`${styles.walletTokenMetricColumn} ${styles.tokenApprovalControl}`} onClick={(event) => event.stopPropagation()}>
+                    <span className={styles.walletTokenMetricLabel}>Approval</span>
                     <label className={styles.iosToggle} title="Allow this token without per-trade approval.">
                       <input
                         type="checkbox"
@@ -1303,12 +1510,42 @@ export default function AgentPublicProfilePage() {
                 </div>
               </div>
             ))}
+            {holdings.length > 3 ? (
+              <div className={styles.paginationRow}>
+                <button type="button" onClick={() => setWalletExpanded((current) => !current)}>
+                  {walletExpanded ? 'Show less' : 'Show more'}
+                </button>
+                {walletExpanded && holdings.length > 10 ? (
+                  <div className={styles.paginationControls}>
+                    <button
+                      type="button"
+                      onClick={() => setWalletPage((current) => Math.max(1, current - 1))}
+                      disabled={normalizedWalletPage <= 1}
+                    >
+                      Prev
+                    </button>
+                    <span className={styles.muted}>
+                      Page {normalizedWalletPage} / {walletTotalPages}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setWalletPage((current) => Math.min(walletTotalPages, current + 1))}
+                      disabled={normalizedWalletPage >= walletTotalPages}
+                    >
+                      Next
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
           </article>
 
             <article className={`${styles.card} ${styles.walletCard}`}>
             <div className={`${styles.cardHeader} ${styles.walletCardHeader}`}>
               <h2>Wallet Activity</h2>
-              <span className={styles.muted}>All wallet-impact events</span>
+              <div className={styles.inlineActions}>
+                <span className={styles.muted}>All wallet-impact events</span>
+              </div>
             </div>
             <div className={styles.rangeButtons}>
               {([
@@ -1330,12 +1567,23 @@ export default function AgentPublicProfilePage() {
             </div>
             {filteredWalletTimeline.length === 0 ? <p className={styles.muted}>No wallet activity in this filter.</p> : null}
             <div className={styles.list}>
-              {filteredWalletTimeline.slice(0, 60).map((row) => (
+              {visibleWalletActivity.map((row) => (
                 <div key={row.id} className={styles.listRow}>
                   <div>
                     <div className={styles.listTitle}>{row.title}</div>
                     <div className={styles.muted}>{row.subtitle}</div>
-                    {row.txHash ? <div className={styles.muted}>Tx: {shortenHex(row.txHash, 10, 8)}</div> : null}
+                    {row.txHash ? (
+                      <div className={styles.muted}>
+                        Tx:{' '}
+                        {row.txExplorerUrl ? (
+                          <a href={row.txExplorerUrl} target="_blank" rel="noreferrer" className={styles.inlineLink}>
+                            {shortenHex(row.txHash, 10, 8)}
+                          </a>
+                        ) : (
+                          shortenHex(row.txHash, 10, 8)
+                        )}
+                      </div>
+                    ) : null}
                   </div>
                   <div className={styles.listMeta}>
                     <span className={styles.statusChip}>{row.status}</span>
@@ -1344,12 +1592,42 @@ export default function AgentPublicProfilePage() {
                 </div>
               ))}
             </div>
+            {filteredWalletTimeline.length > 3 ? (
+              <div className={styles.paginationRow}>
+                <button type="button" onClick={() => setWalletActivityExpanded((current) => !current)}>
+                  {walletActivityExpanded ? 'Show less' : 'Show more'}
+                </button>
+                {walletActivityExpanded && filteredWalletTimeline.length > 10 ? (
+                  <div className={styles.paginationControls}>
+                    <button
+                      type="button"
+                      onClick={() => setWalletActivityPage((current) => Math.max(1, current - 1))}
+                      disabled={normalizedWalletActivityPage <= 1}
+                    >
+                      Prev
+                    </button>
+                    <span className={styles.muted}>
+                      Page {normalizedWalletActivityPage} / {walletActivityTotalPages}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setWalletActivityPage((current) => Math.min(walletActivityTotalPages, current + 1))}
+                      disabled={normalizedWalletActivityPage >= walletActivityTotalPages}
+                    >
+                      Next
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
           </article>
 
             <article id="approval-history" className={`${styles.card} ${styles.walletCard}`}>
             <div className={`${styles.cardHeader} ${styles.walletCardHeader}`}>
               <h2>Approval History</h2>
-              <span className={styles.muted}>Trade, policy, and transfer approvals</span>
+              <div className={styles.inlineActions}>
+                <span className={styles.muted}>Trade, policy, and transfer approvals</span>
+              </div>
             </div>
             <div className={styles.rangeButtons}>
               {([
@@ -1370,175 +1648,205 @@ export default function AgentPublicProfilePage() {
             </div>
             {!isOwner ? <p className={styles.muted}>Viewer mode: approval actions are locked.</p> : null}
             {filteredApprovalHistory.length === 0 ? <p className={styles.muted}>No approvals in this filter.</p> : null}
-            {filteredApprovalHistory.map((row) => (
-              <div key={row.id} className={styles.queueRow}>
-                <div>
-                  <div className={styles.listTitle}>{row.title}</div>
-                  <div className={styles.muted}>{row.subtitle}</div>
-                  <div className={styles.muted}>{formatUtc(row.at)} UTC</div>
-                </div>
-                <div className={styles.queueActions}>
-                  <span className={styles.statusChip}>{row.status}</span>
-                  {isOwner && (row.status === 'pending' || row.status === 'approval_pending') && row.type === 'trade' ? (
-                    <>
-                      <input
-                        value={approvalRejectReasons[row.raw.trade_id] ?? ''}
-                        onChange={(event) =>
-                          setApprovalRejectReasons((current) => ({
-                            ...current,
-                            [row.raw.trade_id]: event.target.value
-                          }))
-                        }
-                        placeholder="Rejection reason (optional)"
-                      />
-                      <button
-                        type="button"
-                        onClick={() =>
-                          void runManagementAction(
-                            () =>
-                              managementPost('/api/v1/management/approvals/decision', {
-                                agentId,
-                                tradeId: row.raw.trade_id,
-                                decision: 'approve'
-                              }).then(() => Promise.resolve()),
-                            `Approved ${row.raw.trade_id}`
-                          )
-                        }
-                      >
-                        Approve
-                      </button>
-                      <button
-                        type="button"
-                        className={styles.dangerButton}
-                        onClick={() =>
-                          void runManagementAction(
-                            () =>
-                              managementPost('/api/v1/management/approvals/decision', {
-                                agentId,
-                                tradeId: row.raw.trade_id,
-                                decision: 'reject',
-                                reasonCode: 'approval_rejected',
-                                reasonMessage: (approvalRejectReasons[row.raw.trade_id] ?? '').trim() || 'Rejected by owner.'
-                              }).then(() => Promise.resolve()),
-                            `Rejected ${row.raw.trade_id}`
-                          )
-                        }
-                      >
-                        Reject
-                      </button>
-                    </>
-                  ) : null}
-                  {isOwner && row.status === 'pending' && row.type === 'policy' ? (
-                    <>
-                      <input
-                        value={approvalRejectReasons[row.raw.request_id] ?? ''}
-                        onChange={(event) =>
-                          setApprovalRejectReasons((current) => ({
-                            ...current,
-                            [row.raw.request_id]: event.target.value
-                          }))
-                        }
-                        placeholder="Rejection reason (optional)"
-                      />
-                      <button
-                        type="button"
-                        onClick={() =>
-                          void runManagementAction(
-                            () =>
-                              managementPost('/api/v1/management/policy-approvals/decision', {
-                                agentId,
-                                policyApprovalId: row.raw.request_id,
-                                decision: 'approve'
-                              }).then(() => Promise.resolve()),
-                            `Approved ${row.raw.request_id}`
-                          )
-                        }
-                      >
-                        Approve
-                      </button>
-                      <button
-                        type="button"
-                        className={styles.dangerButton}
-                        onClick={() =>
-                          void runManagementAction(
-                            () =>
-                              managementPost('/api/v1/management/policy-approvals/decision', {
-                                agentId,
-                                policyApprovalId: row.raw.request_id,
-                                decision: 'reject',
-                                reasonMessage: (approvalRejectReasons[row.raw.request_id] ?? '').trim() || 'Rejected by owner.'
-                              }).then(() => Promise.resolve()),
-                            `Rejected ${row.raw.request_id}`
-                          )
-                        }
-                      >
-                        Deny
-                      </button>
-                    </>
-                  ) : null}
-                  {isOwner && row.status === 'pending' && row.type === 'transfer' ? (
-                    <>
-                      <input
-                        value={approvalRejectReasons[row.raw.approval_id] ?? ''}
-                        onChange={(event) =>
-                          setApprovalRejectReasons((current) => ({
-                            ...current,
-                            [row.raw.approval_id]: event.target.value
-                          }))
-                        }
-                        placeholder="Rejection reason (optional)"
-                      />
-                      <button
-                        type="button"
-                        onClick={() =>
-                          void runManagementAction(
-                            () =>
-                              managementPost('/api/v1/management/transfer-approvals/decision', {
-                                agentId,
-                                approvalId: row.raw.approval_id,
-                                decision: 'approve',
-                                chainKey: row.raw.chain_key
-                              }).then(() => Promise.resolve()),
-                            `Approved ${row.raw.approval_id}`
-                          )
-                        }
-                      >
-                        Approve
-                      </button>
-                      <button
-                        type="button"
-                        className={styles.dangerButton}
-                        onClick={() =>
-                          void runManagementAction(
-                            () =>
-                              managementPost('/api/v1/management/transfer-approvals/decision', {
-                                agentId,
-                                approvalId: row.raw.approval_id,
-                                decision: 'deny',
-                                chainKey: row.raw.chain_key,
-                                reasonMessage: (approvalRejectReasons[row.raw.approval_id] ?? '').trim() || 'Rejected by owner.'
-                              }).then(() => Promise.resolve()),
-                            `Denied ${row.raw.approval_id}`
-                          )
-                        }
-                      >
-                        Deny
-                      </button>
-                    </>
-                  ) : null}
-                </div>
+            {visibleApprovalHistory.map((row) => (
+                  <div key={row.id} className={styles.queueRow}>
+                    <div>
+                      <div className={styles.listTitle}>{row.title}</div>
+                      <div className={styles.muted}>{row.subtitle}</div>
+                      <div className={styles.muted}>{formatUtc(row.at)} UTC</div>
+                    </div>
+                    <div className={styles.queueActions}>
+                      <span className={styles.statusChip}>{row.status}</span>
+                      {isOwner && (row.status === 'pending' || row.status === 'approval_pending') && row.type === 'trade' ? (
+                        <>
+                          <input
+                            value={approvalRejectReasons[row.raw.trade_id] ?? ''}
+                            onChange={(event) =>
+                              setApprovalRejectReasons((current) => ({
+                                ...current,
+                                [row.raw.trade_id]: event.target.value
+                              }))
+                            }
+                            placeholder="Rejection reason (optional)"
+                          />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              void runManagementAction(
+                                () =>
+                                  managementPost('/api/v1/management/approvals/decision', {
+                                    agentId,
+                                    tradeId: row.raw.trade_id,
+                                    decision: 'approve'
+                                  }).then(() => Promise.resolve()),
+                                `Approved ${row.raw.trade_id}`
+                              )
+                            }
+                          >
+                            Approve
+                          </button>
+                          <button
+                            type="button"
+                            className={styles.dangerButton}
+                            onClick={() =>
+                              void runManagementAction(
+                                () =>
+                                  managementPost('/api/v1/management/approvals/decision', {
+                                    agentId,
+                                    tradeId: row.raw.trade_id,
+                                    decision: 'reject',
+                                    reasonCode: 'approval_rejected',
+                                    reasonMessage: (approvalRejectReasons[row.raw.trade_id] ?? '').trim() || 'Rejected by owner.'
+                                  }).then(() => Promise.resolve()),
+                                `Rejected ${row.raw.trade_id}`
+                              )
+                            }
+                          >
+                            Reject
+                          </button>
+                        </>
+                      ) : null}
+                      {isOwner && row.status === 'pending' && row.type === 'policy' ? (
+                        <>
+                          <input
+                            value={approvalRejectReasons[row.raw.request_id] ?? ''}
+                            onChange={(event) =>
+                              setApprovalRejectReasons((current) => ({
+                                ...current,
+                                [row.raw.request_id]: event.target.value
+                              }))
+                            }
+                            placeholder="Rejection reason (optional)"
+                          />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              void runManagementAction(
+                                () =>
+                                  managementPost('/api/v1/management/policy-approvals/decision', {
+                                    agentId,
+                                    policyApprovalId: row.raw.request_id,
+                                    decision: 'approve'
+                                  }).then(() => Promise.resolve()),
+                                `Approved ${row.raw.request_id}`
+                              )
+                            }
+                          >
+                            Approve
+                          </button>
+                          <button
+                            type="button"
+                            className={styles.dangerButton}
+                            onClick={() =>
+                              void runManagementAction(
+                                () =>
+                                  managementPost('/api/v1/management/policy-approvals/decision', {
+                                    agentId,
+                                    policyApprovalId: row.raw.request_id,
+                                    decision: 'reject',
+                                    reasonMessage: (approvalRejectReasons[row.raw.request_id] ?? '').trim() || 'Rejected by owner.'
+                                  }).then(() => Promise.resolve()),
+                                `Rejected ${row.raw.request_id}`
+                              )
+                            }
+                          >
+                            Deny
+                          </button>
+                        </>
+                      ) : null}
+                      {isOwner && row.status === 'pending' && row.type === 'transfer' ? (
+                        <>
+                          <input
+                            value={approvalRejectReasons[row.raw.approval_id] ?? ''}
+                            onChange={(event) =>
+                              setApprovalRejectReasons((current) => ({
+                                ...current,
+                                [row.raw.approval_id]: event.target.value
+                              }))
+                            }
+                            placeholder="Rejection reason (optional)"
+                          />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              void runManagementAction(
+                                () =>
+                                  managementPost('/api/v1/management/transfer-approvals/decision', {
+                                    agentId,
+                                    approvalId: row.raw.approval_id,
+                                    decision: 'approve',
+                                    chainKey: row.raw.chain_key
+                                  }).then(() => Promise.resolve()),
+                                `Approved ${row.raw.approval_id}`
+                              )
+                            }
+                          >
+                            Approve
+                          </button>
+                          <button
+                            type="button"
+                            className={styles.dangerButton}
+                            onClick={() =>
+                              void runManagementAction(
+                                () =>
+                                  managementPost('/api/v1/management/transfer-approvals/decision', {
+                                    agentId,
+                                    approvalId: row.raw.approval_id,
+                                    decision: 'deny',
+                                    chainKey: row.raw.chain_key,
+                                    reasonMessage: (approvalRejectReasons[row.raw.approval_id] ?? '').trim() || 'Rejected by owner.'
+                                  }).then(() => Promise.resolve()),
+                                `Denied ${row.raw.approval_id}`
+                              )
+                            }
+                          >
+                            Deny
+                          </button>
+                        </>
+                      ) : null}
+                    </div>
+                  </div>
+                ))}
+            {filteredApprovalHistory.length > 3 ? (
+              <div className={styles.paginationRow}>
+                <button type="button" onClick={() => setApprovalHistoryExpanded((current) => !current)}>
+                  {approvalHistoryExpanded ? 'Show less' : 'Show more'}
+                </button>
+                {approvalHistoryExpanded && filteredApprovalHistory.length > 10 ? (
+                  <div className={styles.paginationControls}>
+                    <button
+                      type="button"
+                      onClick={() => setApprovalHistoryPage((current) => Math.max(1, current - 1))}
+                      disabled={normalizedApprovalHistoryPage <= 1}
+                    >
+                      Prev
+                    </button>
+                    <span className={styles.muted}>
+                      Page {normalizedApprovalHistoryPage} / {approvalHistoryTotalPages}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setApprovalHistoryPage((current) => Math.min(approvalHistoryTotalPages, current + 1))}
+                      disabled={normalizedApprovalHistoryPage >= approvalHistoryTotalPages}
+                    >
+                      Next
+                    </button>
+                  </div>
+                ) : null}
               </div>
-            ))}
+            ) : null}
           </article>
 
             <article className={`${styles.card} ${styles.walletCard}`}>
               <div className={`${styles.cardHeader} ${styles.walletCardHeader}`}>
                 <h3>Management Audit Log</h3>
-                <span>{management.phase === 'ready' ? management.data.auditLog.length : '—'}</span>
+                <div className={styles.inlineActions}>
+                  <span>{management.phase === 'ready' ? management.data.auditLog.length : '—'}</span>
+                </div>
               </div>
-              {management.phase === 'ready' && management.data.auditLog.length === 0 ? <p className={styles.muted}>No audit entries.</p> : null}
+              {management.phase === 'ready' && auditEntries.length === 0 ? <p className={styles.muted}>No audit entries.</p> : null}
               {management.phase === 'ready'
-                ? management.data.auditLog.slice(0, 25).map((entry) => (
+                ? visibleAuditEntries.map((entry) => (
                     <div key={entry.audit_id} className={styles.listRow}>
                       <div>
                         <div className={styles.listTitle}>
@@ -1549,6 +1857,34 @@ export default function AgentPublicProfilePage() {
                     </div>
                   ))
                 : null}
+              {management.phase === 'ready' && auditEntries.length > 3 ? (
+                <div className={styles.paginationRow}>
+                  <button type="button" onClick={() => setAuditExpanded((current) => !current)}>
+                    {auditExpanded ? 'Show less' : 'Show more'}
+                  </button>
+                  {auditExpanded && auditEntries.length > 10 ? (
+                    <div className={styles.paginationControls}>
+                      <button
+                        type="button"
+                        onClick={() => setAuditPage((current) => Math.max(1, current - 1))}
+                        disabled={normalizedAuditPage <= 1}
+                      >
+                        Prev
+                      </button>
+                      <span className={styles.muted}>
+                        Page {normalizedAuditPage} / {auditTotalPages}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setAuditPage((current) => Math.min(auditTotalPages, current + 1))}
+                        disabled={normalizedAuditPage >= auditTotalPages}
+                      >
+                        Next
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
             </article>
           </div>
 
@@ -1565,7 +1901,7 @@ export default function AgentPublicProfilePage() {
             {isOwner ? (
               <>
                 {copySubscriptions.length === 0 ? <p className={styles.muted}>No copy subscriptions configured.</p> : null}
-                {copySubscriptions.map((item) => (
+                {visibleCopySubscriptions.map((item) => (
                   <div key={item.subscriptionId} className={styles.railQueueRow}>
                     <div>
                       <div className={styles.listTitle}>Leader: {item.leaderAgentId}</div>
@@ -1601,6 +1937,34 @@ export default function AgentPublicProfilePage() {
                     </div>
                   </div>
                 ))}
+                {copySubscriptions.length > 3 ? (
+                  <div className={styles.paginationRow}>
+                    <button type="button" onClick={() => setCopyExpanded((current) => !current)}>
+                      {copyExpanded ? 'Show less' : 'Show more'}
+                    </button>
+                    {copyExpanded && copySubscriptions.length > 10 ? (
+                      <div className={styles.paginationControls}>
+                        <button
+                          type="button"
+                          onClick={() => setCopyPage((current) => Math.max(1, current - 1))}
+                          disabled={normalizedCopyPage <= 1}
+                        >
+                          Prev
+                        </button>
+                        <span className={styles.muted}>
+                          Page {normalizedCopyPage} / {copyTotalPages}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setCopyPage((current) => Math.min(copyTotalPages, current + 1))}
+                          disabled={normalizedCopyPage >= copyTotalPages}
+                        >
+                          Next
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
               </>
             ) : null}
           </article>
@@ -1614,7 +1978,7 @@ export default function AgentPublicProfilePage() {
             {isOwner ? (
               <>
                 {limitOrders.length === 0 ? <p className={styles.muted}>No open or recent limit orders.</p> : null}
-                {limitOrders.slice(0, 20).map((order) => (
+                {visibleLimitOrders.map((order) => (
                   <div key={order.orderId} className={styles.railQueueRow}>
                     <div>
                       <div className={styles.listTitle}>
@@ -1646,6 +2010,34 @@ export default function AgentPublicProfilePage() {
                     </div>
                   </div>
                 ))}
+                {limitOrders.length > 3 ? (
+                  <div className={styles.paginationRow}>
+                    <button type="button" onClick={() => setLimitExpanded((current) => !current)}>
+                      {limitExpanded ? 'Show less' : 'Show more'}
+                    </button>
+                    {limitExpanded && limitOrders.length > 10 ? (
+                      <div className={styles.paginationControls}>
+                        <button
+                          type="button"
+                          onClick={() => setLimitPage((current) => Math.max(1, current - 1))}
+                          disabled={normalizedLimitPage <= 1}
+                        >
+                          Prev
+                        </button>
+                        <span className={styles.muted}>
+                          Page {normalizedLimitPage} / {limitTotalPages}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setLimitPage((current) => Math.min(limitTotalPages, current + 1))}
+                          disabled={normalizedLimitPage >= limitTotalPages}
+                        >
+                          Next
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
               </>
             ) : null}
           </article>

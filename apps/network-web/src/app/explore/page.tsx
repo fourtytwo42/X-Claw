@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 
 import { ChainHeaderControl } from '@/components/chain-header-control';
+import { ActiveAgentSidebarLink } from '@/components/active-agent-sidebar-link';
 import { PublicStatusBadge } from '@/components/public-status-badge';
 import { SidebarIcon } from '@/components/sidebar-icons';
 import { ThemeToggle } from '@/components/theme-toggle';
@@ -527,7 +528,7 @@ export default function ExplorePage() {
   return (
     <div className={styles.root}>
       <aside className={styles.sidebar}>
-        <Link href="/dashboard" className={styles.sidebarLogo} aria-label="X-Claw dashboard">
+        <Link href="/" className={styles.sidebarLogo} aria-label="X-Claw home">
           <Image src="/X-Claw-Logo.png" alt="X-Claw" width={900} height={280} className={styles.sidebarLogoImage} priority />
         </Link>
         <nav className={styles.sidebarNav} aria-label="Explore sections">
@@ -540,9 +541,15 @@ export default function ExplorePage() {
           <Link className={styles.sidebarItem} href="/approvals" aria-label="Approvals Center" title="Approvals Center">
             <SidebarIcon name="approvals" />
           </Link>
-          <Link className={styles.sidebarItem} href="/settings" aria-label="Settings & Security" title="Settings & Security">
-            <SidebarIcon name="settings" />
-          </Link>
+          <ActiveAgentSidebarLink itemClassName={styles.sidebarItem} />
+          <div style={{ marginTop: 'auto', display: 'grid', gap: '0.42rem' }}>
+            <Link className={styles.sidebarItem} href="/settings" aria-label="Settings & Security" title="Settings & Security">
+              <SidebarIcon name="settings" />
+            </Link>
+            <Link className={styles.sidebarItem} href="/how-to" aria-label="How To" title="How To">
+              <SidebarIcon name="howto" />
+            </Link>
+          </div>
         </nav>
       </aside>
 

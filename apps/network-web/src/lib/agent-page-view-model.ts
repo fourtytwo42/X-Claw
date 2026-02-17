@@ -141,6 +141,7 @@ export type ManagementStatePayload = {
     policy_block_reason_code: 'outbound_disabled' | 'destination_not_whitelisted' | null;
     policy_block_reason_message: string | null;
     execution_mode: 'normal' | 'policy_override' | null;
+    confirmations?: number | null;
     created_at: string;
   }>;
   transferApprovalsHistory?: Array<{
@@ -158,6 +159,7 @@ export type ManagementStatePayload = {
     policy_block_reason_code: 'outbound_disabled' | 'destination_not_whitelisted' | null;
     policy_block_reason_message: string | null;
     execution_mode: 'normal' | 'policy_override' | null;
+    confirmations?: number | null;
     created_at: string;
     decided_at: string | null;
     terminal_at: string | null;

@@ -1,0 +1,258 @@
+.root {
+  --status-bg-light: #f6f8fc;
+  --status-surface-light: #ffffff;
+  --status-border-light: #e6ecf5;
+  --status-text-light: #0b1220;
+  --status-muted-light: #5b6b84;
+  --status-accent-light: #2563eb;
+
+  --status-bg-dark: #0b1220;
+  --status-surface-dark: #111a2e;
+  --status-border-dark: #22304d;
+  --status-text-dark: #eaf0ff;
+  --status-muted-dark: #a7b4d0;
+  --status-accent-dark: #3b82f6;
+
+  --status-bg: var(--status-bg-dark);
+  --status-surface: var(--status-surface-dark);
+  --status-border: var(--status-border-dark);
+  --status-text: var(--status-text-dark);
+  --status-muted: var(--status-muted-dark);
+  --status-accent: var(--status-accent-dark);
+
+  min-height: calc(100vh - 2rem);
+  display: grid;
+  grid-template-columns: 82px minmax(0, 1fr);
+  gap: 1rem;
+  color: var(--status-text);
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+:global(:root[data-theme='light']) .root {
+  --status-bg: var(--status-bg-light);
+  --status-surface: var(--status-surface-light);
+  --status-border: var(--status-border-light);
+  --status-text: var(--status-text-light);
+  --status-muted: var(--status-muted-light);
+  --status-accent: var(--status-accent-light);
+}
+
+.sidebar {
+  position: sticky;
+  top: 0.75rem;
+  align-self: start;
+  height: calc(100vh - 1.5rem);
+  border: 1px solid var(--status-border);
+  border-radius: 22px;
+  background: linear-gradient(180deg, var(--status-surface), color-mix(in srgb, var(--status-surface) 70%, transparent));
+  display: grid;
+  grid-template-rows: auto 1fr;
+  padding: 0.8rem 0.45rem;
+}
+
+.sidebarLogo {
+  width: 58px;
+  height: 44px;
+  border-radius: 10px;
+  margin: 0 auto 0.8rem;
+  display: grid;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--status-accent) 45%, var(--status-border));
+  background: color-mix(in srgb, var(--status-accent) 10%, var(--status-surface));
+  padding: 0.2rem;
+}
+
+.sidebarLogoImage {
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+
+.sidebarNav {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 0.42rem;
+}
+
+.sidebarItem {
+  border: 1px solid transparent;
+  border-radius: 12px;
+  color: var(--status-muted);
+  display: grid;
+  place-items: center;
+  padding: 0.58rem 0.35rem;
+  min-height: 42px;
+}
+
+.sidebarItem svg {
+  width: 18px;
+  height: 18px;
+}
+
+.sidebarItem:hover {
+  border-color: var(--status-border);
+  color: var(--status-text);
+}
+
+.mainSurface {
+  border: 1px solid var(--status-border);
+  border-radius: 24px;
+  background: radial-gradient(circle at 90% 0%, color-mix(in srgb, var(--status-accent) 17%, transparent), transparent 30%),
+    linear-gradient(180deg, var(--status-bg), color-mix(in srgb, var(--status-bg) 78%, #091428));
+  padding: 0.95rem;
+  min-width: 0;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 15;
+  border: 1px solid var(--status-border);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--status-surface) 92%, transparent);
+  backdrop-filter: blur(10px);
+  padding: 0.65rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.75rem;
+}
+
+.subtitle {
+  margin: 0.2rem 0 0;
+  color: var(--status-muted);
+  font-size: 0.85rem;
+}
+
+.topbarControls {
+  display: inline-flex;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.chainControl :global(.chain-select) {
+  border-radius: 12px;
+  border: 1px solid var(--status-border);
+  background: var(--status-surface);
+  color: var(--status-text);
+  padding: 0.45rem 0.55rem;
+}
+
+.topbarThemeToggle {
+  border: 1px solid var(--status-border);
+  border-radius: 12px;
+  background: var(--status-surface);
+  color: var(--status-text);
+  display: inline-flex;
+  gap: 0.34rem;
+  align-items: center;
+  padding: 0.42rem 0.6rem;
+  cursor: pointer;
+}
+
+.warningBanner {
+  border: 1px solid color-mix(in srgb, #ef4444 55%, var(--status-border));
+  border-radius: 12px;
+  background: var(--status-surface);
+  padding: 0.55rem 0.68rem;
+  margin: 0.7rem 0 0;
+}
+
+.card {
+  border: 1px solid var(--status-border);
+  border-radius: 16px;
+  background: var(--status-surface);
+  padding: 0.78rem;
+  margin-top: 0.75rem;
+  min-width: 0;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.statusOverview {
+  margin-top: 0.6rem;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.statusGrid {
+  margin-top: 0.6rem;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.managementCard {
+  border: 1px solid var(--status-border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--status-surface) 84%, transparent);
+  padding: 0.6rem;
+}
+
+.managementCard h3 {
+  margin: 0;
+}
+
+.muted {
+  color: var(--status-muted);
+}
+
+.kpiValue {
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+.hardWrap {
+  display: inline-block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.activityList {
+  margin-top: 0.6rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.activityItem {
+  border: 1px solid var(--status-border);
+  border-radius: 12px;
+  padding: 0.58rem;
+  background: color-mix(in srgb, var(--status-surface) 84%, transparent);
+}
+
+@media (max-width: 1100px) {
+  .statusOverview,
+  .statusGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .root {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sidebar {
+    position: static;
+    height: auto;
+    grid-template-rows: auto;
+  }
+
+  .sidebarNav {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}

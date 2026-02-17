@@ -63,8 +63,10 @@ Run and verify:
 3. `npm run seed:load`
 4. `npm run seed:verify`
 5. `npm run build` (when Node/npm available)
-6. For changed functionality, include task-specific verification commands and expected outcomes in summary.
-7. Trading-path features must show Hardhat-local validation evidence before Base Sepolia evidence.
+6. After `npm run build` succeeds, run `pm2 restart all` (when PM2 is available) so the latest build is live for testing.
+7. Build and PM2 restart must be sequential (never parallel): restart only after build exits successfully.
+8. For changed functionality, include task-specific verification commands and expected outcomes in summary.
+9. Trading-path features must show Hardhat-local validation evidence before Base Sepolia evidence.
 
 ## 6) Evidence and traceability
 1. For non-trivial changes, include file-level evidence in summary.

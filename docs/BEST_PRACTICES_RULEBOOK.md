@@ -24,7 +24,7 @@ This rulebook is derived from project references in:
 
 ## C) Testing and acceptance
 1. Maintain deterministic seed fixtures and repeatable runbooks.
-2. Gate claims with executable evidence (parity scripts, seed verify, build).
+2. Gate claims with executable evidence (parity scripts, seed verify, build, then `pm2 restart all` when PM2 is available); run build and restart sequentially, never in parallel.
 3. Add test vectors for state transitions, policy logic, and failure paths.
 4. Include negative/failure-path checks for changed behavior.
 5. Reject placebo tests that do not assert real behavior.

@@ -1,6 +1,6 @@
 import type { SVGProps } from 'react';
 
-type SidebarIconName = 'dashboard' | 'explore' | 'approvals' | 'settings' | 'status';
+type SidebarIconName = 'dashboard' | 'explore' | 'approvals' | 'settings' | 'status' | 'howto';
 
 type SidebarIconProps = {
   name: SidebarIconName;
@@ -57,6 +57,16 @@ export function SidebarIcon({ name, className }: SidebarIconProps) {
       <svg {...common}>
         <circle cx="12" cy="12" r="2.8" />
         <path d="M19.4 12a7.4 7.4 0 0 0-.1-1.2l2-1.6-2-3.5-2.5 1a7.8 7.8 0 0 0-2-1.2l-.4-2.7h-4l-.4 2.7a7.8 7.8 0 0 0-2 1.2l-2.5-1-2 3.5 2 1.6a7.4 7.4 0 0 0-.1 2.4l-2 1.6 2 3.5 2.5-1c.6.5 1.3.9 2 1.2l.4 2.7h4l.4-2.7c.7-.3 1.4-.7 2-1.2l2.5 1 2-3.5-2-1.6c.1-.4.1-.8.1-1.2Z" />
+      </svg>
+    );
+  }
+
+  if (name === 'howto') {
+    return (
+      <svg {...common}>
+        <circle cx="12" cy="12" r="8.8" />
+        <path d="M12 10.2v5.2" />
+        <circle cx="12" cy="7.3" r="0.35" fill="currentColor" stroke="none" />
       </svg>
     );
   }

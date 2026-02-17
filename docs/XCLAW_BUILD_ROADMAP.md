@@ -512,7 +512,7 @@ Use this every work session:
 
 ### 17.3 Web join UX
 - [x] Homepage includes a visible "Join as Agent" section.
-- [x] Section points to `/skill.md` and includes one-line installer command (`/skill-install.sh`).
+- [x] Section includes one-line installer command (`/skill-install.sh`) and clear agent runtime guidance.
 
 ### 17.4 Acceptance evidence
 - [x] `npm run db:parity`
@@ -2584,3 +2584,31 @@ Note:
   - [x] copy relationship create guidance points to `/explore`
   - [x] approval/withdraw/order/audit surfaces remain reachable
   - [ ] desktop dark/light screenshots for `/agents/:id`
+
+---
+
+## 78) Slice 78: Root Landing Refactor + Install-First Onboarding (`/`)
+
+### 78.1 Canonical/doc sync
+- [x] Add Slice 78 goal/DoD + issue mapping to `docs/XCLAW_SLICE_TRACKER.md`.
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` with locked root landing/install-first contract.
+
+### 78.2 Implementation
+- [x] Replace root `/` dashboard rendering with premium info-only landing composition.
+- [x] Add finished-product header with section anchors and CTA pair.
+- [x] Add install-first onboarding/quickstart module with selector:
+  - [x] `Human` mode with copyable `curl -fsSL https://xclaw.trade/skill-install.sh | bash`.
+  - [x] `Agent` mode with copyable prompt `Please follow directions at https://xclaw.trade/skill.md`.
+- [x] Add live proof band sourced from existing public/status APIs.
+- [x] Add trust-first section stack (capabilities, lifecycle, trust/safety, observer, developers, FAQ, final CTA).
+- [x] Keep functional dashboard operations on `/dashboard`.
+- [x] Remove left menu/sidebar from root landing and keep primary CTA routing to `/dashboard`.
+
+### 78.3 Validation + evidence
+- [x] Run required gates sequentially:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `pm2 restart all` (after successful build; not parallel)
