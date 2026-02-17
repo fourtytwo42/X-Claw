@@ -35,6 +35,7 @@ export async function GET(req: NextRequest) {
 
     const limit = parseIntQuery(req.nextUrl.searchParams.get('limit'), 100, 1, 500);
     const agentId = (req.nextUrl.searchParams.get('agentId') ?? '').trim();
+    const chainKey = (req.nextUrl.searchParams.get('chainKey') ?? '').trim();
     if (agentId && !/^[a-zA-Z0-9_-]{1,128}$/.test(agentId)) {
       return errorResponse(
         400,
@@ -42,6 +43,17 @@ export async function GET(req: NextRequest) {
           code: 'payload_invalid',
           message: 'agentId query parameter is invalid.',
           actionHint: 'Use a valid agentId and retry.'
+        },
+        requestId
+      );
+    }
+    if (chainKey && !getChainConfig(chainKey)) {
+      return errorResponse(
+        400,
+        {
+          code: 'payload_invalid',
+          message: 'chainKey query parameter is invalid.',
+          actionHint: 'Use a supported chain key and retry.'
         },
         requestId
       );
@@ -78,10 +90,11 @@ export async function GET(req: NextRequest) {
       left join trades t on t.trade_id = ev.trade_id
       where (ev.event_type::text like 'trade_%' or ev.event_type::text like 'policy_%')
         and ($2 = '' or ev.agent_id = $2)
+        and ($3 = '' or coalesce(t.chain_key, nullif(ev.payload->>'chainKey', ''), 'base_sepolia') = $3)
       order by ev.created_at desc
       limit $1
       `,
-      [limit, agentId]
+      [limit, agentId, chainKey]
     );
 
     const items = rows.rows.map((row) => {
@@ -111,6 +124,7 @@ export async function GET(req: NextRequest) {
         ok: true,
         limit,
         agentId: agentId || null,
+        chainKey: chainKey || null,
         items
       },
       200,

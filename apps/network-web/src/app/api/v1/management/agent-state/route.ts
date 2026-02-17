@@ -208,11 +208,12 @@ export async function GET(req: NextRequest) {
         select trade_id, chain_key, pair, amount_in::text, token_in, token_out, reason, created_at::text
         from trades
         where agent_id = $1
+          and chain_key = $2
           and status = 'approval_pending'
         order by created_at asc
         limit 50
         `,
-        [agentId]
+        [agentId, chainKey]
       ),
       dbQuery<{
         request_id: string;
@@ -225,11 +226,12 @@ export async function GET(req: NextRequest) {
         select request_id, chain_key, request_type, token_address, created_at::text
         from agent_policy_approval_requests
         where agent_id = $1
+          and chain_key = $2
           and status = 'approval_pending'
         order by created_at asc
         limit 50
         `,
-        [agentId]
+        [agentId, chainKey]
       ),
       dbQuery<{
         request_id: string;
@@ -253,10 +255,11 @@ export async function GET(req: NextRequest) {
           decided_at::text
         from agent_policy_approval_requests
         where agent_id = $1
+          and chain_key = $2
         order by created_at desc
         limit 50
         `,
-        [agentId]
+        [agentId, chainKey]
       ),
       dbQuery<{
         mode: 'mock' | 'real';
@@ -282,10 +285,11 @@ export async function GET(req: NextRequest) {
           created_at::text
         from agent_policy_snapshots
         where agent_id = $1
+          and chain_key = $2
         order by created_at desc
         limit 1
         `,
-        [agentId]
+        [agentId, chainKey]
       ),
       dbQuery<{
         audit_id: string;

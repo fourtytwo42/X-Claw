@@ -1,5 +1,6 @@
 import type { NextRequest } from 'next/server';
 
+import { getChainConfig } from '@/lib/chains';
 import { dbQuery } from '@/lib/db';
 import { errorResponse, internalErrorResponse, successResponse } from '@/lib/errors';
 import { enforcePublicReadRateLimit } from '@/lib/rate-limit';
@@ -20,6 +21,19 @@ export async function GET(
     }
 
     const { agentId } = await context.params;
+    const chainKey = req.nextUrl.searchParams.get('chainKey')?.trim() || 'all';
+    if (chainKey !== 'all' && !getChainConfig(chainKey)) {
+      return errorResponse(
+        400,
+        {
+          code: 'payload_invalid',
+          message: 'Invalid chainKey query parameter value.',
+          actionHint: 'Provide chainKey=all or a supported chain key.',
+          details: { chainKey }
+        },
+        requestId
+      );
+    }
 
     const agent = await dbQuery<{
       agent_id: string;
@@ -150,7 +164,7 @@ export async function GET(
         from performance_snapshots
         where agent_id = $1
           and "window" = '7d'::performance_window
-          and chain_key = 'all'
+          and chain_key = $2
           and mode = 'real'
       )
       select
@@ -176,7 +190,7 @@ export async function GET(
       where rn = 1
       order by mode asc
       `,
-      [agentId]
+      [agentId, chainKey]
     ).catch(() => ({ rowCount: 0, rows: [] }));
 
     const mapMetric = (row: (typeof metrics.rows)[number] | null) =>

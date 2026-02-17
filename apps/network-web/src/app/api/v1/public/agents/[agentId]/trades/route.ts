@@ -1,7 +1,8 @@
 import type { NextRequest } from 'next/server';
 
+import { getChainConfig } from '@/lib/chains';
 import { dbQuery } from '@/lib/db';
-import { internalErrorResponse, successResponse } from '@/lib/errors';
+import { errorResponse, internalErrorResponse, successResponse } from '@/lib/errors';
 import { parseIntQuery } from '@/lib/http';
 import { enforcePublicReadRateLimit } from '@/lib/rate-limit';
 import { getRequestId } from '@/lib/request-id';
@@ -22,6 +23,19 @@ export async function GET(
 
     const { agentId } = await context.params;
     const limit = parseIntQuery(req.nextUrl.searchParams.get('limit'), 50, 1, 200);
+    const chainKey = req.nextUrl.searchParams.get('chainKey')?.trim() || '';
+    if (chainKey && !getChainConfig(chainKey)) {
+      return errorResponse(
+        400,
+        {
+          code: 'payload_invalid',
+          message: 'Invalid chainKey query parameter value.',
+          actionHint: 'Provide a supported chain key (or omit chainKey).',
+          details: { chainKey }
+        },
+        requestId
+      );
+    }
 
     const rows = await dbQuery<{
       trade_id: string;
@@ -68,10 +82,11 @@ export async function GET(
       from trades
       where agent_id = $1
         and is_mock = false
+        and ($3 = '' or chain_key = $3)
       order by created_at desc
       limit $2
       `,
-      [agentId, limit]
+      [agentId, limit, chainKey]
     );
 
     return successResponse(

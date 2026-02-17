@@ -655,9 +655,11 @@ export default function AgentPublicProfilePage() {
 
   const loadPublicData = useCallback(async () => {
     const [profileRes, tradesRes, activityRes] = await Promise.all([
-      fetch(`/api/v1/public/agents/${agentId}`, { cache: 'no-store' }),
-      fetch(`/api/v1/public/agents/${agentId}/trades?limit=30`, { cache: 'no-store' }),
-      fetch(`/api/v1/public/activity?limit=30&agentId=${encodeURIComponent(agentId)}`, { cache: 'no-store' })
+      fetch(`/api/v1/public/agents/${agentId}?chainKey=${encodeURIComponent(activeChainKey)}`, { cache: 'no-store' }),
+      fetch(`/api/v1/public/agents/${agentId}/trades?limit=30&chainKey=${encodeURIComponent(activeChainKey)}`, { cache: 'no-store' }),
+      fetch(`/api/v1/public/activity?limit=30&agentId=${encodeURIComponent(agentId)}&chainKey=${encodeURIComponent(activeChainKey)}`, {
+        cache: 'no-store'
+      })
     ]);
 
     if (!profileRes.ok || !tradesRes.ok || !activityRes.ok) {
@@ -671,7 +673,7 @@ export default function AgentPublicProfilePage() {
     setProfile(profilePayload);
     setTrades(tradesPayload.items);
     setActivity(activityPayload.items.slice(0, 20));
-  }, [agentId]);
+  }, [activeChainKey, agentId]);
 
   const loadManagementData = useCallback(async () => {
     async function fetchManagementState() {
@@ -814,7 +816,7 @@ export default function AgentPublicProfilePage() {
       managementGet(`/api/v1/management/deposit?agentId=${encodeURIComponent(agentId)}&chainKey=${encodeURIComponent(activeChainKey)}`),
       managementGet(`/api/v1/management/x402/payments?agentId=${encodeURIComponent(agentId)}&chainKey=${encodeURIComponent(activeChainKey)}`),
       managementGet(`/api/v1/management/x402/receive-link?agentId=${encodeURIComponent(agentId)}&chainKey=${encodeURIComponent(activeChainKey)}`),
-      managementGet(`/api/v1/management/limit-orders?agentId=${encodeURIComponent(agentId)}&limit=50`),
+      managementGet(`/api/v1/management/limit-orders?agentId=${encodeURIComponent(agentId)}&chainKey=${encodeURIComponent(activeChainKey)}&limit=50`),
       managementGet(`/api/v1/management/tracked-agents?agentId=${encodeURIComponent(agentId)}&chainKey=${encodeURIComponent(activeChainKey)}`)
     ]);
 
