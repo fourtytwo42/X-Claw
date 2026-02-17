@@ -63,16 +63,22 @@
   padding: 0.8rem 0.45rem;
 }
 
-.logo {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
+.sidebarLogo {
+  width: 58px;
+  height: 44px;
+  border-radius: 10px;
+  margin: 0 auto 0.8rem;
   display: grid;
   place-items: center;
-  margin: 0 auto 0.8rem;
-  font-weight: 800;
-  border: 1px solid color-mix(in srgb, var(--agent-accent) 40%, var(--agent-border));
-  background: color-mix(in srgb, var(--agent-accent) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--agent-accent) 45%, var(--agent-border));
+  background: color-mix(in srgb, var(--agent-accent) 10%, var(--agent-surface));
+  padding: 0.2rem;
+}
+
+.sidebarLogoImage {
+  width: 100%;
+  height: auto;
+  object-fit: contain;
 }
 
 .nav {

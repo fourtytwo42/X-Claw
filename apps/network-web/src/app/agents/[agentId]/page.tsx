@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
@@ -546,7 +547,9 @@ export default function AgentPublicProfilePage() {
   return (
     <div className={styles.root}>
       <aside className={styles.sidebar}>
-        <div className={styles.logo}>X</div>
+        <Link href="/dashboard" className={styles.sidebarLogo} aria-label="X-Claw dashboard">
+          <Image src="/X-Claw-Logo.png" alt="X-Claw" width={900} height={280} className={styles.sidebarLogoImage} priority />
+        </Link>
         <nav className={styles.nav}>
           <Link href="/dashboard" className={styles.navItem} aria-label="Dashboard" title="Dashboard">
             <SidebarIcon name="dashboard" />
