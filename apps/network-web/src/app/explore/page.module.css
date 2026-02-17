@@ -175,6 +175,12 @@
   margin: 0.7rem 0 0;
 }
 
+.helperText {
+  margin: 0.6rem 0 0;
+  color: var(--explore-muted);
+  font-size: 0.92rem;
+}
+
 .headerRow {
   margin-top: 0.7rem;
   display: flex;

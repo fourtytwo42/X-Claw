@@ -731,8 +731,8 @@ export default function ExplorePage() {
 
         <div className={styles.metaRow}>
           <span className={styles.chip}>{badgeLabel(item)}</span>
-          <span className={styles.chip}>Copy-enabled: {formatNumber(item.followerMeta.copyEnabledFollowers)}</span>
-          <span className={styles.chip}>Follower pct: {item.followerMeta.followerRankPercentile ?? '0'}</span>
+          <span className={styles.chip}>Active Copiers: {formatNumber(item.followerMeta.copyEnabledFollowers)}</span>
+          <span className={styles.chip}>Follower Rank: {item.followerMeta.followerRankPercentile ?? '0'}</span>
           {item.exploreProfile.riskTier ? <span className={styles.chip}>Risk: {item.exploreProfile.riskTier}</span> : null}
           {item.exploreProfile.strategyTags.map((tag) => (
             <span key={`${item.agentId}-st-${tag}`} className={styles.chip}>#{tag}</span>
@@ -743,29 +743,29 @@ export default function ExplorePage() {
         </div>
 
         {item.exploreProfile.descriptionShort ? <p className={styles.copyState}>{item.exploreProfile.descriptionShort}</p> : null}
-        {copyRel?.enabled ? <p className={styles.copyState}>Copied by: {managedAgentLabel(copyRel.followerAgentId)}</p> : null}
+        {copyRel?.enabled ? <p className={styles.copyState}>You are copying this with: {managedAgentLabel(copyRel.followerAgentId)}</p> : null}
 
         <div className={styles.actionRow}>
           <Link href={`/agents/${encodeURIComponent(item.agentId)}`} className={styles.viewBtn}>
-            View
+            Open Profile
           </Link>
           <button
             type="button"
             className={styles.copyBtn}
             onClick={() => openCopyModal(item)}
             disabled={!owner}
-            title={!owner ? 'Add an owned agent via key link to enable copy trading.' : 'Copy this agent'}
+            title={!owner ? 'Claim or connect an agent first to copy trades.' : 'Copy this agent'}
           >
             Copy Trade
           </button>
           {canEditProfile ? (
             <button type="button" className={styles.copyBtn} onClick={() => openProfileModal(item)}>
-              Edit Explore Profile
+              Edit Card Info
             </button>
           ) : null}
         </div>
 
-        {!owner ? <p className={styles.gated}>Add an owned agent via key link to enable copy trading.</p> : null}
+        {!owner ? <p className={styles.gated}>Claim or connect an agent first to start copy trading.</p> : null}
       </article>
     );
   }
@@ -781,7 +781,7 @@ export default function ExplorePage() {
             className={styles.search}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search wallet, strategy, venue, or agent..."
+            placeholder="Search by agent name, strategy, or venue"
             aria-label="Explore search"
           />
           <div className={styles.topbarControls}>
@@ -789,6 +789,9 @@ export default function ExplorePage() {
             <ThemeToggle className={styles.topbarThemeToggle} />
           </div>
         </header>
+        <p className={styles.helperText}>
+          Pick an agent, review performance, and start copy trading with clear limits before any money moves.
+        </p>
 
         {notice ? <p className={styles.successBanner}>{notice}</p> : null}
         {error ? <p className={styles.warningBanner}>{error}</p> : null}
@@ -824,7 +827,7 @@ export default function ExplorePage() {
                 setPage(1);
               }}
             >
-              Favorites
+              Saved
             </button>
           </div>
 
@@ -832,9 +835,9 @@ export default function ExplorePage() {
             <label>
               Sort
               <select value={sort} onChange={(event) => setSort(event.target.value as ExploreSort)}>
-                <option value="pnl">PnL</option>
-                <option value="volume">Volume</option>
-                <option value="winrate">Win Rate</option>
+                <option value="pnl">Profit (USD)</option>
+                <option value="volume">Volume (USD)</option>
+                <option value="winrate">Return %</option>
                 <option value="followers">Followers</option>
                 <option value="recent">Recently Active</option>
                 <option value="name">Name</option>
@@ -886,10 +889,10 @@ export default function ExplorePage() {
               }}
             >
               <option value="all">All</option>
-              <option value="low">low</option>
-              <option value="medium">medium</option>
-              <option value="high">high</option>
-              <option value="very_high">very_high</option>
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+              <option value="very_high">Very High</option>
             </select>
           </label>
 
@@ -898,7 +901,7 @@ export default function ExplorePage() {
           </button>
 
           <button type="button" onClick={() => setAdvancedOpen((value) => !value)}>
-            {advancedOpen ? 'Hide Advanced Filters' : 'Show Advanced Filters'}
+            {advancedOpen ? 'Hide More Filters' : 'Show More Filters'}
           </button>
 
           <div className={styles.filterSummary}>Showing {formatNumber(scopedTotal)} agents · Network: {chainLabel}</div>
@@ -935,9 +938,9 @@ export default function ExplorePage() {
         {advancedOpen ? (
           <section className={styles.sectionCard}>
             <div className={styles.sectionHeader}>
-              <h2>Advanced Filters</h2>
+              <h2>More Filters</h2>
               <button type="button" onClick={resetAdvancedFilters} className={styles.switchBtn}>
-                Reset Filters
+                Clear
               </button>
             </div>
             <div className={styles.controls}>
@@ -977,7 +980,7 @@ export default function ExplorePage() {
 
         <section className={styles.sectionCard}>
           <div className={styles.sectionHeader}>
-            <h2>{section === 'mine' ? 'My Agents' : section === 'favorites' ? 'Favorites' : 'All Agents'}</h2>
+            <h2>{section === 'mine' ? 'My Agents' : section === 'favorites' ? 'Saved Agents' : 'All Agents'}</h2>
             <span>{formatNumber(scopedTotal)}</span>
           </div>
 
@@ -1012,10 +1015,10 @@ export default function ExplorePage() {
         <div className={styles.modalOverlay} role="dialog" aria-modal="true" aria-label="Copy trade configuration">
           <div className={styles.modalCard}>
             <h3>Set Up Copy Trading</h3>
-            <p className={styles.muted}>Agent to copy from: {copyModal.leader.agentName}</p>
+            <p className={styles.muted}>You are copying: {copyModal.leader.agentName}</p>
 
             <label>
-              Your agent that will copy trades
+              Choose your agent (this one will place the copied trades)
               <select
                 value={copyModal.followerAgentId}
                 onChange={(event) => setCopyModal((current) => ({ ...current, followerAgentId: event.target.value }))}
@@ -1045,6 +1048,7 @@ export default function ExplorePage() {
               Max trade size (USD)
               <input value={copyModal.maxTradeUsd} onChange={(event) => setCopyModal((current) => ({ ...current, maxTradeUsd: event.target.value }))} />
             </label>
+            <p className={styles.muted}>Safety limit: copied trades above this amount will be skipped.</p>
 
             <label className={styles.checkbox}>
               <input
