@@ -116,6 +116,15 @@ function tokenLabel(value: string | null | undefined, byAddress: Map<string, str
   return byAddress.get(normalizeAddress(raw)) ?? shortenAddress(raw);
 }
 
+function humanizeKey(value: string): string {
+  return value
+    .replace(/[_-]+/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(' ');
+}
+
 function classifyRisk(input: { rowKind: ApprovalRowKind; policyBlocked?: boolean; reason?: string | null }): 'Low' | 'Med' | 'High' {
   if (input.rowKind === 'transfer' && input.policyBlocked) {
     return 'High';
@@ -142,7 +151,7 @@ function mapPolicyRequestType(requestType: string, token: string): { label: stri
   if (requestType === 'token_preapprove_remove') {
     return { label: 'Policy Approval', summary: `Remove preapproval for ${token}` };
   }
-  return { label: 'Policy Approval', summary: requestType.replace(/_/g, ' ') };
+  return { label: 'Policy Approval', summary: humanizeKey(requestType) };
 }
 
 function normalizeStatus(raw: string | null | undefined): ApprovalRowStatus | null {
@@ -166,6 +175,8 @@ export function buildApprovalsCenterRows(
   const out: ApprovalsCenterRow[] = [];
 
   for (const item of payload.approvalsQueue ?? []) {
+    const tokenIn = tokenLabel(item.token_in, byAddress);
+    const tokenOut = tokenLabel(item.token_out, byAddress);
     const decision = decisions[item.trade_id];
     out.push({
       id: `trade:${item.trade_id}`,
@@ -173,12 +184,12 @@ export function buildApprovalsCenterRows(
       chainKey: item.chain_key,
       createdAt: decision?.decidedAt ?? item.created_at,
       status: decision?.status ?? 'pending',
-      title: item.pair.replace('/', ' -> '),
+      title: `${tokenIn} -> ${tokenOut}`,
       subtitle: `Trade ${item.trade_id}`,
       requestTypeLabel: 'Trade Approval',
       reasonLine: item.reason?.trim() || 'Token not pre-approved',
       riskLabel: classifyRisk({ rowKind: 'trade', reason: item.reason }),
-      tokenSearch: `${item.pair} ${item.token_in} ${item.token_out}`.toLowerCase(),
+      tokenSearch: `${item.pair} ${item.token_in} ${item.token_out} ${tokenIn} ${tokenOut}`.toLowerCase(),
       tradeId: item.trade_id
     });
   }

@@ -7,7 +7,6 @@ import { ChainHeaderControl } from '@/components/chain-header-control';
 import { PrimaryNav } from '@/components/primary-nav';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { useDashboardChainKey } from '@/lib/active-chain';
-import { APPROVALS_CENTER_CAPABILITIES } from '@/lib/approvals-center-capabilities';
 import {
   buildApprovalsCenterRows,
   type ApprovalRowStatus,
@@ -32,7 +31,13 @@ type OwnerContext =
 
 type StatusTab = 'pending' | 'approved' | 'rejected' | 'all';
 type TypeFilter = 'all' | 'trade' | 'policy' | 'transfer';
-type SortFilter = 'newest' | 'oldest' | 'risk';
+type SortFilter = 'newest' | 'oldest';
+
+type PublicAgentPayload = {
+  agent?: {
+    agent_name?: string | null;
+  };
+};
 
 function getCsrfToken(): string | null {
   if (typeof document === 'undefined') {
@@ -106,19 +111,19 @@ function statusLabel(value: ApprovalRowStatus): string {
   return 'Rejected';
 }
 
-function riskRank(value: ApprovalsCenterRow['riskLabel']): number {
-  if (value === 'High') {
-    return 3;
-  }
-  if (value === 'Med') {
-    return 2;
-  }
-  return 1;
+function humanizeKeyLabel(value: string): string {
+  return value
+    .replace(/[_-]+/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(' ');
 }
 
 export default function ApprovalsCenterPage() {
   const [dashboardChainKey, , dashboardChainLabel] = useDashboardChainKey();
   const [ownerContext, setOwnerContext] = useState<OwnerContext>({ phase: 'loading' });
+  const [managedAgentNames, setManagedAgentNames] = useState<Record<string, string>>({});
   const [state, setState] = useState<ApprovalsCenterManagementState | null>(null);
   const [loadingState, setLoadingState] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -225,6 +230,40 @@ export default function ApprovalsCenterPage() {
     };
   }, [ownerContext, effectiveChain]);
 
+  useEffect(() => {
+    if (ownerContext.phase !== 'ready') {
+      setManagedAgentNames({});
+      return;
+    }
+    const managedAgents = ownerContext.managedAgents;
+    let cancelled = false;
+    async function loadNames() {
+      const names: Record<string, string> = {};
+      await Promise.all(
+        managedAgents.map(async (agentId) => {
+          try {
+            const response = await fetch(`/api/v1/public/agents/${encodeURIComponent(agentId)}`, { cache: 'no-store' });
+            if (!response.ok) {
+              names[agentId] = 'Unnamed Agent';
+              return;
+            }
+            const payload = (await response.json()) as PublicAgentPayload;
+            names[agentId] = payload.agent?.agent_name?.trim() || 'Unnamed Agent';
+          } catch {
+            names[agentId] = 'Unnamed Agent';
+          }
+        })
+      );
+      if (!cancelled) {
+        setManagedAgentNames(names);
+      }
+    }
+    void loadNames();
+    return () => {
+      cancelled = true;
+    };
+  }, [ownerContext]);
+
   const rows = useMemo(() => buildApprovalsCenterRows(state ?? {}, decisionMap), [state, decisionMap]);
 
   const filteredRows = useMemo(() => {
@@ -246,9 +285,6 @@ export default function ApprovalsCenterPage() {
     if (sort === 'oldest') {
       return [...out].sort((left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime());
     }
-    if (sort === 'risk') {
-      return [...out].sort((left, right) => riskRank(right.riskLabel) - riskRank(left.riskLabel));
-    }
     return out;
   }, [activeTab, rows, sort, typeFilter, query]);
 
@@ -256,8 +292,7 @@ export default function ApprovalsCenterPage() {
     const pending = rows.filter((row) => row.status === 'pending').length;
     const approved = rows.filter((row) => row.status === 'approved').length;
     const rejected = rows.filter((row) => row.status === 'rejected').length;
-    const highRisk = rows.filter((row) => row.riskLabel === 'High').length;
-    return { pending, approved, rejected, highRisk };
+    return { pending, approved, rejected };
   }, [rows]);
 
   async function handleDecision(row: ApprovalsCenterRow, decision: 'approve' | 'reject') {
@@ -361,21 +396,17 @@ export default function ApprovalsCenterPage() {
                 <p className={styles.summaryLabel}>Rejected (session)</p>
                 <p className={styles.summaryValue}>{formatNumber(summary.rejected)}</p>
               </article>
-              <article className={styles.summaryCard}>
-                <p className={styles.summaryLabel}>High risk items</p>
-                <p className={styles.summaryValue}>{formatNumber(summary.highRisk)}</p>
-              </article>
             </section>
 
             <p className={styles.postureLine}>
-              Security posture: per-request approvals active on current session agent. Cross-agent and allowance posture aggregation is placeholder-only in v1.
+              Security posture: per-request approvals are active for the selected agent.
             </p>
 
             <div className={styles.contentGrid}>
               <section className={styles.card}>
                 <div className={styles.cardHeaderRow}>
                   <h2>Pending Approval Requests</h2>
-                  <span className={styles.agentBadge}>Agent: {ownerContext.activeAgentId}</span>
+                  <span className={styles.agentBadge}>Agent: {managedAgentNames[ownerContext.activeAgentId] || 'Unnamed Agent'}</span>
                 </div>
 
                 <div className={styles.segmentTabs}>
@@ -388,7 +419,15 @@ export default function ApprovalsCenterPage() {
                     <button
                       key={key}
                       type="button"
-                      className={activeTab === key ? styles.segmentTabActive : styles.segmentTab}
+                      className={`${styles.segmentTab}${activeTab === key ? ` ${styles.segmentTabActive}` : ''}${
+                        key === 'pending'
+                          ? ` ${styles.segmentTabPending}`
+                          : key === 'approved'
+                            ? ` ${styles.segmentTabApproved}`
+                            : key === 'rejected'
+                              ? ` ${styles.segmentTabRejected}`
+                              : ` ${styles.segmentTabAll}`
+                      }`}
                       onClick={() => setActiveTab(key)}
                     >
                       {label}
@@ -397,28 +436,15 @@ export default function ApprovalsCenterPage() {
                 </div>
 
                 <div className={styles.filterRow}>
-                  <select
-                    aria-label="Agent filter"
-                    disabled={!APPROVALS_CENTER_CAPABILITIES.crossAgentAggregation}
-                    value={ownerContext.activeAgentId}
-                    onChange={() => {
-                    }}
-                  >
-                    <option value={ownerContext.activeAgentId}>Active session agent</option>
-                  </select>
                   <select aria-label="Type filter" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as TypeFilter)}>
                     <option value="all">All types</option>
                     <option value="trade">Trade approval</option>
                     <option value="policy">Policy approval</option>
                     <option value="transfer">Withdraw approval</option>
                   </select>
-                  <select aria-label="Risk filter" disabled>
-                    <option>Any risk (placeholder)</option>
-                  </select>
                   <select aria-label="Sort" value={sort} onChange={(event) => setSort(event.target.value as SortFilter)}>
                     <option value="newest">Newest</option>
                     <option value="oldest">Oldest</option>
-                    <option value="risk">Highest risk</option>
                   </select>
                   <input
                     value={query}
@@ -427,12 +453,6 @@ export default function ApprovalsCenterPage() {
                     aria-label="Search requests"
                   />
                 </div>
-
-                {activeTab !== 'pending' ? (
-                  <p className={styles.placeholderNote}>
-                    Approved/Rejected tabs show local session and available history rows only. Global cross-agent history needs a dedicated aggregation API.
-                  </p>
-                ) : null}
 
                 {loadingState ? <p className={styles.loadingCopy}>Loading approvals...</p> : null}
                 {!loadingState && filteredRows.length === 0 ? <p className={styles.emptyCopy}>No pending approvals. Your agents are operating within limits.</p> : null}
@@ -449,13 +469,22 @@ export default function ApprovalsCenterPage() {
                             <p className={styles.requestMeta}>{row.subtitle}</p>
                           </div>
                           <div className={styles.rightMeta}>
-                            <span className={styles.statusChip}>{statusLabel(row.status)}</span>
-                            <span className={styles.riskChip}>{row.riskLabel} risk</span>
+                            <span
+                              className={`${styles.statusChip} ${
+                                row.status === 'pending'
+                                  ? styles.statusChipPending
+                                  : row.status === 'approved'
+                                    ? styles.statusChipApproved
+                                    : styles.statusChipRejected
+                              }`}
+                            >
+                              {statusLabel(row.status)}
+                            </span>
                           </div>
                         </div>
                         <p className={styles.reasonLine}>{row.reasonLine}</p>
                         <div className={styles.metadataRow}>
-                          <span>Chain: {row.chainKey}</span>
+                          <span>Chain: {humanizeKeyLabel(row.chainKey)}</span>
                           <span>Requested: {formatUtc(row.createdAt)} UTC</span>
                         </div>
                         <div className={styles.requestActions}>

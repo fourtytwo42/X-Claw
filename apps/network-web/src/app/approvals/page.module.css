@@ -197,7 +197,7 @@
 .summaryStrip {
   margin-top: 0.8rem;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.55rem;
 }
 
@@ -281,10 +281,25 @@
   background: color-mix(in srgb, var(--approvals-accent) 16%, transparent);
 }
 
+.segmentTabPending.segmentTabActive {
+  border-color: color-mix(in srgb, #f59e0b 55%, var(--approvals-border));
+  background: color-mix(in srgb, #f59e0b 20%, transparent);
+}
+
+.segmentTabApproved.segmentTabActive {
+  border-color: color-mix(in srgb, var(--approvals-success) 55%, var(--approvals-border));
+  background: color-mix(in srgb, var(--approvals-success) 20%, transparent);
+}
+
+.segmentTabRejected.segmentTabActive {
+  border-color: color-mix(in srgb, var(--approvals-danger) 55%, var(--approvals-border));
+  background: color-mix(in srgb, var(--approvals-danger) 20%, transparent);
+}
+
 .filterRow {
   margin-top: 0.62rem;
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.44rem;
 }
 
@@ -360,6 +375,21 @@
   border-radius: 999px;
   padding: 0.18rem 0.5rem;
   font-size: 0.72rem;
+}
+
+.statusChipPending {
+  border-color: color-mix(in srgb, #f59e0b 55%, var(--approvals-border));
+  background: color-mix(in srgb, #f59e0b 18%, transparent);
+}
+
+.statusChipApproved {
+  border-color: color-mix(in srgb, var(--approvals-success) 55%, var(--approvals-border));
+  background: color-mix(in srgb, var(--approvals-success) 18%, transparent);
+}
+
+.statusChipRejected {
+  border-color: color-mix(in srgb, var(--approvals-danger) 55%, var(--approvals-border));
+  background: color-mix(in srgb, var(--approvals-danger) 18%, transparent);
 }
 
 .reasonLine {
