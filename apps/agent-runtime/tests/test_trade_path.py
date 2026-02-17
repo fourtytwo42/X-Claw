@@ -1319,12 +1319,16 @@ class TradePathRuntimeTests(unittest.TestCase):
                     "expiresAt": "2026-02-14T22:10:00.000Z",
                 },
             ),
+        ), mock.patch.object(
+            cli, "_maybe_send_owner_link_to_active_chat", return_value={"sent": True, "channel": "telegram", "messageId": "m1"}
         ):
             payload = self._run_and_parse_stdout(lambda: cli.cmd_management_link(args))
         self.assertEqual(payload.get("ok"), True)
         self.assertEqual(payload.get("managementUrl"), "https://xclaw.trade/agents/ag_1?token=ol1.test.token")
         self.assertEqual(payload.get("ownerHandoffRequired"), True)
         self.assertNotIn("sensitiveFields", payload)
+        self.assertEqual(payload.get("deliveredToActiveChat"), True)
+        self.assertEqual((payload.get("delivery") or {}).get("channel"), "telegram")
 
     def test_dashboard_success(self) -> None:
         args = argparse.Namespace(chain="hardhat_local", json=True)

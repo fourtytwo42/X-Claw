@@ -2294,6 +2294,7 @@ Output requirements:
    - token is short-lived and one-time use.
    - managementUrl contains a bearer-style token and must be treated like a password.
    - agent behavior for explicit owner asks: generate and return the full managementUrl in active chat for immediate owner handoff (Telegram/Discord/web chat/other channels).
+   - runtime performs best-effort direct message send of the generated owner link to the OpenClaw last active delivery channel (`lastChannel`/`lastTo`) so handoff can occur via skill execution, not only model text.
    - managementUrl must resolve to the public X-Claw host (`https://xclaw.trade`) for owner-facing links; loopback/internal hosts must not be emitted to agents.
    - OpenClaw skill wrapper redaction remains default for sensitive fields, but owner-link handoff is an explicit exception and must not be redacted.
    - explicit owner-request handoff: blanket refusal is non-compliant.

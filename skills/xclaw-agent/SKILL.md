@@ -211,6 +211,7 @@ Owner-link handoff rule (locked):
 - Default command:
   - `python3 {baseDir}/scripts/xclaw_agent_skill.py owner-link`
   - returns `managementUrl` directly for owner handoff.
+  - runtime also attempts to send the generated link directly to the currently active chat channel (best-effort).
 - If the owner explicitly asks for the management URL/link in chat:
   - run `owner-link` and paste `managementUrl` directly in the active chat.
   - include a concise warning that it is short-lived and should not be forwarded.

@@ -2565,6 +2565,43 @@ def _maybe_delete_telegram_approval_prompt(trade_id: str) -> None:
         _remove_approval_prompt(trade_id)
 
 
+def _maybe_send_owner_link_to_active_chat(management_url: str, expires_at: str | None) -> dict[str, Any]:
+    """
+    Best-effort direct owner-link handoff into the currently active chat channel.
+    This path is intentionally non-blocking: failures should not prevent returning the link payload.
+    """
+    delivery = _read_openclaw_last_delivery()
+    if not delivery:
+        return {"sent": False, "reason": "no_active_delivery"}
+    channel = str(delivery.get("lastChannel") or "").strip().lower()
+    target = str(delivery.get("lastTo") or "").strip()
+    if not channel or not target:
+        return {"sent": False, "reason": "missing_channel_or_target"}
+    openclaw = shutil.which("openclaw")
+    if not openclaw:
+        return {"sent": False, "reason": "openclaw_missing"}
+
+    message = f"Owner management link:\n{management_url}"
+    if isinstance(expires_at, str) and expires_at.strip():
+        message += f"\nExpires: {expires_at.strip()}"
+    message += "\nShort-lived one-time link. Do not forward."
+
+    cmd = [openclaw, "message", "send", "--channel", channel, "--target", target, "--message", message, "--json"]
+    thread_raw = delivery.get("lastThreadId")
+    if channel == "telegram":
+        if isinstance(thread_raw, int):
+            cmd.extend(["--thread-id", str(thread_raw)])
+        elif isinstance(thread_raw, str) and thread_raw.strip():
+            cmd.extend(["--thread-id", thread_raw.strip()])
+    proc = _run_subprocess(cmd, timeout_sec=20, kind="openclaw_send")
+    if proc.returncode != 0:
+        stderr = (proc.stderr or "").strip()
+        stdout = (proc.stdout or "").strip()
+        return {"sent": False, "reason": "send_failed", "error": stderr or stdout or "openclaw message send failed"}
+    message_id = _extract_openclaw_message_id(proc.stdout or "")
+    return {"sent": True, "channel": channel, "messageId": message_id}
+
+
 def cmd_approvals_sync(args: argparse.Namespace) -> int:
     chk = require_json_flag(args)
     if chk is not None:
@@ -4678,6 +4715,7 @@ def cmd_management_link(args: argparse.Namespace) -> int:
                 exit_code=1,
             )
         management_url = _normalize_management_url(body.get("managementUrl"))
+        delivery = _maybe_send_owner_link_to_active_chat(management_url, body.get("expiresAt"))
         return ok(
             "Owner management link generated for immediate owner handoff.",
             agentId=body.get("agentId", agent_id),
@@ -4686,6 +4724,8 @@ def cmd_management_link(args: argparse.Namespace) -> int:
             expiresAt=body.get("expiresAt"),
             ownerHandoffRequired=True,
             securityNote="Short-lived one-time link; send only to the requesting owner.",
+            deliveredToActiveChat=bool(delivery.get("sent")),
+            delivery=delivery,
         )
     except WalletStoreError as exc:
         return fail("management_link_failed", str(exc), "Verify API env/auth and retry.", exit_code=1)
