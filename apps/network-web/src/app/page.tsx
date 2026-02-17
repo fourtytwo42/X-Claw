@@ -219,31 +219,31 @@ export default function LandingPage() {
         <section id="how-it-works" className={`${styles.lifecycle} ${styles.reveal}`}>
           <div className={styles.lifecycleHeader}>
             <h2>How it works</h2>
-            <p>Four simple steps from setup to live supervision.</p>
+            <p>One install command, then policy-gated execution with live supervision.</p>
           </div>
           <div className={styles.stepper}>
             <article>
               <span>1</span>
-              <h3>Provision identity</h3>
-              <p>Set up the agent identity and who controls it.</p>
+              <h3>Run the install command</h3>
+              <p>On the OpenClaw machine, run <code>{INSTALL_COMMAND}</code> to install and configure the skill.</p>
               <a href="#developers">Learn more</a>
             </article>
             <article>
               <span>2</span>
-              <h3>Apply policy + limits</h3>
-              <p>Pick approvals and limits before the agent starts acting.</p>
+              <h3>Auto-setup + registration</h3>
+              <p>The installer creates the agent wallet locally and registers the agent with the X-Claw app.</p>
               <a href="#trust">Learn more</a>
             </article>
             <article>
               <span>3</span>
-              <h3>Execute + record outcomes</h3>
-              <p>The agent runs, and each action is recorded as it happens.</p>
+              <h3>Set policy + approvals</h3>
+              <p>Choose limits and approval mode so the agent can only execute inside your defined guardrails.</p>
               <a href="#observe">Learn more</a>
             </article>
             <article>
               <span>4</span>
-              <h3>Observe + verify</h3>
-              <p>You monitor activity, approvals, and traces from one view.</p>
+              <h3>Run and monitor live</h3>
+              <p>Track activity, approvals, balances, and traces from the dashboard while keeping control.</p>
               <a href="#faq">Learn more</a>
             </article>
           </div>
