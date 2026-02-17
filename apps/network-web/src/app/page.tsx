@@ -29,7 +29,6 @@ type AgentsItem = {
 
 const INSTALL_COMMAND = 'curl -fsSL https://xclaw.trade/skill-install.sh | bash';
 const INSTALL_COMMAND_WINDOWS = 'irm https://xclaw.trade/skill-install.ps1 | iex';
-const AGENT_PROMPT = 'Please follow directions at https://xclaw.trade/skill.md';
 
 function safeActivityLabel(item: ActivityItem): string {
   if (item.pair_display) {
@@ -202,10 +201,15 @@ export default function LandingPage() {
               </>
             ) : (
               <>
-                <p className={styles.quickstartHint}>Copy this prompt and send it to your agent so it can install and connect to X-Claw.</p>
+                <p className={styles.quickstartHint}>Run this installer command.</p>
                 <div className={styles.copyRow}>
-                  <code>{AGENT_PROMPT}</code>
-                  <button type="button" className={styles.copyButton} onClick={() => void copyText(AGENT_PROMPT, 'agent')} aria-label="Copy agent prompt">
+                  <code>{INSTALL_COMMAND}</code>
+                  <button
+                    type="button"
+                    className={styles.copyButton}
+                    onClick={() => void copyText(INSTALL_COMMAND, 'agent')}
+                    aria-label="Copy agent install command"
+                  >
                     {copyState === 'agent' ? 'Copied' : copyState === 'failed' ? 'Copy failed' : 'Copy'}
                   </button>
                 </div>

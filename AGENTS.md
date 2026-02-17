@@ -67,6 +67,7 @@ Run and verify:
 7. Build and PM2 restart must be sequential (never parallel): restart only after build exits successfully.
 8. For changed functionality, include task-specific verification commands and expected outcomes in summary.
 9. Trading-path features must show Hardhat-local validation evidence before Base Sepolia evidence.
+10. After all required validations pass and `npm run build` succeeds, run `pm2 restart all`, then commit and push all changes to GitHub in the same session.
 
 ## 6) Evidence and traceability
 1. For non-trivial changes, include file-level evidence in summary.
