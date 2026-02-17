@@ -29,6 +29,7 @@
     "assetSymbol": { "type": "string", "enum": ["ETH", "USDC", "WETH"] },
     "assetAddress": { "type": ["string", "null"] },
     "amountAtomic": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?$" },
+    "resourceDescription": { "type": ["string", "null"], "maxLength": 280 },
     "linkToken": { "type": ["string", "null"] },
     "ttlSeconds": { "type": ["integer", "null"], "minimum": 60 },
     "paymentUrl": { "type": "string", "format": "uri" },

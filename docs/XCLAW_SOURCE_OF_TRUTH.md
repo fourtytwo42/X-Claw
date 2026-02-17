@@ -1230,7 +1230,7 @@ Delegated runtime CLI commands that must exist:
 - `xclaw-agent wallet send --to <address> --amount-wei <amount_wei> --chain <chain_key> --json`
 - `xclaw-agent wallet balance --chain <chain_key> --json`
 - `xclaw-agent wallet token-balance --token <token_address> --chain <chain_key> --json`
-- `xclaw-agent x402 receive-request --network <network> --facilitator <facilitator> --amount-atomic <amount_atomic> [--asset-kind <native|erc20>] [--asset-symbol <symbol>] [--asset-address <0x...>] --json`
+- `xclaw-agent x402 receive-request --network <network> --facilitator <facilitator> --amount-atomic <amount_atomic> [--asset-kind <native|erc20>] [--asset-symbol <symbol>] [--asset-address <0x...>] [--resource-description <text>] --json`
 - `xclaw-agent x402 pay --url <url> --network <network> --facilitator <facilitator> --amount-atomic <amount_atomic> --json`
 - `xclaw-agent x402 pay-resume --approval-id <approval_id> --json`
 - `xclaw-agent x402 pay-decide --approval-id <approval_id> --decision <approve|deny> --json`
@@ -3086,7 +3086,7 @@ Limitations / notes:
 - Agent wallet keys remain local; no key export to server/web or skill output.
 
 3. Runtime command surface (required):
-- `xclaw-agent x402 receive-request --network <key> --facilitator <key> --amount-atomic <value> [--asset-kind <native|erc20>] [--asset-symbol <symbol>] [--asset-address <0x...>] --json`
+- `xclaw-agent x402 receive-request --network <key> --facilitator <key> --amount-atomic <value> [--asset-kind <native|erc20>] [--asset-symbol <symbol>] [--asset-address <0x...>] [--resource-description <text>] --json`
 - `xclaw-agent x402 pay --url <https://...> --network <key> --facilitator <key> --amount-atomic <value> --json`
 - `xclaw-agent x402 pay-resume --approval-id <xfr_id> --json`
 - `xclaw-agent x402 pay-decide --approval-id <xfr_id> --decision <approve|deny> --json`
@@ -3126,7 +3126,7 @@ Limitations / notes:
   - `x402-policy-get`, `x402-policy-set`
   - `x402-networks`
 - `request-x402-payment` must return hosted receive metadata:
-  - `paymentId`, `paymentUrl`, `network`, `facilitator`, `assetKind`, `assetSymbol`, `amountAtomic`, `status`, `timeLimitNotice`.
+  - `paymentId`, `paymentUrl`, `network`, `facilitator`, `assetKind`, `assetSymbol`, `amountAtomic`, optional `resourceDescription`, `status`, `timeLimitNotice`.
 - Hosted receive links are durable until owner deletion; no runtime TTL timer is required.
 
 9. Installer portability requirements:
@@ -3147,6 +3147,7 @@ Limitations / notes:
   - `GET|POST /api/v1/x402/pay/{agentId}/{linkToken}` (legacy compatibility path)
 - Hosted receive endpoint behavior:
   - returns `402 payment_required` when payment header is missing,
+  - `402` payload includes payer-readable x402 resource metadata when configured (`details.resource.description`),
   - returns `200 payment_settled` when payment header challenge is satisfied,
   - hosted receive links do not expire.
 - Management route provides receive URL metadata:
@@ -3157,6 +3158,7 @@ Limitations / notes:
   - creates a unique, non-expiring receive request URL (`/api/v1/x402/pay/{agentId}/{linkToken}`) per request.
   - request amount is owner-configurable per request (`amountAtomic`).
   - request asset is owner-configurable per request (`assetSymbol` / `assetKind` / `assetAddress`).
+  - optional payer-visible x402 `resource.description` is configurable per request (`resourceDescription`; labeled "Memo" in `/agents/[agentId]` UI).
   - currently supported request assets:
     - `ETH` (native),
     - `USDC` and `WETH` (erc20 canonical token addresses for selected chain).

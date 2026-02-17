@@ -53,6 +53,7 @@ export async function GET(req: NextRequest) {
         tx_hash: string | null;
         reason_code: string | null;
         reason_message: string | null;
+        resource_description: string | null;
         created_at: string;
         updated_at: string;
         terminal_at: string | null;
@@ -74,6 +75,7 @@ export async function GET(req: NextRequest) {
           tx_hash,
           reason_code,
           reason_message,
+          resource_description,
           created_at::text,
           updated_at::text,
           terminal_at::text
@@ -102,6 +104,7 @@ export async function GET(req: NextRequest) {
         tx_hash: string | null;
         reason_code: string | null;
         reason_message: string | null;
+        resource_description: string | null;
         created_at: string;
         updated_at: string;
         terminal_at: string | null;
@@ -123,6 +126,7 @@ export async function GET(req: NextRequest) {
           tx_hash,
           reason_code,
           reason_message,
+          resource_description,
           created_at::text,
           updated_at::text,
           terminal_at::text

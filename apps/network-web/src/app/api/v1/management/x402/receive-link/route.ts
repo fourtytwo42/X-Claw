@@ -55,6 +55,17 @@ function parseAmountAtomic(value: unknown): string | null {
   return raw;
 }
 
+function parseResourceDescription(value: unknown): string | null {
+  const raw = String(value ?? '').trim();
+  if (!raw) {
+    return null;
+  }
+  if (raw.length > 280) {
+    return null;
+  }
+  return raw;
+}
+
 type ResolvedAsset = {
   assetKind: 'native' | 'erc20';
   assetAddress: string | null;
@@ -165,6 +176,7 @@ export async function GET(req: NextRequest) {
       terminal_at: string | null;
       created_at: string;
       updated_at: string;
+      resource_description: string | null;
     }>(
       `
       select
@@ -180,7 +192,8 @@ export async function GET(req: NextRequest) {
         status::text,
         terminal_at::text,
         created_at::text,
-        updated_at::text
+        updated_at::text,
+        resource_description
       from agent_x402_payment_mirror
       where agent_id = $1
         and direction = 'inbound'
@@ -197,12 +210,14 @@ export async function GET(req: NextRequest) {
     let paymentId: string;
     let paymentUrl: string;
     let status: string;
+    let resourceDescription: string | null = null;
     const staticPath = `/api/v1/x402/pay/${encodeURIComponent(agentId)}`;
     paymentUrl = `${origin}${staticPath}`;
 
     if ((active.rowCount ?? 0) > 0 && active.rows[0].payment_url) {
       paymentId = active.rows[0].payment_id;
       status = active.rows[0].status;
+      resourceDescription = active.rows[0].resource_description;
       await dbQuery(
         `
         update agent_x402_payment_mirror
@@ -286,6 +301,7 @@ export async function GET(req: NextRequest) {
         assetSymbol: resolvedAsset.assetSymbol,
         amountAtomic,
         paymentUrl,
+        resourceDescription,
         ttlSeconds: null,
         expiresAt: null,
         timeLimitNotice: 'This payment link does not expire.',
@@ -307,6 +323,7 @@ type CreateReceiveRequestBody = {
   assetAddress?: string | null;
   assetSymbol?: string;
   amountAtomic?: string;
+  resourceDescription?: string | null;
 };
 
 type DeleteReceiveRequestBody = {
@@ -362,6 +379,18 @@ export async function POST(req: NextRequest) {
         requestId
       );
     }
+    const resourceDescription = parseResourceDescription(body.resourceDescription);
+    if (String(body.resourceDescription ?? '').trim() && !resourceDescription) {
+      return errorResponse(
+        400,
+        {
+          code: 'payload_invalid',
+          message: 'resourceDescription must be 280 characters or less.',
+          actionHint: 'Use a shorter payment description.'
+        },
+        requestId
+      );
+    }
 
     const paymentId = makeId('xpm');
     const linkToken = crypto.randomBytes(10).toString('hex');
@@ -379,6 +408,7 @@ export async function POST(req: NextRequest) {
         asset_address,
         asset_symbol,
         amount_atomic,
+        resource_description,
         payment_url,
         link_token,
         expires_at,
@@ -386,7 +416,7 @@ export async function POST(req: NextRequest) {
         updated_at,
         terminal_at
       ) values (
-        $1, $2, 'inbound', 'proposed', $3, $4, $5, $6, $7, $8::numeric, $9, $10, null, now(), now(), null
+        $1, $2, 'inbound', 'proposed', $3, $4, $5, $6, $7, $8::numeric, $9, $10, $11, null, now(), now(), null
       )
       `,
       [
@@ -398,6 +428,7 @@ export async function POST(req: NextRequest) {
         resolvedAsset.assetAddress,
         resolvedAsset.assetSymbol,
         amountAtomic,
+        resourceDescription,
         paymentUrl,
         linkToken
       ]
@@ -415,6 +446,7 @@ export async function POST(req: NextRequest) {
         assetAddress: resolvedAsset.assetAddress,
         assetSymbol: resolvedAsset.assetSymbol,
         amountAtomic,
+        resourceDescription,
         paymentUrl,
         linkToken,
         ttlSeconds: null,

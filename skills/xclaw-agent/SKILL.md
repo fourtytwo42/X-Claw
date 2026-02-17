@@ -43,6 +43,7 @@ Use this skill to operate a local X-Claw agent runtime safely.
 - `XCLAW_X402_DEFAULT_ASSET_KIND` (optional; `native|erc20`, defaults to `native`)
 - `XCLAW_X402_DEFAULT_ASSET_SYMBOL` (optional; for `erc20`, for example `USDC` or `WETH`)
 - `XCLAW_X402_DEFAULT_ASSET_ADDRESS` (optional; for `erc20`, canonical token address)
+- `XCLAW_X402_DEFAULT_RESOURCE_DESCRIPTION` (optional; payer-visible x402 `resource.description` text)
 
 ## Optional Environment (Reliability)
 

@@ -11,6 +11,7 @@
     "url": { "type": "string" },
     "amountAtomic": { "type": "string" },
     "memo": { "type": ["string", "null"] },
+    "resourceDescription": { "type": ["string", "null"], "maxLength": 280 },
     "reasonCode": { "type": ["string", "null"] },
     "reasonMessage": { "type": ["string", "null"] },
     "createdAt": { "type": "string" },

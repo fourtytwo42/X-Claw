@@ -24,6 +24,7 @@ async function handle(req: NextRequest, params: { agentId: string; linkToken: st
       amount_atomic: string;
       payment_url: string | null;
       expires_at: string | null;
+      resource_description: string | null;
       tx_hash: string | null;
     }>(
       `
@@ -37,6 +38,7 @@ async function handle(req: NextRequest, params: { agentId: string; linkToken: st
         amount_atomic::text,
         payment_url,
         expires_at::text,
+        resource_description,
         tx_hash
       from agent_x402_payment_mirror
       where agent_id = $1
@@ -72,7 +74,10 @@ async function handle(req: NextRequest, params: { agentId: string; linkToken: st
             amountAtomic: payment.amount_atomic,
             requiredHeader: 'X-Payment',
             paymentUrl: payment.payment_url,
-            expiresAt: payment.expires_at
+            expiresAt: payment.expires_at,
+            resource: {
+              description: payment.resource_description
+            }
           }
         },
         requestId

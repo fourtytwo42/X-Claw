@@ -135,7 +135,7 @@ def _require_env(*keys: str) -> Optional[int]:
     )
 
 
-def _build_hosted_x402_receive_args() -> list[str]:
+def _build_hosted_x402_receive_args(resource_description: Optional[str] = None) -> list[str]:
     network = os.environ.get("XCLAW_X402_DEFAULT_NETWORK", os.environ.get("XCLAW_DEFAULT_CHAIN", "base_sepolia")).strip()
     facilitator = os.environ.get("XCLAW_X402_DEFAULT_FACILITATOR", "cdp").strip()
     amount = os.environ.get("XCLAW_X402_DEFAULT_AMOUNT_ATOMIC", "0.01").strip()
@@ -161,6 +161,9 @@ def _build_hosted_x402_receive_args() -> list[str]:
     asset_address = os.environ.get("XCLAW_X402_DEFAULT_ASSET_ADDRESS", "").strip()
     if asset_address:
         args.extend(["--asset-address", asset_address])
+    resolved_description = (resource_description or "").strip() or os.environ.get("XCLAW_X402_DEFAULT_RESOURCE_DESCRIPTION", "").strip()
+    if resolved_description:
+        args.extend(["--resource-description", resolved_description])
     return args
 
 
@@ -484,7 +487,8 @@ def main(argv: List[str]) -> int:
         return _run_agent(["faucet-request", "--chain", chain, "--json"])
 
     if cmd == "request-x402-payment":
-        return _run_agent(_build_hosted_x402_receive_args())
+        memo = " ".join(argv[2:]).strip() if len(argv) > 2 else ""
+        return _run_agent(_build_hosted_x402_receive_args(memo or None))
 
     if cmd == "x402-pay":
         if len(argv) < 6:

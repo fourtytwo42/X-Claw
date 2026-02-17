@@ -6253,6 +6253,7 @@ def cmd_x402_receive_request(args: argparse.Namespace) -> int:
         "assetAddress": asset_address,
         "assetSymbol": asset_symbol or None,
         "amountAtomic": format(amount, "f"),
+        "resourceDescription": str(args.resource_description or "").strip() or None,
     }
     try:
         status_code, body = _api_request("POST", "/agent/x402/inbound/proposed", payload=payload, include_idempotency=True)
@@ -6274,6 +6275,7 @@ def cmd_x402_receive_request(args: argparse.Namespace) -> int:
             assetAddress=body.get("assetAddress"),
             assetSymbol=body.get("assetSymbol"),
             amountAtomic=body.get("amountAtomic", format(amount, "f")),
+            resourceDescription=body.get("resourceDescription"),
             status=body.get("status"),
             timeLimitNotice=body.get("timeLimitNotice"),
             requestSource="hosted",
@@ -6564,6 +6566,7 @@ def build_parser() -> argparse.ArgumentParser:
     x402_receive_request.add_argument("--asset-kind", default="native", choices=["native", "erc20"])
     x402_receive_request.add_argument("--asset-address")
     x402_receive_request.add_argument("--asset-symbol")
+    x402_receive_request.add_argument("--resource-description")
     x402_receive_request.add_argument("--json", action="store_true")
     x402_receive_request.set_defaults(func=cmd_x402_receive_request)
 

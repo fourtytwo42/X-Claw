@@ -90,6 +90,7 @@ type X402PaymentRow = {
   tx_hash: string | null;
   reason_code: string | null;
   reason_message: string | null;
+  resource_description: string | null;
   created_at: string;
   updated_at: string;
   terminal_at: string | null;
@@ -113,6 +114,7 @@ type X402ReceiveLinkPayload = {
   assetKind: 'native' | 'erc20';
   assetAddress: string | null;
   amountAtomic: string;
+  resourceDescription?: string | null;
   linkToken?: string | null;
   ttlSeconds: number | null;
   paymentUrl: string;
@@ -339,6 +341,7 @@ export default function AgentPublicProfilePage() {
   const [x402Payments, setX402Payments] = useState<X402PaymentsPayload | null>(null);
   const [x402ReceiveLink, setX402ReceiveLink] = useState<X402ReceiveLinkPayload | null>(null);
   const [x402RequestAmount, setX402RequestAmount] = useState('0.01');
+  const [x402RequestMemo, setX402RequestMemo] = useState('');
   const [x402RequestAssetSymbol, setX402RequestAssetSymbol] = useState<'ETH' | 'USDC' | 'WETH'>('ETH');
   const [limitOrders, setLimitOrders] = useState<LimitOrderItem[]>([]);
   const [copySubscriptions, setCopySubscriptions] = useState<CopySubscription[]>([]);
@@ -2069,6 +2072,12 @@ export default function AgentPublicProfilePage() {
                           placeholder="Amount (e.g. 0.01)"
                           inputMode="decimal"
                         />
+                        <input
+                          value={x402RequestMemo}
+                          onChange={(event) => setX402RequestMemo(event.target.value)}
+                          placeholder="Memo (optional)"
+                          maxLength={280}
+                        />
                         <button
                           type="button"
                           onClick={() =>
@@ -2084,11 +2093,13 @@ export default function AgentPublicProfilePage() {
                                   assetKind: selectedAsset?.assetKind ?? 'native',
                                   assetAddress: selectedAsset?.assetAddress ?? null,
                                   assetSymbol: selectedAsset?.symbol ?? 'ETH',
-                                  facilitatorKey: x402ReceiveLink.facilitatorKey
+                                  facilitatorKey: x402ReceiveLink.facilitatorKey,
+                                  resourceDescription: x402RequestMemo.trim() || null
                                 })) as X402ReceiveLinkPayload;
                                 if (created.paymentUrl) {
                                   await copyToClipboard(created.paymentUrl, 'x402 request URL copied.');
                                 }
+                                setX402RequestMemo('');
                               },
                               'x402 request URL created.'
                             )
@@ -2113,6 +2124,7 @@ export default function AgentPublicProfilePage() {
                           {request.status}
                         </div>
                         <div className={styles.muted}>{formatUtc(request.created_at)} UTC</div>
+                        {request.resource_description ? <div className={styles.muted}>Memo: {request.resource_description}</div> : null}
                       </div>
                       <div className={styles.inlineActions}>
                         <button

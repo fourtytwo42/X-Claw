@@ -21,6 +21,7 @@ type AgentX402InboundProposedRequest = {
   assetAddress?: string | null;
   assetSymbol?: string | null;
   amountAtomic: string;
+  resourceDescription?: string | null;
 };
 
 type ResolvedAsset = {
@@ -32,6 +33,17 @@ type ResolvedAsset = {
 function parseAmountAtomic(value: unknown): string | null {
   const raw = String(value ?? '').trim();
   if (!raw || !/^[0-9]+(\.[0-9]+)?$/.test(raw)) {
+    return null;
+  }
+  return raw;
+}
+
+function parseResourceDescription(value: unknown): string | null {
+  const raw = String(value ?? '').trim();
+  if (!raw) {
+    return null;
+  }
+  if (raw.length > 280) {
     return null;
   }
   return raw;
@@ -132,6 +144,18 @@ export async function POST(req: NextRequest) {
         requestId
       );
     }
+    const resourceDescription = parseResourceDescription(body.resourceDescription);
+    if (String(body.resourceDescription ?? '').trim() && !resourceDescription) {
+      return errorResponse(
+        400,
+        {
+          code: 'payload_invalid',
+          message: 'resourceDescription must be 280 characters or less.',
+          actionHint: 'Use a shorter payment description.'
+        },
+        requestId
+      );
+    }
 
     const resolvedAsset = resolveSupportedAsset(body.networkKey, body.assetKind, body.assetAddress, body.assetSymbol);
     if (!resolvedAsset) {
@@ -162,6 +186,7 @@ export async function POST(req: NextRequest) {
         asset_address,
         asset_symbol,
         amount_atomic,
+        resource_description,
         payment_url,
         link_token,
         expires_at,
@@ -169,7 +194,7 @@ export async function POST(req: NextRequest) {
         updated_at,
         terminal_at
       ) values (
-        $1, $2, 'inbound', 'proposed', $3, $4, $5, $6, $7, $8::numeric, $9, $10, null, now(), now(), null
+        $1, $2, 'inbound', 'proposed', $3, $4, $5, $6, $7, $8::numeric, $9, $10, $11, null, now(), now(), null
       )
       `,
       [
@@ -181,6 +206,7 @@ export async function POST(req: NextRequest) {
         resolvedAsset.assetAddress,
         resolvedAsset.assetSymbol,
         amountAtomic,
+        resourceDescription,
         paymentUrl,
         linkToken
       ]
@@ -197,6 +223,7 @@ export async function POST(req: NextRequest) {
         assetAddress: resolvedAsset.assetAddress,
         assetSymbol: resolvedAsset.assetSymbol,
         amountAtomic,
+        resourceDescription,
         paymentUrl,
         linkToken,
         ttlSeconds: null,

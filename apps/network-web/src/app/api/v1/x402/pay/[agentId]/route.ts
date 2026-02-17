@@ -24,6 +24,7 @@ async function handle(req: NextRequest, params: { agentId: string }) {
       asset_address: string | null;
       amount_atomic: string;
       payment_url: string | null;
+      resource_description: string | null;
       tx_hash: string | null;
     }>(
       `
@@ -36,6 +37,7 @@ async function handle(req: NextRequest, params: { agentId: string }) {
         asset_address,
         amount_atomic::text,
         payment_url,
+        resource_description,
         tx_hash
       from agent_x402_payment_mirror
       where agent_id = $1
@@ -72,7 +74,10 @@ async function handle(req: NextRequest, params: { agentId: string }) {
             amountAtomic: payment.amount_atomic,
             requiredHeader: 'X-Payment',
             paymentUrl: payment.payment_url,
-            expiresAt: null
+            expiresAt: null,
+            resource: {
+              description: payment.resource_description
+            }
           }
         },
         requestId
@@ -94,6 +99,7 @@ async function handle(req: NextRequest, params: { agentId: string }) {
         asset_kind,
         asset_address,
         amount_atomic,
+        resource_description,
         payment_url,
         link_token,
         expires_at,
@@ -104,7 +110,7 @@ async function handle(req: NextRequest, params: { agentId: string }) {
         updated_at,
         terminal_at
       ) values (
-        $1, $2, 'inbound', 'filled', $3, $4, $5, $6, $7::numeric, $8, null, null, $9, null, null, now(), now(), now()
+        $1, $2, 'inbound', 'filled', $3, $4, $5, $6, $7::numeric, $8, $9, null, null, $10, null, null, now(), now(), now()
       )
       `,
       [
@@ -115,6 +121,7 @@ async function handle(req: NextRequest, params: { agentId: string }) {
         payment.asset_kind,
         payment.asset_address,
         payment.amount_atomic,
+        payment.resource_description,
         payment.payment_url,
         txHash
       ]
