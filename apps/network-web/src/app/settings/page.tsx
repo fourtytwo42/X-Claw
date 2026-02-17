@@ -487,33 +487,7 @@ export default function SettingsPage() {
             <section className={styles.card}>
               <h2>Approval Defaults</h2>
               <p className={styles.muted}>These are default safety choices for this device.</p>
-
-              <div className={styles.radioGroup}>
-                <label>
-                  <input
-                    type="radio"
-                    checked={preferences.approvalPosture === 'per_trade'}
-                    onChange={() => setPreferences((current) => ({ ...current, approvalPosture: 'per_trade' }))}
-                  />
-                  Ask every trade (recommended)
-                </label>
-                <label>
-                  <input
-                    type="radio"
-                    checked={preferences.approvalPosture === 'allowlist'}
-                    onChange={() => setPreferences((current) => ({ ...current, approvalPosture: 'allowlist' }))}
-                  />
-                  Allowlisted tokens first
-                </label>
-                <label>
-                  <input
-                    type="radio"
-                    checked={preferences.approvalPosture === 'global_allowed'}
-                    onChange={() => setPreferences((current) => ({ ...current, approvalPosture: 'global_allowed' }))}
-                  />
-                  Allow broad approvals (advanced)
-                </label>
-              </div>
+              <p className={styles.helper}>Ask every trade is active (recommended).</p>
 
               <div className={styles.toggleList}>
                 <label>
@@ -533,14 +507,6 @@ export default function SettingsPage() {
                     onChange={(event) => setPreferences((current) => ({ ...current, requireLargeWithdrawConfirmation: event.target.checked }))}
                   />
                   Require confirmation for large withdrawals
-                </label>
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={preferences.showSpenderDiffBeforeSigning}
-                    onChange={(event) => setPreferences((current) => ({ ...current, showSpenderDiffBeforeSigning: event.target.checked }))}
-                  />
-                  Always show spender and allowance changes before signing
                 </label>
               </div>
             </section>
@@ -564,24 +530,6 @@ export default function SettingsPage() {
                   <option value="15m">15m</option>
                   <option value="1h">1h</option>
                 </select>
-              </div>
-              <div className={styles.toggleList}>
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={preferences.requireReconfirm}
-                    onChange={(event) => setPreferences((current) => ({ ...current, requireReconfirm: event.target.checked }))}
-                  />
-                  Require re-confirmation before approving
-                </label>
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={preferences.extraConfirmForDanger}
-                    onChange={(event) => setPreferences((current) => ({ ...current, extraConfirmForDanger: event.target.checked }))}
-                  />
-                  Add an extra confirmation step for high-risk actions
-                </label>
               </div>
             </section>
 
