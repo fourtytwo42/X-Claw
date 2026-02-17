@@ -773,16 +773,6 @@ function DashboardPage() {
                   </div>
                 </section>
 
-                <section className={styles.card}>
-                  <div className={styles.cardTitle}>How it works</div>
-                  <p className="muted">Learn how trading, approvals, and safety settings work together.</p>
-                  <div className={styles.docsLinks}>
-                    <Link href="/status">Security Guide</Link>
-                    <a href="/skill.md" target="_blank" rel="noreferrer">
-                      Agent docs
-                    </a>
-                  </div>
-                </section>
               </>
             ) : null}
           </div>
