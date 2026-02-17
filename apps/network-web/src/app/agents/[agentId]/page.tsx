@@ -2378,27 +2378,6 @@ export default function AgentPublicProfilePage() {
                   <div className={styles.muted}>Facilitator: {humanizeKeyLabel(x402ReceiveLink.facilitatorKey)}</div>
                   <div className={styles.muted}>Asset Type: {humanizeKeyLabel(x402ReceiveLink.assetKind)}</div>
                   <div className={styles.muted}>Chain scope: {activeChainLabel}</div>
-                  <div className={styles.inlineActions}>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        void runManagementAction(
-                          async () => {
-                            const refreshed = (await managementGet(
-                              `/api/v1/management/x402/receive-link?agentId=${encodeURIComponent(agentId)}&chainKey=${encodeURIComponent(activeChainKey)}`
-                            )) as X402ReceiveLinkPayload;
-                            setX402ReceiveLink(refreshed);
-                          },
-                          'Payment link settings refreshed.'
-                        )
-                      }
-                    >
-                      Refresh
-                    </button>
-                  </div>
-                  <div className={styles.muted} style={{ marginTop: '0.45rem' }}>
-                    Receive request links are created by the agent runtime only.
-                  </div>
                   <div className={styles.muted} style={{ marginTop: '0.55rem' }}>
                     Active request links
                   </div>
