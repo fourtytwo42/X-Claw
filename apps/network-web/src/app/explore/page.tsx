@@ -101,12 +101,6 @@ type ProfileModalState = {
 };
 
 const FAVORITES_KEY = 'xclaw_explore_favorite_agent_ids';
-const STRATEGY_OPTIONS = ['momentum', 'mean_reversion', 'trend_following', 'arb', 'market_making'];
-const VENUE_OPTIONS = ['base', 'aerodrome', 'uniswap', 'sushiswap', 'kite_ai'];
-const LABEL_OVERRIDES: Record<string, string> = {
-  arb: 'Arbitrage',
-  kite_ai: 'Kite AI'
-};
 
 function getCsrfToken(): string | null {
   if (typeof document === 'undefined') {
@@ -158,19 +152,6 @@ function splitCsv(value: string): string[] {
     out.add(normalized);
   }
   return [...out];
-}
-
-function humanizeKeyLabel(value: string): string {
-  const normalized = value.trim().toLowerCase();
-  const override = LABEL_OVERRIDES[normalized];
-  if (override) {
-    return override;
-  }
-  return normalized
-    .split('_')
-    .filter((part) => part.length > 0)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ');
 }
 
 async function postJson(path: string, payload: Record<string, unknown>) {
@@ -260,11 +241,6 @@ export default function ExplorePage() {
   const [section, setSection] = useState<SectionKey>((initialParams.get('section') as SectionKey) || 'all');
   const [page, setPage] = useState(Number(initialParams.get('page') || '1'));
 
-  const [strategy, setStrategy] = useState<string[]>(splitCsv(initialParams.get('strategy') ?? ''));
-  const [venue, setVenue] = useState<string[]>(splitCsv(initialParams.get('venue') ?? ''));
-  const [riskTier, setRiskTier] = useState<'all' | ExploreRiskTier>((initialParams.get('riskTier') as 'all' | ExploreRiskTier) || 'all');
-  const [verifiedOnly, setVerifiedOnly] = useState(initialParams.get('verifiedOnly') === '1');
-
   const [advancedOpen, setAdvancedOpen] = useState(initialParams.get('advanced') === '1');
   const [minFollowers, setMinFollowers] = useState(initialParams.get('minFollowers') ?? '0');
   const [minVolumeUsd, setMinVolumeUsd] = useState(initialParams.get('minVolumeUsd') ?? '');
@@ -329,18 +305,6 @@ export default function ExplorePage() {
     if (page > 1) {
       params.set('page', String(page));
     }
-    if (strategy.length > 0) {
-      params.set('strategy', strategy.join(','));
-    }
-    if (venue.length > 0) {
-      params.set('venue', venue.join(','));
-    }
-    if (riskTier !== 'all') {
-      params.set('riskTier', riskTier);
-    }
-    if (verifiedOnly) {
-      params.set('verifiedOnly', '1');
-    }
     if (advancedOpen) {
       params.set('advanced', '1');
     }
@@ -367,14 +331,10 @@ export default function ExplorePage() {
     minVolumeUsd,
     page,
     pathname,
-    riskTier,
     router,
     section,
     sort,
     status,
-    strategy,
-    venue,
-    verifiedOnly,
     windowRange
   ]);
 
@@ -483,21 +443,11 @@ export default function ExplorePage() {
         sort,
         window: windowRange,
         query: debouncedQuery,
-        minFollowers: String(Math.max(0, Number(minFollowers || '0'))),
-        verifiedOnly: verifiedOnly ? 'true' : 'false'
+        minFollowers: String(Math.max(0, Number(minFollowers || '0')))
       });
 
       if (status !== 'all') {
         params.set('status', status);
-      }
-      if (strategy.length > 0) {
-        params.set('strategy', strategy.join(','));
-      }
-      if (venue.length > 0) {
-        params.set('venue', venue.join(','));
-      }
-      if (riskTier !== 'all') {
-        params.set('riskTier', riskTier);
       }
       if (minVolumeUsd.trim()) {
         params.set('minVolumeUsd', minVolumeUsd.trim());
@@ -538,13 +488,9 @@ export default function ExplorePage() {
     minFollowers,
     minVolumeUsd,
     page,
-    riskTier,
     section,
     sort,
     status,
-    strategy,
-    venue,
-    verifiedOnly,
     windowRange
   ]);
 
@@ -688,17 +634,10 @@ export default function ExplorePage() {
     }
   }
 
-  function toggleTag(selection: string[], setSelection: (values: string[]) => void, value: string) {
-    const next = selection.includes(value) ? selection.filter((item) => item !== value) : [...selection, value];
-    setSelection(next);
-    setPage(1);
-  }
-
   function resetAdvancedFilters() {
     setMinFollowers('0');
     setMinVolumeUsd('');
     setActiveWithinHours('');
-    setVerifiedOnly(false);
     setPage(1);
   }
 
@@ -718,7 +657,6 @@ export default function ExplorePage() {
               <button type="button" className={styles.starBtn} onClick={() => toggleFavorite(item.agentId)} aria-label="Toggle favorite">
                 {favorites.includes(item.agentId) ? '★' : '☆'}
               </button>
-              {item.verified ? <span className={styles.chip}>Verified</span> : null}
             </div>
           </div>
           <div className={styles.statusWrap}>
@@ -749,13 +687,6 @@ export default function ExplorePage() {
           <span className={styles.chip}>{badgeLabel(item)}</span>
           <span className={styles.chip}>Active Copiers: {formatNumber(item.followerMeta.copyEnabledFollowers)}</span>
           <span className={styles.chip}>Follower Rank: {item.followerMeta.followerRankPercentile ?? '0'}</span>
-          {item.exploreProfile.riskTier ? <span className={styles.chip}>Risk: {humanizeKeyLabel(item.exploreProfile.riskTier)}</span> : null}
-          {item.exploreProfile.strategyTags.map((tag) => (
-            <span key={`${item.agentId}-st-${tag}`} className={styles.chip}>{humanizeKeyLabel(tag)}</span>
-          ))}
-          {item.exploreProfile.venueTags.map((tag) => (
-            <span key={`${item.agentId}-vn-${tag}`} className={styles.chip}>{humanizeKeyLabel(tag)}</span>
-          ))}
         </div>
 
         {item.exploreProfile.descriptionShort ? <p className={styles.copyState}>{item.exploreProfile.descriptionShort}</p> : null}
@@ -797,7 +728,7 @@ export default function ExplorePage() {
             className={styles.search}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search by agent name, strategy, or venue"
+            placeholder="Search by agent name"
             aria-label="Explore search"
           />
           <div className={styles.topbarControls}>
@@ -895,60 +826,11 @@ export default function ExplorePage() {
               ))}
             </select>
           </label>
-          <label>
-            Risk
-            <select
-              value={riskTier}
-              onChange={(event) => {
-                setRiskTier(event.target.value as 'all' | ExploreRiskTier);
-                setPage(1);
-              }}
-            >
-              <option value="all">All</option>
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-              <option value="very_high">Very High</option>
-            </select>
-          </label>
-
-          <button type="button" onClick={() => setVerifiedOnly((value) => !value)} className={verifiedOnly ? styles.windowActive : styles.windowBtn}>
-            {verifiedOnly ? 'Verified Only: On' : 'Verified Only: Off'}
-          </button>
-
           <button type="button" onClick={() => setAdvancedOpen((value) => !value)}>
             {advancedOpen ? 'Hide More Filters' : 'Show More Filters'}
           </button>
 
           <div className={styles.filterSummary}>Showing {formatNumber(scopedTotal)} agents · Network: {chainLabel}</div>
-        </section>
-
-        <section className={styles.filterBar}>
-          <span className={styles.subMeta}>Strategy</span>
-          {STRATEGY_OPTIONS.map((value) => (
-            <button
-              key={`strategy-${value}`}
-              type="button"
-              onClick={() => toggleTag(strategy, setStrategy, value)}
-              className={strategy.includes(value) ? styles.windowActive : styles.windowBtn}
-            >
-              {humanizeKeyLabel(value)}
-            </button>
-          ))}
-        </section>
-
-        <section className={styles.filterBar}>
-          <span className={styles.subMeta}>Venue</span>
-          {VENUE_OPTIONS.map((value) => (
-            <button
-              key={`venue-${value}`}
-              type="button"
-              onClick={() => toggleTag(venue, setVenue, value)}
-              className={venue.includes(value) ? styles.windowActive : styles.windowBtn}
-            >
-              {humanizeKeyLabel(value)}
-            </button>
-          ))}
         </section>
 
         {advancedOpen ? (
