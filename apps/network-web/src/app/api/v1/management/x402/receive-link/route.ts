@@ -1,12 +1,10 @@
-import crypto from 'node:crypto';
-
 import type { NextRequest } from 'next/server';
 
 import { getChainConfig } from '@/lib/chains';
 import { dbQuery } from '@/lib/db';
 import { errorResponse, internalErrorResponse, successResponse } from '@/lib/errors';
-import { parseJsonBody } from '@/lib/http';
 import { makeId } from '@/lib/ids';
+import { parseJsonBody } from '@/lib/http';
 import { requireManagementSession, requireManagementWriteAuth } from '@/lib/management-auth';
 import { getRequestId } from '@/lib/request-id';
 
@@ -49,28 +47,6 @@ function buildOrigin(req: NextRequest): string {
     return 'https://xclaw.trade';
   }
   return fallback;
-}
-
-function parseAmountAtomic(value: unknown): string | null {
-  const raw = String(value ?? '').trim();
-  if (!raw) {
-    return null;
-  }
-  if (!/^[0-9]+(\.[0-9]+)?$/.test(raw)) {
-    return null;
-  }
-  return raw;
-}
-
-function parseResourceDescription(value: unknown): string | null {
-  const raw = String(value ?? '').trim();
-  if (!raw) {
-    return null;
-  }
-  if (raw.length > 280) {
-    return null;
-  }
-  return raw;
 }
 
 type ResolvedAsset = {
@@ -323,17 +299,6 @@ export async function GET(req: NextRequest) {
   }
 }
 
-type CreateReceiveRequestBody = {
-  agentId?: string;
-  chainKey?: string;
-  facilitatorKey?: string;
-  assetKind?: 'native' | 'erc20';
-  assetAddress?: string | null;
-  assetSymbol?: string;
-  amountAtomic?: string;
-  resourceDescription?: string | null;
-};
-
 type DeleteReceiveRequestBody = {
   agentId?: string;
   paymentId?: string;
@@ -342,128 +307,13 @@ type DeleteReceiveRequestBody = {
 export async function POST(req: NextRequest) {
   const requestId = getRequestId(req);
   try {
-    await ensureX402ResourceDescriptionColumn();
-    const parsed = await parseJsonBody(req, requestId);
-    if (!parsed.ok) {
-      return parsed.response;
-    }
-    const body = (parsed.body ?? {}) as CreateReceiveRequestBody;
-    const agentId = String(body.agentId ?? '').trim();
-    if (!agentId) {
-      return errorResponse(
-        400,
-        { code: 'payload_invalid', message: 'agentId is required.', actionHint: 'Provide agentId in request body.' },
-        requestId
-      );
-    }
-
-    const auth = await requireManagementWriteAuth(req, requestId, agentId);
-    if (!auth.ok) {
-      return auth.response;
-    }
-
-    const chainKey = String(body.chainKey ?? 'base_sepolia').trim() || 'base_sepolia';
-    const facilitatorKey = String(body.facilitatorKey ?? 'cdp').trim() || 'cdp';
-    const resolvedAsset = resolveSupportedAsset(chainKey, body.assetKind, body.assetAddress, body.assetSymbol);
-    if (!resolvedAsset) {
-      return errorResponse(
-        400,
-        {
-          code: 'payload_invalid',
-          message: 'Unsupported x402 asset for selected chain.',
-          actionHint: 'Use ETH, USDC, or WETH on supported chain configuration.'
-        },
-        requestId
-      );
-    }
-    const amountAtomic = parseAmountAtomic(body.amountAtomic ?? '0.01');
-    if (!amountAtomic) {
-      return errorResponse(
-        400,
-        {
-          code: 'payload_invalid',
-          message: 'amountAtomic must be a positive numeric string.',
-          actionHint: 'Use values like 0.01 or 1.'
-        },
-        requestId
-      );
-    }
-    const resourceDescription = parseResourceDescription(body.resourceDescription);
-    if (String(body.resourceDescription ?? '').trim() && !resourceDescription) {
-      return errorResponse(
-        400,
-        {
-          code: 'payload_invalid',
-          message: 'resourceDescription must be 280 characters or less.',
-          actionHint: 'Use a shorter payment description.'
-        },
-        requestId
-      );
-    }
-
-    const paymentId = makeId('xpm');
-    const linkToken = crypto.randomBytes(10).toString('hex');
-    const paymentUrl = `${buildOrigin(req)}/api/v1/x402/pay/${encodeURIComponent(agentId)}/${encodeURIComponent(linkToken)}`;
-    await dbQuery(
-      `
-      insert into agent_x402_payment_mirror (
-        payment_id,
-        agent_id,
-        direction,
-        status,
-        network_key,
-        facilitator_key,
-        asset_kind,
-        asset_address,
-        asset_symbol,
-        amount_atomic,
-        resource_description,
-        payment_url,
-        link_token,
-        expires_at,
-        created_at,
-        updated_at,
-        terminal_at
-      ) values (
-        $1, $2, 'inbound', 'proposed', $3, $4, $5, $6, $7, $8::numeric, $9, $10, $11, null, now(), now(), null
-      )
-      `,
-      [
-        paymentId,
-        agentId,
-        chainKey,
-        facilitatorKey,
-        resolvedAsset.assetKind,
-        resolvedAsset.assetAddress,
-        resolvedAsset.assetSymbol,
-        amountAtomic,
-        resourceDescription,
-        paymentUrl,
-        linkToken
-      ]
-    );
-
-    return successResponse(
+    return errorResponse(
+      403,
       {
-        ok: true,
-        agentId,
-        chainKey,
-        paymentId,
-        networkKey: chainKey,
-        facilitatorKey,
-        assetKind: resolvedAsset.assetKind,
-        assetAddress: resolvedAsset.assetAddress,
-        assetSymbol: resolvedAsset.assetSymbol,
-        amountAtomic,
-        resourceDescription,
-        paymentUrl,
-        linkToken,
-        ttlSeconds: null,
-        expiresAt: null,
-        timeLimitNotice: 'This payment link does not expire.',
-        status: 'proposed'
+        code: 'payload_invalid',
+        message: 'x402 receive requests can only be created by the agent runtime.',
+        actionHint: 'Use agent x402 commands to create receive requests.'
       },
-      200,
       requestId
     );
   } catch {

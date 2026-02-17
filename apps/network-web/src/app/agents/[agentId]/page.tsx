@@ -136,12 +136,6 @@ type X402ReceiveLinkPayload = {
   status: string;
 };
 
-type X402RequestAssetOption = {
-  symbol: 'ETH' | 'USDC' | 'WETH';
-  assetKind: 'native' | 'erc20';
-  assetAddress: string | null;
-};
-
 type ToastType = 'success' | 'error' | 'info';
 type ToastItem = {
   id: number;
@@ -487,9 +481,6 @@ export default function AgentPublicProfilePage() {
   const [depositData, setDepositData] = useState<DepositPayload | null>(null);
   const [x402Payments, setX402Payments] = useState<X402PaymentsPayload | null>(null);
   const [x402ReceiveLink, setX402ReceiveLink] = useState<X402ReceiveLinkPayload | null>(null);
-  const [x402RequestAmount, setX402RequestAmount] = useState('0.01');
-  const [x402RequestMemo, setX402RequestMemo] = useState('');
-  const [x402RequestAssetSymbol, setX402RequestAssetSymbol] = useState<'ETH' | 'USDC' | 'WETH'>('ETH');
   const [limitOrders, setLimitOrders] = useState<LimitOrderItem[]>([]);
   const [trackedAgents, setTrackedAgents] = useState<TrackedAgent[]>([]);
   const [vaultAddressCopied, setVaultAddressCopied] = useState(false);
@@ -1365,23 +1356,6 @@ export default function AgentPublicProfilePage() {
         .sort((left, right) => Number(new Date(right.created_at)) - Number(new Date(left.created_at))),
     [x402Payments?.queue]
   );
-  const x402RequestAssetOptions = useMemo<X402RequestAssetOption[]>(() => {
-    const options: X402RequestAssetOption[] = [{ symbol: 'ETH', assetKind: 'native', assetAddress: null }];
-    const usdcAddress = chainTokenAddressBySymbol.USDC;
-    if (usdcAddress) {
-      options.push({ symbol: 'USDC', assetKind: 'erc20', assetAddress: usdcAddress });
-    }
-    const wethAddress = chainTokenAddressBySymbol.WETH;
-    if (wethAddress) {
-      options.push({ symbol: 'WETH', assetKind: 'erc20', assetAddress: wethAddress });
-    }
-    return options;
-  }, [chainTokenAddressBySymbol]);
-  useEffect(() => {
-    if (!x402RequestAssetOptions.some((option) => option.symbol === x402RequestAssetSymbol)) {
-      setX402RequestAssetSymbol('ETH');
-    }
-  }, [x402RequestAssetOptions, x402RequestAssetSymbol]);
 
   const filteredWalletTimeline = useMemo(() => {
     const tokenFiltered =
@@ -2422,64 +2396,9 @@ export default function AgentPublicProfilePage() {
                       Refresh
                     </button>
                   </div>
-                  {isOwner ? (
-                    <>
-                      <div className={styles.inlineActions} style={{ marginTop: '0.45rem' }}>
-                        <select
-                          value={x402RequestAssetSymbol}
-                          onChange={(event) => setX402RequestAssetSymbol(event.target.value as 'ETH' | 'USDC' | 'WETH')}
-                        >
-                          {x402RequestAssetOptions.map((option) => (
-                            <option key={option.symbol} value={option.symbol}>
-                              {option.symbol}
-                            </option>
-                          ))}
-                        </select>
-                        <input
-                          value={x402RequestAmount}
-                          onChange={(event) => setX402RequestAmount(event.target.value)}
-                          placeholder="Amount (e.g. 0.01)"
-                          inputMode="decimal"
-                        />
-                        <input
-                          value={x402RequestMemo}
-                          onChange={(event) => setX402RequestMemo(event.target.value)}
-                          placeholder="Memo (optional)"
-                          maxLength={280}
-                        />
-                        <button
-                          type="button"
-                          onClick={() =>
-                            void runManagementAction(
-                              async () => {
-                                const selectedAsset =
-                                  x402RequestAssetOptions.find((option) => option.symbol === x402RequestAssetSymbol) ??
-                                  x402RequestAssetOptions[0];
-                                const created = (await managementPost('/api/v1/management/x402/receive-link', {
-                                  agentId,
-                                  chainKey: activeChainKey,
-                                  amountAtomic: x402RequestAmount.trim() || '0.01',
-                                  assetKind: selectedAsset?.assetKind ?? 'native',
-                                  assetAddress: selectedAsset?.assetAddress ?? null,
-                                  assetSymbol: selectedAsset?.symbol ?? 'ETH',
-                                  facilitatorKey: x402ReceiveLink.facilitatorKey,
-                                  resourceDescription: x402RequestMemo.trim() || null
-                                })) as X402ReceiveLinkPayload;
-                                if (created.paymentUrl) {
-                                  await copyToClipboard(created.paymentUrl, 'Payment link copied.');
-                                }
-                                setX402RequestMemo('');
-                              },
-                              'Payment request link created.'
-                            )
-                          }
-                        >
-                          Create Link
-                        </button>
-                      </div>
-                      <div className={styles.muted}>Each request creates a unique payment link for this chain and token.</div>
-                    </>
-                  ) : null}
+                  <div className={styles.muted} style={{ marginTop: '0.45rem' }}>
+                    Receive request links are created by the agent runtime only.
+                  </div>
                   <div className={styles.muted} style={{ marginTop: '0.55rem' }}>
                     Active request links
                   </div>
