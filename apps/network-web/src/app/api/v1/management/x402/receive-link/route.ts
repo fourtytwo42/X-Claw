@@ -12,6 +12,13 @@ import { getRequestId } from '@/lib/request-id';
 
 export const runtime = 'nodejs';
 
+async function ensureX402ResourceDescriptionColumn(): Promise<void> {
+  await dbQuery(`
+    alter table if exists agent_x402_payment_mirror
+    add column if not exists resource_description text
+  `);
+}
+
 function isoNow(): string {
   return new Date().toISOString();
 }
@@ -117,6 +124,7 @@ function resolveSupportedAsset(
 export async function GET(req: NextRequest) {
   const requestId = getRequestId(req);
   try {
+    await ensureX402ResourceDescriptionColumn();
     const agentId = req.nextUrl.searchParams.get('agentId')?.trim();
     if (!agentId) {
       return errorResponse(
@@ -334,6 +342,7 @@ type DeleteReceiveRequestBody = {
 export async function POST(req: NextRequest) {
   const requestId = getRequestId(req);
   try {
+    await ensureX402ResourceDescriptionColumn();
     const parsed = await parseJsonBody(req, requestId);
     if (!parsed.ok) {
       return parsed.response;
@@ -465,6 +474,7 @@ export async function POST(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const requestId = getRequestId(req);
   try {
+    await ensureX402ResourceDescriptionColumn();
     const parsed = await parseJsonBody(req, requestId);
     if (!parsed.ok) {
       return parsed.response;

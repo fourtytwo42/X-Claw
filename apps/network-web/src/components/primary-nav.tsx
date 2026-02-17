@@ -80,7 +80,12 @@ export function PrimaryNav({ className, desktopExtra, mobileMoreContent }: Prima
             );
           })}
 
-          <ActiveAgentSidebarLink itemClassName={styles.linkItem} activeClassName={styles.linkItemActive} />
+          <ActiveAgentSidebarLink
+            itemClassName={styles.linkItem}
+            activeClassName={styles.linkItemActive}
+            showLabel
+            labelClassName={styles.linkLabel}
+          />
 
           {SECONDARY_ITEMS.map((item) => {
             const active = isActivePath(pathname, item.href);

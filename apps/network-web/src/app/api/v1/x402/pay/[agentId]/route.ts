@@ -7,6 +7,13 @@ import { getRequestId } from '@/lib/request-id';
 
 export const runtime = 'nodejs';
 
+async function ensureX402ResourceDescriptionColumn(): Promise<void> {
+  await dbQuery(`
+    alter table if exists agent_x402_payment_mirror
+    add column if not exists resource_description text
+  `);
+}
+
 type RouteParams = {
   params: Promise<{ agentId: string }>;
 };
@@ -15,6 +22,7 @@ async function handle(req: NextRequest, params: { agentId: string }) {
   const requestId = getRequestId(req);
   const { agentId } = params;
   try {
+    await ensureX402ResourceDescriptionColumn();
     const row = await dbQuery<{
       payment_id: string;
       status: string;

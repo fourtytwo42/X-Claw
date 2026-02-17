@@ -13,6 +13,13 @@ import { validatePayload } from '@/lib/validation';
 
 export const runtime = 'nodejs';
 
+async function ensureX402ResourceDescriptionColumn(): Promise<void> {
+  await dbQuery(`
+    alter table if exists agent_x402_payment_mirror
+    add column if not exists resource_description text
+  `);
+}
+
 type AgentX402InboundProposedRequest = {
   schemaVersion: 1;
   networkKey: string;
@@ -108,6 +115,7 @@ function resolveSupportedAsset(
 export async function POST(req: NextRequest) {
   const requestId = getRequestId(req);
   try {
+    await ensureX402ResourceDescriptionColumn();
     const auth = authenticateAgentByToken(req, requestId);
     if (!auth.ok) {
       return auth.response;

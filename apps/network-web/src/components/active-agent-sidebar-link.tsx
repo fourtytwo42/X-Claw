@@ -20,9 +20,11 @@ type PublicAgentPayload = {
 type ActiveAgentSidebarLinkProps = {
   itemClassName: string;
   activeClassName?: string;
+  showLabel?: boolean;
+  labelClassName?: string;
 };
 
-export function ActiveAgentSidebarLink({ itemClassName, activeClassName }: ActiveAgentSidebarLinkProps) {
+export function ActiveAgentSidebarLink({ itemClassName, activeClassName, showLabel = false, labelClassName }: ActiveAgentSidebarLinkProps) {
   const pathname = usePathname();
   const [agentId, setAgentId] = useState<string>('');
   const [agentName, setAgentName] = useState<string>('');
@@ -92,6 +94,7 @@ export function ActiveAgentSidebarLink({ itemClassName, activeClassName }: Activ
       >
         {initial}
       </span>
+      {showLabel ? <span className={labelClassName}>Agent</span> : null}
     </Link>
   );
 }
