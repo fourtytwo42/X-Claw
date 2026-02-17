@@ -2374,10 +2374,6 @@ export default function AgentPublicProfilePage() {
               </div>
               {x402ReceiveLink ? (
                 <>
-                  <div className={styles.muted}>Network: {humanizeKeyLabel(x402ReceiveLink.networkKey)}</div>
-                  <div className={styles.muted}>Facilitator: {humanizeKeyLabel(x402ReceiveLink.facilitatorKey)}</div>
-                  <div className={styles.muted}>Asset Type: {humanizeKeyLabel(x402ReceiveLink.assetKind)}</div>
-                  <div className={styles.muted}>Chain scope: {activeChainLabel}</div>
                   <div className={styles.muted} style={{ marginTop: '0.55rem' }}>
                     Active request links
                   </div>
