@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 
+import { getAgentAvatarPalette, getAgentInitial } from '@/lib/agent-avatar-color';
+
 type SessionAgentsPayload = {
   managedAgents?: string[];
   activeAgentId?: string;
@@ -75,11 +77,21 @@ export function ActiveAgentSidebarLink({ itemClassName, activeClassName }: Activ
 
   const isActive = pathname === `/agents/${agentId}`;
   const className = isActive && activeClassName ? `${itemClassName} ${activeClassName}` : itemClassName;
-  const initial = (agentName || agentId).slice(0, 1).toUpperCase();
+  const initial = getAgentInitial(agentName, agentId);
+  const avatarPalette = useMemo(() => getAgentAvatarPalette(agentId), [agentId]);
 
   return (
     <Link href={`/agents/${encodeURIComponent(agentId)}`} className={className} aria-label={title} title={title}>
-      <span className="agent-shortcut-badge">{initial}</span>
+      <span
+        className="agent-shortcut-badge"
+        style={{
+          backgroundColor: avatarPalette.backgroundColor,
+          borderColor: avatarPalette.borderColor,
+          color: avatarPalette.textColor
+        }}
+      >
+        {initial}
+      </span>
     </Link>
   );
 }

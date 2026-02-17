@@ -12,6 +12,7 @@ import { PublicStatusBadge } from '@/components/public-status-badge';
 import { SidebarIcon } from '@/components/sidebar-icons';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { useActiveChainKey } from '@/lib/active-chain';
+import { getAgentAvatarPalette, getAgentInitial } from '@/lib/agent-avatar-color';
 import {
   buildHoldings,
   formatActivityTitle,
@@ -292,6 +293,7 @@ export default function AgentPublicProfilePage() {
   const searchParams = useSearchParams();
   const agentId = params.agentId;
   const [activeChainKey, , activeChainLabel] = useActiveChainKey();
+  const avatarPalette = useMemo(() => getAgentAvatarPalette(agentId), [agentId]);
 
   const [bootstrapState, setBootstrapState] = useState<BootstrapState>({ phase: 'ready' });
   const [profile, setProfile] = useState<AgentProfilePayload | null>(null);
@@ -1451,7 +1453,16 @@ export default function AgentPublicProfilePage() {
         <section className={`${styles.walletHeaderCard} ${styles.walletCard}`}>
           <div className={styles.walletHeaderTop}>
             <div className={styles.walletIdentity}>
-              <div className={styles.avatar}>{(profile?.agent.agent_name ?? 'A').slice(0, 1).toUpperCase()}</div>
+              <div
+                className={styles.avatar}
+                style={{
+                  backgroundColor: avatarPalette.backgroundColor,
+                  borderColor: avatarPalette.borderColor,
+                  color: avatarPalette.textColor
+                }}
+              >
+                {getAgentInitial(profile?.agent.agent_name, agentId)}
+              </div>
               <div>
                 <div className={styles.walletTitleRow}>
                 <h1>{profile?.agent.agent_name ?? 'Loading agent...'}</h1>

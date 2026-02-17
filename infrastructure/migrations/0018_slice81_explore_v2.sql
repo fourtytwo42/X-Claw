@@ -10,23 +10,9 @@ create table if not exists agent_explore_profile (
   constraint agent_explore_profile_risk_tier_check check (risk_tier in ('low', 'medium', 'high', 'very_high')),
   constraint agent_explore_profile_strategy_tags_array_check check (
     jsonb_typeof(strategy_tags) = 'array'
-    and not exists (
-      select 1
-      from jsonb_array_elements(strategy_tags) as entry(value)
-      where jsonb_typeof(entry.value) <> 'string'
-        or entry.value <> to_jsonb(lower(trim(both '"' from entry.value::text)))
-        or lower(trim(both '"' from entry.value::text)) !~ '^[a-z0-9_]+$'
-    )
   ),
   constraint agent_explore_profile_venue_tags_array_check check (
     jsonb_typeof(venue_tags) = 'array'
-    and not exists (
-      select 1
-      from jsonb_array_elements(venue_tags) as entry(value)
-      where jsonb_typeof(entry.value) <> 'string'
-        or entry.value <> to_jsonb(lower(trim(both '"' from entry.value::text)))
-        or lower(trim(both '"' from entry.value::text)) !~ '^[a-z0-9_]+$'
-    )
   )
 );
 
