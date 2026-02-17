@@ -1,9 +1,9 @@
 .page {
-  min-height: calc(100vh - 2rem);
+  min-height: 100vh;
   max-width: 100%;
-  border: 1px solid #26365d;
-  border-radius: 28px;
-  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  overflow-x: clip;
   color: #eaf0ff;
   background:
     radial-gradient(circle at 12% -10%, rgba(80, 163, 255, 0.22), transparent 40%),
@@ -99,7 +99,7 @@
 
 .hero {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(330px, 420px);
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 420px);
   gap: 1rem;
   align-items: start;
   min-width: 0;
@@ -459,7 +459,7 @@
   width: min(100%, 420px);
   justify-self: start;
   align-self: center;
-  transform: translateX(-56px);
+  transform: none;
 }
 
 .quickstartCard h3 {
@@ -616,6 +616,10 @@
 }
 
 @media (max-width: 1200px) {
+  .hero {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .proofBand {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
