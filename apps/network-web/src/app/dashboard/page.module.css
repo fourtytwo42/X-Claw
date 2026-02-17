@@ -137,10 +137,20 @@
   align-items: center;
 }
 
+.topbarSearchWrap {
+  min-width: 0;
+}
+
+.topbarSearchWrap :global(.dashboard-search-wrap) {
+  min-width: 0;
+  width: 100%;
+}
+
 .topbarTitle {
   font-size: 1.5rem;
   font-weight: 700;
   line-height: 1;
+  min-width: 0;
 }
 
 .topbarControls {
@@ -148,6 +158,8 @@
   justify-content: flex-end;
   gap: 0.5rem;
   align-items: center;
+  min-width: 0;
+  flex-wrap: wrap;
 }
 
 .chainControl :global(.chain-select) {
@@ -252,6 +264,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
+  flex-wrap: wrap;
+  min-width: 0;
 }
 
 .sectionHeaderRow a {
@@ -262,6 +276,9 @@
 .segmentTabs {
   display: flex;
   gap: 0.4rem;
+  min-width: 0;
+  overflow-x: auto;
+  padding-bottom: 0.15rem;
 }
 
 .segmentTab,
@@ -287,12 +304,15 @@
 .chartControls {
   display: flex;
   gap: 0.32rem;
+  min-width: 0;
+  overflow-x: auto;
+  padding-bottom: 0.15rem;
 }
 
 .inlineFilters {
   margin-top: 0.65rem;
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.4rem;
 }
 
@@ -693,16 +713,16 @@
 
   .rightColumn {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  align-items: start;
-}
-
-.mobileMoreToggleRow {
-  display: none;
-}
+    align-items: start;
+  }
 
   .rightColumn .card:last-child {
     grid-column: 1 / -1;
   }
+}
+
+.mobileMoreToggleRow {
+  display: none;
 }
 
 @media (max-width: 1024px) {
@@ -710,27 +730,17 @@
     grid-template-columns: 1fr;
   }
 
-  .sidebar {
-    position: static;
-    height: auto;
-    grid-template-rows: auto;
-    grid-template-columns: auto 1fr;
-    gap: 0.7rem;
-  }
-
-  .sidebarNav {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-
   .topbar {
     grid-template-columns: 1fr;
     align-items: stretch;
+    gap: 0.55rem;
   }
 
   .topbarControls {
-    justify-content: flex-start;
-    flex-wrap: wrap;
+    justify-content: stretch;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
   }
 
   .kpiStrip {
@@ -763,34 +773,80 @@
     padding: 0.6rem;
   }
 
+  .topbar {
+    padding: 0.58rem;
+    border-radius: 12px;
+  }
+
+  .topbarTitle {
+    font-size: 1.2rem;
+  }
+
   .kpiStrip {
     display: grid;
     grid-auto-flow: column;
-    grid-auto-columns: minmax(210px, 78%);
+    grid-auto-columns: minmax(180px, 82%);
     overflow-x: auto;
     padding-bottom: 0.25rem;
+    gap: 0.45rem;
+    margin-top: 0.7rem;
   }
 
   .chartArea svg {
-    height: 210px;
+    height: 180px;
   }
 
   .healthGrid {
     grid-template-columns: 1fr;
   }
 
+  .inlineFilters {
+    grid-template-columns: 1fr;
+  }
+
+  .segmentTabs,
+  .chartControls {
+    width: 100%;
+  }
+
+  .segmentTab,
+  .segmentTabActive,
+  .rangeBtn,
+  .rangeBtnActive {
+    white-space: nowrap;
+  }
+
+  .chartFooter {
+    gap: 0.32rem;
+  }
+
+  .dexCount {
+    margin-left: 0;
+    width: 100%;
+  }
+
   .mobileMoreToggleRow {
     display: flex;
     justify-content: flex-start;
+    margin-top: -0.2rem;
   }
 
-.feedList,
-.recentList,
-.roomList {
-  max-height: 300px;
-}
+  .mobileMoreToggleRow button {
+    width: 100%;
+    text-align: center;
+  }
+
+  .feedList,
+  .recentList,
+  .roomList {
+    max-height: none;
+    overflow: visible;
+  }
 
   .footerLinks {
     font-size: 0.75rem;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
   }
 }

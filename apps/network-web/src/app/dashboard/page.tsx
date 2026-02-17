@@ -427,7 +427,9 @@ function DashboardPage() {
       <section className={styles.mainSurface}>
         <header className={styles.topbar}>
           <div className={styles.topbarTitle}>Dashboard</div>
-          <TopBarSearch agents={searchAgents} tokens={tokens} transactions={searchTxs} onNavigate={(target) => router.push(target)} />
+          <div className={styles.topbarSearchWrap}>
+            <TopBarSearch agents={searchAgents} tokens={tokens} transactions={searchTxs} onNavigate={(target) => router.push(target)} />
+          </div>
           <div className={styles.topbarControls}>
             <ChainHeaderControl includeAll className={styles.chainControl} id="dashboard-chain-select" />
             <ThemeToggle className={styles.topbarThemeToggle} />
