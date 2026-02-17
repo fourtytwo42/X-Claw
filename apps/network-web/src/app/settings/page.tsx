@@ -7,11 +7,10 @@ import { ChainHeaderControl } from '@/components/chain-header-control';
 import { rememberManagedAgent } from '@/components/management-header-controls';
 import { PrimaryNav } from '@/components/primary-nav';
 import { ThemeToggle } from '@/components/theme-toggle';
-import { SETTINGS_SECURITY_CAPABILITIES } from '@/lib/settings-security-capabilities';
 
 import styles from './page.module.css';
 
-type TabKey = 'access' | 'security' | 'danger';
+type TabKey = 'access' | 'security';
 
 type OwnerContext =
   | { phase: 'loading' }
@@ -245,8 +244,6 @@ export default function SettingsPage() {
     const hash = window.location.hash.toLowerCase();
     if (hash === '#security') {
       setActiveTab('security');
-    } else if (hash === '#danger') {
-      setActiveTab('danger');
     } else {
       setActiveTab('access');
     }
@@ -302,9 +299,6 @@ export default function SettingsPage() {
   const deviceLabel = useMemo(() => inferDeviceLabel(), []);
 
   const lastActive = useMemo(() => new Date().toLocaleString('en-US', { timeZone: 'UTC' }), []);
-
-  const activeAgentId = ownerContext.phase === 'ready' ? ownerContext.activeAgentId : null;
-  const activeAgentName = activeAgentId ? managedAgentNames[activeAgentId] || 'this agent' : 'this agent';
 
   function managedAgentLabel(agentId: string): string {
     return managedAgentNames[agentId] || 'Unnamed Agent';
@@ -390,46 +384,6 @@ export default function SettingsPage() {
     }
   }
 
-  async function onDangerAction(action: 'pause' | 'resume' | 'revoke-all') {
-    if (!activeAgentId) {
-      return;
-    }
-
-    const confirmLabel =
-      action === 'pause'
-        ? `Pause ${activeAgentName}?`
-        : action === 'resume'
-          ? `Resume ${activeAgentName}?`
-          : `Sign out all sessions for ${activeAgentName}?`;
-
-    if (!window.confirm(confirmLabel)) {
-      return;
-    }
-
-    setNotice(null);
-    setError(null);
-    setPendingAction(action);
-
-    try {
-      if (action === 'pause') {
-        await postJson('/api/v1/management/pause', { agentId: activeAgentId });
-        setNotice(`${activeAgentName} paused.`);
-      } else if (action === 'resume') {
-        await postJson('/api/v1/management/resume', { agentId: activeAgentId });
-        setNotice(`${activeAgentName} resumed.`);
-      } else {
-        await postJson('/api/v1/management/revoke-all', { agentId: activeAgentId });
-        storeManagedAgentIds([]);
-        setOwnerContext({ phase: 'none' });
-        setNotice('Signed out all management sessions for this device.');
-      }
-    } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : 'Failed to execute action.');
-    } finally {
-      setPendingAction(null);
-    }
-  }
-
   return (
     <div className={styles.root}>
       <PrimaryNav />
@@ -455,9 +409,6 @@ export default function SettingsPage() {
           </button>
           <button type="button" className={activeTab === 'security' ? styles.tabActive : styles.tabButton} onClick={() => setActiveTab('security')}>
             Security
-          </button>
-          <button type="button" className={activeTab === 'danger' ? styles.tabActive : styles.tabButton} onClick={() => setActiveTab('danger')}>
-            Danger Zone
           </button>
         </section>
 
@@ -502,7 +453,7 @@ export default function SettingsPage() {
                       </div>
                       <div className={styles.agentActions}>
                         <Link href={`/agents/${encodeURIComponent(agentId)}`}>Open</Link>
-                        <button type="button" disabled={!SETTINGS_SECURITY_CAPABILITIES.perAgentRemoveAccess}>
+                        <button type="button" disabled>
                           Remove Access
                         </button>
                       </div>
@@ -651,49 +602,6 @@ export default function SettingsPage() {
           </div>
         ) : null}
 
-        {activeTab === 'danger' ? (
-          <div className={styles.panelGrid}>
-            <section className={`${styles.card} ${styles.dangerCard}`}>
-              <h2>Emergency Controls</h2>
-              <p className={styles.muted}>These actions apply only to the currently selected agent.</p>
-              <div className={styles.actionRow}>
-                <button type="button" onClick={() => void onDangerAction('pause')} disabled={!activeAgentId || pendingAction === 'pause'}>
-                  Pause Selected Agent
-                </button>
-                <button type="button" onClick={() => void onDangerAction('resume')} disabled={!activeAgentId || pendingAction === 'resume'}>
-                  Resume Selected Agent
-                </button>
-                <button
-                  type="button"
-                  className={styles.dangerButton}
-                  onClick={() => void onDangerAction('revoke-all')}
-                  disabled={!activeAgentId || pendingAction === 'revoke-all'}
-                >
-                  Sign Out All Sessions
-                </button>
-              </div>
-              <p className={styles.helper}>
-                Global emergency controls for all agents are not available yet.
-              </p>
-            </section>
-
-            <section className={`${styles.card} ${styles.dangerCard}`}>
-              <h2>Global Emergency Controls (Coming Soon)</h2>
-              <div className={styles.actionRow}>
-                <button type="button" disabled={!SETTINGS_SECURITY_CAPABILITIES.globalPanicActions}>
-                  Pause All Owned Agents
-                </button>
-                <button type="button" disabled={!SETTINGS_SECURITY_CAPABILITIES.allowanceInventorySweep}>
-                  Revoke All Allowances
-                </button>
-                <button type="button" disabled={!SETTINGS_SECURITY_CAPABILITIES.globalPanicActions}>
-                  Disable All Copy Trading
-                </button>
-              </div>
-              <p className={styles.helper}>For now, use per-agent controls from the agent page and approvals page.</p>
-            </section>
-          </div>
-        ) : null}
       </section>
     </div>
   );
