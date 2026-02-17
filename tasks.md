@@ -1,3 +1,39 @@
+# Slice 77 Tasks: Agent Wallet Page MetaMask-Style Full-Screen Refactor (`/agents/:id`)
+
+Active slice: `Slice 77: Agent Wallet Page MetaMask-Style Full-Screen Refactor`
+Issue mapping: `#29` (to be created / mapped)
+
+## Checklist
+- [x] Pre-flight lock: objective + acceptance checks + touched-file allowlist defined before edits.
+- [x] Docs sync first:
+  - [x] `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - [x] `docs/XCLAW_SLICE_TRACKER.md`
+  - [x] `docs/XCLAW_BUILD_ROADMAP.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+- [x] Refactor `/agents/:id` shell from dashboard-framed to MetaMask-style full-screen wallet layout.
+- [x] Keep chain selector + theme toggle in compact utility bar.
+- [x] Recompose module order to wallet-first stack.
+- [x] Remove `Secondary Operations`.
+- [x] Remove transfer/outbound policy editor controls from `/agents/:id`.
+- [x] Keep approvals workflow actions (trade/policy/transfer) and policy toggle/per-token preapprove controls.
+- [x] Keep withdraw destination/asset/amount/max/submit flow.
+- [x] Keep copy relationships list/delete only with create guidance to `/explore`.
+- [x] Keep limit-order review/cancel and audit log visibility.
+- [x] Rewrite route CSS for new full-screen wallet layout with light/dark responsiveness.
+- [ ] Run required gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+- [x] Record verification evidence in `acceptance.md`.
+- [ ] Commit + push Slice 77.
+- [ ] Post verification evidence + commit hash(es) to mapped issue.
+
+---
+
 # Slice 76 Tasks: Explore / Agent Listing Full Frontend Refresh (`/explore` Canonical)
 
 Active slice: `Slice 76: Explore / Agent Listing Full Frontend Refresh (/explore Canonical)`

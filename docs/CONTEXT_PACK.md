@@ -791,3 +791,38 @@ Issue mapping: `#26`
   - owner mode operations still hit existing management endpoints,
   - approvals queue decisions reflect in refreshed UI state,
   - placeholder modules are clearly labeled where APIs do not yet exist.
+## Slice 77 Context: Agent Wallet Page MetaMask-Style Full-Screen Refactor
+
+Issue mapping: `#29` (to be created / mapped)
+
+### Objective + scope lock
+- Objective: refactor `/agents/:id` into MetaMask-style full-screen wallet framing while preserving existing owner/viewer contracts and management endpoint semantics.
+- Scope guard honored: frontend-first page/copy/layout changes; no speculative backend contract additions.
+
+### Expected touched files (Slice 77 allowlist)
+- Docs/process:
+  - `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - `docs/XCLAW_SLICE_TRACKER.md`
+  - `docs/XCLAW_BUILD_ROADMAP.md`
+  - `docs/CONTEXT_PACK.md`
+  - `spec.md`
+  - `tasks.md`
+  - `acceptance.md`
+- Web/UI:
+  - `apps/network-web/src/app/agents/[agentId]/page.tsx`
+  - `apps/network-web/src/app/agents/[agentId]/page.module.css`
+
+### Verification Plan
+- Required gates:
+  - `npm run db:parity`
+  - `npm run seed:reset`
+  - `npm run seed:load`
+  - `npm run seed:verify`
+  - `npm run build`
+- Functional checks:
+  - no dashboard sidebar shell on `/agents/:id`,
+  - wallet-first module order preserved,
+  - transfer/outbound policy editor controls removed,
+  - approval decisions + withdraw + copy delete + limit-order cancel + audit remain functional.
+
+---

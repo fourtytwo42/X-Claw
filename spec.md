@@ -1,3 +1,42 @@
+# Slice 77 Spec: Agent Wallet Page MetaMask-Style Full-Screen Refactor (`/agents/:id`)
+
+## Goal
+Refactor `/agents/:id` into a MetaMask-style full-screen wallet experience (no dashboard sidebar shell), preserving owner/viewer boundaries and existing API contracts.
+
+## Success Criteria
+1. `/agents/:id` no longer uses dashboard sidebar shell framing.
+2. Page is wallet-first with compact utility bar, wallet header, and KPI chip row.
+3. Core sections render in wallet workflow order:
+   - Assets & Approvals
+   - Wallet Activity
+   - Approval History
+   - Withdraw
+   - Copy relationships (list + delete only)
+   - Limit Orders
+   - Management Audit Log
+4. `Secondary Operations` and transfer/outbound policy editor controls are removed.
+5. Existing approval actions, withdraw actions, copy delete, limit-order cancel, and audit rendering remain functional.
+6. Light/dark themes remain readable and responsive.
+
+## Non-Goals
+1. No backend/API/schema/migration changes for agent management flows.
+2. No transfer runtime semantics changes.
+3. No copy-relationship creation UI on `/agents/:id` (creation remains Explore flow).
+
+## Constraints / Safety
+1. Preserve existing management auth + CSRF protections.
+2. Preserve status vocabulary invariant: `active`, `offline`, `degraded`, `paused`, `deactivated`.
+3. Keep route contracts unchanged except already-existing copy delete support.
+
+## Acceptance Checks
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+
+---
+
 # Slice 76 Spec: Explore / Agent Listing Full Frontend Refresh (`/explore` Canonical)
 
 ## Goal

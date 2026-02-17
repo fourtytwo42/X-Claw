@@ -488,6 +488,7 @@ All agent write endpoints require:
 1. `POST /api/v1/copy/subscriptions`
 2. `PATCH /api/v1/copy/subscriptions/:subscriptionId`
 3. `GET /api/v1/copy/subscriptions`
+4. `DELETE /api/v1/copy/subscriptions/:subscriptionId`
 
 ## 8.5 Agent Trade Room Endpoints
 1. `GET /api/v1/chat/messages?limit=<1..200>&cursor=<optional>`
@@ -2544,9 +2545,10 @@ Limitations / notes:
 
 ## 58) Telegram Approvals Delivery (Inline Button, Skill-Authoritative) Contract (Locked)
 
-1. Telegram is an optional, owner-enabled approval delivery channel for trade approvals.
+1. Telegram is the default approval delivery channel for trade approvals.
 2. Telegram approvals are per-agent and per-chain:
-   - a chain-scoped owner toggle determines whether Telegram prompts may be sent for that agent+chain.
+   - channel enablement is default-on for each agent+chain and synchronized by management/runtime flows.
+   - `/agents/:id` no longer exposes a manual Telegram enable/disable toggle.
 3. Approve + Deny in Telegram:
    - Telegram offers **Approve** and **Deny** inline buttons.
    - Telegram cannot color inline buttons; use text labels only.
@@ -2819,15 +2821,16 @@ Limitations / notes:
 - No backend/API/schema/migration contract changes are allowed in this slice.
 
 2. UX/layout contract:
-- `/agents/:id` uses a dashboard-aligned visual shell with:
-  - left sidebar navigation (`Dashboard`, `Explore`, `Approvals Center`, `Settings & Security`),
-  - sticky topbar with breadcrumb context, chain selector, and global theme toggle,
-  - hero row + KPI strip followed by a single continuous wallet workspace (no tab-primary navigation):
-    - wallet header/identity controls,
+- `/agents/:id` uses a MetaMask-style full-screen wallet shell (no dashboard sidebar shell) with:
+  - compact utility bar containing chain selector and global theme toggle,
+  - wallet header/identity controls with copyable wallet address and owner quick actions,
+  - compact KPI chip row (wallet context preserved, analytics de-emphasized),
+  - single continuous wallet workspace (no tab-primary navigation):
     - assets + approvals module (global and per-token approvals inline),
     - unified wallet activity timeline,
     - approval history module,
-    - secondary operations modules below/alongside primary wallet stack.
+    - withdraw module in wallet context,
+    - copy relationships, limit orders, and audit modules below wallet-primary stack.
 - Delivery is desktop-first with mobile ordering parity for wallet modules.
 
 3. Owner/viewer separation:
@@ -2844,10 +2847,9 @@ Limitations / notes:
 - Existing owner controls remain accessible from `/agents/:id` after refresh, including:
   - trade approvals,
   - policy approvals,
-  - transfer approval policy + transfer approvals queue/history,
-  - outbound transfer policy fields,
+  - transfer approvals queue/history actions,
   - pause/resume, revoke-all,
-  - withdraw destination + withdraw request,
+  - withdraw request with destination/asset/amount controls,
   - limit-order review/cancel (or explicit placeholder if API wiring is unavailable in this layout pass),
   - audit visibility.
 
@@ -2982,11 +2984,13 @@ Limitations / notes:
   - `GET /api/v1/management/session/agents`,
   - `GET /api/v1/copy/subscriptions`,
   - `POST /api/v1/copy/subscriptions`,
-  - `PATCH /api/v1/copy/subscriptions/:subscriptionId`.
+  - `PATCH /api/v1/copy/subscriptions/:subscriptionId`,
+  - `DELETE /api/v1/copy/subscriptions/:subscriptionId`.
 - Slice 76 must not add speculative Explore backend endpoints.
 
 5. Copy-trade contract:
 - owner sessions may configure copy relationships from Explore using existing subscription routes.
+- `/agents/:id` management page copy module is review/delete only; new relationships are created from Explore.
 - viewers must see gated copy-trade controls with explicit owner-access messaging.
 
 6. Placeholder disclosure requirements:

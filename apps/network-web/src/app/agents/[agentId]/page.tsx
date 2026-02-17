@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
@@ -8,14 +7,11 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { ChainHeaderControl } from '@/components/chain-header-control';
 import { rememberManagedAgent } from '@/components/management-header-controls';
 import { PublicStatusBadge } from '@/components/public-status-badge';
-import { SidebarIcon } from '@/components/sidebar-icons';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { useActiveChainKey } from '@/lib/active-chain';
-import { AGENT_PAGE_CAPABILITIES } from '@/lib/agent-page-capabilities';
 import {
   buildActivityRows,
   buildHoldings,
-  formatDecimalText,
   formatUnitsTruncated,
   type ActivityPayload,
   type AgentProfilePayload,
@@ -25,7 +21,7 @@ import {
   type TradePayload,
   tokenSymbolByAddress
 } from '@/lib/agent-page-view-model';
-import { formatPercent, formatUsd, formatUtc, isStale, shortenAddress } from '@/lib/public-format';
+import { formatUsd, formatUtc, shortenAddress } from '@/lib/public-format';
 import { isPublicStatus } from '@/lib/public-types';
 
 import styles from './page.module.css';
@@ -70,8 +66,6 @@ type WalletTimelineItem = {
   status: string;
   txHash: string | null;
 };
-
-const HEARTBEAT_STALE_THRESHOLD_SECONDS = 180;
 
 function getCsrfToken(): string | null {
   if (typeof document === 'undefined') {
@@ -239,7 +233,10 @@ export default function AgentPublicProfilePage() {
   const [limitOrders, setLimitOrders] = useState<LimitOrderItem[]>([]);
   const [copySubscriptions, setCopySubscriptions] = useState<CopySubscription[]>([]);
   const [depositAddressCopied, setDepositAddressCopied] = useState(false);
+  const [vaultAddressCopied, setVaultAddressCopied] = useState(false);
   const depositCopyResetTimerRef = useRef<number | null>(null);
+  const vaultCopyResetTimerRef = useRef<number | null>(null);
+  const telegramAutoEnableInFlightRef = useRef<Set<string>>(new Set());
 
   const [walletActivityFilter, setWalletActivityFilter] = useState<WalletActivityFilter>('all');
   const [approvalStatusFilter, setApprovalStatusFilter] = useState<ApprovalStatusFilter>('all');
@@ -247,13 +244,8 @@ export default function AgentPublicProfilePage() {
 
   const [withdrawDestination, setWithdrawDestination] = useState('');
   const [withdrawAmount, setWithdrawAmount] = useState('0.1');
-  const [copyLeaderAgentId, setCopyLeaderAgentId] = useState('');
-  const [copyScaleBps, setCopyScaleBps] = useState('10000');
-  const [copyMaxTradeUsd, setCopyMaxTradeUsd] = useState('1000');
+  const [withdrawAsset, setWithdrawAsset] = useState('NATIVE');
 
-  const [outboundTransfersEnabled, setOutboundTransfersEnabled] = useState(false);
-  const [outboundMode, setOutboundMode] = useState<'disabled' | 'allow_all' | 'whitelist'>('disabled');
-  const [outboundWhitelistInput, setOutboundWhitelistInput] = useState('');
   const [policyApprovalMode, setPolicyApprovalMode] = useState<'per_trade' | 'auto'>('per_trade');
   const [policyMaxTradeUsd, setPolicyMaxTradeUsd] = useState('50');
   const [policyMaxDailyUsd, setPolicyMaxDailyUsd] = useState('250');
@@ -261,10 +253,6 @@ export default function AgentPublicProfilePage() {
   const [policyDailyTradeCapEnabled, setPolicyDailyTradeCapEnabled] = useState(true);
   const [policyMaxDailyTradeCount, setPolicyMaxDailyTradeCount] = useState('0');
   const [policyAllowedTokens, setPolicyAllowedTokens] = useState<string[]>([]);
-  const [transferApprovalMode, setTransferApprovalMode] = useState<'auto' | 'per_transfer'>('per_transfer');
-  const [transferNativePreapproved, setTransferNativePreapproved] = useState<boolean>(false);
-  const [transferAllowedTokensText, setTransferAllowedTokensText] = useState<string>('');
-  const [telegramApprovalsEnabled, setTelegramApprovalsEnabled] = useState(false);
 
   const isOwner = management.phase === 'ready';
 
@@ -343,9 +331,6 @@ export default function AgentPublicProfilePage() {
     setManagement({ phase: 'ready', data: payload });
     rememberManagedAgent(agentId);
 
-    setOutboundTransfersEnabled(payload.outboundTransfersPolicy.outboundTransfersEnabled);
-    setOutboundMode(payload.outboundTransfersPolicy.outboundMode);
-    setOutboundWhitelistInput(payload.outboundTransfersPolicy.outboundWhitelistAddresses.join(','));
     setPolicyApprovalMode(payload.latestPolicy?.approval_mode ?? 'per_trade');
     setPolicyMaxTradeUsd(payload.latestPolicy?.max_trade_usd ?? '50');
     setPolicyMaxDailyUsd(payload.latestPolicy?.max_daily_usd ?? '250');
@@ -357,20 +342,24 @@ export default function AgentPublicProfilePage() {
         : (payload.latestPolicy?.max_daily_trade_count ?? '0')
     );
     setPolicyAllowedTokens(payload.latestPolicy?.allowed_tokens ?? []);
-    setTransferApprovalMode(payload.transferApprovalPolicy?.transferApprovalMode ?? 'per_transfer');
-    setTransferNativePreapproved(Boolean(payload.transferApprovalPolicy?.nativeTransferPreapproved));
-    setTransferAllowedTokensText((payload.transferApprovalPolicy?.allowedTransferTokens ?? []).join(', '));
-    setTelegramApprovalsEnabled(Boolean(payload.approvalChannels?.telegram?.enabled));
-
-    const savedDestination =
-      (payload.agent?.metadata as { management?: { withdrawDestinations?: Record<string, string> } } | undefined)?.management
-        ?.withdrawDestinations?.[activeChainKey] ??
-      (payload.agent?.metadata as { management?: { withdrawDestinations?: Record<string, string> } } | undefined)?.management
-        ?.withdrawDestinations?.base_sepolia ??
-      '';
-
-    if (savedDestination) {
-      setWithdrawDestination(savedDestination);
+    const telegramEnabled = Boolean(payload.approvalChannels?.telegram?.enabled);
+    if (!telegramEnabled) {
+      const autoEnableKey = `${agentId}:${activeChainKey}:telegram`;
+      if (!telegramAutoEnableInFlightRef.current.has(autoEnableKey)) {
+        telegramAutoEnableInFlightRef.current.add(autoEnableKey);
+        void managementPost('/api/v1/management/approval-channels/update', {
+          agentId,
+          chainKey: activeChainKey,
+          channel: 'telegram',
+          enabled: true
+        })
+          .catch(() => {
+            // Keep silent: this is a best-effort background default-on sync.
+          })
+          .finally(() => {
+            telegramAutoEnableInFlightRef.current.delete(autoEnableKey);
+          });
+      }
     }
 
     const [depositPayload, limitOrderPayload, copyPayload] = await Promise.all([
@@ -384,9 +373,12 @@ export default function AgentPublicProfilePage() {
     setCopySubscriptions(((copyPayload as CopySubscriptionsGetPayload).items ?? []).filter(Boolean));
   }, [activeChainKey, agentId]);
 
-  const refreshAll = useCallback(async () => {
+  const refreshAll = useCallback(async (options?: { showLoading?: boolean }) => {
+    const showLoading = options?.showLoading ?? true;
     setError(null);
-    setManagementError(null);
+    if (showLoading) {
+      setManagementError(null);
+    }
     try {
       await loadPublicData();
     } catch (loadError) {
@@ -394,13 +386,20 @@ export default function AgentPublicProfilePage() {
     }
 
     try {
-      setManagement({ phase: 'loading' });
+      if (showLoading) {
+        setManagement({ phase: 'loading' });
+      }
       await loadManagementData();
     } catch (loadError) {
-      setManagement({
-        phase: 'error',
-        message: loadError instanceof Error ? loadError.message : 'Failed to load management state.'
-      });
+      const message = loadError instanceof Error ? loadError.message : 'Failed to load management state.';
+      if (showLoading) {
+        setManagement({
+          phase: 'error',
+          message
+        });
+      } else {
+        setManagementError(message);
+      }
     }
   }, [loadManagementData, loadPublicData]);
 
@@ -408,7 +407,7 @@ export default function AgentPublicProfilePage() {
     if (!agentId || bootstrapState.phase !== 'ready') {
       return;
     }
-    void refreshAll();
+    void refreshAll({ showLoading: true });
   }, [agentId, bootstrapState.phase, refreshAll]);
 
   useEffect(() => {
@@ -416,7 +415,7 @@ export default function AgentPublicProfilePage() {
       return;
     }
     const intervalId = window.setInterval(() => {
-      void refreshAll();
+      void refreshAll({ showLoading: false });
     }, 5000);
     return () => {
       window.clearInterval(intervalId);
@@ -429,10 +428,10 @@ export default function AgentPublicProfilePage() {
     try {
       await action();
       setManagementNotice(successMessage);
-      await refreshAll();
+      await refreshAll({ showLoading: false });
     } catch (actionError) {
       setManagementError(actionError instanceof Error ? actionError.message : 'Management action failed.');
-      await refreshAll();
+      await refreshAll({ showLoading: false });
     }
   }
 
@@ -451,6 +450,9 @@ export default function AgentPublicProfilePage() {
     return () => {
       if (depositCopyResetTimerRef.current !== null) {
         window.clearTimeout(depositCopyResetTimerRef.current);
+      }
+      if (vaultCopyResetTimerRef.current !== null) {
+        window.clearTimeout(vaultCopyResetTimerRef.current);
       }
     };
   }, []);
@@ -491,12 +493,11 @@ export default function AgentPublicProfilePage() {
       dailyTradeCapEnabled: policyDailyTradeCapEnabled,
       maxDailyTradeCount: policyDailyTradeCapEnabled ? Number(policyMaxDailyTradeCount || '0') : null,
       allowedTokens: next.allowedTokens ?? policyAllowedTokens,
-      outboundTransfersEnabled,
-      outboundMode,
-      outboundWhitelistAddresses: outboundWhitelistInput
-        .split(',')
-        .map((value) => value.trim())
-        .filter((value) => value.length > 0)
+      outboundTransfersEnabled:
+        management.phase === 'ready' ? management.data.outboundTransfersPolicy.outboundTransfersEnabled : false,
+      outboundMode: management.phase === 'ready' ? management.data.outboundTransfersPolicy.outboundMode : 'disabled',
+      outboundWhitelistAddresses:
+        management.phase === 'ready' ? management.data.outboundTransfersPolicy.outboundWhitelistAddresses : []
     };
   }
 
@@ -540,6 +541,38 @@ export default function AgentPublicProfilePage() {
   );
 
   const holdings = useMemo(() => buildHoldings(profile, depositData, activeChainKey), [profile, depositData, activeChainKey]);
+  const withdrawAssetOptions = useMemo(() => {
+    const opts: Array<{ label: string; value: string }> = [{ label: 'ETH (Native)', value: 'NATIVE' }];
+    const seen = new Set<string>(['NATIVE']);
+    for (const holding of holdings) {
+      const symbol = holding.token.trim().toUpperCase();
+      if (!symbol || symbol === 'ETH' || symbol === 'NATIVE') {
+        continue;
+      }
+      if (!seen.has(symbol)) {
+        seen.add(symbol);
+        opts.push({ label: symbol, value: symbol });
+      }
+    }
+    return opts;
+  }, [holdings]);
+
+  const withdrawSelectedHolding = useMemo(() => {
+    if (withdrawAsset === 'NATIVE') {
+      return holdings.find((holding) => {
+        const symbol = holding.token.trim().toUpperCase();
+        return symbol === 'ETH' || symbol === 'NATIVE';
+      }) ?? null;
+    }
+    return holdings.find((holding) => holding.token.trim().toUpperCase() === withdrawAsset.trim().toUpperCase()) ?? null;
+  }, [holdings, withdrawAsset]);
+
+  const withdrawMaxAmount = useMemo(() => {
+    if (!withdrawSelectedHolding) {
+      return '';
+    }
+    return formatUnitsTruncated(withdrawSelectedHolding.amountRaw, withdrawSelectedHolding.decimals, 18);
+  }, [withdrawSelectedHolding]);
   const activityRows = useMemo(
     () => buildActivityRows(trades, activity, management.phase === 'ready' ? management.data.chainTokens : undefined),
     [trades, activity, management]
@@ -730,9 +763,6 @@ export default function AgentPublicProfilePage() {
   }, [filledTrades, trades]);
 
   const status = profile?.agent.public_status;
-  const heartbeatStale = profile?.agent.last_heartbeat_at
-    ? isStale(profile.agent.last_heartbeat_at, HEARTBEAT_STALE_THRESHOLD_SECONDS)
-    : true;
 
   if (bootstrapState.phase === 'bootstrapping') {
     return <main className={styles.loadingPage}>Validating management token...</main>;
@@ -751,30 +781,10 @@ export default function AgentPublicProfilePage() {
 
   return (
     <div className={styles.root}>
-      <aside className={styles.sidebar}>
-        <Link href="/dashboard" className={styles.sidebarLogo} aria-label="X-Claw dashboard">
-          <Image src="/X-Claw-Logo.png" alt="X-Claw" width={900} height={280} className={styles.sidebarLogoImage} priority />
-        </Link>
-        <nav className={styles.nav}>
-          <Link href="/dashboard" className={styles.navItem} aria-label="Dashboard" title="Dashboard">
-            <SidebarIcon name="dashboard" />
-          </Link>
-          <Link href="/explore" className={`${styles.navItem} ${styles.navItemActive}`} aria-label="Explore" title="Explore">
-            <SidebarIcon name="explore" />
-          </Link>
-          <Link href="/approvals" className={styles.navItem} aria-label="Approvals Center" title="Approvals Center">
-            <SidebarIcon name="approvals" />
-          </Link>
-          <Link href="/settings" className={styles.navItem} aria-label="Settings & Security" title="Settings & Security">
-            <SidebarIcon name="settings" />
-          </Link>
-        </nav>
-      </aside>
-
       <section className={styles.surface}>
-        <header className={styles.topbar}>
-          <div className={styles.breadcrumb}>Wallet / Agents / {profile?.agent.agent_name ?? agentId}</div>
-          <div className={styles.topControls}>
+        <header className={styles.utilityBar}>
+          <div className={styles.utilityLabel}>Agent Wallet</div>
+          <div className={styles.utilityControls}>
             <ChainHeaderControl />
             <ThemeToggle className={styles.themeButton} />
           </div>
@@ -784,38 +794,107 @@ export default function AgentPublicProfilePage() {
         {managementNotice ? <p className={styles.successBanner}>{managementNotice}</p> : null}
         {managementError ? <p className={styles.warningBanner}>{managementError}</p> : null}
 
-        <section className={styles.heroCard}>
-          <div className={styles.heroIdentity}>
-            <div className={styles.avatar}>{(profile?.agent.agent_name ?? 'A').slice(0, 1).toUpperCase()}</div>
-            <div>
-              <div className={styles.heroTitleRow}>
+        <section className={styles.walletHeaderCard}>
+          <div className={styles.walletHeaderTop}>
+            <div className={styles.walletIdentity}>
+              <div className={styles.avatar}>{(profile?.agent.agent_name ?? 'A').slice(0, 1).toUpperCase()}</div>
+              <div>
+                <div className={styles.walletTitleRow}>
                 <h1>{profile?.agent.agent_name ?? 'Loading agent...'}</h1>
                 {status && isPublicStatus(status) ? <PublicStatusBadge status={status} /> : null}
                 {!status ? <span className={styles.muted}>status unavailable</span> : null}
               </div>
-              <div className={styles.heroMeta}>
+                <div className={styles.walletMeta}>
                 <span>{profile?.agent.runtime_platform ?? 'runtime unavailable'}</span>
-                <span>Vault: {activeWallet ? shortenAddress(activeWallet.address) : '—'}</span>
                 <span>Chain: {activeChainLabel}</span>
-              </div>
-              <div className={styles.heroTags}>
-                <span>Arbitrage</span>
-                <span>DeFi</span>
-                <span>DEX</span>
-                {heartbeatStale ? <span className={styles.warnTag}>degraded heartbeat</span> : <span className={styles.okTag}>heartbeat healthy</span>}
+                  <span>Vault: {activeWallet ? shortenAddress(activeWallet.address) : '—'}</span>
+                </div>
               </div>
             </div>
+
+            {activeWallet?.address ? (
+              <button
+                type="button"
+                className={`${styles.addressCopyButton} ${vaultAddressCopied ? styles.addressCopyButtonActive : ''}`}
+                onClick={() =>
+                  void copyToClipboard(activeWallet.address, 'Vault address copied.', () => {
+                    setVaultAddressCopied(true);
+                    if (vaultCopyResetTimerRef.current !== null) {
+                      window.clearTimeout(vaultCopyResetTimerRef.current);
+                    }
+                    vaultCopyResetTimerRef.current = window.setTimeout(() => {
+                      setVaultAddressCopied(false);
+                      vaultCopyResetTimerRef.current = null;
+                    }, 1000);
+                  })
+                }
+                title="Copy full vault address"
+              >
+                <span className={styles.addressCopyHeader}>
+                  <span className={styles.muted}>Wallet Address</span>
+                  <span className={styles.copyIcon} aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path
+                        d="M9 9.75A2.25 2.25 0 0 1 11.25 7.5h6A2.25 2.25 0 0 1 19.5 9.75v6A2.25 2.25 0 0 1 17.25 18h-6A2.25 2.25 0 0 1 9 15.75v-6Z"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                      />
+                      <path
+                        d="M15 7.5V6.75A2.25 2.25 0 0 0 12.75 4.5h-6A2.25 2.25 0 0 0 4.5 6.75v6A2.25 2.25 0 0 0 6.75 15H9"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                      />
+                    </svg>
+                  </span>
+                </span>
+                <code className={styles.addressValue}>{activeWallet.address}</code>
+              </button>
+            ) : null}
           </div>
 
-          <div className={styles.heroActions}>
-            {isOwner ? (
+          <div className={styles.walletActions}>
+            {isOwner && management.phase === 'ready' ? (
               <>
-                <button type="button" onClick={() => document.getElementById('wallet-controls')?.scrollIntoView({ behavior: 'smooth' })}>
-                  Wallet Controls
+                <button
+                  type="button"
+                  onClick={() =>
+                    void runManagementAction(
+                      () => managementPost('/api/v1/management/pause', { agentId }).then(() => Promise.resolve()),
+                      'Agent paused.'
+                    )
+                  }
+                >
+                  Pause
                 </button>
-                <button type="button" onClick={() => document.getElementById('approval-history')?.scrollIntoView({ behavior: 'smooth' })}>
-                  Approval History
+                <button
+                  type="button"
+                  onClick={() =>
+                    void runManagementAction(
+                      () => managementPost('/api/v1/management/resume', { agentId }).then(() => Promise.resolve()),
+                      'Agent resumed.'
+                    )
+                  }
+                >
+                  Resume
                 </button>
+                <label className={styles.toggleLabel}>
+                  <input
+                    type="checkbox"
+                    checked={management.data.chainPolicy?.chainEnabled}
+                    onChange={(event) =>
+                      void runManagementAction(
+                        () =>
+                          managementPost('/api/v1/management/chains/update', {
+                            agentId,
+                            chainKey: activeChainKey,
+                            chainEnabled: event.target.checked
+                          }).then(() => Promise.resolve()),
+                        event.target.checked ? 'Chain access enabled.' : 'Chain access disabled.'
+                      )
+                    }
+                  />
+                  Chain enabled
+                </label>
                 <button
                   type="button"
                   className={styles.dangerButton}
@@ -825,790 +904,521 @@ export default function AgentPublicProfilePage() {
                       'Revoked management sessions and rotated owner token.'
                     )
                   }
-                  disabled={!isOwner}
                 >
                   Revoke All
                 </button>
               </>
             ) : (
-              <>
-                <button type="button" disabled={!AGENT_PAGE_CAPABILITIES.watchApi}>
-                  Watch
-                </button>
-                <button type="button" disabled={!AGENT_PAGE_CAPABILITIES.shareApi}>
-                  Share
-                </button>
-                <button type="button" disabled={!AGENT_PAGE_CAPABILITIES.copyAgentLinkApi}>
-                  Copy Agent Link
-                </button>
-              </>
+              <p className={styles.muted}>Viewer mode: owner controls are locked.</p>
             )}
           </div>
         </section>
 
-        <section className={styles.kpiGrid}>
-          <article className={styles.kpiCard}>
+        <section className={styles.kpiStrip}>
+          <article className={styles.kpiChip}>
             <div className={styles.kpiLabel}>Lifetime PnL</div>
-            <div className={styles.kpiValue}>{formatUsd(profile?.latestMetrics?.pnl_usd ?? null)}</div>
+            <div className={styles.kpiValueCompact}>{formatUsd(profile?.latestMetrics?.pnl_usd ?? null)}</div>
           </article>
-          <article className={styles.kpiCard}>
+          <article className={styles.kpiChip}>
             <div className={styles.kpiLabel}>24h Volume</div>
-            <div className={styles.kpiValue}>{formatUsd(profile?.latestMetrics?.volume_usd ?? null)}</div>
+            <div className={styles.kpiValueCompact}>{formatUsd(profile?.latestMetrics?.volume_usd ?? null)}</div>
           </article>
-          <article className={styles.kpiCard}>
+          <article className={styles.kpiChip}>
             <div className={styles.kpiLabel}>Win Rate</div>
-            <div className={styles.kpiValue}>{winRate}</div>
+            <div className={styles.kpiValueCompact}>{winRate}</div>
           </article>
-          <article className={styles.kpiCard}>
+          <article className={styles.kpiChip}>
             <div className={styles.kpiLabel}>Fees Paid</div>
-            <div className={styles.kpiValue}>—</div>
-            <div className={styles.kpiHint}>Placeholder until dedicated fee metric API is added.</div>
+            <div className={styles.kpiValueCompact}>—</div>
           </article>
         </section>
 
-        <div className={styles.grid}>
-          <div className={styles.mainCol}>
-            <article id="wallet-controls" className={styles.card}>
-              <div className={styles.cardHeader}>
-                <h2>Wallet Controls</h2>
-                <span className={styles.muted}>{activeChainLabel}</span>
+        <div className={styles.stack}>
+          <article className={styles.card}>
+            <div className={styles.cardHeader}>
+              <h2>Assets &amp; Approvals</h2>
+              <span className={styles.muted}>{policyApprovalMode === 'auto' ? 'Global Approval: On' : 'Global Approval: Off'}</span>
+            </div>
+            {isOwner ? (
+              <div className={styles.toggleRow}>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={policyApprovalMode === 'auto'}
+                    onChange={(event) => {
+                      const nextMode = event.target.checked ? 'auto' : 'per_trade';
+                      setPolicyApprovalMode(nextMode);
+                      void runManagementAction(
+                        () => managementPost('/api/v1/management/policy/update', buildPolicyUpdatePayload({ approvalMode: nextMode })).then(() => Promise.resolve()),
+                        `Global approval ${nextMode === 'auto' ? 'enabled' : 'disabled'}.`
+                      );
+                    }}
+                  />
+                  Approve all
+                </label>
               </div>
-              {!isOwner ? <p className={styles.muted}>Owner-only controls are locked for viewers.</p> : null}
-              {isOwner && management.phase === 'ready' ? (
-                <>
-                  <div className={styles.toggleRow}>
+            ) : (
+              <p className={styles.muted}>Viewer mode: approval controls are read-only.</p>
+            )}
+            {holdings.length === 0 ? <p className={styles.muted}>No balances detected for this chain.</p> : null}
+            {holdings.map((holding) => (
+              <div key={holding.token} className={styles.listRow}>
+                <div>
+                  <div className={styles.listTitle}>{holding.token}</div>
+                  <div className={styles.muted}>Balance in vault wallet</div>
+                </div>
+                <div className={styles.listMeta}>
+                  <span>{formatUnitsTruncated(holding.amountRaw, holding.decimals, 6)}</span>
+                  {isOwner ? (
                     <button
                       type="button"
-                      onClick={() =>
+                      onClick={() => {
+                        const approved = isTokenPreapproved(holding.token);
+                        const allowedTokens = nextAllowedTokensForSymbol(holding.token, !approved);
                         void runManagementAction(
-                          () => managementPost('/api/v1/management/pause', { agentId }).then(() => Promise.resolve()),
-                          'Agent paused.'
-                        )
-                      }
-                    >
-                      Pause Agent
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        void runManagementAction(
-                          () => managementPost('/api/v1/management/resume', { agentId }).then(() => Promise.resolve()),
-                          'Agent resumed.'
-                        )
-                      }
-                    >
-                      Resume Agent
-                    </button>
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={management.data.chainPolicy?.chainEnabled}
-                        onChange={(event) =>
-                          void runManagementAction(
-                            () =>
-                              managementPost('/api/v1/management/chains/update', {
-                                agentId,
-                                chainKey: activeChainKey,
-                                chainEnabled: event.target.checked
-                              }).then(() => Promise.resolve()),
-                            event.target.checked ? 'Chain access enabled.' : 'Chain access disabled.'
-                          )
-                        }
-                      />
-                      Chain enabled
-                    </label>
-                  </div>
-
-                  <div className={styles.subSection}>
-                    <h3>Deposit &amp; Withdraw</h3>
-                    {activeDepositChain?.depositAddress ? (
-                      <button
-                        type="button"
-                        className={`${styles.addressCopyButton} ${depositAddressCopied ? styles.addressCopyButtonActive : ''}`}
-                        onClick={() =>
-                          void copyToClipboard(activeDepositChain.depositAddress, 'Deposit address copied.', () => {
-                            setDepositAddressCopied(true);
-                            if (depositCopyResetTimerRef.current !== null) {
-                              window.clearTimeout(depositCopyResetTimerRef.current);
-                            }
-                            depositCopyResetTimerRef.current = window.setTimeout(() => {
-                              setDepositAddressCopied(false);
-                              depositCopyResetTimerRef.current = null;
-                            }, 1000);
-                          })
-                        }
-                        title="Click to copy full deposit address"
-                      >
-                        <span className={styles.addressCopyHeader}>
-                          <span className={styles.muted}>Deposit address</span>
-                          <span className={styles.copyIcon} aria-hidden="true">
-                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                              <path
-                                d="M9 9.75A2.25 2.25 0 0 1 11.25 7.5h6A2.25 2.25 0 0 1 19.5 9.75v6A2.25 2.25 0 0 1 17.25 18h-6A2.25 2.25 0 0 1 9 15.75v-6Z"
-                                stroke="currentColor"
-                                strokeWidth="1.5"
-                              />
-                              <path
-                                d="M15 7.5V6.75A2.25 2.25 0 0 0 12.75 4.5h-6A2.25 2.25 0 0 0 4.5 6.75v6A2.25 2.25 0 0 0 6.75 15H9"
-                                stroke="currentColor"
-                                strokeWidth="1.5"
-                              />
-                            </svg>
-                          </span>
-                        </span>
-                        <code className={styles.addressValue}>{activeDepositChain.depositAddress}</code>
-                      </button>
-                    ) : (
-                      <p className={styles.muted}>Deposit address unavailable</p>
-                    )}
-                    <div className={styles.formGrid}>
-                      <label>
-                        Withdraw destination
-                        <input value={withdrawDestination} onChange={(event) => setWithdrawDestination(event.target.value)} />
-                      </label>
-                      <label>
-                        Withdraw amount (ETH)
-                        <input value={withdrawAmount} onChange={(event) => setWithdrawAmount(event.target.value)} />
-                      </label>
-                    </div>
-                    <div className={styles.toggleRow}>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          void runManagementAction(
-                            () =>
-                              managementPost('/api/v1/management/withdraw/destination', {
-                                agentId,
-                                chainKey: activeChainKey,
-                                destination: withdrawDestination
-                              }).then(() => Promise.resolve()),
-                            'Withdraw destination updated.'
-                          )
-                        }
-                      >
-                        Save Destination
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          void runManagementAction(
-                            () =>
-                              managementPost('/api/v1/management/withdraw', {
-                                agentId,
-                                chainKey: activeChainKey,
-                                asset: 'NATIVE',
-                                amount: withdrawAmount,
-                                destination: withdrawDestination
-                              }).then(() => Promise.resolve()),
-                            'Withdraw request submitted.'
-                          )
-                        }
-                      >
-                        Submit Withdraw
-                      </button>
-                    </div>
-                  </div>
-                </>
-              ) : null}
-            </article>
-
-            <article className={styles.card}>
-              <div className={styles.cardHeader}>
-                <h2>Assets &amp; Approvals</h2>
-                <span className={styles.muted}>{policyApprovalMode === 'auto' ? 'Global Approval: On' : 'Global Approval: Off'}</span>
-              </div>
-              {isOwner ? (
-                <div className={styles.toggleRow}>
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={policyApprovalMode === 'auto'}
-                      onChange={(event) => {
-                        const nextMode = event.target.checked ? 'auto' : 'per_trade';
-                        setPolicyApprovalMode(nextMode);
-                        void runManagementAction(
-                          () => managementPost('/api/v1/management/policy/update', buildPolicyUpdatePayload({ approvalMode: nextMode })).then(() => Promise.resolve()),
-                          `Global approval ${nextMode === 'auto' ? 'enabled' : 'disabled'}.`
+                          () => managementPost('/api/v1/management/policy/update', buildPolicyUpdatePayload({ allowedTokens })).then(() => Promise.resolve()),
+                          `${approved ? 'Removed' : 'Added'} ${holding.token} preapproval.`
                         );
                       }}
-                    />
-                    Approve all
-                  </label>
+                    >
+                      {isTokenPreapproved(holding.token) ? 'Preapproved' : 'Preapprove'}
+                    </button>
+                  ) : (
+                    <span className={styles.muted}>{isTokenPreapproved(holding.token) ? 'Preapproved' : 'Not preapproved'}</span>
+                  )}
                 </div>
-              ) : (
-                <p className={styles.muted}>Viewer mode: approval controls are read-only.</p>
-              )}
-              {holdings.length === 0 ? <p className={styles.muted}>No balances detected for this chain.</p> : null}
-              {holdings.map((holding) => (
-                <div key={holding.token} className={styles.listRow}>
-                  <div>
-                    <div className={styles.listTitle}>{holding.token}</div>
-                    <div className={styles.muted}>Balance in vault wallet</div>
-                  </div>
-                  <div className={styles.listMeta}>
-                    <span>{formatUnitsTruncated(holding.amountRaw, holding.decimals, 6)}</span>
-                    {isOwner ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const approved = isTokenPreapproved(holding.token);
-                          const allowedTokens = nextAllowedTokensForSymbol(holding.token, !approved);
-                          void runManagementAction(
-                            () => managementPost('/api/v1/management/policy/update', buildPolicyUpdatePayload({ allowedTokens })).then(() => Promise.resolve()),
-                            `${approved ? 'Removed' : 'Added'} ${holding.token} preapproval.`
-                          );
-                        }}
-                      >
-                        {isTokenPreapproved(holding.token) ? 'Preapproved' : 'Preapprove'}
-                      </button>
-                    ) : (
-                      <span className={styles.muted}>{isTokenPreapproved(holding.token) ? 'Preapproved' : 'Not preapproved'}</span>
-                    )}
-                  </div>
-                </div>
+              </div>
+            ))}
+          </article>
+
+          <article className={styles.card}>
+            <div className={styles.cardHeader}>
+              <h2>Wallet Activity</h2>
+              <span className={styles.muted}>All wallet-impact events</span>
+            </div>
+            <div className={styles.rangeButtons}>
+              {([
+                ['all', 'All'],
+                ['trades', 'Trades'],
+                ['transfers', 'Transfers'],
+                ['approvals', 'Approvals'],
+                ['deposits', 'Deposits/Withdrawals']
+              ] as const).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  className={walletActivityFilter === key ? styles.rangeActive : ''}
+                  onClick={() => setWalletActivityFilter(key)}
+                >
+                  {label}
+                </button>
               ))}
-            </article>
-
-            <article className={styles.card}>
-              <div className={styles.cardHeader}>
-                <h2>Wallet Activity</h2>
-                <span className={styles.muted}>All wallet-impact events</span>
-              </div>
-              <div className={styles.rangeButtons}>
-                {([
-                  ['all', 'All'],
-                  ['trades', 'Trades'],
-                  ['transfers', 'Transfers'],
-                  ['approvals', 'Approvals'],
-                  ['deposits', 'Deposits/Withdrawals']
-                ] as const).map(([key, label]) => (
-                  <button
-                    key={key}
-                    type="button"
-                    className={walletActivityFilter === key ? styles.rangeActive : ''}
-                    onClick={() => setWalletActivityFilter(key)}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-              {filteredWalletTimeline.length === 0 ? <p className={styles.muted}>No wallet activity in this filter.</p> : null}
-              <div className={styles.list}>
-                {filteredWalletTimeline.slice(0, 60).map((row) => (
-                  <div key={row.id} className={styles.listRow}>
-                    <div>
-                      <div className={styles.listTitle}>{row.title}</div>
-                      <div className={styles.muted}>{row.subtitle}</div>
-                      {row.txHash ? <div className={styles.muted}>Tx: {shortenHex(row.txHash, 10, 8)}</div> : null}
-                    </div>
-                    <div className={styles.listMeta}>
-                      <span className={styles.statusChip}>{row.status}</span>
-                      <span>{formatUtc(row.at)} UTC</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </article>
-
-            <article id="approval-history" className={styles.card}>
-              <div className={styles.cardHeader}>
-                <h2>Approval History</h2>
-                <span className={styles.muted}>Trade, policy, and transfer approvals</span>
-              </div>
-              <div className={styles.rangeButtons}>
-                {([
-                  ['all', 'All'],
-                  ['pending', 'Pending'],
-                  ['approved', 'Approved'],
-                  ['rejected', 'Rejected/Denied']
-                ] as const).map(([key, label]) => (
-                  <button
-                    key={key}
-                    type="button"
-                    className={approvalStatusFilter === key ? styles.rangeActive : ''}
-                    onClick={() => setApprovalStatusFilter(key)}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-              {!isOwner ? <p className={styles.muted}>Viewer mode: approval actions are locked.</p> : null}
-              {filteredApprovalHistory.length === 0 ? <p className={styles.muted}>No approvals in this filter.</p> : null}
-              {filteredApprovalHistory.map((row) => (
-                <div key={row.id} className={styles.queueRow}>
+            </div>
+            {filteredWalletTimeline.length === 0 ? <p className={styles.muted}>No wallet activity in this filter.</p> : null}
+            <div className={styles.list}>
+              {filteredWalletTimeline.slice(0, 60).map((row) => (
+                <div key={row.id} className={styles.listRow}>
                   <div>
                     <div className={styles.listTitle}>{row.title}</div>
                     <div className={styles.muted}>{row.subtitle}</div>
-                    <div className={styles.muted}>{formatUtc(row.at)} UTC</div>
+                    {row.txHash ? <div className={styles.muted}>Tx: {shortenHex(row.txHash, 10, 8)}</div> : null}
                   </div>
-                  <div className={styles.queueActions}>
+                  <div className={styles.listMeta}>
                     <span className={styles.statusChip}>{row.status}</span>
-                    {isOwner && (row.status === 'pending' || row.status === 'approval_pending') && row.type === 'trade' ? (
-                      <>
-                        <input
-                          value={approvalRejectReasons[row.raw.trade_id] ?? ''}
-                          onChange={(event) =>
-                            setApprovalRejectReasons((current) => ({
-                              ...current,
-                              [row.raw.trade_id]: event.target.value
-                            }))
-                          }
-                          placeholder="Rejection reason (optional)"
-                        />
-                        <button
-                          type="button"
-                          onClick={() =>
-                            void runManagementAction(
-                              () =>
-                                managementPost('/api/v1/management/approvals/decision', {
-                                  agentId,
-                                  tradeId: row.raw.trade_id,
-                                  decision: 'approve'
-                                }).then(() => Promise.resolve()),
-                              `Approved ${row.raw.trade_id}`
-                            )
-                          }
-                        >
-                          Approve
-                        </button>
-                        <button
-                          type="button"
-                          className={styles.dangerButton}
-                          onClick={() =>
-                            void runManagementAction(
-                              () =>
-                                managementPost('/api/v1/management/approvals/decision', {
-                                  agentId,
-                                  tradeId: row.raw.trade_id,
-                                  decision: 'reject',
-                                  reasonCode: 'approval_rejected',
-                                  reasonMessage: (approvalRejectReasons[row.raw.trade_id] ?? '').trim() || 'Rejected by owner.'
-                                }).then(() => Promise.resolve()),
-                              `Rejected ${row.raw.trade_id}`
-                            )
-                          }
-                        >
-                          Reject
-                        </button>
-                      </>
-                    ) : null}
-                    {isOwner && row.status === 'pending' && row.type === 'policy' ? (
-                      <>
-                        <input
-                          value={approvalRejectReasons[row.raw.request_id] ?? ''}
-                          onChange={(event) =>
-                            setApprovalRejectReasons((current) => ({
-                              ...current,
-                              [row.raw.request_id]: event.target.value
-                            }))
-                          }
-                          placeholder="Rejection reason (optional)"
-                        />
-                        <button
-                          type="button"
-                          onClick={() =>
-                            void runManagementAction(
-                              () =>
-                                managementPost('/api/v1/management/policy-approvals/decision', {
-                                  agentId,
-                                  policyApprovalId: row.raw.request_id,
-                                  decision: 'approve'
-                                }).then(() => Promise.resolve()),
-                              `Approved ${row.raw.request_id}`
-                            )
-                          }
-                        >
-                          Approve
-                        </button>
-                        <button
-                          type="button"
-                          className={styles.dangerButton}
-                          onClick={() =>
-                            void runManagementAction(
-                              () =>
-                                managementPost('/api/v1/management/policy-approvals/decision', {
-                                  agentId,
-                                  policyApprovalId: row.raw.request_id,
-                                  decision: 'reject',
-                                  reasonMessage: (approvalRejectReasons[row.raw.request_id] ?? '').trim() || 'Rejected by owner.'
-                                }).then(() => Promise.resolve()),
-                              `Rejected ${row.raw.request_id}`
-                            )
-                          }
-                        >
-                          Deny
-                        </button>
-                      </>
-                    ) : null}
-                    {isOwner && row.status === 'pending' && row.type === 'transfer' ? (
-                      <>
-                        <input
-                          value={approvalRejectReasons[row.raw.approval_id] ?? ''}
-                          onChange={(event) =>
-                            setApprovalRejectReasons((current) => ({
-                              ...current,
-                              [row.raw.approval_id]: event.target.value
-                            }))
-                          }
-                          placeholder="Rejection reason (optional)"
-                        />
-                        <button
-                          type="button"
-                          onClick={() =>
-                            void runManagementAction(
-                              () =>
-                                managementPost('/api/v1/management/transfer-approvals/decision', {
-                                  agentId,
-                                  approvalId: row.raw.approval_id,
-                                  decision: 'approve',
-                                  chainKey: row.raw.chain_key
-                                }).then(() => Promise.resolve()),
-                              `Approved ${row.raw.approval_id}`
-                            )
-                          }
-                        >
-                          Approve
-                        </button>
-                        <button
-                          type="button"
-                          className={styles.dangerButton}
-                          onClick={() =>
-                            void runManagementAction(
-                              () =>
-                                managementPost('/api/v1/management/transfer-approvals/decision', {
-                                  agentId,
-                                  approvalId: row.raw.approval_id,
-                                  decision: 'deny',
-                                  chainKey: row.raw.chain_key,
-                                  reasonMessage: (approvalRejectReasons[row.raw.approval_id] ?? '').trim() || 'Rejected by owner.'
-                                }).then(() => Promise.resolve()),
-                              `Denied ${row.raw.approval_id}`
-                            )
-                          }
-                        >
-                          Deny
-                        </button>
-                      </>
-                    ) : null}
+                    <span>{formatUtc(row.at)} UTC</span>
                   </div>
                 </div>
               ))}
-            </article>
-          </div>
+            </div>
+          </article>
 
-          <aside className={styles.railCol}>
-            <article className={styles.card}>
-              <div className={styles.cardHeader}>
-                <h3>Copy Trading</h3>
-                <span>{isOwner ? `${copySubscriptions.length} active` : 'viewer'}</span>
+          <article id="approval-history" className={styles.card}>
+            <div className={styles.cardHeader}>
+              <h2>Approval History</h2>
+              <span className={styles.muted}>Trade, policy, and transfer approvals</span>
+            </div>
+            <div className={styles.rangeButtons}>
+              {([
+                ['all', 'All'],
+                ['pending', 'Pending'],
+                ['approved', 'Approved'],
+                ['rejected', 'Rejected/Denied']
+              ] as const).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  className={approvalStatusFilter === key ? styles.rangeActive : ''}
+                  onClick={() => setApprovalStatusFilter(key)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {!isOwner ? <p className={styles.muted}>Viewer mode: approval actions are locked.</p> : null}
+            {filteredApprovalHistory.length === 0 ? <p className={styles.muted}>No approvals in this filter.</p> : null}
+            {filteredApprovalHistory.map((row) => (
+              <div key={row.id} className={styles.queueRow}>
+                <div>
+                  <div className={styles.listTitle}>{row.title}</div>
+                  <div className={styles.muted}>{row.subtitle}</div>
+                  <div className={styles.muted}>{formatUtc(row.at)} UTC</div>
+                </div>
+                <div className={styles.queueActions}>
+                  <span className={styles.statusChip}>{row.status}</span>
+                  {isOwner && (row.status === 'pending' || row.status === 'approval_pending') && row.type === 'trade' ? (
+                    <>
+                      <input
+                        value={approvalRejectReasons[row.raw.trade_id] ?? ''}
+                        onChange={(event) =>
+                          setApprovalRejectReasons((current) => ({
+                            ...current,
+                            [row.raw.trade_id]: event.target.value
+                          }))
+                        }
+                        placeholder="Rejection reason (optional)"
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void runManagementAction(
+                            () =>
+                              managementPost('/api/v1/management/approvals/decision', {
+                                agentId,
+                                tradeId: row.raw.trade_id,
+                                decision: 'approve'
+                              }).then(() => Promise.resolve()),
+                            `Approved ${row.raw.trade_id}`
+                          )
+                        }
+                      >
+                        Approve
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.dangerButton}
+                        onClick={() =>
+                          void runManagementAction(
+                            () =>
+                              managementPost('/api/v1/management/approvals/decision', {
+                                agentId,
+                                tradeId: row.raw.trade_id,
+                                decision: 'reject',
+                                reasonCode: 'approval_rejected',
+                                reasonMessage: (approvalRejectReasons[row.raw.trade_id] ?? '').trim() || 'Rejected by owner.'
+                              }).then(() => Promise.resolve()),
+                            `Rejected ${row.raw.trade_id}`
+                          )
+                        }
+                      >
+                        Reject
+                      </button>
+                    </>
+                  ) : null}
+                  {isOwner && row.status === 'pending' && row.type === 'policy' ? (
+                    <>
+                      <input
+                        value={approvalRejectReasons[row.raw.request_id] ?? ''}
+                        onChange={(event) =>
+                          setApprovalRejectReasons((current) => ({
+                            ...current,
+                            [row.raw.request_id]: event.target.value
+                          }))
+                        }
+                        placeholder="Rejection reason (optional)"
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void runManagementAction(
+                            () =>
+                              managementPost('/api/v1/management/policy-approvals/decision', {
+                                agentId,
+                                policyApprovalId: row.raw.request_id,
+                                decision: 'approve'
+                              }).then(() => Promise.resolve()),
+                            `Approved ${row.raw.request_id}`
+                          )
+                        }
+                      >
+                        Approve
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.dangerButton}
+                        onClick={() =>
+                          void runManagementAction(
+                            () =>
+                              managementPost('/api/v1/management/policy-approvals/decision', {
+                                agentId,
+                                policyApprovalId: row.raw.request_id,
+                                decision: 'reject',
+                                reasonMessage: (approvalRejectReasons[row.raw.request_id] ?? '').trim() || 'Rejected by owner.'
+                              }).then(() => Promise.resolve()),
+                            `Rejected ${row.raw.request_id}`
+                          )
+                        }
+                      >
+                        Deny
+                      </button>
+                    </>
+                  ) : null}
+                  {isOwner && row.status === 'pending' && row.type === 'transfer' ? (
+                    <>
+                      <input
+                        value={approvalRejectReasons[row.raw.approval_id] ?? ''}
+                        onChange={(event) =>
+                          setApprovalRejectReasons((current) => ({
+                            ...current,
+                            [row.raw.approval_id]: event.target.value
+                          }))
+                        }
+                        placeholder="Rejection reason (optional)"
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void runManagementAction(
+                            () =>
+                              managementPost('/api/v1/management/transfer-approvals/decision', {
+                                agentId,
+                                approvalId: row.raw.approval_id,
+                                decision: 'approve',
+                                chainKey: row.raw.chain_key
+                              }).then(() => Promise.resolve()),
+                            `Approved ${row.raw.approval_id}`
+                          )
+                        }
+                      >
+                        Approve
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.dangerButton}
+                        onClick={() =>
+                          void runManagementAction(
+                            () =>
+                              managementPost('/api/v1/management/transfer-approvals/decision', {
+                                agentId,
+                                approvalId: row.raw.approval_id,
+                                decision: 'deny',
+                                chainKey: row.raw.chain_key,
+                                reasonMessage: (approvalRejectReasons[row.raw.approval_id] ?? '').trim() || 'Rejected by owner.'
+                              }).then(() => Promise.resolve()),
+                            `Denied ${row.raw.approval_id}`
+                          )
+                        }
+                      >
+                        Deny
+                      </button>
+                    </>
+                  ) : null}
+                </div>
               </div>
-              {!isOwner ? <p className={styles.muted}>Copy this agent from one of your owned agents after owner session bootstrap.</p> : null}
-              {isOwner ? (
-                <>
-                  {copySubscriptions.length === 0 ? <p className={styles.muted}>No copy subscriptions configured.</p> : null}
-                  {copySubscriptions.map((item) => (
-                    <div key={item.subscriptionId} className={styles.railQueueRow}>
-                      <div>
-                        <div className={styles.listTitle}>Leader: {item.leaderAgentId}</div>
-                        <div className={styles.muted}>
-                          {item.enabled ? 'active' : 'paused'} · scale {(item.scaleBps / 10000).toFixed(2)}x · max {item.maxTradeUsd ?? '—'}
-                        </div>
+            ))}
+          </article>
+
+          <article id="withdraw" className={styles.card}>
+            <div className={styles.cardHeader}>
+              <h2>Withdraw</h2>
+              <span className={styles.muted}>{activeChainLabel}</span>
+            </div>
+            {activeDepositChain?.depositAddress ? (
+              <button
+                type="button"
+                className={`${styles.addressCopyButton} ${depositAddressCopied ? styles.addressCopyButtonActive : ''}`}
+                onClick={() =>
+                  void copyToClipboard(activeDepositChain.depositAddress, 'Deposit address copied.', () => {
+                    setDepositAddressCopied(true);
+                    if (depositCopyResetTimerRef.current !== null) {
+                      window.clearTimeout(depositCopyResetTimerRef.current);
+                    }
+                    depositCopyResetTimerRef.current = window.setTimeout(() => {
+                      setDepositAddressCopied(false);
+                      depositCopyResetTimerRef.current = null;
+                    }, 1000);
+                  })
+                }
+                title="Copy full deposit address"
+              >
+                <span className={styles.addressCopyHeader}>
+                  <span className={styles.muted}>Deposit address</span>
+                  <span className={styles.copyIcon} aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M9 9.75A2.25 2.25 0 0 1 11.25 7.5h6A2.25 2.25 0 0 1 19.5 9.75v6A2.25 2.25 0 0 1 17.25 18h-6A2.25 2.25 0 0 1 9 15.75v-6Z" stroke="currentColor" strokeWidth="1.5" />
+                      <path d="M15 7.5V6.75A2.25 2.25 0 0 0 12.75 4.5h-6A2.25 2.25 0 0 0 4.5 6.75v6A2.25 2.25 0 0 0 6.75 15H9" stroke="currentColor" strokeWidth="1.5" />
+                    </svg>
+                  </span>
+                </span>
+                <code className={styles.addressValue}>{activeDepositChain.depositAddress}</code>
+              </button>
+            ) : (
+              <p className={styles.muted}>Deposit address unavailable</p>
+            )}
+            <div className={styles.formGrid}>
+              <label>
+                Withdraw destination
+                <input value={withdrawDestination} onChange={(event) => setWithdrawDestination(event.target.value)} />
+              </label>
+              <label>
+                Asset
+                <select value={withdrawAsset} onChange={(event) => setWithdrawAsset(event.target.value)}>
+                  {withdrawAssetOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Withdraw amount
+                <input value={withdrawAmount} onChange={(event) => setWithdrawAmount(event.target.value)} />
+                <span className={styles.muted}>
+                  Available: {withdrawSelectedHolding ? formatUnitsTruncated(withdrawSelectedHolding.amountRaw, withdrawSelectedHolding.decimals, 6) : '—'}
+                </span>
+              </label>
+            </div>
+            <div className={styles.toggleRow}>
+              <button type="button" disabled={!withdrawMaxAmount} onClick={() => setWithdrawAmount(withdrawMaxAmount || '0')}>
+                Max
+              </button>
+              <button
+                type="button"
+                disabled={!isOwner || !withdrawDestination.trim() || !withdrawAmount.trim()}
+                onClick={() =>
+                  void runManagementAction(
+                    () =>
+                      managementPost('/api/v1/management/withdraw', {
+                        agentId,
+                        chainKey: activeChainKey,
+                        asset: withdrawAsset,
+                        amount: withdrawAmount,
+                        destination: withdrawDestination
+                      }).then(() => Promise.resolve()),
+                    'Withdraw request submitted.'
+                  )
+                }
+              >
+                Submit Withdraw
+              </button>
+            </div>
+          </article>
+
+          <article className={styles.card}>
+            <div className={styles.cardHeader}>
+              <h3>Copy Trading</h3>
+              <span>{isOwner ? `${copySubscriptions.length} relationships` : 'viewer'}</span>
+            </div>
+            {!isOwner ? <p className={styles.muted}>Copy relationships are owner-only.</p> : null}
+            <p className={styles.muted}>
+              Create copy relationships from <Link href="/explore" className={styles.inlineLink}>Explore</Link>. This panel is review and delete only.
+            </p>
+            {isOwner ? (
+              <>
+                {copySubscriptions.length === 0 ? <p className={styles.muted}>No copy subscriptions configured.</p> : null}
+                {copySubscriptions.map((item) => (
+                  <div key={item.subscriptionId} className={styles.railQueueRow}>
+                    <div>
+                      <div className={styles.listTitle}>Leader: {item.leaderAgentId}</div>
+                      <div className={styles.muted}>
+                        {item.enabled ? 'active' : 'paused'} · scale {(item.scaleBps / 10000).toFixed(2)}x · max {item.maxTradeUsd ?? '—'}
                       </div>
-                      <div className={styles.inlineActions}>
+                    </div>
+                    <div className={styles.inlineActions}>
+                      <button
+                        type="button"
+                        className={styles.dangerButton}
+                        onClick={() =>
+                          void runManagementAction(
+                            () =>
+                              fetch(`/api/v1/copy/subscriptions/${encodeURIComponent(item.subscriptionId)}`, {
+                                method: 'DELETE',
+                                credentials: 'same-origin',
+                                headers: {
+                                  ...(getCsrfToken() ? { 'x-csrf-token': getCsrfToken() as string } : {})
+                                }
+                              }).then((res) => {
+                                if (!res.ok) {
+                                  throw new Error('Failed to delete copy subscription.');
+                                }
+                                return Promise.resolve();
+                              }),
+                            `Deleted copy subscription ${item.subscriptionId}.`
+                          )
+                        }
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </>
+            ) : null}
+          </article>
+
+          <article className={styles.card}>
+            <div className={styles.cardHeader}>
+              <h3>Limit Orders</h3>
+              <span>{isOwner ? `${limitOrders.length} loaded` : 'viewer'}</span>
+            </div>
+            {!isOwner ? <p className={styles.muted}>Viewer mode cannot manage limit orders.</p> : null}
+            {isOwner ? (
+              <>
+                {limitOrders.length === 0 ? <p className={styles.muted}>No open or recent limit orders.</p> : null}
+                {limitOrders.slice(0, 20).map((order) => (
+                  <div key={order.orderId} className={styles.railQueueRow}>
+                    <div>
+                      <div className={styles.listTitle}>
+                        {order.tokenIn} {order.side === 'buy' ? '->' : 'to'} {order.tokenOut}
+                      </div>
+                      <div className={styles.muted}>
+                        {order.status} · amount {order.amountIn} · limit {order.limitPrice}
+                      </div>
+                    </div>
+                    <div className={styles.inlineActions}>
+                      <span className={styles.statusChip}>{order.status}</span>
+                      {(order.status === 'open' || order.status === 'triggered') && (
                         <button
                           type="button"
+                          className={styles.dangerButton}
                           onClick={() =>
                             void runManagementAction(
                               () =>
-                                fetch(`/api/v1/copy/subscriptions/${encodeURIComponent(item.subscriptionId)}`, {
-                                  method: 'PATCH',
-                                  credentials: 'same-origin',
-                                  headers: {
-                                    'content-type': 'application/json',
-                                    ...(getCsrfToken() ? { 'x-csrf-token': getCsrfToken() as string } : {})
-                                  },
-                                  body: JSON.stringify({ enabled: !item.enabled })
-                                }).then((res) => {
-                                  if (!res.ok) {
-                                    throw new Error('Failed to update copy subscription.');
-                                  }
-                                  return Promise.resolve();
-                                }),
-                              `Copy subscription ${item.enabled ? 'paused' : 'resumed'}.`
+                                managementPost(`/api/v1/management/limit-orders/${encodeURIComponent(order.orderId)}/cancel`, {
+                                  agentId
+                                }).then(() => Promise.resolve()),
+                              `Cancelled limit order ${order.orderId}.`
                             )
                           }
                         >
-                          {item.enabled ? 'Pause' : 'Resume'}
+                          Cancel
                         </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </>
+            ) : null}
+          </article>
+
+          <article className={styles.card}>
+            <div className={styles.cardHeader}>
+              <h3>Management Audit Log</h3>
+              <span>{management.phase === 'ready' ? management.data.auditLog.length : '—'}</span>
+            </div>
+            {management.phase === 'ready' && management.data.auditLog.length === 0 ? <p className={styles.muted}>No audit entries.</p> : null}
+            {management.phase === 'ready'
+              ? management.data.auditLog.slice(0, 25).map((entry) => (
+                  <div key={entry.audit_id} className={styles.listRow}>
+                    <div>
+                      <div className={styles.listTitle}>
+                        {entry.action_type} ({entry.action_status})
                       </div>
                     </div>
-                  ))}
-
-                  <div className={styles.subSection}>
-                    <h4>Enable Copy Relationship</h4>
-                    <div className={styles.formGridCompact}>
-                      <label>
-                        Leader agent id
-                        <input value={copyLeaderAgentId} onChange={(event) => setCopyLeaderAgentId(event.target.value)} placeholder="leader agent id" />
-                      </label>
-                      <label>
-                        Scale bps
-                        <input value={copyScaleBps} onChange={(event) => setCopyScaleBps(event.target.value)} />
-                      </label>
-                      <label>
-                        Max trade USD
-                        <input value={copyMaxTradeUsd} onChange={(event) => setCopyMaxTradeUsd(event.target.value)} />
-                      </label>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        void runManagementAction(
-                          () =>
-                            fetch('/api/v1/copy/subscriptions', {
-                              method: 'POST',
-                              credentials: 'same-origin',
-                              headers: {
-                                'content-type': 'application/json',
-                                ...(getCsrfToken() ? { 'x-csrf-token': getCsrfToken() as string } : {})
-                              },
-                              body: JSON.stringify({
-                                leaderAgentId: copyLeaderAgentId.trim(),
-                                followerAgentId: agentId,
-                                enabled: true,
-                                scaleBps: Number(copyScaleBps || '10000'),
-                                maxTradeUsd: copyMaxTradeUsd,
-                                allowedTokens: []
-                              })
-                            }).then((res) => {
-                              if (!res.ok) {
-                                throw new Error('Failed to create copy subscription.');
-                              }
-                              return Promise.resolve();
-                            }),
-                          'Copy subscription saved.'
-                        )
-                      }
-                    >
-                      Save Copy Trading
-                    </button>
+                    <div className={styles.listMeta}>{formatUtc(entry.created_at)} UTC</div>
                   </div>
-                </>
-              ) : null}
-            </article>
-
-            <article className={styles.card}>
-              <div className={styles.cardHeader}>
-                <h3>Limits &amp; Policy</h3>
-              </div>
-              {isOwner && management.phase === 'ready' ? (
-                <div className={styles.keyValueList}>
-                  <div>
-                    <span>Global approval</span>
-                    <span>{management.data.latestPolicy?.approval_mode === 'auto' ? 'On' : 'Off'}</span>
-                  </div>
-                  <div>
-                    <span>Allowlist tokens</span>
-                    <span>{management.data.latestPolicy?.allowed_tokens.length ?? 0}</span>
-                  </div>
-                  <div>
-                    <span>Transfer approval mode</span>
-                    <span>{management.data.transferApprovalPolicy?.transferApprovalMode ?? 'per_transfer'}</span>
-                  </div>
-                  <div>
-                    <span>Chain access</span>
-                    <span>{management.data.chainPolicy.chainEnabled ? 'enabled' : 'disabled'}</span>
-                  </div>
-                </div>
-              ) : (
-                <p className={styles.muted}>Viewer posture summary only. Owner controls are locked.</p>
-              )}
-            </article>
-
-            <article className={styles.card}>
-              <div className={styles.cardHeader}>
-                <h3>Limit Orders</h3>
-                <span>{isOwner ? `${limitOrders.length} loaded` : 'viewer'}</span>
-              </div>
-              {!isOwner ? <p className={styles.muted}>Viewer mode cannot manage limit orders.</p> : null}
-              {isOwner ? (
-                <>
-                  {limitOrders.length === 0 ? <p className={styles.muted}>No open or recent limit orders.</p> : null}
-                  {limitOrders.slice(0, 20).map((order) => (
-                    <div key={order.orderId} className={styles.railQueueRow}>
-                      <div>
-                        <div className={styles.listTitle}>
-                          {order.tokenIn} {order.side === 'buy' ? '->' : 'to'} {order.tokenOut}
-                        </div>
-                        <div className={styles.muted}>
-                          {order.status} · amount {order.amountIn} · limit {order.limitPrice}
-                        </div>
-                      </div>
-                      <div className={styles.inlineActions}>
-                        <span className={styles.statusChip}>{order.status}</span>
-                        {(order.status === 'open' || order.status === 'triggered') && (
-                          <button
-                            type="button"
-                            className={styles.dangerButton}
-                            onClick={() =>
-                              void runManagementAction(
-                                () =>
-                                  managementPost(`/api/v1/management/limit-orders/${encodeURIComponent(order.orderId)}/cancel`, {
-                                    agentId
-                                  }).then(() => Promise.resolve()),
-                                `Cancelled limit order ${order.orderId}.`
-                              )
-                            }
-                          >
-                            Cancel
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </>
-              ) : null}
-            </article>
-
-            <article className={styles.card}>
-              <div className={styles.cardHeader}>
-                <h3>Secondary Operations</h3>
-              </div>
-              {!isOwner ? <p className={styles.muted}>Owner-only operations are hidden in viewer mode.</p> : null}
-              {isOwner && management.phase === 'ready' ? (
-                <>
-                  <div className={styles.subSection}>
-                    <h4>Outbound Transfer Policy</h4>
-                    <div className={styles.toggleRow}>
-                      <label>
-                        <input
-                          type="checkbox"
-                          checked={outboundTransfersEnabled}
-                          onChange={(event) => setOutboundTransfersEnabled(event.target.checked)}
-                        />
-                        Outbound transfers enabled
-                      </label>
-                      <label>
-                        Mode
-                        <select value={outboundMode} onChange={(event) => setOutboundMode(event.target.value as 'disabled' | 'allow_all' | 'whitelist')}>
-                          <option value="disabled">disabled</option>
-                          <option value="allow_all">allow_all</option>
-                          <option value="whitelist">whitelist</option>
-                        </select>
-                      </label>
-                    </div>
-                    <label>
-                      Whitelist addresses (comma-separated)
-                      <input value={outboundWhitelistInput} onChange={(event) => setOutboundWhitelistInput(event.target.value)} />
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        void runManagementAction(
-                          () => managementPost('/api/v1/management/policy/update', buildPolicyUpdatePayload({})).then(() => Promise.resolve()),
-                          'Outbound policy saved.'
-                        )
-                      }
-                    >
-                      Save Outbound Policy
-                    </button>
-                  </div>
-
-                  <div className={styles.subSection}>
-                    <h4>Transfer Approval Policy</h4>
-                    <div className={styles.toggleRow}>
-                      <label>
-                        <input
-                          type="checkbox"
-                          checked={transferApprovalMode === 'auto'}
-                          onChange={(event) => setTransferApprovalMode(event.target.checked ? 'auto' : 'per_transfer')}
-                        />
-                        Auto-approve transfers
-                      </label>
-                      <label>
-                        <input
-                          type="checkbox"
-                          checked={transferNativePreapproved}
-                          disabled={transferApprovalMode === 'auto'}
-                          onChange={(event) => setTransferNativePreapproved(event.target.checked)}
-                        />
-                        Native preapproved
-                      </label>
-                    </div>
-                    <label>
-                      Allowed transfer tokens (comma-separated 0x addresses)
-                      <input value={transferAllowedTokensText} onChange={(event) => setTransferAllowedTokensText(event.target.value)} />
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        void runManagementAction(
-                          () =>
-                            managementPost('/api/v1/management/transfer-policy/update', {
-                              agentId,
-                              chainKey: activeChainKey,
-                              transferApprovalMode,
-                              nativeTransferPreapproved: transferNativePreapproved,
-                              allowedTransferTokens: transferAllowedTokensText
-                                .split(',')
-                                .map((value) => value.trim().toLowerCase())
-                                .filter((value) => /^0x[a-f0-9]{40}$/.test(value))
-                            }).then(() => Promise.resolve()),
-                          'Transfer approval policy updated.'
-                        )
-                      }
-                    >
-                      Save Transfer Approval Policy
-                    </button>
-                  </div>
-
-                  <div className={styles.subSection}>
-                    <h4>Telegram Approval Channel</h4>
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={telegramApprovalsEnabled}
-                        onChange={(event) => {
-                          const next = event.target.checked;
-                          void runManagementAction(
-                            () =>
-                              managementPost('/api/v1/management/approval-channels/update', {
-                                agentId,
-                                chainKey: activeChainKey,
-                                channel: 'telegram',
-                                enabled: next
-                              }).then(() => Promise.resolve()),
-                            `Telegram approvals ${next ? 'enabled' : 'disabled'}.`
-                          );
-                        }}
-                      />
-                      Telegram approvals enabled
-                    </label>
-                  </div>
-                </>
-              ) : null}
-            </article>
-
-            <article className={styles.card}>
-              <div className={styles.cardHeader}>
-                <h3>Management Audit Log</h3>
-                <span>{management.phase === 'ready' ? management.data.auditLog.length : '—'}</span>
-              </div>
-              {management.phase === 'ready' && management.data.auditLog.length === 0 ? <p className={styles.muted}>No audit entries.</p> : null}
-              {management.phase === 'ready'
-                ? management.data.auditLog.slice(0, 25).map((entry) => (
-                    <div key={entry.audit_id} className={styles.listRow}>
-                      <div>
-                        <div className={styles.listTitle}>
-                          {entry.action_type} ({entry.action_status})
-                        </div>
-                      </div>
-                      <div className={styles.listMeta}>{formatUtc(entry.created_at)} UTC</div>
-                    </div>
-                  ))
-                : null}
-            </article>
-          </aside>
+                ))
+              : null}
+          </article>
         </div>
       </section>
     </div>

@@ -1,19 +1,21 @@
 .root {
-  --agent-bg-light: #f6f8fc;
+  --agent-bg-light: #f3f5fa;
   --agent-surface-light: #ffffff;
-  --agent-border-light: #e6ecf5;
-  --agent-text-light: #0b1220;
-  --agent-muted-light: #5b6b84;
+  --agent-elevated-light: #f8faff;
+  --agent-border-light: #dde5f2;
+  --agent-text-light: #0d1526;
+  --agent-muted-light: #5e6e88;
   --agent-accent-light: #2563eb;
   --agent-ok-light: #16a34a;
   --agent-warn-light: #f59e0b;
   --agent-danger-light: #dc2626;
 
-  --agent-bg-dark: #0b1220;
-  --agent-surface-dark: #111a2e;
-  --agent-border-dark: #22304d;
-  --agent-text-dark: #eaf0ff;
-  --agent-muted-dark: #a7b4d0;
+  --agent-bg-dark: #0a111f;
+  --agent-surface-dark: #10182c;
+  --agent-elevated-dark: #141f36;
+  --agent-border-dark: #27344d;
+  --agent-text-dark: #e9efff;
+  --agent-muted-dark: #aab8d3;
   --agent-accent-dark: #3b82f6;
   --agent-ok-dark: #22c55e;
   --agent-warn-dark: #fbbf24;
@@ -21,6 +23,7 @@
 
   --agent-bg: var(--agent-bg-dark);
   --agent-surface: var(--agent-surface-dark);
+  --agent-elevated: var(--agent-elevated-dark);
   --agent-border: var(--agent-border-dark);
   --agent-text: var(--agent-text-dark);
   --agent-muted: var(--agent-muted-dark);
@@ -30,17 +33,15 @@
   --agent-danger: var(--agent-danger-dark);
 
   min-height: calc(100vh - 2rem);
-  display: grid;
-  grid-template-columns: 84px minmax(0, 1fr);
-  gap: 0.9rem;
   color: var(--agent-text);
+  width: 100%;
   max-width: 100%;
-  overflow-x: clip;
 }
 
 :global(:root[data-theme='light']) .root {
   --agent-bg: var(--agent-bg-light);
   --agent-surface: var(--agent-surface-light);
+  --agent-elevated: var(--agent-elevated-light);
   --agent-border: var(--agent-border-light);
   --agent-text: var(--agent-text-light);
   --agent-muted: var(--agent-muted-light);
@@ -50,102 +51,34 @@
   --agent-danger: var(--agent-danger-light);
 }
 
-.sidebar {
-  position: sticky;
-  top: 0.75rem;
-  align-self: start;
-  height: calc(100vh - 1.5rem);
-  border: 1px solid var(--agent-border);
-  border-radius: 22px;
-  background: linear-gradient(180deg, var(--agent-surface), color-mix(in srgb, var(--agent-surface) 78%, transparent));
-  display: grid;
-  grid-template-rows: auto 1fr;
-  padding: 0.8rem 0.45rem;
-}
-
-.sidebarLogo {
-  width: 58px;
-  height: 44px;
-  border-radius: 10px;
-  margin: 0 auto 0.8rem;
-  display: grid;
-  place-items: center;
-  border: 1px solid color-mix(in srgb, var(--agent-accent) 45%, var(--agent-border));
-  background: color-mix(in srgb, var(--agent-accent) 10%, var(--agent-surface));
-  padding: 0.2rem;
-}
-
-.sidebarLogoImage {
-  width: 100%;
-  height: auto;
-  object-fit: contain;
-}
-
-.nav {
-  display: grid;
-  gap: 0.42rem;
-  align-content: start;
-}
-
-.navItem {
-  border: 1px solid transparent;
-  border-radius: 12px;
-  color: var(--agent-muted);
-  display: grid;
-  place-items: center;
-  padding: 0.58rem 0.35rem;
-  min-height: 42px;
-}
-
-.navItem svg {
-  width: 18px;
-  height: 18px;
-}
-
-.navItem:hover {
-  border-color: var(--agent-border);
-  color: var(--agent-text);
-}
-
-.navItemActive {
-  color: var(--agent-text);
-  border-color: color-mix(in srgb, var(--agent-accent) 55%, var(--agent-border));
-  background: color-mix(in srgb, var(--agent-accent) 16%, transparent);
-}
-
 .surface {
   border: 1px solid var(--agent-border);
-  border-radius: 24px;
-  background: radial-gradient(circle at 90% 0%, color-mix(in srgb, var(--agent-accent) 16%, transparent), transparent 30%),
-    linear-gradient(180deg, var(--agent-bg), color-mix(in srgb, var(--agent-bg) 80%, #091428));
-  padding: 0.92rem;
+  border-radius: 22px;
+  background: radial-gradient(circle at 85% 0%, color-mix(in srgb, var(--agent-accent) 14%, transparent), transparent 32%),
+    linear-gradient(180deg, var(--agent-bg), color-mix(in srgb, var(--agent-bg) 84%, #0f1f3a));
+  padding: 1rem;
   min-width: 0;
 }
 
-.topbar {
-  position: sticky;
-  top: 0;
-  z-index: 12;
-  border: 1px solid var(--agent-border);
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--agent-surface) 92%, transparent);
-  backdrop-filter: blur(10px);
-  padding: 0.4rem 0.5rem;
+.utilityBar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 0.34rem;
+  gap: 0.6rem;
+  border: 1px solid var(--agent-border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--agent-surface) 94%, transparent);
+  padding: 0.45rem 0.6rem;
 }
 
-.breadcrumb {
-  font-size: 0.8rem;
-  line-height: 1.2;
+.utilityLabel {
   color: var(--agent-muted);
+  font-size: 0.82rem;
 }
 
-.topControls {
+.utilityControls {
   display: inline-flex;
-  gap: 0.3rem;
+  gap: 0.35rem;
   align-items: center;
 }
 
@@ -155,62 +88,68 @@
   background: var(--agent-surface);
   color: var(--agent-text);
   display: inline-flex;
-  gap: 0.34rem;
+  gap: 0.35rem;
   align-items: center;
   padding: 0.28rem 0.44rem;
   cursor: pointer;
 }
 
-.heroCard,
-.card,
-.kpiCard {
+.walletHeaderCard,
+.kpiChip,
+.card {
   border: 1px solid var(--agent-border);
   border-radius: 16px;
   background: var(--agent-surface);
 }
 
-.heroCard {
-  margin-top: 0.86rem;
-  padding: 0.86rem;
-  display: flex;
-  justify-content: space-between;
-  gap: 0.8rem;
+.walletHeaderCard {
+  margin-top: 0.8rem;
+  padding: 0.85rem;
+  display: grid;
+  gap: 0.7rem;
 }
 
-.heroIdentity {
+.walletHeaderTop {
   display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
   gap: 0.75rem;
+}
+
+.walletIdentity {
+  display: flex;
+  gap: 0.7rem;
+  align-items: flex-start;
   min-width: 0;
 }
 
 .avatar {
-  width: 58px;
-  height: 58px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
   display: grid;
   place-items: center;
   font-weight: 700;
-  background: color-mix(in srgb, var(--agent-accent) 22%, transparent);
-  border: 1px solid color-mix(in srgb, var(--agent-accent) 45%, var(--agent-border));
+  background: color-mix(in srgb, var(--agent-accent) 24%, transparent);
+  border: 1px solid color-mix(in srgb, var(--agent-accent) 46%, var(--agent-border));
   flex: 0 0 auto;
 }
 
-.heroTitleRow {
+.walletTitleRow {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.45rem;
   align-items: center;
   flex-wrap: wrap;
 }
 
-.heroTitleRow h1 {
+.walletTitleRow h1 {
   margin: 0;
-  font-size: 2rem;
-  line-height: 1;
+  font-size: 1.7rem;
+  line-height: 1.05;
 }
 
-.heroMeta,
-.heroTags {
-  margin-top: 0.45rem;
+.walletMeta {
+  margin-top: 0.44rem;
   display: flex;
   gap: 0.45rem;
   flex-wrap: wrap;
@@ -218,279 +157,22 @@
   font-size: 0.83rem;
 }
 
-.heroTags span {
-  border: 1px solid var(--agent-border);
-  border-radius: 999px;
-  padding: 0.22rem 0.5rem;
-  color: var(--agent-text);
-  background: color-mix(in srgb, var(--agent-surface) 88%, transparent);
-}
-
-.okTag {
-  border-color: color-mix(in srgb, var(--agent-ok) 65%, var(--agent-border));
-  color: var(--agent-ok);
-}
-
-.warnTag {
-  border-color: color-mix(in srgb, var(--agent-warn) 65%, var(--agent-border));
-  color: var(--agent-warn);
-}
-
-.heroActions {
+.walletActions {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
-  justify-content: flex-end;
-  align-content: start;
+  align-items: center;
 }
 
-.heroActions button,
-.card button,
-.tabs button,
-.rangeButtons button,
-.queueActions button,
-.inlineActions button {
+.toggleLabel {
+  display: inline-flex;
+  gap: 0.35rem;
+  align-items: center;
+  color: var(--agent-muted);
+  font-size: 0.84rem;
+  padding: 0.2rem 0.35rem;
   border: 1px solid var(--agent-border);
   border-radius: 10px;
-  background: color-mix(in srgb, var(--agent-surface) 90%, transparent);
-  color: var(--agent-text);
-  font: inherit;
-  cursor: pointer;
-  padding: 0.38rem 0.62rem;
-}
-
-.heroActions button:hover,
-.card button:hover,
-.tabs button:hover,
-.rangeButtons button:hover,
-.queueActions button:hover,
-.inlineActions button:hover {
-  border-color: color-mix(in srgb, var(--agent-accent) 60%, var(--agent-border));
-}
-
-.dangerButton {
-  border-color: color-mix(in srgb, var(--agent-danger) 55%, var(--agent-border)) !important;
-  color: var(--agent-danger) !important;
-}
-
-.kpiGrid {
-  margin-top: 0.76rem;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.56rem;
-}
-
-.kpiCard {
-  padding: 0.72rem;
-}
-
-.kpiLabel {
-  color: var(--agent-muted);
-  font-size: 0.74rem;
-}
-
-.kpiValue {
-  margin-top: 0.2rem;
-  font-size: 1.6rem;
-  font-weight: 700;
-  line-height: 1.08;
-}
-
-.kpiHint {
-  margin-top: 0.25rem;
-  color: var(--agent-muted);
-  font-size: 0.74rem;
-}
-
-.tabs {
-  margin-top: 0.75rem;
-  border: 1px solid var(--agent-border);
-  border-radius: 14px;
-  padding: 0.4rem;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.34rem;
-  background: color-mix(in srgb, var(--agent-surface) 95%, transparent);
-}
-
-.tabButton {
-  color: var(--agent-muted);
-}
-
-.tabActive {
-  border-color: color-mix(in srgb, var(--agent-accent) 65%, var(--agent-border)) !important;
-  background: color-mix(in srgb, var(--agent-accent) 20%, transparent) !important;
-}
-
-.grid {
-  margin-top: 0.74rem;
-  display: grid;
-  grid-template-columns: minmax(0, 1.72fr) minmax(300px, 1fr);
-  gap: 0.7rem;
-}
-
-.mainCol,
-.railCol {
-  display: grid;
-  gap: 0.7rem;
-  align-content: start;
-}
-
-.card {
-  padding: 0.76rem;
-}
-
-.cardHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.cardHeader h2,
-.cardHeader h3,
-.cardHeader h4 {
-  margin: 0;
-}
-
-.rangeButtons {
-  display: inline-flex;
-  gap: 0.3rem;
-}
-
-.rangeActive {
-  border-color: color-mix(in srgb, var(--agent-accent) 62%, var(--agent-border)) !important;
-  background: color-mix(in srgb, var(--agent-accent) 20%, transparent) !important;
-}
-
-.chartPlaceholder {
-  margin-top: 0.65rem;
-  border: 1px dashed var(--agent-border);
-  border-radius: 12px;
-  min-height: 184px;
-  display: grid;
-  place-items: center;
-  color: var(--agent-muted);
-  text-align: center;
-  padding: 0.5rem;
-}
-
-.cardFooterMeta {
-  margin-top: 0.5rem;
-  display: flex;
-  justify-content: space-between;
-  color: var(--agent-muted);
-  font-size: 0.8rem;
-}
-
-.list {
-  margin-top: 0.45rem;
-  display: grid;
-  gap: 0.4rem;
-}
-
-.listRow,
-.railQueueRow,
-.queueRow,
-.holdingRow {
-  border: 1px solid var(--agent-border);
-  border-radius: 12px;
-  padding: 0.5rem;
-  display: flex;
-  justify-content: space-between;
-  gap: 0.6rem;
-  align-items: center;
-}
-
-.listRow > div:first-child,
-.railQueueRow > div:first-child,
-.queueRow > div:first-child,
-.holdingRow > span:first-child {
-  min-width: 0;
-}
-
-.holdingRow {
-  margin-top: 0.42rem;
-}
-
-.listTitle {
-  font-weight: 600;
-  overflow-wrap: anywhere;
-  word-break: break-word;
-}
-
-.listMeta {
-  color: var(--agent-muted);
-  display: grid;
-  justify-items: end;
-  gap: 0.2rem;
-  font-size: 0.78rem;
-}
-
-.statusChip {
-  border: 1px solid var(--agent-border);
-  border-radius: 999px;
-  padding: 0.14rem 0.42rem;
-  color: var(--agent-text);
-  font-size: 0.72rem;
-}
-
-.subSection {
-  margin-top: 0.72rem;
-  border: 1px solid var(--agent-border);
-  border-radius: 12px;
-  padding: 0.6rem;
-}
-
-.subSection h3,
-.subSection h4 {
-  margin: 0 0 0.42rem;
-}
-
-.formGrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.45rem;
-}
-
-.formGridCompact {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 0.38rem;
-}
-
-.formGrid label,
-.formGridCompact label {
-  display: grid;
-  gap: 0.2rem;
-  color: var(--agent-muted);
-  font-size: 0.8rem;
-}
-
-.card input,
-.card select,
-.queueActions input {
-  border: 1px solid var(--agent-border);
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--agent-surface) 95%, transparent);
-  color: var(--agent-text);
-  padding: 0.35rem 0.45rem;
-  min-width: 0;
-}
-
-.toggleRow {
-  margin: 0.5rem 0;
-  display: flex;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-  align-items: center;
-}
-
-.toggleRow label {
-  display: inline-flex;
-  gap: 0.32rem;
-  align-items: center;
-  color: var(--agent-muted);
 }
 
 .addressCopyButton {
@@ -500,14 +182,14 @@
   gap: 0.28rem;
   border: 1px solid var(--agent-border);
   border-radius: 10px;
-  background: color-mix(in srgb, var(--agent-surface) 94%, transparent);
+  background: color-mix(in srgb, var(--agent-elevated) 92%, transparent);
   color: var(--agent-text);
   padding: 0.5rem 0.6rem;
   transition: border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
 }
 
 .addressCopyButton:hover {
-  border-color: color-mix(in srgb, var(--agent-accent) 60%, var(--agent-border));
+  border-color: color-mix(in srgb, var(--agent-accent) 62%, var(--agent-border));
 }
 
 .addressCopyButtonActive {
@@ -536,6 +218,138 @@
   word-break: break-word;
 }
 
+.kpiStrip {
+  margin-top: 0.7rem;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.kpiChip {
+  padding: 0.56rem 0.62rem;
+}
+
+.kpiLabel {
+  color: var(--agent-muted);
+  font-size: 0.73rem;
+}
+
+.kpiValueCompact {
+  margin-top: 0.2rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.stack {
+  margin-top: 0.7rem;
+  display: grid;
+  gap: 0.7rem;
+}
+
+.card {
+  padding: 0.76rem;
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.cardHeader h2,
+.cardHeader h3,
+.cardHeader h4 {
+  margin: 0;
+}
+
+.rangeButtons {
+  display: inline-flex;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+}
+
+.rangeActive {
+  border-color: color-mix(in srgb, var(--agent-accent) 62%, var(--agent-border)) !important;
+  background: color-mix(in srgb, var(--agent-accent) 20%, transparent) !important;
+}
+
+.list {
+  margin-top: 0.45rem;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.listRow,
+.railQueueRow,
+.queueRow {
+  border: 1px solid var(--agent-border);
+  border-radius: 12px;
+  padding: 0.5rem;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.listRow > div:first-child,
+.railQueueRow > div:first-child,
+.queueRow > div:first-child {
+  min-width: 0;
+}
+
+.listTitle {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.listMeta {
+  color: var(--agent-muted);
+  display: grid;
+  justify-items: end;
+  gap: 0.2rem;
+  font-size: 0.78rem;
+}
+
+.statusChip {
+  border: 1px solid var(--agent-border);
+  border-radius: 999px;
+  padding: 0.14rem 0.42rem;
+  color: var(--agent-text);
+  font-size: 0.72rem;
+}
+
+.formGrid {
+  margin-top: 0.55rem;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.formGrid label {
+  display: grid;
+  gap: 0.2rem;
+  color: var(--agent-muted);
+  font-size: 0.8rem;
+}
+
+.toggleRow {
+  margin-top: 0.55rem;
+  display: flex;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.toggleRow label {
+  display: inline-flex;
+  gap: 0.32rem;
+  align-items: center;
+  color: var(--agent-muted);
+}
+
 .queueActions,
 .inlineActions {
   display: flex;
@@ -548,54 +362,42 @@
   min-width: 220px;
 }
 
-.placeholderPanel,
-.placeholderLine {
-  margin-top: 0.65rem;
-  border: 1px dashed var(--agent-border);
-  border-radius: 10px;
-  padding: 0.55rem;
-  color: var(--agent-muted);
-  font-size: 0.8rem;
-}
-
-.keyValueList {
-  display: grid;
-  gap: 0.4rem;
-}
-
-.keyValueList > div {
+.walletActions button,
+.card button,
+.rangeButtons button,
+.queueActions button,
+.inlineActions button {
   border: 1px solid var(--agent-border);
   border-radius: 10px;
-  padding: 0.46rem;
-  display: flex;
-  justify-content: space-between;
-  gap: 0.5rem;
-  color: var(--agent-muted);
-}
-
-.keyValueList > div span:last-child {
-  color: var(--agent-text);
-}
-
-.usageRow {
-  display: grid;
-  gap: 0.22rem;
-  margin-top: 0.35rem;
-}
-
-.usageBar {
-  height: 8px;
-  border-radius: 999px;
-  overflow: hidden;
-  border: 1px solid var(--agent-border);
   background: color-mix(in srgb, var(--agent-surface) 90%, transparent);
+  color: var(--agent-text);
+  font: inherit;
+  cursor: pointer;
+  padding: 0.38rem 0.62rem;
 }
 
-.usageFill {
-  display: block;
-  height: 100%;
-  width: 0;
-  background: linear-gradient(90deg, color-mix(in srgb, var(--agent-accent) 85%, white), var(--agent-accent));
+.walletActions button:hover,
+.card button:hover,
+.rangeButtons button:hover,
+.queueActions button:hover,
+.inlineActions button:hover {
+  border-color: color-mix(in srgb, var(--agent-accent) 60%, var(--agent-border));
+}
+
+.dangerButton {
+  border-color: color-mix(in srgb, var(--agent-danger) 55%, var(--agent-border)) !important;
+  color: var(--agent-danger) !important;
+}
+
+.card input,
+.card select,
+.queueActions input {
+  border: 1px solid var(--agent-border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--agent-surface) 95%, transparent);
+  color: var(--agent-text);
+  padding: 0.35rem 0.45rem;
+  min-width: 0;
 }
 
 .warningBanner,
@@ -616,6 +418,11 @@
   color: var(--agent-ok);
 }
 
+.inlineLink {
+  color: var(--agent-accent);
+  text-decoration: underline;
+}
+
 .muted {
   color: var(--agent-muted);
   font-size: 0.82rem;
@@ -632,37 +439,23 @@
   padding: 0.9rem;
 }
 
-@media (max-width: 1200px) {
-  .kpiGrid {
+@media (max-width: 1080px) {
+  .kpiStrip {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .grid {
-    grid-template-columns: minmax(0, 1fr);
+  .formGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-@media (max-width: 900px) {
-  .root {
-    grid-template-columns: minmax(0, 1fr);
+@media (max-width: 820px) {
+  .surface {
+    padding: 0.8rem;
   }
 
-  .sidebar {
-    position: static;
-    height: auto;
-    grid-template-rows: auto;
-  }
-
-  .nav {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-
-  .heroCard {
+  .walletHeaderTop {
     flex-direction: column;
-  }
-
-  .heroActions {
-    justify-content: flex-start;
   }
 
   .formGrid {

@@ -1360,6 +1360,17 @@ paths:
           description: Subscription updated.
         '404':
           $ref: '#/components/responses/ErrorResponse'
+    delete:
+      summary: Delete copy subscription.
+      security:
+        - managementCookie: []
+      parameters:
+        - $ref: '#/components/parameters/SubscriptionIdPath'
+      responses:
+        '200':
+          description: Subscription deleted.
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
 components:
   parameters:
     AgentIdPath:

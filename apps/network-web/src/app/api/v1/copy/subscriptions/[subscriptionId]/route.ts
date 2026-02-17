@@ -182,3 +182,81 @@ export async function PATCH(
     return internalErrorResponse(requestId);
   }
 }
+
+export async function DELETE(
+  req: NextRequest,
+  context: { params: Promise<{ subscriptionId: string }> }
+) {
+  const requestId = getRequestId(req);
+
+  try {
+    const { subscriptionId } = await context.params;
+
+    const auth = await requireManagementSession(req, requestId);
+    if (!auth.ok) {
+      return auth.response;
+    }
+
+    const csrf = requireCsrfToken(req, requestId);
+    if (!csrf.ok) {
+      return csrf.response;
+    }
+
+    const result = await withTransaction(async (client) => {
+      const existing = await client.query<{
+        subscription_id: string;
+        leader_agent_id: string;
+        follower_agent_id: string;
+      }>(
+        `
+        select subscription_id, leader_agent_id, follower_agent_id
+        from copy_subscriptions
+        where subscription_id = $1
+        limit 1
+        `,
+        [subscriptionId]
+      );
+
+      if ((existing.rowCount ?? 0) === 0) {
+        return { ok: false as const, kind: 'missing' as const };
+      }
+
+      const row = existing.rows[0];
+      if (row.follower_agent_id !== auth.session.agentId) {
+        return { ok: false as const, kind: 'forbidden' as const };
+      }
+
+      await client.query('delete from copy_subscriptions where subscription_id = $1', [subscriptionId]);
+      await recomputeMetricsForAgents(client, [row.leader_agent_id, row.follower_agent_id]);
+      return { ok: true as const };
+    });
+
+    if (!result.ok) {
+      if (result.kind === 'missing') {
+        return errorResponse(
+          404,
+          {
+            code: 'payload_invalid',
+            message: 'Copy subscription was not found.',
+            actionHint: 'Verify subscriptionId and retry.'
+          },
+          requestId
+        );
+      }
+
+      return errorResponse(
+        401,
+        {
+          code: 'auth_invalid',
+          message: 'Subscription does not belong to authenticated follower session.',
+          actionHint: 'Use the management session for the subscription follower agent.'
+        },
+        requestId
+      );
+    }
+
+    return successResponse({ ok: true, subscriptionId }, 200, requestId);
+  } catch {
+    return internalErrorResponse(requestId);
+  }
+}

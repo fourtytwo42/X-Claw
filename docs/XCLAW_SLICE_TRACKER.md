@@ -671,7 +671,7 @@ Goal:
 
 DoD:
 - [x] docs sync first: source-of-truth + roadmap + tracker + openapi + context/spec/tasks/acceptance aligned to Slice 37.
-- [x] management toggle remains chain-scoped (`Telegram approvals enabled`) and no longer returns/shows a secret.
+- [x] Telegram approvals remain chain-scoped, default enabled, and no longer return/show a secret; `/agents/:id` does not expose a manual Telegram toggle.
 - [x] OpenClaw Telegram callback approve uses `xclaw-agent` API key to post `approval_pending -> approved` via `/api/v1/trades/:tradeId/status` (agent-auth + Idempotency-Key).
 - [x] channel-auth endpoint `/api/v1/channel/approvals/decision` removed and OpenAPI/schemas updated.
 - [x] `/agents/:id` management rail no longer instructs configuring `XCLAW_APPROVALS_TELEGRAM_SECRET`.
@@ -1310,10 +1310,11 @@ Goal:
 
 DoD:
 - [x] docs sync first: source-of-truth + roadmap + tracker + context/spec/tasks/acceptance aligned to Slice 73.
-- [x] `/agents/:id` is direct-replaced with new desktop-first wallet-first layout (hero, KPI strip, single continuous wallet workspace, secondary modules demoted).
+- [x] `/agents/:id` is direct-replaced with MetaMask-style full-screen wallet layout (no dashboard sidebar shell), compact KPI chips, and single continuous wallet workspace.
 - [x] existing APIs remain unchanged; owner operations continue using existing management routes.
 - [x] unsupported API surfaces render explicit placeholders/disabled controls (no speculative backend changes).
 - [x] viewer mode hides owner-only controls while preserving public profile observability.
+- [x] secondary operations / transfer policy editor surfaces are removed from `/agents/:id`; transfer approval actions/history remain visible in approvals modules.
 - [x] dark/light themes remain supported with dark default.
 - [x] canonical status vocabulary remains unchanged (`active`, `offline`, `degraded`, `paused`, `deactivated`).
 - [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`.
@@ -1406,6 +1407,7 @@ DoD:
   - [x] `GET /api/v1/copy/subscriptions`
   - [x] `POST /api/v1/copy/subscriptions`
   - [x] `PATCH /api/v1/copy/subscriptions/:subscriptionId`
+  - [x] `DELETE /api/v1/copy/subscriptions/:subscriptionId`
 - [x] copy-trade CTA behavior:
   - [x] owner: modal + save flow wired
   - [x] viewer: disabled/gated copy with explicit messaging
@@ -1419,3 +1421,25 @@ DoD:
 
 Blocker:
 - Desktop dark/light screenshots for `/explore` still pending attachment in issue #28.
+
+---
+
+## Slice 77: Agent Wallet Page MetaMask-Style Full-Screen Refactor (`/agents/:id`)
+Status: [!]
+Issue: #29 (to be created / mapped)
+
+Goal:
+- Reframe `/agents/:id` as a MetaMask-style full-screen wallet experience, remove transfer/outbound policy editor clutter, and preserve existing owner/viewer controls and API contracts.
+
+DoD:
+- [x] docs sync first: source-of-truth + roadmap + tracker + context/spec/tasks/acceptance aligned to Slice 77.
+- [x] `/agents/:id` no longer uses dashboard sidebar shell framing; chain selector + theme remain in compact utility bar.
+- [x] wallet-first module order present: header + compact KPI chips + assets/approvals + activity + approval history + withdraw + copy + limit orders + audit.
+- [x] `Secondary Operations` section removed.
+- [x] transfer/outbound policy editor controls removed from `/agents/:id` while transfer approval actions/history remain in approvals surfaces.
+- [x] copy relationships on `/agents/:id` remain list/delete only with create flow guidance to `/explore`.
+- [x] light/dark support preserved and responsive overflow remains safe.
+- [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`.
+
+Blocker:
+- Issue mapping and screenshot evidence post pending.

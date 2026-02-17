@@ -2398,8 +2398,13 @@ Note:
   - [x] unified wallet activity timeline (trades/transfers/deposits/approvals)
   - [x] integrated approval history/actions in wallet context
   - [x] secondary modules (copy/risk/ops/audit) demoted below primary wallet stack
+- [x] Finalize `/agents/:id` as MetaMask-style full-screen wallet shell:
+  - [x] remove dashboard sidebar shell framing from this route
+  - [x] keep compact KPI chips under wallet header
+  - [x] remove `Secondary Operations` and transfer/outbound policy editor controls
+  - [x] keep copy relationships as list/delete only with create flow directed to `/explore`
 - [x] Preserve existing API integration for profile/trades/activity/management actions.
-- [x] Keep owner controls reachable (policy, approvals, transfer policy/approvals, limits, audit, withdraw/deposit, pause/resume, revoke-all).
+- [x] Keep owner controls reachable (policy approvals, approval decisions, limits, audit, withdraw, pause/resume, revoke-all).
 - [x] Enforce viewer lock behavior for owner-only controls.
 - [x] Add explicit placeholder states for unsupported API-backed modules.
 - [x] Add frontend view-model/capability modules:
@@ -2521,7 +2526,7 @@ Note:
 - [x] Wire existing data surfaces:
   - [x] public agents + leaderboard
   - [x] owner session context
-  - [x] copy subscriptions get/create/update
+  - [x] copy subscriptions get/create/update/delete
 - [x] Add explicit placeholders/disabled controls for unsupported enriched filters/metadata.
 - [x] Update dashboard/agent/approvals/settings nav links to `/explore`.
 - [x] Treat `/explore` as dashboard-shell route in `public-shell`.
@@ -2538,3 +2543,44 @@ Note:
   - [x] owner mode (my agents + copy-trade save flow)
   - [x] placeholders for unsupported filter dimensions
   - [ ] desktop dark/light screenshots for `/explore`
+
+---
+
+## 77) Slice 77: Agent Wallet Page MetaMask-Style Full-Screen Refactor (`/agents/:id`)
+
+### 77.1 Canonical/doc sync
+- [x] Add Slice 77 goal/DoD + issue mapping to `docs/XCLAW_SLICE_TRACKER.md`.
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` Slice 73 contract for MetaMask-style full-screen wallet shell.
+- [x] Update handoff/process artifacts:
+  - [x] `docs/CONTEXT_PACK.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+
+### 77.2 Implementation
+- [x] Refactor `/agents/:id` from dashboard shell framing to full-screen wallet shell.
+- [x] Keep chain selector + theme toggle in compact utility bar.
+- [x] Keep compact KPI chip row below wallet header.
+- [x] Recompose wallet-first stack:
+  - [x] Assets & Approvals
+  - [x] Wallet Activity
+  - [x] Approval History
+  - [x] Withdraw
+  - [x] Copy relationships (list/delete only)
+  - [x] Limit Orders
+  - [x] Management Audit Log
+- [x] Remove `Secondary Operations` card and transfer/outbound policy editor controls.
+- [x] Preserve existing owner/viewer auth boundaries and management endpoint wiring.
+
+### 77.3 Validation + evidence
+- [x] Run required gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+- [ ] Record functional verification evidence:
+  - [x] transfer/outbound policy editor controls removed from `/agents/:id`
+  - [x] copy relationship create guidance points to `/explore`
+  - [x] approval/withdraw/order/audit surfaces remain reachable
+  - [ ] desktop dark/light screenshots for `/agents/:id`

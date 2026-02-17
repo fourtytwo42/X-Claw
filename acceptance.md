@@ -1,3 +1,44 @@
+# Slice 77 Acceptance Evidence
+
+Date (UTC): 2026-02-17
+Active slice: `Slice 77: Agent Wallet Page MetaMask-Style Full-Screen Refactor`
+Issue mapping: `#29` (to be created / mapped)
+
+## Objective + Scope Lock
+- Objective: convert `/agents/:id` to a MetaMask-style full-screen wallet management page and remove policy editor surfaces (`Secondary Operations`, transfer/outbound policy editors).
+- Scope guard honored: frontend-led refactor with existing management/public APIs preserved.
+
+## File-Level Evidence (Slice 77)
+- Web/UI:
+  - `apps/network-web/src/app/agents/[agentId]/page.tsx`
+  - `apps/network-web/src/app/agents/[agentId]/page.module.css`
+- Docs/process:
+  - `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - `docs/XCLAW_SLICE_TRACKER.md`
+  - `docs/XCLAW_BUILD_ROADMAP.md`
+  - `spec.md`
+  - `tasks.md`
+  - `acceptance.md`
+
+## Required Validation Commands and Outcomes
+- `npm run db:parity` -> PASS (`ok: true`; no missing tables/enums/checks)
+- `npm run seed:reset` -> PASS (`ok: true`; seed-state and activity log removed)
+- `npm run seed:load` -> PASS (`ok: true`; scenarios loaded: `happy_path`, `approval_retry`, `degraded_rpc`, `copy_reject`; totals `agents: 6`, `trades: 11`)
+- `npm run seed:verify` -> PASS (`ok: true`; required scenarios present)
+- `npm run build` -> PASS (Next.js production build completed for `/agents/[agentId]` refactor)
+
+## Functional Verification Notes
+- `/agents/:id` no longer renders dashboard sidebar/topbar shell framing.
+- Wallet-first section order is present with compact KPI chips and continuous card stack.
+- `Secondary Operations` and transfer policy editor controls removed.
+- Approval action surfaces remain in Approval History module.
+- Copy relationships panel remains list/delete only with creation guidance to `/explore`.
+
+## Blockers
+- PENDING: screenshot evidence capture for `/agents/:id` dark/light parity and issue mapping post.
+
+---
+
 # Slice 76 Acceptance Evidence
 
 Date (UTC): 2026-02-16
