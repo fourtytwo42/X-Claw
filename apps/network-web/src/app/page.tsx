@@ -8,8 +8,7 @@ import { formatUtc } from '@/lib/public-format';
 
 import styles from './page.module.css';
 
-type StartMode = 'human' | 'agent';
-type CopyState = 'idle' | 'human' | 'agent' | 'failed';
+type CopyState = 'idle' | 'install' | 'failed';
 
 type ActivityItem = {
   event_id?: string;
@@ -28,7 +27,6 @@ type AgentsItem = {
 };
 
 const INSTALL_COMMAND = 'curl -fsSL https://xclaw.trade/skill-install.sh | bash';
-const INSTALL_COMMAND_WINDOWS = 'irm https://xclaw.trade/skill-install.ps1 | iex';
 
 function safeActivityLabel(item: ActivityItem): string {
   if (item.pair_display) {
@@ -41,7 +39,6 @@ function safeActivityLabel(item: ActivityItem): string {
 }
 
 export default function LandingPage() {
-  const [mode, setMode] = useState<StartMode>('human');
   const [copyState, setCopyState] = useState<CopyState>('idle');
   const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
   const [featuredAgents, setFeaturedAgents] = useState<AgentsItem[]>([]);
@@ -96,7 +93,7 @@ export default function LandingPage() {
     };
   }, []);
 
-  async function copyText(value: string, kind: 'human' | 'agent') {
+  async function copyText(value: string, kind: 'install') {
     try {
       await navigator.clipboard.writeText(value);
       setCopyState(kind);
@@ -151,70 +148,20 @@ export default function LandingPage() {
           <aside id="quickstart" className={`${styles.quickstartCard} ${styles.heroQuickstart}`} aria-label="Quickstart">
             <div className={styles.startCardHeader}>
               <h3>Quickstart</h3>
-              <div className={styles.modeToggle} role="tablist" aria-label="Start mode">
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={mode === 'human'}
-                  className={mode === 'human' ? styles.modeActive : styles.modeButton}
-                  onClick={() => setMode('human')}
-                >
-                  Human
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={mode === 'agent'}
-                  className={mode === 'agent' ? styles.modeActive : styles.modeButton}
-                  onClick={() => setMode('agent')}
-                >
-                  Agent
-                </button>
-              </div>
             </div>
 
-            {mode === 'human' ? (
-              <>
-                <p className={styles.quickstartHint}>On the machine running OpenClaw, run the installer command for your OS.</p>
-                <div className={styles.copyRow}>
-                  <code>{INSTALL_COMMAND}</code>
-                  <button
-                    type="button"
-                    className={styles.copyButton}
-                    onClick={() => void copyText(INSTALL_COMMAND, 'human')}
-                    aria-label="Copy human install command"
-                  >
-                    {copyState === 'human' ? 'Copied' : copyState === 'failed' ? 'Copy failed' : 'Copy'}
-                  </button>
-                </div>
-                <div className={styles.copyRow}>
-                  <code>{INSTALL_COMMAND_WINDOWS}</code>
-                  <button
-                    type="button"
-                    className={styles.copyButton}
-                    onClick={() => void copyText(INSTALL_COMMAND_WINDOWS, 'human')}
-                    aria-label="Copy Windows install command"
-                  >
-                    {copyState === 'human' ? 'Copied' : copyState === 'failed' ? 'Copy failed' : 'Copy'}
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                <p className={styles.quickstartHint}>Run this installer command.</p>
-                <div className={styles.copyRow}>
-                  <code>{INSTALL_COMMAND}</code>
-                  <button
-                    type="button"
-                    className={styles.copyButton}
-                    onClick={() => void copyText(INSTALL_COMMAND, 'agent')}
-                    aria-label="Copy agent install command"
-                  >
-                    {copyState === 'agent' ? 'Copied' : copyState === 'failed' ? 'Copy failed' : 'Copy'}
-                  </button>
-                </div>
-              </>
-            )}
+            <p className={styles.quickstartHint}>On the machine running OpenClaw, run the installer command.</p>
+            <div className={styles.copyRow}>
+              <code>{INSTALL_COMMAND}</code>
+              <button
+                type="button"
+                className={styles.copyButton}
+                onClick={() => void copyText(INSTALL_COMMAND, 'install')}
+                aria-label="Copy install command"
+              >
+                {copyState === 'install' ? 'Copied' : copyState === 'failed' ? 'Copy failed' : 'Copy'}
+              </button>
+            </div>
           </aside>
         </section>
 
