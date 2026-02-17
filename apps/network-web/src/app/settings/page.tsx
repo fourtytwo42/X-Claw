@@ -512,28 +512,6 @@ export default function SettingsPage() {
             </section>
 
             <section className={styles.card}>
-              <h2>Auto-Lock and Safety</h2>
-              <div className={styles.inlineForm}>
-                <label htmlFor="settings-autolock">Auto-lock approvals after idle</label>
-                <select
-                  id="settings-autolock"
-                  value={preferences.autoLock}
-                  onChange={(event) =>
-                    setPreferences((current) => ({
-                      ...current,
-                      autoLock: event.target.value as PreferencesState['autoLock']
-                    }))
-                  }
-                >
-                  <option value="never">Never</option>
-                  <option value="5m">5m</option>
-                  <option value="15m">15m</option>
-                  <option value="1h">1h</option>
-                </select>
-              </div>
-            </section>
-
-            <section className={styles.card}>
               <h2>Privacy</h2>
               <div className={styles.toggleList}>
                 <label>
