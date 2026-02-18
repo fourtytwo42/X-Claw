@@ -641,9 +641,7 @@ class TradePathRuntimeTests(unittest.TestCase):
         self.assertEqual(str(swap_values[1]), "570")
 
     def test_telegram_prompt_includes_swap_details(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir, mock.patch.dict(
-            cli.os.environ, {"XCLAW_TELEGRAM_DIRECT_APPROVAL_PROMPTS": "1"}, clear=False
-        ), mock.patch.object(cli, "APP_DIR", pathlib.Path(tmpdir)), mock.patch.object(
+        with tempfile.TemporaryDirectory() as tmpdir, mock.patch.object(cli, "APP_DIR", pathlib.Path(tmpdir)), mock.patch.object(
             cli, "APPROVAL_PROMPTS_FILE", pathlib.Path(tmpdir) / "approval_prompts.json"
         ), mock.patch.object(
             cli, "_get_approval_prompt", return_value=None
@@ -703,9 +701,7 @@ class TradePathRuntimeTests(unittest.TestCase):
             self.assertIn("xappr|r|trd_abc|base_sepolia", callback_data)
 
     def test_telegram_transfer_prompt_includes_details_and_callbacks(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir, mock.patch.dict(
-            cli.os.environ, {"XCLAW_TELEGRAM_DIRECT_APPROVAL_PROMPTS": "1"}, clear=False
-        ), mock.patch.object(cli, "APP_DIR", pathlib.Path(tmpdir)), mock.patch.object(
+        with tempfile.TemporaryDirectory() as tmpdir, mock.patch.object(cli, "APP_DIR", pathlib.Path(tmpdir)), mock.patch.object(
             cli, "APPROVAL_PROMPTS_FILE", pathlib.Path(tmpdir) / "approval_prompts.json"
         ), mock.patch.object(
             cli, "_read_openclaw_last_delivery", return_value={"lastChannel": "telegram", "lastTo": "123", "lastThreadId": None}
@@ -753,33 +749,9 @@ class TradePathRuntimeTests(unittest.TestCase):
             self.assertIn("xfer|r|xfr_abc|base_sepolia", callback_data)
 
     def test_telegram_transfer_prompt_skips_when_last_channel_not_telegram(self) -> None:
-        with mock.patch.dict(
-            cli.os.environ, {"XCLAW_TELEGRAM_DIRECT_APPROVAL_PROMPTS": "1"}, clear=False
-        ), mock.patch.object(cli, "_read_openclaw_last_delivery", return_value={"lastChannel": "web", "lastTo": "123", "lastThreadId": None}), mock.patch.object(
+        with mock.patch.object(cli, "_read_openclaw_last_delivery", return_value={"lastChannel": "web", "lastTo": "123", "lastThreadId": None}), mock.patch.object(
             cli, "_run_subprocess"
         ) as run_mock:
-            cli._maybe_send_telegram_transfer_approval_prompt(
-                {
-                    "approvalId": "xfr_abc",
-                    "chainKey": "base_sepolia",
-                    "transferType": "token",
-                    "tokenSymbol": "WETH",
-                    "tokenDecimals": 18,
-                    "amountWei": "1000000000000000",
-                    "toAddress": "0x9099d24d55c105818b4e9ee117d87bc11063cf10",
-                }
-            )
-        run_mock.assert_not_called()
-
-    def test_telegram_direct_prompts_disabled_by_default(self) -> None:
-        with mock.patch.dict(cli.os.environ, {}, clear=True), mock.patch.object(
-            cli, "_read_openclaw_last_delivery", return_value={"lastChannel": "telegram", "lastTo": "123", "lastThreadId": None}
-        ), mock.patch.object(cli, "_run_subprocess") as run_mock:
-            cli._maybe_send_telegram_approval_prompt(
-                "trd_abc",
-                "base_sepolia",
-                {"amountInHuman": "1", "tokenInSymbol": "WETH", "tokenOutSymbol": "USDC"},
-            )
             cli._maybe_send_telegram_transfer_approval_prompt(
                 {
                     "approvalId": "xfr_abc",

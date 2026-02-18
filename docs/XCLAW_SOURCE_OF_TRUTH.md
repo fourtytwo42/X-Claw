@@ -2592,9 +2592,11 @@ Limitations / notes:
      - it must run a JS syntax check on the patched output (e.g. `node --check`) before writing,
      - and it should target only the canonical gateway bundle(s) (at minimum `dist/reply-*.js`), not broadly patch every dist file that happens to match heuristics.
 5. Trade lifecycle:
-   - when a trade is inserted as `approval_pending`, primary delivery is the queued approval message in chat with inline buttons attached by OpenClaw gateway.
-   - direct out-of-band runtime Telegram prompt sends are disabled by default to avoid test-channel spam.
-   - optional direct prompt sends are allowed only when `XCLAW_TELEGRAM_DIRECT_APPROVAL_PROMPTS=1`.
+   - when a trade is inserted as `approval_pending`, runtime sends a Telegram approval prompt when OpenClaw’s last active channel is Telegram (session store `lastChannel == "telegram"`).
+   - Telegram prompt content must be self-describing and include:
+     - swap summary: `<amountIn> <tokenInSymbol> -> <tokenOutSymbol>`,
+     - `chainKey`,
+     - `tradeId`.
    - Preferred delivery: inline buttons in the agent's queued message (single Telegram message).
      - OpenClaw gateway auto-attaches the inline keyboard when the queued message includes `Status: approval_pending` and `Trade ID: trd_...`.
      - The model may also emit OpenClaw `[[buttons: ...]]` directives, but auto-attach is the portability default.
@@ -2820,8 +2822,7 @@ Limitations / notes:
      - if transfer is terminal (`filled|failed|rejected`), decision returns converged terminal success,
    - final deterministic transfer result message is always sent to chat (`status`, `approvalId`, `chain`, `txHash` when available),
    - synthetic `[X-CLAW TRANSFER RESULT]` message is routed to agent pipeline for narrative follow-up,
-   - transfer approval creation does not send out-of-band Telegram prompts by default,
-   - optional direct prompt sends are allowed only when `XCLAW_TELEGRAM_DIRECT_APPROVAL_PROMPTS=1` and OpenClaw `lastChannel == telegram`,
+   - transfer approval creation sends an out-of-band Telegram approval prompt only when OpenClaw `lastChannel == telegram`,
    - if active channel is not Telegram, no transfer approval prompt is pushed to chat (approval remains web-manageable),
    - when transfer status is `approval_pending`, user-facing skill reply must be concise (queued for management approval) and must not dump raw queued transfer message text.
    - before broadcasting approved transfers, runtime must run balance preflight checks:

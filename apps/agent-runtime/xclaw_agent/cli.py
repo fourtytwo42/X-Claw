@@ -2567,11 +2567,6 @@ def _last_delivery_is_telegram() -> bool:
     return str(delivery.get("lastChannel") or "").strip().lower() == "telegram"
 
 
-def _direct_telegram_approval_prompts_enabled() -> bool:
-    raw = str(os.environ.get("XCLAW_TELEGRAM_DIRECT_APPROVAL_PROMPTS") or "").strip().lower()
-    return raw in {"1", "true", "yes", "on"}
-
-
 def _require_openclaw_bin() -> str:
     env_path = (os.environ.get("OPENCLAW_BIN") or "").strip()
     if env_path:
@@ -2635,8 +2630,6 @@ def _post_approval_prompt_metadata(trade_id: str, chain: str, to_addr: str, thre
         raise WalletStoreError(f"{code}: {message}")
 
 def _maybe_send_telegram_approval_prompt(trade_id: str, chain: str, summary: dict[str, Any] | None = None) -> None:
-    if not _direct_telegram_approval_prompts_enabled():
-        return
     # Avoid duplicate sends.
     existing = _get_approval_prompt(trade_id)
     if existing and str(existing.get("channel") or "") == "telegram":
@@ -2714,8 +2707,6 @@ def _maybe_send_telegram_approval_prompt(trade_id: str, chain: str, summary: dic
 
 
 def _maybe_send_telegram_transfer_approval_prompt(flow: dict[str, Any]) -> None:
-    if not _direct_telegram_approval_prompts_enabled():
-        return
     approval_id = str(flow.get("approvalId") or "").strip()
     chain = str(flow.get("chainKey") or "").strip()
     if not approval_id or not chain:
