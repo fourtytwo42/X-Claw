@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
 set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-PYTHONPATH="${SCRIPT_DIR}/..:${PYTHONPATH:-}" exec python3 -m xclaw_agent.cli "$@"
+PYTHON_BIN="${XCLAW_AGENT_PYTHON_BIN:-python3}"
+PYTHONPATH="${SCRIPT_DIR}/..:${PYTHONPATH:-}" exec "$PYTHON_BIN" -m xclaw_agent.cli "$@"

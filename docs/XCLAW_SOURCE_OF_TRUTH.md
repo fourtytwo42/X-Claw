@@ -1248,6 +1248,7 @@ Configured under `skills.entries.xclaw-agent.env` in `~/.openclaw/openclaw.json`
 
 Optional non-interactive wallet automation env:
 - `XCLAW_WALLET_PASSPHRASE` (enables non-interactive `wallet-sign-challenge`)
+- `XCLAW_AGENT_PYTHON_BIN` (optional absolute interpreter path used by `xclaw-agent`; installer sets this automatically when a fallback runtime venv is needed)
 
 Runtime binary requirements for skill operation:
 - `openclaw`

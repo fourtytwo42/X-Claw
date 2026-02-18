@@ -28,6 +28,10 @@ if (-not $env:XCLAW_API_BASE_URL) { $env:XCLAW_API_BASE_URL = "${origin}/api/v1"
 if (-not $env:XCLAW_DEFAULT_CHAIN) { $env:XCLAW_DEFAULT_CHAIN = "base_sepolia" }
 
 function Resolve-Python {
+  if ($env:XCLAW_AGENT_PYTHON_BIN -and (Test-Path $env:XCLAW_AGENT_PYTHON_BIN)) {
+    return @($env:XCLAW_AGENT_PYTHON_BIN)
+  }
+
   $py = Get-Command python -ErrorAction SilentlyContinue
   if ($py) {
     return @($py.Source)
@@ -91,14 +95,36 @@ function Ensure-PythonRuntimeDeps {
   } catch {
     $getPipPath = Join-Path $tmpRoot "get-pip.py"
     Write-Host "[xclaw] pip still unavailable; bootstrapping via get-pip.py"
-    Invoke-WebRequest -Uri "https://bootstrap.pypa.io/get-pip.py" -OutFile $getPipPath
-    Invoke-Python $getPipPath "--user" | Out-Null
+    try {
+      Invoke-WebRequest -Uri "https://bootstrap.pypa.io/get-pip.py" -OutFile $getPipPath
+      Invoke-Python $getPipPath "--user" | Out-Null
+    } catch {
+      # Continue to venv fallback.
+    }
   }
 
-  Invoke-Python "-m" "pip" "--version" | Out-Null
+  $usingVenv = $false
+  try {
+    Invoke-Python "-m" "pip" "--version" | Out-Null
+  } catch {
+    $venvDir = Join-Path $HOME ".xclaw-agent\\runtime-venv"
+    Write-Host "[xclaw] pip unavailable on system interpreter; creating fallback venv at $venvDir"
+    Invoke-Python "-m" "venv" $venvDir | Out-Null
+    $venvPython = Join-Path $venvDir "Scripts\\python.exe"
+    if (-not (Test-Path $venvPython)) {
+      throw "Fallback venv python not found: $venvPython"
+    }
+    $env:XCLAW_AGENT_PYTHON_BIN = $venvPython
+    $usingVenv = $true
+    Invoke-Python "-m" "pip" "--version" | Out-Null
+  }
 
   Write-Host "[xclaw] installing python runtime deps from $requirementsPath"
-  Invoke-Python "-m" "pip" "install" "--disable-pip-version-check" "--user" "-r" $requirementsPath | Out-Null
+  if ($usingVenv) {
+    Invoke-Python "-m" "pip" "install" "--disable-pip-version-check" "-r" $requirementsPath | Out-Null
+  } else {
+    Invoke-Python "-m" "pip" "install" "--disable-pip-version-check" "--user" "-r" $requirementsPath | Out-Null
+  }
 
   $hasArgon2 = Test-PythonImport -ModuleName "argon2"
   $hasKeccak = Test-PythonImport -ModuleName "Crypto.Hash.keccak"
@@ -379,6 +405,7 @@ try {
     Write-Host "[xclaw] configuring OpenClaw skill env defaults"
     Set-OpenClawConfigSafe "skills.entries.xclaw-agent.env.XCLAW_API_BASE_URL" "$($env:XCLAW_API_BASE_URL)"
     Set-OpenClawConfigSafe "skills.entries.xclaw-agent.env.XCLAW_DEFAULT_CHAIN" "$($env:XCLAW_DEFAULT_CHAIN)"
+    Set-OpenClawConfigSafe "skills.entries.xclaw-agent.env.XCLAW_AGENT_PYTHON_BIN" "$($env:XCLAW_AGENT_PYTHON_BIN)"
     if ($env:XCLAW_AGENT_ID) {
       Set-OpenClawConfigSafe "skills.entries.xclaw-agent.env.XCLAW_AGENT_ID" "$($env:XCLAW_AGENT_ID)"
     }

@@ -104,17 +104,33 @@ PY
 
   if ! "$py_bin" -m pip --version >/dev/null 2>&1; then
     echo "[xclaw] pip still unavailable; bootstrapping via get-pip.py"
-    curl -fsSL https://bootstrap.pypa.io/get-pip.py -o "$tmp_dir/get-pip.py"
-    "$py_bin" "$tmp_dir/get-pip.py" --user >/dev/null 2>&1
+    if curl -fsSL https://bootstrap.pypa.io/get-pip.py -o "$tmp_dir/get-pip.py"; then
+      "$py_bin" "$tmp_dir/get-pip.py" --user >/dev/null 2>&1 || true
+    fi
   fi
 
   if ! "$py_bin" -m pip --version >/dev/null 2>&1; then
-    echo "[xclaw] unable to provision pip for $py_bin"
-    exit 1
+    local venv_dir="$HOME/.xclaw-agent/runtime-venv"
+    echo "[xclaw] pip unavailable on system interpreter; creating fallback venv at $venv_dir"
+    "$py_bin" -m venv "$venv_dir" >/dev/null 2>&1 || {
+      echo "[xclaw] unable to provision pip or create venv fallback"
+      exit 1
+    }
+    py_bin="$venv_dir/bin/python"
+    if [ ! -x "$py_bin" ]; then
+      echo "[xclaw] fallback venv python not found at $py_bin"
+      exit 1
+    fi
+    export XCLAW_PYTHON_BIN="$py_bin"
+    export XCLAW_PYTHON_IN_VENV="1"
   fi
 
   echo "[xclaw] installing python runtime deps from $req_file"
-  "$py_bin" -m pip install --disable-pip-version-check --user -r "$req_file"
+  if [ "\${XCLAW_PYTHON_IN_VENV:-0}" = "1" ]; then
+    "$py_bin" -m pip install --disable-pip-version-check -r "$req_file"
+  else
+    "$py_bin" -m pip install --disable-pip-version-check --user -r "$req_file"
+  fi
 
   if ! "$py_bin" - <<'PY' >/dev/null 2>&1
 import importlib
@@ -174,6 +190,7 @@ if ! XCLAW_PYTHON_BIN="$(resolve_python_bin)"; then
   exit 1
 fi
 ensure_python_runtime_deps "$XCLAW_PYTHON_BIN"
+export XCLAW_AGENT_PYTHON_BIN="$XCLAW_PYTHON_BIN"
 echo "[xclaw] running setup_agent_skill.py"
 "$XCLAW_PYTHON_BIN" skills/xclaw-agent/scripts/setup_agent_skill.py
 
@@ -206,6 +223,7 @@ echo "[xclaw] using runtime launcher: $XCLAW_AGENT_BIN"
 echo "[xclaw] configuring OpenClaw skill env defaults"
 openclaw config set skills.entries.xclaw-agent.env.XCLAW_API_BASE_URL "$XCLAW_API_BASE_URL" || true
 openclaw config set skills.entries.xclaw-agent.env.XCLAW_DEFAULT_CHAIN "$XCLAW_DEFAULT_CHAIN" || true
+openclaw config set skills.entries.xclaw-agent.env.XCLAW_AGENT_PYTHON_BIN "$XCLAW_AGENT_PYTHON_BIN" || true
 if [ -n "\${XCLAW_AGENT_ID:-}" ]; then
   openclaw config set skills.entries.xclaw-agent.env.XCLAW_AGENT_ID "$XCLAW_AGENT_ID" || true
 fi
