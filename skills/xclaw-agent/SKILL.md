@@ -155,12 +155,6 @@ Poll server intents:
 python3 {baseDir}/scripts/xclaw_agent_skill.py intents-poll
 ```
 
-Run limit-order loop one iteration (useful for testing):
-
-```bash
-python3 {baseDir}/scripts/xclaw_agent_skill.py limit-orders-run-once
-```
-
 Check approval state for an intent:
 
 ```bash
@@ -291,22 +285,7 @@ Wallet creation is installer-managed on first bootstrap and is not exposed as an
 Wallet import/remove are also not exposed as agent skill commands.
 Outbound transfers are owner-policy gated (`disabled` / `allow_all` / `whitelist`) and enforced for both native and token transfers.
 
-Limit-order commands:
-
-```bash
-python3 {baseDir}/scripts/xclaw_agent_skill.py limit-orders-create <real> <side> <token_in> <token_out> <amount_in> <limit_price> <slippage_bps>
-python3 {baseDir}/scripts/xclaw_agent_skill.py limit-orders-cancel <order_id>
-python3 {baseDir}/scripts/xclaw_agent_skill.py limit-orders-list
-python3 {baseDir}/scripts/xclaw_agent_skill.py limit-orders-run-loop
-```
-
-Note: `limit-orders-run-loop` returns a single JSON object per invocation (no multi-line JSON output).
-
-Limit price units (locked):
-- `limit_price` is `token_in per 1 token_out` (example: `buy USDC WETH ... 2500` means "buy WETH when price is <= 2500 USDC per 1 WETH")
-- Trigger rules:
-  - `buy` triggers when `currentPrice <= limitPrice`
-  - `sell` triggers when `currentPrice >= limitPrice`
+Limit-order commands are intentionally not exposed through this skill surface.
 
 ## References
 

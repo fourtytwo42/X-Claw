@@ -20,7 +20,6 @@ import {
   type ActivityPayload,
   type AgentProfilePayload,
   type DepositPayload,
-  type LimitOrderItem,
   type ManagementStatePayload,
   type TradePayload,
   tokenSymbolByAddress
@@ -40,31 +39,6 @@ type ManagementViewState =
   | { phase: 'unauthorized' }
   | { phase: 'error'; message: string }
   | { phase: 'ready'; data: ManagementStatePayload };
-
-type TrackedAgent = {
-  trackingId: string;
-  trackedAgentId: string;
-  agentName: string;
-  publicStatus: string;
-  walletAddress: string | null;
-  lastActivityAt: string | null;
-  lastHeartbeatAt: string | null;
-  latestMetrics: {
-    pnlUsd: string | null;
-    returnPct: string | null;
-    volumeUsd: string | null;
-    tradesCount: number;
-    asOf: string | null;
-  } | null;
-  createdAt: string;
-};
-
-type TrackedAgentsGetPayload = {
-  ok: boolean;
-  agentId: string;
-  chainKey: string;
-  items: TrackedAgent[];
-};
 
 type SessionAgentsPayload = {
   managedAgents?: string[];
@@ -536,8 +510,6 @@ export default function AgentPublicProfilePage() {
   const [depositData, setDepositData] = useState<DepositPayload | null>(null);
   const [x402Payments, setX402Payments] = useState<X402PaymentsPayload | null>(null);
   const [x402ReceiveLink, setX402ReceiveLink] = useState<X402ReceiveLinkPayload | null>(null);
-  const [limitOrders, setLimitOrders] = useState<LimitOrderItem[]>([]);
-  const [trackedAgents, setTrackedAgents] = useState<TrackedAgent[]>([]);
   const [vaultAddressCopied, setVaultAddressCopied] = useState(false);
   const vaultCopyResetTimerRef = useRef<number | null>(null);
   const telegramAutoEnableInFlightRef = useRef<Set<string>>(new Set());
@@ -559,10 +531,6 @@ export default function AgentPublicProfilePage() {
   const [auditPage, setAuditPage] = useState(1);
   const [walletExpanded, setWalletExpanded] = useState(false);
   const [walletPage, setWalletPage] = useState(1);
-  const [trackedExpanded, setTrackedExpanded] = useState(false);
-  const [trackedPage, setTrackedPage] = useState(1);
-  const [limitExpanded, setLimitExpanded] = useState(false);
-  const [limitPage, setLimitPage] = useState(1);
 
   const [policyApprovalMode, setPolicyApprovalMode] = useState<'per_trade' | 'auto'>('per_trade');
   const [policyMaxTradeUsd, setPolicyMaxTradeUsd] = useState('50');
@@ -821,8 +789,6 @@ export default function AgentPublicProfilePage() {
       setDepositData(null);
       setX402Payments(null);
       setX402ReceiveLink(null);
-      setLimitOrders([]);
-      setTrackedAgents([]);
       return;
     }
 
@@ -866,19 +832,15 @@ export default function AgentPublicProfilePage() {
       }
     }
 
-    const [depositPayload, x402PaymentsPayload, x402ReceivePayload, limitOrderPayload, trackedPayload] = await Promise.all([
+    const [depositPayload, x402PaymentsPayload, x402ReceivePayload] = await Promise.all([
       managementGet(`/api/v1/management/deposit?agentId=${encodeURIComponent(agentId)}&chainKey=${encodeURIComponent(activeChainKey)}`),
       managementGet(`/api/v1/management/x402/payments?agentId=${encodeURIComponent(agentId)}&chainKey=${encodeURIComponent(activeChainKey)}`),
-      managementGet(`/api/v1/management/x402/receive-link?agentId=${encodeURIComponent(agentId)}&chainKey=${encodeURIComponent(activeChainKey)}`),
-      managementGet(`/api/v1/management/limit-orders?agentId=${encodeURIComponent(agentId)}&chainKey=${encodeURIComponent(activeChainKey)}&limit=50`),
-      managementGet(`/api/v1/management/tracked-agents?agentId=${encodeURIComponent(agentId)}&chainKey=${encodeURIComponent(activeChainKey)}`)
+      managementGet(`/api/v1/management/x402/receive-link?agentId=${encodeURIComponent(agentId)}&chainKey=${encodeURIComponent(activeChainKey)}`)
     ]);
 
     setDepositData(depositPayload as DepositPayload);
     setX402Payments(x402PaymentsPayload as X402PaymentsPayload);
     setX402ReceiveLink(x402ReceivePayload as X402ReceiveLinkPayload);
-    setLimitOrders(((limitOrderPayload as { items?: LimitOrderItem[] }).items ?? []).filter(Boolean));
-    setTrackedAgents(((trackedPayload as TrackedAgentsGetPayload).items ?? []).filter(Boolean));
   }, [activeChainKey, agentId, bootstrapToken]);
 
   const refreshAll = useCallback(async (options?: { showLoading?: boolean }) => {
@@ -1692,26 +1654,6 @@ export default function AgentPublicProfilePage() {
     const start = (normalizedWalletPage - 1) * 10;
     return holdings.slice(start, start + 10);
   }, [holdings, normalizedWalletPage, walletExpanded]);
-  const trackedTotalPages = trackedExpanded ? Math.max(1, Math.ceil(trackedAgents.length / 10)) : 1;
-  const normalizedTrackedPage = Math.min(trackedPage, trackedTotalPages);
-  const visibleTrackedAgents = useMemo(() => {
-    if (!trackedExpanded) {
-      return trackedAgents.slice(0, 3);
-    }
-    const start = (normalizedTrackedPage - 1) * 10;
-    return trackedAgents.slice(start, start + 10);
-  }, [normalizedTrackedPage, trackedAgents, trackedExpanded]);
-  const limitTotalPages = limitExpanded ? Math.max(1, Math.ceil(limitOrders.length / 10)) : 1;
-  const normalizedLimitPage = Math.min(limitPage, limitTotalPages);
-  const visibleLimitOrders = useMemo(() => {
-    if (!limitExpanded) {
-      return limitOrders.slice(0, 3);
-    }
-    const start = (normalizedLimitPage - 1) * 10;
-    return limitOrders.slice(start, start + 10);
-  }, [limitExpanded, limitOrders, normalizedLimitPage]);
-  const trackedRecentTrades = management.phase === 'ready' ? management.data.trackedRecentTrades ?? [] : [];
-
   useEffect(() => {
     setWalletPage(1);
   }, [walletExpanded, holdings.length]);
@@ -1719,14 +1661,6 @@ export default function AgentPublicProfilePage() {
   useEffect(() => {
     setWalletActivityPage(1);
   }, [walletActivityExpanded, walletActivityFilter, selectedWalletTokens, filteredWalletTimeline.length]);
-
-  useEffect(() => {
-    setTrackedPage(1);
-  }, [trackedAgents.length, trackedExpanded]);
-
-  useEffect(() => {
-    setLimitPage(1);
-  }, [limitExpanded, limitOrders.length]);
 
   const renderUtilityBar = () => (
     <header className={styles.utilityBar}>
@@ -2550,170 +2484,6 @@ export default function AgentPublicProfilePage() {
                 <p className={styles.muted}>Payment link setup is unavailable right now.</p>
               )}
             </article>
-
-            <article className={`${styles.card} ${styles.walletCard}`}>
-            <div className={`${styles.cardHeader} ${styles.walletCardHeader}`}>
-              <h3>Tracked Agents</h3>
-              <span>{isOwner ? `${trackedAgents.length} tracked` : 'view only'}</span>
-            </div>
-            {!isOwner ? <p className={styles.muted}>Only the owner can manage tracked agents.</p> : null}
-            <p className={styles.muted}>
-              Track agents from <Link href="/explore?section=saved" className={styles.inlineLink}>Explore</Link>. Use this list for ideas and manual trades.
-            </p>
-            {isOwner ? (
-              <>
-                {trackedAgents.length === 0 ? <p className={styles.muted}>No tracked agents yet.</p> : null}
-                {visibleTrackedAgents.map((item) => (
-                  <div key={item.trackingId} className={styles.railQueueRow}>
-                    <div>
-                      <div className={styles.listTitle}>{item.agentName}</div>
-                      <div className={styles.muted}>
-                        {humanizeKeyLabel(item.publicStatus)} · PnL {formatUsd(item.latestMetrics?.pnlUsd ?? '0')} · Volume{' '}
-                        {formatUsd(item.latestMetrics?.volumeUsd ?? '0')}
-                      </div>
-                    </div>
-                    <div className={styles.inlineActions}>
-                      <button
-                        type="button"
-                        className={styles.dangerButton}
-                        onClick={() =>
-                          void runManagementAction(
-                            () => managementDelete('/api/v1/management/tracked-agents', { agentId, trackedAgentId: item.trackedAgentId }).then(() => Promise.resolve()),
-                            'Tracked agent removed.'
-                          )
-                        }
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  </div>
-                ))}
-                {trackedAgents.length > 3 ? (
-                  <div className={styles.paginationRow}>
-                    <button type="button" onClick={() => setTrackedExpanded((current) => !current)}>
-                      {trackedExpanded ? 'Show less' : 'Show more'}
-                    </button>
-                    {trackedExpanded && trackedAgents.length > 10 ? (
-                      <div className={styles.paginationControls}>
-                        <button
-                          type="button"
-                          onClick={() => setTrackedPage((current) => Math.max(1, current - 1))}
-                          disabled={normalizedTrackedPage <= 1}
-                        >
-                          Prev
-                        </button>
-                        <span className={styles.muted}>
-                          Page {normalizedTrackedPage} / {trackedTotalPages}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setTrackedPage((current) => Math.min(trackedTotalPages, current + 1))}
-                          disabled={normalizedTrackedPage >= trackedTotalPages}
-                        >
-                          Next
-                        </button>
-                      </div>
-                    ) : null}
-                  </div>
-                ) : null}
-                <div className={styles.muted} style={{ marginTop: '0.6rem' }}>Recent tracked trades</div>
-                {trackedRecentTrades.length === 0 ? <p className={styles.muted}>No recent filled trades from tracked agents.</p> : null}
-                {trackedRecentTrades.slice(0, 6).map((trade) => (
-                  <div key={trade.tradeId} className={styles.railQueueRow}>
-                    <div>
-                      <div className={styles.listTitle}>
-                        <Link href={`/agents/${encodeURIComponent(trade.trackedAgentId)}`} className={styles.inlineLink}>
-                          {trade.agentName}
-                        </Link>{' '}
-                        · {displayStatusLabel(trade.status)}
-                      </div>
-                      <div className={styles.muted}>
-                        {(trade.pair ?? `${trade.tokenIn} -> ${trade.tokenOut}`)} · {formatUtc(trade.createdAt)} UTC
-                      </div>
-                    </div>
-                    <div className={styles.inlineActions}>
-                      <Link href={`/agents/${encodeURIComponent(trade.trackedAgentId)}`} className={styles.inlineLink}>
-                        Open
-                      </Link>
-                    </div>
-                  </div>
-                ))}
-              </>
-            ) : null}
-          </article>
-
-            <article className={`${styles.card} ${styles.walletCard}`}>
-            <div className={`${styles.cardHeader} ${styles.walletCardHeader}`}>
-              <h3>Limit Orders</h3>
-              <span>{isOwner ? `${limitOrders.length} loaded` : 'view only'}</span>
-            </div>
-            {!isOwner ? <p className={styles.muted}>Only the owner can manage limit orders.</p> : null}
-            {isOwner ? (
-              <>
-                {limitOrders.length === 0 ? <p className={styles.muted}>No open or recent limit orders.</p> : null}
-                {visibleLimitOrders.map((order) => (
-                  <div key={order.orderId} className={styles.railQueueRow}>
-                    <div>
-                      <div className={styles.listTitle}>
-                        {order.tokenIn} {order.side === 'buy' ? '->' : 'to'} {order.tokenOut}
-                      </div>
-                      <div className={styles.muted}>
-                        {displayStatusLabel(order.status)} · amount {order.amountIn} · limit {order.limitPrice}
-                      </div>
-                    </div>
-                    <div className={styles.inlineActions}>
-                      <span className={styles.statusChip}>{displayStatusLabel(order.status)}</span>
-                      {(order.status === 'open' || order.status === 'triggered') && (
-                        <button
-                          type="button"
-                          className={styles.dangerButton}
-                          onClick={() =>
-                            void runManagementAction(
-                              () =>
-                                managementPost(`/api/v1/management/limit-orders/${encodeURIComponent(order.orderId)}/cancel`, {
-                                  agentId
-                                }).then(() => Promise.resolve()),
-                              'Limit order canceled.'
-                            )
-                          }
-                        >
-                          Cancel
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-                {limitOrders.length > 3 ? (
-                  <div className={styles.paginationRow}>
-                    <button type="button" onClick={() => setLimitExpanded((current) => !current)}>
-                      {limitExpanded ? 'Show less' : 'Show more'}
-                    </button>
-                    {limitExpanded && limitOrders.length > 10 ? (
-                      <div className={styles.paginationControls}>
-                        <button
-                          type="button"
-                          onClick={() => setLimitPage((current) => Math.max(1, current - 1))}
-                          disabled={normalizedLimitPage <= 1}
-                        >
-                          Prev
-                        </button>
-                        <span className={styles.muted}>
-                          Page {normalizedLimitPage} / {limitTotalPages}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setLimitPage((current) => Math.min(limitTotalPages, current + 1))}
-                          disabled={normalizedLimitPage >= limitTotalPages}
-                        >
-                          Next
-                        </button>
-                      </div>
-                    ) : null}
-                  </div>
-                ) : null}
-              </>
-            ) : null}
-          </article>
 
           </aside>
         </div>

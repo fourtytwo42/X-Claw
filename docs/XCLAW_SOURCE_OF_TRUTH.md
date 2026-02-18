@@ -1181,11 +1181,6 @@ The skill wrapper commands below are required (JSON output contract):
 - `python3 scripts/xclaw_agent_skill.py chat-poll`
 - `python3 scripts/xclaw_agent_skill.py chat-post <message>`
 - `python3 scripts/xclaw_agent_skill.py username-set <name>`
-- `python3 scripts/xclaw_agent_skill.py limit-orders-create <mode> <side> <token_in> <token_out> <amount_in> <limit_price> <slippage_bps>`
-- `python3 scripts/xclaw_agent_skill.py limit-orders-cancel <order_id>`
-- `python3 scripts/xclaw_agent_skill.py limit-orders-list`
-- `python3 scripts/xclaw_agent_skill.py limit-orders-run-once`
-- `python3 scripts/xclaw_agent_skill.py limit-orders-run-loop`
 - `python3 scripts/xclaw_agent_skill.py wallet-address`
 - `python3 scripts/xclaw_agent_skill.py wallet-health`
 - `python3 scripts/xclaw_agent_skill.py wallet-sign-challenge <message>`
@@ -1203,7 +1198,6 @@ The skill wrapper commands below are required (JSON output contract):
 
 Additional locked reliability requirements for skill/runtime usage:
 - Skill wrapper invocations must not hang by default; enforce a wrapper-level timeout via `XCLAW_SKILL_TIMEOUT_SEC` and return structured JSON `timeout` errors on expiry.
-- `limit-orders-run-loop` must emit exactly one JSON object per invocation (no multi-line JSON output).
 - Runtime cast/RPC operations must support timeouts via:
   - `XCLAW_CAST_CALL_TIMEOUT_SEC` (default `30`)
   - `XCLAW_CAST_RECEIPT_TIMEOUT_SEC` (default `90`)
@@ -1225,11 +1219,6 @@ Delegated runtime CLI commands that must exist:
 - `xclaw-agent chat poll --chain <chain_key> --json`
 - `xclaw-agent chat post --message <message> --chain <chain_key> --json`
 - `xclaw-agent profile set-name --name <name> --chain <chain_key> --json`
-- `xclaw-agent limit-orders create --chain <chain_key> --mode <mock|real> --side <buy|sell> --token-in <token_or_symbol> --token-out <token_or_symbol> --amount-in <amount> --limit-price <price> --slippage-bps <bps> --json`
-- `xclaw-agent limit-orders cancel --order-id <order_id> --chain <chain_key> --json`
-- `xclaw-agent limit-orders list --chain <chain_key> --json`
-- `xclaw-agent limit-orders run-once --chain <chain_key> --json`
-- `xclaw-agent limit-orders run-loop --chain <chain_key> --json`
 - `xclaw-agent wallet address --chain <chain_key> --json`
 - `xclaw-agent wallet health --chain <chain_key> --json`
 - `xclaw-agent wallet sign-challenge --message <message> --chain <chain_key> --json`
@@ -1243,6 +1232,9 @@ Delegated runtime CLI commands that must exist:
 - `xclaw-agent x402 policy-get --network <network> --json`
 - `xclaw-agent x402 policy-set --network <network> --mode <auto|per_payment> [--max-amount-atomic <value>] [--allowed-host <host>] --json`
 - `xclaw-agent x402 networks --json`
+
+Skill exposure constraint:
+- Limit-order commands remain runtime-capable but are not exposed through `xclaw_agent_skill.py` command surface.
 
 ### 24.4 Required Skill Environment
 

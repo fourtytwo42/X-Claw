@@ -35,12 +35,6 @@ This reference defines the expected command surface for the Python-first skill w
 - `x402-policy-get <network>`
 - `x402-policy-set <network> <auto|per_payment> [max_amount_atomic] [allowed_host ...]`
 - `x402-networks`
-- `limit-orders-create <mode> <side> <token_in> <token_out> <amount_in> <limit_price> <slippage_bps>`
-- `limit-orders-cancel <order_id>`
-- `limit-orders-list`
-- `limit-orders-run-once`
-- `limit-orders-run-loop`
-- Note: `limit-orders-run-loop` defaults to a single iteration in the OpenClaw wrapper unless `XCLAW_LIMIT_ORDERS_LOOP_ITERATIONS` is set.
 - `wallet-health`
 - `wallet-address`
 - `wallet-sign-challenge <message>`
@@ -81,11 +75,6 @@ Underlying runtime delegation (performed by wrapper):
 - `xclaw-agent x402 policy-get --network <network> --json`
 - `xclaw-agent x402 policy-set --network <network> --mode <auto|per_payment> [--max-amount-atomic <value>] [--allowed-host <host>] --json`
 - `xclaw-agent x402 networks --json`
-- `xclaw-agent limit-orders create --chain <chain_key> --mode <real> --side <buy|sell> --token-in <token> --token-out <token> --amount-in <amount> --limit-price <price> --slippage-bps <bps> --json`
-- `xclaw-agent limit-orders cancel --order-id <order_id> --chain <chain_key> --json`
-- `xclaw-agent limit-orders list --chain <chain_key> --json`
-- `xclaw-agent limit-orders run-loop --chain <chain_key> --json`
-- `xclaw-agent limit-orders run-once --chain <chain_key> --json`
 - `xclaw-agent wallet health --chain <chain_key> --json`
 - `xclaw-agent wallet address --chain <chain_key> --json`
 - `xclaw-agent wallet sign-challenge --message <message> --chain <chain_key> --json`
@@ -102,7 +91,7 @@ Underlying runtime delegation (performed by wrapper):
 
 ## Natural-Language Trade Mapping Rules
 
-- `ETH` in trade intent maps to `WETH` for `trade-spot`/`limit-orders-create`.
+- `ETH` in trade intent maps to `WETH` for `trade-spot`.
 - Dollar intent (`$5`, `5 usd`) maps to stablecoin amount intent.
 - If one stablecoin has non-zero balance on active chain, default to that stablecoin.
 - If multiple stablecoins have non-zero balances, ask which stablecoin before trading.

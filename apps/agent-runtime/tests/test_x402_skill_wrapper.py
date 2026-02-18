@@ -161,5 +161,11 @@ class X402SkillWrapperTests(unittest.TestCase):
         emitted = json.loads(buf.getvalue().strip())
         self.assertEqual(emitted.get("code"), "send_failed")
 
+    def test_limit_orders_are_not_exposed_in_skill_wrapper(self) -> None:
+        code, payload = self._capture(["xclaw_agent_skill.py", "limit-orders-list"])
+        self.assertEqual(code, 2)
+        self.assertIsInstance(payload, dict)
+        self.assertEqual(payload.get("code"), "unknown_command")
+
 if __name__ == "__main__":
     unittest.main()

@@ -360,7 +360,7 @@ def main(argv: List[str]) -> int:
         return _err(
             "usage",
             "Missing command.",
-            "Use one of: status, dashboard, intents-poll, approval-check, trade-exec, trade-spot, trade-resume, transfer-resume, transfer-decide, transfer-policy-get, transfer-policy-set, report-send, chat-poll, chat-post, tracked-list, tracked-trades, username-set, owner-link, faucet-request, faucet-networks, chains, x402-pay, x402-pay-resume, x402-pay-decide, x402-policy-get, x402-policy-set, x402-networks, request-x402-payment, limit-orders-create, limit-orders-cancel, limit-orders-list, limit-orders-run-once, limit-orders-run-loop, wallet-health, wallet-address, wallet-sign-challenge, wallet-send, wallet-send-token, wallet-balance, wallet-token-balance",
+            "Use one of: status, dashboard, intents-poll, approval-check, trade-exec, trade-spot, trade-resume, transfer-resume, transfer-decide, transfer-policy-get, transfer-policy-set, report-send, chat-poll, chat-post, tracked-list, tracked-trades, username-set, owner-link, faucet-request, faucet-networks, chains, x402-pay, x402-pay-resume, x402-pay-decide, x402-policy-get, x402-policy-set, x402-networks, request-x402-payment, wallet-health, wallet-address, wallet-sign-challenge, wallet-send, wallet-send-token, wallet-balance, wallet-token-balance",
             exit_code=2,
         )
 
@@ -392,11 +392,6 @@ def main(argv: List[str]) -> int:
         "faucet-request",
         "faucet-networks",
         "chains",
-        "limit-orders-create",
-        "limit-orders-cancel",
-        "limit-orders-list",
-        "limit-orders-run-once",
-        "limit-orders-run-loop",
     }
     wallet_commands = {
         "wallet-health",
@@ -799,87 +794,10 @@ def main(argv: List[str]) -> int:
             return _err("invalid_input", "Invalid token address format.", "Use 0x-prefixed 20-byte hex address.", {"token": token_addr}, exit_code=2)
         return _run_agent(["wallet", "token-balance", "--token", token_addr, "--chain", chain, "--json"])
 
-    if cmd == "limit-orders-create":
-        if len(argv) < 9:
-            return _err(
-                "usage",
-                "limit-orders-create requires <mode> <side> <token_in> <token_out> <amount_in> <limit_price> <slippage_bps>",
-                "usage: limit-orders-create <mode> <side> <token_in> <token_out> <amount_in> <limit_price> <slippage_bps>",
-                exit_code=2,
-            )
-        mode = str(argv[2]).strip().lower()
-        if mode == "mock":
-            return _err(
-                "unsupported_mode",
-                "Mock mode is deprecated for agent skill commands.",
-                "Use network mode (`real`) on base_sepolia.",
-                {"mode": argv[2], "supportedMode": "real", "chain": chain},
-                exit_code=2,
-            )
-        return _run_agent(
-            [
-                "limit-orders",
-                "create",
-                "--chain",
-                chain,
-                "--mode",
-                mode,
-                "--side",
-                argv[3],
-                "--token-in",
-                argv[4],
-                "--token-out",
-                argv[5],
-                "--amount-in",
-                argv[6],
-                "--limit-price",
-                argv[7],
-                "--slippage-bps",
-                argv[8],
-                "--json",
-            ]
-        )
-
-    if cmd == "limit-orders-cancel":
-        if len(argv) < 3:
-            return _err("usage", "limit-orders-cancel requires <order_id>", "usage: limit-orders-cancel <order_id>", exit_code=2)
-        return _run_agent(["limit-orders", "cancel", "--order-id", argv[2], "--chain", chain, "--json"])
-
-    if cmd == "limit-orders-list":
-        args = ["limit-orders", "list", "--chain", chain, "--json"]
-        status = os.environ.get("XCLAW_LIMIT_ORDERS_LIST_STATUS")
-        limit = os.environ.get("XCLAW_LIMIT_ORDERS_LIST_LIMIT")
-        if status:
-            args.extend(["--status", status])
-        if limit:
-            args.extend(["--limit", limit])
-        return _run_agent(args)
-
-    if cmd == "limit-orders-run-loop":
-        args = ["limit-orders", "run-loop", "--chain", chain, "--json"]
-        if os.environ.get("XCLAW_LIMIT_ORDERS_SYNC_LOOP", "1") != "0":
-            args.append("--sync")
-        iterations = os.environ.get("XCLAW_LIMIT_ORDERS_LOOP_ITERATIONS")
-        interval = os.environ.get("XCLAW_LIMIT_ORDERS_LOOP_INTERVAL_SEC")
-        if not iterations:
-            # Default to a single iteration so the skill does not hang by default.
-            iterations = "1"
-        if iterations:
-            args.extend(["--iterations", iterations])
-        if interval:
-            args.extend(["--interval-sec", interval])
-        return _run_agent(args)
-
-    if cmd == "limit-orders-run-once":
-        args = ["limit-orders", "run-once", "--chain", chain, "--json"]
-        if os.environ.get("XCLAW_LIMIT_ORDERS_SYNC_LOOP", "1") != "0":
-            args.append("--sync")
-        return _run_agent(args)
-
     return _err(
         "unknown_command",
         f"Unknown command: {cmd}",
-        "Use one of: status, dashboard, intents-poll, approval-check, trade-exec, trade-spot, trade-resume, transfer-resume, transfer-decide, transfer-policy-get, transfer-policy-set, report-send, chat-poll, chat-post, tracked-list, tracked-trades, username-set, owner-link, faucet-request, faucet-networks, chains, x402-pay, x402-pay-resume, x402-pay-decide, x402-policy-get, x402-policy-set, x402-networks, request-x402-payment, limit-orders-create, limit-orders-cancel, limit-orders-list, limit-orders-run-once, limit-orders-run-loop, wallet-health, wallet-address, wallet-sign-challenge, wallet-send, wallet-send-token, wallet-balance, wallet-token-balance",
+        "Use one of: status, dashboard, intents-poll, approval-check, trade-exec, trade-spot, trade-resume, transfer-resume, transfer-decide, transfer-policy-get, transfer-policy-set, report-send, chat-poll, chat-post, tracked-list, tracked-trades, username-set, owner-link, faucet-request, faucet-networks, chains, x402-pay, x402-pay-resume, x402-pay-decide, x402-policy-get, x402-policy-set, x402-networks, request-x402-payment, wallet-health, wallet-address, wallet-sign-challenge, wallet-send, wallet-send-token, wallet-balance, wallet-token-balance",
         exit_code=2,
     )
 
