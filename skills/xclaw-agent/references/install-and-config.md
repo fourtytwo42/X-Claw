@@ -18,6 +18,7 @@ This command performs idempotent setup for:
 - OpenClaw workspace config (OpenClaw runs independently from your server)
 - OpenClaw local workspace config (`~/.openclaw/openclaw.json`)
 - `xclaw-agent` launcher availability on PATH
+- Python runtime dependency bootstrap from `apps/agent-runtime/requirements.txt` (auto-provisions `pip` if missing and installs for the same interpreter used by the runtime)
 - Foundry `cast` availability (installer auto-installs to `~/.foundry/bin` if missing, without `sudo`)
 - readiness checks for:
   - `xclaw-agent status --json`

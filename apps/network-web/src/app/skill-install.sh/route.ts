@@ -60,6 +60,73 @@ ensure_cast() {
   echo "[xclaw] cast installed: $(cast --version | head -n1)"
 }
 
+resolve_python_bin() {
+  if command -v python3 >/dev/null 2>&1; then
+    command -v python3
+    return 0
+  fi
+  if command -v python >/dev/null 2>&1; then
+    command -v python
+    return 0
+  fi
+  return 1
+}
+
+ensure_python_runtime_deps() {
+  local py_bin="$1"
+  local req_file="$XCLAW_WORKDIR/apps/agent-runtime/requirements.txt"
+  if [ ! -f "$req_file" ]; then
+    echo "[xclaw] runtime requirements file not found: $req_file"
+    exit 1
+  fi
+
+  if "$py_bin" - <<'PY' >/dev/null 2>&1
+import importlib
+import sys
+missing = []
+for mod in ("argon2", "Crypto.Hash.keccak"):
+    try:
+        importlib.import_module(mod)
+    except Exception:
+        missing.append(mod)
+if missing:
+    raise SystemExit(1)
+PY
+  then
+    echo "[xclaw] python runtime deps already installed for $py_bin"
+    return 0
+  fi
+
+  echo "[xclaw] ensuring pip is available for $py_bin"
+  if ! "$py_bin" -m pip --version >/dev/null 2>&1; then
+    "$py_bin" -m ensurepip --upgrade >/dev/null 2>&1 || true
+  fi
+
+  if ! "$py_bin" -m pip --version >/dev/null 2>&1; then
+    echo "[xclaw] pip still unavailable; bootstrapping via get-pip.py"
+    curl -fsSL https://bootstrap.pypa.io/get-pip.py -o "$tmp_dir/get-pip.py"
+    "$py_bin" "$tmp_dir/get-pip.py" --user >/dev/null 2>&1
+  fi
+
+  if ! "$py_bin" -m pip --version >/dev/null 2>&1; then
+    echo "[xclaw] unable to provision pip for $py_bin"
+    exit 1
+  fi
+
+  echo "[xclaw] installing python runtime deps from $req_file"
+  "$py_bin" -m pip install --disable-pip-version-check --user -r "$req_file"
+
+  if ! "$py_bin" - <<'PY' >/dev/null 2>&1
+import importlib
+for mod in ("argon2", "Crypto.Hash.keccak"):
+    importlib.import_module(mod)
+PY
+  then
+    echo "[xclaw] python runtime deps verification failed after install"
+    exit 1
+  fi
+}
+
 if [ -d "$XCLAW_WORKDIR/.git" ]; then
   echo "[xclaw] existing git workspace found: $XCLAW_WORKDIR"
   cd "$XCLAW_WORKDIR"
@@ -102,8 +169,13 @@ fi
 
 cd "$XCLAW_WORKDIR"
 ensure_cast
+if ! XCLAW_PYTHON_BIN="$(resolve_python_bin)"; then
+  echo "[xclaw] python3/python is unavailable on PATH"
+  exit 1
+fi
+ensure_python_runtime_deps "$XCLAW_PYTHON_BIN"
 echo "[xclaw] running setup_agent_skill.py"
-python3 skills/xclaw-agent/scripts/setup_agent_skill.py
+"$XCLAW_PYTHON_BIN" skills/xclaw-agent/scripts/setup_agent_skill.py
 
 resolve_xclaw_agent_bin() {
   export PATH="$HOME/.xclaw-agent/bin:$PATH"

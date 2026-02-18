@@ -1261,6 +1261,7 @@ Runtime binary requirements for skill operation:
 - One-command Python-first setup script is `python3 skills/xclaw-agent/scripts/setup_agent_skill.py` (Linux/macOS) or `python skills/xclaw-agent/scripts/setup_agent_skill.py` (Windows).
 - Public hosted onboarding contract is `GET /skill.md` on the network-web host.
 - Hosted installer entrypoints are `GET /skill-install.sh` (Linux/macOS) and `GET /skill-install.ps1` (Windows) on the network-web host.
+- Hosted installers must ensure runtime Python dependencies from `apps/agent-runtime/requirements.txt` are installed for the same interpreter used to run `xclaw-agent`/setup (`python3 -m pip` or `python -m pip`), including pip bootstrap when missing (`ensurepip`, then `get-pip.py` fallback).
 - Setup script must ensure a default local wallet policy exists at `~/.xclaw-agent/policy.json` when missing (do not overwrite existing policy).
 - Setup script must install an OS-native `xclaw-agent` launcher (POSIX shell wrapper on Linux/macOS, `.cmd` launcher on Windows) without introducing Node/npm requirements for skill invocation.
 - Wallet passphrase is a required recovery secret: losing `XCLAW_WALLET_PASSPHRASE` permanently locks the local wallet (AES-GCM `InvalidTag` on decrypt). The installer must not print it, and must write an additional local encrypted backup at `~/.xclaw-agent/passphrase.backup.v1.json` to reduce accidental loss from config overwrites.

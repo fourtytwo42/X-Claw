@@ -52,6 +52,61 @@ function Invoke-Python {
   & $exe @prefix @Args
 }
 
+function Test-PythonImport {
+  param([string]$ModuleName)
+  try {
+    Invoke-Python "-c" "import importlib; importlib.import_module('$ModuleName')" | Out-Null
+    return $true
+  } catch {
+    return $false
+  }
+}
+
+function Ensure-PythonRuntimeDeps {
+  $requirementsPath = Join-Path $env:XCLAW_WORKDIR "apps\\agent-runtime\\requirements.txt"
+  if (-not (Test-Path $requirementsPath)) {
+    throw "Runtime requirements file not found: $requirementsPath"
+  }
+
+  $hasArgon2 = Test-PythonImport -ModuleName "argon2"
+  $hasKeccak = Test-PythonImport -ModuleName "Crypto.Hash.keccak"
+  if ($hasArgon2 -and $hasKeccak) {
+    Write-Host "[xclaw] python runtime deps already installed for selected interpreter"
+    return
+  }
+
+  Write-Host "[xclaw] ensuring pip is available for selected Python interpreter"
+  try {
+    Invoke-Python "-m" "pip" "--version" | Out-Null
+  } catch {
+    try {
+      Invoke-Python "-m" "ensurepip" "--upgrade" | Out-Null
+    } catch {
+      # Continue to get-pip fallback.
+    }
+  }
+
+  try {
+    Invoke-Python "-m" "pip" "--version" | Out-Null
+  } catch {
+    $getPipPath = Join-Path $tmpRoot "get-pip.py"
+    Write-Host "[xclaw] pip still unavailable; bootstrapping via get-pip.py"
+    Invoke-WebRequest -Uri "https://bootstrap.pypa.io/get-pip.py" -OutFile $getPipPath
+    Invoke-Python $getPipPath "--user" | Out-Null
+  }
+
+  Invoke-Python "-m" "pip" "--version" | Out-Null
+
+  Write-Host "[xclaw] installing python runtime deps from $requirementsPath"
+  Invoke-Python "-m" "pip" "install" "--disable-pip-version-check" "--user" "-r" $requirementsPath | Out-Null
+
+  $hasArgon2 = Test-PythonImport -ModuleName "argon2"
+  $hasKeccak = Test-PythonImport -ModuleName "Crypto.Hash.keccak"
+  if (-not ($hasArgon2 -and $hasKeccak)) {
+    throw "Python runtime dependency verification failed after install."
+  }
+}
+
 function Get-JsonStringProperty {
   param([string]$JsonText, [string]$PropertyName)
   if ([string]::IsNullOrWhiteSpace($JsonText)) {
@@ -314,6 +369,7 @@ try {
   Push-Location $workdir
   try {
     Ensure-Cast
+    Ensure-PythonRuntimeDeps
 
     Write-Host "[xclaw] running setup_agent_skill.py"
     Invoke-Python "skills/xclaw-agent/scripts/setup_agent_skill.py"
