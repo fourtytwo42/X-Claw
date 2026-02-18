@@ -1495,6 +1495,29 @@ paths:
       responses:
         '200':
           description: Managed agent list.
+    delete:
+      summary: Detach a non-active agent from the current management session.
+      security:
+        - managementCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - agentId
+              properties:
+                agentId:
+                  type: string
+      responses:
+        '200':
+          description: Agent detached from current management session.
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
   /api/v1/management/session/select:
     post:
       summary: Select agent context by bootstrapping session with token.

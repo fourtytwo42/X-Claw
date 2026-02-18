@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://xclaw.trade/schemas/management-session-agent-detach-request.schema.json",
+  "title": "ManagementSessionAgentDetachRequest",
+  "type": "object",
+  "required": ["agentId"],
+  "additionalProperties": false,
+  "properties": {
+    "agentId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    }
+  }
+}

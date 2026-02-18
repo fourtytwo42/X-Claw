@@ -71,6 +71,19 @@ export type LinkManagementSessionAgentOutput = {
   managedAgents: string[];
 };
 
+export type DetachManagementSessionAgentInput = {
+  sessionId: string;
+  targetAgentId: string;
+  userAgent: string | null;
+};
+
+export type DetachManagementSessionAgentOutput = {
+  sessionId: string;
+  activeAgentId: string;
+  detachedAgentId: string;
+  managedAgents: string[];
+};
+
 function getManagementKey(): Buffer {
   const decoded = Buffer.from(requireManagementTokenEncKey(), 'base64');
   if (decoded.length !== 32) {
@@ -421,6 +434,127 @@ export async function linkAgentToManagementSession(
         sessionId: session.session_id,
         activeAgentId: session.agent_id,
         linkedAgentId: input.agentId,
+        managedAgents
+      }
+    };
+  });
+}
+
+export async function detachAgentFromManagementSession(
+  input: DetachManagementSessionAgentInput
+): Promise<ServiceResult<DetachManagementSessionAgentOutput>> {
+  return withTransaction(async (client) => {
+    const sessionResult = await client.query<{ session_id: string; agent_id: string; expires_at: string; revoked_at: string | null }>(
+      `
+      select session_id, agent_id, expires_at::text, revoked_at::text
+      from management_sessions
+      where session_id = $1
+      limit 1
+      for update
+      `,
+      [input.sessionId]
+    );
+
+    if (sessionResult.rowCount === 0) {
+      return {
+        ok: false,
+        error: {
+          status: 401,
+          code: 'auth_invalid',
+          message: 'Management session is invalid or expired.',
+          actionHint: 'Bootstrap a fresh management session and retry.'
+        }
+      };
+    }
+
+    const session = sessionResult.rows[0];
+    if (session.revoked_at || new Date(session.expires_at).getTime() <= Date.now()) {
+      return {
+        ok: false,
+        error: {
+          status: 401,
+          code: 'auth_invalid',
+          message: 'Management session is invalid or expired.',
+          actionHint: 'Bootstrap a fresh management session and retry.'
+        }
+      };
+    }
+
+    const detachedAgentId = String(input.targetAgentId).trim();
+    if (detachedAgentId.length === 0) {
+      return {
+        ok: false,
+        error: {
+          status: 400,
+          code: 'payload_invalid',
+          message: 'Agent id is required.',
+          actionHint: 'Provide a valid agentId to remove access.'
+        }
+      };
+    }
+
+    if (detachedAgentId === session.agent_id) {
+      return {
+        ok: false,
+        error: {
+          status: 400,
+          code: 'payload_invalid',
+          message: 'Cannot detach the active agent from the current session.',
+          actionHint: 'Use logout to remove active-agent access from this browser.'
+        }
+      };
+    }
+
+    await client.query(
+      `
+      delete from management_session_agents
+      where session_id = $1
+        and agent_id = $2
+      `,
+      [session.session_id, detachedAgentId]
+    );
+
+    const managed = await client.query<{ agent_id: string }>(
+      `
+      select agent_id
+      from management_session_agents
+      where session_id = $1
+      order by created_at asc
+      `,
+      [session.session_id]
+    );
+    const managedAgents = Array.from(
+      new Set(
+        managed.rows
+          .map((row) => String(row.agent_id ?? '').trim())
+          .filter((row) => row.length > 0)
+          .concat([session.agent_id])
+      )
+    );
+
+    await client.query(
+      `
+      insert into management_audit_log (
+        audit_id, agent_id, management_session_id, action_type, action_status,
+        public_redacted_payload, private_payload, user_agent, created_at
+      ) values ($1, $2, $3, 'session.detach', 'accepted', $4::jsonb, $5::jsonb, $6, now())
+      `,
+      [
+        makeId('aud'),
+        detachedAgentId,
+        session.session_id,
+        JSON.stringify({ detachedAgentId }),
+        JSON.stringify({ activeAgentId: session.agent_id }),
+        input.userAgent
+      ]
+    );
+
+    return {
+      ok: true,
+      data: {
+        sessionId: session.session_id,
+        activeAgentId: session.agent_id,
+        detachedAgentId,
         managedAgents
       }
     };

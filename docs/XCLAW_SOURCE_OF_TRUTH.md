@@ -3010,6 +3010,7 @@ Limitations / notes:
 4. API preservation and wiring:
 - Slice 75 reuses existing routes as-is:
   - `GET /api/v1/management/session/agents`,
+  - `DELETE /api/v1/management/session/agents` (post-slice bugfix; detach non-active agent from current management session),
   - `POST /api/v1/management/session/select`,
   - `POST /api/v1/management/logout`,
   - `POST /api/v1/management/pause`,
@@ -3022,8 +3023,8 @@ Limitations / notes:
   - verified cross-agent access inventory,
   - global panic controls across all owned agents in one server operation,
   - full allowance inventory/revoke sweep from settings.
-- Per-agent `Remove Access` in `/settings#access` is implemented as a device-local/session action with confirmation:
-  - removing non-active agents updates local browser-managed access list,
+- Per-agent `Remove Access` in `/settings#access` is implemented as a session detach action with confirmation:
+  - removing non-active agents detaches the agent from `management_session_agents` for the current browser session and updates local browser-managed access list,
   - removing active agent clears current management session and local access for that agent,
   - on-chain approvals/allowances remain unchanged.
 

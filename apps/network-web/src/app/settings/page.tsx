@@ -23,6 +23,11 @@ type SessionAgentsPayload = {
   activeAgentId?: string;
 };
 
+type SessionAgentDetachPayload = {
+  managedAgents?: string[];
+  activeAgentId?: string;
+};
+
 type PreferencesState = {
   approvalPosture: 'per_trade' | 'allowlist' | 'global_allowed';
   requireUnlimitedAllowanceConfirmation: boolean;
@@ -201,6 +206,35 @@ async function postJson(path: string, payload: Record<string, unknown>) {
 
   const response = await fetch(path, {
     method: 'POST',
+    credentials: 'same-origin',
+    headers,
+    body: JSON.stringify(payload)
+  });
+
+  const json = (await response.json().catch(() => null)) as { message?: string; actionHint?: string; code?: string } | null;
+  if (!response.ok) {
+    const error = new Error(json?.message ?? 'Request failed.') as Error & { code?: string; actionHint?: string };
+    if (json?.code) {
+      error.code = json.code;
+    }
+    if (json?.actionHint) {
+      error.actionHint = json.actionHint;
+    }
+    throw error;
+  }
+
+  return json;
+}
+
+async function deleteJson(path: string, payload: Record<string, unknown>) {
+  const csrf = getCsrfToken();
+  const headers: Record<string, string> = { 'content-type': 'application/json' };
+  if (csrf) {
+    headers['x-csrf-token'] = csrf;
+  }
+
+  const response = await fetch(path, {
+    method: 'DELETE',
     credentials: 'same-origin',
     headers,
     body: JSON.stringify(payload)
@@ -429,7 +463,7 @@ export default function SettingsPage() {
 
     const agentName = managedAgentLabel(agentId);
     const confirmed = window.confirm(
-      `Remove access to "${agentName}" on this browser?\n\nThis only removes local device access. On-chain approvals are unchanged.`
+      `Remove access to "${agentName}" on this browser?\n\nThis detaches this browser session from that agent. On-chain approvals are unchanged.`
     );
     if (!confirmed) {
       return;
@@ -440,8 +474,28 @@ export default function SettingsPage() {
     setPendingAction(`remove-access:${agentId}`);
 
     try {
+      const activeAgentId = ownerContext.phase === 'ready' ? ownerContext.activeAgentId : null;
+      const isActiveAgent = activeAgentId === agentId;
+
+      if (isActiveAgent) {
+        await postJson('/api/v1/management/logout', {});
+        storeManagedAgentIds([]);
+        storeManagedAgentTokens({});
+        setOwnerContext({ phase: 'none' });
+        setNotice(`Removed ${agentName} from this browser session.`);
+        return;
+      }
+
+      const detached = (await deleteJson('/api/v1/management/session/agents', { agentId })) as SessionAgentDetachPayload | null;
+      const serverManagedAgents =
+        Array.isArray(detached?.managedAgents) && detached?.managedAgents
+          ? detached.managedAgents.filter((id): id is string => typeof id === 'string' && id.trim().length > 0)
+          : ownerContext.phase === 'ready'
+            ? ownerContext.managedAgents.filter((id) => id !== agentId)
+            : [];
+
       const nextStoredAgents = parseStoredManagedAgentIds().filter((id) => id !== agentId);
-      storeManagedAgentIds(nextStoredAgents);
+      storeManagedAgentIds(nextStoredAgents.filter((id) => serverManagedAgents.includes(id)));
       const tokens = parseStoredManagedAgentTokens();
       delete tokens[agentId];
       storeManagedAgentTokens(tokens);
@@ -451,30 +505,19 @@ export default function SettingsPage() {
         return copy;
       });
 
-      const activeAgentId = ownerContext.phase === 'ready' ? ownerContext.activeAgentId : null;
-      const isActiveAgent = activeAgentId === agentId;
-
-      if (isActiveAgent) {
-        await postJson('/api/v1/management/logout', {});
-        setOwnerContext({ phase: 'none' });
-        setNotice(
-          nextStoredAgents.length > 0
-            ? `Removed ${agentName}. Open another agent key link to continue managing on this device.`
-            : `Removed ${agentName} from this device.`
-        );
-        return;
-      }
-
       if (ownerContext.phase === 'ready') {
-        const nextManagedAgents = ownerContext.managedAgents.filter((id) => id !== agentId);
-        if (nextManagedAgents.length === 0) {
+        if (serverManagedAgents.length === 0) {
           setOwnerContext({ phase: 'none' });
         } else {
-          setOwnerContext({ ...ownerContext, managedAgents: nextManagedAgents });
+          setOwnerContext({
+            phase: 'ready',
+            activeAgentId: detached?.activeAgentId && typeof detached.activeAgentId === 'string' ? detached.activeAgentId : ownerContext.activeAgentId,
+            managedAgents: serverManagedAgents
+          });
         }
       }
 
-      setNotice(`Removed ${agentName} from this device.`);
+      setNotice(`Removed ${agentName} from this browser session.`);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'Failed to remove access.');
     } finally {
