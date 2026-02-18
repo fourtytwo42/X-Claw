@@ -132,7 +132,16 @@ async function syncChainDeposits(agentId: string, chainKey: string, walletAddres
             `
             insert into deposit_events (
               deposit_event_id, agent_id, chain_key, token, amount, tx_hash, log_index, block_number, confirmed_at, status, created_at
-            ) values ($1, $2, $3, $4, $5, $6, $7, $8, now(), 'confirmed', now())
+            )
+            select $1, $2, $3, $4, $5, $6, $7, $8, now(), 'confirmed', now()
+            where not exists (
+              select 1
+              from trades
+              where agent_id = $2
+                and chain_key = $3
+                and tx_hash is not null
+                and lower(tx_hash) = lower($6)
+            )
             on conflict (chain_key, tx_hash, log_index, token)
             do nothing
             `,

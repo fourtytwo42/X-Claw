@@ -1,3 +1,31 @@
+# Hotfix Spec: Telegram Trade Result Noise + Swap-Deposit Misclassification
+
+## Goal
+Fix three operator-facing issues in live approval/trade UX:
+1. prevent swap outputs from being duplicated as wallet deposits,
+2. eliminate `? TOKEN_IN -> TOKEN_OUT` fallback text in Telegram trade-result callback output,
+3. reduce Telegram callback message noise by suppressing redundant deterministic trade-result post.
+
+## Non-goals
+1. No approval-state contract changes.
+2. No schema/migration changes.
+3. No runtime custody/policy model changes.
+
+## Locked scope
+1. `apps/network-web/src/app/api/v1/management/deposit/route.ts`
+2. `skills/xclaw-agent/scripts/openclaw_gateway_patch.py`
+
+## Acceptance checks
+- `XCLAW_AGENT_HOME=/tmp/xclaw-agent-test python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `pm2 restart all`
+
+---
+
 # Slice 85 Spec: EVM-Wide Portability Foundation (Chain-Agnostic Core, x402 Unchanged)
 
 ## Goal

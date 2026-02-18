@@ -1,3 +1,28 @@
+# Hotfix Tasks: Telegram Trade Result Noise + Swap-Deposit Misclassification
+
+Active slice context: `Slice 86` is currently in progress; this is an explicit user-requested hotfix outside sequential slice work.
+
+## 1) Scope lock
+- [x] Define objective + acceptance checks + touched files before edits.
+- [x] Keep changes limited to deposit ingestion filter + Telegram callback patch behavior.
+
+## 2) Implementation
+- [x] Exclude trade tx hashes from `deposit_events` ingestion in management deposit sync route.
+- [x] Remove noisy deterministic trade-result Telegram post in callback resume path.
+- [x] Remove placeholder fallbacks (`?`, `TOKEN_IN`, `TOKEN_OUT`) from trade-result composition logic.
+- [x] Ensure patch-upgrade path rewrites already-patched gateway bundles.
+
+## 3) Validation
+- [x] `XCLAW_AGENT_HOME=/tmp/xclaw-agent-test python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+
+---
+
 # Slice 85 Tasks: EVM-Wide Portability Foundation (Chain-Agnostic Core, x402 Unchanged)
 
 Active slice: `Slice 85: EVM-Wide Portability Foundation`

@@ -368,6 +368,34 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         )
         return text7, (n > 0) or (n2 > 0) or (n3 > 0) or (n4 > 0) or (n5 > 0) or (n6 > 0)
 
+    def _upgrade_trade_result_noise(text: str) -> tuple[str, bool]:
+        text2, n1 = re.subn(
+            r'const amountHuman = String\(body\?\.amountIn \?\? flow\?\.amountInHuman \?\? \(pairMatch\?\.\[1\] \|\| "\?"\)\);',
+            'const amountHuman = String(body?.amountIn ?? flow?.amountInHuman ?? (pairMatch?.[1] || "")).trim();',
+            text,
+        )
+        text3, n2 = re.subn(
+            r'const tokenInSym = String\(body\?\.tokenInSymbol \?\? flow\?\.tokenInSymbol \?\? \(pairMatch\?\.\[2\] \|\| "TOKEN_IN"\)\);',
+            'const tokenInSym = String(body?.tokenInSymbol ?? flow?.tokenInSymbol ?? (pairMatch?.[2] || "")).trim();',
+            text2,
+        )
+        text4, n3 = re.subn(
+            r'const tokenOutSym = String\(body\?\.tokenOutSymbol \?\? flow\?\.tokenOutSymbol \?\? \(pairMatch\?\.\[3\] \|\| "TOKEN_OUT"\)\);',
+            'const tokenOutSym = String(body?.tokenOutSymbol ?? flow?.tokenOutSymbol ?? (pairMatch?.[3] || "")).trim();',
+            text3,
+        )
+        text5, n4 = re.subn(
+            r'const finalMsg = `\$\{head\}\\n\$\{amountHuman\} \$\{tokenInSym\} -> \$\{tokenOutSym\}\\nTrade: \$\{subjectId\}\\nChain: \$\{chainKey\}\$\{txLine\}\$\{reasonLine\}`;',
+            'const pairLine = amountHuman && tokenInSym && tokenOutSym ? `\\n${amountHuman} ${tokenInSym} -> ${tokenOutSym}` : ""; const finalMsg = `${head}${pairLine}\\nTrade: ${subjectId}\\nChain: ${chainKey}${txLine}${reasonLine}`;',
+            text4,
+        )
+        text6, n5 = re.subn(
+            r'\s*try \{ await bot\.api\.sendMessage\(chatId, finalMsg\); \} catch \{\}\n',
+            '\n',
+            text5,
+        )
+        return text6, (n1 > 0) or (n2 > 0) or (n3 > 0) or (n4 > 0) or (n5 > 0)
+
     if (
         MARKER in raw
         and DECISION_ACK_MARKER_V3 in raw
@@ -390,6 +418,8 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         changed_any = changed_any or changed_spawn
         raw, changed_route = _upgrade_transfer_result_routing(raw)
         changed_any = changed_any or changed_route
+        raw, changed_trade_noise = _upgrade_trade_result_noise(raw)
+        changed_any = changed_any or changed_trade_noise
         if QUEUED_BUTTONS_MARKER not in raw:
             raw2, changed2, err2 = _patch_queued_buttons(raw)
             if not err2:
@@ -573,14 +603,14 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst flow = body?.flowSummary ?? {};\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst promptText = String(callbackMessage.text ?? "");\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst pairMatch = promptText.match(/\\n\\s*([0-9]+(?:\\.[0-9]+)?)\\s+([A-Z0-9_]+)\\s*->\\s*([A-Z0-9_]+)/i);\n'
-        '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst amountHuman = String(body?.amountIn ?? flow?.amountInHuman ?? (pairMatch?.[1] || "?"));\n'
-        '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst tokenInSym = String(body?.tokenInSymbol ?? flow?.tokenInSymbol ?? (pairMatch?.[2] || "TOKEN_IN"));\n'
-        '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst tokenOutSym = String(body?.tokenOutSymbol ?? flow?.tokenOutSymbol ?? (pairMatch?.[3] || "TOKEN_OUT"));\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst amountHuman = String(body?.amountIn ?? flow?.amountInHuman ?? (pairMatch?.[1] || "")).trim();\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst tokenInSym = String(body?.tokenInSymbol ?? flow?.tokenInSymbol ?? (pairMatch?.[2] || "")).trim();\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst tokenOutSym = String(body?.tokenOutSymbol ?? flow?.tokenOutSymbol ?? (pairMatch?.[3] || "")).trim();\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst head = body?.ok ? `Trade result: ${statusWord}` : `Trade result: failed`;\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst txLine = txHash ? `\\nTx: ${txHash}` : "";\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst reasonLine = !body?.ok ? `\\nReason: ${String(body?.message ?? err ?? `resume exit ${exitCode}`)}` : "";\n'
-        '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst finalMsg = `${head}\\n${amountHuman} ${tokenInSym} -> ${tokenOutSym}\\nTrade: ${subjectId}\\nChain: ${chainKey}${txLine}${reasonLine}`;\n'
-        '\t\t\t\t\t\t\t\t\t\t\t\t\t\ttry { await bot.api.sendMessage(chatId, finalMsg); } catch {}\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst pairLine = amountHuman && tokenInSym && tokenOutSym ? `\\n${amountHuman} ${tokenInSym} -> ${tokenOutSym}` : "";\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst finalMsg = `${head}${pairLine}\\nTrade: ${subjectId}\\nChain: ${chainKey}${txLine}${reasonLine}`;\n'
         f'\t\t\t\t\t\t\t\t\t\t\t\t\t\ttry {{ logger.info({{ subjectId, chainKey, chatId, ok: !!body?.ok }}, "{DECISION_RESULT_ROUTE_MARKER_V1}"); }} catch {{}}\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t} catch (resumeErr) {\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\ttry { logger.error({ subjectId, chainKey, err: String(resumeErr) }, "xclaw: trade resume trigger failed"); } catch {}\n'

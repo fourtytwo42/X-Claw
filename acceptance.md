@@ -1,3 +1,30 @@
+# Hotfix Acceptance Evidence: Telegram Trade Result Noise + Swap-Deposit Misclassification
+
+Date (UTC): 2026-02-18
+Active slice context: `Slice 86` is in progress; this change was executed as explicit user-requested hotfix.
+
+## Objective + Scope Lock
+- Objective: remove confusing/duplicative Telegram trade-result output and stop swap outputs from rendering as deposits in wallet activity.
+- Scope lock:
+  - `apps/network-web/src/app/api/v1/management/deposit/route.ts`
+  - `skills/xclaw-agent/scripts/openclaw_gateway_patch.py`
+
+## Validation Commands and Outcomes
+- `XCLAW_AGENT_HOME=/tmp/xclaw-agent-test python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS (`Ran 77 tests`, `OK`)
+- `npm run db:parity` -> PASS (`ok: true`)
+- `npm run seed:reset` -> PASS (`ok: true`)
+- `npm run seed:load` -> PASS (`ok: true`; scenarios loaded)
+- `npm run seed:verify` -> PASS (`ok: true`)
+- `npm run build` -> PASS (Next.js production build completed)
+- `pm2 restart all` -> PASS (`xclaw-web` online after restart)
+
+## Functional Verification Notes
+- Deposit sync now skips tx hashes already recorded in `trades` for the same agent/chain, preventing swap output transfer logs from being ingested as `deposit_events`.
+- Gateway patch upgrade path now removes deterministic callback `Trade result: ...` post for trade approve callbacks, reducing duplicate Telegram chat messages.
+- Gateway patch now normalizes trade-result pair composition without `? TOKEN_IN -> TOKEN_OUT` fallback placeholders.
+
+---
+
 # Slice 85 Acceptance Evidence
 
 Date (UTC): 2026-02-18
