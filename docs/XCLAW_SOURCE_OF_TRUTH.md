@@ -3511,6 +3511,7 @@ Limitations / notes:
 - Endpoint: `GET /api/v1/management/approvals/inbox`.
 - Provides normalized rows across trade/policy/transfer approval surfaces for agents linked to current management session.
 - Includes deterministic risk labels and chain-scoped permission inventory blocks.
+- Trade/policy/transfer token labels in inbox rows must prefer canonical token symbols and RPC-resolved metadata (fallback to shortened address when metadata is unavailable).
 
 3. Direct permissions update endpoint:
 - Endpoint: `POST /api/v1/management/permissions/update`.

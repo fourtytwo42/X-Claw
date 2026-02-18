@@ -1,9 +1,11 @@
 import type { NextRequest } from 'next/server';
 
+import { getChainConfig } from '@/lib/chains';
 import { dbQuery } from '@/lib/db';
 import { errorResponse, internalErrorResponse, successResponse } from '@/lib/errors';
 import { requireManagementSession } from '@/lib/management-auth';
 import { getRequestId } from '@/lib/request-id';
+import { resolveTokenMetadata } from '@/lib/token-metadata';
 
 export const runtime = 'nodejs';
 
@@ -60,6 +62,14 @@ function riskForRow(input: { rowKind: InboxType; reason?: string | null; policyB
     return 'Med';
   }
   return 'Low';
+}
+
+function isHexAddress(value: string): boolean {
+  return /^0x[a-fA-F0-9]{40}$/.test(value);
+}
+
+function shortAddress(value: string): string {
+  return `${value.slice(0, 6)}...${value.slice(-4)}`;
 }
 
 export async function GET(req: NextRequest) {
@@ -232,6 +242,86 @@ export async function GET(req: NextRequest) {
     }
 
     const rows: Array<Record<string, unknown>> = [];
+    const tokenLabelByKey = new Map<string, string>();
+    const tokenResolveInFlight = new Map<string, Promise<void>>();
+
+    async function resolveTokenLabel(chain: string, rawToken: string | null | undefined): Promise<string> {
+      const token = String(rawToken ?? '').trim();
+      if (!token) {
+        return 'token';
+      }
+      if (!isHexAddress(token)) {
+        return token;
+      }
+
+      const normalized = token.toLowerCase();
+      const cacheKey = `${chain}:${normalized}`;
+      if (tokenLabelByKey.has(cacheKey)) {
+        return tokenLabelByKey.get(cacheKey) ?? token;
+      }
+
+      const pending = tokenResolveInFlight.get(cacheKey);
+      if (pending) {
+        await pending;
+        return tokenLabelByKey.get(cacheKey) ?? shortAddress(token);
+      }
+
+      const resolvePromise = (async () => {
+        const chainCfg = getChainConfig(chain);
+        for (const [symbol, address] of Object.entries(chainCfg?.canonicalTokens ?? {})) {
+          if (String(address).trim().toLowerCase() === normalized) {
+            tokenLabelByKey.set(cacheKey, symbol);
+            return;
+          }
+        }
+
+        const resolved = await resolveTokenMetadata(chain, normalized).catch(() => null);
+        const label = (resolved?.symbol ?? '').trim() || shortAddress(token);
+        tokenLabelByKey.set(cacheKey, label);
+      })();
+
+      tokenResolveInFlight.set(cacheKey, resolvePromise);
+      try {
+        await resolvePromise;
+      } finally {
+        tokenResolveInFlight.delete(cacheKey);
+      }
+
+      return tokenLabelByKey.get(cacheKey) ?? shortAddress(token);
+    }
+
+    const tokensToWarm = new Map<string, string>();
+    for (const row of tradeRows.rows) {
+      if (isHexAddress(row.token_in)) {
+        tokensToWarm.set(`${row.chain_key}:${row.token_in.toLowerCase()}`, row.token_in);
+      }
+      if (isHexAddress(row.token_out)) {
+        tokensToWarm.set(`${row.chain_key}:${row.token_out.toLowerCase()}`, row.token_out);
+      }
+    }
+    for (const row of policyRows.rows) {
+      if (isHexAddress(String(row.token_address ?? ''))) {
+        const token = String(row.token_address);
+        tokensToWarm.set(`${row.chain_key}:${token.toLowerCase()}`, token);
+      }
+    }
+    for (const row of transferRows.rows) {
+      if (isHexAddress(String(row.token_address ?? ''))) {
+        const token = String(row.token_address);
+        tokensToWarm.set(`${row.chain_key}:${token.toLowerCase()}`, token);
+      }
+    }
+    await Promise.all(
+      [...tokensToWarm.keys()].map(async (key) => {
+        const splitAt = key.indexOf(':');
+        if (splitAt <= 0) {
+          return;
+        }
+        const chain = key.slice(0, splitAt);
+        const token = tokensToWarm.get(key) ?? '';
+        await resolveTokenLabel(chain, token);
+      })
+    );
 
     for (const row of tradeRows.rows) {
       if (!typeFilter.includes('trade')) {
@@ -244,6 +334,8 @@ export async function GET(req: NextRequest) {
       if (statusFilter !== 'all' && normalizedStatus !== statusFilter) {
         continue;
       }
+      const tokenInLabel = await resolveTokenLabel(row.chain_key, row.token_in);
+      const tokenOutLabel = await resolveTokenLabel(row.chain_key, row.token_out);
       rows.push({
         id: `trade:${row.trade_id}`,
         requestId: row.trade_id,
@@ -252,7 +344,7 @@ export async function GET(req: NextRequest) {
         agentName: namesByAgent.get(row.agent_id)?.name ?? row.agent_id,
         chainKey: row.chain_key,
         status: normalizedStatus,
-        title: `${row.token_in} -> ${row.token_out}`,
+        title: `${tokenInLabel} -> ${tokenOutLabel}`,
         subtitle: `Trade ${row.trade_id}`,
         requestTypeLabel: 'Trade Approval',
         reasonLine: row.reason || 'Token not pre-approved',
@@ -272,6 +364,13 @@ export async function GET(req: NextRequest) {
       if (statusFilter !== 'all' && normalizedStatus !== statusFilter) {
         continue;
       }
+      const tokenLabel = await resolveTokenLabel(row.chain_key, row.token_address);
+      const title =
+        row.request_type === 'token_preapprove_add'
+          ? `Preapprove ${tokenLabel}`
+          : row.request_type === 'token_preapprove_remove'
+            ? `Remove preapproval for ${tokenLabel}`
+            : row.request_type;
       rows.push({
         id: `policy:${row.request_id}`,
         requestId: row.request_id,
@@ -280,7 +379,7 @@ export async function GET(req: NextRequest) {
         agentName: namesByAgent.get(row.agent_id)?.name ?? row.agent_id,
         chainKey: row.chain_key,
         status: normalizedStatus,
-        title: row.request_type,
+        title,
         subtitle: `Request ${row.request_id}`,
         requestTypeLabel: 'Policy Approval',
         reasonLine: row.reason_message || 'Policy change requires owner confirmation.',
@@ -301,6 +400,7 @@ export async function GET(req: NextRequest) {
       if (statusFilter !== 'all' && normalizedStatus !== statusFilter) {
         continue;
       }
+      const tokenLabel = row.transfer_type === 'native' ? 'Native' : await resolveTokenLabel(row.chain_key, row.token_symbol || row.token_address);
       rows.push({
         id: `transfer:${row.approval_id}`,
         requestId: row.approval_id,
@@ -309,7 +409,7 @@ export async function GET(req: NextRequest) {
         agentName: namesByAgent.get(row.agent_id)?.name ?? row.agent_id,
         chainKey: row.chain_key,
         status: normalizedStatus,
-        title: `Transfer ${row.token_symbol || row.token_address || 'asset'} to ${row.to_address}`,
+        title: `Transfer ${tokenLabel} to ${row.to_address}`,
         subtitle: `Transfer approval ${row.approval_id}`,
         requestTypeLabel: 'Withdraw Approval',
         reasonLine: row.policy_block_reason_message || row.reason_message || 'Transfer requires owner confirmation.',
