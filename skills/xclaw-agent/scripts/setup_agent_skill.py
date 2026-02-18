@@ -17,12 +17,18 @@ POLICY_FILE = APP_DIR / "policy.json"
 PATCHER = Path(__file__).resolve().parent / "openclaw_gateway_patch.py"
 
 
-def run(cmd: list[str], check: bool = True, capture: bool = True) -> subprocess.CompletedProcess[str]:
+def run(
+    cmd: list[str],
+    check: bool = True,
+    capture: bool = True,
+    env: Optional[dict[str, str]] = None,
+) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         cmd,
         check=check,
         text=True,
         capture_output=capture,
+        env=env,
     )
 
 
@@ -82,7 +88,7 @@ def ensure_openclaw(workspace: Path) -> Path:
     if not cfg.exists():
         run(
             [
-                "openclaw",
+                str(openclaw_bin),
                 "onboard",
                 "--non-interactive",
                 "--accept-risk",
@@ -104,7 +110,7 @@ def ensure_openclaw(workspace: Path) -> Path:
     else:
         # Preserve existing workspace unless explicitly requested to update.
         if os.environ.get("XCLAW_OPENCLAW_SET_WORKSPACE", "").strip().lower() in {"1", "true", "yes"}:
-            run(["openclaw", "config", "set", "agents.defaults.workspace", str(workspace)])
+            run([str(openclaw_bin), "config", "set", "agents.defaults.workspace", str(workspace)])
     return openclaw_bin
 
 
@@ -196,21 +202,21 @@ def ensure_runtime_bin_env(launcher_path: Path) -> None:
     cfg.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
 
-def ensure_ready() -> dict[str, str]:
+def ensure_ready(openclaw_bin: Path) -> dict[str, str]:
     python_cmd = _python_command()
 
     if shutil.which("xclaw-agent") is None:
         raise RuntimeError("xclaw-agent launcher was not found on PATH after setup")
 
     run(["xclaw-agent", "status", "--json"])
-    run(["openclaw", "skills", "info", "xclaw-agent"])
-    run(["openclaw", "skills", "list", "--eligible"])
+    run([str(openclaw_bin), "skills", "info", "xclaw-agent"])
+    run([str(openclaw_bin), "skills", "list", "--eligible"])
 
     python_version = run([*python_cmd, "--version"])
     version_text = (python_version.stdout or "").strip() or (python_version.stderr or "").strip()
     versions = {
         "python": version_text,
-        "openclaw": run(["openclaw", "--version"]).stdout.strip(),
+        "openclaw": run([str(openclaw_bin), "--version"]).stdout.strip(),
     }
     return versions
 
@@ -273,7 +279,9 @@ def main() -> int:
         try:
             if os.environ.get("XCLAW_OPENCLAW_AUTO_PATCH", "1").strip().lower() not in {"0", "false", "no"} and PATCHER.exists():
                 # Restart is best-effort and guarded by cooldown+lock inside patcher.
-                patch_proc = run([*_python_command(), str(PATCHER), "--json", "--restart"], check=False)
+                patch_env = dict(os.environ)
+                patch_env["OPENCLAW_BIN"] = str(openclaw_bin)
+                patch_proc = run([*_python_command(), str(PATCHER), "--json", "--restart"], check=False, env=patch_env)
                 gateway_patch = _parse_last_json_line((patch_proc.stdout or "").strip()) or {}
                 if not gateway_patch:
                     gateway_patch = {
@@ -284,6 +292,15 @@ def main() -> int:
                         "stderr": (patch_proc.stderr or "").strip()[:300],
                     }
                 strict_patch = os.environ.get("XCLAW_OPENCLAW_PATCH_STRICT", "1").strip().lower() not in {"0", "false", "no"}
+                reported_bin = str(gateway_patch.get("openclawBin") or "").strip()
+                if strict_patch and reported_bin:
+                    expected_bin = str(openclaw_bin.resolve())
+                    selected_bin = str(Path(reported_bin).resolve())
+                    if selected_bin != expected_bin:
+                        raise RuntimeError(
+                            "OpenClaw gateway patch targeted a different binary than setup resolved "
+                            f"(expected {expected_bin}, got {selected_bin})."
+                        )
                 if strict_patch and not bool(gateway_patch.get("ok")):
                     err = str(gateway_patch.get("error") or "unknown_patch_error")
                     hint = "Ensure OpenClaw is current, then rerun setup."
@@ -297,7 +314,7 @@ def main() -> int:
                     raise RuntimeError(f"OpenClaw gateway patch failed: {err}. {hint}")
         except Exception:
             raise
-        versions = ensure_ready()
+        versions = ensure_ready(openclaw_bin)
     except subprocess.CalledProcessError as exc:
         stderr = (exc.stderr or "").strip()
         stdout = (exc.stdout or "").strip()

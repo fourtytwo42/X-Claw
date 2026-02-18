@@ -1270,6 +1270,7 @@ Runtime binary requirements for skill operation:
 - Setup script auto-patch for Telegram callbacks must target top-level gateway reply bundles (`dist/reply-*.js`) and fail fast with explicit error when patch syntax validation fails (no silent success on broken callback patch).
 - If OpenClaw is installed in a root-owned location and gateway patch write fails with permission denied, installer/setup must fail with explicit terminal guidance to rerun installer with elevated privileges (`sudo`).
 - Linux/macOS hosted installer (`/skill-install.sh`) must surface that permission-denied/sudo-required condition as a high-visibility terminal warning block (ANSI color + clear rerun command) so it is not lost in dependency-install noise.
+- Setup must resolve a single active OpenClaw binary path first, execute onboarding/config/patching against that exact binary, and reject patch results that target a different binary than the one selected for setup.
 - Hosted installers must ensure `xclaw-agent` is discoverable for future sessions by persisting launcher paths in user PATH (or equivalent stable shim path) after install.
 - Skill wrapper should normalize known safe input-guard rejections (for example symbol token unit mismatch) into non-fatal JSON responses so chat UX does not emit misleading hard-failure tool traces when no transaction was executed.
 - Token decimals used for UI/API display must be chain-scoped and resolved from on-chain ERC-20 metadata via RPC/cache when token addresses are known (avoid static per-token decimal baking across chains).

@@ -114,6 +114,7 @@ class PatchResult:
     ok: bool
     patched: bool
     restarted: bool
+    openclaw_bin: str | None = None
     openclaw_version: str | None = None
     openclaw_root: str | None = None
     loader_paths: list[str] | None = None
@@ -151,6 +152,12 @@ def _release_lock() -> None:
 
 
 def _resolve_openclaw_bin() -> str | None:
+    forced = os.environ.get("OPENCLAW_BIN", "").strip() or os.environ.get("XCLAW_OPENCLAW_BIN", "").strip()
+    if forced:
+        candidate = Path(forced).expanduser()
+        if candidate.exists():
+            return str(candidate)
+        return None
     return shutil.which("openclaw")
 
 
@@ -967,13 +974,22 @@ def ensure_patched(*, restart: bool, cooldown_sec: int) -> PatchResult:
 
         bundles = _find_loader_bundles(pkg_root)
         if not bundles:
-            return PatchResult(ok=False, patched=False, restarted=False, openclaw_version=version, openclaw_root=str(pkg_root), error="callback_bundle_not_found")
+            return PatchResult(
+                ok=False,
+                patched=False,
+                restarted=False,
+                openclaw_bin=openclaw_bin,
+                openclaw_version=version,
+                openclaw_root=str(pkg_root),
+                error="callback_bundle_not_found",
+            )
 
         state = _read_json(STATE_FILE)
         # Bump schemaVersion when patch heuristics/normalization change to invalidate cached fast-path.
         state["schemaVersion"] = STATE_SCHEMA_VERSION
         state.setdefault("bundles", {})
         state["lastAttemptAt"] = _utc_now()
+        state["openclawBin"] = openclaw_bin
         state["openclawVersion"] = version
         state["openclawRoot"] = str(pkg_root)
 
@@ -989,6 +1005,7 @@ def ensure_patched(*, restart: bool, cooldown_sec: int) -> PatchResult:
                 ok=False,
                 patched=False,
                 restarted=False,
+                openclaw_bin=openclaw_bin,
                 openclaw_version=version,
                 openclaw_root=str(pkg_root),
                 loader_paths=[str(p) for p in bundles],
@@ -1095,6 +1112,7 @@ def ensure_patched(*, restart: bool, cooldown_sec: int) -> PatchResult:
             ok=patched_any,
             patched=changed_any or patched_any,
             restarted=restarted,
+            openclaw_bin=openclaw_bin,
             openclaw_version=version,
             openclaw_root=str(pkg_root),
             loader_paths=loader_paths,
@@ -1118,6 +1136,7 @@ def main(argv: list[str]) -> int:
                 "ok": result.ok,
                 "patched": result.patched,
                 "restarted": result.restarted,
+                "openclawBin": result.openclaw_bin,
                 "openclawVersion": result.openclaw_version,
                 "openclawRoot": result.openclaw_root,
                 "loaderPaths": result.loader_paths,
