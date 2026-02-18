@@ -2,13 +2,12 @@
 
 import { useEffect, useMemo, useState } from 'react';
 
-export type ChainKey = 'base_sepolia' | 'kite_ai_testnet' | 'hardhat_local';
+export type ChainKey = 'base_sepolia' | 'kite_ai_testnet';
 export type DashboardChainKey = 'all' | ChainKey;
 
 export const CHAIN_OPTIONS: Array<{ key: ChainKey; label: string }> = [
   { key: 'base_sepolia', label: 'Base Sepolia' },
-  { key: 'kite_ai_testnet', label: 'Kite AI Testnet' },
-  { key: 'hardhat_local', label: 'Hardhat Local' }
+  { key: 'kite_ai_testnet', label: 'Kite AI Testnet' }
 ];
 
 export const DASHBOARD_CHAIN_OPTIONS: Array<{ key: DashboardChainKey; label: string }> = [
@@ -26,7 +25,7 @@ const EVENT_NAME = 'xclaw:chain_changed';
 const DASHBOARD_EVENT_NAME = 'xclaw:dashboard_chain_changed';
 
 function isChainKey(value: unknown): value is ChainKey {
-  return value === 'base_sepolia' || value === 'kite_ai_testnet' || value === 'hardhat_local';
+  return value === 'base_sepolia' || value === 'kite_ai_testnet';
 }
 
 function isDashboardChainKey(value: unknown): value is DashboardChainKey {
