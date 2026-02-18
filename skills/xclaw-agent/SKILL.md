@@ -80,6 +80,9 @@ Single-trigger spot flow (Telegram-focused):
 - Treat `trade-spot` as one user trigger.
 - If approval is needed, post queued approval message and wait for owner approve/deny.
 - On Telegram Approve callback, runtime auto-resumes execution (`trade-resume`) without requiring a second user message.
+- Agent callback-notification rule:
+  - do not send synthetic agent-pipeline notification on non-terminal `approved`,
+  - send synthetic agent-pipeline notification on terminal trade result (`filled|failed`) and explicit rejection (`rejected`).
 - Always report final trade result (success/failure, trade id, tx hash when available) back to the human.
 
 Single-trigger transfer flow (Telegram-focused):
@@ -91,6 +94,7 @@ Single-trigger transfer flow (Telegram-focused):
   - approve: `xfer|a|<approvalId>|<chainKey>`
   - deny: `xfer|r|<approvalId>|<chainKey>`
 - Callback path is deterministic (non-LLM mediation) and must emit final transfer result message (`status`, `approvalId`, `chain`, `txHash` when available).
+- Agent is notified from callback path on terminal transfer outcomes (`filled|failed|rejected`) so autonomous behavior can stay synchronized with wallet state.
 
 Natural-language normalization (locked for trading intent interpretation):
 - If user says `ETH` in a trade intent, interpret it as `WETH`.

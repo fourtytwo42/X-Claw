@@ -1,3 +1,30 @@
+# Hotfix Tasks: Terminal-Only Agent Callback Notifications (Telegram)
+
+Active slice context: `Slice 86` remains in progress; this is an explicit operator UX hotfix.
+
+## 1) Scope lock
+- [x] Lock callback behavior to terminal/rejection notifications for agent pipeline.
+- [x] Keep deterministic Telegram user-facing callback confirmations intact.
+
+## 2) Implementation
+- [x] Trade callback approve path (`xappr|a`) keeps auto-resume behavior.
+- [x] Trade callback no longer notifies agent pipeline on non-terminal `approved`.
+- [x] Trade callback now notifies agent pipeline on terminal `filled|failed`.
+- [x] Trade/policy callback deny path notifies agent pipeline (`rejected`).
+- [x] Docs updated for notification contract in source-of-truth + skill.
+
+## 3) Validation
+- [x] `XCLAW_AGENT_HOME=/tmp/xclaw-agent-test python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+- [x] `python3 skills/xclaw-agent/scripts/openclaw_gateway_patch.py --json`
+
+---
+
 # Hotfix Tasks: Telegram Trade Result Noise + Swap-Deposit Misclassification
 
 Active slice context: `Slice 86` is currently in progress; this is an explicit user-requested hotfix outside sequential slice work.

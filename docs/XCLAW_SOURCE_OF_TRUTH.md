@@ -2631,7 +2631,9 @@ Limitations / notes:
    - Reliability requirement: for both trade (`xappr`) and policy (`xpol`) callbacks, Telegram callback success (including converged terminal `409`) must emit immediate visible feedback (`Approved/Denied ...`).
    - Single-trigger spot flow requirement (Telegram-focused): for `trade spot` approvals (`xappr approve`), the system must auto-resume execution without requiring a second user message.
    - Final-result requirement: after auto-resume execution, the system must emit a deterministic final result message in the same chat (status + tradeId + chain + tx hash when available).
-   - To prevent duplicate chatter and duplicate executions, Telegram callback handling must not inject additional synthetic approval/result messages into the general agent message pipeline for trade callbacks.
+   - Agent-pipeline notification rule:
+     - do not inject synthetic agent-pipeline notifications for non-terminal `approved` callbacks,
+     - inject synthetic agent-pipeline notifications for terminal trade outcomes (`filled`/`failed`) and explicit rejection (`rejected`) so autonomous agent state stays synchronized.
    - after approve/deny in web while runtime is waiting on the trade, runtime posts a confirmation message into the active Telegram chat with the same details.
    - if active channel is non-Telegram, confirmation and next-step instructions should reference web management approval status (not Telegram callbacks/buttons).
 11. Approval wait latency:
@@ -2665,7 +2667,8 @@ Limitations / notes:
      - `Approval ID: ppr_...`
    - Runtime must return a `queuedMessage` template that includes these lines verbatim so the agent can paste it without formatting mistakes.
 7. Decision feedback:
-   - After Telegram approve/deny, decision feedback must be routed into the agent message pipeline (synthetic inbound message + instructions) so the agent informs the user.
+   - After Telegram deny, decision feedback must be routed into the agent message pipeline (synthetic inbound message + instructions) so the agent can react to rejection context.
+   - Telegram approve for policy requests should not trigger synthetic agent-pipeline notification (non-terminal/no execution event).
    - Reliability requirement: for policy approvals, Telegram callback success must also emit an immediate deterministic confirmation message (`Approved policy approval ...` / `Denied policy approval ...`) so the user gets feedback even if agent pipeline produces no visible reply.
    - Converged callback requirement: when Telegram callback returns idempotent/converged `409` with terminal `currentStatus` (`approved`/`rejected`/`filled`), policy approvals must still emit deterministic confirmation after inline buttons are cleared.
    - For proposed policy approvals, the agent must echo the `queuedMessage` verbatim to the user so Telegram buttons can attach reliably.

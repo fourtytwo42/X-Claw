@@ -1,3 +1,33 @@
+# Hotfix Spec: Terminal-Only Agent Callback Notifications (Telegram)
+
+## Goal
+Ensure Telegram callback events notify the agent pipeline only when they are operationally terminal for execution context:
+- terminal trade outcomes (`filled|failed`),
+- explicit rejections (`rejected` for trade/policy/transfer),
+while avoiding non-terminal notify on `approved`.
+
+## Non-goals
+1. No API contract changes.
+2. No schema/migration changes.
+3. No callback payload prefix changes (`xappr|xpol|xfer` unchanged).
+
+## Locked scope
+1. `skills/xclaw-agent/scripts/openclaw_gateway_patch.py`
+2. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+3. `skills/xclaw-agent/SKILL.md`
+
+## Acceptance checks
+- `XCLAW_AGENT_HOME=/tmp/xclaw-agent-test python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `pm2 restart all`
+- `python3 skills/xclaw-agent/scripts/openclaw_gateway_patch.py --json`
+
+---
+
 # Hotfix Spec: Telegram Trade Result Noise + Swap-Deposit Misclassification
 
 ## Goal

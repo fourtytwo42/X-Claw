@@ -1,3 +1,33 @@
+# Hotfix Acceptance Evidence: Terminal-Only Agent Callback Notifications (Telegram)
+
+Date (UTC): 2026-02-18
+Active slice context: `Slice 86` in progress; this was executed as explicit operator UX hotfix.
+
+## Objective + Scope Lock
+- Objective: notify agent pipeline only on terminal callback outcomes (`filled|failed|rejected`), not on non-terminal `approved`.
+- Scope lock:
+  - `skills/xclaw-agent/scripts/openclaw_gateway_patch.py`
+  - `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - `skills/xclaw-agent/SKILL.md`
+
+## Validation Commands and Outcomes
+- `XCLAW_AGENT_HOME=/tmp/xclaw-agent-test python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS (`Ran 77 tests`, `OK`)
+- `npm run db:parity` -> PASS (`ok: true`)
+- `npm run seed:reset` -> PASS (`ok: true`)
+- `npm run seed:load` -> PASS (`ok: true`)
+- `npm run seed:verify` -> PASS (`ok: true`)
+- `npm run build` -> PASS
+- `pm2 restart all` -> PASS (`xclaw-web` online)
+- `python3 skills/xclaw-agent/scripts/openclaw_gateway_patch.py --json` -> PASS (`patched: true`, OpenClaw bundle updated)
+
+## Functional Verification Notes
+- Telegram trade approve callback continues deterministic user confirmation + auto-resume execution.
+- Non-terminal approval no longer triggers synthetic notify into agent pipeline.
+- Trade terminal outcomes now notify agent pipeline with synthetic terminal result context.
+- Trade/policy deny callbacks now notify agent pipeline with rejection context.
+
+---
+
 # Hotfix Acceptance Evidence: Telegram Trade Result Noise + Swap-Deposit Misclassification
 
 Date (UTC): 2026-02-18
