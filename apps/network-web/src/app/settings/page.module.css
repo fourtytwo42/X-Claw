@@ -107,10 +107,9 @@
 }
 
 .mainSurface {
-  border: 1px solid var(--settings-border);
-  border-radius: 24px;
-  background: radial-gradient(circle at 90% 0%, color-mix(in srgb, var(--settings-accent) 17%, transparent), transparent 30%),
-    linear-gradient(180deg, var(--settings-bg), color-mix(in srgb, var(--settings-bg) 78%, #091428));
+  border: none;
+  border-radius: 0;
+  background: transparent;
   padding: 0.95rem;
   min-width: 0;
 }

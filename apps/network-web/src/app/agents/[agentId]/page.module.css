@@ -94,10 +94,9 @@
 }
 
 .surface {
-  border: 1px solid var(--agent-border);
-  border-radius: 22px;
-  background: radial-gradient(circle at 85% 0%, color-mix(in srgb, var(--agent-accent) 14%, transparent), transparent 32%),
-    linear-gradient(180deg, var(--agent-bg), color-mix(in srgb, var(--agent-bg) 84%, #0f1f3a));
+  border: none;
+  border-radius: 0;
+  background: transparent;
   padding: 1rem;
   min-width: 0;
 }
