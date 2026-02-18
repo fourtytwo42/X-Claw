@@ -282,7 +282,7 @@ fi
 ensure_python_runtime_deps "$XCLAW_PYTHON_BIN"
 export XCLAW_AGENT_PYTHON_BIN="$XCLAW_PYTHON_BIN"
 echo "[xclaw] running setup_agent_skill.py"
-xclaw_telegram_force_management="disabled"
+xclaw_telegram_force_management="0"
 set +e
 setup_output="$("$XCLAW_PYTHON_BIN" skills/xclaw-agent/scripts/setup_agent_skill.py 2>&1)"
 setup_status=$?
@@ -310,7 +310,7 @@ if [ "$setup_status" -ne 0 ]; then
       printf '%s\n' "$setup_output"
     fi
     if [ "$setup_status" -eq 0 ]; then
-      xclaw_telegram_force_management="enabled"
+      xclaw_telegram_force_management="1"
     fi
   fi
   if [ "$setup_status" -ne 0 ]; then

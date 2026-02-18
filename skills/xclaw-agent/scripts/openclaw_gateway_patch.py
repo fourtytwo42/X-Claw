@@ -412,7 +412,12 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
             r'\1 try { await bot.api.sendMessage(chatId, finalMsg); } catch {} try { const decisionWord = body?.ok ? "FILLED" : "FAILED"; const instruction = body?.ok ? "Reply to the user confirming the trade succeeded with tx details." : "Reply to the user confirming the trade failed and provide next steps."; const syntheticText = `[X-CLAW TRADE RESULT]\\nDecision: ${decisionWord}\\nTrade: ${subjectId}\\nChain: ${chainKey}\\nTxHash: ${txHash || "n/a"}${pairLine ? `\\nPair: ${amountHuman} ${tokenInSym} -> ${tokenOutSym}` : ""}\\nSource: telegram_callback_trade\\nInstruction: ${instruction}`; const storeAllowFrom2 = await readChannelAllowFromStore("telegram").catch(() => []); const getFile2 = typeof ctx.getFile === "function" ? ctx.getFile.bind(ctx) : async () => ({}); const syntheticMessage2 = { ...callbackMessage, from: callback.from, text: syntheticText, caption: void 0, caption_entities: void 0, entities: void 0, date: Math.floor(Date.now() / 1000) }; await processMessage({ message: syntheticMessage2, me: ctx.me, getFile: getFile2 }, [], storeAllowFrom2, { messageIdOverride: `xclaw-trade-result-${callback.id}` }); } catch {}',
             text5,
         )
-        return text6, (n1 > 0) or (n2 > 0) or (n3 > 0) or (n4 > 0) or (n5 > 0)
+        text7, n6 = re.subn(
+            r'(const finalMsg = `\$\{head\}\$\{pairLine\}\\nTrade: \$\{subjectId\}\\nChain: \$\{chainKey\}\$\{txLine\}\$\{reasonLine\}`;\s*)(try \{ const decisionWord = body\?\.ok \? "FILLED" : "FAILED";)',
+            r'\1try { await bot.api.sendMessage(chatId, finalMsg); } catch {} \2',
+            text6,
+        )
+        return text7, (n1 > 0) or (n2 > 0) or (n3 > 0) or (n4 > 0) or (n5 > 0) or (n6 > 0)
 
     if (
         MARKER in raw

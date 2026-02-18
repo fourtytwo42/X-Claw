@@ -456,6 +456,7 @@ try {
     Set-OpenClawConfigSafe "skills.entries.xclaw-agent.env.XCLAW_API_BASE_URL" "$($env:XCLAW_API_BASE_URL)"
     Set-OpenClawConfigSafe "skills.entries.xclaw-agent.env.XCLAW_DEFAULT_CHAIN" "$($env:XCLAW_DEFAULT_CHAIN)"
     Set-OpenClawConfigSafe "skills.entries.xclaw-agent.env.XCLAW_AGENT_PYTHON_BIN" "$($env:XCLAW_AGENT_PYTHON_BIN)"
+    Set-OpenClawConfigSafe "skills.entries.xclaw-agent.env.XCLAW_TELEGRAM_APPROVALS_FORCE_MANAGEMENT" "0"
     if ($env:XCLAW_AGENT_ID) {
       Set-OpenClawConfigSafe "skills.entries.xclaw-agent.env.XCLAW_AGENT_ID" "$($env:XCLAW_AGENT_ID)"
     }
