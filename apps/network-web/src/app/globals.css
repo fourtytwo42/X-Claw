@@ -72,6 +72,7 @@ body {
   margin: 0;
   padding: 0;
   min-height: 100%;
+  overflow-x: clip;
 }
 
 body {
@@ -119,7 +120,8 @@ a {
 }
 
 .primary-shell {
-  width: min(100vw, 1840px);
+  width: 100%;
+  max-width: 1840px;
   margin: 0 auto;
   padding: 0.75rem;
   min-height: 100vh;
@@ -137,7 +139,8 @@ a {
 }
 
 .left-nav-shell {
-  width: min(100vw, 1840px);
+  width: 100%;
+  max-width: 1840px;
   margin: 0 auto;
   padding: 0.75rem;
   min-height: 100vh;
@@ -337,12 +340,14 @@ a {
 }
 
 .page-content {
-  width: min(1560px, 96vw);
+  width: 100%;
+  max-width: 1560px;
   margin: clamp(0.8rem, 1.4vw, 1.4rem) auto;
 }
 
 .page-content-dashboard {
-  width: min(100vw, 1840px);
+  width: 100%;
+  max-width: 1840px;
   margin: 0 auto;
   padding: 0.75rem;
 }
@@ -1181,7 +1186,7 @@ th {
 
 @media (max-width: 1439px) {
   .page-content {
-    width: min(1300px, 95vw);
+    max-width: 1300px;
   }
 
   .agent-layout {
@@ -1233,18 +1238,21 @@ th {
 
 @media (max-width: 760px) {
   .page-content {
-    width: min(100%, 96vw);
+    width: 100%;
+    max-width: none;
     margin: 0.65rem auto;
   }
 
   .page-content-dashboard {
-    width: min(100%, 100vw);
+    width: 100%;
+    max-width: none;
     padding: 0.5rem;
     padding-bottom: calc(5.6rem + env(safe-area-inset-bottom));
   }
 
   .primary-shell {
-    width: min(100%, 100vw);
+    width: 100%;
+    max-width: none;
     grid-template-columns: 1fr;
     gap: 0.6rem;
     padding: 0.5rem;
@@ -1257,7 +1265,8 @@ th {
   }
 
   .left-nav-shell {
-    width: min(100%, 100vw);
+    width: 100%;
+    max-width: none;
     grid-template-columns: 1fr;
     gap: 0.6rem;
     padding: 0.5rem;
