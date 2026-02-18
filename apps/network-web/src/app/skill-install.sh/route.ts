@@ -292,10 +292,10 @@ if [ -n "$setup_output" ]; then
 fi
 if [ "$setup_status" -ne 0 ]; then
   if printf '%s' "$setup_output" | grep -qi 'write_failed:.*permission denied'; then
-    printf '\n\\033[1;37;41m[xclaw] INSTALLER ACTION REQUIRED\\033[0m\n'
+    printf '\n\\033[1;37;44m[xclaw] INSTALLER NOTE\\033[0m\n'
     printf '\\033[1;31m[xclaw] Gateway patch write is not available in current install context.\\033[0m\n'
     printf '\\033[1;33m[xclaw] Continuing in fallback mode: Telegram approvals will use management-link flow (no inline buttons).\\033[0m\n'
-    printf '\\033[1;31m[xclaw] For full Telegram inline button support, rerun with sudo:\\033[0m\n'
+    printf '\\033[1;31m[xclaw] For full Telegram inline button support, rerun with sudo (recommended):\\033[0m\n'
     printf '\\033[1;33m  curl -fsSL https://xclaw.trade/skill-install.sh | sudo bash\\033[0m\n\n'
     echo "[xclaw] retrying setup with gateway patch disabled"
     set +e
@@ -766,27 +766,11 @@ if [ "$xclaw_telegram_force_management" = "enabled" ]; then
   printf '\n\\033[1;37;41m[xclaw] TELEGRAM FALLBACK MODE ENABLED\\033[0m\n'
   printf '\\033[1;33m[xclaw] Inline Approve/Deny buttons are disabled in this install context.\\033[0m\n'
   printf '\\033[1;33m[xclaw] Agent will route Telegram approvals through X-Claw management links.\\033[0m\n'
-  printf '\\033[1;31m[xclaw] For full Telegram inline button functionality, rerun:\\033[0m\n'
+  printf '\\033[1;31m[xclaw] For full Telegram inline button functionality, rerun with sudo (recommended):\\033[0m\n'
   printf '\\033[1;33m  curl -fsSL https://xclaw.trade/skill-install.sh | sudo bash\\033[0m\n\n'
 fi
 
-cat <<'NEXT_STEPS'
 [xclaw] install complete
-
-Next steps:
-1) Fetch full instructions:
-   curl -fsSL ${origin}/skill.md
-2) Verify skill availability in OpenClaw:
-   openclaw skills info xclaw-agent
-3) Register + heartbeat:
-   attempted automatically via bootstrap endpoint or provided credentials
-4) Gateway:
-   restarted automatically (fallback warning shown if restart failed)
-5) Start runtime checks:
-   python3 ~/.openclaw/skills/xclaw-agent/scripts/xclaw_agent_skill.py status
-6) Verify installed script versions/hashes:
-   python3 ~/.openclaw/skills/xclaw-agent/scripts/xclaw_agent_skill.py version
-NEXT_STEPS
 `;
 }
 
