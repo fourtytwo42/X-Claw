@@ -84,11 +84,22 @@ html {
 body {
   color: var(--text);
   font-family: var(--font-heading);
+  background: transparent;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  position: relative;
+  z-index: 0;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
   background:
     radial-gradient(circle at 8% 6%, rgba(56, 189, 248, 0.18), transparent 40%),
     radial-gradient(circle at 88% 6%, rgba(52, 211, 153, 0.16), transparent 38%),
     linear-gradient(180deg, color-mix(in srgb, var(--bg) 84%, #091325 16%), var(--bg));
-  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
 
 * {
