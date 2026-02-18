@@ -1646,7 +1646,7 @@ DoD:
 
 ## Slice 86: Multi-Agent Management Session + Chain-Scoped Trade Policy Snapshots
 Status: [~]
-Issue: #86
+Issue: #33
 
 Goal:
 - Expand management-session authorization to support multiple managed agents per cookie session, and harden `agent_policy_snapshots` reads/writes to chain-scoped behavior.
@@ -1661,7 +1661,7 @@ DoD:
 
 ## Slice 87: Approvals Center Core APIs + Permission Inventory
 Status: [~]
-Issue: #87
+Issue: #34
 
 Goal:
 - Make `/approvals` fully functional for approve+allowlist and permission-native inventory while preserving existing approval decision routes.
@@ -1675,7 +1675,7 @@ DoD:
 
 ## Slice 88: Approvals Center Full UX Flush (Batch + Risk)
 Status: [~]
-Issue: #88
+Issue: #35
 
 Goal:
 - Complete approvals UX with deterministic risk context and batched decision operations.
