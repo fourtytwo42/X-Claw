@@ -552,6 +552,32 @@ export default function ApprovalsCenterPage() {
                       </span>
                       <span>
                         {item.outboundPermissions.outboundTransfersEnabled ? item.outboundPermissions.outboundMode : 'disabled'}
+                        <br />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void managementPost('/api/v1/management/permissions/update', {
+                              agentId: item.agentId,
+                              chainKey: item.chainKey,
+                              tradeApprovalMode: item.tradePermissions.approvalMode === 'auto' ? 'per_trade' : 'auto'
+                            }).then(() => reloadInbox())
+                          }
+                        >
+                          {item.tradePermissions.approvalMode === 'auto' ? 'Set Per-Trade' : 'Set Approve-All'}
+                        </button>
+                        <br />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void managementPost('/api/v1/management/permissions/update', {
+                              agentId: item.agentId,
+                              chainKey: item.chainKey,
+                              outboundTransfersEnabled: !item.outboundPermissions.outboundTransfersEnabled
+                            }).then(() => reloadInbox())
+                          }
+                        >
+                          {item.outboundPermissions.outboundTransfersEnabled ? 'Disable Outbound' : 'Enable Outbound'}
+                        </button>
                       </span>
                     </div>
                   ))}
