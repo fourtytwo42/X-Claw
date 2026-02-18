@@ -372,11 +372,11 @@
 .riskChip {
   border: 1px solid var(--approvals-border);
   border-radius: 999px;
-  padding: 0 0.56rem;
-  font-size: 0.72rem;
+  padding: 0 0.46rem;
+  font-size: 0.68rem;
   font-weight: 600;
   line-height: 1;
-  min-height: 1.38rem;
+  min-height: 1.15rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
