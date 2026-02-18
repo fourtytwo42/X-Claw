@@ -762,7 +762,7 @@ if [ "$(id -u)" -eq 0 ] && [ -n "\${SUDO_USER:-}" ] && [ "$SUDO_USER" != "root" 
   chown -R "$XCLAW_INSTALL_TARGET_USER":"$XCLAW_INSTALL_TARGET_USER" "$HOME/.openclaw" "$HOME/.xclaw-agent" "$HOME/.foundry" "$XCLAW_WORKDIR" 2>/dev/null || true
 fi
 
-if [ "$xclaw_telegram_force_management" = "enabled" ]; then
+if [ "$xclaw_telegram_force_management" = "1" ]; then
   printf '\n\\033[1;37;41m[xclaw] TELEGRAM FALLBACK MODE ENABLED\\033[0m\n'
   printf '\\033[1;33m[xclaw] Inline Approve/Deny buttons are disabled in this install context.\\033[0m\n'
   printf '\\033[1;33m[xclaw] Agent will route Telegram approvals through X-Claw management links.\\033[0m\n'
@@ -770,7 +770,7 @@ if [ "$xclaw_telegram_force_management" = "enabled" ]; then
   printf '\\033[1;33m  curl -fsSL https://xclaw.trade/skill-install.sh | sudo bash\\033[0m\n\n'
 fi
 
-[xclaw] install complete
+echo "[xclaw] install complete"
 `;
 }
 
