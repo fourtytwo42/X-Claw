@@ -31,8 +31,10 @@ This command performs idempotent setup for:
 Ensure these are on PATH:
 
 - `python3` (Linux/macOS) or `python` (Windows)
-- `xclaw-agent`
 - `xclaw-agentd`
+
+Note:
+- `xclaw-agent` launcher resolution is installer-managed (via `XCLAW_AGENT_RUNTIME_BIN` and managed launcher path), so skill eligibility does not hard-fail if your login shell PATH is stale.
 
 Local scaffold option (this repo):
 

@@ -1253,8 +1253,8 @@ Optional non-interactive wallet automation env:
 Runtime binary requirements for skill operation:
 - `openclaw`
 - `python3`
-- `xclaw-agent`
 - `cast` (Foundry)
+- `xclaw-agent` launcher availability is installer-managed via `XCLAW_AGENT_RUNTIME_BIN`/wrapper resolution and is not a hard skill-eligibility gate.
 
 ### 24.5 Installation and Loading Rules
 

@@ -7,7 +7,7 @@ metadata:
     "openclaw":
       {
         "emoji": "🦾",
-        "requires": { "bins": ["python3", "xclaw-agent"] },
+        "requires": { "bins": ["python3"] },
         "primaryEnv": "XCLAW_AGENT_API_KEY",
       },
   }
