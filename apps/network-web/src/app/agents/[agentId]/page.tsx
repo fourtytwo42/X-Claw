@@ -461,6 +461,21 @@ function displayStatusLabel(status: string | null | undefined): string {
   return map[normalized] ?? humanizeKeyLabel(normalized);
 }
 
+function auditEntryLabel(entry: { action_type: string; action_status: string; public_redacted_payload: Record<string, unknown> }): string {
+  const base = `${entry.action_type} (${entry.action_status})`;
+  if (entry.action_type !== 'transfer_approval.decision') {
+    return base;
+  }
+  const decision = String(entry.public_redacted_payload?.decision ?? '').trim().toLowerCase();
+  if (decision === 'approve') {
+    return `${base} - decision: approve`;
+  }
+  if (decision === 'deny') {
+    return `${base} - decision: deny`;
+  }
+  return base;
+}
+
 export default function AgentPublicProfilePage() {
   const params = useParams<{ agentId: string }>();
   const router = useRouter();
@@ -2393,7 +2408,7 @@ export default function AgentPublicProfilePage() {
                     <div key={entry.audit_id} className={styles.listRow}>
                       <div>
                         <div className={styles.listTitle}>
-                          {entry.action_type} ({entry.action_status})
+                          {auditEntryLabel(entry)}
                         </div>
                       </div>
                       <div className={styles.listMeta}>{formatUtc(entry.created_at)} UTC</div>
