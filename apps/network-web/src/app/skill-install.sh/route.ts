@@ -22,6 +22,22 @@ set -euo pipefail
 
 echo "[xclaw] bootstrap start"
 
+XCLAW_INSTALL_TARGET_USER="$USER"
+XCLAW_INSTALL_TARGET_HOME="$HOME"
+if [ "$(id -u)" -eq 0 ] && [ -n "\${SUDO_USER:-}" ] && [ "$SUDO_USER" != "root" ]; then
+  XCLAW_INSTALL_TARGET_USER="$SUDO_USER"
+  XCLAW_INSTALL_TARGET_HOME="$(getent passwd "$SUDO_USER" | cut -d: -f6 || true)"
+  if [ -z "$XCLAW_INSTALL_TARGET_HOME" ]; then
+    XCLAW_INSTALL_TARGET_HOME="$(eval echo "~$SUDO_USER")"
+  fi
+  if [ -z "$XCLAW_INSTALL_TARGET_HOME" ] || [ ! -d "$XCLAW_INSTALL_TARGET_HOME" ]; then
+    echo "[xclaw] unable to resolve home directory for sudo user: $SUDO_USER"
+    exit 1
+  fi
+  export HOME="$XCLAW_INSTALL_TARGET_HOME"
+  echo "[xclaw] sudo detected; targeting user context: $XCLAW_INSTALL_TARGET_USER ($XCLAW_INSTALL_TARGET_HOME)"
+fi
+
 export XCLAW_WORKDIR="\${XCLAW_WORKDIR:-$HOME/xclaw}"
 export XCLAW_REPO_REF="\${XCLAW_REPO_REF:-main}"
 export XCLAW_REPO_URL="\${XCLAW_REPO_URL:-https://github.com/fourtytwo42/ETHDenver2026}"
@@ -720,6 +736,11 @@ else
   echo "[xclaw] warning: gateway restart failed; run 'openclaw gateway restart' manually"
 fi
 
+if [ "$(id -u)" -eq 0 ] && [ -n "\${SUDO_USER:-}" ] && [ "$SUDO_USER" != "root" ]; then
+  echo "[xclaw] fixing ownership for user context artifacts"
+  chown -R "$XCLAW_INSTALL_TARGET_USER":"$XCLAW_INSTALL_TARGET_USER" "$HOME/.openclaw" "$HOME/.xclaw-agent" "$HOME/.foundry" "$XCLAW_WORKDIR" 2>/dev/null || true
+fi
+
 cat <<'NEXT_STEPS'
 [xclaw] install complete
 
@@ -733,9 +754,9 @@ Next steps:
 4) Gateway:
    restarted automatically (fallback warning shown if restart failed)
 5) Start runtime checks:
-   python3 skills/xclaw-agent/scripts/xclaw_agent_skill.py status
+   python3 ~/.openclaw/skills/xclaw-agent/scripts/xclaw_agent_skill.py status
 6) Verify installed script versions/hashes:
-   python3 skills/xclaw-agent/scripts/xclaw_agent_skill.py version
+   python3 ~/.openclaw/skills/xclaw-agent/scripts/xclaw_agent_skill.py version
 NEXT_STEPS
 `;
 }
