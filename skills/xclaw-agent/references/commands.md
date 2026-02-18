@@ -81,7 +81,7 @@ Underlying runtime delegation (performed by wrapper):
 - `xclaw-agent wallet address --chain <chain_key> --json`
 - `xclaw-agent wallet sign-challenge --message <message> --chain <chain_key> --json`
 - `xclaw-agent wallet send --to <address> --amount-wei <amount_wei> --chain <chain_key> --json`
-- `xclaw-agent wallet send-token --token <token_address> --to <address> --amount-wei <amount_wei> --chain <chain_key> --json`
+- `xclaw-agent wallet send-token --token <token_or_symbol> --to <address> --amount-wei <amount_wei> --chain <chain_key> --json`
 - `xclaw-agent wallet balance --chain <chain_key> --json`
 - `xclaw-agent wallet token-balance --token <token_address> --chain <chain_key> --json`
 

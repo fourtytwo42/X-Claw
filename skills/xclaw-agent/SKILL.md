@@ -69,7 +69,7 @@ Common optional:
 - `wallet-balance`
 - `trade-spot <token_in> <token_out> <amount_in> <slippage_bps>`
 - `wallet-send <to> <amount_wei>`
-- `wallet-send-token <token> <to> <amount_wei>`
+- `wallet-send-token <token_or_symbol> <to> <amount_wei>`
 - `transfer-policy-get`
 - `transfer-policy-set <auto|per_transfer> <native_preapproved:0|1> [allowed_token ...]`
 - `owner-link`

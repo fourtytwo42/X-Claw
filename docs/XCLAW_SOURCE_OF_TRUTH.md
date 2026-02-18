@@ -1187,6 +1187,7 @@ The skill wrapper commands below are required (JSON output contract):
 - `python3 scripts/xclaw_agent_skill.py wallet-send <to> <amount_wei>`
 - `python3 scripts/xclaw_agent_skill.py wallet-balance`
 - `python3 scripts/xclaw_agent_skill.py wallet-token-balance <token_address>`
+- `python3 scripts/xclaw_agent_skill.py wallet-send-token <token_or_symbol> <to> <amount_wei>`
 - `python3 scripts/xclaw_agent_skill.py request-x402-payment`
 - `python3 scripts/xclaw_agent_skill.py request-x402-payment --network <network> --facilitator <facilitator> --amount-atomic <amount_atomic> --asset-kind <native|erc20> [--asset-symbol <symbol>] [--asset-address <0x...>] [--resource-description <text>]`
 - `python3 scripts/xclaw_agent_skill.py x402-pay <url> <network> <facilitator> <amount_atomic>`

@@ -122,6 +122,51 @@ class X402SkillWrapperTests(unittest.TestCase):
         self.assertEqual(code, 0)
         run_mock.assert_called_once_with(["tracked", "trades", "--chain", "base_sepolia", "--json", "--agent", "ag_test", "--limit", "15"])
 
+    def test_wallet_send_token_accepts_symbol_and_delegates(self) -> None:
+        with mock.patch.dict("os.environ", self._ENV, clear=False):
+            with mock.patch.object(skill, "_run_agent", return_value=0) as run_mock:
+                code = skill.main(
+                    [
+                        "xclaw_agent_skill.py",
+                        "wallet-send-token",
+                        "USDC",
+                        "0x9099d24D55c105818b4e9eE117d87BC11063CF10",
+                        "10000000",
+                    ]
+                )
+        self.assertEqual(code, 0)
+        run_mock.assert_called_once_with(
+            [
+                "wallet",
+                "send-token",
+                "--token",
+                "USDC",
+                "--to",
+                "0x9099d24D55c105818b4e9eE117d87BC11063CF10",
+                "--amount-wei",
+                "10000000",
+                "--chain",
+                "base_sepolia",
+                "--json",
+            ]
+        )
+
+    def test_wallet_send_token_rejects_empty_token(self) -> None:
+        with mock.patch.dict("os.environ", self._ENV, clear=False):
+            code, payload = self._capture(
+                [
+                    "xclaw_agent_skill.py",
+                    "wallet-send-token",
+                    "",
+                    "0x9099d24D55c105818b4e9eE117d87BC11063CF10",
+                    "10000000",
+                ]
+            )
+        self.assertEqual(code, 2)
+        self.assertIsInstance(payload, dict)
+        self.assertEqual(payload.get("code"), "invalid_input")
+        self.assertIn("token", (payload.get("details") or {}))
+
     def test_run_agent_normalizes_pending_approval_to_success(self) -> None:
         pending_payload = {
             "ok": False,

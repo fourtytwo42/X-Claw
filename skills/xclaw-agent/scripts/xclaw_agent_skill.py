@@ -866,19 +866,19 @@ def main(argv: List[str]) -> int:
         if len(argv) < 5:
             return _err(
                 "usage",
-                "wallet-send-token requires <token> <to> <amount_wei>",
-                "usage: wallet-send-token <token> <to> <amount_wei>",
+                "wallet-send-token requires <token_or_symbol> <to> <amount_wei>",
+                "usage: wallet-send-token <token_or_symbol> <to> <amount_wei>",
                 exit_code=2,
             )
-        token_addr = argv[2]
+        token_or_symbol = argv[2].strip()
         to_addr = argv[3]
         amount_wei = argv[4]
-        if not _is_hex_address(token_addr):
+        if not token_or_symbol:
             return _err(
                 "invalid_input",
-                "Invalid token address format.",
-                "Use 0x-prefixed 20-byte hex address.",
-                {"token": token_addr},
+                "Token must not be empty.",
+                "Use a canonical token symbol (for example USDC) or 0x token address.",
+                {"token": token_or_symbol},
                 exit_code=2,
             )
         if not _is_hex_address(to_addr):
@@ -890,7 +890,7 @@ def main(argv: List[str]) -> int:
                 "wallet",
                 "send-token",
                 "--token",
-                token_addr,
+                token_or_symbol,
                 "--to",
                 to_addr,
                 "--amount-wei",
