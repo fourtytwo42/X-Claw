@@ -116,9 +116,20 @@ def _extract_json_payload(stdout: str) -> Optional[dict]:
     try:
         payload = json.loads(trimmed)
     except json.JSONDecodeError:
-        return None
+        payload = None
     if isinstance(payload, dict) and "ok" in payload and "code" in payload:
         return payload
+    # Some runtimes/loggers prepend lines; fall back to scanning trailing JSON lines.
+    for line in reversed(trimmed.splitlines()):
+        candidate = line.strip()
+        if not candidate:
+            continue
+        try:
+            payload = json.loads(candidate)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(payload, dict) and "ok" in payload and "code" in payload:
+            return payload
     return None
 
 
@@ -310,6 +321,12 @@ def _run_agent(args: Iterable[str]) -> int:
     if proc.returncode == 0:
         # Preserve native CLI JSON output when available.
         out = proc.stdout.strip()
+        runtime_json = _extract_json_payload(out)
+        if runtime_json is not None:
+            normalized_non_terminal = _normalize_non_terminal_approval(runtime_json)
+            if normalized_non_terminal is not None:
+                _print_json(normalized_non_terminal)
+                return 0
         if out and not _show_sensitive() and _should_redact_sensitive(args):
             out = _redact_sensitive_stdout(out)
         if out:

@@ -161,6 +161,33 @@ class X402SkillWrapperTests(unittest.TestCase):
         emitted = json.loads(buf.getvalue().strip())
         self.assertEqual(emitted.get("code"), "send_failed")
 
+    def test_run_agent_normalizes_pending_approval_even_when_exit_zero(self) -> None:
+        pending_payload = {
+            "ok": False,
+            "code": "approval_required",
+            "message": "Transfer is waiting for management approval.",
+            "details": {"approvalId": "xfr_999", "status": "approval_pending"},
+        }
+        proc = mock.Mock(returncode=0, stdout=json.dumps(pending_payload), stderr="")
+        with mock.patch.object(skill, "_resolve_agent_binary", return_value="/usr/bin/xclaw-agent"):
+            with mock.patch.object(skill, "_maybe_patch_openclaw_gateway"):
+                with mock.patch.object(skill.subprocess, "run", return_value=proc):
+                    buf = io.StringIO()
+                    with redirect_stdout(buf):
+                        code = skill._run_agent(["wallet", "send-token"])
+        self.assertEqual(code, 0)
+        emitted = json.loads(buf.getvalue().strip())
+        self.assertTrue(emitted.get("ok"))
+        self.assertEqual(emitted.get("code"), "approval_pending")
+        self.assertEqual(emitted.get("details", {}).get("approvalId"), "xfr_999")
+
+    def test_extract_json_payload_handles_prefixed_line_noise(self) -> None:
+        payload = {"ok": False, "code": "approval_required", "details": {"status": "approval_pending"}}
+        raw = "warning: transient rpc error\n" + json.dumps(payload)
+        extracted = skill._extract_json_payload(raw)
+        self.assertIsInstance(extracted, dict)
+        self.assertEqual(extracted.get("code"), "approval_required")
+
     def test_limit_orders_are_not_exposed_in_skill_wrapper(self) -> None:
         code, payload = self._capture(["xclaw_agent_skill.py", "limit-orders-list"])
         self.assertEqual(code, 2)
