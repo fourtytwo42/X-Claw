@@ -2437,10 +2437,22 @@ def _read_openclaw_last_delivery() -> dict[str, Any] | None:
 
 
 def _require_openclaw_bin() -> str:
+    env_path = (os.environ.get("OPENCLAW_BIN") or "").strip()
+    if env_path:
+        candidate = pathlib.Path(env_path).expanduser()
+        if candidate.exists() and os.access(candidate, os.X_OK):
+            return str(candidate)
     path = shutil.which("openclaw")
-    if not path:
-        raise WalletStoreError("Missing dependency: openclaw (required for Telegram approval prompts).")
-    return path
+    if path:
+        return path
+    for candidate in (
+        pathlib.Path("/usr/local/bin/openclaw"),
+        pathlib.Path("/usr/bin/openclaw"),
+        pathlib.Path.home() / ".local" / "bin" / "openclaw",
+    ):
+        if candidate.exists() and os.access(candidate, os.X_OK):
+            return str(candidate)
+    raise WalletStoreError("Missing dependency: openclaw (required for Telegram approval prompts).")
 
 
 def _extract_openclaw_message_id(stdout: str) -> str | None:
@@ -2571,10 +2583,6 @@ def _maybe_send_telegram_transfer_approval_prompt(flow: dict[str, Any]) -> None:
     approval_id = str(flow.get("approvalId") or "").strip()
     chain = str(flow.get("chainKey") or "").strip()
     if not approval_id or not chain:
-        return
-
-    policy = _fetch_outbound_transfer_policy(chain)
-    if not _approval_channels_enabled(policy, "telegram"):
         return
 
     delivery = _read_openclaw_last_delivery()
