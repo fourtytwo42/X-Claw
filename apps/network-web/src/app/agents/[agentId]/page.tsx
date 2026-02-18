@@ -476,6 +476,45 @@ function auditEntryLabel(entry: { action_type: string; action_status: string; pu
   return base;
 }
 
+function formatAuditValue(value: unknown): string {
+  if (value === null || value === undefined) {
+    return 'null';
+  }
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    const text = String(value).trim();
+    return text.length > 0 ? text : 'empty';
+  }
+  if (Array.isArray(value)) {
+    if (value.length === 0) {
+      return '[]';
+    }
+    return value.map((item) => formatAuditValue(item)).join(', ');
+  }
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
+function auditEntryDetails(entry: { public_redacted_payload: Record<string, unknown> }): string {
+  const payload = entry.public_redacted_payload ?? {};
+  const keys = Object.keys(payload);
+  if (keys.length === 0) {
+    return 'No public details recorded.';
+  }
+  const preferredOrder = ['decision', 'approvalId', 'tradeId', 'policyApprovalId', 'requestId', 'agentId', 'chainKey', 'reasonCode', 'reasonMessage'];
+  const ordered = [
+    ...preferredOrder.filter((key) => keys.includes(key)),
+    ...keys.filter((key) => !preferredOrder.includes(key)).sort((a, b) => a.localeCompare(b))
+  ];
+  const lines = ordered.slice(0, 10).map((key) => `${humanizeKeyLabel(key)}: ${formatAuditValue(payload[key])}`);
+  if (ordered.length > 10) {
+    lines.push(`Additional fields: ${ordered.length - 10}`);
+  }
+  return lines.join(' | ');
+}
+
 export default function AgentPublicProfilePage() {
   const params = useParams<{ agentId: string }>();
   const router = useRouter();
@@ -2410,6 +2449,7 @@ export default function AgentPublicProfilePage() {
                         <div className={styles.listTitle}>
                           {auditEntryLabel(entry)}
                         </div>
+                        <div className={styles.muted}>{auditEntryDetails(entry)}</div>
                       </div>
                       <div className={styles.listMeta}>{formatUtc(entry.created_at)} UTC</div>
                     </div>

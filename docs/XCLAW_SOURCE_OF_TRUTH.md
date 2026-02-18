@@ -261,6 +261,9 @@ Wallet model note:
 - `user_agent` text nullable
 - `created_at`
 
+Audit UI traceability contract:
+- Management audit views must render `action_type`, `action_status`, `created_at`, and human-readable details derived from `public_redacted_payload` (for example: decision, approval/trade IDs, chain key, and reason fields when present).
+
 Append-only enforcement:
 - No updates/deletes in normal operation.
 - Only retention/archive jobs are allowed to move historical rows.
