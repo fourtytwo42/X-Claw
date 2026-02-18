@@ -180,6 +180,34 @@ class X402SkillWrapperTests(unittest.TestCase):
         self.assertTrue(emitted.get("ok"))
         self.assertEqual(emitted.get("code"), "approval_pending")
         self.assertEqual(emitted.get("details", {}).get("approvalId"), "xfr_999")
+        self.assertNotIn("queuedMessage", emitted.get("details", {}))
+        self.assertIn("management approval", str(emitted.get("message", "")).lower())
+
+    def test_run_agent_sanitizes_transfer_queued_message(self) -> None:
+        pending_payload = {
+            "ok": False,
+            "code": "approval_required",
+            "message": "Transfer is waiting for management approval.",
+            "actionHint": "Send queuedMessage verbatim so Telegram buttons can attach, then wait for Approve/Deny.",
+            "details": {
+                "approvalId": "xfr_abc",
+                "status": "approval_pending",
+                "queuedMessage": "Approval required (transfer)\nStatus: approval_pending",
+            },
+        }
+        proc = mock.Mock(returncode=1, stdout=json.dumps(pending_payload), stderr="")
+        with mock.patch.object(skill, "_resolve_agent_binary", return_value="/usr/bin/xclaw-agent"):
+            with mock.patch.object(skill, "_maybe_patch_openclaw_gateway"):
+                with mock.patch.object(skill.subprocess, "run", return_value=proc):
+                    buf = io.StringIO()
+                    with redirect_stdout(buf):
+                        code = skill._run_agent(["wallet", "send-token"])
+        self.assertEqual(code, 0)
+        emitted = json.loads(buf.getvalue().strip())
+        self.assertEqual(emitted.get("code"), "approval_pending")
+        self.assertEqual(emitted.get("message"), "Transfer queued for management approval.")
+        self.assertNotIn("queuedMessage", emitted.get("details", {}))
+        self.assertIn("wait for owner approve/deny", str(emitted.get("actionHint", "")).lower())
 
     def test_extract_json_payload_handles_prefixed_line_noise(self) -> None:
         payload = {"ok": False, "code": "approval_required", "details": {"status": "approval_pending"}}

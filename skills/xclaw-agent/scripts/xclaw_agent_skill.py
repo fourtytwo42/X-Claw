@@ -147,7 +147,15 @@ def _normalize_non_terminal_approval(runtime_json: dict) -> Optional[dict]:
     normalized["ok"] = True
     normalized["code"] = "approval_pending"
     normalized["message"] = str(runtime_json.get("message") or "Approval is pending.")
-    if "actionHint" not in normalized and runtime_json.get("actionHint"):
+    approval_id = str(details.get("approvalId") or "").strip().lower()
+    if approval_id.startswith("xfr_"):
+        sanitized_details = dict(details)
+        sanitized_details.pop("queuedMessage", None)
+        sanitized_details["nextAction"] = "Approval is queued in X-Claw management. Wait for owner decision."
+        normalized["details"] = sanitized_details
+        normalized["message"] = "Transfer queued for management approval."
+        normalized["actionHint"] = "Acknowledge the queued transfer briefly and wait for owner approve/deny in X-Claw."
+    elif "actionHint" not in normalized and runtime_json.get("actionHint"):
         normalized["actionHint"] = runtime_json.get("actionHint")
     return normalized
 

@@ -2816,7 +2816,8 @@ Limitations / notes:
    - deny must mark `rejected` with reason and must not execute transfer,
    - final deterministic transfer result message is always sent to chat (`status`, `approvalId`, `chain`, `txHash` when available),
    - synthetic `[X-CLAW TRANSFER RESULT]` message is routed to agent pipeline for narrative follow-up,
-   - when transfer status is `approval_pending`, the queued transfer message is the only user-facing Telegram reply (no prefix/suffix) so inline buttons attach deterministically.
+   - when transfer status is `approval_pending`, user-facing skill reply must be concise (queued for management approval) and must not dump raw queued transfer message text.
+   - transfer approve/deny actions are handled from management surfaces/callback pipeline; transfer queued-message text is an internal payload, not the primary chat UX.
 8. Web remote interface requirements:
    - `/agents/:id` management exposes transfer approval policy controls and transfer approval queue/history,
    - approve/deny actions use management endpoints and must converge with runtime state/mirror,

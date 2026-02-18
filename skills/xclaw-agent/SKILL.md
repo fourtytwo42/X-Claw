@@ -84,8 +84,8 @@ Single-trigger spot flow (Telegram-focused):
 
 Single-trigger transfer flow (Telegram-focused):
 - `wallet-send` / `wallet-send-token` may return queued transfer approval with `Approval ID: xfr_...` and `Status: approval_pending`.
-- Post queued transfer message verbatim so Telegram buttons can auto-attach.
-- For pending transfer approvals, the queued message must be the only user-facing Telegram message (no prefix/suffix).
+- Do not paste transfer `queuedMessage` verbatim into chat.
+- Reply with a short acknowledgment that transfer approval is queued and pending owner decision in X-Claw management.
 - Telegram callbacks:
   - approve: `xfer|a|<approvalId>|<chainKey>`
   - deny: `xfer|r|<approvalId>|<chainKey>`
