@@ -1,7 +1,9 @@
 import json
+import io
 import pathlib
 import sys
 import unittest
+from contextlib import redirect_stdout
 from unittest import mock
 
 SKILL_SCRIPTS = pathlib.Path("skills/xclaw-agent/scripts").resolve()
@@ -119,6 +121,45 @@ class X402SkillWrapperTests(unittest.TestCase):
                 code = skill.main(["xclaw_agent_skill.py", "tracked-trades", "ag_test", "15"])
         self.assertEqual(code, 0)
         run_mock.assert_called_once_with(["tracked", "trades", "--chain", "base_sepolia", "--json", "--agent", "ag_test", "--limit", "15"])
+
+    def test_run_agent_normalizes_pending_approval_to_success(self) -> None:
+        pending_payload = {
+            "ok": False,
+            "code": "approval_required",
+            "message": "Transfer is waiting for management approval.",
+            "actionHint": "Send queuedMessage verbatim so Telegram buttons can attach, then wait for Approve/Deny.",
+            "details": {
+                "approvalId": "xfr_123",
+                "chain": "base_sepolia",
+                "status": "approval_pending",
+                "queuedMessage": "Approval required (transfer)\nStatus: approval_pending"
+            }
+        }
+        proc = mock.Mock(returncode=1, stdout=json.dumps(pending_payload), stderr="")
+        with mock.patch.object(skill, "_resolve_agent_binary", return_value="/usr/bin/xclaw-agent"):
+            with mock.patch.object(skill, "_maybe_patch_openclaw_gateway"):
+                with mock.patch.object(skill.subprocess, "run", return_value=proc):
+                    buf = io.StringIO()
+                    with redirect_stdout(buf):
+                        code = skill._run_agent(["wallet", "send-token"])
+        self.assertEqual(code, 0)
+        emitted = json.loads(buf.getvalue().strip())
+        self.assertTrue(emitted.get("ok"))
+        self.assertEqual(emitted.get("code"), "approval_pending")
+        self.assertEqual(emitted.get("details", {}).get("approvalId"), "xfr_123")
+
+    def test_run_agent_keeps_non_approval_error_nonzero(self) -> None:
+        payload = {"ok": False, "code": "send_failed", "message": "boom"}
+        proc = mock.Mock(returncode=1, stdout=json.dumps(payload), stderr="")
+        with mock.patch.object(skill, "_resolve_agent_binary", return_value="/usr/bin/xclaw-agent"):
+            with mock.patch.object(skill, "_maybe_patch_openclaw_gateway"):
+                with mock.patch.object(skill.subprocess, "run", return_value=proc):
+                    buf = io.StringIO()
+                    with redirect_stdout(buf):
+                        code = skill._run_agent(["wallet", "send-token"])
+        self.assertEqual(code, 1)
+        emitted = json.loads(buf.getvalue().strip())
+        self.assertEqual(emitted.get("code"), "send_failed")
 
 if __name__ == "__main__":
     unittest.main()

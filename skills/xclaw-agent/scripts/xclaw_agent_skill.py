@@ -122,6 +122,25 @@ def _extract_json_payload(stdout: str) -> Optional[dict]:
     return None
 
 
+def _normalize_non_terminal_approval(runtime_json: dict) -> Optional[dict]:
+    code = str(runtime_json.get("code") or "").strip().lower()
+    if code != "approval_required":
+        return None
+    details = runtime_json.get("details")
+    if not isinstance(details, dict):
+        return None
+    status = str(details.get("status") or "").strip().lower()
+    if status != "approval_pending":
+        return None
+    normalized = dict(runtime_json)
+    normalized["ok"] = True
+    normalized["code"] = "approval_pending"
+    normalized["message"] = str(runtime_json.get("message") or "Approval is pending.")
+    if "actionHint" not in normalized and runtime_json.get("actionHint"):
+        normalized["actionHint"] = runtime_json.get("actionHint")
+    return normalized
+
+
 def _require_env(*keys: str) -> Optional[int]:
     missing = [k for k in keys if not os.environ.get(k)]
     if not missing:
@@ -303,6 +322,10 @@ def _run_agent(args: Iterable[str]) -> int:
     stdout = (proc.stdout or "").strip()
     runtime_json = _extract_json_payload(stdout)
     if runtime_json is not None:
+        normalized_non_terminal = _normalize_non_terminal_approval(runtime_json)
+        if normalized_non_terminal is not None:
+            _print_json(normalized_non_terminal)
+            return 0
         _print_json(runtime_json)
         return proc.returncode
 

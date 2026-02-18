@@ -116,7 +116,7 @@ Underlying runtime delegation (performed by wrapper):
 ## Approval Surface Routing Rules
 
 - Telegram-focused conversation:
-  - approval-pending messages may include Telegram inline-button directives.
+  - for transfer/trade/policy `approval_pending`, respond with the runtime `queuedMessage` verbatim as the only message so inline buttons attach reliably.
 - Non-Telegram conversation (web chat / Slack / Discord / other):
   - do not include Telegram button directives or callback payloads,
   - route user to web approval on `xclaw.trade`,

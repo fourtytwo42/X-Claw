@@ -1227,7 +1227,8 @@ export default function AgentPublicProfilePage() {
 
     for (const deposit of activeDepositChain?.recentDeposits ?? []) {
       const depositSymbol = normalizeTokenSelectionSymbol(deposit.token);
-      const depositAmount = formatHumanAmount(deposit.amount, deposit.token);
+      const depositDecimals = tokenDecimalsBySymbol.get(depositSymbol) ?? undefined;
+      const depositAmount = formatHumanAmount(deposit.amount, deposit.token, depositDecimals);
       const confirmationsText = activeDepositChain?.minConfirmations
         ? `Confirmations: >= ${activeDepositChain.minConfirmations}`
         : 'Confirmations: n/a';
@@ -1437,6 +1438,17 @@ export default function AgentPublicProfilePage() {
       tokenSymbols: string[];
       raw: any;
     }> = [];
+    const pendingTransferQueueIds = new Set((management.data.transferApprovalsQueue ?? []).map((item) => item.approval_id));
+    const formatTransferApprovalAmount = (item: {
+      transfer_type: 'native' | 'token';
+      token_symbol: string | null;
+      amount_wei: string;
+    }): string => {
+      const transferTokenLabel = item.transfer_type === 'native' ? `${activeChainLabel} ${activeNativeSymbol}` : item.token_symbol ?? 'Token';
+      const transferDecimals =
+        item.transfer_type === 'native' ? 18 : (tokenDecimalsBySymbol.get(normalizeTokenSelectionSymbol(item.token_symbol)) ?? 18);
+      return formatHumanAmount(item.amount_wei, transferTokenLabel, transferDecimals);
+    };
     for (const item of management.data.approvalsQueue) {
       const tokenInLabel = resolveTokenLabel(item.token_in, chainTokenSymbolByAddress);
       const tokenOutLabel = resolveTokenLabel(item.token_out, chainTokenSymbolByAddress);
@@ -1486,40 +1498,45 @@ export default function AgentPublicProfilePage() {
         item.transfer_type === 'native' ? 'native' : 'erc20',
         item.token_symbol
       );
+      const transferAmount = formatTransferApprovalAmount(item);
       rows.push({
         id: `transfer-pending-${item.approval_id}`,
         at: item.created_at,
-        title: item.approval_source === 'x402' ? 'x402 outbound payment' : `Transfer to ${shortenAddress(item.to_address)}`,
+        title: item.approval_source === 'x402' ? `x402 outbound payment` : `${item.token_symbol ?? activeNativeSymbol} transfer`,
         status: item.status,
         subtitle:
           item.approval_source === 'x402'
             ? `Payment link: ${item.x402_url ?? 'n/a'}; Amount: ${x402AmountLabel}; Network: ${humanizeKeyLabel(
                 item.x402_network_key ?? item.chain_key
               )}`
-            : `Amount: ${item.amount_wei}`,
+            : `To: ${shortenAddress(item.to_address)}; Amount: ${transferAmount}; Network: ${humanizeKeyLabel(item.chain_key)}`,
         type: 'transfer',
         tokenSymbols: transferSymbol ? [transferSymbol] : [],
         raw: item
       });
     }
     for (const item of management.data.transferApprovalsHistory ?? []) {
+      if ((item.status === 'pending' || item.status === 'approval_pending') && pendingTransferQueueIds.has(item.approval_id)) {
+        continue;
+      }
       const transferSymbol = item.transfer_type === 'native' ? activeNativeSymbol : normalizeTokenSelectionSymbol(item.token_symbol);
       const x402AmountLabel = formatX402AtomicAmount(
         item.x402_amount_atomic ?? item.amount_wei,
         item.transfer_type === 'native' ? 'native' : 'erc20',
         item.token_symbol
       );
+      const transferAmount = formatTransferApprovalAmount(item);
       rows.push({
         id: `transfer-history-${item.approval_id}`,
         at: item.terminal_at ?? item.decided_at ?? item.created_at,
-        title: item.approval_source === 'x402' ? 'x402 outbound payment' : `Transfer to ${shortenAddress(item.to_address)}`,
+        title: item.approval_source === 'x402' ? `x402 outbound payment` : `${item.token_symbol ?? activeNativeSymbol} transfer`,
         status: item.status,
         subtitle:
           item.approval_source === 'x402'
             ? `Payment link: ${item.x402_url ?? 'n/a'}; Amount: ${x402AmountLabel}; Network: ${humanizeKeyLabel(
                 item.x402_network_key ?? item.chain_key
               )}`
-            : `Amount: ${item.amount_wei}`,
+            : `To: ${shortenAddress(item.to_address)}; Amount: ${transferAmount}; Network: ${humanizeKeyLabel(item.chain_key)}`,
         type: 'transfer',
         tokenSymbols: transferSymbol ? [transferSymbol] : [],
         raw: item
@@ -1527,7 +1544,7 @@ export default function AgentPublicProfilePage() {
     }
     rows.sort((a, b) => Number(new Date(b.at).getTime()) - Number(new Date(a.at).getTime()));
     return rows;
-  }, [activeNativeSymbol, chainTokenSymbolByAddress, formatX402AtomicAmount, management]);
+  }, [activeChainLabel, activeNativeSymbol, chainTokenSymbolByAddress, formatHumanAmount, formatX402AtomicAmount, management, tokenDecimalsBySymbol]);
 
   const filteredApprovalHistory = useMemo(() => {
     const tokenFiltered =
@@ -2232,7 +2249,7 @@ export default function AgentPublicProfilePage() {
                           </button>
                         </>
                       ) : null}
-                      {isOwner && row.status === 'pending' && row.type === 'policy' ? (
+                      {isOwner && (row.status === 'pending' || row.status === 'approval_pending') && row.type === 'policy' ? (
                         <>
                           <input
                             value={approvalRejectReasons[row.raw.request_id] ?? ''}
@@ -2280,7 +2297,7 @@ export default function AgentPublicProfilePage() {
                           </button>
                         </>
                       ) : null}
-                      {isOwner && row.status === 'pending' && row.type === 'transfer' ? (
+                      {isOwner && (row.status === 'pending' || row.status === 'approval_pending') && row.type === 'transfer' ? (
                         <>
                           <input
                             value={approvalRejectReasons[row.raw.approval_id] ?? ''}
