@@ -140,7 +140,9 @@ class X402SkillWrapperTests(unittest.TestCase):
         child.communicate.return_value = (json.dumps(pending_payload), "")
         with mock.patch.object(skill, "_resolve_agent_binary", return_value="/usr/bin/xclaw-agent"):
             with mock.patch.object(skill, "_maybe_patch_openclaw_gateway"):
-                with mock.patch.object(skill.subprocess, "Popen", return_value=child):
+                with mock.patch.object(skill.subprocess, "Popen", return_value=child), mock.patch.object(
+                    skill, "_fetch_owner_link_payload", return_value=None
+                ):
                     buf = io.StringIO()
                     with redirect_stdout(buf):
                         code = skill._run_agent(["wallet", "send-token"])
@@ -177,7 +179,9 @@ class X402SkillWrapperTests(unittest.TestCase):
         child.communicate.return_value = (json.dumps(pending_payload), "")
         with mock.patch.object(skill, "_resolve_agent_binary", return_value="/usr/bin/xclaw-agent"):
             with mock.patch.object(skill, "_maybe_patch_openclaw_gateway"):
-                with mock.patch.object(skill.subprocess, "Popen", return_value=child):
+                with mock.patch.object(skill.subprocess, "Popen", return_value=child), mock.patch.object(
+                    skill, "_fetch_owner_link_payload", return_value=None
+                ):
                     buf = io.StringIO()
                     with redirect_stdout(buf):
                         code = skill._run_agent(["wallet", "send-token"])
@@ -228,7 +232,9 @@ class X402SkillWrapperTests(unittest.TestCase):
         child.communicate.return_value = (json.dumps(pending_payload), "")
         with mock.patch.object(skill, "_resolve_agent_binary", return_value="/usr/bin/xclaw-agent"):
             with mock.patch.object(skill, "_maybe_patch_openclaw_gateway"):
-                with mock.patch.object(skill.subprocess, "Popen", return_value=child):
+                with mock.patch.object(skill.subprocess, "Popen", return_value=child), mock.patch.object(
+                    skill, "_fetch_owner_link_payload", return_value=None
+                ):
                     buf = io.StringIO()
                     with redirect_stdout(buf):
                         code = skill._run_agent(["wallet", "send-token"])
@@ -238,6 +244,38 @@ class X402SkillWrapperTests(unittest.TestCase):
         self.assertEqual(emitted.get("message"), "Transfer queued for management approval.")
         self.assertNotIn("queuedMessage", emitted.get("details", {}))
         self.assertIn("wait for owner approve/deny", str(emitted.get("actionHint", "")).lower())
+
+    def test_run_agent_transfer_pending_includes_management_url(self) -> None:
+        pending_payload = {
+            "ok": False,
+            "code": "approval_required",
+            "message": "Transfer is waiting for management approval.",
+            "details": {"approvalId": "xfr_mgmt", "status": "approval_pending"},
+        }
+        owner_link = {
+            "ok": True,
+            "code": "ok",
+            "managementUrl": "https://xclaw.trade/agents/ag_1?token=ol_abc",
+        }
+        child = mock.Mock()
+        child.returncode = 1
+        child.communicate.return_value = (json.dumps(pending_payload), "")
+        with mock.patch.object(skill, "_resolve_agent_binary", return_value="/usr/bin/xclaw-agent"):
+            with mock.patch.object(skill, "_maybe_patch_openclaw_gateway"):
+                with mock.patch.object(skill.subprocess, "Popen", return_value=child), mock.patch.object(
+                    skill, "_fetch_owner_link_payload", return_value=owner_link
+                ):
+                    buf = io.StringIO()
+                    with redirect_stdout(buf):
+                        code = skill._run_agent(["wallet", "send-token"])
+        self.assertEqual(code, 0)
+        emitted = json.loads(buf.getvalue().strip())
+        self.assertEqual(emitted.get("code"), "approval_pending")
+        self.assertEqual(
+            (emitted.get("details") or {}).get("managementUrl"),
+            "https://xclaw.trade/agents/ag_1?token=ol_abc",
+        )
+        self.assertIn("share managementurl", str(emitted.get("actionHint", "")).lower())
 
     def test_run_agent_timeout_kills_process_group(self) -> None:
         child = mock.Mock()

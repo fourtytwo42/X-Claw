@@ -43,6 +43,8 @@ This reference defines the expected command surface for the Python-first skill w
 - `wallet-balance`
 - `wallet-token-balance <token_address>`
 
+`wallet-balance` returns native chain balance plus canonical token balances (`tokens[]`) in one response payload.
+
 Underlying runtime delegation (performed by wrapper):
 
 - `xclaw-agent status --json`
@@ -106,11 +108,12 @@ Underlying runtime delegation (performed by wrapper):
 
 - Telegram-focused conversation:
   - transfer `approval_pending` (`xfr_...`): do not echo `queuedMessage`; send a short "queued for management approval" acknowledgment.
-  - trade/policy `approval_pending`: respond with runtime `queuedMessage` verbatim as the only message when Telegram button attach is expected.
+  - trade/policy `approval_pending`: send concise pending-approval acknowledgment; runtime/gateway handles Telegram button delivery.
 - Non-Telegram conversation (web chat / Slack / Discord / other):
   - do not include Telegram button directives or callback payloads,
   - route user to web approval on `xclaw.trade`,
   - provide owner management link via `owner-link` command.
+  - for transfer `approval_pending` (`xfr_...`), include `details.managementUrl` when returned by runtime owner-link lookup.
 - Management-link ask routing:
   - when user asks for X-Claw management URL/link, invoke `owner-link` before responding,
   - return generated `managementUrl` (or management token/code when present),
@@ -118,7 +121,7 @@ Underlying runtime delegation (performed by wrapper):
 
 ## Policy Approval ID Provenance Rule
 
-- For policy-approval prompts, use only the `policyApprovalId` (or `queuedMessage`) from the latest runtime command response.
+- For policy-approval prompts, use only the `policyApprovalId` from the latest runtime command response.
 - Never replay or fabricate `ppr_...` IDs from older transcript/memory context.
 - If the same request is retried and returns the same `ppr_...`, treat it as server-side pending-request de-dupe and continue with that ID.
 

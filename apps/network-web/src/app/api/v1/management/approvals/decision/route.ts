@@ -1,3 +1,6 @@
+import { existsSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+
 import type { NextRequest } from 'next/server';
 
 import { withTransaction } from '@/lib/db';
@@ -17,6 +20,36 @@ type ApprovalDecisionRequest = {
   reasonCode?: string;
   reasonMessage?: string;
 };
+
+function approvalDecisionRuntimeTimeoutMs(): number {
+  const raw = (process.env.XCLAW_APPROVAL_DECISION_TIMEOUT_MS ?? '').trim();
+  if (raw.length === 0) {
+    return 240_000;
+  }
+  if (!/^\d+$/.test(raw)) {
+    return 240_000;
+  }
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed < 1_000) {
+    return 240_000;
+  }
+  return parsed;
+}
+
+function resolveRuntimeBin(): string {
+  const candidates = [
+    process.env.XCLAW_AGENT_RUNTIME_BIN?.trim() ?? '',
+    `${process.env.HOME ?? ''}/.local/bin/xclaw-agent`,
+    `${process.env.HOME ?? ''}/.nvm/current/bin/xclaw-agent`,
+    'xclaw-agent'
+  ].filter((value) => value.length > 0);
+  for (const candidate of candidates) {
+    if (candidate === 'xclaw-agent' || existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  return 'xclaw-agent';
+}
 
 export async function POST(req: NextRequest) {
   const requestId = getRequestId(req);
@@ -120,7 +153,7 @@ export async function POST(req: NextRequest) {
         ]
       );
 
-      return { ok: true as const, status: targetStatus };
+      return { ok: true as const, status: targetStatus, chainKey: trade.rows[0].chain_key };
     });
 
     if (!result.ok) {
@@ -148,11 +181,45 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    let runtimeResume: Record<string, unknown> | null = null;
+    if (body.decision === 'approve') {
+      const runtimeBin = resolveRuntimeBin();
+      const runtimeArgs = ['approvals', 'resume-spot', '--trade-id', body.tradeId, '--chain', result.chainKey, '--json'];
+      const child = spawnSync(runtimeBin, runtimeArgs, {
+        encoding: 'utf8',
+        timeout: approvalDecisionRuntimeTimeoutMs()
+      });
+      if (child.stdout) {
+        const lines = child.stdout
+          .split(/\r?\n/)
+          .map((value) => value.trim())
+          .filter((value) => value.length > 0);
+        if (lines.length > 0) {
+          try {
+            const parsedLast = JSON.parse(lines[lines.length - 1]);
+            if (parsedLast && typeof parsedLast === 'object') {
+              runtimeResume = parsedLast as Record<string, unknown>;
+            }
+          } catch {}
+        }
+      }
+      if (!runtimeResume) {
+        runtimeResume = {
+          ok: child.status === 0,
+          code: child.status === 0 ? 'ok' : 'resume_failed',
+          runtimeExitStatus: child.status,
+          stderr: (child.stderr || '').slice(0, 1200)
+        };
+      }
+    }
+
     return successResponse(
       {
         ok: true,
         tradeId: body.tradeId,
-        status: result.status
+        status: result.status,
+        chainKey: result.chainKey,
+        runtimeResume
       },
       200,
       requestId

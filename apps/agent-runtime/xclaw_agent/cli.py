@@ -6642,19 +6642,18 @@ def cmd_wallet_balance(args: argparse.Namespace) -> int:
             )
         _validate_wallet_entry_shape(wallet)
         address = str(wallet.get("address"))
-        cast_bin = _require_cast_bin()
-        rpc_url = _chain_rpc_url(chain)
-        proc = _run_subprocess(
-            [cast_bin, "balance", address, "--rpc-url", rpc_url],
-            timeout_sec=_cast_call_timeout_sec(),
-            kind="cast_call",
-        )
-        if proc.returncode != 0:
-            stderr = (proc.stderr or "").strip()
-            stdout = (proc.stdout or "").strip()
-            raise WalletStoreError(stderr or stdout or "cast balance failed.")
-        output = (proc.stdout or "").strip().splitlines()
-        parsed = _parse_uint_text(output[-1] if output else "")
+        holdings = _fetch_wallet_holdings(chain)
+        native = holdings.get("native") if isinstance(holdings, dict) else None
+        if not isinstance(native, dict):
+            raise WalletStoreError("Wallet holdings payload missing native balance.")
+        balance_wei = str(native.get("balanceWei") or "0")
+        parsed = _parse_uint_text(balance_wei)
+        tokens = holdings.get("tokens", [])
+        if not isinstance(tokens, list):
+            tokens = []
+        token_errors = holdings.get("tokenErrors", [])
+        if not isinstance(token_errors, list):
+            token_errors = []
         return ok(
             "Wallet balance fetched.",
             chain=chain,
@@ -6663,6 +6662,8 @@ def cmd_wallet_balance(args: argparse.Namespace) -> int:
             balanceEth=_format_units(int(parsed), 18),
             decimals=18,
             symbol=_native_symbol_for_chain(chain),
+            tokens=tokens,
+            tokenErrors=token_errors,
         )
     except WalletSecurityError as exc:
         return fail("unsafe_permissions", str(exc), "Restrict permissions to owner-only (0700/0600) and retry.", {"chain": chain}, exit_code=1)

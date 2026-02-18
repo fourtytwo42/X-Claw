@@ -153,12 +153,43 @@ def _normalize_non_terminal_approval(runtime_json: dict) -> Optional[dict]:
         sanitized_details = dict(details)
         sanitized_details.pop("queuedMessage", None)
         sanitized_details["nextAction"] = "Approval is queued in X-Claw management. Wait for owner decision."
+        owner_link = _fetch_owner_link_payload()
+        if isinstance(owner_link, dict):
+            management_url = str(owner_link.get("managementUrl") or "").strip()
+            if management_url:
+                sanitized_details["managementUrl"] = management_url
+            elif owner_link.get("managementUrlOmitted") is True:
+                sanitized_details["managementUrlOmitted"] = True
+                delivery = owner_link.get("delivery")
+                if isinstance(delivery, dict):
+                    sanitized_details["managementDelivery"] = delivery
         normalized["details"] = sanitized_details
         normalized["message"] = "Transfer queued for management approval."
-        normalized["actionHint"] = "Acknowledge the queued transfer briefly and wait for owner approve/deny in X-Claw."
+        if str(sanitized_details.get("managementUrl") or "").strip():
+            normalized["actionHint"] = "Share managementUrl with the owner and wait for approve/deny in X-Claw."
+        else:
+            normalized["actionHint"] = "Acknowledge the queued transfer briefly and wait for owner approve/deny in X-Claw."
     elif "actionHint" not in normalized and runtime_json.get("actionHint"):
         normalized["actionHint"] = runtime_json.get("actionHint")
     return normalized
+
+
+def _fetch_owner_link_payload() -> Optional[dict]:
+    binary = _resolve_agent_binary()
+    if not binary:
+        return None
+    cmd: list[str] = [binary, "management-link", "--json"]
+    ttl = os.environ.get("XCLAW_OWNER_LINK_TTL_SECONDS", "").strip()
+    if ttl:
+        cmd.extend(["--ttl-seconds", ttl])
+    try:
+        proc = subprocess.run(cmd, text=True, capture_output=True, timeout=20)
+    except Exception:
+        return None
+    payload = _extract_json_payload(proc.stdout or "")
+    if isinstance(payload, dict) and payload.get("ok") is True:
+        return payload
+    return None
 
 
 def _require_env(*keys: str) -> Optional[int]:

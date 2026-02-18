@@ -21,6 +21,19 @@ type ManagementTransferApprovalDecisionRequest = {
   chainKey?: string;
 };
 
+const RUNTIME_RECONCILE_STATUSES = new Set(['approved', 'executing', 'filled', 'failed', 'rejected']);
+
+function runtimeStatusFromPayload(payload: Record<string, unknown> | null): string | null {
+  if (!payload) {
+    return null;
+  }
+  const raw = String(payload.status ?? '').trim().toLowerCase();
+  if (!RUNTIME_RECONCILE_STATUSES.has(raw)) {
+    return null;
+  }
+  return raw;
+}
+
 function transferDecisionRuntimeTimeoutMs(): number {
   const raw = (process.env.XCLAW_TRANSFER_DECISION_TIMEOUT_MS ?? '').trim();
   if (raw.length === 0) {
@@ -209,6 +222,53 @@ export async function POST(req: NextRequest) {
         };
       }
     }
+
+    // Runtime decisions can succeed locally while mirror sync fails (for example missing runtime API env).
+    // Reconcile mirror row from runtime payload so management UI does not remain stuck in approval_pending.
+    const reconciledStatus = runtimeStatusFromPayload(runtimePayload);
+    if (applied && reconciledStatus) {
+      const runtimeTxHash = String(runtimePayload?.txHash ?? '').trim() || null;
+      const runtimeReasonCode = String(runtimePayload?.reasonCode ?? '').trim() || null;
+      const runtimeReasonMessage = String(runtimePayload?.reasonMessage ?? '').trim() || null;
+      const shouldSetDecidedAt = ['approved', 'executing', 'filled', 'failed', 'rejected'].includes(reconciledStatus);
+      const shouldSetTerminalAt = ['filled', 'failed', 'rejected'].includes(reconciledStatus);
+      await dbQuery(
+        `
+        update agent_transfer_approval_mirror
+        set status = $1::varchar,
+            tx_hash = coalesce($2, tx_hash),
+            reason_code = $3,
+            reason_message = $4,
+            decided_at = case
+              when $7
+                then coalesce(decided_at, now())
+              else decided_at
+            end,
+            terminal_at = case
+              when $8
+                then coalesce(terminal_at, now())
+              else terminal_at
+            end,
+            updated_at = now()
+        where approval_id = $5
+          and agent_id = $6
+        `,
+        [
+          reconciledStatus,
+          runtimeTxHash,
+          runtimeReasonCode,
+          runtimeReasonMessage,
+          body.approvalId,
+          body.agentId,
+          shouldSetDecidedAt,
+          shouldSetTerminalAt
+        ]
+      );
+      if (appliedVia === 'runtime') {
+        appliedVia = 'mirror_fallback';
+      }
+    }
+
     await dbQuery(
       `
       update agent_transfer_decision_inbox

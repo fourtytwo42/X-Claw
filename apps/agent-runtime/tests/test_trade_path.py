@@ -901,6 +901,52 @@ class TradePathRuntimeTests(unittest.TestCase):
                 cli._enforce_outbound_transfer_policy("base_sepolia", "0x" + "11" * 20)
         self.assertEqual(ctx.exception.code, "chain_disabled")
 
+    def test_wallet_balance_includes_canonical_token_balances(self) -> None:
+        args = argparse.Namespace(chain="base_sepolia", json=True)
+        wallet_entry = {"address": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+        holdings = {
+            "address": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "native": {
+                "symbol": "ETH",
+                "balanceWei": "123000000000000000",
+                "balance": "0.123",
+                "balancePretty": "0.123",
+                "decimals": 18,
+            },
+            "tokens": [
+                {
+                    "symbol": "USDC",
+                    "token": "0x39A0C0D1b3dDcE1B49fAa5c6e1D300C14012F4E2",
+                    "balanceWei": "186727950026975000137164",
+                    "balance": "186727.950026975000137164",
+                    "balancePretty": "186,727.95",
+                    "decimals": 18,
+                },
+                {
+                    "symbol": "WETH",
+                    "token": "0xC97e903056f679ea1Db80893008A92578aDfE609",
+                    "balanceWei": "86898428135396339692",
+                    "balance": "86.898428135396339692",
+                    "balancePretty": "86.8984",
+                    "decimals": 18,
+                },
+            ],
+            "tokenErrors": [],
+        }
+        with mock.patch.object(cli, "load_wallet_store", return_value={}), mock.patch.object(
+            cli, "_chain_wallet", return_value=("base_sepolia", wallet_entry)
+        ), mock.patch.object(
+            cli, "_validate_wallet_entry_shape", return_value=None
+        ), mock.patch.object(
+            cli, "_fetch_wallet_holdings", return_value=holdings
+        ):
+            payload = self._run_and_parse_stdout(lambda: cli.cmd_wallet_balance(args))
+        self.assertTrue(payload.get("ok"))
+        self.assertEqual(payload.get("symbol"), "ETH")
+        self.assertEqual(payload.get("balanceWei"), "123000000000000000")
+        self.assertEqual(len(payload.get("tokens", [])), 2)
+        self.assertEqual(payload.get("tokens", [])[0].get("symbol"), "USDC")
+
     def test_wallet_send_token_requires_transfer_approval(self) -> None:
         args = argparse.Namespace(
             token="0x" + "11" * 20,

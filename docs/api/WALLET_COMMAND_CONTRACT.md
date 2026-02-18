@@ -148,7 +148,10 @@ Current behavior in `apps/agent-runtime/xclaw_agent/cli.py`:
    - approve executes one-off override for that transfer (`executionMode=policy_override`) without mutating outbound policy,
    - deny marks transfer `rejected`,
    - `chain_disabled` remains hard block.
-8. `wallet-balance` is implemented via cast-backed native balance query for wallet address and chain RPC.
+8. `wallet-balance` returns combined holdings for wallet address and chain RPC:
+   - native balance fields (`balanceWei`, `balanceEth`, `symbol`, `decimals`),
+   - canonical token balances in `tokens[]` (best effort per configured chain canonical tokens),
+   - token query failures in `tokenErrors[]` without failing native balance fetch.
 9. `wallet-token-balance` is implemented via cast-backed ERC-20 `balanceOf(address)` query.
 10. Missing cast dependency returns structured `missing_dependency` error.
 11. Wrapper-level input validation executes before runtime delegation.

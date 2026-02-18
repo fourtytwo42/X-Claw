@@ -1204,6 +1204,7 @@ Additional locked reliability requirements for skill/runtime usage:
   - `XCLAW_CAST_SEND_TIMEOUT_SEC` (default `30`)
 - `status` output should include `agentName` best-effort when resolvable without making the command fail on profile lookup issues.
 - `wallet-health` ok responses should include actionable guidance (`nextAction` and `actionHint`).
+- `wallet-balance` should return combined holdings in one payload: native fields plus canonical token balances (`tokens[]`) and non-fatal token fetch failures (`tokenErrors[]`).
 - `faucet-request` rate-limit failures should surface machine-readable retry timing when available (`retryAfterSec` from server details).
 - `trade-spot` gas output should include both exact numeric ETH (`totalGasCostEthExact`) and display-friendly pretty form (`totalGasCostEthPretty`), while keeping backward-compatible `totalGasCostEth`.
 
@@ -2599,7 +2600,7 @@ Limitations / notes:
      - `tradeId`.
    - Preferred delivery: inline buttons in the agent's queued message (single Telegram message).
      - OpenClaw gateway auto-attaches the inline keyboard when the queued message includes `Status: approval_pending` and `Trade ID: trd_...`.
-     - The model may also emit OpenClaw `[[buttons: ...]]` directives, but auto-attach is the portability default.
+     - Model-authored button directives are optional and should not be relied on; runtime/gateway auto-attach is the default path.
      - Debuggability: when auto-attach is evaluated, the gateway must emit logs indicating whether buttons were attached or skipped (and why), so missing buttons can be diagnosed from gateway logs.
    - Non-Telegram focused channel rule:
      - if active channel is not Telegram (for example web chat, Slack, Discord), agent must not emit Telegram button directives or Telegram-specific callback instructions.
@@ -2665,13 +2666,13 @@ Limitations / notes:
    - OpenClaw gateway auto-attaches policy approval buttons when a queued message contains:
      - `Status: approval_pending`
      - `Approval ID: ppr_...`
-   - Runtime must return a `queuedMessage` template that includes these lines verbatim so the agent can paste it without formatting mistakes.
+   - Runtime should provide machine-readable policy approval fields (`policyApprovalId`, `status`, `chain`) so chat surfaces can render concise prompts without brittle template replay.
 7. Decision feedback:
    - After Telegram deny, decision feedback must be routed into the agent message pipeline (synthetic inbound message + instructions) so the agent can react to rejection context.
    - Telegram approve for policy requests should not trigger synthetic agent-pipeline notification (non-terminal/no execution event).
    - Reliability requirement: for policy approvals, Telegram callback success must also emit an immediate deterministic confirmation message (`Approved policy approval ...` / `Denied policy approval ...`) so the user gets feedback even if agent pipeline produces no visible reply.
    - Converged callback requirement: when Telegram callback returns idempotent/converged `409` with terminal `currentStatus` (`approved`/`rejected`/`filled`), policy approvals must still emit deterministic confirmation after inline buttons are cleared.
-   - For proposed policy approvals, the agent must echo the `queuedMessage` verbatim to the user so Telegram buttons can attach reliably.
+   - For proposed policy approvals, the agent should send concise pending-approval text; Telegram button attachment is handled by runtime/gateway.
    - Approval ID provenance rule: the agent must source `policyApprovalId`/`Approval ID` from the current runtime/API response for that request; it must never replay/fabricate a `ppr_...` from older transcript or memory context.
    - User-facing response contract: in normal chat responses, the agent must not expose internal tool-call/CLI command strings (for example `python3 ... xclaw_agent_skill.py ...`) unless the user explicitly asks for the exact command syntax.
    - Wrapper reliability contract: `approval_required` responses with `details.status=approval_pending` or `details.lastStatus=approval_pending` are non-terminal orchestration outcomes and must not be surfaced as command-exec failures to the user.
@@ -2827,7 +2828,7 @@ Limitations / notes:
    - synthetic `[X-CLAW TRANSFER RESULT]` message is routed to agent pipeline for narrative follow-up,
    - transfer approval creation sends an out-of-band Telegram approval prompt only when OpenClaw `lastChannel == telegram`,
    - if active channel is not Telegram, no transfer approval prompt is pushed to chat (approval remains web-manageable),
-   - when transfer status is `approval_pending`, user-facing skill reply must be concise (queued for management approval) and must not dump raw queued transfer message text.
+   - when transfer status is `approval_pending`, user-facing skill reply must be concise (queued for management approval), must not dump raw queued transfer message text, and should include owner `managementUrl` when available from owner-link lookup.
    - before broadcasting approved transfers, runtime must run balance preflight checks:
      - native sends: fail fast when wallet native balance is insufficient,
      - token sends: fail fast when token balance is insufficient for `amountWei`,
