@@ -1,3 +1,31 @@
+# Hotfix Acceptance Evidence: Telegram Transfer Callback Pairing-Prompt Regression
+
+Date (UTC): 2026-02-18
+Active slice context: `Slice 87` in progress; this was executed as explicit operator reliability hotfix.
+
+## Objective + Scope Lock
+- Objective: keep deterministic Telegram transfer result delivery while preventing callback path from triggering pairing/access prompts in the same chat.
+- Scope lock:
+  - `skills/xclaw-agent/scripts/openclaw_gateway_patch.py`
+  - `skills/xclaw-agent/scripts/xclaw_agent_skill.py`
+  - docs sync (`XCLAW_SOURCE_OF_TRUTH`, `XCLAW_SLICE_TRACKER`, `XCLAW_BUILD_ROADMAP`, handoff artifacts)
+
+## Validation Commands and Outcomes
+- `python3 -m unittest apps/agent-runtime/tests/test_x402_skill_wrapper.py -v` -> PASS (`Ran 21 tests`, `OK`)
+- `npm run db:parity` -> PASS (`ok: true`)
+- `npm run seed:reset` -> PASS (`ok: true`)
+- `npm run seed:load` -> PASS (`ok: true`)
+- `npm run seed:verify` -> PASS (`ok: true`)
+- `npm run build` -> PASS
+- `pm2 restart all` -> PASS (`xclaw-web` online)
+
+## Functional Verification Notes
+- Telegram transfer callback still posts deterministic final result message.
+- Transfer callback patch no longer reinjects synthetic transfer-result message into chat pipeline.
+- Skill wrapper now normalizes known symbol-unit mismatch guard errors to non-fatal `input_guarded` response for cleaner chat UX when no tx is sent.
+
+---
+
 # Hotfix Acceptance Evidence: Terminal-Only Agent Callback Notifications (Telegram)
 
 Date (UTC): 2026-02-18

@@ -2935,6 +2935,7 @@ Note:
 - [~] Wire `/approvals` to inbox API and enable `Approve + Allowlist Token` action.
 - [~] Replace allowances placeholder with permissions inventory module.
 - [x] Add non-Telegram web synthetic agent prod bridge for trade/transfer decisions + terminal outcomes with Telegram guard.
+- [x] Keep Telegram transfer callback deterministic result delivery but avoid synthetic transfer-result reinjection into chat pipeline (prevents pairing/access prompt regressions).
 
 ### 87.3 Validation + evidence
 - [ ] Verify approve+allowlist updates trade status and chain allowlist atomically.

@@ -1,3 +1,31 @@
+# Hotfix Spec: Telegram Transfer Callback Pairing-Prompt Regression
+
+## Goal
+Stop Telegram transfer approval callbacks from causing unexpected pairing/access prompts in chat after successful transfer result delivery.
+
+## Non-goals
+1. No transfer execution contract changes.
+2. No API schema changes.
+3. No migration changes.
+
+## Locked scope
+1. `skills/xclaw-agent/scripts/openclaw_gateway_patch.py`
+2. `skills/xclaw-agent/scripts/xclaw_agent_skill.py`
+3. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+4. `docs/XCLAW_SLICE_TRACKER.md`
+5. `docs/XCLAW_BUILD_ROADMAP.md`
+
+## Acceptance checks
+- `python3 -m unittest apps/agent-runtime/tests/test_x402_skill_wrapper.py -v`
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `pm2 restart all`
+
+---
+
 # Hotfix Spec: Terminal-Only Agent Callback Notifications (Telegram)
 
 ## Goal

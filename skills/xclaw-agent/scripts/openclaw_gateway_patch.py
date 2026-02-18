@@ -41,6 +41,7 @@ DECISION_ACK_MARKER_V10 = "xclaw: telegram approval decision ack v10"
 DECISION_ACK_MARKER_V11 = "xclaw: telegram approval decision ack v11"
 DECISION_ACK_MARKER_V12 = "xclaw: telegram approval decision ack v12"
 DECISION_ACK_MARKER_V13 = "xclaw: telegram approval decision ack v13"
+DECISION_ACK_MARKER_V14 = "xclaw: telegram approval decision ack v14"
 DECISION_ROUTE_MARKER_V1 = "xclaw: telegram approval decision routed to agent"
 DECISION_EXEC_MARKER_V1 = "xclaw: telegram trade resume trigger v1"
 DECISION_RESULT_ROUTE_MARKER_V1 = "xclaw: telegram trade result routed to agent"
@@ -49,7 +50,7 @@ QUEUED_BUTTONS_MARKER_V2 = "xclaw: telegram queued approval buttons v2"
 QUEUED_BUTTONS_MARKER_V3 = "xclaw: telegram queued approval buttons v3"
 LEGACY_DM_SENTINEL = 'Allow in DMs even when inlineButtonsScope is "allowlist", gated by chatId == senderId.'
 # Bump when patch semantics change so we invalidate the cached "already patched" fast-path.
-STATE_SCHEMA_VERSION = 43
+STATE_SCHEMA_VERSION = 44
 STATE_DIR = Path.home() / ".openclaw" / "xclaw"
 STATE_FILE = STATE_DIR / "openclaw_patch_state.json"
 LOCK_FILE = STATE_DIR / "openclaw_patch.lock"
@@ -288,6 +289,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         or DECISION_ACK_MARKER_V11 not in raw
         or DECISION_ACK_MARKER_V12 not in raw
         or DECISION_ACK_MARKER_V13 not in raw
+        or DECISION_ACK_MARKER_V14 not in raw
         or DECISION_ROUTE_MARKER_V1 not in raw
         or DECISION_EXEC_MARKER_V1 not in raw
         or DECISION_RESULT_ROUTE_MARKER_V1 not in raw
@@ -314,6 +316,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         or DECISION_ACK_MARKER_V11 not in raw
         or DECISION_ACK_MARKER_V12 not in raw
         or DECISION_ACK_MARKER_V13 not in raw
+        or DECISION_ACK_MARKER_V14 not in raw
         or DECISION_ROUTE_MARKER_V1 not in raw
         or DECISION_EXEC_MARKER_V1 not in raw
         or DECISION_RESULT_ROUTE_MARKER_V1 not in raw
@@ -422,6 +425,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         and DECISION_ACK_MARKER_V11 in raw
         and DECISION_ACK_MARKER_V12 in raw
         and DECISION_ACK_MARKER_V13 in raw
+        and DECISION_ACK_MARKER_V14 in raw
         and DECISION_ROUTE_MARKER_V1 in raw
         and DECISION_EXEC_MARKER_V1 in raw
         and DECISION_RESULT_ROUTE_MARKER_V1 in raw
@@ -529,26 +533,10 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         '\t\t\t\t\t\t\tconst amountLine = amountDisplay ? amountDisplay : (normalizedAmount || `${amountWei} ${tokenSymbol}`);\n'
         '\t\t\t\t\t\t\tconst finalMsg = `${head}\\n${amountLine}\\nTo: ${toAddress}\\nApproval: ${subjectId}\\nChain: ${chainKey}${modeLine}${txLine}${reasonLine}`;\n'
         '\t\t\t\t\t\t\ttry { await bot.api.sendMessage(chatId, finalMsg); } catch {}\n'
-        '\t\t\t\t\t\t\ttry {\n'
-        '\t\t\t\t\t\t\t\tconst transferStatus = String(body?.status ?? (body?.ok ? "filled" : "failed")).toLowerCase();\n'
-        '\t\t\t\t\t\t\t\tconst isRejected = transferStatus === "rejected";\n'
-        '\t\t\t\t\t\t\t\tconst isFilled = transferStatus === "filled";\n'
-        '\t\t\t\t\t\t\t\tconst decisionWord = isFilled ? "FILLED" : (isRejected ? "REJECTED" : "FAILED");\n'
-        '\t\t\t\t\t\t\t\tconst instruction = isFilled ? "Reply to the user confirming the transfer succeeded with tx details. No additional tools are needed." : (isRejected ? "Reply to the user confirming the transfer was denied and no transaction was executed. No additional tools are needed." : "Reply to the user confirming the transfer failed and provide next steps. No additional tools are needed.");\n'
-        '\t\t\t\t\t\t\t\tconst syntheticText = `[X-CLAW TRANSFER RESULT]\\nDecision: ${decisionWord}\\nApproval: ${subjectId}\\nChain: ${chainKey}\\nTxHash: ${txHash || "n/a"}\\nAmount: ${amountLine}\\nAmountWei: ${amountWei}\\nToken: ${tokenSymbol}\\nTo: ${toAddress}\\nSource: telegram_callback_transfer\\nInstruction: ${instruction}`;\n'
-        '\t\t\t\t\t\t\t\tconst storeAllowFrom2 = await readChannelAllowFromStore("telegram").catch(() => []);\n'
-        '\t\t\t\t\t\t\t\tconst getFile2 = typeof ctx.getFile === "function" ? ctx.getFile.bind(ctx) : async () => ({});\n'
-        '\t\t\t\t\t\t\t\tconst syntheticMessage2 = {\n'
-        '\t\t\t\t\t\t\t\t\t...callbackMessage,\n'
-        '\t\t\t\t\t\t\t\t\tfrom: callback.from,\n'
-        '\t\t\t\t\t\t\t\t\ttext: syntheticText,\n'
-        '\t\t\t\t\t\t\t\t\tcaption: void 0,\n'
-        '\t\t\t\t\t\t\t\t\tcaption_entities: void 0,\n'
-        '\t\t\t\t\t\t\t\t\tentities: void 0,\n'
-        '\t\t\t\t\t\t\t\t\tdate: Math.floor(Date.now() / 1000)\n'
-        '\t\t\t\t\t\t\t\t};\n'
-        '\t\t\t\t\t\t\t\tawait processMessage({ message: syntheticMessage2, me: ctx.me, getFile: getFile2 }, [], storeAllowFrom2, { messageIdOverride: `xclaw-transfer-result-${callback.id}` });\n'
-        '\t\t\t\t\t\t\t} catch {}\n'
+        '\t\t\t\t\t\t\t// Transfer callbacks already emit deterministic result text above.\n'
+        '\t\t\t\t\t\t\t// Do not route synthetic transfer-result messages back through processMessage here,\n'
+        '\t\t\t\t\t\t\t// because channel access middleware can emit pairing prompts into the same chat.\n'
+        '\t\t\t\t\t\t\ttry { logger.info({ subjectId, chainKey, chatId }, "xclaw: telegram transfer result delivered (no synthetic route)"); } catch {}\n'
         '\t\t\t\t\t\t\treturn;\n'
         '\t\t\t\t\t\t}\n'
         '\t\t\t\t\t\tconst url = parts[0] === "xpol"\n'
@@ -578,6 +566,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V11}\n'
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V12}\n'
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V13}\n'
+        f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V14}\n'
         '\t\t\t\t\t\t\t\t// Keep queued text in chat history and only clear inline buttons.\n'
         '\t\t\t\t\t\t\t\ttry { await bot.api.editMessageReplyMarkup(chatId, callbackMessage.message_id, { inline_keyboard: [] }); } catch {}\n'
         '\t\t\t\t\t\t\t\t// Emit deterministic confirmation immediately so users always see a result.\n'

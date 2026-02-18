@@ -1676,6 +1676,7 @@ DoD:
 - [x] non-Telegram web synthetic prod bridge dispatches trade/transfer decision + terminal notifications with Telegram-channel guard.
 - [x] transfer Telegram approval prompts are tracked and cleared on approve/deny convergence.
 - [x] owner-link direct-send is disabled for Telegram-active channel (button-first approval UX).
+- [x] transfer Telegram callback path avoids synthetic chat-pipeline reinjection that can trigger pairing/access prompts in the same chat; deterministic transfer result message remains.
 
 ## Slice 88: Approvals Center Full UX Flush (Batch + Risk)
 Status: [~]

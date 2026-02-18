@@ -1,3 +1,28 @@
+# Hotfix Tasks: Telegram Transfer Callback Pairing-Prompt Regression
+
+Active slice context: `Slice 87` remains in progress; this is an explicit operator-reported reliability hotfix.
+
+## 1) Scope lock
+- [x] Keep transfer callback deterministic result message.
+- [x] Prevent transfer callback from re-entering chat pipeline in a way that triggers pairing/access prompts.
+
+## 2) Implementation
+- [x] Gateway patch no longer re-injects synthetic transfer-result messages via `processMessage(...)` in Telegram callback path.
+- [x] Gateway patch version marker/schema bumped so existing installs upgrade.
+- [x] Skill wrapper keeps known symbol-unit guard rejections non-fatal to avoid noisy `Exec ... failed` chat traces when no tx was sent.
+- [x] Docs/tracker/roadmap updated for behavior contract.
+
+## 3) Validation
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_x402_skill_wrapper.py -v`
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+
+---
+
 # Hotfix Tasks: Terminal-Only Agent Callback Notifications (Telegram)
 
 Active slice context: `Slice 86` remains in progress; this is an explicit operator UX hotfix.
