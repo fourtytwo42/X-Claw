@@ -86,7 +86,8 @@ Single-trigger transfer flow (Telegram-focused):
 - `wallet-send` / `wallet-send-token` may return queued transfer approval with `Approval ID: xfr_...` and `Status: approval_pending`.
 - Do not paste transfer `queuedMessage` verbatim into chat.
 - Reply with a short acknowledgment that transfer approval is queued and pending owner decision in X-Claw management.
-- Runtime auto-sends transfer approval prompt/buttons only when Telegram is the active channel (`lastChannel == telegram`).
+- Runtime direct Telegram approval prompt/buttons are disabled by default to avoid test-chat spam.
+- Optional: enable direct prompt sends by setting `XCLAW_TELEGRAM_DIRECT_APPROVAL_PROMPTS=1`.
 - Telegram callbacks:
   - approve: `xfer|a|<approvalId>|<chainKey>`
   - deny: `xfer|r|<approvalId>|<chainKey>`
