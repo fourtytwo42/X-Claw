@@ -2592,9 +2592,7 @@ Limitations / notes:
      - it must run a JS syntax check on the patched output (e.g. `node --check`) before writing,
      - and it should target only the canonical gateway bundle(s) (at minimum `dist/reply-*.js`), not broadly patch every dist file that happens to match heuristics.
 5. Trade lifecycle:
-   - when a trade is inserted as `approval_pending`, the runtime may send a Telegram approval prompt **only** if:
-     - Telegram approvals are enabled for that agent+chain, and
-     - OpenClaw’s last active channel is Telegram (session store `lastChannel == "telegram"`).
+   - when a trade is inserted as `approval_pending`, runtime sends a Telegram approval prompt when OpenClaw’s last active channel is Telegram (session store `lastChannel == "telegram"`).
    - Telegram prompt content must be self-describing and include:
      - swap summary: `<amountIn> <tokenInSymbol> -> <tokenOutSymbol>`,
      - `chainKey`,

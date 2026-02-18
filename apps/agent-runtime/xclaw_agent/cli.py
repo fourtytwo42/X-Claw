@@ -2335,17 +2335,12 @@ def _execute_pending_transfer_flow(flow: dict[str, Any]) -> dict[str, Any]:
 
 
 def _wait_for_trade_approval(trade_id: str, chain: str, summary: dict[str, Any] | None = None) -> dict[str, Any]:
-    # Telegram approval prompts can be delivered either:
-    # - inline in the agent's chat response (preferred; no extra prompt message), or
-    # - out-of-band via `openclaw message send --buttons` (legacy).
-    #
-    # Default is inline (do not send an extra prompt message). Set
-    # `XCLAW_TELEGRAM_OUT_OF_BAND_APPROVAL_PROMPT=1` to re-enable legacy prompting.
-    if (os.environ.get("XCLAW_TELEGRAM_OUT_OF_BAND_APPROVAL_PROMPT") or "").strip() == "1":
-        try:
-            _maybe_send_telegram_approval_prompt(trade_id, chain, summary or {})
-        except Exception:
-            pass
+    # Always attempt Telegram prompt delivery when Telegram is the active chat.
+    # Helper applies channel checks + de-dupe.
+    try:
+        _maybe_send_telegram_approval_prompt(trade_id, chain, summary or {})
+    except Exception:
+        pass
     deadline_ms = int(time.time() * 1000) + (APPROVAL_WAIT_TIMEOUT_SEC * 1000)
     last_status: str | None = None
     while int(time.time() * 1000) <= deadline_ms:
@@ -2621,10 +2616,6 @@ def _maybe_send_telegram_approval_prompt(trade_id: str, chain: str, summary: dic
     # Avoid duplicate sends.
     existing = _get_approval_prompt(trade_id)
     if existing and str(existing.get("channel") or "") == "telegram":
-        return
-
-    policy = _fetch_outbound_transfer_policy(chain)
-    if not _approval_channels_enabled(policy, "telegram"):
         return
 
     delivery = _read_openclaw_last_delivery()
