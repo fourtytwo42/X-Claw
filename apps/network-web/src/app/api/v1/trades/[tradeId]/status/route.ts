@@ -89,13 +89,13 @@ export async function POST(
       const trade = await client.query<{
         agent_id: string;
         chain_key: string;
-        mode: string;
+        is_mock: boolean;
         status: string;
         amount_in: string | null;
         amount_out: string | null;
         tx_hash: string | null;
       }>(
-        'select agent_id, chain_key, mode, status, amount_in, amount_out, tx_hash from trades where trade_id = $1',
+        'select agent_id, chain_key, is_mock, status, amount_in, amount_out, tx_hash from trades where trade_id = $1',
         [pathTradeId]
       );
 
@@ -135,7 +135,7 @@ export async function POST(
         };
       }
 
-      if (row.mode === 'real' && ['executing', 'verifying', 'filled'].includes(body.toStatus) && !resolvedTxHash) {
+      if (!row.is_mock && ['executing', 'verifying', 'filled'].includes(body.toStatus) && !resolvedTxHash) {
         return {
           ok: false as const,
           kind: 'missing_tx_hash' as const
