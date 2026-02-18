@@ -2847,7 +2847,7 @@ Limitations / notes:
      - if transfer is already `executing|verifying`, decision returns converged in-progress success (not failure),
      - if transfer is terminal (`filled|failed|rejected`), decision returns converged terminal success,
    - final deterministic transfer result message is always sent to chat (`status`, `approvalId`, `chain`, `txHash` when available),
-   - transfer callback handling must not re-inject user-like synthetic messages into the Telegram chat pipeline when it can trigger channel-access/pairing prompts in the same conversation,
+  - transfer callback handling must emit a deterministic transfer result chat message and also route a controlled synthetic transfer-result envelope into agent processing so the agent can provide completion follow-up,
    - callback failure notices must be sent as new chat messages and must not overwrite/edit the original queued approval prompt text,
    - callback success/converged decisions must clear inline buttons on the original queued prompt while preserving message text,
    - transfer approval creation sends an out-of-band Telegram approval prompt only when OpenClaw `lastChannel == telegram`,

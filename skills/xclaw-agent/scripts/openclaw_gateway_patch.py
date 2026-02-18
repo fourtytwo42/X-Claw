@@ -384,7 +384,12 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
             'Amount: ${amountLine}',
             text6,
         )
-        return text7, (n > 0) or (n2 > 0) or (n3 > 0) or (n4 > 0) or (n5 > 0) or (n6 > 0)
+        text8, n7 = re.subn(
+            r'// Transfer callbacks already emit deterministic result text above\.\s*// Do not route synthetic transfer-result messages back through processMessage here,\s*// because channel access middleware can emit pairing prompts into the same chat\.\s*try \{ logger\.info\(\{ subjectId, chainKey, chatId \}, "xclaw: telegram transfer result delivered \(no synthetic route\)"\); \} catch \{\}\s*return;',
+            'try { const transferStatus = String(body?.status ?? (body?.ok ? "filled" : "failed")).toLowerCase(); const isRejected = transferStatus === "rejected"; const isFilled = transferStatus === "filled"; const decisionWord = isFilled ? "FILLED" : (isRejected ? "REJECTED" : "FAILED"); const instruction = isFilled ? "Reply to the user confirming the transfer succeeded with tx details." : (isRejected ? "Reply to the user confirming the transfer was denied and no transaction was executed." : "Reply to the user confirming the transfer failed and provide next steps."); const syntheticText = `[X-CLAW TRANSFER RESULT]\\nDecision: ${decisionWord}\\nApproval: ${subjectId}\\nChain: ${chainKey}\\nTxHash: ${txHash || "n/a"}\\nAmount: ${amountLine}\\nTo: ${toAddress}\\nSource: telegram_callback_transfer\\nInstruction: ${instruction}`; const storeAllowFrom2 = await readChannelAllowFromStore("telegram").catch(() => []); const getFile2 = typeof ctx.getFile === "function" ? ctx.getFile.bind(ctx) : async () => ({}); const syntheticMessage2 = { ...callbackMessage, from: callback.from, text: syntheticText, caption: void 0, caption_entities: void 0, entities: void 0, date: Math.floor(Date.now() / 1000) }; await processMessage({ message: syntheticMessage2, me: ctx.me, getFile: getFile2 }, [], storeAllowFrom2, { messageIdOverride: `xclaw-transfer-result-${callback.id}` }); } catch {} try { logger.info({ subjectId, chainKey, chatId, ok: !!body?.ok }, "xclaw: telegram transfer result routed to agent"); } catch {} return;',
+            text7,
+        )
+        return text8, (n > 0) or (n2 > 0) or (n3 > 0) or (n4 > 0) or (n5 > 0) or (n6 > 0) or (n7 > 0)
 
     def _upgrade_trade_result_noise(text: str) -> tuple[str, bool]:
         text2, n1 = re.subn(
@@ -540,10 +545,31 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         '\t\t\t\t\t\t\tconst amountLine = amountDisplay ? amountDisplay : (normalizedAmount || `${amountWei} ${tokenSymbol}`);\n'
         '\t\t\t\t\t\t\tconst finalMsg = `${head}\\n${amountLine}\\nTo: ${toAddress}\\nApproval: ${subjectId}\\nChain: ${chainKey}${modeLine}${txLine}${reasonLine}`;\n'
         '\t\t\t\t\t\t\ttry { await bot.api.sendMessage(chatId, finalMsg); } catch {}\n'
-        '\t\t\t\t\t\t\t// Transfer callbacks already emit deterministic result text above.\n'
-        '\t\t\t\t\t\t\t// Do not route synthetic transfer-result messages back through processMessage here,\n'
-        '\t\t\t\t\t\t\t// because channel access middleware can emit pairing prompts into the same chat.\n'
-        '\t\t\t\t\t\t\ttry { logger.info({ subjectId, chainKey, chatId }, "xclaw: telegram transfer result delivered (no synthetic route)"); } catch {}\n'
+        '\t\t\t\t\t\t\ttry {\n'
+        '\t\t\t\t\t\t\t\tconst transferStatus = String(body?.status ?? (body?.ok ? "filled" : "failed")).toLowerCase();\n'
+        '\t\t\t\t\t\t\t\tconst isRejected = transferStatus === "rejected";\n'
+        '\t\t\t\t\t\t\t\tconst isFilled = transferStatus === "filled";\n'
+        '\t\t\t\t\t\t\t\tconst decisionWord = isFilled ? "FILLED" : (isRejected ? "REJECTED" : "FAILED");\n'
+        '\t\t\t\t\t\t\t\tconst instruction = isFilled\n'
+        '\t\t\t\t\t\t\t\t\t? "Reply to the user confirming the transfer succeeded with tx details."\n'
+        '\t\t\t\t\t\t\t\t\t: (isRejected\n'
+        '\t\t\t\t\t\t\t\t\t\t? "Reply to the user confirming the transfer was denied and no transaction was executed."\n'
+        '\t\t\t\t\t\t\t\t\t\t: "Reply to the user confirming the transfer failed and provide next steps.");\n'
+        '\t\t\t\t\t\t\t\tconst syntheticText = `[X-CLAW TRANSFER RESULT]\\nDecision: ${decisionWord}\\nApproval: ${subjectId}\\nChain: ${chainKey}\\nTxHash: ${txHash || "n/a"}\\nAmount: ${amountLine}\\nTo: ${toAddress}\\nSource: telegram_callback_transfer\\nInstruction: ${instruction}`;\n'
+        '\t\t\t\t\t\t\t\tconst storeAllowFrom2 = await readChannelAllowFromStore("telegram").catch(() => []);\n'
+        '\t\t\t\t\t\t\t\tconst getFile2 = typeof ctx.getFile === "function" ? ctx.getFile.bind(ctx) : async () => ({});\n'
+        '\t\t\t\t\t\t\t\tconst syntheticMessage2 = {\n'
+        '\t\t\t\t\t\t\t\t\t...callbackMessage,\n'
+        '\t\t\t\t\t\t\t\t\tfrom: callback.from,\n'
+        '\t\t\t\t\t\t\t\t\ttext: syntheticText,\n'
+        '\t\t\t\t\t\t\t\t\tcaption: void 0,\n'
+        '\t\t\t\t\t\t\t\t\tcaption_entities: void 0,\n'
+        '\t\t\t\t\t\t\t\t\tentities: void 0,\n'
+        '\t\t\t\t\t\t\t\t\tdate: Math.floor(Date.now() / 1000)\n'
+        '\t\t\t\t\t\t\t\t};\n'
+        '\t\t\t\t\t\t\t\tawait processMessage({ message: syntheticMessage2, me: ctx.me, getFile: getFile2 }, [], storeAllowFrom2, { messageIdOverride: `xclaw-transfer-result-${callback.id}` });\n'
+        '\t\t\t\t\t\t\t} catch {}\n'
+        '\t\t\t\t\t\t\ttry { logger.info({ subjectId, chainKey, chatId, ok: !!body?.ok }, "xclaw: telegram transfer result routed to agent"); } catch {}\n'
         '\t\t\t\t\t\t\treturn;\n'
         '\t\t\t\t\t\t}\n'
         '\t\t\t\t\t\tconst url = parts[0] === "xpol"\n'

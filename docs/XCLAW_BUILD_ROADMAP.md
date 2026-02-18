@@ -2935,7 +2935,7 @@ Note:
 - [~] Wire `/approvals` to inbox API and enable `Approve + Allowlist Token` action.
 - [~] Replace allowances placeholder with permissions inventory module.
 - [x] Add web synthetic agent prod bridge for trade/transfer decisions + terminal outcomes with no-deliver dispatch (Telegram-safe by default; optional Telegram guard override).
-- [x] Keep Telegram transfer callback deterministic result delivery but avoid synthetic transfer-result reinjection into chat pipeline (prevents pairing/access prompt regressions).
+- [x] Keep Telegram transfer callback deterministic result delivery and route synthetic transfer-result envelope into agent pipeline for completion follow-up.
 - [x] Shell installer uses capability-gated gateway patching: on patch permission failure it auto-degrades (no patch), enables Telegram management-link fallback mode, and emits explicit sudo rerun guidance for inline-button support.
 
 ### 87.3 Validation + evidence
