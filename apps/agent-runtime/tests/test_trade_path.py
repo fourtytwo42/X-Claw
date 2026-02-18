@@ -49,7 +49,7 @@ class TradePathRuntimeTests(unittest.TestCase):
 
         with mock.patch.object(cli, "_require_cast_bin", return_value="cast"), mock.patch.object(
             cli.subprocess, "run", side_effect=fake_run
-        ):
+        ), mock.patch.object(cli.time, "sleep") as sleep_mock:
             tx_hash = cli._cast_rpc_send_transaction("https://rpc.example", tx_obj, "0x" + "11" * 32)
 
         self.assertEqual(tx_hash, "0x" + "ab" * 32)
@@ -59,6 +59,7 @@ class TradePathRuntimeTests(unittest.TestCase):
         self.assertIn("1", send_cmds[0])
         self.assertIn("10gwei", send_cmds[0])
         self.assertIn("20gwei", send_cmds[1])
+        sleep_mock.assert_called_once_with(2)
 
     def test_cast_send_non_retryable_error_fails_immediately(self) -> None:
         tx_obj = {
