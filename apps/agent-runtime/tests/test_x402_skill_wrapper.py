@@ -135,10 +135,12 @@ class X402SkillWrapperTests(unittest.TestCase):
                 "queuedMessage": "Approval required (transfer)\nStatus: approval_pending"
             }
         }
-        proc = mock.Mock(returncode=1, stdout=json.dumps(pending_payload), stderr="")
+        child = mock.Mock()
+        child.returncode = 1
+        child.communicate.return_value = (json.dumps(pending_payload), "")
         with mock.patch.object(skill, "_resolve_agent_binary", return_value="/usr/bin/xclaw-agent"):
             with mock.patch.object(skill, "_maybe_patch_openclaw_gateway"):
-                with mock.patch.object(skill.subprocess, "run", return_value=proc):
+                with mock.patch.object(skill.subprocess, "Popen", return_value=child):
                     buf = io.StringIO()
                     with redirect_stdout(buf):
                         code = skill._run_agent(["wallet", "send-token"])
@@ -150,10 +152,12 @@ class X402SkillWrapperTests(unittest.TestCase):
 
     def test_run_agent_keeps_non_approval_error_nonzero(self) -> None:
         payload = {"ok": False, "code": "send_failed", "message": "boom"}
-        proc = mock.Mock(returncode=1, stdout=json.dumps(payload), stderr="")
+        child = mock.Mock()
+        child.returncode = 1
+        child.communicate.return_value = (json.dumps(payload), "")
         with mock.patch.object(skill, "_resolve_agent_binary", return_value="/usr/bin/xclaw-agent"):
             with mock.patch.object(skill, "_maybe_patch_openclaw_gateway"):
-                with mock.patch.object(skill.subprocess, "run", return_value=proc):
+                with mock.patch.object(skill.subprocess, "Popen", return_value=child):
                     buf = io.StringIO()
                     with redirect_stdout(buf):
                         code = skill._run_agent(["wallet", "send-token"])
@@ -168,10 +172,12 @@ class X402SkillWrapperTests(unittest.TestCase):
             "message": "Transfer is waiting for management approval.",
             "details": {"approvalId": "xfr_999", "status": "approval_pending"},
         }
-        proc = mock.Mock(returncode=0, stdout=json.dumps(pending_payload), stderr="")
+        child = mock.Mock()
+        child.returncode = 0
+        child.communicate.return_value = (json.dumps(pending_payload), "")
         with mock.patch.object(skill, "_resolve_agent_binary", return_value="/usr/bin/xclaw-agent"):
             with mock.patch.object(skill, "_maybe_patch_openclaw_gateway"):
-                with mock.patch.object(skill.subprocess, "run", return_value=proc):
+                with mock.patch.object(skill.subprocess, "Popen", return_value=child):
                     buf = io.StringIO()
                     with redirect_stdout(buf):
                         code = skill._run_agent(["wallet", "send-token"])
@@ -195,10 +201,12 @@ class X402SkillWrapperTests(unittest.TestCase):
                 "queuedMessage": "Approval required (transfer)\nStatus: approval_pending",
             },
         }
-        proc = mock.Mock(returncode=1, stdout=json.dumps(pending_payload), stderr="")
+        child = mock.Mock()
+        child.returncode = 1
+        child.communicate.return_value = (json.dumps(pending_payload), "")
         with mock.patch.object(skill, "_resolve_agent_binary", return_value="/usr/bin/xclaw-agent"):
             with mock.patch.object(skill, "_maybe_patch_openclaw_gateway"):
-                with mock.patch.object(skill.subprocess, "run", return_value=proc):
+                with mock.patch.object(skill.subprocess, "Popen", return_value=child):
                     buf = io.StringIO()
                     with redirect_stdout(buf):
                         code = skill._run_agent(["wallet", "send-token"])
@@ -208,6 +216,25 @@ class X402SkillWrapperTests(unittest.TestCase):
         self.assertEqual(emitted.get("message"), "Transfer queued for management approval.")
         self.assertNotIn("queuedMessage", emitted.get("details", {}))
         self.assertIn("wait for owner approve/deny", str(emitted.get("actionHint", "")).lower())
+
+    def test_run_agent_timeout_kills_process_group(self) -> None:
+        child = mock.Mock()
+        child.pid = 12345
+        child.communicate.side_effect = [
+            skill.subprocess.TimeoutExpired(cmd=["xclaw-agent", "trade", "spot"], timeout=1),
+            ("", ""),
+        ]
+        with mock.patch.object(skill, "_resolve_agent_binary", return_value="/usr/bin/xclaw-agent"):
+            with mock.patch.object(skill, "_maybe_patch_openclaw_gateway"):
+                with mock.patch.object(skill.subprocess, "Popen", return_value=child):
+                    with mock.patch.object(skill.os, "killpg") as killpg_mock:
+                        buf = io.StringIO()
+                        with redirect_stdout(buf):
+                            code = skill._run_agent(["trade", "spot"])
+        self.assertEqual(code, 124)
+        killpg_mock.assert_called_once_with(12345, skill.signal.SIGKILL)
+        emitted = json.loads(buf.getvalue().strip())
+        self.assertEqual(emitted.get("code"), "timeout")
 
     def test_extract_json_payload_handles_prefixed_line_noise(self) -> None:
         payload = {"ok": False, "code": "approval_required", "details": {"status": "approval_pending"}}

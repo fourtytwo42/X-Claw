@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import signal
 import shutil
 import subprocess
 import sys
@@ -316,14 +317,41 @@ def _run_agent(args: Iterable[str]) -> int:
 
     try:
         _maybe_patch_openclaw_gateway()
-        proc = subprocess.run(cmd, text=True, capture_output=True, timeout=timeout_sec)
-    except subprocess.TimeoutExpired:
+        child = subprocess.Popen(
+            cmd,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            start_new_session=True,
+        )
+        try:
+            stdout, stderr = child.communicate(timeout=timeout_sec)
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(child.pid, signal.SIGKILL)
+            except Exception:
+                try:
+                    child.kill()
+                except Exception:
+                    pass
+            try:
+                child.communicate(timeout=5)
+            except Exception:
+                pass
+            return _err(
+                "timeout",
+                "Command timed out.",
+                "Increase XCLAW_SKILL_TIMEOUT_SEC or investigate RPC/cast health, then retry.",
+                {"command": cmd, "timeoutSec": timeout_sec},
+                exit_code=124,
+            )
+        proc = subprocess.CompletedProcess(cmd, child.returncode, stdout, stderr)
+    except OSError as exc:
         return _err(
-            "timeout",
-            "Command timed out.",
-            "Increase XCLAW_SKILL_TIMEOUT_SEC or investigate RPC/cast health, then retry.",
-            {"command": cmd, "timeoutSec": timeout_sec},
-            exit_code=124,
+            "agent_command_failed",
+            f"Failed to start xclaw-agent command: {exc}",
+            "Verify xclaw-agent runtime install and permissions, then retry.",
+            {"command": cmd},
         )
 
     if proc.returncode == 0:
