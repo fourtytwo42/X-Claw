@@ -6,6 +6,7 @@ import { errorResponse, internalErrorResponse, successResponse } from '@/lib/err
 import { makeId } from '@/lib/ids';
 import { requireCsrfToken, requireManagementSession, sessionHasAgentAccess } from '@/lib/management-auth';
 import { getRequestId } from '@/lib/request-id';
+import { resolveTokenDecimals } from '@/lib/token-metadata';
 
 export const runtime = 'nodejs';
 
@@ -19,19 +20,6 @@ type RpcLog = {
   topics: string[];
   data: string;
 };
-
-async function readErc20Decimals(rpcUrl: string, tokenAddress: string): Promise<number | null> {
-  try {
-    const raw = (await rpcRequest(rpcUrl, 'eth_call', [{ to: tokenAddress, data: '0x313ce567' }, 'latest'])) as string;
-    const parsed = Number(hexToBigInt(raw));
-    if (!Number.isFinite(parsed) || parsed < 0 || parsed > 255) {
-      return null;
-    }
-    return parsed;
-  } catch {
-    return null;
-  }
-}
 
 function toHexBlock(blockNumber: bigint): string {
   return `0x${blockNumber.toString(16)}`;
@@ -229,17 +217,8 @@ export async function GET(req: NextRequest) {
     }>;
 
     for (const wallet of wallets.rows) {
-      const sync = await syncChainDeposits(agentId, wallet.chain_key, wallet.address);
-
-      const rpcUrl = chainRpcUrl(wallet.chain_key);
       const cfg = getChainConfig(wallet.chain_key);
-      const decimalsByToken: Record<string, number> = { NATIVE: 18 };
-      if (rpcUrl && cfg?.canonicalTokens) {
-        for (const [symbol, tokenAddress] of Object.entries(cfg.canonicalTokens)) {
-          const decimals = await readErc20Decimals(rpcUrl, tokenAddress);
-          decimalsByToken[symbol] = decimals ?? 18;
-        }
-      }
+      const sync = await syncChainDeposits(agentId, wallet.chain_key, wallet.address);
 
       const [balances, deposits] = await Promise.all([
         dbQuery<{ token: string; balance: string; block_number: string | null; observed_at: string }>(
@@ -264,6 +243,13 @@ export async function GET(req: NextRequest) {
       ]);
 
       const lastSyncedAt = balances.rows.length > 0 ? balances.rows[0].observed_at : null;
+      const decimalsByToken = new Map<string, number>();
+      await Promise.all(
+        Array.from(new Set(balances.rows.map((row) => String(row.token).trim()).filter((token) => token.length > 0))).map(async (token) => {
+          const resolved = await resolveTokenDecimals(wallet.chain_key, token).catch(() => 18);
+          decimalsByToken.set(token, resolved);
+        })
+      );
 
       chains.push({
         chainKey: wallet.chain_key,
@@ -275,7 +261,7 @@ export async function GET(req: NextRequest) {
         balances: balances.rows.map((row) => ({
           token: row.token,
           balance: row.balance,
-          decimals: decimalsByToken[row.token] ?? 18,
+          decimals: decimalsByToken.get(row.token) ?? 18,
           blockNumber: row.block_number ? Number(row.block_number) : null,
           observedAt: row.observed_at
         })),

@@ -1,4 +1,4 @@
-import { chainRpcUrl } from '@/lib/chains';
+import { chainNativeSymbol, getChainConfig, chainRpcUrl } from '@/lib/chains';
 import { dbQuery } from '@/lib/db';
 
 type ResolveSource = 'config' | 'rpc' | 'cache' | 'fallback';
@@ -205,4 +205,34 @@ export async function resolveTokenMetadata(chainKey: string, tokenAddress: strin
       isFallbackLabel: true,
     };
   }
+}
+
+export async function resolveTokenDecimals(chainKey: string, token: string | null | undefined): Promise<number> {
+  const raw = String(token ?? '').trim();
+  const cfg = getChainConfig(chainKey);
+  const nativeDecimals = cfg?.nativeCurrency?.decimals ?? 18;
+  const nativeSymbol = chainNativeSymbol(chainKey).toUpperCase();
+
+  if (!raw) {
+    return nativeDecimals;
+  }
+
+  const normalizedUpper = raw.toUpperCase();
+  if (normalizedUpper === 'NATIVE' || normalizedUpper === nativeSymbol) {
+    return nativeDecimals;
+  }
+
+  if (isHexAddress(raw)) {
+    const resolved = await resolveTokenMetadata(chainKey, raw);
+    return typeof resolved.decimals === 'number' && resolved.decimals >= 0 ? resolved.decimals : 18;
+  }
+
+  const canonical = cfg?.canonicalTokens ?? {};
+  const canonicalAddress = Object.entries(canonical).find(([symbol]) => symbol.toUpperCase() === normalizedUpper)?.[1];
+  if (canonicalAddress && isHexAddress(canonicalAddress)) {
+    const resolved = await resolveTokenMetadata(chainKey, canonicalAddress);
+    return typeof resolved.decimals === 'number' && resolved.decimals >= 0 ? resolved.decimals : 18;
+  }
+
+  return 18;
 }

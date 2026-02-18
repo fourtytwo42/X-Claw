@@ -5,6 +5,7 @@ import { dbQuery } from '@/lib/db';
 import { errorResponse, internalErrorResponse, successResponse } from '@/lib/errors';
 import { enforcePublicReadRateLimit } from '@/lib/rate-limit';
 import { getRequestId } from '@/lib/request-id';
+import { resolveTokenDecimals } from '@/lib/token-metadata';
 
 export const runtime = 'nodejs';
 
@@ -215,12 +216,19 @@ export async function GET(
         }
       : null;
 
+    const enrichedWalletBalances = await Promise.all(
+      walletBalances.rows.map(async (row) => ({
+        ...row,
+        decimals: await resolveTokenDecimals(row.chain_key, row.token).catch(() => row.decimals ?? 18)
+      }))
+    );
+
     return successResponse(
       {
         ok: true,
         agent: agent.rows[0],
         wallets: wallets.rows,
-        walletBalances: walletBalances.rows,
+        walletBalances: enrichedWalletBalances,
         latestMetrics,
         metricsByMode: {
           mock: null,

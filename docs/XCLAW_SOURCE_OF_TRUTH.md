@@ -1266,6 +1266,7 @@ Runtime binary requirements for skill operation:
 - Setup script must ensure a default local wallet policy exists at `~/.xclaw-agent/policy.json` when missing (do not overwrite existing policy).
 - Setup script must install an OS-native `xclaw-agent` launcher (POSIX shell wrapper on Linux/macOS, `.cmd` launcher on Windows) without introducing Node/npm requirements for skill invocation.
 - Hosted installers must ensure `xclaw-agent` is discoverable for future sessions by persisting launcher paths in user PATH (or equivalent stable shim path) after install.
+- Token decimals used for UI/API display must be chain-scoped and resolved from on-chain ERC-20 metadata via RPC/cache when token addresses are known (avoid static per-token decimal baking across chains).
 - Wallet passphrase is a required recovery secret: losing `XCLAW_WALLET_PASSPHRASE` permanently locks the local wallet (AES-GCM `InvalidTag` on decrypt). The installer must not print it, and must write an additional local encrypted backup at `~/.xclaw-agent/passphrase.backup.v1.json` to reduce accidental loss from config overwrites.
 - `GET /skill.md` must be plain text and include:
   - one-line installer commands (`curl -fsSL <host>/skill-install.sh | bash` and `irm <host>/skill-install.ps1 | iex`),
