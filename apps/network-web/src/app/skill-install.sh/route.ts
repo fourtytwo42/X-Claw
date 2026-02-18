@@ -366,6 +366,7 @@ echo "[xclaw] using runtime launcher: $XCLAW_AGENT_BIN"
 persist_runtime_path
 
 echo "[xclaw] configuring OpenClaw skill env defaults"
+openclaw config set skills.entries.xclaw-agent.env.XCLAW_AGENT_RUNTIME_BIN "$XCLAW_AGENT_BIN" || true
 openclaw config set skills.entries.xclaw-agent.env.XCLAW_API_BASE_URL "$XCLAW_API_BASE_URL" || true
 openclaw config set skills.entries.xclaw-agent.env.XCLAW_DEFAULT_CHAIN "$XCLAW_DEFAULT_CHAIN" || true
 openclaw config set skills.entries.xclaw-agent.env.XCLAW_AGENT_PYTHON_BIN "$XCLAW_AGENT_PYTHON_BIN" || true
