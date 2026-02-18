@@ -265,6 +265,33 @@ function Resolve-XclawAgentBin {
   throw "xclaw-agent launcher not found after setup. Expected ~/.xclaw-agent/bin or apps/agent-runtime/bin."
 }
 
+function Persist-UserPath {
+  param([string]$RuntimeBin)
+  if (-not $RuntimeBin) {
+    return
+  }
+  $localBin = Join-Path $HOME ".local\\bin"
+  New-Item -ItemType Directory -Path $localBin -Force | Out-Null
+  $shimPath = Join-Path $localBin "xclaw-agent.cmd"
+  @(
+    "@echo off",
+    "setlocal",
+    ('"' + $RuntimeBin + '" %*')
+  ) | Set-Content -Path $shimPath -Encoding ASCII
+
+  $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+  $parts = @()
+  if ($userPath) {
+    $parts = $userPath.Split(';') | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+  }
+  foreach ($entry in @((Join-Path $HOME ".xclaw-agent\\bin"), $localBin)) {
+    if ($parts -notcontains $entry) {
+      $parts += $entry
+    }
+  }
+  [Environment]::SetEnvironmentVariable("Path", ($parts -join ';'), "User")
+}
+
 function Write-PassphraseBackup {
   param([string]$BackupPath, [string]$Passphrase)
   if ([string]::IsNullOrWhiteSpace($BackupPath) -or [string]::IsNullOrWhiteSpace($Passphrase)) {
@@ -423,6 +450,7 @@ try {
     Invoke-Python "skills/xclaw-agent/scripts/setup_agent_skill.py"
     $xclawAgentBin = Resolve-XclawAgentBin
     Write-Host "[xclaw] using runtime launcher: $xclawAgentBin"
+    Persist-UserPath -RuntimeBin $xclawAgentBin
 
     Write-Host "[xclaw] configuring OpenClaw skill env defaults"
     Set-OpenClawConfigSafe "skills.entries.xclaw-agent.env.XCLAW_API_BASE_URL" "$($env:XCLAW_API_BASE_URL)"

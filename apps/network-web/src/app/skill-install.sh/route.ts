@@ -236,12 +236,33 @@ resolve_xclaw_agent_bin() {
   return 1
 }
 
+ensure_shell_path_entry() {
+  local rc_file="$1"
+  local export_line='export PATH="$HOME/.xclaw-agent/bin:$HOME/.local/bin:$PATH"'
+  if [ ! -f "$rc_file" ]; then
+    return 0
+  fi
+  if grep -Fq "$export_line" "$rc_file"; then
+    return 0
+  fi
+  printf "\n# X-Claw runtime launcher path\n%s\n" "$export_line" >> "$rc_file"
+}
+
+persist_runtime_path() {
+  mkdir -p "$HOME/.local/bin"
+  ln -sf "$XCLAW_AGENT_BIN" "$HOME/.local/bin/xclaw-agent"
+  ensure_shell_path_entry "$HOME/.profile"
+  ensure_shell_path_entry "$HOME/.bashrc"
+  ensure_shell_path_entry "$HOME/.zshrc"
+}
+
 if ! XCLAW_AGENT_BIN="$(resolve_xclaw_agent_bin)"; then
   echo "[xclaw] unable to resolve xclaw-agent launcher after setup"
   echo "[xclaw] expected launcher in ~/.xclaw-agent/bin or apps/agent-runtime/bin"
   exit 1
 fi
 echo "[xclaw] using runtime launcher: $XCLAW_AGENT_BIN"
+persist_runtime_path
 
 echo "[xclaw] configuring OpenClaw skill env defaults"
 openclaw config set skills.entries.xclaw-agent.env.XCLAW_API_BASE_URL "$XCLAW_API_BASE_URL" || true
