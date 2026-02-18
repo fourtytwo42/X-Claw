@@ -91,9 +91,9 @@ MAX_TRADE_RETRIES = 3
 APPROVAL_WAIT_TIMEOUT_SEC = 1800
 # Poll faster while waiting so Telegram/web decisions feel instant.
 APPROVAL_WAIT_POLL_SEC = 1
-DEFAULT_TX_GAS_PRICE_GWEI = 5
+DEFAULT_TX_GAS_PRICE_GWEI = 10
 DEFAULT_TX_SEND_MAX_ATTEMPTS = 5
-TX_GAS_PRICE_BUMP_GWEI = 5
+TX_GAS_PRICE_BUMP_GWEI = 10
 LIMIT_ORDER_STORE_VERSION = 1
 AGENT_RECOVERY_ACTION = "agent_key_recovery"
 
@@ -4451,6 +4451,10 @@ def _cast_rpc_send_transaction(rpc_url: str, tx_obj: dict[str, str], private_key
             nonce: int | None
             if nonce_override is not None:
                 nonce = nonce_override
+            elif attempt == 0:
+                # Let the RPC assign nonce for first submit to avoid accidental
+                # replacement races with concurrent in-flight txs.
+                nonce = None
             else:
                 nonce_pending = _cast_nonce(cast_bin, rpc_url, from_addr, "pending")
                 nonce_latest = _cast_nonce(cast_bin, rpc_url, from_addr, "latest")

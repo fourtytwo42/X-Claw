@@ -2639,7 +2639,7 @@ Limitations / notes:
    - callback/web approval continues to auto-resume execution (`xappr approve`) without requiring a second user message.
    - for non-Telegram channels, runtime may use bounded short polling while waiting for a just-issued decision to converge.
 12. Real-mode transaction send robustness:
-   - runtime send path must prefer `pending` nonce for signed transactions to avoid replacing an in-flight nonce unintentionally.
+   - runtime send path must let RPC assign nonce on first signed-submit attempt; retries may pin nonce from pending/latest reads to recover deterministically.
    - retryable send errors (`replacement transaction underpriced`, `transaction underpriced`, `nonce too low`, `already known`) must trigger bounded gas escalation across attempts before final failure.
 
 ---
