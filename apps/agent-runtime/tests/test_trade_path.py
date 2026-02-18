@@ -19,6 +19,18 @@ from xclaw_agent import cli  # noqa: E402
 
 
 class TradePathRuntimeTests(unittest.TestCase):
+    def setUp(self) -> None:
+        # Prevent unit tests from reading the operator's real OpenClaw session state.
+        self._openclaw_state_tmp = tempfile.TemporaryDirectory()
+        self._openclaw_state_patcher = mock.patch.dict(
+            cli.os.environ, {"OPENCLAW_STATE_DIR": self._openclaw_state_tmp.name}, clear=False
+        )
+        self._openclaw_state_patcher.start()
+
+    def tearDown(self) -> None:
+        self._openclaw_state_patcher.stop()
+        self._openclaw_state_tmp.cleanup()
+
     def _run_and_parse_stdout(self, fn) -> dict:
         buf = io.StringIO()
         with redirect_stdout(buf):
