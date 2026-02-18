@@ -1,7 +1,15 @@
 {
   "chainKey": "hardhat_local",
+  "family": "evm",
+  "enabled": true,
+  "uiVisible": false,
   "chainId": 31337,
   "displayName": "Hardhat Local",
+  "nativeCurrency": {
+    "name": "Ether",
+    "symbol": "ETH",
+    "decimals": 18
+  },
   "explorerBaseUrl": null,
   "rpc": {
     "primary": "http://127.0.0.1:8545",
@@ -21,6 +29,14 @@
   "canonicalTokens": {
     "WETH": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
     "USDC": "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707"
+  },
+  "capabilities": {
+    "wallet": true,
+    "trade": true,
+    "limitOrders": true,
+    "x402": false,
+    "faucet": false,
+    "deposits": true
   },
   "updatedAt": "2026-02-13T16:38:14.748Z",
   "version": 1,

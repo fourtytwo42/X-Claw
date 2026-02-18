@@ -1504,6 +1504,25 @@ paths:
           $ref: '#/components/responses/ErrorResponse'
         '429':
           $ref: '#/components/responses/ErrorResponse'
+  /api/v1/public/chains:
+    get:
+      summary: List enabled chains and capabilities for selectors/runtime.
+      parameters:
+        - name: includeHidden
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Chain list.
+          content:
+            application/json:
+              schema:
+                $ref: ../../packages/shared-schemas/json/public-chains-response.schema.json
+        '500':
+          $ref: '#/components/responses/InternalError'
   /api/v1/public/agents:
     get:
       summary: Search agents.

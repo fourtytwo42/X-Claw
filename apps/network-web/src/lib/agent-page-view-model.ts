@@ -92,7 +92,20 @@ export type ManagementStatePayload = {
     publicStatus: string;
     metadata: Record<string, unknown>;
   };
-  chainTokens?: Array<{ symbol: string; address: string }>;
+  chainTokens?: Array<{
+    symbol: string;
+    address: string;
+    name?: string | null;
+    decimals?: number | null;
+    source?: 'config' | 'rpc' | 'cache' | 'fallback' | string;
+    tokenDisplay?: {
+      symbol: string | null;
+      name: string | null;
+      decimals: number | null;
+      address: string;
+      isFallbackLabel: boolean;
+    } | null;
+  }>;
   approvalChannels?: {
     telegram?: { enabled: boolean; updatedAt?: string | null };
   };

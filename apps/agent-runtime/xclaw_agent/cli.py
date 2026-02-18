@@ -34,6 +34,14 @@ from typing import Any
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from xclaw_agent import x402_state
+from xclaw_agent.chains import (
+    ChainRegistryError,
+    assert_capability as assert_chain_capability,
+    assert_chain_supported,
+    chain_capability,
+    list_chains as list_chain_registry,
+    supported_chain_hint as chain_supported_hint,
+)
 from xclaw_agent.x402_policy import get_policy as x402_get_policy
 from xclaw_agent.x402_policy import set_policy as x402_set_policy
 from xclaw_agent.x402_runtime import list_networks as x402_list_networks
@@ -427,6 +435,7 @@ def _require_cast_bin() -> str:
 
 
 def _load_chain_config(chain: str) -> dict[str, Any]:
+    assert_chain_supported(chain)
     path = CHAIN_CONFIG_DIR / f"{chain}.json"
     if not path.exists():
         raise WalletStoreError(f"Chain config not found for '{chain}' at '{path}'.")
@@ -4908,6 +4917,11 @@ def cmd_faucet_request(args: argparse.Namespace) -> int:
     chk = require_json_flag(args)
     if chk is not None:
         return chk
+    chain = str(args.chain or "").strip()
+    try:
+        assert_chain_capability(chain, "faucet")
+    except ChainRegistryError as exc:
+        return fail("unsupported_chain_capability", str(exc), chain_supported_hint(), {"chain": chain}, exit_code=2)
     try:
         api_key = _resolve_api_key()
         agent_id = _resolve_agent_id(api_key)
@@ -4916,13 +4930,13 @@ def cmd_faucet_request(args: argparse.Namespace) -> int:
                 "auth_invalid",
                 "Agent id could not be resolved for faucet request.",
                 "Set XCLAW_AGENT_ID or use signed agent token format.",
-                {"chain": args.chain},
+                {"chain": chain},
                 exit_code=1,
             )
         payload = {
             "schemaVersion": 1,
             "agentId": agent_id,
-            "chainKey": args.chain,
+            "chainKey": chain,
         }
         requested_assets: list[str] = []
         for asset in list(getattr(args, "asset", []) or []):
@@ -4943,7 +4957,7 @@ def cmd_faucet_request(args: argparse.Namespace) -> int:
                 except Exception:
                     retry_after_sec = None
 
-            details = _api_error_details(status_code, body, "/agent/faucet/request", chain=args.chain)
+            details = _api_error_details(status_code, body, "/agent/faucet/request", chain=chain)
             payload = {
                 "ok": False,
                 "code": str(body.get("code", "api_error")),
@@ -4961,7 +4975,7 @@ def cmd_faucet_request(args: argparse.Namespace) -> int:
         return ok(
             "Faucet request submitted.",
             agentId=agent_id,
-            chain=args.chain,
+            chain=chain,
             amountWei=str(body.get("amountWei", "50000000000000000")),
             txHash=body.get("txHash"),
             to=body.get("to"),
@@ -4975,9 +4989,9 @@ def cmd_faucet_request(args: argparse.Namespace) -> int:
             nextAction="Wait ~1-2 blocks, then run dashboard. Balances may not update immediately after tx submission.",
         )
     except WalletStoreError as exc:
-        return fail("faucet_request_failed", str(exc), "Verify API env/auth and retry.", {"chain": args.chain}, exit_code=1)
+        return fail("faucet_request_failed", str(exc), "Verify API env/auth and retry.", {"chain": chain}, exit_code=1)
     except Exception as exc:
-        return fail("faucet_request_failed", str(exc), "Inspect runtime faucet request path and retry.", {"chain": args.chain}, exit_code=1)
+        return fail("faucet_request_failed", str(exc), "Inspect runtime faucet request path and retry.", {"chain": chain}, exit_code=1)
 
 
 def cmd_faucet_networks(args: argparse.Namespace) -> int:
@@ -5011,6 +5025,42 @@ def cmd_faucet_networks(args: argparse.Namespace) -> int:
         return fail("faucet_networks_failed", str(exc), "Verify API env/auth and retry.", exit_code=1)
     except Exception as exc:
         return fail("faucet_networks_failed", str(exc), "Inspect runtime faucet networks path and retry.", exit_code=1)
+
+
+def cmd_chains(args: argparse.Namespace) -> int:
+    chk = require_json_flag(args)
+    if chk is not None:
+        return chk
+    try:
+        rows = []
+        for cfg in list_chain_registry(include_disabled=bool(getattr(args, "include_disabled", False))):
+            chain_key = str(cfg.get("chainKey") or "").strip()
+            native = cfg.get("nativeCurrency") if isinstance(cfg.get("nativeCurrency"), dict) else {}
+            rows.append(
+                {
+                    "chainKey": chain_key,
+                    "displayName": cfg.get("displayName") or chain_key,
+                    "family": cfg.get("family") or "evm",
+                    "enabled": cfg.get("enabled", True) is not False,
+                    "uiVisible": cfg.get("uiVisible", True) is not False,
+                    "nativeCurrency": {
+                        "name": native.get("name") if isinstance(native, dict) else None,
+                        "symbol": (native.get("symbol") if isinstance(native, dict) else None) or "ETH",
+                        "decimals": (native.get("decimals") if isinstance(native, dict) else None) or 18,
+                    },
+                    "capabilities": {
+                        "wallet": chain_capability(chain_key, "wallet"),
+                        "trade": chain_capability(chain_key, "trade"),
+                        "limitOrders": chain_capability(chain_key, "limitOrders"),
+                        "x402": chain_capability(chain_key, "x402"),
+                        "faucet": chain_capability(chain_key, "faucet"),
+                        "deposits": chain_capability(chain_key, "deposits"),
+                    },
+                }
+            )
+        return ok("Chains loaded.", chains=rows, count=len(rows))
+    except ChainRegistryError as exc:
+        return fail("chain_registry_error", str(exc), "Verify config/chains/*.json and retry.", exit_code=1)
 
 
 def _fetch_native_balance_wei(chain: str, address: str) -> str:
@@ -6365,6 +6415,10 @@ def cmd_x402_receive_request(args: argparse.Namespace) -> int:
     amount_atomic = str(args.amount_atomic or "").strip()
     if not network:
         return fail("invalid_input", "network is required.", "Provide --network and retry.", exit_code=2)
+    try:
+        assert_chain_capability(network, "x402")
+    except ChainRegistryError as exc:
+        return fail("unsupported_chain_capability", str(exc), chain_supported_hint(), {"network": network}, exit_code=2)
     if not facilitator:
         return fail("invalid_input", "facilitator is required.", "Provide --facilitator and retry.", exit_code=2)
     if not amount_atomic:
@@ -6434,10 +6488,15 @@ def cmd_x402_pay(args: argparse.Namespace) -> int:
     chk = require_json_flag(args)
     if chk is not None:
         return chk
+    network = str(args.network or "").strip()
+    try:
+        assert_chain_capability(network, "x402")
+    except ChainRegistryError as exc:
+        return fail("unsupported_chain_capability", str(exc), chain_supported_hint(), {"network": network}, exit_code=2)
     try:
         payload = x402_pay_create_or_execute(
             url=str(args.url or "").strip(),
-            network=str(args.network or "").strip(),
+            network=network,
             facilitator=str(args.facilitator or "").strip(),
             amount_atomic=str(args.amount_atomic or "").strip(),
             memo=str(args.memo or "").strip() or None,
@@ -6720,6 +6779,11 @@ def build_parser() -> argparse.ArgumentParser:
     faucet_networks.add_argument("--json", action="store_true")
     faucet_networks.set_defaults(func=cmd_faucet_networks)
 
+    chains_cmd = sub.add_parser("chains")
+    chains_cmd.add_argument("--include-disabled", action="store_true")
+    chains_cmd.add_argument("--json", action="store_true")
+    chains_cmd.set_defaults(func=cmd_chains)
+
     x402 = sub.add_parser("x402")
     x402_sub = x402.add_subparsers(dest="x402_cmd")
 
@@ -6887,6 +6951,32 @@ def main(argv: list[str] | None = None) -> int:
     if not hasattr(args, "func"):
         parser.print_help()
         return 2
+    chain = getattr(args, "chain", None)
+    if isinstance(chain, str) and chain.strip():
+        normalized_chain = chain.strip()
+        try:
+            assert_chain_supported(normalized_chain)
+        except ChainRegistryError as exc:
+            return fail("unsupported_chain", str(exc), chain_supported_hint(), {"chain": normalized_chain}, exit_code=2)
+
+        top = str(getattr(args, "top", "") or "")
+        capability = "wallet"
+        if top == "trade":
+            capability = "trade"
+        elif top == "limit-orders":
+            capability = "limitOrders"
+        elif top == "faucet-request":
+            capability = "faucet"
+        try:
+            assert_chain_capability(normalized_chain, capability)
+        except ChainRegistryError as exc:
+            return fail(
+                "unsupported_chain_capability",
+                str(exc),
+                "Select a chain that supports this command capability.",
+                {"chain": normalized_chain, "requiredCapability": capability},
+                exit_code=2,
+            )
     return int(args.func(args))
 
 

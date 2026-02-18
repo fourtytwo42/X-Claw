@@ -266,6 +266,21 @@ class TradePathRuntimeTests(unittest.TestCase):
         self.assertTrue(payload.get("ok"))
         self.assertEqual(payload.get("count"), 2)
 
+    def test_faucet_request_rejects_chain_without_faucet_capability(self) -> None:
+        args = argparse.Namespace(chain="hardhat_local", asset=[], json=True)
+        payload = self._run_and_parse_stdout(lambda: cli.cmd_faucet_request(args))
+        self.assertFalse(payload.get("ok"))
+        self.assertEqual(payload.get("code"), "unsupported_chain_capability")
+
+    def test_chains_command_success(self) -> None:
+        args = argparse.Namespace(include_disabled=False, json=True)
+        payload = self._run_and_parse_stdout(lambda: cli.cmd_chains(args))
+        self.assertTrue(payload.get("ok"))
+        self.assertGreaterEqual(int(payload.get("count") or 0), 1)
+        first = (payload.get("chains") or [None])[0]
+        self.assertIsInstance(first, dict)
+        self.assertIn("capabilities", first)
+
     def test_status_includes_agent_name_best_effort(self) -> None:
         args = argparse.Namespace(json=True)
         with mock.patch.dict(cli.os.environ, {"XCLAW_DEFAULT_CHAIN": "base_sepolia", "XCLAW_API_BASE_URL": "https://xclaw.trade"}, clear=False), mock.patch.object(

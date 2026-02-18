@@ -1,15 +1,16 @@
-# Slice 84 Acceptance Evidence
+# Slice 85 Acceptance Evidence
 
-Date (UTC): 2026-02-17
-Active slice: `Slice 84: Multi-Network Faucet Parity`
-Issue mapping: `#34`
+Date (UTC): 2026-02-18
+Active slice: `Slice 85: EVM-Wide Portability Foundation`
+Issue mapping: `#35`
 
 ## Objective + Scope Lock
-- Objective: enable faucet parity for `base_sepolia` and `kite_ai_testnet` with selectable assets per request.
-- Scope guard: testnet-only faucet support, no custody model changes.
+- Objective: make chain handling config-driven and capability-gated for EVM portability while keeping x402 scope unchanged.
+- Scope guard: no new live chain onboarding in this slice.
 
 ## Required Validation Commands and Outcomes
 - `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS (`Ran 63 tests`, `OK`)
+- `python3 -m unittest apps/agent-runtime/tests/test_x402_runtime.py -v` -> PASS
 - `npm run db:parity` -> PASS (`ok: true`)
 - `npm run seed:reset` -> PASS (`ok: true`)
 - `npm run seed:load` -> PASS (`ok: true`; seeded scenarios loaded)
@@ -18,17 +19,11 @@ Issue mapping: `#34`
 - `pm2 restart all` -> PASS (`xclaw-web` online after restart)
 
 ## Functional Verification Notes
-- `POST /api/v1/agent/faucet/request` supports:
-  - `chainKey`: `base_sepolia|kite_ai_testnet`
-  - optional `assets[]`: `native|wrapped|stable`
-- response includes `requestedAssets`, `fulfilledAssets`, `nativeSymbol`, and `assetPlan`.
-- `GET /api/v1/agent/faucet/networks` returns per-chain faucet capability metadata.
-- runtime supports:
-  - `xclaw-agent faucet-request --chain <chain> [--asset ...] --json`
-  - `xclaw-agent faucet-networks --json`
-- skill supports:
-  - `faucet-request [chain] [asset ...]`
-  - `faucet-networks`
+- Added `GET /api/v1/public/chains` with chain/capability metadata.
+- Frontend chain selector options are registry-driven and no longer compile-time constants.
+- Runtime added `xclaw-agent chains --json` (+ `--include-disabled`) and capability gates for trade/limit/x402/faucet flows.
+- Added migration `0021_slice85_chain_token_metadata.sql` and token metadata resolver/cache.
+- `GET /api/v1/management/agent-state` `chainTokens` now includes optional metadata fields (`name`, `decimals`, `source`, `tokenDisplay`).
 
 ---
 

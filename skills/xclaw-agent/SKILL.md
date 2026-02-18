@@ -242,6 +242,7 @@ Testnet faucet actions:
 python3 {baseDir}/scripts/xclaw_agent_skill.py faucet-request
 python3 {baseDir}/scripts/xclaw_agent_skill.py faucet-request kite_ai_testnet native wrapped stable
 python3 {baseDir}/scripts/xclaw_agent_skill.py faucet-networks
+python3 {baseDir}/scripts/xclaw_agent_skill.py chains
 ```
 
 Faucet policy:

@@ -1,23 +1,25 @@
-# Slice 84 Spec: Multi-Network Faucet Parity (Base Sepolia + Kite Testnet)
+# Slice 85 Spec: EVM-Wide Portability Foundation (Chain-Agnostic Core, x402 Unchanged)
 
 ## Goal
-Enable chain-aware faucet support across Base Sepolia and Kite AI testnet with explicit per-request asset selection and discoverable faucet capabilities.
+Prepare X-Claw for config-driven EVM chain portability so adding a chain later is primarily config/data work.
 
 ## Non-goals
-1. No faucet support for Base mainnet or Kite mainnet.
-2. No custody/signing model changes.
-3. No management UI faucet controls in this slice.
+1. No onboarding of new live chains in this slice.
+2. No x402 expansion beyond currently enabled networks.
+3. No custody/signing model changes.
 
 ## Locked scope
-1. Extend `POST /api/v1/agent/faucet/request` for `chainKey=base_sepolia|kite_ai_testnet`.
-2. Add optional `assets[]` selector (`native|wrapped|stable`) with default to all assets.
-3. Add `GET /api/v1/agent/faucet/networks` capability endpoint.
-4. Extend runtime CLI with `faucet-networks` and `faucet-request --asset ...`.
-5. Extend skill wrapper with `faucet-networks` and optional chain/assets for `faucet-request`.
-6. Sync OpenAPI/schemas/source-of-truth/tracker/roadmap/handoff artifacts.
+1. Extend chain config contract with `family`, `enabled`, `uiVisible`, `nativeCurrency`, and `capabilities`.
+2. Add token metadata cache table (`chain_token_metadata_cache`).
+3. Add `GET /api/v1/public/chains`.
+4. Replace hardcoded frontend chain selector options with registry-driven options.
+5. Add runtime chain registry command (`xclaw-agent chains --json`) and capability gating.
+6. Add token metadata resolution path (`config -> cache -> rpc -> fallback`) for management chain tokens.
+7. Keep x402 scope unchanged and capability-gated.
 
 ## Acceptance checks
 - `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- `python3 -m unittest apps/agent-runtime/tests/test_x402_runtime.py -v`
 - `npm run db:parity`
 - `npm run seed:reset`
 - `npm run seed:load`

@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.xclaw.trade/public-chains-response.schema.json",
+  "type": "object",
+  "required": ["ok", "chains"],
+  "properties": {
+    "ok": { "type": "boolean", "const": true },
+    "chains": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["chainKey", "family", "enabled", "uiVisible", "displayName", "nativeCurrency", "capabilities"],
+        "properties": {
+          "chainKey": { "type": "string", "minLength": 1 },
+          "family": { "type": "string", "enum": ["evm"] },
+          "enabled": { "type": "boolean" },
+          "uiVisible": { "type": "boolean" },
+          "displayName": { "type": "string", "minLength": 1 },
+          "chainId": { "type": ["integer", "null"] },
+          "explorerBaseUrl": { "type": ["string", "null"] },
+          "nativeCurrency": {
+            "type": "object",
+            "required": ["name", "symbol", "decimals"],
+            "properties": {
+              "name": { "type": "string", "minLength": 1 },
+              "symbol": { "type": "string", "minLength": 1 },
+              "decimals": { "type": "integer", "minimum": 0 }
+            }
+          },
+          "capabilities": {
+            "type": "object",
+            "required": ["wallet", "trade", "limitOrders", "x402", "faucet", "deposits"],
+            "properties": {
+              "wallet": { "type": "boolean" },
+              "trade": { "type": "boolean" },
+              "limitOrders": { "type": "boolean" },
+              "x402": { "type": "boolean" },
+              "faucet": { "type": "boolean" },
+              "deposits": { "type": "boolean" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

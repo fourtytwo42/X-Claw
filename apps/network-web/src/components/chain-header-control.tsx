@@ -3,12 +3,12 @@
 import { useRouter } from 'next/navigation';
 
 import {
-  CHAIN_OPTIONS,
-  DASHBOARD_CHAIN_OPTIONS,
   type ChainKey,
   type DashboardChainKey,
   useActiveChainKey,
-  useDashboardChainKey
+  useDashboardChainKey,
+  useChainOptions,
+  useDashboardChainOptions
 } from '@/lib/active-chain';
 
 type ChainHeaderControlProps = {
@@ -21,6 +21,8 @@ export function ChainHeaderControl({ includeAll = false, className, id = 'chain-
   const router = useRouter();
   const [chainKey, setChainKey] = useActiveChainKey();
   const [dashboardChainKey, setDashboardChainKey] = useDashboardChainKey();
+  const chainOptions = useChainOptions();
+  const dashboardChainOptions = useDashboardChainOptions();
 
   if (includeAll) {
     const onChange = (next: DashboardChainKey) => {
@@ -39,7 +41,7 @@ export function ChainHeaderControl({ includeAll = false, className, id = 'chain-
           onChange={(e) => onChange(e.target.value as DashboardChainKey)}
           className="chain-select"
         >
-          {DASHBOARD_CHAIN_OPTIONS.map((opt) => (
+          {dashboardChainOptions.map((opt) => (
             <option key={opt.key} value={opt.key}>
               {opt.label}
             </option>
@@ -60,7 +62,7 @@ export function ChainHeaderControl({ includeAll = false, className, id = 'chain-
         Network
       </label>
       <select id={id} value={chainKey} onChange={(e) => onChange(e.target.value as ChainKey)} className="chain-select">
-        {CHAIN_OPTIONS.map((opt) => (
+        {chainOptions.map((opt) => (
           <option key={opt.key} value={opt.key}>
             {opt.label}
           </option>

@@ -1,5 +1,45 @@
 # X-Claw Context Pack
 
+## Slice 85 Context: EVM-Wide Portability Foundation (Chain-Agnostic Core, x402 Unchanged)
+
+Issue mapping: `#35`
+
+### Objective + scope lock
+- Objective: remove hardcoded chain assumptions and make chain handling/capability gating config-driven for EVM portability.
+- Scope guard: no new live chain onboarding and no x402 network expansion in this slice.
+
+### Expected touched files (Slice 85 allowlist)
+- Config/contracts:
+  - `config/chains/base_sepolia.json`
+  - `config/chains/kite_ai_testnet.json`
+  - `config/chains/hardhat_local.json`
+  - `infrastructure/migrations/0021_slice85_chain_token_metadata.sql`
+  - `packages/shared-schemas/json/public-chains-response.schema.json`
+- Web/API:
+  - `apps/network-web/src/lib/chains.ts`
+  - `apps/network-web/src/lib/active-chain.ts`
+  - `apps/network-web/src/lib/token-metadata.ts`
+  - `apps/network-web/src/components/chain-header-control.tsx`
+  - `apps/network-web/src/app/api/v1/public/chains/route.ts`
+  - `apps/network-web/src/app/api/v1/management/agent-state/route.ts`
+  - `apps/network-web/src/app/api/v1/agent/faucet/request/route.ts`
+  - `apps/network-web/src/app/api/v1/agent/faucet/networks/route.ts`
+- Runtime/skill:
+  - `apps/agent-runtime/xclaw_agent/chains.py`
+  - `apps/agent-runtime/xclaw_agent/cli.py`
+  - `skills/xclaw-agent/scripts/xclaw_agent_skill.py`
+  - `skills/xclaw-agent/SKILL.md`
+  - `skills/xclaw-agent/references/commands.md`
+- Canonical docs:
+  - `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - `docs/XCLAW_SLICE_TRACKER.md`
+  - `docs/XCLAW_BUILD_ROADMAP.md`
+  - `docs/api/openapi.v1.yaml`
+  - `docs/api/WALLET_COMMAND_CONTRACT.md`
+  - `spec.md`
+  - `tasks.md`
+  - `acceptance.md`
+
 ## Slice 84 Context: Multi-Network Faucet Parity (Base Sepolia + Kite Testnet)
 
 Issue mapping: `#34`

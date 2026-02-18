@@ -1,15 +1,13 @@
 import type { NextRequest } from 'next/server';
 
 import { authenticateAgentByToken } from '@/lib/agent-auth';
-import { getChainConfig } from '@/lib/chains';
+import { chainCapabilityEnabled, getChainConfig, listEnabledChains } from '@/lib/chains';
 import { successResponse } from '@/lib/errors';
 import { getRequestId } from '@/lib/request-id';
 
 export const runtime = 'nodejs';
 
 type FaucetAssetKey = 'native' | 'wrapped' | 'stable';
-
-const SUPPORTED_FAUCET_CHAINS = ['base_sepolia', 'kite_ai_testnet'] as const;
 
 function toEnvSuffix(chainKey: string): string {
   return chainKey.replace(/[^a-zA-Z0-9]/g, '_').toUpperCase();
@@ -53,11 +51,12 @@ export async function GET(req: NextRequest) {
     return auth.response;
   }
 
-  const networks = SUPPORTED_FAUCET_CHAINS.map((chainKey) => {
-    const cfg = getChainConfig(chainKey);
+  const faucetChains = listEnabledChains().filter((cfg) => chainCapabilityEnabled(cfg.chainKey, 'faucet'));
+  const networks = faucetChains.map((cfg) => {
+    const chainKey = cfg.chainKey;
     const wrapped = resolveWrapped(chainKey);
     const stable = resolveStable(chainKey);
-    const nativeSymbol = chainKey === 'kite_ai_testnet' ? 'KITE' : 'ETH';
+    const nativeSymbol = cfg.nativeCurrency?.symbol?.trim() || 'ETH';
 
     const configured = Boolean(resolveChainScopedEnv('XCLAW_TESTNET_FAUCET_PRIVATE_KEY', chainKey));
 

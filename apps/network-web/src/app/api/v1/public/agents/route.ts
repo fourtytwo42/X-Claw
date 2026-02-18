@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 
-import { getChainConfig } from '@/lib/chains';
+import { getChainConfig, listEnabledChains } from '@/lib/chains';
 import { dbQuery } from '@/lib/db';
 import { errorResponse, internalErrorResponse, successResponse } from '@/lib/errors';
 import { parseIntQuery } from '@/lib/http';
@@ -97,13 +97,14 @@ export async function GET(req: NextRequest) {
     const requestedMode = req.nextUrl.searchParams.get('mode') ?? 'all';
     const mode: 'real' = 'real';
     const chain = req.nextUrl.searchParams.get('chain') ?? 'all';
+    const supportedChains = listEnabledChains().map((cfg) => cfg.chainKey);
     if (chain !== 'all' && !getChainConfig(chain)) {
       return errorResponse(
         400,
         {
           code: 'payload_invalid',
           message: 'Invalid chain query value.',
-          actionHint: 'Use one of: all, base_sepolia, kite_ai_testnet, hardhat_local.'
+          actionHint: `Use one of: all, ${supportedChains.join(', ')}.`
         },
         requestId
       );

@@ -2869,3 +2869,37 @@ Note:
   - [x] `npm run seed:verify`
   - [x] `npm run build`
   - [x] `pm2 restart all`
+
+---
+
+## 85) Slice 85: EVM-Wide Portability Foundation (Chain-Agnostic Core, x402 Unchanged)
+
+### 85.1 Canonical/doc sync
+- [x] Add Slice 85 goal/DoD + issue mapping to `docs/XCLAW_SLICE_TRACKER.md`.
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` with locked portability contract and x402 scope boundary.
+- [x] Update handoff/process artifacts:
+  - [x] `docs/CONTEXT_PACK.md`
+  - [x] `spec.md`
+  - [x] `tasks.md`
+  - [x] `acceptance.md`
+- [x] Update `docs/api/WALLET_COMMAND_CONTRACT.md` and `docs/api/openapi.v1.yaml`.
+
+### 85.2 Implementation
+- [x] Extend `config/chains/*.json` contract with `family`, `enabled`, `uiVisible`, `nativeCurrency`, and `capabilities`.
+- [x] Add migration `0021_slice85_chain_token_metadata.sql`.
+- [x] Add public chain registry endpoint `GET /api/v1/public/chains`.
+- [x] Replace static frontend chain selector options with dynamic `/api/v1/public/chains` loading + local fallback cache.
+- [x] Add runtime chain registry loader + `xclaw-agent chains --json`.
+- [x] Add capability gating for chain-scoped runtime command families (`wallet`, `trade`, `limitOrders`, `x402`, `faucet`).
+- [x] Add token metadata resolver/cache and include metadata fields in management chain tokens.
+
+### 85.3 Validation + evidence
+- [x] Runtime tests:
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- [x] Run required gates sequentially:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `pm2 restart all`

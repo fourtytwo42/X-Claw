@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server';
 import { Contract, JsonRpcProvider, Wallet, isAddress } from 'ethers';
 
 import { requireAgentAuth } from '@/lib/agent-auth';
-import { chainRpcUrl, getChainConfig } from '@/lib/chains';
+import { chainCapabilityEnabled, chainRpcUrl, getChainConfig, supportedChainHint } from '@/lib/chains';
 import { dbQuery } from '@/lib/db';
 import { errorResponse, successResponse } from '@/lib/errors';
 import { parseJsonBody } from '@/lib/http';
@@ -23,7 +23,6 @@ type AgentFaucetRequest = {
   assets?: FaucetAssetKey[];
 };
 
-const SUPPORTED_FAUCET_CHAINS = new Set(['base_sepolia', 'kite_ai_testnet']);
 const DEFAULT_ASSETS: FaucetAssetKey[] = ['native', 'wrapped', 'stable'];
 
 const BASE_DRIP_NATIVE_WEI = '20000000000000000'; // 0.02 ETH
@@ -181,13 +180,13 @@ export async function POST(req: NextRequest) {
     }
 
     const chainKey = (body.chainKey || 'base_sepolia').trim();
-    if (!SUPPORTED_FAUCET_CHAINS.has(chainKey)) {
+    if (!getChainConfig(chainKey) || !chainCapabilityEnabled(chainKey, 'faucet')) {
       return errorResponse(
         400,
         {
           code: 'payload_invalid',
-          message: 'Faucet is only available on base_sepolia and kite_ai_testnet.',
-          actionHint: 'Retry with chainKey=base_sepolia or chainKey=kite_ai_testnet.',
+          message: 'Faucet is not available on the requested chain.',
+          actionHint: supportedChainHint(),
           details: { chainKey }
         },
         requestId
@@ -317,7 +316,7 @@ export async function POST(req: NextRequest) {
     const provider = new JsonRpcProvider(rpcUrl);
     const signer = new Wallet(faucetPrivateKey, provider);
 
-    const nativeSymbol = chainKey === 'kite_ai_testnet' ? 'KITE' : 'ETH';
+    const nativeSymbol = getChainConfig(chainKey)?.nativeCurrency?.symbol?.trim() || 'ETH';
     const dripAmounts = resolveDripAmounts(chainKey);
     const dripNative = BigInt(dripAmounts.nativeWei);
     const dripWrapped = BigInt(dripAmounts.wrappedWei);

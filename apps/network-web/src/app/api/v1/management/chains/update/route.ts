@@ -7,7 +7,7 @@ import { makeId } from '@/lib/ids';
 import { requireManagementWriteAuth } from '@/lib/management-auth';
 import { getRequestId } from '@/lib/request-id';
 import { validatePayload } from '@/lib/validation';
-import { getChainConfig } from '@/lib/chains';
+import { getChainConfig, supportedChainHint } from '@/lib/chains';
 
 export const runtime = 'nodejs';
 
@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
         {
           code: 'payload_invalid',
           message: 'Invalid chainKey value.',
-          actionHint: 'Use a supported chain key (for example base_sepolia or kite_ai_testnet).',
+          actionHint: supportedChainHint(),
           details: { chainKey: body.chainKey }
         },
         requestId

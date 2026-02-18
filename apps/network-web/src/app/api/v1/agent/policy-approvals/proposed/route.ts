@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server';
 import { authenticateAgentByToken } from '@/lib/agent-auth';
 import { withTransaction } from '@/lib/db';
 import { errorResponse, internalErrorResponse, successResponse } from '@/lib/errors';
-import { getChainConfig } from '@/lib/chains';
+import { getChainConfig, supportedChainHint } from '@/lib/chains';
 import { parseJsonBody } from '@/lib/http';
 import { ensureIdempotency, storeIdempotencyResponse } from '@/lib/idempotency';
 import { makeId } from '@/lib/ids';
@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
         {
           code: 'payload_invalid',
           message: 'Invalid chainKey value.',
-          actionHint: 'Use a supported chain key (for example base_sepolia or kite_ai_testnet).',
+          actionHint: supportedChainHint(),
           details: { chainKey: body.chainKey }
         },
         requestId

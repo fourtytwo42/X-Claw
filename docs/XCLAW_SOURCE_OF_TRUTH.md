@@ -3425,3 +3425,54 @@ Limitations / notes:
 - Skill wrapper commands:
   - `faucet-request [chain] [asset ...]`
   - `faucet-networks`
+
+## 73) Slice 85 EVM-Wide Portability Foundation Contract (Locked)
+
+1. Scope boundary:
+- Chain onboarding is config-driven for EVM networks.
+- This slice does not add new live chains; it removes hardcoded chain assumptions.
+- x402 remains chain-scoped and unchanged in capability surface (no new x402 networks enabled by this slice).
+
+2. Chain config contract:
+- `config/chains/<chain>.json` must support:
+  - `chainKey`
+  - `family` (`evm`)
+  - `enabled` (boolean)
+  - `uiVisible` (boolean)
+  - `displayName`
+  - `chainId`
+  - `nativeCurrency` (`name`, `symbol`, `decimals`)
+  - `rpc` (`primary`, `fallback`)
+  - `explorerBaseUrl`
+  - `capabilities` (`wallet`, `trade`, `limitOrders`, `x402`, `faucet`, `deposits`)
+  - optional `canonicalTokens`
+- Capability default behavior when omitted:
+  - `wallet=true`
+  - all other capabilities default false.
+
+3. Capability gating contract:
+- Runtime and web must reject unsupported operations with structured capability errors.
+- Wallet flows may run only when `capabilities.wallet=true`.
+- Trade flows require `capabilities.trade=true`.
+- Limit-order flows require `capabilities.limitOrders=true`.
+- Faucet flows require `capabilities.faucet=true`.
+- x402 flows require `capabilities.x402=true`.
+
+4. Public chain registry contract:
+- `GET /api/v1/public/chains` returns enabled chain registry metadata for selectors/runtime:
+  - `chainKey`, `family`, `enabled`, `uiVisible`, `displayName`, `chainId`, `nativeCurrency`, `explorerBaseUrl`, `capabilities`.
+- Default response excludes chains with `uiVisible=false` unless `includeHidden=true`.
+
+5. Token metadata portability contract:
+- Add DB cache table `chain_token_metadata_cache` keyed by `(chain_key, token_address)`.
+- Token metadata resolution order:
+  1. canonical config mapping,
+  2. metadata cache,
+  3. on-chain RPC (`symbol`, `name`, `decimals`),
+  4. fallback label (shortened address).
+- Management chain-token rows may include optional metadata fields:
+  - `name`, `decimals`, `source`, `tokenDisplay`.
+
+6. Runtime/skill introspection contract:
+- Runtime exposes `xclaw-agent chains --json` (optional `--include-disabled`) for tool routing.
+- Skill wrapper exposes `chains`.

@@ -1,7 +1,15 @@
 {
   "chainKey": "base_sepolia",
+  "family": "evm",
+  "enabled": true,
+  "uiVisible": true,
   "chainId": 84532,
   "displayName": "Base Sepolia",
+  "nativeCurrency": {
+    "name": "Ether",
+    "symbol": "ETH",
+    "decimals": 18
+  },
   "explorerBaseUrl": "https://sepolia.basescan.org",
   "rpc": {
     "primary": "https://sepolia.base.org",
@@ -21,6 +29,14 @@
   "canonicalTokens": {
     "WETH": "0xC97e903056f679ea1Db80893008A92578aDfE609",
     "USDC": "0x39A0C0D1b3dDcE1B49fAa5c6e1D300C14012F4E2"
+  },
+  "capabilities": {
+    "wallet": true,
+    "trade": true,
+    "limitOrders": true,
+    "x402": true,
+    "faucet": true,
+    "deposits": true
   },
   "updatedAt": "2026-02-14T07:55:51.788Z",
   "version": 1,

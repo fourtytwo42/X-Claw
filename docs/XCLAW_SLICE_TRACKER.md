@@ -1621,3 +1621,23 @@ DoD:
 - [x] runtime CLI adds `faucet-networks` and extends `faucet-request --asset ...`.
 - [x] skill wrapper adds `faucet-networks` and supports optional `faucet-request [chain] [asset ...]`.
 - [x] required gates pass: runtime tests, `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all` (sequential).
+
+---
+
+## Slice 85: EVM-Wide Portability Foundation (Chain-Agnostic Core, x402 Unchanged)
+Status: [x]
+Issue: #35
+
+Goal:
+- Make chain plumbing config-driven and capability-gated so adding EVM chains is data/config work, while preserving x402 scope boundaries.
+
+DoD:
+- [x] docs sync first: source-of-truth + roadmap + tracker + wallet contract + context/spec/tasks/acceptance aligned to Slice 85.
+- [x] chain config contract extended with `family`, `enabled`, `uiVisible`, `nativeCurrency`, and `capabilities`.
+- [x] new migration adds `chain_token_metadata_cache` for symbol/name/decimals cache with resolve status.
+- [x] new `GET /api/v1/public/chains` returns enabled chain registry + capabilities.
+- [x] web chain selectors load chain options from public chain registry (with local fallback cache).
+- [x] runtime adds chain registry command (`xclaw-agent chains --json`) and capability enforcement.
+- [x] faucet and chain validation paths consume config/capability model instead of hardcoded chain lists.
+- [x] management agent-state chain token rows include optional resolved metadata (`name`, `decimals`, `source`, `tokenDisplay`).
+- [x] x402 scope remains unchanged and chain-gated by capability.

@@ -2,9 +2,10 @@ import type { NextRequest } from 'next/server';
 
 import { dbQuery } from '@/lib/db';
 import { errorResponse, internalErrorResponse, successResponse } from '@/lib/errors';
-import { chainRpcUrl, getChainConfig } from '@/lib/chains';
+import { chainRpcUrl, getChainConfig, supportedChainHint } from '@/lib/chains';
 import { requireManagementSession } from '@/lib/management-auth';
 import { getRequestId } from '@/lib/request-id';
+import { resolveTokenMetadata } from '@/lib/token-metadata';
 
 export const runtime = 'nodejs';
 
@@ -161,17 +162,34 @@ export async function GET(req: NextRequest) {
         {
           code: 'payload_invalid',
           message: 'Invalid chainKey query parameter value.',
-          actionHint: 'Provide a supported chainKey (for example base_sepolia or kite_ai_testnet).',
+          actionHint: supportedChainHint(),
           details: { chainKey }
         },
         requestId
       );
     }
 
-    const chainTokens = Object.entries(chainCfg.canonicalTokens ?? {}).map(([symbol, address]) => ({
-      symbol,
-      address
-    }));
+    const chainTokens = await Promise.all(
+      Object.entries(chainCfg.canonicalTokens ?? {}).map(async ([symbol, address]) => {
+        const resolved = await resolveTokenMetadata(chainKey, address).catch(() => null);
+        return {
+          symbol,
+          address,
+          name: resolved?.name ?? null,
+          decimals: resolved?.decimals ?? null,
+          source: resolved?.source ?? 'config',
+          tokenDisplay: resolved
+            ? {
+                symbol: resolved.symbol,
+                name: resolved.name,
+                decimals: resolved.decimals,
+                address: resolved.address,
+                isFallbackLabel: resolved.isFallbackLabel,
+              }
+            : null,
+        };
+      })
+    );
 
     const [
       agent,

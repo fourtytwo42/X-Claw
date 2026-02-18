@@ -3,6 +3,9 @@ import path from 'node:path';
 
 export type ChainConfig = {
   chainKey: string;
+  family?: 'evm' | string;
+  enabled?: boolean;
+  uiVisible?: boolean;
   chainId?: number;
   displayName?: string;
   nativeCurrency?: {
@@ -18,6 +21,14 @@ export type ChainConfig = {
   coreContracts?: {
     router?: string;
     quoter?: string;
+  };
+  capabilities?: {
+    wallet?: boolean;
+    trade?: boolean;
+    limitOrders?: boolean;
+    x402?: boolean;
+    faucet?: boolean;
+    deposits?: boolean;
   };
   canonicalTokens?: Record<string, string>;
 };
@@ -46,9 +57,54 @@ export function getChainConfig(chainKey: string): ChainConfig | null {
   return readChainConfigs().find((cfg) => cfg.chainKey === chainKey) ?? null;
 }
 
+function isChainEnabled(cfg: ChainConfig): boolean {
+  return cfg.enabled !== false;
+}
+
+export function listEnabledChains(): ChainConfig[] {
+  return readChainConfigs().filter(isChainEnabled);
+}
+
+export function listVisibleEnabledChains(): ChainConfig[] {
+  return listEnabledChains().filter((cfg) => cfg.uiVisible !== false);
+}
+
+export function isSupportedChainKey(chainKey: string): boolean {
+  return listEnabledChains().some((cfg) => cfg.chainKey === chainKey);
+}
+
+export function chainCapabilityEnabled(
+  chainKey: string,
+  capability: 'wallet' | 'trade' | 'limitOrders' | 'x402' | 'faucet' | 'deposits'
+): boolean {
+  const cfg = getChainConfig(chainKey);
+  if (!cfg || !isChainEnabled(cfg)) {
+    return false;
+  }
+  const caps = cfg.capabilities;
+  if (!caps || typeof caps !== 'object') {
+    return capability === 'wallet';
+  }
+  const value = caps[capability];
+  if (typeof value === 'boolean') {
+    return value;
+  }
+  return capability === 'wallet';
+}
+
+export function supportedChainHint(sampleSize = 6): string {
+  const keys = listEnabledChains()
+    .map((cfg) => cfg.chainKey)
+    .slice(0, sampleSize);
+  if (keys.length === 0) {
+    return 'No enabled chains are configured.';
+  }
+  return `Use one of: ${keys.join(', ')}.`;
+}
+
 export function chainRpcUrl(chainKey: string): string | null {
   const cfg = getChainConfig(chainKey);
-  if (!cfg) {
+  if (!cfg || !isChainEnabled(cfg)) {
     return null;
   }
 

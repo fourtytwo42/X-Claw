@@ -248,7 +248,7 @@ def main(argv: List[str]) -> int:
         return _err(
             "usage",
             "Missing command.",
-            "Use one of: status, dashboard, intents-poll, approval-check, trade-exec, trade-spot, trade-resume, transfer-resume, transfer-decide, transfer-policy-get, transfer-policy-set, report-send, chat-poll, chat-post, tracked-list, tracked-trades, username-set, owner-link, faucet-request, faucet-networks, x402-pay, x402-pay-resume, x402-pay-decide, x402-policy-get, x402-policy-set, x402-networks, request-x402-payment, limit-orders-create, limit-orders-cancel, limit-orders-list, limit-orders-run-once, limit-orders-run-loop, wallet-health, wallet-address, wallet-sign-challenge, wallet-send, wallet-send-token, wallet-balance, wallet-token-balance",
+            "Use one of: status, dashboard, intents-poll, approval-check, trade-exec, trade-spot, trade-resume, transfer-resume, transfer-decide, transfer-policy-get, transfer-policy-set, report-send, chat-poll, chat-post, tracked-list, tracked-trades, username-set, owner-link, faucet-request, faucet-networks, chains, x402-pay, x402-pay-resume, x402-pay-decide, x402-policy-get, x402-policy-set, x402-networks, request-x402-payment, limit-orders-create, limit-orders-cancel, limit-orders-list, limit-orders-run-once, limit-orders-run-loop, wallet-health, wallet-address, wallet-sign-challenge, wallet-send, wallet-send-token, wallet-balance, wallet-token-balance",
             exit_code=2,
         )
 
@@ -279,6 +279,7 @@ def main(argv: List[str]) -> int:
         "owner-link",
         "faucet-request",
         "faucet-networks",
+        "chains",
         "limit-orders-create",
         "limit-orders-cancel",
         "limit-orders-list",
@@ -524,6 +525,13 @@ def main(argv: List[str]) -> int:
     if cmd == "faucet-networks":
         return _run_agent(["faucet-networks", "--json"])
 
+    if cmd == "chains":
+        args = ["chains"]
+        if argv and str(argv[0]).strip().lower() in {"--include-disabled", "include-disabled", "all"}:
+            args.append("--include-disabled")
+        args.append("--json")
+        return _run_agent(args)
+
     if cmd == "request-x402-payment":
         memo = " ".join(argv[2:]).strip() if len(argv) > 2 else ""
         return _run_agent(_build_hosted_x402_receive_args(memo or None))
@@ -757,7 +765,7 @@ def main(argv: List[str]) -> int:
     return _err(
         "unknown_command",
         f"Unknown command: {cmd}",
-        "Use one of: status, dashboard, intents-poll, approval-check, trade-exec, trade-spot, trade-resume, transfer-resume, transfer-decide, transfer-policy-get, transfer-policy-set, report-send, chat-poll, chat-post, tracked-list, tracked-trades, username-set, owner-link, faucet-request, faucet-networks, x402-pay, x402-pay-resume, x402-pay-decide, x402-policy-get, x402-policy-set, x402-networks, request-x402-payment, limit-orders-create, limit-orders-cancel, limit-orders-list, limit-orders-run-once, limit-orders-run-loop, wallet-health, wallet-address, wallet-sign-challenge, wallet-send, wallet-send-token, wallet-balance, wallet-token-balance",
+        "Use one of: status, dashboard, intents-poll, approval-check, trade-exec, trade-spot, trade-resume, transfer-resume, transfer-decide, transfer-policy-get, transfer-policy-set, report-send, chat-poll, chat-post, tracked-list, tracked-trades, username-set, owner-link, faucet-request, faucet-networks, chains, x402-pay, x402-pay-resume, x402-pay-decide, x402-policy-get, x402-policy-set, x402-networks, request-x402-payment, limit-orders-create, limit-orders-cancel, limit-orders-list, limit-orders-run-once, limit-orders-run-loop, wallet-health, wallet-address, wallet-sign-challenge, wallet-send, wallet-send-token, wallet-balance, wallet-token-balance",
         exit_code=2,
     )
 

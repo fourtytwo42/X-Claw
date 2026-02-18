@@ -1,23 +1,26 @@
-# Slice 84 Tasks: Multi-Network Faucet Parity (Base Sepolia + Kite Testnet)
+# Slice 85 Tasks: EVM-Wide Portability Foundation (Chain-Agnostic Core, x402 Unchanged)
 
-Active slice: `Slice 84: Multi-Network Faucet Parity`
-Issue mapping: `#34`
+Active slice: `Slice 85: EVM-Wide Portability Foundation`
+Issue mapping: `#35`
 
 ## 1) Canonical sync
-- [x] Add Slice 84 tracker + roadmap entries with issue mapping.
-- [x] Update source-of-truth with locked faucet parity contract.
+- [x] Add Slice 85 tracker + roadmap entries with issue mapping.
+- [x] Update source-of-truth with locked portability contract.
 - [x] Update context/spec/tasks/acceptance artifacts.
 - [x] Update wallet command contract + OpenAPI + schemas.
 
 ## 2) Implementation
-- [x] Refactor `POST /api/v1/agent/faucet/request` for chain allowlist and asset selection.
-- [x] Add `GET /api/v1/agent/faucet/networks` endpoint.
-- [x] Extend runtime `faucet-request --asset ...` and add `faucet-networks`.
-- [x] Extend skill `faucet-request [chain] [asset ...]` and add `faucet-networks`.
-- [x] Keep per-agent/per-chain limiter semantics.
+- [x] Extend `config/chains/*.json` contract with `family/enabled/uiVisible/nativeCurrency/capabilities`.
+- [x] Add migration `0021_slice85_chain_token_metadata.sql`.
+- [x] Add `GET /api/v1/public/chains`.
+- [x] Replace static frontend chain options with registry-driven fetch/cached options.
+- [x] Add runtime `chains` command and capability checks.
+- [x] Replace hardcoded chain action hints with dynamic supported-chain hints in key API routes.
+- [x] Add token metadata resolver/cache and include metadata on management chain tokens.
 
 ## 3) Validation
 - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_x402_runtime.py -v`
 - [x] `npm run db:parity`
 - [x] `npm run seed:reset`
 - [x] `npm run seed:load`
