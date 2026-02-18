@@ -149,10 +149,61 @@ PY
   fi
 
   echo "[xclaw] installing python runtime deps from $req_file"
+  install_output=""
+  install_status=0
+  set +e
   if [ "\${XCLAW_PYTHON_IN_VENV:-0}" = "1" ]; then
-    "$py_bin" -m pip install --disable-pip-version-check -r "$req_file"
+    install_output="$("$py_bin" -m pip install --disable-pip-version-check -r "$req_file" 2>&1)"
+    install_status=$?
   else
-    "$py_bin" -m pip install --disable-pip-version-check --user -r "$req_file"
+    install_output="$("$py_bin" -m pip install --disable-pip-version-check --user -r "$req_file" 2>&1)"
+    install_status=$?
+  fi
+  set -e
+
+  if [ "$install_status" -ne 0 ] && [ "\${XCLAW_PYTHON_IN_VENV:-0}" != "1" ] && printf '%s' "$install_output" | grep -qi "externally-managed-environment"; then
+    local venv_dir="$HOME/.xclaw-agent/runtime-venv"
+    local venv_python="$venv_dir/bin/python"
+    echo "[xclaw] detected externally managed python (PEP 668); creating fallback venv at $venv_dir"
+    if ! "$py_bin" -m venv "$venv_dir" >/dev/null 2>&1; then
+      echo "[xclaw] standard venv creation failed; retrying with --without-pip"
+      if ! "$py_bin" -m venv --without-pip "$venv_dir" >/dev/null 2>&1; then
+        if command -v virtualenv >/dev/null 2>&1; then
+          virtualenv "$venv_dir" >/dev/null 2>&1 || true
+        fi
+      fi
+    fi
+    if [ ! -x "$venv_python" ]; then
+      printf '%s\n' "$install_output"
+      echo "[xclaw] unable to provision fallback venv for externally managed python"
+      exit 1
+    fi
+    if ! "$venv_python" -m pip --version >/dev/null 2>&1; then
+      if [ ! -f "$tmp_dir/get-pip.py" ]; then
+        curl -fsSL https://bootstrap.pypa.io/get-pip.py -o "$tmp_dir/get-pip.py" || true
+      fi
+      if [ -f "$tmp_dir/get-pip.py" ]; then
+        "$venv_python" "$tmp_dir/get-pip.py" >/dev/null 2>&1 || true
+      fi
+    fi
+    if ! "$venv_python" -m pip --version >/dev/null 2>&1; then
+      printf '%s\n' "$install_output"
+      echo "[xclaw] venv created for externally managed python, but pip bootstrap failed"
+      exit 1
+    fi
+
+    py_bin="$venv_python"
+    export XCLAW_PYTHON_BIN="$py_bin"
+    export XCLAW_PYTHON_IN_VENV="1"
+    set +e
+    install_output="$("$py_bin" -m pip install --disable-pip-version-check -r "$req_file" 2>&1)"
+    install_status=$?
+    set -e
+  fi
+
+  if [ "$install_status" -ne 0 ]; then
+    printf '%s\n' "$install_output"
+    exit "$install_status"
   fi
 
   if ! "$py_bin" - <<'PY' >/dev/null 2>&1
