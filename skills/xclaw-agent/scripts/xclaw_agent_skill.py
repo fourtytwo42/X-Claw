@@ -52,6 +52,12 @@ def _err(code: str, message: str, action_hint: Optional[str] = None, details: Op
 
 
 def _resolve_agent_binary() -> Optional[str]:
+    configured = (os.environ.get("XCLAW_AGENT_RUNTIME_BIN") or "").strip()
+    if configured:
+        configured_path = Path(configured).expanduser()
+        if configured_path.exists() and os.access(configured_path, os.X_OK):
+            return str(configured_path)
+
     script_dir = Path(__file__).resolve().parent
     repo_binary = script_dir.parent.parent.parent / "apps" / "agent-runtime" / "bin" / "xclaw-agent"
     if repo_binary.exists() and os.access(repo_binary, os.X_OK):

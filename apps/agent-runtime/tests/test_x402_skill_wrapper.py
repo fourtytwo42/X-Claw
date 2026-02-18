@@ -2,6 +2,7 @@ import json
 import io
 import pathlib
 import sys
+import tempfile
 import unittest
 from contextlib import redirect_stdout
 from unittest import mock
@@ -47,6 +48,26 @@ class X402SkillWrapperTests(unittest.TestCase):
                 "--json",
             ]
         )
+
+    def test_resolve_agent_binary_prefers_configured_runtime_bin(self) -> None:
+        with tempfile.NamedTemporaryFile(delete=False) as f:
+            p = pathlib.Path(f.name)
+        p.chmod(0o755)
+        self.addCleanup(lambda: p.unlink(missing_ok=True))
+        with mock.patch.dict(skill.os.environ, {"XCLAW_AGENT_RUNTIME_BIN": str(p)}, clear=False):
+            resolved = skill._resolve_agent_binary()
+        self.assertEqual(resolved, str(p))
+
+    def test_resolve_agent_binary_falls_back_when_configured_bin_not_executable(self) -> None:
+        with tempfile.NamedTemporaryFile(delete=False) as f:
+            p = pathlib.Path(f.name)
+        p.chmod(0o644)
+        self.addCleanup(lambda: p.unlink(missing_ok=True))
+        with mock.patch.dict(skill.os.environ, {"XCLAW_AGENT_RUNTIME_BIN": str(p)}, clear=False):
+            with mock.patch.object(skill.os, "access", return_value=False):
+                with mock.patch.object(skill.shutil, "which", return_value="/usr/bin/xclaw-agent"):
+                    resolved = skill._resolve_agent_binary()
+        self.assertEqual(resolved, "/usr/bin/xclaw-agent")
 
     def test_request_x402_payment_rejects_positional_text(self) -> None:
         code, payload = self._capture(["xclaw_agent_skill.py", "request-x402-payment", "please", "request", "$5", "usdc"])

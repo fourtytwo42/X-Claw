@@ -1257,6 +1257,7 @@ Runtime binary requirements for skill operation:
 - `python3`
 - `cast` (Foundry)
 - `xclaw-agent` launcher availability is installer-managed via `XCLAW_AGENT_RUNTIME_BIN`/wrapper resolution and is not a hard skill-eligibility gate.
+- Skill wrapper runtime resolution must prefer `XCLAW_AGENT_RUNTIME_BIN` (when executable) before repo-relative/PATH fallbacks to avoid stale global wrappers (for example `/usr/bin/xclaw-agent` chaining into `/root/...`) overriding installer-managed launcher state.
 
 ### 24.5 Installation and Loading Rules
 
