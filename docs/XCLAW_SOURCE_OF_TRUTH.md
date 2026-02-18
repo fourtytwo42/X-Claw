@@ -2816,6 +2816,8 @@ Limitations / notes:
    - deny must mark `rejected` with reason and must not execute transfer,
    - final deterministic transfer result message is always sent to chat (`status`, `approvalId`, `chain`, `txHash` when available),
    - synthetic `[X-CLAW TRANSFER RESULT]` message is routed to agent pipeline for narrative follow-up,
+   - transfer approval creation sends an out-of-band Telegram approval prompt only when OpenClaw `lastChannel == telegram`,
+   - if active channel is not Telegram, no transfer approval prompt is pushed to chat (approval remains web-manageable),
    - when transfer status is `approval_pending`, user-facing skill reply must be concise (queued for management approval) and must not dump raw queued transfer message text.
    - transfer approve/deny actions are handled from management surfaces/callback pipeline; transfer queued-message text is an internal payload, not the primary chat UX.
 8. Web remote interface requirements:

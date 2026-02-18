@@ -2567,6 +2567,78 @@ def _maybe_send_telegram_approval_prompt(trade_id: str, chain: str, summary: dic
         pass
 
 
+def _maybe_send_telegram_transfer_approval_prompt(flow: dict[str, Any]) -> None:
+    approval_id = str(flow.get("approvalId") or "").strip()
+    chain = str(flow.get("chainKey") or "").strip()
+    if not approval_id or not chain:
+        return
+
+    policy = _fetch_outbound_transfer_policy(chain)
+    if not _approval_channels_enabled(policy, "telegram"):
+        return
+
+    delivery = _read_openclaw_last_delivery()
+    if not delivery or str(delivery.get("lastChannel") or "").lower() != "telegram":
+        return
+
+    chat_id = str(delivery.get("lastTo") or "").strip()
+    if not chat_id:
+        return
+
+    thread_raw = delivery.get("lastThreadId")
+    thread_id: str | None = None
+    if isinstance(thread_raw, int):
+        thread_id = str(thread_raw)
+    elif isinstance(thread_raw, str) and thread_raw.strip():
+        thread_id = thread_raw.strip()
+
+    callback_approve = f"xfer|a|{approval_id}|{chain}"
+    callback_deny = f"xfer|r|{approval_id}|{chain}"
+    if len(callback_approve.encode("utf-8")) > 64 or len(callback_deny.encode("utf-8")) > 64:
+        return
+
+    transfer_type = str(flow.get("transferType") or "token").strip().lower()
+    token_symbol = str(flow.get("tokenSymbol") or ("ETH" if transfer_type == "native" else "TOKEN")).strip() or "TOKEN"
+    token_decimals = 18
+    try:
+        token_decimals = int(flow.get("tokenDecimals", 18))
+    except Exception:
+        token_decimals = 18
+    amount_wei = str(flow.get("amountWei") or "0").strip() or "0"
+    amount_human, amount_unit = _transfer_amount_display(amount_wei, transfer_type, token_symbol, token_decimals)
+    amount_display = f"{amount_human} {amount_unit}"
+    to_address = str(flow.get("toAddress") or "").strip().lower() or "unknown"
+
+    text = (
+        "Approve transfer\n"
+        f"Amount: {amount_display}\n"
+        f"To: {to_address}\n"
+        f"Chain: {chain}\n"
+        f"Approval: {approval_id}\n\n"
+        "Tap Approve to execute (or Deny to reject)."
+    )
+    if bool(flow.get("policyBlockedAtCreate")):
+        reason_code = str(flow.get("policyBlockReasonCode") or "unknown")
+        text += (
+            f"\n\nPolicy blocked at create: {reason_code}"
+            "\nApprove executes this transfer as a one-off override."
+        )
+
+    buttons = json.dumps(
+        [[{"text": "Approve", "callback_data": callback_approve}, {"text": "Deny", "callback_data": callback_deny}]],
+        separators=(",", ":"),
+    )
+    openclaw = _require_openclaw_bin()
+    cmd = [openclaw, "message", "send", "--channel", "telegram", "--target", chat_id, "--message", text, "--buttons", buttons, "--json"]
+    if thread_id:
+        cmd.extend(["--thread-id", thread_id])
+    proc = _run_subprocess(cmd, timeout_sec=30, kind="openclaw_send")
+    if proc.returncode != 0:
+        stderr = (proc.stderr or "").strip()
+        stdout = (proc.stdout or "").strip()
+        raise WalletStoreError(stderr or stdout or "openclaw message send failed.")
+
+
 def _maybe_send_telegram_decision_message(
     *,
     trade_id: str,
@@ -6112,6 +6184,10 @@ def cmd_wallet_send(args: argparse.Namespace) -> int:
         _mirror_transfer_approval(flow)
 
         if approval_required:
+            try:
+                _maybe_send_telegram_transfer_approval_prompt(flow)
+            except Exception:
+                pass
             queued_message = (
                 "Approval required (transfer)\n\n"
                 "Request: Send native token\n"
@@ -6224,6 +6300,10 @@ def cmd_wallet_send_token(args: argparse.Namespace) -> int:
         _mirror_transfer_approval(flow)
 
         if approval_required:
+            try:
+                _maybe_send_telegram_transfer_approval_prompt(flow)
+            except Exception:
+                pass
             queued_message = (
                 "Approval required (transfer)\n\n"
                 "Request: Send token\n"

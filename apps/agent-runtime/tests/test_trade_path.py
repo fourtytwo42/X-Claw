@@ -665,6 +665,77 @@ class TradePathRuntimeTests(unittest.TestCase):
             self.assertIn("xappr|a|trd_abc|base_sepolia", callback_data)
             self.assertIn("xappr|r|trd_abc|base_sepolia", callback_data)
 
+    def test_telegram_transfer_prompt_includes_details_and_callbacks(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir, mock.patch.object(cli, "APP_DIR", pathlib.Path(tmpdir)), mock.patch.object(
+            cli, "APPROVAL_PROMPTS_FILE", pathlib.Path(tmpdir) / "approval_prompts.json"
+        ), mock.patch.object(
+            cli, "_fetch_outbound_transfer_policy", return_value={"approvalChannels": {"telegram": {"enabled": True}}}
+        ), mock.patch.object(
+            cli, "_read_openclaw_last_delivery", return_value={"lastChannel": "telegram", "lastTo": "123", "lastThreadId": None}
+        ), mock.patch.object(
+            cli, "_require_openclaw_bin", return_value="openclaw"
+        ):
+            captured: dict[str, object] = {}
+
+            def fake_run(cmd: list[str], timeout_sec: int, kind: str):
+                captured["cmd"] = cmd
+                return mock.Mock(returncode=0, stdout='{"payload":{"messageId":"777"}}', stderr="")
+
+            with mock.patch.object(cli, "_run_subprocess", side_effect=fake_run):
+                cli._maybe_send_telegram_transfer_approval_prompt(
+                    {
+                        "approvalId": "xfr_abc",
+                        "chainKey": "base_sepolia",
+                        "transferType": "token",
+                        "tokenSymbol": "WETH",
+                        "tokenDecimals": 18,
+                        "amountWei": "1000000000000000",
+                        "toAddress": "0x9099d24d55c105818b4e9ee117d87bc11063cf10",
+                    }
+                )
+
+            cmd = captured.get("cmd") or []
+            self.assertIn("--channel", cmd)
+            self.assertIn("telegram", cmd)
+            message_arg = None
+            buttons_arg = None
+            for idx, part in enumerate(cmd):
+                if part == "--message" and idx + 1 < len(cmd):
+                    message_arg = cmd[idx + 1]
+                if part == "--buttons" and idx + 1 < len(cmd):
+                    buttons_arg = cmd[idx + 1]
+            self.assertIsNotNone(message_arg)
+            self.assertIn("Approve transfer", message_arg)
+            self.assertIn("Amount: 0.001 WETH", message_arg)
+            self.assertIn("Approval: xfr_abc", message_arg)
+            self.assertIsNotNone(buttons_arg)
+            buttons = json.loads(buttons_arg or "[]")
+            row0 = buttons[0]
+            callback_data = [b.get("callback_data") for b in row0 if isinstance(b, dict)]
+            self.assertIn("xfer|a|xfr_abc|base_sepolia", callback_data)
+            self.assertIn("xfer|r|xfr_abc|base_sepolia", callback_data)
+
+    def test_telegram_transfer_prompt_skips_when_last_channel_not_telegram(self) -> None:
+        with mock.patch.object(
+            cli, "_fetch_outbound_transfer_policy", return_value={"approvalChannels": {"telegram": {"enabled": True}}}
+        ), mock.patch.object(
+            cli, "_read_openclaw_last_delivery", return_value={"lastChannel": "web", "lastTo": "123", "lastThreadId": None}
+        ), mock.patch.object(
+            cli, "_run_subprocess"
+        ) as run_mock:
+            cli._maybe_send_telegram_transfer_approval_prompt(
+                {
+                    "approvalId": "xfr_abc",
+                    "chainKey": "base_sepolia",
+                    "transferType": "token",
+                    "tokenSymbol": "WETH",
+                    "tokenDecimals": 18,
+                    "amountWei": "1000000000000000",
+                    "toAddress": "0x9099d24d55c105818b4e9ee117d87bc11063cf10",
+                }
+            )
+        run_mock.assert_not_called()
+
     def test_trade_spot_does_not_reuse_after_approval(self) -> None:
         # De-dupe only applies while approval is pending; once approved, a repeated identical request
         # should propose a new tradeId.
