@@ -1995,3 +1995,14 @@ Issue mapping: `#32`
 - [x] Add batch decision API.
 - [x] Rewire `/approvals` to inbox API, bulk actions, and permissions inventory.
 - [ ] Run full required validation + collect evidence.
+
+## Non-Telegram Web Agent Prod Bridge Tasks Addendum
+
+- [x] Add shared helper `apps/network-web/src/lib/non-telegram-agent-prod.ts`.
+- [x] Add dispatch hooks for trade decision and approve+allowlist decision routes.
+- [x] Add dispatch hooks for transfer decision route (decision + terminal).
+- [x] Add terminal dispatch hook for trade status route (non-replay only).
+- [x] Add terminal dispatch hook for transfer mirror route (status-change only).
+- [x] Add Telegram guard and no-`--deliver`/no-`message send` invariants.
+- [x] Update source-of-truth + roadmap + tracker + handoff docs.
+- [ ] Run required validation sequence and capture evidence.

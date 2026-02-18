@@ -1673,6 +1673,7 @@ DoD:
 - [~] add `POST /api/v1/management/permissions/update` for direct permission posture updates.
 - [~] `/approvals` uses inbox API and enables `Approve + Allowlist Token`.
 - [~] allowances placeholder replaced with permissions inventory module.
+- [x] non-Telegram web synthetic prod bridge dispatches trade/transfer decision + terminal notifications with Telegram-channel guard.
 
 ## Slice 88: Approvals Center Full UX Flush (Batch + Risk)
 Status: [~]

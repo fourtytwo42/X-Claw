@@ -8,6 +8,12 @@ import { errorResponse, internalErrorResponse, successResponse } from '@/lib/err
 import { parseJsonBody } from '@/lib/http';
 import { makeId } from '@/lib/ids';
 import { requireManagementWriteAuth } from '@/lib/management-auth';
+import {
+  buildWebTradeDecisionProdMessage,
+  buildWebTradeResultProdMessage,
+  dispatchNonTelegramAgentProd,
+  isTradeTerminalStatus
+} from '@/lib/non-telegram-agent-prod';
 import { getRequestId } from '@/lib/request-id';
 import { validatePayload } from '@/lib/validation';
 
@@ -182,6 +188,17 @@ export async function POST(req: NextRequest) {
     }
 
     let runtimeResume: Record<string, unknown> | null = null;
+    const agentProdDecision = await dispatchNonTelegramAgentProd({
+      message: buildWebTradeDecisionProdMessage({
+        decision: body.decision,
+        tradeId: body.tradeId,
+        chainKey: result.chainKey,
+        source: 'web_management_trade_decision',
+        reasonMessage: body.reasonMessage ?? null
+      })
+    });
+    let agentProdTerminal: Awaited<ReturnType<typeof dispatchNonTelegramAgentProd>> | null = null;
+
     if (body.decision === 'approve') {
       const runtimeBin = resolveRuntimeBin();
       const runtimeArgs = ['approvals', 'resume-spot', '--trade-id', body.tradeId, '--chain', result.chainKey, '--json'];
@@ -211,6 +228,20 @@ export async function POST(req: NextRequest) {
           stderr: (child.stderr || '').slice(0, 1200)
         };
       }
+
+      const terminalStatus = String(runtimeResume.status ?? '').trim().toLowerCase();
+      if (isTradeTerminalStatus(terminalStatus)) {
+        agentProdTerminal = await dispatchNonTelegramAgentProd({
+          message: buildWebTradeResultProdMessage({
+            status: terminalStatus,
+            tradeId: body.tradeId,
+            chainKey: result.chainKey,
+            txHash: String(runtimeResume.txHash ?? '').trim() || null,
+            source: 'web_management_trade_decision_resume',
+            reasonMessage: String(runtimeResume.reasonMessage ?? '').trim() || (body.reasonMessage ?? null)
+          })
+        });
+      }
     }
 
     return successResponse(
@@ -219,7 +250,9 @@ export async function POST(req: NextRequest) {
         tradeId: body.tradeId,
         status: result.status,
         chainKey: result.chainKey,
-        runtimeResume
+        runtimeResume,
+        agentProdDecision,
+        agentProdTerminal
       },
       200,
       requestId

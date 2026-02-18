@@ -1738,3 +1738,26 @@ Pivot public product behavior from copy trading to tracked-agent monitoring whil
 ### Data changes
 - `management_session_agents` table.
 - `agent_policy_snapshots.chain_key` backfill + required writes.
+
+## Non-Telegram Web Agent Prod Bridge Spec Addendum
+
+### Goal
+- Add a web-runtime synthetic inbound prod bridge for non-Telegram active sessions so agent pipeline is nudged on trade/transfer decision and terminal outcomes.
+
+### Non-goals
+- No Telegram callback/gateway behavior changes.
+- No additional Telegram chat messages.
+- No public API contract changes.
+
+### Interfaces
+- Internal helper: `dispatchNonTelegramAgentProd(...)` in `apps/network-web/src/lib/non-telegram-agent-prod.ts`.
+- Internal env:
+  - `XCLAW_NON_TG_PROD_ENABLED` (default enabled),
+  - `XCLAW_NON_TG_PROD_TIMEOUT_MS` (default bounded timeout).
+
+### Trigger points
+- `POST /api/v1/management/approvals/decision`
+- `POST /api/v1/management/approvals/approve-allowlist-token`
+- `POST /api/v1/management/transfer-approvals/decision`
+- `POST /api/v1/trades/:tradeId/status` (terminal only)
+- `POST /api/v1/agent/transfer-approvals/mirror` (terminal status-change only)

@@ -4203,3 +4203,44 @@ Issue mapping: `#32` (`https://github.com/fourtytwo42/ETHDenver2026/issues/32`)
 - `npm run seed:verify`
 - `npm run build`
 - `pm2 restart all`
+
+## Non-Telegram Web Agent Prod Bridge Acceptance Addendum
+
+### Objective
+- Verify non-Telegram synthetic dispatch for web decision/terminal flows without Telegram message regressions.
+
+### Targeted checks
+- Non-Telegram active session decision path attempts dispatch.
+- Telegram active session decision path skips with `telegram_guard`.
+- Trade terminal status path dispatches once and idempotency replay does not redispatch.
+- Transfer mirror terminal status redispatch is blocked when status is unchanged.
+- Missing OpenClaw binary/timeout does not fail route business semantics.
+
+### Required gates
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `pm2 restart all`
+
+### Execution evidence (UTC 2026-02-18)
+- `npm run db:parity` -> PASS (`ok: true`, no missing tables/enums/checks)
+- `npm run seed:reset` -> PASS
+- `npm run seed:load` -> PASS (`agents=6`, `trades=11`)
+- `npm run seed:verify` -> PASS (`ok: true`)
+- `npm run build` -> PASS (Next.js production build completed)
+- `pm2 restart all` -> PASS (`xclaw-web` online)
+
+### Targeted bridge checks
+- Telegram guard + no-session skip reasons are implemented in helper:
+  - `apps/network-web/src/lib/non-telegram-agent-prod.ts` (`reason: 'telegram_guard'`, `reason: 'no_session'`)
+- Idempotency replay no-redispatch guard for trade status is preserved:
+  - `apps/network-web/src/app/api/v1/trades/[tradeId]/status/route.ts` (early return on `idempotency.ctx.replayResponse` before dispatch logic)
+- Terminal-only dispatch guards are implemented:
+  - trade terminal: `isTradeTerminalStatus(...)`
+  - transfer terminal: `isTransferTerminalStatus(...)`
+- Transfer mirror duplicate terminal redispatch guard is implemented:
+  - dispatch requires `nextStatus !== priorStatus`
+- Dispatch is best-effort only and does not change business failure semantics:
+  - dispatch results are captured in response/audit payloads; routes do not throw on dispatch failure.

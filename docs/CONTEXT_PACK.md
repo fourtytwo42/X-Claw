@@ -1167,3 +1167,28 @@ Issue mapping: `#32`
 - `docs/XCLAW_BUILD_ROADMAP.md`
 - `docs/api/openapi.v1.yaml`
 - `packages/shared-schemas/json/*.schema.json`
+
+## Context Pack Addendum: Non-Telegram Web Agent Prod Bridge (Trade/Transfer)
+
+### Objective + scope lock
+- Objective: keep autonomous agent state synchronized for web-driven decisions and terminal outcomes when active channel is non-Telegram.
+- Scope lock:
+  - trade decision (`/management/approvals/decision`),
+  - approve+allowlist decision (`/management/approvals/approve-allowlist-token`),
+  - transfer decision (`/management/transfer-approvals/decision`),
+  - trade terminal status (`/trades/:tradeId/status`),
+  - transfer mirror terminal transition (`/agent/transfer-approvals/mirror`).
+
+### Safety constraints
+- Do not modify Telegram callback/gateway behavior.
+- Skip synthetic dispatch when OpenClaw last channel is Telegram.
+- Never use `openclaw message send` from this bridge.
+- Dispatch failures are best-effort and cannot fail business endpoints.
+
+### Expected touched files
+- `apps/network-web/src/lib/non-telegram-agent-prod.ts`
+- `apps/network-web/src/app/api/v1/management/approvals/decision/route.ts`
+- `apps/network-web/src/app/api/v1/management/approvals/approve-allowlist-token/route.ts`
+- `apps/network-web/src/app/api/v1/management/transfer-approvals/decision/route.ts`
+- `apps/network-web/src/app/api/v1/trades/[tradeId]/status/route.ts`
+- `apps/network-web/src/app/api/v1/agent/transfer-approvals/mirror/route.ts`

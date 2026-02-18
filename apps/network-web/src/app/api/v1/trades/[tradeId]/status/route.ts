@@ -12,6 +12,7 @@ import { eventTypeForTradeStatus, isAllowedTransition } from '@/lib/trade-state'
 import { validatePayload } from '@/lib/validation';
 import { generateCopyIntentsForLeaderFill, syncCopyIntentFromTradeStatus } from '@/lib/copy-lifecycle';
 import { recomputeMetricsForAgents } from '@/lib/metrics';
+import { buildWebTradeResultProdMessage, dispatchNonTelegramAgentProd, isTradeTerminalStatus } from '@/lib/non-telegram-agent-prod';
 
 export const runtime = 'nodejs';
 
@@ -226,7 +227,7 @@ export async function POST(
         await recomputeMetricsForAgents(client, [...affectedAgents]);
       }
 
-      return { ok: true as const };
+      return { ok: true as const, chainKey: row.chain_key };
     });
 
     if (!updateResult.ok) {
@@ -316,10 +317,25 @@ export async function POST(
       );
     }
 
+    let agentProdTerminal: Awaited<ReturnType<typeof dispatchNonTelegramAgentProd>> | null = null;
+    if (isTradeTerminalStatus(body.toStatus)) {
+      agentProdTerminal = await dispatchNonTelegramAgentProd({
+        message: buildWebTradeResultProdMessage({
+          status: body.toStatus,
+          tradeId: pathTradeId,
+          chainKey: updateResult.chainKey,
+          txHash: body.txHash ?? null,
+          source: 'web_trade_status',
+          reasonMessage: body.reasonMessage ?? null
+        })
+      });
+    }
+
     const responseBody = {
       ok: true,
       tradeId: pathTradeId,
-      status: body.toStatus
+      status: body.toStatus,
+      agentProdTerminal
     };
 
     await storeIdempotencyResponse(idempotency.ctx, 200, responseBody);

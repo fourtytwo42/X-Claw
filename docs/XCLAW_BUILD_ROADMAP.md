@@ -2934,10 +2934,13 @@ Note:
 - [~] Add `POST /api/v1/management/permissions/update`.
 - [~] Wire `/approvals` to inbox API and enable `Approve + Allowlist Token` action.
 - [~] Replace allowances placeholder with permissions inventory module.
+- [x] Add non-Telegram web synthetic agent prod bridge for trade/transfer decisions + terminal outcomes with Telegram guard.
 
 ### 87.3 Validation + evidence
 - [ ] Verify approve+allowlist updates trade status and chain allowlist atomically.
 - [ ] Verify inbox aggregation across linked agents and chain filter behavior.
+- [x] Verify non-Telegram prod dispatch attempted on web decision/terminal paths.
+- [x] Verify Telegram guard skip (`lastChannel=telegram`) produces no extra Telegram messages.
 
 ## 88) Slice 88: Approvals Full UX Flush (Batch + Risk)
 

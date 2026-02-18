@@ -5,6 +5,7 @@ import { errorResponse, internalErrorResponse, successResponse } from '@/lib/err
 import { parseJsonBody } from '@/lib/http';
 import { makeId } from '@/lib/ids';
 import { requireManagementWriteAuth } from '@/lib/management-auth';
+import { buildWebTradeDecisionProdMessage, dispatchNonTelegramAgentProd } from '@/lib/non-telegram-agent-prod';
 import { getRequestId } from '@/lib/request-id';
 import { validatePayload } from '@/lib/validation';
 
@@ -231,7 +232,24 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    return successResponse(result, 200, requestId);
+    const agentProdDecision = await dispatchNonTelegramAgentProd({
+      message: buildWebTradeDecisionProdMessage({
+        decision: 'approved_allowlist',
+        tradeId: result.tradeId,
+        chainKey: result.chainKey,
+        source: 'web_management_trade_allowlist_decision',
+        reasonMessage: null
+      })
+    });
+
+    return successResponse(
+      {
+        ...result,
+        agentProdDecision
+      },
+      200,
+      requestId
+    );
   } catch {
     return internalErrorResponse(requestId);
   }

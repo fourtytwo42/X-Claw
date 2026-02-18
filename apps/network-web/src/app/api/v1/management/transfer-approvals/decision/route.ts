@@ -8,6 +8,12 @@ import { errorResponse, internalErrorResponse, successResponse } from '@/lib/err
 import { parseJsonBody } from '@/lib/http';
 import { makeId } from '@/lib/ids';
 import { requireManagementWriteAuth } from '@/lib/management-auth';
+import {
+  buildWebTransferDecisionProdMessage,
+  buildWebTransferResultProdMessage,
+  dispatchNonTelegramAgentProd,
+  isTransferTerminalStatus
+} from '@/lib/non-telegram-agent-prod';
 import { getRequestId } from '@/lib/request-id';
 import { validatePayload } from '@/lib/validation';
 
@@ -281,6 +287,40 @@ export async function POST(req: NextRequest) {
       [applied ? 'applied' : 'failed', body.approvalId, body.agentId, chainKey]
     );
 
+    let agentProdDecision: Awaited<ReturnType<typeof dispatchNonTelegramAgentProd>> | null = null;
+    let agentProdTerminal: Awaited<ReturnType<typeof dispatchNonTelegramAgentProd>> | null = null;
+
+    if (applied) {
+      agentProdDecision = await dispatchNonTelegramAgentProd({
+        message: buildWebTransferDecisionProdMessage({
+          decision: body.decision,
+          approvalId: body.approvalId,
+          chainKey,
+          source: 'web_management_transfer_decision',
+          reasonMessage: body.reasonMessage ?? null
+        })
+      });
+
+      let terminalStatus = '';
+      if (isTransferTerminalStatus(reconciledStatus ?? '')) {
+        terminalStatus = String(reconciledStatus ?? '').trim().toLowerCase();
+      } else if (body.decision === 'deny' && appliedVia === 'mirror_fallback') {
+        terminalStatus = 'rejected';
+      }
+      if (terminalStatus) {
+        agentProdTerminal = await dispatchNonTelegramAgentProd({
+          message: buildWebTransferResultProdMessage({
+            status: terminalStatus,
+            approvalId: body.approvalId,
+            chainKey,
+            txHash: String(runtimePayload?.txHash ?? '').trim() || null,
+            source: 'web_management_transfer_decision',
+            reasonMessage: String(runtimePayload?.reasonMessage ?? '').trim() || (body.reasonMessage ?? null)
+          })
+        });
+      }
+    }
+
     await dbQuery(
       `
       insert into management_audit_log (
@@ -301,6 +341,8 @@ export async function POST(req: NextRequest) {
           runtimeExitStatus: child.status,
           appliedVia,
           runtimePayload,
+          agentProdDecision,
+          agentProdTerminal,
           stderr: (child.stderr || '').slice(0, 1200),
           reasonMessage: body.reasonMessage ?? null
         }),
@@ -336,7 +378,9 @@ export async function POST(req: NextRequest) {
         decision: body.decision,
         appliedVia,
         runtimeApplied: applied,
-        runtimePayload
+        runtimePayload,
+        agentProdDecision,
+        agentProdTerminal
       },
       200,
       requestId

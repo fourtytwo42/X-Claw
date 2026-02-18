@@ -4,6 +4,7 @@ import { authenticateAgentByToken } from '@/lib/agent-auth';
 import { dbQuery } from '@/lib/db';
 import { errorResponse, internalErrorResponse, successResponse } from '@/lib/errors';
 import { parseJsonBody } from '@/lib/http';
+import { buildWebTransferResultProdMessage, dispatchNonTelegramAgentProd, isTransferTerminalStatus } from '@/lib/non-telegram-agent-prod';
 import { getRequestId } from '@/lib/request-id';
 import { validatePayload } from '@/lib/validation';
 
@@ -68,6 +69,18 @@ export async function POST(req: NextRequest) {
     }
 
     const body = validated.data;
+    const prior = await dbQuery<{ status: string }>(
+      `
+      select status::text
+      from agent_transfer_approval_mirror
+      where approval_id = $1
+        and agent_id = $2
+      limit 1
+      `,
+      [body.approvalId, auth.agentId]
+    );
+    const priorStatus = (prior.rowCount ?? 0) > 0 ? String(prior.rows[0].status ?? '').trim().toLowerCase() : '';
+
     await dbQuery(
       `
       insert into agent_transfer_approval_mirror (
@@ -161,7 +174,26 @@ export async function POST(req: NextRequest) {
       ]
     );
 
-    return successResponse({ ok: true, approvalId: body.approvalId, status: body.status }, 200, requestId);
+    let agentProdTerminal: Awaited<ReturnType<typeof dispatchNonTelegramAgentProd>> | null = null;
+    const nextStatus = String(body.status ?? '').trim().toLowerCase();
+    if (isTransferTerminalStatus(nextStatus) && nextStatus !== priorStatus) {
+      agentProdTerminal = await dispatchNonTelegramAgentProd({
+        message: buildWebTransferResultProdMessage({
+          status: nextStatus,
+          approvalId: body.approvalId,
+          chainKey: body.chainKey,
+          txHash: body.txHash ?? null,
+          source: 'web_transfer_mirror_status',
+          reasonMessage: body.reasonMessage ?? null
+        })
+      });
+    }
+
+    return successResponse(
+      { ok: true, approvalId: body.approvalId, status: body.status, agentProdTerminal },
+      200,
+      requestId
+    );
   } catch {
     return internalErrorResponse(requestId);
   }
