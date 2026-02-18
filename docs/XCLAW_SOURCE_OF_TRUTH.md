@@ -2627,11 +2627,11 @@ Limitations / notes:
 9. Telegram deny:
    - Deny transitions `approval_pending -> rejected` (reasonCode `approval_rejected`, reasonMessage set).
 10. Decision feedback in chat:
-   - after approve/deny in Telegram, the agent posts a confirmation message into the same chat with trade details (tradeId, amount/pair, and reason for deny).
-     - Implementation note: OpenClaw gateway should route the decision into the agent message pipeline (synthetic message + instructions), rather than posting a raw gateway-generated ack message.
-   - Reliability requirement: for both trade (`xappr`) and policy (`xpol`) callbacks, Telegram callback success (including converged terminal `409`) must emit an immediate deterministic confirmation message (`Approved/Denied trade ...` or `Approved/Denied policy approval ...`) so users always receive visible feedback.
+   - after approve/deny in Telegram, the system posts a deterministic confirmation message directly in the same chat (tradeId/policyId + chain + decision).
+   - Reliability requirement: for both trade (`xappr`) and policy (`xpol`) callbacks, Telegram callback success (including converged terminal `409`) must emit immediate visible feedback (`Approved/Denied ...`).
    - Single-trigger spot flow requirement (Telegram-focused): for `trade spot` approvals (`xappr approve`), the system must auto-resume execution without requiring a second user message.
-   - Final-result requirement: after auto-resume execution, the system must emit a deterministic final result message in the same chat (status + tradeId + chain + tx hash when available), and route a synthetic final-result message into the agent pipeline so the agent can provide a human narrative.
+   - Final-result requirement: after auto-resume execution, the system must emit a deterministic final result message in the same chat (status + tradeId + chain + tx hash when available).
+   - To prevent duplicate chatter and duplicate executions, Telegram callback handling must not inject additional synthetic approval/result messages into the general agent message pipeline for trade callbacks.
    - after approve/deny in web while runtime is waiting on the trade, runtime posts a confirmation message into the active Telegram chat with the same details.
    - if active channel is non-Telegram, confirmation and next-step instructions should reference web management approval status (not Telegram callbacks/buttons).
 11. Approval wait latency:
