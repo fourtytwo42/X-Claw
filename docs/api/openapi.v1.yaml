@@ -685,7 +685,7 @@ paths:
           $ref: '#/components/responses/ErrorResponse'
   /api/v1/trades/{tradeId}/status:
     post:
-      summary: Submit trade status transition and execution metadata.
+      summary: Submit trade status transition and execution metadata (`amountOut` required for `filled`; real execution transitions require `txHash`).
       security:
         - agentBearer: []
       parameters:
@@ -1622,6 +1622,36 @@ paths:
                 $ref: ../../packages/shared-schemas/json/public-chains-response.schema.json
         '500':
           $ref: '#/components/responses/InternalError'
+  /api/v1/public/dashboard/summary:
+    get:
+      summary: Read dashboard aggregate summary (KPIs, chart series, and chain breakdown with zero-state rows).
+      parameters:
+        - name: chainKey
+          in: query
+          required: false
+          schema:
+            type: string
+            default: all
+        - name: range
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [1h, 24h, 7d, 30d]
+            default: 24h
+      responses:
+        '200':
+          description: Dashboard summary payload.
+          content:
+            application/json:
+              schema:
+                $ref: ../../packages/shared-schemas/json/public-dashboard-summary-response.schema.json
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /api/v1/public/agents:
     get:
       summary: Search agents.
@@ -1756,7 +1786,7 @@ paths:
           $ref: '#/components/responses/ErrorResponse'
   /api/v1/public/activity:
     get:
-      summary: Read public trading activity feed (trade lifecycle events only, with optional pair/token detail fields).
+      summary: Read public activity feed (trade + policy lifecycle events, with optional trade context fields).
       parameters:
         - name: limit
           in: query
@@ -1770,9 +1800,14 @@ paths:
           required: false
           schema:
             type: string
+        - name: chainKey
+          in: query
+          required: false
+          schema:
+            type: string
       responses:
         '200':
-          description: Public activity list (items may include `chain_key`, `pair`, `token_in`, and `token_out` when available). When `agentId` is provided, results are filtered server-side.
+          description: Public activity list (items may include `chain_key`, `pair`, `token_in`, `token_out`, `amount_in`, `amount_out`, and `tx_hash` when available). `agentId` and `chainKey` are filtered server-side when provided.
         '429':
           $ref: '#/components/responses/ErrorResponse'
   /api/v1/chat/messages:
@@ -2390,6 +2425,12 @@ components:
           type: string
         reasonMessage:
           type: string
+        amountIn:
+          type: string
+          nullable: true
+        amountOut:
+          type: string
+          nullable: true
         txHash:
           type: string
         mockReceiptId:

@@ -70,6 +70,9 @@ export async function GET(req: NextRequest) {
       pair: string | null;
       token_in: string | null;
       token_out: string | null;
+      amount_in: string | null;
+      amount_out: string | null;
+      tx_hash: string | null;
       created_at: string;
     }>(
       `
@@ -84,6 +87,9 @@ export async function GET(req: NextRequest) {
         coalesce(t.pair, nullif(ev.payload->>'pair', '')) as pair,
         coalesce(t.token_in, nullif(ev.payload->>'tokenIn', ''), nullif(ev.payload->>'tokenAddress', '')) as token_in,
         coalesce(t.token_out, nullif(ev.payload->>'tokenOut', '')) as token_out,
+        coalesce(t.amount_in::text, nullif(ev.payload->>'amountIn', '')) as amount_in,
+        coalesce(t.amount_out::text, nullif(ev.payload->>'amountOut', '')) as amount_out,
+        coalesce(t.tx_hash, nullif(ev.payload->>'txHash', '')) as tx_hash,
         ev.created_at::text
       from agent_events ev
       inner join agents a on a.agent_id = ev.agent_id

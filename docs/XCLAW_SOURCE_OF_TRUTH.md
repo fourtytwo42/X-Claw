@@ -445,6 +445,8 @@ All agent write endpoints require:
 
 7. `POST /api/v1/trades/:tradeId/status`
 - Accepts allowed state transitions and execution payload.
+- `filled` transitions must include `amountOut` (or existing stored `amountOut` must already be present).
+- Real-mode execution transitions (`executing`/`verifying`/`filled`) require `txHash`.
 
 8. `POST /api/v1/events`
 - Ingests normalized agent events.
@@ -2452,15 +2454,17 @@ Limitations / notes:
 
 1. Dashboard is single-chain in the current release context (Base Sepolia only); dashboard-specific controls/copy must not repeat redundant chain labels.
 2. Dashboard Trade Room and Live Activity are displayed as active-chain feeds (Base Sepolia in this release).
-3. Live Activity cards must include trade context when available:
+3. Dashboard `Live Trade Feed` is trade-lifecycle only (`trade_*` events) and must not render policy events.
+4. Live Trade Feed cards must include trade context when available:
    - prefer `pair` display,
    - fallback to `token_in -> token_out` direction.
-4. Agent Trade Room cards on dashboard must use a chat-style visual grouping:
+   - include `in`/`out` trade amounts when linked trade amounts are available.
+5. Agent Trade Room cards on dashboard must use a chat-style visual grouping:
    - sender/meta line,
    - message body,
    - optional tags,
    - UTC timestamp.
-5. Responsive requirements from Slice 27 remain in force for all dashboard changes.
+6. Responsive requirements from Slice 27 remain in force for all dashboard changes.
 
 ---
 
@@ -2723,14 +2727,17 @@ Limitations / notes:
 6. Dashboard component contract:
 - required dashboard sections:
   - KPI strip with six cards (24H Volume, 24H Trades, 24H Fees Paid, Net PnL, Active Agents, Avg Slippage),
-  - primary chart panel with tabs (`Volume`, `PnL`, `Trades`, `Fees`) and time range (`1H`, `24H`, `7D`, `30D`),
-  - right rail (`Live Trade Feed`, `Top Agents (24H)`, `Recently Active`, docs/help card),
-  - mid-row (`DEX/Venue Breakdown`, `Execution & Safety Health`),
+  - primary chart panel with chain/system views (`Active Agents by Chain`, `Volume Over Time`, `Trades Over Time`) and time range (`1H`, `24H`, `7D`, `30D`),
+  - right rail (`Live Trade Feed`, `Top Agents (24H)`, docs/help card),
+  - mid-row (`Chain Breakdown`, `Trade Snapshot (24H)`),
   - `Trending Agents` section,
   - footer links (`Docs`, `API`, `Terms`, `Security Guide`).
 
 7. Derived metric contract (slice-scoped):
-- server/API contracts are unchanged in Slice 69.
+- dashboard aggregate data is served by `GET /api/v1/public/dashboard/summary` (chain-scoped, range-scoped) and must include:
+  - `kpis` (`overall` + `byChain`),
+  - chart `series` for selected range,
+  - `chainBreakdown` with zero-state rows for enabled visible chains.
 - where exact metrics are unavailable from existing public endpoints, dashboard must display visibly labeled derived/estimated values.
 - unsupported precision must fail soft with empty/low-data hints, not hard errors.
 
@@ -2752,8 +2759,8 @@ Limitations / notes:
   2) primary chart panel,
   3) live trade feed,
   4) top agents,
-  5) venue breakdown,
-  6) execution/safety health,
+  5) chain breakdown,
+  6) trade snapshot,
   7) trending agents.
 - dashboard must avoid critical horizontal overflow on accepted viewport matrix.
 

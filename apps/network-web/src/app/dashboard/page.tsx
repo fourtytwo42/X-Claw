@@ -13,7 +13,7 @@ import { formatNumber, formatUsd, formatUtc, shortenAddress } from '@/lib/public
 
 import styles from './page.module.css';
 
-type ChartTab = 'volume' | 'pnl' | 'trades' | 'fees';
+type ChartView = 'active_agents_chain' | 'volume_over_time' | 'trades_over_time';
 type TimeRange = '1h' | '24h' | '7d' | '30d';
 type LeaderboardSort = 'pnl' | 'volume' | 'winrate';
 
@@ -36,12 +36,16 @@ type ActivityItem = {
   event_id: string;
   agent_id: string;
   agent_name: string;
+  trade_id?: string | null;
   event_type: string;
   chain_key: string;
   pair: string | null;
   pair_display?: string | null;
   token_in: string | null;
   token_out: string | null;
+  amount_in?: string | null;
+  amount_out?: string | null;
+  tx_hash?: string | null;
   token_in_symbol?: string | null;
   token_out_symbol?: string | null;
   created_at: string;
@@ -57,6 +61,50 @@ type ChatItem = {
   tags: string[];
   createdAt: string;
 };
+
+type DashboardSummary = {
+  chainKey: string;
+  range: TimeRange;
+  chains: Array<{ chainKey: string; displayName: string }>;
+  kpis: {
+    overall: {
+      activeAgents: number;
+      trades: number;
+      volumeUsd: number;
+      pnlUsd: number;
+      feesUsd: number;
+      avgSlippagePct: number;
+    };
+  };
+  chainBreakdown: Array<{
+    chainKey: string;
+    displayName: string;
+    activeAgents: number;
+    trades: number;
+    volumeUsd: number;
+  }>;
+  series: Array<{
+    bucketStart: string;
+    bucketEnd: string;
+    trades: number;
+    volumeUsd: number;
+  }>;
+};
+
+type ChartPoint = {
+  value: number;
+  label: string;
+  chainKey?: string;
+  trades?: number;
+  volumeUsd?: number;
+};
+
+const FIXED_CHAIN_COLORS: Record<string, string> = {
+  base_sepolia: '#3b82f6',
+  hardhat_local: '#f59e0b',
+  kite_ai_testnet: '#22c55e',
+};
+const FALLBACK_CHAIN_COLORS = ['#38bdf8', '#fb7185', '#34d399', '#fbbf24', '#a78bfa', '#f97316'];
 
 function toNumber(value: string | null | undefined): number {
   if (!value) {
@@ -112,6 +160,9 @@ function describePair(item: ActivityItem): string {
 }
 
 function getTxHash(item: ActivityItem): string | null {
+  if (typeof item.tx_hash === 'string' && item.tx_hash.startsWith('0x')) {
+    return item.tx_hash;
+  }
   const hash = item.payload?.txHash;
   if (typeof hash === 'string' && hash.startsWith('0x')) {
     return hash;
@@ -131,6 +182,56 @@ function getApproxTradeSize(item: ActivityItem): number {
     }
   }
   return 0;
+}
+
+function payloadString(item: ActivityItem, key: string): string | null {
+  const value = item.payload?.[key];
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function resolveTradeToken(item: ActivityItem, leg: 'in' | 'out'): string {
+  if (leg === 'in') {
+    const payloadTokenIn = payloadString(item, 'tokenIn');
+    return (
+      item.token_in_symbol?.trim() ||
+      payloadString(item, 'tokenInSymbol') ||
+      (item.token_in ? shortenAddress(item.token_in) : '') ||
+      (payloadTokenIn ? shortenAddress(payloadTokenIn) : '') ||
+      'token'
+    );
+  }
+  const payloadTokenOut = payloadString(item, 'tokenOut');
+  return (
+    item.token_out_symbol?.trim() ||
+    payloadString(item, 'tokenOutSymbol') ||
+    (item.token_out ? shortenAddress(item.token_out) : '') ||
+    (payloadTokenOut ? shortenAddress(payloadTokenOut) : '') ||
+    'token'
+  );
+}
+
+function resolveTradeAmount(item: ActivityItem, leg: 'in' | 'out'): string | null {
+  if (leg === 'in') {
+    return item.amount_in ?? payloadString(item, 'amountIn') ?? null;
+  }
+  return item.amount_out ?? payloadString(item, 'amountOut') ?? null;
+}
+
+function formatTradeLegAmount(raw: string | null | undefined): string {
+  if (!raw) {
+    return 'n/a';
+  }
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) {
+    return raw;
+  }
+  if (Math.abs(parsed) >= 1000) {
+    return parsed.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  }
+  if (Math.abs(parsed) >= 1) {
+    return parsed.toLocaleString(undefined, { maximumFractionDigits: 4 });
+  }
+  return parsed.toLocaleString(undefined, { maximumSignificantDigits: 6 });
 }
 
 function estimatedDelta(seed: number): number {
@@ -153,41 +254,57 @@ function trendPath(points: number[], width: number, height: number): string {
     .join(' ');
 }
 
-function bucketSeries(activity: ActivityItem[], points: number): number[] {
-  if (points <= 0) {
-    return [];
+function formatCompactCount(value: number): string {
+  if (!Number.isFinite(value)) {
+    return '0';
   }
-  const now = Date.now();
-  const bucketMs = Math.max(Math.floor((24 * 60 * 60 * 1000) / points), 1);
-  const out = new Array<number>(points).fill(0);
-  for (const item of activity) {
-    const delta = now - new Date(item.created_at).getTime();
-    if (!Number.isFinite(delta) || delta < 0) {
-      continue;
-    }
-    const index = points - 1 - Math.min(points - 1, Math.floor(delta / bucketMs));
-    out[index] += 1;
+  if (Math.abs(value) >= 1000) {
+    return value.toLocaleString(undefined, { notation: 'compact', maximumFractionDigits: 1 });
   }
-  return out;
+  return Math.round(value).toLocaleString();
+}
+
+function formatCompactUsd(value: number): string {
+  if (!Number.isFinite(value)) {
+    return '$0';
+  }
+  if (Math.abs(value) >= 1000) {
+    return `$${value.toLocaleString(undefined, { notation: 'compact', maximumFractionDigits: 1 })}`;
+  }
+  return formatUsd(value);
+}
+
+function stableChainColor(chainKey: string, index: number): string {
+  return FIXED_CHAIN_COLORS[chainKey] ?? FALLBACK_CHAIN_COLORS[index % FALLBACK_CHAIN_COLORS.length];
+}
+
+function formatBucketLabel(value: string, range: TimeRange): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  if (range === '1h' || range === '24h') {
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+  return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
 function DashboardPage() {
   const router = useRouter();
-  const [chainKey, , chainLabel] = useDashboardChainKey();
+  const [chainKey, setChainKey, chainLabel] = useDashboardChainKey();
 
   const [timeRange, setTimeRange] = useState<TimeRange>('24h');
-  const [chartTab, setChartTab] = useState<ChartTab>('volume');
+  const [chartView, setChartView] = useState<ChartView>('volume_over_time');
   const [leaderboardSort, setLeaderboardSort] = useState<LeaderboardSort>('pnl');
-  const [dexFilter, setDexFilter] = useState('All');
-  const [strategyFilter, setStrategyFilter] = useState('All');
-  const [riskFilter, setRiskFilter] = useState('Any');
 
   const [leaderboard, setLeaderboard] = useState<LeaderboardItem[] | null>(null);
   const [activity, setActivity] = useState<ActivityItem[] | null>(null);
   const [chat, setChat] = useState<ChatItem[] | null>(null);
+  const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [chatError, setChatError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
+  const [hoveredBarIndex, setHoveredBarIndex] = useState<number | null>(null);
   const [isPhoneViewport, setIsPhoneViewport] = useState(false);
   const [showMoreInsights, setShowMoreInsights] = useState(true);
 
@@ -212,20 +329,28 @@ function DashboardPage() {
 
       const chainQuery = chainKey === 'all' ? 'all' : chainKey;
       const metricWindow = getMetricWindow(timeRange);
+      const activityQuery = new URLSearchParams({ limit: '120' });
+      if (chainKey !== 'all') {
+        activityQuery.set('chainKey', chainKey);
+      }
 
       try {
-        const [leaderboardRes, activityRes, chatRes] = await Promise.all([
+        const [leaderboardRes, activityRes, chatRes, summaryRes] = await Promise.all([
           fetch(`/api/v1/public/leaderboard?window=${metricWindow}&mode=real&chain=${chainQuery}`, { cache: 'no-store' }),
-          fetch('/api/v1/public/activity?limit=120', { cache: 'no-store' }),
-          fetch('/api/v1/chat/messages?limit=40', { cache: 'no-store' })
+          fetch(`/api/v1/public/activity?${activityQuery.toString()}`, { cache: 'no-store' }),
+          fetch('/api/v1/chat/messages?limit=40', { cache: 'no-store' }),
+          fetch(`/api/v1/public/dashboard/summary?chainKey=${encodeURIComponent(chainQuery)}&range=${encodeURIComponent(timeRange)}`, {
+            cache: 'no-store',
+          })
         ]);
 
-        if (!leaderboardRes.ok || !activityRes.ok) {
+        if (!leaderboardRes.ok || !activityRes.ok || !summaryRes.ok) {
           throw new Error('Dashboard data request failed.');
         }
 
         const leaderboardPayload = (await leaderboardRes.json()) as { items: LeaderboardItem[] };
         const activityPayload = (await activityRes.json()) as { items: ActivityItem[] };
+        const summaryPayload = (await summaryRes.json()) as DashboardSummary;
         let chatPayload: { items: ChatItem[] } | null = null;
 
         if (chatRes.ok) {
@@ -240,11 +365,13 @@ function DashboardPage() {
 
         setLeaderboard(leaderboardPayload.items ?? []);
         setActivity(activityPayload.items ?? []);
+        setSummary(summaryPayload ?? null);
         setChat(chatPayload?.items ?? []);
       } catch (loadError) {
         if (!cancelled) {
           setError(loadError instanceof Error ? loadError.message : 'Failed to load dashboard.');
           setChat([]);
+          setSummary(null);
         }
       }
     };
@@ -265,7 +392,6 @@ function DashboardPage() {
     return chainKey === 'all' ? items : items.filter((item) => item.chain_key === chainKey);
   }, [activity, chainKey]);
 
-  const liveFeed = filteredActivity.slice(0, 20);
   const filteredChat = useMemo(() => {
     const items = chat ?? [];
     return chainKey === 'all' ? items : items.filter((item) => item.chainKey === chainKey);
@@ -285,44 +411,106 @@ function DashboardPage() {
     });
     return rows.slice(0, 10);
   }, [filteredLeaderboard, leaderboardSort]);
-  const recentlyActive = filteredActivity.slice(0, 20);
+  const tradeEvents = filteredActivity.filter((item) => item.event_type.startsWith('trade_'));
 
-  const kpis = useMemo(() => {
-    const volume = filteredLeaderboard.reduce((acc, item) => acc + toNumber(item.volume_usd), 0);
-    const trades = filteredLeaderboard.reduce((acc, item) => acc + (Number.isFinite(item.trades_count) ? item.trades_count : 0), 0);
-    const pnl = filteredLeaderboard.reduce((acc, item) => acc + toNumber(item.pnl_usd), 0);
-    const activeAgents = filteredLeaderboard.length;
+  const summaryKpis = summary?.kpis?.overall;
+  const kpis = useMemo(
+    () => ({
+      volume: summaryKpis?.volumeUsd ?? 0,
+      trades: summaryKpis?.trades ?? 0,
+      fees: summaryKpis?.feesUsd ?? 0,
+      pnl: summaryKpis?.pnlUsd ?? 0,
+      activeAgents: summaryKpis?.activeAgents ?? 0,
+      slippage: summaryKpis?.avgSlippagePct ?? 0.22,
+    }),
+    [summaryKpis]
+  );
 
-    const fees = volume * 0.003;
-    const totalTradeSize = filteredActivity.reduce((acc, item) => acc + getApproxTradeSize(item), 0);
-    const avgSize = filteredActivity.length > 0 ? totalTradeSize / filteredActivity.length : 0;
-    const slippage = avgSize > 0 ? Math.min(1.8, 0.08 + avgSize / 180000) : 0.22;
-
-    return {
-      volume,
-      trades,
-      fees,
-      pnl,
-      activeAgents,
-      slippage
-    };
-  }, [filteredLeaderboard, filteredActivity]);
-
-  const chartSeries = useMemo(() => {
-    const buckets = bucketSeries(filteredActivity, 22);
-    if (chartTab === 'trades') {
-      return buckets.map((v) => v + 1);
+  const chainBreakdown = useMemo(() => summary?.chainBreakdown ?? [], [summary]);
+  const chartPoints = useMemo<ChartPoint[]>(() => {
+    if (chartView === 'active_agents_chain') {
+      return chainBreakdown.slice(0, 8).map((row) => ({
+        value: row.activeAgents,
+        label: row.displayName,
+        chainKey: row.chainKey,
+        trades: row.trades,
+        volumeUsd: row.volumeUsd,
+      }));
     }
-    if (chartTab === 'fees') {
-      return buckets.map((v, idx) => v * 230 + idx * 14);
-    }
-    if (chartTab === 'pnl') {
-      return buckets.map((v, idx) => Math.max(0, v * 310 - idx * 6 + 130));
-    }
-    return buckets.map((v, idx) => v * 540 + idx * 24 + 180);
-  }, [filteredActivity, chartTab]);
+    return (summary?.series ?? []).map((row) => ({
+      value: chartView === 'volume_over_time' ? row.volumeUsd : row.trades,
+      label: formatBucketLabel(row.bucketStart, timeRange),
+      trades: row.trades,
+      volumeUsd: row.volumeUsd,
+    }));
+  }, [chainBreakdown, chartView, summary, timeRange]);
 
-  const bars = useMemo(() => bucketSeries(filteredActivity, 22).map((v, idx) => v * 26 + idx * 2), [filteredActivity]);
+  const chartBars = useMemo(() => chartPoints.map((point) => point.value), [chartPoints]);
+  const noTradeData = kpis.trades <= 0;
+  const chartXAxisLabels = useMemo(() => {
+    if (chartPoints.length === 0) {
+      return { left: '', mid: '', right: '' };
+    }
+    const left = chartPoints[0]?.label ?? '';
+    const mid = chartPoints[Math.floor(chartPoints.length / 2)]?.label ?? '';
+    const right = chartPoints[chartPoints.length - 1]?.label ?? '';
+    return { left, mid, right };
+  }, [chartPoints]);
+  const chartMax = Math.max(...chartBars, 1);
+  const chartTopLabel = useMemo(() => {
+    if (chartView === 'volume_over_time') {
+      return formatCompactUsd(chartMax);
+    }
+    return formatCompactCount(chartMax);
+  }, [chartMax, chartView]);
+  const chartMidLabel = useMemo(() => {
+    const mid = chartMax / 2;
+    if (chartView === 'volume_over_time') {
+      return formatCompactUsd(mid);
+    }
+    return formatCompactCount(mid);
+  }, [chartMax, chartView]);
+  const chartSubtitle = useMemo(() => {
+    if (chartView === 'active_agents_chain') {
+      return chainKey === 'all' ? 'Active agent distribution across chains' : `Active agent count for ${chainLabel}`;
+    }
+    if (chartView === 'volume_over_time') {
+      return `Estimated traded volume trend (${timeRange.toUpperCase()})`;
+    }
+    return `Trade event count trend (${timeRange.toUpperCase()})`;
+  }, [chainKey, chainLabel, chartView, timeRange]);
+  const chartModeTitle = useMemo(() => {
+    if (chartView === 'active_agents_chain') {
+      return 'Active Agents by Chain';
+    }
+    if (chartView === 'volume_over_time') {
+      return 'Volume Over Time';
+    }
+    return 'Trades Over Time';
+  }, [chartView]);
+  const legendChips = useMemo(() => {
+    if (chartView === 'active_agents_chain') {
+      return chainBreakdown.slice(0, 4).map((row, idx) => ({
+        key: row.chainKey,
+        label: `${row.displayName}: ${formatNumber(row.activeAgents)} active • ${formatNumber(row.trades)} trades • ${formatUsd(row.volumeUsd)}`,
+        color: stableChainColor(row.chainKey, idx),
+      }));
+    }
+    const totalValue = chartBars.reduce((acc, value) => acc + value, 0);
+    const peak = chartPoints.reduce<{ idx: number; value: number }>(
+      (acc, point, idx) => (point.value > acc.value ? { idx, value: point.value } : acc),
+      { idx: -1, value: -1 }
+    );
+    const peakLabel = peak.idx >= 0 ? chartPoints[peak.idx]?.label ?? '' : '';
+    const totalLabel = chartView === 'volume_over_time' ? `Total: ${formatUsd(totalValue)}` : `Total: ${formatNumber(totalValue)}`;
+    const peakValueLabel = chartView === 'volume_over_time' ? formatUsd(peak.value) : formatNumber(peak.value);
+    return [
+      { key: 'total', label: totalLabel, color: '#60a5fa' },
+      { key: 'peak', label: peak.idx >= 0 ? `Peak: ${peakValueLabel} @ ${peakLabel}` : 'Peak: n/a', color: '#22c55e' },
+      { key: 'buckets', label: `Buckets: ${chartPoints.length}`, color: '#f59e0b' },
+    ];
+  }, [chainBreakdown, chartBars, chartPoints, chartView]);
+  const hoveredPoint = hoveredBarIndex !== null ? chartPoints[hoveredBarIndex] ?? null : null;
 
   const tokens = useMemo(() => {
     const unique = new Set<string>();
@@ -349,7 +537,7 @@ function DashboardPage() {
   );
 
   const trending = rankedAgents.slice(0, 6);
-  const tradeEvents = filteredActivity.filter((item) => item.event_type.startsWith('trade_'));
+  const liveFeed = tradeEvents.slice(0, 20);
   const topPairs = useMemo(() => {
     const counts = new Map<string, number>();
     for (const item of tradeEvents) {
@@ -367,8 +555,8 @@ function DashboardPage() {
   );
   const largestTrade = useMemo(() => (tradeSizes.length > 0 ? Math.max(...tradeSizes) : 0), [tradeSizes]);
 
-  const linePath = trendPath(chartSeries, 660, 190);
-  const barMax = Math.max(...bars, 1);
+  const linePath = trendPath(chartBars, 660, 190);
+  const barMax = chartMax;
 
   const kpiCards = [
     {
@@ -422,6 +610,10 @@ function DashboardPage() {
   ] as const;
   const showAdvancedInsights = !isPhoneViewport || showMoreInsights;
 
+  useEffect(() => {
+    setHoveredBarIndex(null);
+  }, [chartView, chainKey, timeRange]);
+
   return (
     <div className={styles.dashboardRoot}>
       <PrimaryNav />
@@ -448,14 +640,7 @@ function DashboardPage() {
                 key={card.id}
                 type="button"
                 title={card.tooltip}
-                className={`${styles.kpiCard} ${chartTab === card.id || (card.id === 'active-agents' && chartTab === 'trades') ? styles.kpiCardActive : ''}`}
-                onClick={() => {
-                  if (card.id === 'active-agents' || card.id === 'avg-slippage') {
-                    setChartTab('trades');
-                    return;
-                  }
-                  setChartTab(card.id as ChartTab);
-                }}
+                className={styles.kpiCard}
               >
                 <div className={styles.kpiTitle}>{card.title}</div>
                 <div className={styles.kpiValue}>{card.value}</div>
@@ -473,14 +658,18 @@ function DashboardPage() {
             <section className={styles.card}>
               <div className={styles.cardHeaderRow}>
                 <div className={styles.segmentTabs}>
-                  {(['volume', 'pnl', 'trades', 'fees'] as ChartTab[]).map((tab) => (
+                  {([
+                    ['active_agents_chain', 'Active Agents by Chain'],
+                    ['volume_over_time', 'Volume Over Time'],
+                    ['trades_over_time', 'Trades Over Time']
+                  ] as const).map(([view, label]) => (
                     <button
-                      key={tab}
+                      key={view}
                       type="button"
-                      onClick={() => setChartTab(tab)}
-                      className={chartTab === tab ? styles.segmentTabActive : styles.segmentTab}
+                      onClick={() => setChartView(view)}
+                      className={chartView === view ? styles.segmentTabActive : styles.segmentTab}
                     >
-                      {tab === 'pnl' ? 'PnL' : tab[0].toUpperCase() + tab.slice(1)}
+                      {label}
                     </button>
                   ))}
                 </div>
@@ -499,47 +688,102 @@ function DashboardPage() {
                 </div>
               </div>
 
-              <div className={styles.inlineFilters}>
-                <select value={dexFilter} onChange={(event) => setDexFilter(event.target.value)}>
-                  <option>All</option>
-                  <option>Uniswap</option>
-                  <option>Sushi</option>
-                  <option>Other</option>
-                </select>
-                <select value={strategyFilter} onChange={(event) => setStrategyFilter(event.target.value)}>
-                  <option>All</option>
-                  <option>Arbitrage</option>
-                  <option>Trend</option>
-                  <option>Yield</option>
-                </select>
-                <select value={riskFilter} onChange={(event) => setRiskFilter(event.target.value)}>
-                  <option>Any</option>
-                  <option>Low</option>
-                  <option>Med</option>
-                  <option>High</option>
-                </select>
-              </div>
-
               <div className={styles.chartArea}>
-                <svg viewBox="0 0 720 240" role="img" aria-label="Primary metric chart">
+                <div className={styles.chartContext}>
+                  <div>
+                    <div className={styles.chartTitle}>{chartModeTitle}</div>
+                    <div className={styles.chartSubtitle}>{chartSubtitle}</div>
+                  </div>
+                  {hoveredPoint ? (
+                    <div className={styles.chartHoverInfo}>
+                      <div>{hoveredPoint.label}</div>
+                      <div>
+                        {chartView === 'volume_over_time'
+                          ? `Volume ${formatUsd(hoveredPoint.volumeUsd ?? hoveredPoint.value)}`
+                          : chartView === 'trades_over_time'
+                            ? `Trades ${formatNumber(hoveredPoint.trades ?? hoveredPoint.value)}`
+                            : `${formatNumber(hoveredPoint.value)} active`}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+                <svg viewBox="0 0 720 240" role="img" aria-label="Primary metric chart" onMouseLeave={() => setHoveredBarIndex(null)}>
                   <rect x="0" y="0" width="720" height="240" fill="transparent" />
                   {[0, 1, 2, 3].map((line) => (
                     <line key={line} x1="0" x2="720" y1={40 + line * 50} y2={40 + line * 50} className={styles.chartGridLine} />
                   ))}
-                  {bars.map((bar, idx) => {
+                  <text x="8" y="38" className={styles.chartAxisLabel}>
+                    {chartTopLabel}
+                  </text>
+                  <text x="8" y="136" className={styles.chartAxisLabel}>
+                    {chartMidLabel}
+                  </text>
+                  <text x="8" y="232" className={styles.chartAxisLabel}>
+                    0
+                  </text>
+                  {chartBars.map((bar, idx) => {
                     const x = idx * 30 + 12;
                     const h = (bar / barMax) * 140;
-                    return <rect key={`${bar}:${idx}`} x={x} y={212 - h} width="18" height={h} className={styles.chartBar} rx="4" />;
+                    const point = chartPoints[idx];
+                    const barColor =
+                      chartView === 'active_agents_chain'
+                        ? stableChainColor(point?.chainKey ?? `idx_${idx}`, idx)
+                        : undefined;
+                    const barClass = chartView === 'active_agents_chain' ? styles.chartBarChain : styles.chartBar;
+                    return (
+                      <g key={`${bar}:${idx}`}>
+                        <rect
+                          x={x}
+                          y={212 - h}
+                          width="18"
+                          height={h}
+                          className={barClass}
+                          rx="4"
+                          style={barColor ? { fill: barColor } : undefined}
+                          onMouseEnter={() => setHoveredBarIndex(idx)}
+                        />
+                        <rect
+                          x={x - 4}
+                          y={32}
+                          width="26"
+                          height="184"
+                          className={styles.chartHoverTarget}
+                          onMouseEnter={() => setHoveredBarIndex(idx)}
+                        />
+                      </g>
+                    );
                   })}
-                  <path d={linePath} className={styles.chartLine} />
+                  {chartView === 'active_agents_chain' ? null : <path d={linePath} className={styles.chartLine} />}
+                  <text x="16" y="236" className={styles.chartAxisLabel}>
+                    {chartXAxisLabels.left}
+                  </text>
+                  <text x="342" y="236" className={styles.chartAxisLabel}>
+                    {chartXAxisLabels.mid}
+                  </text>
+                  <text x="636" y="236" className={styles.chartAxisLabel}>
+                    {chartXAxisLabels.right}
+                  </text>
                 </svg>
+                {noTradeData ? (
+                  <div className={styles.chartEmptyState}>
+                    <div>{chainKey === 'all' ? `No trades in ${timeRange.toUpperCase()} window.` : `No trades in ${timeRange.toUpperCase()} window for ${chainLabel}.`}</div>
+                    {chainKey !== 'all' ? (
+                      <button type="button" className={styles.switchAllBtn} onClick={() => setChainKey('all')}>
+                        Switch to All chains
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
 
               <div className={styles.chartFooter}>
-                <span className={styles.venueChip}>Uniswap {formatUsd(kpis.volume * 0.52)}</span>
-                <span className={styles.venueChip}>Sushi {formatUsd(kpis.volume * 0.23)}</span>
-                <span className={styles.venueChip}>Other {formatUsd(kpis.volume * 0.25)}</span>
-                <span className={styles.dexCount}>3 Active DEXs</span>
+                {legendChips.map((chip) => (
+                  <span key={chip.key} className={styles.venueChip}>
+                    <span className={styles.chainDot} style={{ backgroundColor: chip.color }} aria-hidden="true" />
+                    {chip.label}
+                  </span>
+                ))}
+                <span className={styles.dexCount}>{chartView === 'active_agents_chain' ? 'Chain distribution' : `${timeRange.toUpperCase()} window`}</span>
               </div>
             </section>
 
@@ -555,23 +799,17 @@ function DashboardPage() {
               <>
                 <div className={styles.midGrid}>
                   <section className={styles.card}>
-                    <div className={styles.cardTitle}>DEX / Venue Breakdown</div>
-                    <div className={styles.venueLayout}>
-                      <div className={styles.donut} aria-hidden="true" />
-                      <div className={styles.venueLegend}>
-                        <button type="button" className={styles.legendItem} onClick={() => setDexFilter('Uniswap')}>
-                          <span>Uniswap</span>
-                          <strong>{formatUsd(kpis.volume * 0.52)}</strong>
-                        </button>
-                        <button type="button" className={styles.legendItem} onClick={() => setDexFilter('Sushi')}>
-                          <span>Sushi</span>
-                          <strong>{formatUsd(kpis.volume * 0.23)}</strong>
-                        </button>
-                        <button type="button" className={styles.legendItem} onClick={() => setDexFilter('Other')}>
-                          <span>Other</span>
-                          <strong>{formatUsd(kpis.volume * 0.25)}</strong>
-                        </button>
-                      </div>
+                    <div className={styles.cardTitle}>Chain Breakdown (24H)</div>
+                    <div className={styles.venueLegend}>
+                      {chainBreakdown.length === 0 ? <p className="muted">No chain activity for this filter.</p> : null}
+                      {chainBreakdown.slice(0, 6).map((row) => (
+                        <div key={row.chainKey} className={styles.legendItem}>
+                          <span>{row.displayName}</span>
+                          <strong>
+                            {formatNumber(row.activeAgents)} active • {formatNumber(row.trades)} trades • {formatUsd(row.volumeUsd)}
+                          </strong>
+                        </div>
+                      ))}
                     </div>
                   </section>
 
@@ -641,7 +879,6 @@ function DashboardPage() {
                 {liveFeed.map((item) => {
                   const expanded = expandedEventId === item.event_id;
                   const txHash = getTxHash(item);
-                  const approxSize = getApproxTradeSize(item);
                   return (
                     <article
                       key={item.event_id}
@@ -663,13 +900,20 @@ function DashboardPage() {
                         <span className={styles.statusChip}>{item.event_type.replace('trade_', '')}</span>
                       </div>
                       <div className={styles.feedPair}>{describePair(item)}</div>
+                      <div className={styles.feedAmounts}>
+                        <span>
+                          In: {formatTradeLegAmount(resolveTradeAmount(item, 'in'))} {resolveTradeToken(item, 'in')}
+                        </span>
+                        <span>
+                          Out: {formatTradeLegAmount(resolveTradeAmount(item, 'out'))} {resolveTradeToken(item, 'out')}
+                        </span>
+                      </div>
                       <div className={styles.feedMeta}>
-                        <span>{approxSize > 0 ? formatUsd(approxSize) : 'size n/a'}</span>
                         <span>{getRelativeTime(item.created_at)}</span>
                       </div>
                       {expanded ? (
                         <div className={styles.feedExpanded}>
-                          <div>Route: {dexFilter === 'All' ? 'Uniswap > Sushi (estimated)' : `${dexFilter} route`}</div>
+                          <div>Chain: {item.chain_key}</div>
                           <div>Gas: 0.0018 ETH (estimated)</div>
                           <div>Price impact: 0.14% (estimated)</div>
                           {txHash ? (
@@ -758,21 +1002,6 @@ function DashboardPage() {
                     View All
                   </Link>
                 </section>
-
-                <section className={styles.card}>
-                  <div className={styles.cardTitle}>Recently Active</div>
-                  <div className={styles.recentList}>
-                    {recentlyActive.length === 0 ? <div className={styles.emptyHint}>No recent activity events.</div> : null}
-                    {recentlyActive.map((item) => (
-                      <Link key={item.event_id} className={styles.recentRow} href={`/agents/${item.agent_id}`}>
-                        <span>{item.agent_name}</span>
-                        <span>{describePair(item)}</span>
-                        <span>{getRelativeTime(item.created_at)}</span>
-                      </Link>
-                    ))}
-                  </div>
-                </section>
-
               </>
             ) : null}
           </div>

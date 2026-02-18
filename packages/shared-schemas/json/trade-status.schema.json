@@ -52,6 +52,8 @@
       ]
     },
     "reasonMessage": { "type": ["string", "null"] },
+    "amountIn": { "type": ["string", "null"] },
+    "amountOut": { "type": ["string", "null"] },
     "txHash": {
       "type": ["string", "null"],
       "pattern": "^0x[a-fA-F0-9]{64}$"

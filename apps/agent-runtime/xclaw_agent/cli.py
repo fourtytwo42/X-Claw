@@ -3914,7 +3914,12 @@ def cmd_trade_spot(args: argparse.Namespace) -> int:
             _post_trade_usage(chain, day_key, projected_spend_usd, 1)
         except Exception:
             pass
-        _post_trade_status(trade_id, "verifying", "filled", {"txHash": tx_hash})
+        _post_trade_status(
+            trade_id,
+            "verifying",
+            "filled",
+            {"txHash": tx_hash, "amountOut": _format_units(int(expected_out_int), token_out_decimals)},
+        )
         _remove_pending_spot_trade_flow(trade_id)
 
         def _parse_receipt_uint(field: str, payload: dict[str, Any]) -> int | None:
@@ -4529,7 +4534,12 @@ def cmd_trade_execute(args: argparse.Namespace) -> int:
             _post_trade_usage(args.chain, day_key, projected_spend_usd, 1)
         except Exception:
             pass
-        _post_trade_status(args.intent, "verifying", "filled", {"txHash": tx_hash})
+        _post_trade_status(
+            args.intent,
+            "verifying",
+            "filled",
+            {"txHash": tx_hash, "amountOut": str(trade.get("amountOut") or "") or None},
+        )
         report_result = {
             "ok": False,
             "skipped": True,

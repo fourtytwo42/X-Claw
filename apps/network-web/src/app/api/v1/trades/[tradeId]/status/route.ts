@@ -19,6 +19,8 @@ type TradeStatusRequest = {
   tradeId: string;
   fromStatus: string;
   toStatus: string;
+  amountIn?: string | null;
+  amountOut?: string | null;
   reasonCode?: string | null;
   reasonMessage?: string | null;
   txHash?: string | null;
@@ -87,14 +89,23 @@ export async function POST(
       const trade = await client.query<{
         agent_id: string;
         chain_key: string;
+        mode: string;
         status: string;
-      }>('select agent_id, chain_key, status from trades where trade_id = $1', [pathTradeId]);
+        amount_in: string | null;
+        amount_out: string | null;
+        tx_hash: string | null;
+      }>(
+        'select agent_id, chain_key, mode, status, amount_in, amount_out, tx_hash from trades where trade_id = $1',
+        [pathTradeId]
+      );
 
       if (trade.rowCount === 0) {
         return { ok: false as const, kind: 'missing_trade' as const };
       }
 
       const row = trade.rows[0];
+      const resolvedTxHash = body.txHash ?? row.tx_hash;
+      const resolvedAmountOut = body.amountOut ?? row.amount_out;
 
       if (row.agent_id !== auth.agentId) {
         return { ok: false as const, kind: 'auth_mismatch' as const };
@@ -124,6 +135,20 @@ export async function POST(
         };
       }
 
+      if (row.mode === 'real' && ['executing', 'verifying', 'filled'].includes(body.toStatus) && !resolvedTxHash) {
+        return {
+          ok: false as const,
+          kind: 'missing_tx_hash' as const
+        };
+      }
+
+      if (body.toStatus === 'filled' && !resolvedAmountOut) {
+        return {
+          ok: false as const,
+          kind: 'missing_amount_out' as const
+        };
+      }
+
       await client.query(
         `
         update trades
@@ -134,9 +159,11 @@ export async function POST(
           tx_hash = coalesce($4, tx_hash),
           mock_receipt_id = coalesce($5, mock_receipt_id),
           error_message = coalesce($6, error_message),
-          executed_at = case when $1::trade_status in ('filled', 'failed') then $7::timestamptz else executed_at end,
+          amount_in = coalesce($7, amount_in),
+          amount_out = coalesce($8, amount_out),
+          executed_at = case when $1::trade_status in ('filled', 'failed') then $9::timestamptz else executed_at end,
           updated_at = now()
-        where trade_id = $8
+        where trade_id = $10
         `,
         [
           body.toStatus,
@@ -145,6 +172,8 @@ export async function POST(
           body.txHash ?? null,
           body.mockReceiptId ?? null,
           body.errorMessage ?? null,
+          body.amountIn ?? null,
+          body.amountOut ?? null,
           body.at,
           pathTradeId
         ]
@@ -165,6 +194,8 @@ export async function POST(
             toStatus: body.toStatus,
             reasonCode: body.reasonCode ?? null,
             reasonMessage: body.reasonMessage ?? null,
+            amountIn: body.amountIn ?? null,
+            amountOut: body.amountOut ?? null,
             txHash: body.txHash ?? null,
             mockReceiptId: body.mockReceiptId ?? null
           }),
@@ -244,6 +275,30 @@ export async function POST(
             message: 'Trade status update rejected because fromStatus does not match current state.',
             actionHint: 'Refresh trade state and retry with the correct fromStatus.',
             details: { currentStatus: updateResult.currentStatus }
+          },
+          requestId
+        );
+      }
+
+      if (updateResult.kind === 'missing_tx_hash') {
+        return errorResponse(
+          400,
+          {
+            code: 'payload_invalid',
+            message: 'txHash is required for real-mode execution transitions.',
+            actionHint: 'Include txHash when transitioning to executing, verifying, or filled.'
+          },
+          requestId
+        );
+      }
+
+      if (updateResult.kind === 'missing_amount_out') {
+        return errorResponse(
+          400,
+          {
+            code: 'payload_invalid',
+            message: 'amountOut is required when marking a trade as filled.',
+            actionHint: 'Include amountOut in the status payload for filled transitions.'
           },
           requestId
         );
