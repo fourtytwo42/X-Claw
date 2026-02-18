@@ -168,6 +168,13 @@ def _last_delivery_is_telegram() -> bool:
     return best_channel == "telegram"
 
 
+def _env_truthy(name: str, default: bool = False) -> bool:
+    raw = os.environ.get(name, "").strip().lower()
+    if not raw:
+        return default
+    return raw in {"1", "true", "yes", "on"}
+
+
 def _normalize_non_terminal_approval(runtime_json: dict) -> Optional[dict]:
     code = str(runtime_json.get("code") or "").strip().lower()
     if code != "approval_required":
@@ -187,7 +194,9 @@ def _normalize_non_terminal_approval(runtime_json: dict) -> Optional[dict]:
         sanitized_details = dict(details)
         sanitized_details.pop("queuedMessage", None)
         sanitized_details["nextAction"] = "Approval is queued in X-Claw management. Wait for owner decision."
-        if not _last_delivery_is_telegram():
+        force_management = _env_truthy("XCLAW_TELEGRAM_APPROVALS_FORCE_MANAGEMENT", default=False)
+        should_include_management_link = force_management or not _last_delivery_is_telegram()
+        if should_include_management_link:
             owner_link = _fetch_owner_link_payload()
             if isinstance(owner_link, dict):
                 management_url = str(owner_link.get("managementUrl") or "").strip()
@@ -202,6 +211,11 @@ def _normalize_non_terminal_approval(runtime_json: dict) -> Optional[dict]:
         normalized["message"] = "Transfer queued for management approval."
         if str(sanitized_details.get("managementUrl") or "").strip():
             normalized["actionHint"] = "Share managementUrl with the owner and wait for approve/deny in X-Claw."
+        elif force_management:
+            normalized["actionHint"] = (
+                "Telegram inline approvals are disabled for this install context. "
+                "Use management link approval flow and wait for owner approve/deny in X-Claw."
+            )
         else:
             normalized["actionHint"] = "Acknowledge the queued transfer briefly and wait for owner approve/deny in X-Claw."
     elif "actionHint" not in normalized and runtime_json.get("actionHint"):

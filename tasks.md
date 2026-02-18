@@ -1,3 +1,30 @@
+# Hotfix Tasks: Capability-Gated Telegram Patch + Management-Link Fallback
+
+Active slice context: `Slice 87` remains in progress; this is an explicit owner-requested installer reliability hotfix.
+
+## 1) Scope lock
+- [x] Shell installer only (`/skill-install.sh`) for install-mode behavior split.
+- [x] No API/schema/migration changes.
+
+## 2) Implementation
+- [x] Installer runs setup patch-first; on permission-denied patch write failure it auto-retries with patch disabled.
+- [x] Installer persists `XCLAW_TELEGRAM_APPROVALS_FORCE_MANAGEMENT` (`1` degraded, `0` normal) in OpenClaw skill env.
+- [x] Installer emits explicit degraded-mode warning and sudo rerun command for restoring inline buttons.
+- [x] Skill wrapper uses forced-management flag to include management-link handoff for Telegram `approval_pending`.
+- [x] Skill prompt contracts + canonical docs/roadmap/tracker updated.
+
+## 3) Validation
+- [x] `python3 -m py_compile skills/xclaw-agent/scripts/xclaw_agent_skill.py`
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_x402_skill_wrapper.py -v`
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+
+---
+
 # Hotfix Tasks: Telegram Transfer Callback Pairing-Prompt Regression
 
 Active slice context: `Slice 87` remains in progress; this is an explicit operator-reported reliability hotfix.

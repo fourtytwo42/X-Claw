@@ -1,3 +1,37 @@
+# Hotfix Spec: Capability-Gated Telegram Patch + Management-Link Fallback
+
+## Goal
+Make shell installer resilient across root-owned and user-owned OpenClaw installs by:
+1. Attempting Telegram gateway patch normally when possible.
+2. Auto-degrading to non-patched mode on permission-denied patch writes.
+3. Switching Telegram `approval_pending` UX to management-link handoff when degraded.
+
+## Non-goals
+1. No PowerShell parity in this change.
+2. No OpenClaw gateway patch semantics changes.
+3. No API/schema/migration changes.
+
+## Locked scope
+1. `apps/network-web/src/app/skill-install.sh/route.ts`
+2. `skills/xclaw-agent/scripts/xclaw_agent_skill.py`
+3. `skills/xclaw-agent/SKILL.md`
+4. `skills/xclaw-agent/references/commands.md`
+5. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+6. `docs/XCLAW_BUILD_ROADMAP.md`
+7. `docs/XCLAW_SLICE_TRACKER.md`
+
+## Acceptance checks
+- `python3 -m py_compile skills/xclaw-agent/scripts/xclaw_agent_skill.py`
+- `python3 -m unittest apps/agent-runtime/tests/test_x402_skill_wrapper.py -v`
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `pm2 restart all`
+
+---
+
 # Hotfix Spec: Telegram Transfer Callback Pairing-Prompt Regression
 
 ## Goal

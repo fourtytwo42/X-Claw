@@ -1677,6 +1677,7 @@ DoD:
 - [x] transfer Telegram approval prompts are tracked and cleared on approve/deny convergence.
 - [x] owner-link direct-send is disabled for Telegram-active channel (button-first approval UX).
 - [x] transfer Telegram callback path avoids synthetic chat-pipeline reinjection that can trigger pairing/access prompts in the same chat; deterministic transfer result message remains.
+- [x] shell installer capability-gates Telegram gateway patching; permission-denied patch paths auto-degrade to management-link Telegram fallback mode with explicit sudo rerun guidance for inline-button support.
 
 ## Slice 88: Approvals Center Full UX Flush (Batch + Risk)
 Status: [~]

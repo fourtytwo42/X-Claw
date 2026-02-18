@@ -1,5 +1,26 @@
 # X-Claw Context Pack
 
+## Hotfix Context: Capability-Gated Telegram Patch + Management-Link Fallback
+
+Issue mapping: `#35` (approvals/install reliability track)
+
+### Objective + scope lock
+- Objective: keep installer successful across root-owned and user-owned OpenClaw installs by capability-gating gateway patching and enabling deterministic Telegram management-link fallback when patching is unavailable.
+- Scope guard: shell installer only (`/skill-install.sh`) with skill-wrapper fallback toggle and doc sync.
+
+### Expected touched files
+- `apps/network-web/src/app/skill-install.sh/route.ts`
+- `skills/xclaw-agent/scripts/xclaw_agent_skill.py`
+- `skills/xclaw-agent/SKILL.md`
+- `skills/xclaw-agent/references/commands.md`
+- `docs/XCLAW_SOURCE_OF_TRUTH.md`
+- `docs/XCLAW_BUILD_ROADMAP.md`
+- `docs/XCLAW_SLICE_TRACKER.md`
+- `docs/CONTEXT_PACK.md`
+- `spec.md`
+- `tasks.md`
+- `acceptance.md`
+
 ## Slice 85 Context: EVM-Wide Portability Foundation (Chain-Agnostic Core, x402 Unchanged)
 
 Issue mapping: `#35`

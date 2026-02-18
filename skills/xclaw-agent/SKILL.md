@@ -42,6 +42,7 @@ Common optional:
 
 - Telegram button rendering is handled by runtime/gateway automation.
 - Do not construct manual Telegram `[[buttons: ...]]` directives.
+- If `XCLAW_TELEGRAM_APPROVALS_FORCE_MANAGEMENT=1`, treat Telegram approvals like non-Telegram management flow (no inline button expectation).
 - For `approval_pending`:
   - transfer (`xfr_...`): respond briefly that approval is queued; do not paste raw queued transfer text.
   - trade/policy: respond with concise pending status and next step.

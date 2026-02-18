@@ -1,3 +1,33 @@
+# Hotfix Acceptance Evidence: Capability-Gated Telegram Patch + Management-Link Fallback
+
+Date (UTC): 2026-02-18
+Active slice context: `Slice 87` in progress (owner-requested reliability hotfix)
+
+## Objective + Scope Lock
+- Objective: make shell installer robust across user/root OpenClaw installs by capability-gating Telegram patching and auto-degrading to management-link mode when privileged patch writes are unavailable.
+- Scope: `skill-install.sh` + skill wrapper fallback behavior + prompt/docs sync.
+- Out of scope: PowerShell installer parity.
+
+## Behavior Checks
+- [x] Permission-denied patch write path auto-degrades and continues install with patch disabled.
+  - Evidence: `apps/network-web/src/app/skill-install.sh/route.ts` now retries setup with `XCLAW_OPENCLAW_AUTO_PATCH=0` and `XCLAW_OPENCLAW_PATCH_STRICT=0` after matching `write_failed:.*permission denied`.
+- [x] Installer persists `XCLAW_TELEGRAM_APPROVALS_FORCE_MANAGEMENT=1` in degraded mode and `0` in normal mode.
+  - Evidence: installer sets `xclaw_telegram_force_management` and writes `skills.entries.xclaw-agent.env.XCLAW_TELEGRAM_APPROVALS_FORCE_MANAGEMENT`.
+- [x] Telegram `approval_pending` includes management-link handoff when forced-management mode is enabled.
+  - Evidence: `skills/xclaw-agent/scripts/xclaw_agent_skill.py` now allows owner-link fetch when `XCLAW_TELEGRAM_APPROVALS_FORCE_MANAGEMENT` is truthy.
+
+## Required Validation Gates
+- [x] `python3 -m py_compile skills/xclaw-agent/scripts/xclaw_agent_skill.py` -> PASS
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_x402_skill_wrapper.py -v` -> PASS (`Ran 22 tests`, `OK`)
+- [x] `npm run db:parity` -> PASS (`ok: true`)
+- [x] `npm run seed:reset` -> PASS (`ok: true`)
+- [x] `npm run seed:load` -> PASS (`ok: true`)
+- [x] `npm run seed:verify` -> PASS (`ok: true`)
+- [x] `npm run build` -> PASS (Next.js build succeeded)
+- [x] `pm2 restart all` -> PASS (`xclaw-web` online)
+
+---
+
 # Hotfix Acceptance Evidence: Telegram Transfer Callback Pairing-Prompt Regression
 
 Date (UTC): 2026-02-18

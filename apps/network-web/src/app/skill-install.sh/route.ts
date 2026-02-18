@@ -282,6 +282,7 @@ fi
 ensure_python_runtime_deps "$XCLAW_PYTHON_BIN"
 export XCLAW_AGENT_PYTHON_BIN="$XCLAW_PYTHON_BIN"
 echo "[xclaw] running setup_agent_skill.py"
+xclaw_telegram_force_management=0
 set +e
 setup_output="$("$XCLAW_PYTHON_BIN" skills/xclaw-agent/scripts/setup_agent_skill.py 2>&1)"
 setup_status=$?
@@ -292,11 +293,29 @@ fi
 if [ "$setup_status" -ne 0 ]; then
   if printf '%s' "$setup_output" | grep -qi 'write_failed:.*permission denied'; then
     printf '\n\\033[1;37;41m[xclaw] INSTALLER ACTION REQUIRED\\033[0m\n'
-    printf '\\033[1;31m[xclaw] OpenClaw is installed in a root-owned location.\\033[0m\n'
-    printf '\\033[1;31m[xclaw] Re-run installer with sudo:\\033[0m\n'
+    printf '\\033[1;31m[xclaw] Gateway patch write is not available in current install context.\\033[0m\n'
+    printf '\\033[1;33m[xclaw] Continuing in fallback mode: Telegram approvals will use management-link flow (no inline buttons).\\033[0m\n'
+    printf '\\033[1;31m[xclaw] For full Telegram inline button support, rerun with sudo:\\033[0m\n'
     printf '\\033[1;33m  curl -fsSL https://xclaw.trade/skill-install.sh | sudo bash\\033[0m\n\n'
+    echo "[xclaw] retrying setup with gateway patch disabled"
+    set +e
+    setup_output="$(
+      XCLAW_OPENCLAW_AUTO_PATCH=0 \
+      XCLAW_OPENCLAW_PATCH_STRICT=0 \
+      "$XCLAW_PYTHON_BIN" skills/xclaw-agent/scripts/setup_agent_skill.py 2>&1
+    )"
+    setup_status=$?
+    set -e
+    if [ -n "$setup_output" ]; then
+      printf '%s\n' "$setup_output"
+    fi
+    if [ "$setup_status" -eq 0 ]; then
+      xclaw_telegram_force_management=1
+    fi
   fi
+  if [ "$setup_status" -ne 0 ]; then
   exit "$setup_status"
+  fi
 fi
 
 resolve_xclaw_agent_bin() {
@@ -350,6 +369,7 @@ echo "[xclaw] configuring OpenClaw skill env defaults"
 openclaw config set skills.entries.xclaw-agent.env.XCLAW_API_BASE_URL "$XCLAW_API_BASE_URL" || true
 openclaw config set skills.entries.xclaw-agent.env.XCLAW_DEFAULT_CHAIN "$XCLAW_DEFAULT_CHAIN" || true
 openclaw config set skills.entries.xclaw-agent.env.XCLAW_AGENT_PYTHON_BIN "$XCLAW_AGENT_PYTHON_BIN" || true
+openclaw config set skills.entries.xclaw-agent.env.XCLAW_TELEGRAM_APPROVALS_FORCE_MANAGEMENT "$xclaw_telegram_force_management" || true
 if [ -n "\${XCLAW_AGENT_ID:-}" ]; then
   openclaw config set skills.entries.xclaw-agent.env.XCLAW_AGENT_ID "$XCLAW_AGENT_ID" || true
 fi
@@ -739,6 +759,14 @@ fi
 if [ "$(id -u)" -eq 0 ] && [ -n "\${SUDO_USER:-}" ] && [ "$SUDO_USER" != "root" ]; then
   echo "[xclaw] fixing ownership for user context artifacts"
   chown -R "$XCLAW_INSTALL_TARGET_USER":"$XCLAW_INSTALL_TARGET_USER" "$HOME/.openclaw" "$HOME/.xclaw-agent" "$HOME/.foundry" "$XCLAW_WORKDIR" 2>/dev/null || true
+fi
+
+if [ "$xclaw_telegram_force_management" = "1" ]; then
+  printf '\n\\033[1;37;41m[xclaw] TELEGRAM FALLBACK MODE ENABLED\\033[0m\n'
+  printf '\\033[1;33m[xclaw] Inline Approve/Deny buttons are disabled in this install context.\\033[0m\n'
+  printf '\\033[1;33m[xclaw] Agent will route Telegram approvals through X-Claw management links.\\033[0m\n'
+  printf '\\033[1;31m[xclaw] For full Telegram inline button functionality, rerun:\\033[0m\n'
+  printf '\\033[1;33m  curl -fsSL https://xclaw.trade/skill-install.sh | sudo bash\\033[0m\n\n'
 fi
 
 cat <<'NEXT_STEPS'
