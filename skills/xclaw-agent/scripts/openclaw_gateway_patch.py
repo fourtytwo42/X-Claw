@@ -50,7 +50,7 @@ QUEUED_BUTTONS_MARKER_V2 = "xclaw: telegram queued approval buttons v2"
 QUEUED_BUTTONS_MARKER_V3 = "xclaw: telegram queued approval buttons v3"
 LEGACY_DM_SENTINEL = 'Allow in DMs even when inlineButtonsScope is "allowlist", gated by chatId == senderId.'
 # Bump when patch semantics change so we invalidate the cached "already patched" fast-path.
-STATE_SCHEMA_VERSION = 44
+STATE_SCHEMA_VERSION = 45
 STATE_DIR = Path.home() / ".openclaw" / "xclaw"
 STATE_FILE = STATE_DIR / "openclaw_patch_state.json"
 LOCK_FILE = STATE_DIR / "openclaw_patch.lock"
@@ -385,7 +385,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
             text6,
         )
         text8, n7 = re.subn(
-            r'// Transfer callbacks already emit deterministic result text above\.\s*// Do not route synthetic transfer-result messages back through processMessage here,\s*// because channel access middleware can emit pairing prompts into the same chat\.\s*try \{ logger\.info\(\{ subjectId, chainKey, chatId \}, "xclaw: telegram transfer result delivered \(no synthetic route\)"\); \} catch \{\}\s*return;',
+            r'try \{ logger\.info\(\{ subjectId, chainKey, chatId \}, "xclaw: telegram transfer result delivered \(no synthetic route\)"\); \} catch \{\}\s*return;',
             'try { const transferStatus = String(body?.status ?? (body?.ok ? "filled" : "failed")).toLowerCase(); const isRejected = transferStatus === "rejected"; const isFilled = transferStatus === "filled"; const decisionWord = isFilled ? "FILLED" : (isRejected ? "REJECTED" : "FAILED"); const instruction = isFilled ? "Reply to the user confirming the transfer succeeded with tx details." : (isRejected ? "Reply to the user confirming the transfer was denied and no transaction was executed." : "Reply to the user confirming the transfer failed and provide next steps."); const syntheticText = `[X-CLAW TRANSFER RESULT]\\nDecision: ${decisionWord}\\nApproval: ${subjectId}\\nChain: ${chainKey}\\nTxHash: ${txHash || "n/a"}\\nAmount: ${amountLine}\\nTo: ${toAddress}\\nSource: telegram_callback_transfer\\nInstruction: ${instruction}`; const storeAllowFrom2 = await readChannelAllowFromStore("telegram").catch(() => []); const getFile2 = typeof ctx.getFile === "function" ? ctx.getFile.bind(ctx) : async () => ({}); const syntheticMessage2 = { ...callbackMessage, from: callback.from, text: syntheticText, caption: void 0, caption_entities: void 0, entities: void 0, date: Math.floor(Date.now() / 1000) }; await processMessage({ message: syntheticMessage2, me: ctx.me, getFile: getFile2 }, [], storeAllowFrom2, { messageIdOverride: `xclaw-transfer-result-${callback.id}` }); } catch {} try { logger.info({ subjectId, chainKey, chatId, ok: !!body?.ok }, "xclaw: telegram transfer result routed to agent"); } catch {} return;',
             text7,
         )
