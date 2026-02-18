@@ -544,10 +544,10 @@ export default function ExplorePage() {
     setPage(1);
   }
 
-  function renderCard(item: ExploreAgent) {
+  function renderCard(item: ExploreAgent, index: number) {
     const owner = ownerContext.phase === 'ready';
     const isTracked = owner ? trackedAgentIds.includes(item.agentId) : favorites.includes(item.agentId);
-    const avatarPalette = getAgentAvatarPalette(item.agentId);
+    const avatarPalette = getAgentAvatarPalette(item.agentId, index * 137);
     const avatarInitial = getAgentInitial(item.agentName, item.agentId);
 
     return (
@@ -803,7 +803,7 @@ export default function ExplorePage() {
           </div>
 
           {scopedItems.length === 0 ? <p className={styles.empty}>No agents match current filters.</p> : null}
-          <div className={styles.grid}>{scopedItems.map((item) => renderCard(item))}</div>
+          <div className={styles.grid}>{scopedItems.map((item, index) => renderCard(item, index))}</div>
 
           {section === 'all' ? (
             <div className={styles.pagination}>
