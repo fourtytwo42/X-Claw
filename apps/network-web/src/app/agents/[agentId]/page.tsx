@@ -2153,221 +2153,6 @@ export default function AgentPublicProfilePage() {
             ) : null}
           </article>
 
-            <article id="approval-history" className={`${styles.card} ${styles.walletCard}`}>
-            <div className={`${styles.cardHeader} ${styles.walletCardHeader}`}>
-              <h2>Approvals</h2>
-              <div className={styles.inlineActions}>
-                <span className={styles.muted}>Requests waiting for a decision and past decisions</span>
-              </div>
-            </div>
-            <div className={styles.rangeButtons}>
-              {([
-                ['all', 'All'],
-                ['pending', 'Pending'],
-                ['approved', 'Approved'],
-                ['rejected', 'Rejected/Denied']
-              ] as const).map(([key, label]) => (
-                <button
-                  key={key}
-                  type="button"
-                  className={approvalStatusFilter === key ? styles.rangeActive : ''}
-                  onClick={() => setApprovalStatusFilter(key)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            {!isOwner ? <p className={styles.muted}>View-only mode: only the owner can approve or deny.</p> : null}
-            {filteredApprovalHistory.length === 0 ? <p className={styles.muted}>No approvals in this filter.</p> : null}
-            {visibleApprovalHistory.map((row) => (
-                  <div key={row.id} className={styles.queueRow}>
-                    <div>
-                      <div className={styles.listTitle}>{row.title}</div>
-                      <div className={styles.muted}>{row.subtitle}</div>
-                      <div className={styles.muted}>{formatUtc(row.at)} UTC</div>
-                    </div>
-                    <div className={styles.queueActions}>
-                      <span className={styles.statusChip}>{displayStatusLabel(row.status)}</span>
-                      {isOwner && (row.status === 'pending' || row.status === 'approval_pending') && row.type === 'trade' ? (
-                        <>
-                          <input
-                            value={approvalRejectReasons[row.raw.trade_id] ?? ''}
-                            onChange={(event) =>
-                              setApprovalRejectReasons((current) => ({
-                                ...current,
-                                [row.raw.trade_id]: event.target.value
-                              }))
-                            }
-                            placeholder="Reason (optional)"
-                          />
-                          <button
-                            type="button"
-                            onClick={() =>
-                              void runManagementAction(
-                                () =>
-                                  managementPost('/api/v1/management/approvals/decision', {
-                                    agentId,
-                                    tradeId: row.raw.trade_id,
-                                    decision: 'approve'
-                                  }).then(() => Promise.resolve()),
-                                'Trade approved.'
-                              )
-                            }
-                          >
-                            Approve
-                          </button>
-                          <button
-                            type="button"
-                            className={styles.dangerButton}
-                            onClick={() =>
-                              void runManagementAction(
-                                () =>
-                                  managementPost('/api/v1/management/approvals/decision', {
-                                    agentId,
-                                    tradeId: row.raw.trade_id,
-                                    decision: 'reject',
-                                    reasonCode: 'approval_rejected',
-                                    reasonMessage: (approvalRejectReasons[row.raw.trade_id] ?? '').trim() || 'Rejected by owner.'
-                                  }).then(() => Promise.resolve()),
-                                'Trade rejected.'
-                              )
-                            }
-                          >
-                            Reject
-                          </button>
-                        </>
-                      ) : null}
-                      {isOwner && (row.status === 'pending' || row.status === 'approval_pending') && row.type === 'policy' ? (
-                        <>
-                          <input
-                            value={approvalRejectReasons[row.raw.request_id] ?? ''}
-                            onChange={(event) =>
-                              setApprovalRejectReasons((current) => ({
-                                ...current,
-                                [row.raw.request_id]: event.target.value
-                              }))
-                            }
-                            placeholder="Reason (optional)"
-                          />
-                          <button
-                            type="button"
-                            onClick={() =>
-                              void runManagementAction(
-                                () =>
-                                  managementPost('/api/v1/management/policy-approvals/decision', {
-                                    agentId,
-                                    policyApprovalId: row.raw.request_id,
-                                    decision: 'approve'
-                                  }).then(() => Promise.resolve()),
-                                'Policy request approved.'
-                              )
-                            }
-                          >
-                            Approve
-                          </button>
-                          <button
-                            type="button"
-                            className={styles.dangerButton}
-                            onClick={() =>
-                              void runManagementAction(
-                                () =>
-                                  managementPost('/api/v1/management/policy-approvals/decision', {
-                                    agentId,
-                                    policyApprovalId: row.raw.request_id,
-                                    decision: 'reject',
-                                    reasonMessage: (approvalRejectReasons[row.raw.request_id] ?? '').trim() || 'Rejected by owner.'
-                                  }).then(() => Promise.resolve()),
-                                'Policy request denied.'
-                              )
-                            }
-                          >
-                            Deny
-                          </button>
-                        </>
-                      ) : null}
-                      {isOwner && (row.status === 'pending' || row.status === 'approval_pending') && row.type === 'transfer' ? (
-                        <>
-                          <input
-                            value={approvalRejectReasons[row.raw.approval_id] ?? ''}
-                            onChange={(event) =>
-                              setApprovalRejectReasons((current) => ({
-                                ...current,
-                                [row.raw.approval_id]: event.target.value
-                              }))
-                            }
-                            placeholder="Reason (optional)"
-                          />
-                          <button
-                            type="button"
-                            onClick={() =>
-                              void runManagementAction(
-                                () =>
-                                  managementPost('/api/v1/management/transfer-approvals/decision', {
-                                    agentId,
-                                    approvalId: row.raw.approval_id,
-                                    decision: 'approve',
-                                    chainKey: row.raw.chain_key
-                                  }).then(() => Promise.resolve()),
-                                'Transfer approved.'
-                              )
-                            }
-                          >
-                            Approve
-                          </button>
-                          <button
-                            type="button"
-                            className={styles.dangerButton}
-                            onClick={() =>
-                              void runManagementAction(
-                                () =>
-                                  managementPost('/api/v1/management/transfer-approvals/decision', {
-                                    agentId,
-                                    approvalId: row.raw.approval_id,
-                                    decision: 'deny',
-                                    chainKey: row.raw.chain_key,
-                                    reasonMessage: (approvalRejectReasons[row.raw.approval_id] ?? '').trim() || 'Rejected by owner.'
-                                  }).then(() => Promise.resolve()),
-                                'Transfer denied.'
-                              )
-                            }
-                          >
-                            Deny
-                          </button>
-                        </>
-                      ) : null}
-                    </div>
-                  </div>
-                ))}
-            {filteredApprovalHistory.length > 3 ? (
-              <div className={styles.paginationRow}>
-                <button type="button" onClick={() => setApprovalHistoryExpanded((current) => !current)}>
-                  {approvalHistoryExpanded ? 'Show less' : 'Show more'}
-                </button>
-                {approvalHistoryExpanded && filteredApprovalHistory.length > 10 ? (
-                  <div className={styles.paginationControls}>
-                    <button
-                      type="button"
-                      onClick={() => setApprovalHistoryPage((current) => Math.max(1, current - 1))}
-                      disabled={normalizedApprovalHistoryPage <= 1}
-                    >
-                      Prev
-                    </button>
-                    <span className={styles.muted}>
-                      Page {normalizedApprovalHistoryPage} / {approvalHistoryTotalPages}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setApprovalHistoryPage((current) => Math.min(approvalHistoryTotalPages, current + 1))}
-                      disabled={normalizedApprovalHistoryPage >= approvalHistoryTotalPages}
-                    >
-                      Next
-                    </button>
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-          </article>
-
             <article className={`${styles.card} ${styles.walletCard}`}>
               <div className={`${styles.cardHeader} ${styles.walletCardHeader}`}>
                 <h3>Management Audit Log</h3>
@@ -2421,6 +2206,221 @@ export default function AgentPublicProfilePage() {
           </div>
 
           <aside className={styles.sideColumn}>
+            <article id="approval-history" className={`${styles.card} ${styles.walletCard}`}>
+              <div className={`${styles.cardHeader} ${styles.walletCardHeader}`}>
+                <h2>Approvals</h2>
+                <div className={styles.inlineActions}>
+                  <span className={styles.muted}>Requests waiting for a decision and past decisions</span>
+                </div>
+              </div>
+              <div className={styles.rangeButtons}>
+                {([
+                  ['all', 'All'],
+                  ['pending', 'Pending'],
+                  ['approved', 'Approved'],
+                  ['rejected', 'Rejected/Denied']
+                ] as const).map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    className={approvalStatusFilter === key ? styles.rangeActive : ''}
+                    onClick={() => setApprovalStatusFilter(key)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {!isOwner ? <p className={styles.muted}>View-only mode: only the owner can approve or deny.</p> : null}
+              {filteredApprovalHistory.length === 0 ? <p className={styles.muted}>No approvals in this filter.</p> : null}
+              {visibleApprovalHistory.map((row) => (
+                <div key={row.id} className={styles.queueRow}>
+                  <div>
+                    <div className={styles.listTitle}>{row.title}</div>
+                    <div className={styles.muted}>{row.subtitle}</div>
+                    <div className={styles.muted}>{formatUtc(row.at)} UTC</div>
+                  </div>
+                  <div className={styles.queueActions}>
+                    <span className={styles.statusChip}>{displayStatusLabel(row.status)}</span>
+                    {isOwner && (row.status === 'pending' || row.status === 'approval_pending') && row.type === 'trade' ? (
+                      <>
+                        <input
+                          value={approvalRejectReasons[row.raw.trade_id] ?? ''}
+                          onChange={(event) =>
+                            setApprovalRejectReasons((current) => ({
+                              ...current,
+                              [row.raw.trade_id]: event.target.value
+                            }))
+                          }
+                          placeholder="Reason (optional)"
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void runManagementAction(
+                              () =>
+                                managementPost('/api/v1/management/approvals/decision', {
+                                  agentId,
+                                  tradeId: row.raw.trade_id,
+                                  decision: 'approve'
+                                }).then(() => Promise.resolve()),
+                              'Trade approved.'
+                            )
+                          }
+                        >
+                          Approve
+                        </button>
+                        <button
+                          type="button"
+                          className={styles.dangerButton}
+                          onClick={() =>
+                            void runManagementAction(
+                              () =>
+                                managementPost('/api/v1/management/approvals/decision', {
+                                  agentId,
+                                  tradeId: row.raw.trade_id,
+                                  decision: 'reject',
+                                  reasonCode: 'approval_rejected',
+                                  reasonMessage: (approvalRejectReasons[row.raw.trade_id] ?? '').trim() || 'Rejected by owner.'
+                                }).then(() => Promise.resolve()),
+                              'Trade rejected.'
+                            )
+                          }
+                        >
+                          Reject
+                        </button>
+                      </>
+                    ) : null}
+                    {isOwner && (row.status === 'pending' || row.status === 'approval_pending') && row.type === 'policy' ? (
+                      <>
+                        <input
+                          value={approvalRejectReasons[row.raw.request_id] ?? ''}
+                          onChange={(event) =>
+                            setApprovalRejectReasons((current) => ({
+                              ...current,
+                              [row.raw.request_id]: event.target.value
+                            }))
+                          }
+                          placeholder="Reason (optional)"
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void runManagementAction(
+                              () =>
+                                managementPost('/api/v1/management/policy-approvals/decision', {
+                                  agentId,
+                                  policyApprovalId: row.raw.request_id,
+                                  decision: 'approve'
+                                }).then(() => Promise.resolve()),
+                              'Policy request approved.'
+                            )
+                          }
+                        >
+                          Approve
+                        </button>
+                        <button
+                          type="button"
+                          className={styles.dangerButton}
+                          onClick={() =>
+                            void runManagementAction(
+                              () =>
+                                managementPost('/api/v1/management/policy-approvals/decision', {
+                                  agentId,
+                                  policyApprovalId: row.raw.request_id,
+                                  decision: 'reject',
+                                  reasonMessage: (approvalRejectReasons[row.raw.request_id] ?? '').trim() || 'Rejected by owner.'
+                                }).then(() => Promise.resolve()),
+                              'Policy request denied.'
+                            )
+                          }
+                        >
+                          Deny
+                        </button>
+                      </>
+                    ) : null}
+                    {isOwner && (row.status === 'pending' || row.status === 'approval_pending') && row.type === 'transfer' ? (
+                      <>
+                        <input
+                          value={approvalRejectReasons[row.raw.approval_id] ?? ''}
+                          onChange={(event) =>
+                            setApprovalRejectReasons((current) => ({
+                              ...current,
+                              [row.raw.approval_id]: event.target.value
+                            }))
+                          }
+                          placeholder="Reason (optional)"
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void runManagementAction(
+                              () =>
+                                managementPost('/api/v1/management/transfer-approvals/decision', {
+                                  agentId,
+                                  approvalId: row.raw.approval_id,
+                                  decision: 'approve',
+                                  chainKey: row.raw.chain_key
+                                }).then(() => Promise.resolve()),
+                              'Transfer approved.'
+                            )
+                          }
+                        >
+                          Approve
+                        </button>
+                        <button
+                          type="button"
+                          className={styles.dangerButton}
+                          onClick={() =>
+                            void runManagementAction(
+                              () =>
+                                managementPost('/api/v1/management/transfer-approvals/decision', {
+                                  agentId,
+                                  approvalId: row.raw.approval_id,
+                                  decision: 'deny',
+                                  chainKey: row.raw.chain_key,
+                                  reasonMessage: (approvalRejectReasons[row.raw.approval_id] ?? '').trim() || 'Rejected by owner.'
+                                }).then(() => Promise.resolve()),
+                              'Transfer denied.'
+                            )
+                          }
+                        >
+                          Deny
+                        </button>
+                      </>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+              {filteredApprovalHistory.length > 3 ? (
+                <div className={styles.paginationRow}>
+                  <button type="button" onClick={() => setApprovalHistoryExpanded((current) => !current)}>
+                    {approvalHistoryExpanded ? 'Show less' : 'Show more'}
+                  </button>
+                  {approvalHistoryExpanded && filteredApprovalHistory.length > 10 ? (
+                    <div className={styles.paginationControls}>
+                      <button
+                        type="button"
+                        onClick={() => setApprovalHistoryPage((current) => Math.max(1, current - 1))}
+                        disabled={normalizedApprovalHistoryPage <= 1}
+                      >
+                        Prev
+                      </button>
+                      <span className={styles.muted}>
+                        Page {normalizedApprovalHistoryPage} / {approvalHistoryTotalPages}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setApprovalHistoryPage((current) => Math.min(approvalHistoryTotalPages, current + 1))}
+                        disabled={normalizedApprovalHistoryPage >= approvalHistoryTotalPages}
+                      >
+                        Next
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+            </article>
+
             <article className={`${styles.card} ${styles.walletCard}`}>
               <div className={`${styles.cardHeader} ${styles.walletCardHeader}`}>
                 <h3>x402 Receive Requests</h3>
