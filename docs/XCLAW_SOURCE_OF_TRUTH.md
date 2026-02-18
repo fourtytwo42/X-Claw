@@ -2669,7 +2669,7 @@ Limitations / notes:
    - For proposed policy approvals, the agent must echo the `queuedMessage` verbatim to the user so Telegram buttons can attach reliably.
    - Approval ID provenance rule: the agent must source `policyApprovalId`/`Approval ID` from the current runtime/API response for that request; it must never replay/fabricate a `ppr_...` from older transcript or memory context.
    - User-facing response contract: in normal chat responses, the agent must not expose internal tool-call/CLI command strings (for example `python3 ... xclaw_agent_skill.py ...`) unless the user explicitly asks for the exact command syntax.
-   - Wrapper reliability contract: `approval_required` responses with `details.status=approval_pending` are non-terminal orchestration outcomes and must not be surfaced as command-exec failures to the user.
+   - Wrapper reliability contract: `approval_required` responses with `details.status=approval_pending` or `details.lastStatus=approval_pending` are non-terminal orchestration outcomes and must not be surfaced as command-exec failures to the user.
 8. Canonical endpoints:
    - `POST /api/v1/agent/policy-approvals/proposed` (agent-auth) creates a pending request.
      - Runtime idempotency for propose requests must be per-attempt (nonce-suffixed key), not a long-lived deterministic key, to avoid replaying stale terminal approvals from idempotency cache.

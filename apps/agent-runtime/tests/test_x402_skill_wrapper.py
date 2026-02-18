@@ -189,6 +189,28 @@ class X402SkillWrapperTests(unittest.TestCase):
         self.assertNotIn("queuedMessage", emitted.get("details", {}))
         self.assertIn("management approval", str(emitted.get("message", "")).lower())
 
+    def test_run_agent_normalizes_trade_pending_with_last_status(self) -> None:
+        pending_payload = {
+            "ok": False,
+            "code": "approval_required",
+            "message": "Trade is waiting for management approval.",
+            "details": {"tradeId": "trd_abc", "chain": "base_sepolia", "lastStatus": "approval_pending"},
+        }
+        child = mock.Mock()
+        child.returncode = 1
+        child.communicate.return_value = (json.dumps(pending_payload), "")
+        with mock.patch.object(skill, "_resolve_agent_binary", return_value="/usr/bin/xclaw-agent"):
+            with mock.patch.object(skill, "_maybe_patch_openclaw_gateway"):
+                with mock.patch.object(skill.subprocess, "Popen", return_value=child):
+                    buf = io.StringIO()
+                    with redirect_stdout(buf):
+                        code = skill._run_agent(["trade", "spot"])
+        self.assertEqual(code, 0)
+        emitted = json.loads(buf.getvalue().strip())
+        self.assertTrue(emitted.get("ok"))
+        self.assertEqual(emitted.get("code"), "approval_pending")
+        self.assertEqual(emitted.get("details", {}).get("tradeId"), "trd_abc")
+
     def test_run_agent_sanitizes_transfer_queued_message(self) -> None:
         pending_payload = {
             "ok": False,

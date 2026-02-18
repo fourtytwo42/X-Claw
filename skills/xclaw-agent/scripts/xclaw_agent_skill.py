@@ -141,7 +141,7 @@ def _normalize_non_terminal_approval(runtime_json: dict) -> Optional[dict]:
     details = runtime_json.get("details")
     if not isinstance(details, dict):
         return None
-    status = str(details.get("status") or "").strip().lower()
+    status = str(details.get("status") or details.get("lastStatus") or "").strip().lower()
     if status != "approval_pending":
         return None
     normalized = dict(runtime_json)
