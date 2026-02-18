@@ -1224,6 +1224,7 @@ Delegated runtime CLI commands that must exist:
 - `xclaw-agent wallet health --chain <chain_key> --json`
 - `xclaw-agent wallet sign-challenge --message <message> --chain <chain_key> --json`
 - `xclaw-agent wallet send --to <address> --amount-wei <amount_wei> --chain <chain_key> --json`
+- `xclaw-agent wallet send-token --token <token_or_symbol> --to <address> --amount-wei <amount_wei> --chain <chain_key> --json`
 - `xclaw-agent wallet balance --chain <chain_key> --json`
 - `xclaw-agent wallet token-balance --token <token_address> --chain <chain_key> --json`
 - `xclaw-agent x402 receive-request --network <network> --facilitator <facilitator> --amount-atomic <amount_atomic> [--asset-kind <native|erc20>] [--asset-symbol <symbol>] [--asset-address <0x...>] [--resource-description <text>] --json`
@@ -2810,6 +2811,7 @@ Limitations / notes:
    - `transferApprovalMode`: `auto | per_transfer`,
    - `allowedTransferTokens`: token-address list for ERC-20 auto-approval when mode is `per_transfer`,
    - `nativeTransferPreapproved`: boolean for native sends when mode is `per_transfer`.
+   - `wallet-send-token` accepts canonical token symbol or token address; runtime resolves to canonical token address before policy evaluation/execution.
 5. Single-trigger behavior:
    - one user transfer intent must be sufficient,
    - if approval is required, queued message includes:

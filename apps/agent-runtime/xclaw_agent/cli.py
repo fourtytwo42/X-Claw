@@ -6475,6 +6475,14 @@ def cmd_wallet_sign_challenge(args: argparse.Namespace) -> int:
         return fail("unsafe_permissions", str(exc), "Restrict permissions to owner-only (0700/0600) and retry.", {"chain": chain}, exit_code=1)
     except WalletStoreError as exc:
         msg = str(exc)
+        if "Unsupported token symbol" in msg:
+            return fail(
+                "invalid_input",
+                msg,
+                "Use a canonical token symbol (for example USDC) or 0x token address.",
+                {"chain": chain, "token": str(args.token or "")},
+                exit_code=2,
+            )
         if "Missing dependency: cast" in msg:
             return fail(
                 "missing_dependency",
@@ -6603,18 +6611,18 @@ def cmd_wallet_send_token(args: argparse.Namespace) -> int:
         return chk
     if not is_hex_address(args.to):
         return fail("invalid_input", "Invalid recipient address format.", "Use 0x-prefixed 20-byte hex address.", {"to": args.to}, exit_code=2)
-    if not is_hex_address(args.token):
-        return fail("invalid_input", "Invalid token address format.", "Use 0x-prefixed 20-byte hex address.", {"token": args.token}, exit_code=2)
     if not re.fullmatch(r"[0-9]+", args.amount_wei):
         return fail("invalid_input", "Invalid amount-wei format.", "Use base-unit integer string.", {"amountWei": args.amount_wei}, exit_code=2)
 
     chain = args.chain
     amount_wei = int(args.amount_wei)
     try:
+        token_input = str(args.token or "").strip()
+        token_address = _resolve_token_address(chain, token_input)
         _enforce_spend_preconditions(chain, amount_wei)
         outbound_eval = _evaluate_outbound_transfer_policy(chain, args.to)
 
-        token_meta = _fetch_erc20_metadata(chain, args.token)
+        token_meta = _fetch_erc20_metadata(chain, token_address)
         token_symbol = str(token_meta.get("symbol") or "").strip() or "TOKEN"
         try:
             token_decimals = int(token_meta.get("decimals", 18))
@@ -6622,7 +6630,7 @@ def cmd_wallet_send_token(args: argparse.Namespace) -> int:
             token_decimals = 18
         amount_human, amount_unit = _transfer_amount_display(str(args.amount_wei), "token", token_symbol, token_decimals)
         amount_display = f"{amount_human} {amount_unit}"
-        approval_required, transfer_policy = _transfer_requires_approval(chain, "token", args.token)
+        approval_required, transfer_policy = _transfer_requires_approval(chain, "token", token_address)
         if not bool(outbound_eval.get("allowed")):
             approval_required = True
         approval_id = _make_transfer_approval_id()
@@ -6631,7 +6639,7 @@ def cmd_wallet_send_token(args: argparse.Namespace) -> int:
             "chainKey": chain,
             "status": "approval_pending" if approval_required else "approved",
             "transferType": "token",
-            "tokenAddress": args.token.lower(),
+            "tokenAddress": token_address.lower(),
             "tokenSymbol": token_symbol,
             "tokenDecimals": token_decimals,
             "toAddress": args.to.lower(),
@@ -6657,7 +6665,7 @@ def cmd_wallet_send_token(args: argparse.Namespace) -> int:
             queued_message = (
                 "Approval required (transfer)\n\n"
                 "Request: Send token\n"
-                f"Token: {token_symbol} ({args.token.lower()})\n"
+                f"Token: {token_symbol} ({token_address.lower()})\n"
                 f"Amount: {amount_display} ({args.amount_wei} wei)\n"
                 f"To: {args.to.lower()}\n"
                 f"Chain: {chain}\n"

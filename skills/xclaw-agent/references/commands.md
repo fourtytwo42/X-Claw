@@ -39,7 +39,7 @@ This reference defines the expected command surface for the Python-first skill w
 - `wallet-address`
 - `wallet-sign-challenge <message>`
 - `wallet-send <to> <amount_wei>`
-- `wallet-send-token <token> <to> <amount_wei>`
+- `wallet-send-token <token_or_symbol> <to> <amount_wei>`
 - `wallet-balance`
 - `wallet-token-balance <token_address>`
 

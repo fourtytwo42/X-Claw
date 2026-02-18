@@ -18,11 +18,12 @@ Required wallet commands:
 6. `wallet-send <to> <amount_wei>`
 7. `wallet-balance`
 8. `wallet-token-balance <token_address>`
-9. `wallet-remove`
-10. `transfer-policy-get`
-11. `transfer-policy-set`
-12. `transfer-resume`
-13. `transfer-decide`
+9. `wallet-send-token <token_or_symbol> <to> <amount_wei>`
+10. `wallet-remove`
+11. `transfer-policy-get`
+12. `transfer-policy-set`
+13. `transfer-resume`
+14. `transfer-decide`
 
 Notes:
 - `chain` is sourced from `XCLAW_DEFAULT_CHAIN`.
@@ -39,6 +40,7 @@ Wrapper delegation target commands:
 - `xclaw-agent wallet address --chain <chain_key> --json`
 - `xclaw-agent wallet sign-challenge --message <message> --chain <chain_key> --json`
 - `xclaw-agent wallet send --to <address> --amount-wei <amount_wei> --chain <chain_key> --json`
+- `xclaw-agent wallet send-token --token <token_or_symbol> --to <address> --amount-wei <amount_wei> --chain <chain_key> --json`
 - `xclaw-agent wallet balance --chain <chain_key> --json`
 - `xclaw-agent wallet token-balance --token <token_address> --chain <chain_key> --json`
 - `xclaw-agent wallet remove --chain <chain_key> --json`
@@ -88,14 +90,15 @@ Errors MUST be machine-parseable and human-readable:
 
 1. `wallet-send` validates recipient address format before delegation.
 2. `wallet-send` validates amount is non-negative integer string.
-3. `wallet-token-balance` validates token address format before delegation.
-4. `wallet-sign-challenge` rejects empty message.
-5. `wallet-create` and `wallet-import` support non-interactive automation when required env vars are provided:
+3. `wallet-send-token` accepts canonical token symbol (for example `USDC`) or `0x` token address and resolves to canonical token address before execution.
+4. `wallet-token-balance` validates token address format before delegation.
+5. `wallet-sign-challenge` rejects empty message.
+6. `wallet-create` and `wallet-import` support non-interactive automation when required env vars are provided:
 - `wallet-create`: requires `XCLAW_WALLET_PASSPHRASE`
 - `wallet-import`: requires both `XCLAW_WALLET_IMPORT_PRIVATE_KEY` and `XCLAW_WALLET_PASSPHRASE`
   Without these env vars, non-interactive calls fail with `non_interactive`.
-6. `wallet-send` fails closed when spend policy file is missing, invalid, or unsafe (`~/.xclaw-agent/policy.json`).
-7. `wallet-send` enforces policy preconditions:
+7. `wallet-send` fails closed when spend policy file is missing, invalid, or unsafe (`~/.xclaw-agent/policy.json`).
+8. `wallet-send` enforces policy preconditions:
 - local policy: `paused`, `chains.<chain>.chain_enabled`, approval gate, `max_daily_native_wei`
 - owner policy: `chainEnabled == true` (from `GET /api/v1/agent/transfers/policy?chainKey=...`).
 

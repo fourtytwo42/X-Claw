@@ -1018,6 +1018,8 @@ class TradePathRuntimeTests(unittest.TestCase):
         ), mock.patch.object(
             cli, "_fetch_erc20_metadata", return_value={"symbol": "USDC", "decimals": 18}
         ), mock.patch.object(
+            cli, "_resolve_token_address", return_value="0x" + "11" * 20
+        ), mock.patch.object(
             cli, "_mirror_transfer_approval"
         ):
             payload = self._run_and_parse_stdout(lambda: cli.cmd_wallet_send_token(args))
@@ -1030,6 +1032,40 @@ class TradePathRuntimeTests(unittest.TestCase):
         self.assertIn("Approval ID:", queued)
         self.assertIn("Status: approval_pending", queued)
         self.assertIn("Amount: 0.0000000000000001 USDC (100 wei)", queued)
+
+    def test_wallet_send_token_accepts_symbol_and_resolves_address(self) -> None:
+        args = argparse.Namespace(
+            token="usdc",
+            to="0x" + "22" * 20,
+            amount_wei="100",
+            chain="base_sepolia",
+            json=True,
+        )
+        with mock.patch.object(
+            cli,
+            "_evaluate_outbound_transfer_policy",
+            return_value={
+                "allowed": True,
+                "policyBlockedAtCreate": False,
+                "policyBlockReasonCode": None,
+                "policyBlockReasonMessage": None,
+            },
+        ), mock.patch.object(
+            cli, "_enforce_spend_preconditions", return_value=({}, "2026-02-16", 0, 10**30)
+        ), mock.patch.object(
+            cli, "_sync_transfer_policy_from_remote", return_value={"transferApprovalMode": "per_transfer", "nativeTransferPreapproved": False, "allowedTransferTokens": []}
+        ), mock.patch.object(
+            cli, "_fetch_erc20_metadata", return_value={"symbol": "USDC", "decimals": 18}
+        ), mock.patch.object(
+            cli, "_resolve_token_address", return_value="0x" + "11" * 20
+        ) as resolve_mock, mock.patch.object(
+            cli, "_mirror_transfer_approval"
+        ):
+            payload = self._run_and_parse_stdout(lambda: cli.cmd_wallet_send_token(args))
+        self.assertEqual(payload.get("code"), "approval_required")
+        resolve_mock.assert_called_once_with("base_sepolia", "usdc")
+        details = payload.get("details") or {}
+        self.assertIn("(0x1111111111111111111111111111111111111111)", str(details.get("queuedMessage") or ""))
 
     def test_wallet_send_token_policy_blocked_routes_to_transfer_approval(self) -> None:
         args = argparse.Namespace(

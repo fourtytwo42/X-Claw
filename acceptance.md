@@ -4268,3 +4268,23 @@ Issue mapping: `#32` (`https://github.com/fourtytwo42/ETHDenver2026/issues/32`)
 - `npm run seed:verify` -> PASS
 - `npm run build` -> PASS
 - `pm2 restart all` -> PASS
+
+## Wallet Send-Token Symbol Resolution Fix (UTC 2026-02-18)
+
+### Objective
+- Prevent `wallet-send-token usdc ...` from failing with `invalid_input` after transfer approval flows by resolving canonical token symbols to token addresses before transfer orchestration.
+
+### Targeted verification
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS (81 tests)
+  - includes:
+    - `test_wallet_send_token_accepts_symbol_and_resolves_address`
+    - `test_wallet_send_token_requires_transfer_approval`
+    - `test_wallet_send_token_policy_blocked_routes_to_transfer_approval`
+
+### Required gates (sequential)
+- `npm run db:parity` -> PASS
+- `npm run seed:reset` -> PASS
+- `npm run seed:load` -> PASS
+- `npm run seed:verify` -> PASS
+- `npm run build` -> PASS
+- `pm2 restart all` -> PASS
