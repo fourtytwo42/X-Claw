@@ -209,6 +209,28 @@ def _normalize_non_terminal_approval(runtime_json: dict) -> Optional[dict]:
     return normalized
 
 
+def _normalize_known_nonfatal_error(runtime_json: dict, command_args: Iterable[str]) -> Optional[dict]:
+    code = str(runtime_json.get("code") or "").strip().lower()
+    message = str(runtime_json.get("message") or "")
+    args = [str(v) for v in command_args]
+    if code == "invalid_input" and "amount is too small for symbol-based transfer" in message.lower():
+        if len(args) >= 2 and args[0] == "wallet" and args[1] == "send-token":
+            details = runtime_json.get("details")
+            if not isinstance(details, dict):
+                details = {}
+            normalized = dict(runtime_json)
+            normalized["ok"] = True
+            normalized["code"] = "input_guarded"
+            normalized["message"] = "Transfer input was safely rejected before execution due to token unit mismatch."
+            normalized["actionHint"] = (
+                "No transaction was sent. Ask user to confirm token units and continue via approval flow; "
+                "do not retry immediate wallet-send-token with the same raw amount."
+            )
+            normalized["details"] = details
+            return normalized
+    return None
+
+
 def _fetch_owner_link_payload() -> Optional[dict]:
     binary = _resolve_agent_binary()
     if not binary:
@@ -441,6 +463,10 @@ def _run_agent(args: Iterable[str]) -> int:
     stdout = (proc.stdout or "").strip()
     runtime_json = _extract_json_payload(stdout)
     if runtime_json is not None:
+        normalized_known_nonfatal = _normalize_known_nonfatal_error(runtime_json, args)
+        if normalized_known_nonfatal is not None:
+            _print_json(normalized_known_nonfatal)
+            return 0
         normalized_non_terminal = _normalize_non_terminal_approval(runtime_json)
         if normalized_non_terminal is not None:
             _print_json(normalized_non_terminal)

@@ -227,6 +227,27 @@ class X402SkillWrapperTests(unittest.TestCase):
         emitted = json.loads(buf.getvalue().strip())
         self.assertEqual(emitted.get("code"), "send_failed")
 
+    def test_run_agent_normalizes_symbol_unit_mismatch_to_nonfatal(self) -> None:
+        payload = {
+            "ok": False,
+            "code": "invalid_input",
+            "message": "Amount is too small for symbol-based transfer and looks like a base-unit mistake.",
+            "details": {"token": "USDC", "amountWei": "10000000"},
+        }
+        child = mock.Mock()
+        child.returncode = 1
+        child.communicate.return_value = (json.dumps(payload), "")
+        with mock.patch.object(skill, "_resolve_agent_binary", return_value="/usr/bin/xclaw-agent"):
+            with mock.patch.object(skill, "_maybe_patch_openclaw_gateway"):
+                with mock.patch.object(skill.subprocess, "Popen", return_value=child):
+                    buf = io.StringIO()
+                    with redirect_stdout(buf):
+                        code = skill._run_agent(["wallet", "send-token", "--token", "USDC"])
+        self.assertEqual(code, 0)
+        emitted = json.loads(buf.getvalue().strip())
+        self.assertTrue(emitted.get("ok"))
+        self.assertEqual(emitted.get("code"), "input_guarded")
+
     def test_run_agent_normalizes_pending_approval_even_when_exit_zero(self) -> None:
         pending_payload = {
             "ok": False,
