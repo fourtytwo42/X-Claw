@@ -52,6 +52,14 @@ function nonTelegramProdTimeoutMs(): number {
   return parsed;
 }
 
+function telegramGuardEnabled(): boolean {
+  const raw = (process.env.XCLAW_NON_TG_PROD_TELEGRAM_GUARD ?? '').trim().toLowerCase();
+  if (!raw) {
+    return false;
+  }
+  return raw === '1' || raw === 'true' || raw === 'on' || raw === 'yes';
+}
+
 function sanitizeOpenclawAgentId(value: string | undefined): string {
   const raw = (value ?? '').trim() || 'main';
   if (/^[A-Za-z0-9_-]{1,64}$/.test(raw)) {
@@ -218,7 +226,7 @@ export async function dispatchNonTelegramAgentProd(input: NonTelegramAgentProdIn
   if (!delivery) {
     return { attempted: false, skipped: true, reason: 'no_session' };
   }
-  if (delivery.lastChannel === 'telegram') {
+  if (delivery.lastChannel === 'telegram' && telegramGuardEnabled()) {
     return { attempted: false, skipped: true, reason: 'telegram_guard' };
   }
 

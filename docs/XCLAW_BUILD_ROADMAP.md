@@ -2934,14 +2934,14 @@ Note:
 - [~] Add `POST /api/v1/management/permissions/update`.
 - [~] Wire `/approvals` to inbox API and enable `Approve + Allowlist Token` action.
 - [~] Replace allowances placeholder with permissions inventory module.
-- [x] Add non-Telegram web synthetic agent prod bridge for trade/transfer decisions + terminal outcomes with Telegram guard.
+- [x] Add web synthetic agent prod bridge for trade/transfer decisions + terminal outcomes with no-deliver dispatch (Telegram-safe by default; optional Telegram guard override).
 - [x] Keep Telegram transfer callback deterministic result delivery but avoid synthetic transfer-result reinjection into chat pipeline (prevents pairing/access prompt regressions).
 
 ### 87.3 Validation + evidence
 - [ ] Verify approve+allowlist updates trade status and chain allowlist atomically.
 - [ ] Verify inbox aggregation across linked agents and chain filter behavior.
 - [x] Verify non-Telegram prod dispatch attempted on web decision/terminal paths.
-- [x] Verify Telegram guard skip (`lastChannel=telegram`) produces no extra Telegram messages.
+- [x] Verify Telegram-last synthetic prod dispatch runs without `--deliver` and does not emit extra Telegram messages.
 - [x] Verify transfer approval Telegram inline buttons are removed on approve/deny convergence.
 - [x] Verify owner-link direct-send is skipped when active channel is Telegram (button-first handoff).
 

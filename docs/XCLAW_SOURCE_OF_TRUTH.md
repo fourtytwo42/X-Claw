@@ -3575,7 +3575,7 @@ Limitations / notes:
 - Request cards include deterministic risk labels (`Low|Med|High`) derived from canonical server data.
 - Approvals center inventory copy uses permission language (no allowances placeholder contract in this slice).
 
-## 77) Non-Telegram Web Agent Prod Bridge (Locked)
+## 77) Web Agent Prod Bridge (Locked)
 
 1. Scope:
 - Applies to web/runtime decision and terminal-result paths for trade and transfer approvals.
@@ -3586,17 +3586,18 @@ Limitations / notes:
   - `POST /api/v1/trades/:tradeId/status` (terminal statuses),
   - `POST /api/v1/agent/transfer-approvals/mirror` (terminal status transitions).
 
-2. Non-Telegram prod behavior:
+2. Prod behavior:
 - Web runtime may dispatch a synthetic inbound message to OpenClaw agent processing to keep autonomous state synchronized.
 - Dispatch command contract:
   - `openclaw agent --agent <id> --channel last --message <synthetic> --json`
   - no `--deliver`
   - no direct `openclaw message send` from this bridge.
 
-3. Delivery-channel guard:
+3. Delivery-channel handling:
 - Read OpenClaw last-delivery context from session store (`OPENCLAW_STATE_DIR` fallback `~/.openclaw`).
-- If last active channel is Telegram (`lastChannel == telegram`), the bridge must skip dispatch.
-- Bridge skip reasons are structured (`telegram_guard`, `no_session`, etc.).
+- If a valid session exists, dispatch is allowed even when last active channel is Telegram (`lastChannel == telegram`) because `--deliver` is omitted.
+- Optional emergency guard `XCLAW_NON_TG_PROD_TELEGRAM_GUARD=1` may force skip on Telegram (`reason=telegram_guard`).
+- Bridge skip reasons are structured (`no_session`, `telegram_guard`, etc.).
 
 4. Telegram non-regression:
 - Telegram callback routing and deterministic Telegram confirmation/final-result messaging remain unchanged.
@@ -3607,7 +3608,8 @@ Limitations / notes:
 - Decision/status API outcomes must not fail due to bridge dispatch failure/timeouts.
 - Config knobs:
   - `XCLAW_NON_TG_PROD_ENABLED` (default enabled),
-  - `XCLAW_NON_TG_PROD_TIMEOUT_MS` (bounded timeout default).
+  - `XCLAW_NON_TG_PROD_TIMEOUT_MS` (bounded timeout default),
+  - `XCLAW_NON_TG_PROD_TELEGRAM_GUARD` (default disabled).
 
 6. Synthetic envelope contract:
 - Deterministic internal envelopes are required:
