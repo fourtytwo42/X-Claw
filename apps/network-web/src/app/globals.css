@@ -76,8 +76,9 @@ body {
 }
 
 html {
+  background: var(--bg);
   overflow-y: scroll;
-  scrollbar-gutter: stable both-edges;
+  scrollbar-gutter: stable;
 }
 
 body {
