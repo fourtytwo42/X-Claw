@@ -74,7 +74,8 @@ function Ensure-PythonRuntimeDeps {
 
   $hasArgon2 = Test-PythonImport -ModuleName "argon2"
   $hasKeccak = Test-PythonImport -ModuleName "Crypto.Hash.keccak"
-  if ($hasArgon2 -and $hasKeccak) {
+  $hasCrypto = Test-PythonImport -ModuleName "cryptography.hazmat.primitives.asymmetric.ec"
+  if ($hasArgon2 -and $hasKeccak -and $hasCrypto) {
     Write-Host "[xclaw] python runtime deps already installed for selected interpreter"
     return
   }
@@ -148,7 +149,8 @@ function Ensure-PythonRuntimeDeps {
 
   $hasArgon2 = Test-PythonImport -ModuleName "argon2"
   $hasKeccak = Test-PythonImport -ModuleName "Crypto.Hash.keccak"
-  if (-not ($hasArgon2 -and $hasKeccak)) {
+  $hasCrypto = Test-PythonImport -ModuleName "cryptography.hazmat.primitives.asymmetric.ec"
+  if (-not ($hasArgon2 -and $hasKeccak -and $hasCrypto)) {
     throw "Python runtime dependency verification failed after install."
   }
 }

@@ -84,7 +84,7 @@ ensure_python_runtime_deps() {
 import importlib
 import sys
 missing = []
-for mod in ("argon2", "Crypto.Hash.keccak"):
+for mod in ("argon2", "Crypto.Hash.keccak", "cryptography.hazmat.primitives.asymmetric.ec"):
     try:
         importlib.import_module(mod)
     except Exception:
@@ -157,7 +157,7 @@ PY
 
   if ! "$py_bin" - <<'PY' >/dev/null 2>&1
 import importlib
-for mod in ("argon2", "Crypto.Hash.keccak"):
+for mod in ("argon2", "Crypto.Hash.keccak", "cryptography.hazmat.primitives.asymmetric.ec"):
     importlib.import_module(mod)
 PY
   then
