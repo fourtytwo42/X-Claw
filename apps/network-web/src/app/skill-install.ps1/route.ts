@@ -109,13 +109,33 @@ function Ensure-PythonRuntimeDeps {
   } catch {
     $venvDir = Join-Path $HOME ".xclaw-agent\\runtime-venv"
     Write-Host "[xclaw] pip unavailable on system interpreter; creating fallback venv at $venvDir"
-    Invoke-Python "-m" "venv" $venvDir | Out-Null
+    try {
+      Invoke-Python "-m" "venv" $venvDir | Out-Null
+    } catch {
+      Write-Host "[xclaw] standard venv creation failed; retrying with --without-pip"
+      try {
+        Invoke-Python "-m" "venv" "--without-pip" $venvDir | Out-Null
+      } catch {
+        throw "Unable to provision pip or create venv fallback. Install python3-venv or provide XCLAW_AGENT_PYTHON_BIN."
+      }
+    }
     $venvPython = Join-Path $venvDir "Scripts\\python.exe"
     if (-not (Test-Path $venvPython)) {
       throw "Fallback venv python not found: $venvPython"
     }
     $env:XCLAW_AGENT_PYTHON_BIN = $venvPython
     $usingVenv = $true
+    try {
+      Invoke-Python "-m" "pip" "--version" | Out-Null
+    } catch {
+      $getPipPath = Join-Path $tmpRoot "get-pip.py"
+      try {
+        Invoke-WebRequest -Uri "https://bootstrap.pypa.io/get-pip.py" -OutFile $getPipPath
+        Invoke-Python $getPipPath | Out-Null
+      } catch {
+        throw "Venv created but pip bootstrap failed. Install python3-pip or provide XCLAW_AGENT_PYTHON_BIN."
+      }
+    }
     Invoke-Python "-m" "pip" "--version" | Out-Null
   }
 

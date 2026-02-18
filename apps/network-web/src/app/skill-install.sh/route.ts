@@ -111,16 +111,39 @@ PY
 
   if ! "$py_bin" -m pip --version >/dev/null 2>&1; then
     local venv_dir="$HOME/.xclaw-agent/runtime-venv"
+    local venv_python="$venv_dir/bin/python"
     echo "[xclaw] pip unavailable on system interpreter; creating fallback venv at $venv_dir"
-    "$py_bin" -m venv "$venv_dir" >/dev/null 2>&1 || {
+    if ! "$py_bin" -m venv "$venv_dir" >/dev/null 2>&1; then
+      echo "[xclaw] standard venv creation failed; retrying with --without-pip"
+      if ! "$py_bin" -m venv --without-pip "$venv_dir" >/dev/null 2>&1; then
+        if command -v virtualenv >/dev/null 2>&1; then
+          virtualenv "$venv_dir" >/dev/null 2>&1 || true
+        fi
+      fi
+    fi
+
+    if [ ! -x "$venv_python" ]; then
       echo "[xclaw] unable to provision pip or create venv fallback"
-      exit 1
-    }
-    py_bin="$venv_dir/bin/python"
-    if [ ! -x "$py_bin" ]; then
-      echo "[xclaw] fallback venv python not found at $py_bin"
+      echo "[xclaw] install python3-venv (or provide XCLAW_AGENT_PYTHON_BIN), then rerun installer"
       exit 1
     fi
+
+    if ! "$venv_python" -m pip --version >/dev/null 2>&1; then
+      if [ ! -f "$tmp_dir/get-pip.py" ]; then
+        curl -fsSL https://bootstrap.pypa.io/get-pip.py -o "$tmp_dir/get-pip.py" || true
+      fi
+      if [ -f "$tmp_dir/get-pip.py" ]; then
+        "$venv_python" "$tmp_dir/get-pip.py" >/dev/null 2>&1 || true
+      fi
+    fi
+
+    if ! "$venv_python" -m pip --version >/dev/null 2>&1; then
+      echo "[xclaw] venv created but pip bootstrap failed"
+      echo "[xclaw] install python3-pip or set XCLAW_AGENT_PYTHON_BIN to a Python with pip, then rerun installer"
+      exit 1
+    fi
+
+    py_bin="$venv_python"
     export XCLAW_PYTHON_BIN="$py_bin"
     export XCLAW_PYTHON_IN_VENV="1"
   fi
