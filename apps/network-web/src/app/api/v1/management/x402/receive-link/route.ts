@@ -1,10 +1,7 @@
 import type { NextRequest } from 'next/server';
-import crypto from 'node:crypto';
 
-import { getChainConfig } from '@/lib/chains';
 import { dbQuery } from '@/lib/db';
 import { errorResponse, internalErrorResponse, successResponse } from '@/lib/errors';
-import { makeId } from '@/lib/ids';
 import { parseJsonBody } from '@/lib/http';
 import { requireManagementSession, requireManagementWriteAuth } from '@/lib/management-auth';
 import { getRequestId } from '@/lib/request-id';
@@ -16,87 +13,6 @@ async function ensureX402ResourceDescriptionColumn(): Promise<void> {
     alter table if exists agent_x402_payment_mirror
     add column if not exists resource_description text
   `);
-}
-
-function isoNow(): string {
-  return new Date().toISOString();
-}
-
-function buildOrigin(req: NextRequest): string {
-  const explicit = process.env.XCLAW_PUBLIC_BASE_URL?.trim();
-  if (explicit) {
-    return explicit.replace(/\/$/, '');
-  }
-  const forwardedHost = req.headers.get('x-forwarded-host')?.trim();
-  const forwardedProto = req.headers.get('x-forwarded-proto')?.trim();
-  if (forwardedHost) {
-    const proto = forwardedProto && (forwardedProto === 'http' || forwardedProto === 'https') ? forwardedProto : 'https';
-    return `${proto}://${forwardedHost}`.replace(/\/$/, '');
-  }
-
-  const hostHeader = req.headers.get('host')?.trim();
-  if (hostHeader && hostHeader !== '0.0.0.0' && hostHeader !== '127.0.0.1' && hostHeader !== 'localhost') {
-    return `https://${hostHeader}`.replace(/\/$/, '');
-  }
-
-  const fallback = req.nextUrl.origin.replace(/\/$/, '');
-  if (
-    fallback.includes('0.0.0.0') ||
-    fallback.includes('127.0.0.1') ||
-    fallback.includes('localhost')
-  ) {
-    return 'https://xclaw.trade';
-  }
-  return fallback;
-}
-
-type ResolvedAsset = {
-  assetKind: 'native' | 'erc20';
-  assetAddress: string | null;
-  assetSymbol: 'ETH' | 'KITE' | 'USDC' | 'WETH' | 'WKITE' | 'USDT';
-};
-
-function resolveSupportedAsset(
-  chainKey: string,
-  assetKindRaw: unknown,
-  assetAddressRaw: unknown,
-  assetSymbolRaw: unknown
-): ResolvedAsset | null {
-  const config = getChainConfig(chainKey);
-  if (!config) {
-    return null;
-  }
-  const canonicalTokens = config.canonicalTokens ?? {};
-  const assetKind = assetKindRaw === 'erc20' ? 'erc20' : 'native';
-  const symbol = String(assetSymbolRaw ?? '').trim().toUpperCase();
-  if (assetKind === 'native') {
-    const nativeSymbol = chainKey === 'kite_ai_testnet' ? 'KITE' : 'ETH';
-    return { assetKind: 'native', assetAddress: null, assetSymbol: nativeSymbol };
-  }
-
-  const bySymbol = new Map<string, string>();
-  for (const [tokenSymbol, tokenAddress] of Object.entries(canonicalTokens)) {
-    if (!tokenAddress || typeof tokenAddress !== 'string') {
-      continue;
-    }
-    const normalized = tokenSymbol.trim().toUpperCase();
-    if (normalized === 'USDC' || normalized === 'WETH' || normalized === 'WKITE' || normalized === 'USDT') {
-      bySymbol.set(normalized, tokenAddress.toLowerCase());
-    }
-  }
-
-  const requestedAddress = String(assetAddressRaw ?? '').trim().toLowerCase();
-  if (symbol && bySymbol.has(symbol)) {
-    return { assetKind: 'erc20', assetAddress: bySymbol.get(symbol) ?? null, assetSymbol: symbol as ResolvedAsset['assetSymbol'] };
-  }
-  if (requestedAddress) {
-    for (const [knownSymbol, knownAddress] of bySymbol.entries()) {
-      if (knownAddress === requestedAddress) {
-        return { assetKind: 'erc20', assetAddress: knownAddress, assetSymbol: knownSymbol as 'USDC' | 'WETH' };
-      }
-    }
-  }
-  return null;
 }
 
 export async function GET(req: NextRequest) {
@@ -130,27 +46,6 @@ export async function GET(req: NextRequest) {
 
     const chainKey = req.nextUrl.searchParams.get('chainKey')?.trim() || 'base_sepolia';
     const facilitatorKey = req.nextUrl.searchParams.get('facilitatorKey')?.trim() || 'cdp';
-    const resolvedAsset = resolveSupportedAsset(
-      chainKey,
-      req.nextUrl.searchParams.get('assetKind')?.trim(),
-      req.nextUrl.searchParams.get('assetAddress')?.trim(),
-      req.nextUrl.searchParams.get('assetSymbol')?.trim()
-    );
-    if (!resolvedAsset) {
-      return errorResponse(
-        400,
-        {
-          code: 'payload_invalid',
-          message: 'Unsupported x402 asset for selected chain.',
-          actionHint:
-            chainKey === 'kite_ai_testnet'
-              ? 'Use KITE, WKITE, or USDT on Kite AI Testnet.'
-              : 'Use ETH, USDC, or WETH on supported chain configuration.'
-        },
-        requestId
-      );
-    }
-    const amountAtomic = req.nextUrl.searchParams.get('amountAtomic')?.trim() || '0.01';
     const active = await dbQuery<{
       payment_id: string;
       network_key: string;
@@ -193,94 +88,45 @@ export async function GET(req: NextRequest) {
       `,
       [agentId, chainKey]
     );
-
-    const origin = buildOrigin(req);
-    let paymentId: string;
-    let linkToken: string;
-    let paymentUrl: string;
-    let status: string;
-    let resourceDescription: string | null = null;
-
-    if ((active.rowCount ?? 0) > 0) {
-      paymentId = active.rows[0].payment_id;
-      linkToken = String(active.rows[0].link_token ?? '').trim() || crypto.randomBytes(10).toString('hex');
-      paymentUrl = `${origin}/api/v1/x402/pay/${encodeURIComponent(agentId)}/${encodeURIComponent(linkToken)}`;
-      status = active.rows[0].status;
-      resourceDescription = active.rows[0].resource_description;
-      await dbQuery(
-        `
-        update agent_x402_payment_mirror
-        set
-          facilitator_key = $1,
-          asset_kind = $2,
-          asset_address = $3,
-          asset_symbol = $4,
-          amount_atomic = $5::numeric,
-          payment_url = $6,
-          link_token = $7,
-          reason_code = null,
-          reason_message = null,
-          expires_at = null,
-          updated_at = $8::timestamptz,
-          terminal_at = null
-        where payment_id = $9
-        `,
-        [
-          facilitatorKey,
-          resolvedAsset.assetKind,
-          resolvedAsset.assetAddress,
-          resolvedAsset.assetSymbol,
-          amountAtomic,
-          paymentUrl,
-          linkToken,
-          isoNow(),
-          paymentId
-        ]
-      );
-    } else {
-      paymentId = makeId('xpm');
-      linkToken = crypto.randomBytes(10).toString('hex');
-      paymentUrl = `${origin}/api/v1/x402/pay/${encodeURIComponent(agentId)}/${encodeURIComponent(linkToken)}`;
-      status = 'proposed';
-      await dbQuery(
-        `
-        insert into agent_x402_payment_mirror (
-          payment_id,
-          agent_id,
-          direction,
-          status,
-          network_key,
-          facilitator_key,
-          asset_kind,
-          asset_address,
-          asset_symbol,
-          amount_atomic,
-          payment_url,
-          link_token,
-          expires_at,
-          created_at,
-          updated_at,
-          terminal_at
-        ) values (
-          $1, $2, 'inbound', 'proposed', $3, $4, $5, $6, $7, $8::numeric, $9, $10, null, $11::timestamptz, $12::timestamptz, null
-        )
-        `,
-        [
-          paymentId,
+    if ((active.rowCount ?? 0) === 0) {
+      return successResponse(
+        {
+          ok: true,
           agentId,
           chainKey,
+          paymentId: '',
+          networkKey: chainKey,
           facilitatorKey,
-          resolvedAsset.assetKind,
-          resolvedAsset.assetAddress,
-          resolvedAsset.assetSymbol,
-          amountAtomic,
-          paymentUrl,
-          linkToken,
-          isoNow(),
-          isoNow()
-        ]
+          assetKind: 'native',
+          assetAddress: null,
+          assetSymbol: chainKey === 'kite_ai_testnet' ? 'KITE' : 'ETH',
+          amountAtomic: '0',
+          paymentUrl: '',
+          resourceDescription: null,
+          ttlSeconds: null,
+          expiresAt: null,
+          timeLimitNotice: 'No active receive requests.',
+          status: 'unavailable'
+        },
+        200,
+        requestId
       );
     }
+
+    const paymentId = active.rows[0].payment_id;
+    const paymentUrl = active.rows[0].payment_url ?? '';
+    const status = active.rows[0].status;
+    const resourceDescription = active.rows[0].resource_description;
+    const assetKind = active.rows[0].asset_kind;
+    const assetAddress = active.rows[0].asset_address;
+    const assetSymbol = (active.rows[0].asset_symbol ?? (chainKey === 'kite_ai_testnet' ? 'KITE' : 'ETH')) as
+      | 'ETH'
+      | 'KITE'
+      | 'USDC'
+      | 'WETH'
+      | 'WKITE'
+      | 'USDT';
+    const amountAtomic = active.rows[0].amount_atomic;
 
     return successResponse(
       {
@@ -290,9 +136,9 @@ export async function GET(req: NextRequest) {
         paymentId,
         networkKey: chainKey,
         facilitatorKey,
-        assetKind: resolvedAsset.assetKind,
-        assetAddress: resolvedAsset.assetAddress,
-        assetSymbol: resolvedAsset.assetSymbol,
+        assetKind,
+        assetAddress,
+        assetSymbol,
         amountAtomic,
         paymentUrl,
         resourceDescription,
