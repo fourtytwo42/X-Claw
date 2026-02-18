@@ -2814,6 +2814,9 @@ Limitations / notes:
 7. Callback reliability:
    - approve must trigger deterministic runtime execution continuation (`approvals decide-transfer ... approve`),
    - deny must mark `rejected` with reason and must not execute transfer,
+   - duplicate/concurrent callback decisions must be idempotent:
+     - if transfer is already `executing|verifying`, decision returns converged in-progress success (not failure),
+     - if transfer is terminal (`filled|failed|rejected`), decision returns converged terminal success,
    - final deterministic transfer result message is always sent to chat (`status`, `approvalId`, `chain`, `txHash` when available),
    - synthetic `[X-CLAW TRANSFER RESULT]` message is routed to agent pipeline for narrative follow-up,
    - transfer approval creation sends an out-of-band Telegram approval prompt only when OpenClaw `lastChannel == telegram`,

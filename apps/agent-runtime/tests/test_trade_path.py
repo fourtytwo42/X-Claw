@@ -1002,6 +1002,31 @@ class TradePathRuntimeTests(unittest.TestCase):
         self.assertIsNotNone(saved)
         self.assertEqual(str((saved or {}).get("status")), "rejected")
 
+    def test_approvals_decide_transfer_executing_is_idempotent(self) -> None:
+        approval_id = "xfr_test_executing"
+        cli._record_pending_transfer_flow(
+            approval_id,
+            {
+                "approvalId": approval_id,
+                "chainKey": "base_sepolia",
+                "status": "executing",
+                "transferType": "token",
+                "tokenAddress": "0x" + "11" * 20,
+                "tokenSymbol": "WETH",
+                "tokenDecimals": 18,
+                "toAddress": "0x" + "22" * 20,
+                "amountWei": "1000000000000000",
+                "createdAt": cli.utc_now(),
+                "updatedAt": cli.utc_now(),
+            },
+        )
+        args = argparse.Namespace(approval_id=approval_id, decision="approve", reason_message=None, chain="base_sepolia", json=True)
+        payload = self._run_and_parse_stdout(lambda: cli.cmd_approvals_decide_transfer(args))
+        self.assertTrue(payload.get("ok"))
+        self.assertEqual(payload.get("status"), "executing")
+        self.assertEqual(payload.get("inProgress"), True)
+        self.assertEqual(payload.get("converged"), True)
+
     def test_approvals_decide_transfer_falls_back_to_x402_flow(self) -> None:
         approval_id = "xfr_x402_1"
         args = argparse.Namespace(approval_id=approval_id, decision="approve", reason_message=None, chain="base_sepolia", json=True)
