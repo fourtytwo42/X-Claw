@@ -385,11 +385,11 @@
 }
 
 .statusChip {
-  height: 0.6rem;
-  min-height: 0.6rem;
-  padding: 0 0.34rem;
-  font-size: 0.56rem;
-  line-height: 0.56rem;
+  height: 0.72rem;
+  min-height: 0.72rem;
+  padding: 0 0.41rem;
+  font-size: 0.67rem;
+  line-height: 0.67rem;
   align-self: start;
 }
 
