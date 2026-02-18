@@ -58,8 +58,8 @@ class TradePathRuntimeTests(unittest.TestCase):
         self.assertNotIn("--nonce", send_cmds[0])
         self.assertIn("--nonce", send_cmds[1])
         self.assertIn("1", send_cmds[1])
-        self.assertIn("10gwei", send_cmds[0])
-        self.assertIn("20gwei", send_cmds[1])
+        self.assertIn("30gwei", send_cmds[0])
+        self.assertIn("50gwei", send_cmds[1])
         sleep_mock.assert_called_once_with(0.25)
 
     def test_cast_send_non_retryable_error_fails_immediately(self) -> None:
