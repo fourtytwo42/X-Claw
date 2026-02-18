@@ -8,6 +8,7 @@ It does not perform wallet signing itself; it delegates to the local xclaw-agent
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 import re
 import signal
@@ -473,16 +474,73 @@ def _is_uint_string(value: str) -> bool:
     return bool(re.fullmatch(r"[0-9]+", value))
 
 
+def _sha256_file(path: Path) -> str:
+    try:
+        digest = hashlib.sha256()
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(65536), b""):
+                digest.update(chunk)
+        return digest.hexdigest()
+    except Exception:
+        return ""
+
+
+def _read_patch_state() -> dict:
+    state_path = Path.home() / ".openclaw" / "xclaw" / "openclaw_patch_state.json"
+    if not state_path.exists():
+        return {"present": False, "path": str(state_path)}
+    try:
+        payload = json.loads(state_path.read_text(encoding="utf-8") or "{}")
+    except Exception:
+        payload = {}
+    if not isinstance(payload, dict):
+        payload = {}
+    return {
+        "present": True,
+        "path": str(state_path),
+        "schemaVersion": payload.get("schemaVersion"),
+        "lastPatchedAt": payload.get("lastPatchedAt"),
+        "lastError": payload.get("lastError"),
+        "openclawVersion": payload.get("openclawVersion"),
+        "openclawRoot": payload.get("openclawRoot"),
+        "bundleCount": len(payload.get("bundles") or {}) if isinstance(payload.get("bundles"), dict) else 0,
+    }
+
+
+def _skill_version_payload() -> dict:
+    script_dir = Path(__file__).resolve().parent
+    setup_script = script_dir / "setup_agent_skill.py"
+    patch_script = script_dir / "openclaw_gateway_patch.py"
+    runtime_bin = _resolve_agent_binary() or ""
+    return {
+        "ok": True,
+        "code": "skill_version",
+        "message": "Skill version metadata ready.",
+        "skillScriptPath": str(Path(__file__).resolve()),
+        "setupScriptPath": str(setup_script),
+        "gatewayPatchScriptPath": str(patch_script),
+        "skillScriptSha256": _sha256_file(Path(__file__).resolve()),
+        "setupScriptSha256": _sha256_file(setup_script),
+        "gatewayPatchScriptSha256": _sha256_file(patch_script),
+        "runtimeBinary": runtime_bin,
+        "defaultChain": _chain_from_env(),
+        "patchState": _read_patch_state(),
+    }
+
+
 def main(argv: List[str]) -> int:
     if len(argv) < 2:
         return _err(
             "usage",
             "Missing command.",
-            "Use one of: status, dashboard, intents-poll, approval-check, trade-exec, trade-spot, trade-resume, transfer-resume, transfer-decide, transfer-policy-get, transfer-policy-set, report-send, chat-poll, chat-post, tracked-list, tracked-trades, username-set, owner-link, faucet-request, faucet-networks, chains, x402-pay, x402-pay-resume, x402-pay-decide, x402-policy-get, x402-policy-set, x402-networks, request-x402-payment, wallet-health, wallet-address, wallet-sign-challenge, wallet-send, wallet-send-token, wallet-balance, wallet-token-balance",
+            "Use one of: version, status, dashboard, intents-poll, approval-check, trade-exec, trade-spot, trade-resume, transfer-resume, transfer-decide, transfer-policy-get, transfer-policy-set, report-send, chat-poll, chat-post, tracked-list, tracked-trades, username-set, owner-link, faucet-request, faucet-networks, chains, x402-pay, x402-pay-resume, x402-pay-decide, x402-policy-get, x402-policy-set, x402-networks, request-x402-payment, wallet-health, wallet-address, wallet-sign-challenge, wallet-send, wallet-send-token, wallet-balance, wallet-token-balance",
             exit_code=2,
         )
 
     cmd = argv[1]
+    if cmd == "version":
+        _print_json(_skill_version_payload())
+        return 0
 
     api_commands = {
         "status",
@@ -915,7 +973,7 @@ def main(argv: List[str]) -> int:
     return _err(
         "unknown_command",
         f"Unknown command: {cmd}",
-        "Use one of: status, dashboard, intents-poll, approval-check, trade-exec, trade-spot, trade-resume, transfer-resume, transfer-decide, transfer-policy-get, transfer-policy-set, report-send, chat-poll, chat-post, tracked-list, tracked-trades, username-set, owner-link, faucet-request, faucet-networks, chains, x402-pay, x402-pay-resume, x402-pay-decide, x402-policy-get, x402-policy-set, x402-networks, request-x402-payment, wallet-health, wallet-address, wallet-sign-challenge, wallet-send, wallet-send-token, wallet-balance, wallet-token-balance",
+        "Use one of: version, status, dashboard, intents-poll, approval-check, trade-exec, trade-spot, trade-resume, transfer-resume, transfer-decide, transfer-policy-get, transfer-policy-set, report-send, chat-poll, chat-post, tracked-list, tracked-trades, username-set, owner-link, faucet-request, faucet-networks, chains, x402-pay, x402-pay-resume, x402-pay-decide, x402-policy-get, x402-policy-set, x402-networks, request-x402-payment, wallet-health, wallet-address, wallet-sign-challenge, wallet-send, wallet-send-token, wallet-balance, wallet-token-balance",
         exit_code=2,
     )
 

@@ -64,6 +64,7 @@ Common optional:
 ## High-Use Commands
 
 - `status`
+- `version`
 - `dashboard`
 - `wallet-address`
 - `wallet-balance`

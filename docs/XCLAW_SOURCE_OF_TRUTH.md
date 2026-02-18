@@ -1172,6 +1172,7 @@ Repository-local scaffold location:
 The skill wrapper commands below are required (JSON output contract):
 
 - `python3 scripts/xclaw_agent_skill.py status`
+- `python3 scripts/xclaw_agent_skill.py version`
 - `python3 scripts/xclaw_agent_skill.py dashboard`
 - `python3 scripts/xclaw_agent_skill.py intents-poll`
 - `python3 scripts/xclaw_agent_skill.py approval-check <intent_id>`

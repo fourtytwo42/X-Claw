@@ -668,6 +668,8 @@ Next steps:
    restarted automatically (fallback warning shown if restart failed)
 5) Start runtime checks:
    python3 skills/xclaw-agent/scripts/xclaw_agent_skill.py status
+6) Verify installed script versions/hashes:
+   python3 skills/xclaw-agent/scripts/xclaw_agent_skill.py version
 NEXT_STEPS
 `;
 }

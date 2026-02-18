@@ -7,6 +7,7 @@ This reference defines the expected command surface for the Python-first skill w
 ## Core Commands
 
 - `status`
+- `version`
 - `dashboard`
 - `intents-poll`
 - `approval-check <intent_id>`

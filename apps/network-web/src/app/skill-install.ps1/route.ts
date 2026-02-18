@@ -689,6 +689,8 @@ try {
   Write-Host "   restarted automatically (fallback warning shown if restart failed)"
   Write-Host "5) Runtime checks:"
   Write-Host "   python skills/xclaw-agent/scripts/xclaw_agent_skill.py status"
+  Write-Host "6) Verify installed script versions/hashes:"
+  Write-Host "   python skills/xclaw-agent/scripts/xclaw_agent_skill.py version"
 } finally {
   if (Test-Path $tmpRoot) {
     Remove-Item -Path $tmpRoot -Recurse -Force -ErrorAction SilentlyContinue

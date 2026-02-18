@@ -108,6 +108,21 @@ class X402SkillWrapperTests(unittest.TestCase):
         self.assertEqual(code, 0)
         run_mock.assert_called_once_with(["x402", "networks", "--json"])
 
+    def test_version_emits_skill_metadata_without_runtime_call(self) -> None:
+        expected = {
+            "ok": True,
+            "code": "skill_version",
+            "skillScriptSha256": "abc123",
+            "patchState": {"schemaVersion": 43, "lastError": None},
+        }
+        with mock.patch.object(skill, "_skill_version_payload", return_value=expected), mock.patch.object(
+            skill, "_run_agent"
+        ) as run_mock:
+            code, payload = self._capture(["xclaw_agent_skill.py", "version"])
+        self.assertEqual(code, 0)
+        self.assertEqual(payload, expected)
+        run_mock.assert_not_called()
+
     def test_tracked_list_delegates_to_runtime(self) -> None:
         with mock.patch.dict("os.environ", self._ENV, clear=False):
             with mock.patch.object(skill, "_run_agent", return_value=0) as run_mock:
