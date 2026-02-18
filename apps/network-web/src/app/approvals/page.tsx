@@ -423,7 +423,15 @@ export default function ApprovalsCenterPage() {
                     <button
                       key={key}
                       type="button"
-                      className={`${styles.segmentTab}${activeTab === key ? ` ${styles.segmentTabActive}` : ''}`}
+                      className={`${styles.segmentTab}${activeTab === key ? ` ${styles.segmentTabActive}` : ''}${
+                        key === 'pending'
+                          ? ` ${styles.segmentTabPending}`
+                          : key === 'approved'
+                            ? ` ${styles.segmentTabApproved}`
+                            : key === 'rejected'
+                              ? ` ${styles.segmentTabRejected}`
+                              : ''
+                      }`}
                       onClick={() => setActiveTab(key)}
                     >
                       {label}
