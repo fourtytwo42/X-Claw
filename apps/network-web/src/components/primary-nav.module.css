@@ -3,9 +3,9 @@
   top: 0.75rem;
   align-self: start;
   height: calc(100dvh - 1.5rem);
-  border: 1px solid var(--line, #22304d);
+  border: none;
   border-radius: 0;
-  background: linear-gradient(180deg, var(--bg-elev, #111a2e), var(--bg-elev-2, #0f172a));
+  background: transparent;
   display: grid;
   grid-template-rows: auto 1fr auto;
   gap: 0.65rem;
