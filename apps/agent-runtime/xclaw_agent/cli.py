@@ -91,9 +91,9 @@ MAX_TRADE_RETRIES = 3
 APPROVAL_WAIT_TIMEOUT_SEC = 1800
 # Poll faster while waiting so Telegram/web decisions feel instant.
 APPROVAL_WAIT_POLL_SEC = 1
-DEFAULT_TX_GAS_PRICE_GWEI = 5
-DEFAULT_TX_SEND_MAX_ATTEMPTS = 5
-TX_GAS_PRICE_BUMP_GWEI = 5
+DEFAULT_TX_GAS_PRICE_GWEI = 10
+DEFAULT_TX_SEND_MAX_ATTEMPTS = 7
+TX_GAS_PRICE_BUMP_GWEI = 10
 LIMIT_ORDER_STORE_VERSION = 1
 AGENT_RECOVERY_ACTION = "agent_key_recovery"
 
@@ -4448,7 +4448,9 @@ def _cast_rpc_send_transaction(rpc_url: str, tx_obj: dict[str, str], private_key
             raise WalletStoreError("cast send requires tx_obj.data as hex calldata.")
         attempts = _tx_send_max_attempts()
         last_err = "cast send failed."
-        nonce_override: int | None = None
+        # Prefer pending nonce so we submit after any in-flight txs instead of
+        # accidentally replacing the latest confirmed nonce at too-low gas.
+        nonce_override: int | None = _cast_nonce(cast_bin, rpc_url, from_addr, "pending")
         for attempt in range(attempts):
             send_cmd = [
                 cast_bin,

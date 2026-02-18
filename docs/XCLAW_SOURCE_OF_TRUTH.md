@@ -2638,6 +2638,9 @@ Limitations / notes:
    - Telegram-focused behavior is non-blocking: once a trade is `approval_pending`, the runtime should send/ensure prompt delivery and return control quickly (no long-running chat "typing").
    - callback/web approval continues to auto-resume execution (`xappr approve`) without requiring a second user message.
    - for non-Telegram channels, runtime may use bounded short polling while waiting for a just-issued decision to converge.
+12. Real-mode transaction send robustness:
+   - runtime send path must prefer `pending` nonce for signed transactions to avoid replacing an in-flight nonce unintentionally.
+   - retryable send errors (`replacement transaction underpriced`, `transaction underpriced`, `nonce too low`, `already known`) must trigger bounded gas escalation across attempts before final failure.
 
 ---
 
