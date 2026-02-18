@@ -1005,10 +1005,6 @@
 }
 
 @media (max-width: 1080px) {
-  .root {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
   .sidebar {
     position: static;
     height: auto;
@@ -1126,5 +1122,11 @@
 
   .walletTokenTitleRow .listTitle {
     max-width: 100%;
+  }
+}
+
+@media (max-width: 760px) {
+  .root {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

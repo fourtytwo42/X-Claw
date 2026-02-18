@@ -215,7 +215,7 @@
   }
 }
 
-@media (max-width: 900px) {
+@media (max-width: 760px) {
   .root {
     grid-template-columns: minmax(0, 1fr);
     padding-bottom: calc(5.2rem + env(safe-area-inset-bottom, 0px));

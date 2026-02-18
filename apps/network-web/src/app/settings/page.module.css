@@ -376,18 +376,18 @@
 }
 
 @media (max-width: 1080px) {
-  .root {
-    grid-template-columns: 1fr;
-    padding-bottom: calc(5.2rem + env(safe-area-inset-bottom, 0px));
-  }
-
   .agentRow {
     flex-direction: column;
     align-items: flex-start;
   }
 }
 
-@media (max-width: 720px) {
+@media (max-width: 760px) {
+  .root {
+    grid-template-columns: 1fr;
+    padding-bottom: calc(5.2rem + env(safe-area-inset-bottom, 0px));
+  }
+
   .agentActions,
   .actionRow {
     width: 100%;

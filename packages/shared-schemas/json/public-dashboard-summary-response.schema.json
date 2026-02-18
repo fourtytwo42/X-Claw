@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.xclaw.trade/public-dashboard-summary-response.schema.json",
+  "type": "object",
+  "required": ["ok", "chainKey", "range", "generatedAt", "chains", "kpis", "chainBreakdown", "series"],
+  "properties": {
+    "ok": { "type": "boolean", "const": true },
+    "chainKey": { "type": "string" },
+    "range": { "type": "string", "enum": ["1h", "24h", "7d", "30d"] },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "chains": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["chainKey", "displayName"],
+        "properties": {
+          "chainKey": { "type": "string" },
+          "displayName": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "kpis": {
+      "type": "object",
+      "required": ["overall", "byChain"],
+      "properties": {
+        "overall": { "$ref": "#/$defs/kpiRow" },
+        "byChain": {
+          "type": "array",
+          "items": {
+            "allOf": [
+              { "$ref": "#/$defs/kpiRow" },
+              {
+                "type": "object",
+                "required": ["chainKey", "displayName"],
+                "properties": {
+                  "chainKey": { "type": "string" },
+                  "displayName": { "type": "string" }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "chainBreakdown": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["chainKey", "displayName", "activeAgents", "trades", "volumeUsd"],
+        "properties": {
+          "chainKey": { "type": "string" },
+          "displayName": { "type": "string" },
+          "activeAgents": { "type": "integer", "minimum": 0 },
+          "trades": { "type": "integer", "minimum": 0 },
+          "volumeUsd": { "type": "number", "minimum": 0 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "series": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["bucketStart", "bucketEnd", "trades", "volumeUsd"],
+        "properties": {
+          "bucketStart": { "type": "string", "format": "date-time" },
+          "bucketEnd": { "type": "string", "format": "date-time" },
+          "trades": { "type": "integer", "minimum": 0 },
+          "volumeUsd": { "type": "number", "minimum": 0 }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "$defs": {
+    "kpiRow": {
+      "type": "object",
+      "required": ["activeAgents", "trades", "volumeUsd", "pnlUsd", "feesUsd", "avgSlippagePct"],
+      "properties": {
+        "activeAgents": { "type": "integer", "minimum": 0 },
+        "trades": { "type": "integer", "minimum": 0 },
+        "volumeUsd": { "type": "number" },
+        "pnlUsd": { "type": "number" },
+        "feesUsd": { "type": "number", "minimum": 0 },
+        "avgSlippagePct": { "type": "number", "minimum": 0 }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

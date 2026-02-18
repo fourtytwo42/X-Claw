@@ -1207,7 +1207,8 @@ DoD:
 - [x] dashboard shell is route-scoped (`/`, `/dashboard`) and does not regress non-dashboard pages.
 - [x] owner-only scope selector (`All agents` / `My agents`) appears only when owner session context exists.
 - [x] dashboard chain selector supports `All chains`, `Base Sepolia`, `Hardhat Local` and consistently filters dashboard data.
-- [x] KPI strip, chart panel (tabs + time range + filters), live feed, top agents, recently active, venue breakdown, execution health, trending cards, and docs card are present with loading/empty/error handling.
+- [x] KPI strip, chain/system chart panel (view switcher + time range), live feed, top agents, chain breakdown, trade snapshot, trending cards, and docs card are present with loading/empty/error handling.
+- [x] `GET /api/v1/public/dashboard/summary` provides dashboard KPIs, range chart series, and chain breakdown with zero-state enabled-chain rows.
 - [x] unsupported metrics (fees/slippage/health internals) are visibly labeled as estimated/derived where exact API data is unavailable.
 - [x] dark/light theme tokens for dashboard match locked palette and remain readable.
 - [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`.

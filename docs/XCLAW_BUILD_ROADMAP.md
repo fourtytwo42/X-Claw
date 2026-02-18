@@ -2209,15 +2209,15 @@ Note:
   - [x] `ScopeSelector` (owner-only)
   - [x] `DarkModeToggle` (sun/moon + localStorage)
   - [x] `KPIStatCard` strip
-  - [x] `ChartPanel` (tabs/range/filter chips + line/bar)
+  - [x] `ChartPanel` (chain/system view switcher + time range + line/bar)
   - [x] `LiveTradeFeedList`
   - [x] `TopAgentsLeaderboard`
-  - [x] `RecentlyActiveList`
-  - [x] `VenueBreakdownChart`
-  - [x] `ExecutionHealthCard`
+  - [x] `ChainBreakdownCard`
+  - [x] `TradeSnapshotCard`
   - [x] `TrendingAgentCardGrid`
   - [x] `DocLinkCard`
 - [x] Keep existing API contracts and derive unsupported metrics with explicit estimated labeling.
+- [x] Add `GET /api/v1/public/dashboard/summary` for chain-aware KPI + series + zero-state chain breakdown aggregation.
 
 ### 69.3 Validation + evidence
 - [x] Run required gates:
