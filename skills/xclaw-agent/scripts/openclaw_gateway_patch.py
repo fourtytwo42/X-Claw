@@ -408,16 +408,11 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
             text4,
         )
         text6, n5 = re.subn(
-            r'\s*try \{ await bot\.api\.sendMessage\(chatId, finalMsg\); \} catch \{\}\n',
-            '\n',
+            r'(const finalMsg = `\$\{head\}\$\{pairLine\}\\nTrade: \$\{subjectId\}\\nChain: \$\{chainKey\}\$\{txLine\}\$\{reasonLine\}`;)',
+            r'\1 try { await bot.api.sendMessage(chatId, finalMsg); } catch {} try { const decisionWord = body?.ok ? "FILLED" : "FAILED"; const instruction = body?.ok ? "Reply to the user confirming the trade succeeded with tx details." : "Reply to the user confirming the trade failed and provide next steps."; const syntheticText = `[X-CLAW TRADE RESULT]\\nDecision: ${decisionWord}\\nTrade: ${subjectId}\\nChain: ${chainKey}\\nTxHash: ${txHash || "n/a"}${pairLine ? `\\nPair: ${amountHuman} ${tokenInSym} -> ${tokenOutSym}` : ""}\\nSource: telegram_callback_trade\\nInstruction: ${instruction}`; const storeAllowFrom2 = await readChannelAllowFromStore("telegram").catch(() => []); const getFile2 = typeof ctx.getFile === "function" ? ctx.getFile.bind(ctx) : async () => ({}); const syntheticMessage2 = { ...callbackMessage, from: callback.from, text: syntheticText, caption: void 0, caption_entities: void 0, entities: void 0, date: Math.floor(Date.now() / 1000) }; await processMessage({ message: syntheticMessage2, me: ctx.me, getFile: getFile2 }, [], storeAllowFrom2, { messageIdOverride: `xclaw-trade-result-${callback.id}` }); } catch {}',
             text5,
         )
-        text7, n6 = re.subn(
-            r'(const finalMsg = `\$\{head\}\$\{pairLine\}\\nTrade: \$\{subjectId\}\\nChain: \$\{chainKey\}\$\{txLine\}\$\{reasonLine\}`;)',
-            r'\1 try { const decisionWord = body?.ok ? "FILLED" : "FAILED"; const instruction = body?.ok ? "Reply to the user confirming the trade succeeded with tx details." : "Reply to the user confirming the trade failed and provide next steps."; const syntheticText = `[X-CLAW TRADE RESULT]\\nDecision: ${decisionWord}\\nTrade: ${subjectId}\\nChain: ${chainKey}\\nTxHash: ${txHash || "n/a"}${pairLine ? `\\nPair: ${amountHuman} ${tokenInSym} -> ${tokenOutSym}` : ""}\\nSource: telegram_callback_trade\\nInstruction: ${instruction}`; const storeAllowFrom2 = await readChannelAllowFromStore("telegram").catch(() => []); const getFile2 = typeof ctx.getFile === "function" ? ctx.getFile.bind(ctx) : async () => ({}); const syntheticMessage2 = { ...callbackMessage, from: callback.from, text: syntheticText, caption: void 0, caption_entities: void 0, entities: void 0, date: Math.floor(Date.now() / 1000) }; await processMessage({ message: syntheticMessage2, me: ctx.me, getFile: getFile2 }, [], storeAllowFrom2, { messageIdOverride: `xclaw-trade-result-${callback.id}` }); } catch {}',
-            text6,
-        )
-        return text7, (n1 > 0) or (n2 > 0) or (n3 > 0) or (n4 > 0) or (n5 > 0) or (n6 > 0)
+        return text6, (n1 > 0) or (n2 > 0) or (n3 > 0) or (n4 > 0) or (n5 > 0)
 
     if (
         MARKER in raw
@@ -647,6 +642,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst reasonLine = !body?.ok ? `\\nReason: ${String(body?.message ?? err ?? `resume exit ${exitCode}`)}` : "";\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst pairLine = amountHuman && tokenInSym && tokenOutSym ? `\\n${amountHuman} ${tokenInSym} -> ${tokenOutSym}` : "";\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst finalMsg = `${head}${pairLine}\\nTrade: ${subjectId}\\nChain: ${chainKey}${txLine}${reasonLine}`;\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\ttry { await bot.api.sendMessage(chatId, finalMsg); } catch {}\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\ttry {\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst decisionWord = body?.ok ? "FILLED" : "FAILED";\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst instruction = body?.ok\n'
