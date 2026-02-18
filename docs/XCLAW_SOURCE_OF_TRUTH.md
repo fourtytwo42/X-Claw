@@ -2822,6 +2822,10 @@ Limitations / notes:
    - transfer approval creation sends an out-of-band Telegram approval prompt only when OpenClaw `lastChannel == telegram`,
    - if active channel is not Telegram, no transfer approval prompt is pushed to chat (approval remains web-manageable),
    - when transfer status is `approval_pending`, user-facing skill reply must be concise (queued for management approval) and must not dump raw queued transfer message text.
+   - before broadcasting approved transfers, runtime must run balance preflight checks:
+     - native sends: fail fast when wallet native balance is insufficient,
+     - token sends: fail fast when token balance is insufficient for `amountWei`,
+     - failure message must include wallet context (and token address for ERC-20) so operator can diagnose wallet/agent mismatch.
    - transfer approve/deny actions are handled from management surfaces/callback pipeline; transfer queued-message text is an internal payload, not the primary chat UX.
 8. Web remote interface requirements:
    - `/agents/:id` management exposes transfer approval policy controls and transfer approval queue/history,

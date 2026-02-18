@@ -1063,6 +1063,32 @@ class TradePathRuntimeTests(unittest.TestCase):
         self.assertEqual(out.get("ok"), False)
         self.assertEqual(out.get("code"), "not_actionable")
 
+    def test_transfer_balance_precondition_blocks_insufficient_token_balance(self) -> None:
+        with mock.patch.object(cli, "_fetch_token_balance_wei", return_value="500"):
+            with self.assertRaises(cli.WalletStoreError) as ctx:
+                cli._assert_transfer_balance_preconditions(
+                    chain="base_sepolia",
+                    transfer_type="token",
+                    wallet_address="0x" + "11" * 20,
+                    amount_wei="1000",
+                    token_address="0x" + "22" * 20,
+                    token_symbol="WETH",
+                    token_decimals=18,
+                )
+        self.assertIn("Insufficient WETH balance", str(ctx.exception))
+
+    def test_transfer_balance_precondition_allows_sufficient_token_balance(self) -> None:
+        with mock.patch.object(cli, "_fetch_token_balance_wei", return_value="1000"):
+            cli._assert_transfer_balance_preconditions(
+                chain="base_sepolia",
+                transfer_type="token",
+                wallet_address="0x" + "11" * 20,
+                amount_wei="1000",
+                token_address="0x" + "22" * 20,
+                token_symbol="WETH",
+                token_decimals=18,
+            )
+
     def test_trade_spot_builds_quote_and_swap_calls(self) -> None:
         args = argparse.Namespace(
             chain="base_sepolia",

@@ -2141,6 +2141,7 @@ def _execute_pending_transfer_flow(flow: dict[str, Any]) -> dict[str, Any]:
     _record_pending_transfer_flow(approval_id, flow)
     _mirror_transfer_approval(flow)
 
+    from_address: str | None = None
     try:
         amount_int = int(amount_wei)
         state, day_key, current_spend, max_daily_wei = _enforce_spend_preconditions(chain, amount_int)
@@ -2160,6 +2161,16 @@ def _execute_pending_transfer_flow(flow: dict[str, Any]) -> dict[str, Any]:
         if wallet is None:
             raise WalletStoreError(f"No wallet configured for chain '{chain}'.")
         _validate_wallet_entry_shape(wallet)
+        from_address = str(wallet.get("address"))
+        _assert_transfer_balance_preconditions(
+            chain=chain,
+            transfer_type=transfer_type,
+            wallet_address=from_address,
+            amount_wei=amount_wei,
+            token_address=token_address,
+            token_symbol=token_symbol,
+            token_decimals=token_decimals,
+        )
         passphrase = _require_wallet_passphrase_for_signing(chain)
         private_key_hex = _decrypt_private_key(wallet, passphrase).hex()
 
@@ -2187,7 +2198,6 @@ def _execute_pending_transfer_flow(flow: dict[str, Any]) -> dict[str, Any]:
                 stdout = (receipt_proc.stdout or "").strip()
                 raise WalletStoreError(stderr or stdout or "cast receipt failed.")
         else:
-            from_address = str(wallet.get("address"))
             rpc_url = _chain_rpc_url(chain)
             data = _cast_calldata("transfer(address,uint256)(bool)", [to_address, amount_wei])
             tx_hash = _cast_rpc_send_transaction(
@@ -2234,6 +2244,7 @@ def _execute_pending_transfer_flow(flow: dict[str, Any]) -> dict[str, Any]:
             "amount": amount_human,
             "amountUnit": amount_unit,
             "amountDisplay": amount_display,
+            "from": from_address,
             "txHash": tx_hash,
             "day": day_key,
             "dailySpendWei": str(current_spend + amount_int),
@@ -2269,6 +2280,7 @@ def _execute_pending_transfer_flow(flow: dict[str, Any]) -> dict[str, Any]:
             "amount": amount_human,
             "amountUnit": amount_unit,
             "amountDisplay": amount_display,
+            "from": from_address,
             "txHash": flow.get("txHash"),
             "reasonCode": "transfer_execution_failed",
             "reasonMessage": message,
@@ -5297,6 +5309,46 @@ def _fetch_token_allowance_wei(chain: str, token_address: str, owner: str, spend
     output = (proc.stdout or "").strip().splitlines()
     parsed = _parse_uint_text(output[-1] if output else "")
     return str(parsed)
+
+
+def _assert_transfer_balance_preconditions(
+    *,
+    chain: str,
+    transfer_type: str,
+    wallet_address: str,
+    amount_wei: str,
+    token_address: str | None,
+    token_symbol: str,
+    token_decimals: int | None,
+) -> None:
+    amount_int = int(amount_wei)
+    if transfer_type == "native":
+        native_balance_wei = int(_fetch_native_balance_wei(chain, wallet_address))
+        if native_balance_wei < amount_int:
+            native_symbol = _native_symbol_for_chain(chain)
+            raise WalletStoreError(
+                f"Insufficient {native_symbol} balance for transfer: "
+                f"have {_format_units_pretty(native_balance_wei, 18)} {native_symbol}, "
+                f"need {_format_units_pretty(amount_int, 18)} {native_symbol} "
+                f"(wallet {wallet_address})."
+            )
+        return
+
+    if transfer_type != "token":
+        return
+    if not token_address or not is_hex_address(token_address):
+        raise WalletStoreError("Transfer token address is invalid.")
+
+    token_balance_wei = int(_fetch_token_balance_wei(chain, wallet_address, token_address))
+    decimals = int(token_decimals) if token_decimals is not None else 18
+    symbol = token_symbol.strip() or "TOKEN"
+    if token_balance_wei < amount_int:
+        raise WalletStoreError(
+            f"Insufficient {symbol} balance for transfer: "
+            f"have {_format_units_pretty(token_balance_wei, decimals)} {symbol}, "
+            f"need {_format_units_pretty(amount_int, decimals)} {symbol} "
+            f"(wallet {wallet_address}, token {token_address})."
+        )
 
 
 def _canonical_token_map(chain: str) -> dict[str, str]:
