@@ -13,9 +13,9 @@ function hashString(input: string): number {
   return hash >>> 0;
 }
 
-export function getAgentAvatarPalette(agentId: string): AgentAvatarPalette {
+export function getAgentAvatarPalette(agentId: string, hueOffset = 0): AgentAvatarPalette {
   const hash = hashString(agentId || 'xclaw-agent');
-  const hue = hash % 360;
+  const hue = ((hash % 360) + (hueOffset % 360) + 360) % 360;
   const lightness = 42 + ((hash >>> 8) % 8);
   const borderLightness = Math.max(24, lightness - 14);
   return {

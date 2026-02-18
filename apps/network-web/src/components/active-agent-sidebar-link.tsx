@@ -88,13 +88,13 @@ export function ActiveAgentSidebarLink({ itemClassName, activeClassName, showLab
 
   return (
     <>
-      {managedAgentIds.map((agentId) => {
+      {managedAgentIds.map((agentId, index) => {
         const agentName = agentNames[agentId] ?? agentId;
         const title = agentName || agentId;
         const isActive = pathname === `/agents/${agentId}`;
         const className = isActive && activeClassName ? `${itemClassName} ${activeClassName}` : itemClassName;
         const initial = getAgentInitial(agentName, agentId);
-        const avatarPalette = getAgentAvatarPalette(agentId);
+        const avatarPalette = getAgentAvatarPalette(agentId, index * 137);
         return (
           <Link key={`managed-${agentId}`} href={`/agents/${encodeURIComponent(agentId)}`} className={className} aria-label={title} title={title}>
             <span
