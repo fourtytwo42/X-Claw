@@ -40,6 +40,7 @@ DECISION_ACK_MARKER_V9 = "xclaw: telegram approval decision ack v9"
 DECISION_ACK_MARKER_V10 = "xclaw: telegram approval decision ack v10"
 DECISION_ACK_MARKER_V11 = "xclaw: telegram approval decision ack v11"
 DECISION_ACK_MARKER_V12 = "xclaw: telegram approval decision ack v12"
+DECISION_ACK_MARKER_V13 = "xclaw: telegram approval decision ack v13"
 DECISION_ROUTE_MARKER_V1 = "xclaw: telegram approval decision routed to agent"
 DECISION_EXEC_MARKER_V1 = "xclaw: telegram trade resume trigger v1"
 DECISION_RESULT_ROUTE_MARKER_V1 = "xclaw: telegram trade result routed to agent"
@@ -48,7 +49,7 @@ QUEUED_BUTTONS_MARKER_V2 = "xclaw: telegram queued approval buttons v2"
 QUEUED_BUTTONS_MARKER_V3 = "xclaw: telegram queued approval buttons v3"
 LEGACY_DM_SENTINEL = 'Allow in DMs even when inlineButtonsScope is "allowlist", gated by chatId == senderId.'
 # Bump when patch semantics change so we invalidate the cached "already patched" fast-path.
-STATE_SCHEMA_VERSION = 42
+STATE_SCHEMA_VERSION = 43
 STATE_DIR = Path.home() / ".openclaw" / "xclaw"
 STATE_FILE = STATE_DIR / "openclaw_patch_state.json"
 LOCK_FILE = STATE_DIR / "openclaw_patch.lock"
@@ -195,7 +196,9 @@ def _find_loader_bundles(pkg_root: Path) -> list[Path]:
         return []
     # OpenClaw gateway mode (`dist/index.js`) imports hashed bundles (e.g. `reply-*.js`).
     # We patch any bundle that contains the Telegram callback_query handler we need.
-    candidates = sorted(dist_dir.rglob("*.js"))
+    # Restrict to top-level gateway bundles only. `dist/plugin-sdk/*` bundles are not the
+    # runtime callback surface and patching them can break syntax validation.
+    candidates = sorted(dist_dir.glob("reply-*.js"))
     bundles: list[Path] = []
     for path in candidates:
         # Safety: only patch the canonical gateway reply bundle(s). Patching multiple hashed bundles
@@ -284,6 +287,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         or DECISION_ACK_MARKER_V10 not in raw
         or DECISION_ACK_MARKER_V11 not in raw
         or DECISION_ACK_MARKER_V12 not in raw
+        or DECISION_ACK_MARKER_V13 not in raw
         or DECISION_ROUTE_MARKER_V1 not in raw
         or DECISION_EXEC_MARKER_V1 not in raw
         or DECISION_RESULT_ROUTE_MARKER_V1 not in raw
@@ -309,6 +313,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         or DECISION_ACK_MARKER_V10 not in raw
         or DECISION_ACK_MARKER_V11 not in raw
         or DECISION_ACK_MARKER_V12 not in raw
+        or DECISION_ACK_MARKER_V13 not in raw
         or DECISION_ROUTE_MARKER_V1 not in raw
         or DECISION_EXEC_MARKER_V1 not in raw
         or DECISION_RESULT_ROUTE_MARKER_V1 not in raw
@@ -416,6 +421,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         and DECISION_ACK_MARKER_V10 in raw
         and DECISION_ACK_MARKER_V11 in raw
         and DECISION_ACK_MARKER_V12 in raw
+        and DECISION_ACK_MARKER_V13 in raw
         and DECISION_ROUTE_MARKER_V1 in raw
         and DECISION_EXEC_MARKER_V1 in raw
         and DECISION_RESULT_ROUTE_MARKER_V1 in raw
@@ -557,6 +563,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         '\t\t\t\t\t\t\tbody: JSON.stringify(payload)\n'
         '\t\t\t\t\t\t});\n'
         '\t\t\t\t\t\ttry { logger.info({ subjectId, chainKey, kind: parts[0], status: res.status }, "xclaw: telegram approval callback server response"); } catch {}\n'
+        '\t\t\t\t\t\t\ttry {\n'
         '\t\t\t\t\t\t\tif (res.ok) {\n'
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER}\n'
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V2}\n'
@@ -570,6 +577,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V10}\n'
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V11}\n'
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V12}\n'
+        f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V13}\n'
         '\t\t\t\t\t\t\t\t// Keep queued text in chat history and only clear inline buttons.\n'
         '\t\t\t\t\t\t\t\ttry { await bot.api.editMessageReplyMarkup(chatId, callbackMessage.message_id, { inline_keyboard: [] }); } catch {}\n'
         '\t\t\t\t\t\t\t\t// Emit deterministic confirmation immediately so users always see a result.\n'
@@ -672,6 +680,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         '\t\t\t\t\t\t\t\t\t\t\t}\n'
         '\t\t\t\t\t\t\t\t\t\t} catch {}\n'
         '\t\t\t\t\t\t\t\t}\n'
+        '\t\t\t\t\t\t\t}\n'
         '\t\t\t\t\t\t\t} catch (err) {\n'
         '\t\t\t\t\t\t\t\t\t// Fallback: still send minimal confirmation so the user sees feedback even if the agent pipeline fails.\n'
         '\t\t\t\t\t\t\t\t\ttry {\n'
@@ -684,7 +693,6 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         '\t\t\t\t\t\t\t\t\t} catch {}\n'
         '\t\t\t\t\t\t\t\t}\n'
         '\t\t\t\t\t\t\t\treturn;\n'
-        '\t\t\t\t\t\t\t}\n'
         '\t\t\t\t\t\t\tlet errCode = "api_error"; let errMsg = `HTTP ${res.status}`;\n'
         '\t\t\t\t\t\t\ttry { const body = await res.json(); if (typeof body?.code === "string" && body.code.trim()) errCode = body.code.trim(); if (typeof body?.message === "string" && body.message.trim()) errMsg = body.message.trim(); if (res.status === 409 && (body?.details?.currentStatus === "approved" || body?.details?.currentStatus === "filled" || body?.details?.currentStatus === "rejected")) { try { await bot.api.editMessageReplyMarkup(chatId, callbackMessage.message_id, { inline_keyboard: [] }); } catch {} const currentStatus = String(body?.details?.currentStatus || ""); const decision = currentStatus === "rejected" ? "Denied" : "Approved"; const subjectLabel = parts[0] === "xpol" ? "policy approval" : (parts[0] === "xfer" ? "transfer approval" : "trade"); await bot.api.sendMessage(chatId, `${decision} ${subjectLabel} ${subjectId}\\nChain: ${chainKey}`); return; } } catch {}\n'
         '\t\t\t\t\t\t\ttry {\n'

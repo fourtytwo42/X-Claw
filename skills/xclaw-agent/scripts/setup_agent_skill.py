@@ -43,6 +43,22 @@ def fail(message: str, action_hint: str = "") -> int:
     return 1
 
 
+def _parse_last_json_line(text: str) -> dict | None:
+    for raw in reversed((text or "").splitlines()):
+        line = raw.strip()
+        if not line:
+            continue
+        if not (line.startswith("{") and line.endswith("}")):
+            continue
+        try:
+            parsed = json.loads(line)
+            if isinstance(parsed, dict):
+                return parsed
+        except Exception:
+            continue
+    return None
+
+
 def resolve_openclaw() -> Optional[Path]:
     found = shutil.which("openclaw")
     if found:
@@ -252,13 +268,30 @@ def main() -> int:
         launcher = ensure_launcher(workspace, openclaw_bin)
         ensure_runtime_bin_env(launcher)
         ensure_default_policy_file(os.environ.get("XCLAW_DEFAULT_CHAIN", "base_sepolia"))
+        gateway_patch: dict[str, object] | None = None
         # Portable Telegram approvals: patch OpenClaw gateway bundle idempotently.
         try:
             if os.environ.get("XCLAW_OPENCLAW_AUTO_PATCH", "1").strip().lower() not in {"0", "false", "no"} and PATCHER.exists():
                 # Restart is best-effort and guarded by cooldown+lock inside patcher.
-                run(["python3", str(PATCHER), "--json", "--restart"], check=False)
+                patch_proc = run([*_python_command(), str(PATCHER), "--json", "--restart"], check=False)
+                gateway_patch = _parse_last_json_line((patch_proc.stdout or "").strip()) or {}
+                if not gateway_patch:
+                    gateway_patch = {
+                        "ok": False,
+                        "patched": False,
+                        "error": "patch_output_parse_failed",
+                        "stdout": (patch_proc.stdout or "").strip()[:300],
+                        "stderr": (patch_proc.stderr or "").strip()[:300],
+                    }
+                strict_patch = os.environ.get("XCLAW_OPENCLAW_PATCH_STRICT", "1").strip().lower() not in {"0", "false", "no"}
+                if strict_patch and not bool(gateway_patch.get("ok")):
+                    err = str(gateway_patch.get("error") or "unknown_patch_error")
+                    hint = "Ensure OpenClaw is current, then rerun setup."
+                    if "syntax_check_failed" in err:
+                        hint = "OpenClaw bundle patch failed syntax check. Update OpenClaw and rerun setup."
+                    raise RuntimeError(f"OpenClaw gateway patch failed: {err}. {hint}")
         except Exception:
-            pass
+            raise
         versions = ensure_ready()
     except subprocess.CalledProcessError as exc:
         stderr = (exc.stderr or "").strip()
@@ -280,6 +313,8 @@ def main() -> int:
         "python": versions["python"],
         "openclaw": versions["openclaw"],
     }
+    if gateway_patch is not None:
+        payload["gatewayPatch"] = gateway_patch
     print(json.dumps(payload))
     return 0
 
