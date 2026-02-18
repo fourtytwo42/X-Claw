@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 
-import { getChainConfig } from '@/lib/chains';
+import { chainRpcUrl, getChainConfig } from '@/lib/chains';
 import { dbQuery } from '@/lib/db';
 import { errorResponse, internalErrorResponse, successResponse } from '@/lib/errors';
 import { enforcePublicReadRateLimit } from '@/lib/rate-limit';
@@ -8,6 +8,26 @@ import { getRequestId } from '@/lib/request-id';
 import { resolveTokenDecimals } from '@/lib/token-metadata';
 
 export const runtime = 'nodejs';
+
+async function rpcRequest(rpcUrl: string, method: string, params: unknown[]): Promise<unknown> {
+  const res = await fetch(rpcUrl, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params })
+  });
+  if (!res.ok) {
+    throw new Error(`RPC ${method} failed with HTTP ${res.status}`);
+  }
+  const parsed = (await res.json()) as { result?: unknown; error?: { message?: string } };
+  if (parsed.error) {
+    throw new Error(parsed.error.message ?? `RPC ${method} returned error`);
+  }
+  return parsed.result;
+}
+
+function normalizeTokenKey(value: string): string {
+  return String(value ?? '').trim().toLowerCase();
+}
 
 export async function GET(
   req: NextRequest,
@@ -223,12 +243,73 @@ export async function GET(
       }))
     );
 
+    // Fallback: include canonical token balances from live RPC when snapshots are missing.
+    const canonicalFallbackRows: Array<{
+      chain_key: string;
+      token: string;
+      balance: string;
+      decimals: number;
+      observed_at: string;
+    }> = [];
+    const walletsByChain = new Map(wallets.rows.map((row) => [row.chain_key, row.address]));
+    const existingTokenKeysByChain = new Map<string, Set<string>>();
+    for (const row of enrichedWalletBalances) {
+      const set = existingTokenKeysByChain.get(row.chain_key) ?? new Set<string>();
+      set.add(normalizeTokenKey(row.token));
+      existingTokenKeysByChain.set(row.chain_key, set);
+    }
+    const chainTargets = chainKey === 'all' ? wallets.rows.map((row) => row.chain_key) : [chainKey];
+    for (const targetChain of chainTargets) {
+      const cfg = getChainConfig(targetChain);
+      const rpcUrl = chainRpcUrl(targetChain);
+      const walletAddress = walletsByChain.get(targetChain) ?? '';
+      if (!cfg || !rpcUrl || !walletAddress) {
+        continue;
+      }
+      const present = existingTokenKeysByChain.get(targetChain) ?? new Set<string>();
+      for (const [symbol, tokenAddress] of Object.entries(cfg.canonicalTokens ?? {})) {
+        const symbolKey = normalizeTokenKey(symbol);
+        const addressKey = normalizeTokenKey(tokenAddress);
+        if (present.has(symbolKey) || present.has(addressKey)) {
+          continue;
+        }
+        try {
+          const rawBalanceHex = (await rpcRequest(rpcUrl, 'eth_call', [
+            {
+              to: tokenAddress,
+              data: `0x70a08231000000000000000000000000${walletAddress.slice(2).toLowerCase()}`
+            },
+            'latest'
+          ])) as string;
+          const balance = BigInt(String(rawBalanceHex || '0x0')).toString();
+          canonicalFallbackRows.push({
+            chain_key: targetChain,
+            token: symbol,
+            balance,
+            decimals: await resolveTokenDecimals(targetChain, tokenAddress).catch(() => 18),
+            observed_at: new Date().toISOString()
+          });
+          present.add(symbolKey);
+          present.add(addressKey);
+          existingTokenKeysByChain.set(targetChain, present);
+        } catch {
+          // Best-effort fallback only.
+        }
+      }
+    }
+    const finalWalletBalances = [...enrichedWalletBalances, ...canonicalFallbackRows].sort((a, b) => {
+      if (a.chain_key !== b.chain_key) {
+        return a.chain_key.localeCompare(b.chain_key);
+      }
+      return a.token.localeCompare(b.token);
+    });
+
     return successResponse(
       {
         ok: true,
         agent: agent.rows[0],
         wallets: wallets.rows,
-        walletBalances: enrichedWalletBalances,
+        walletBalances: finalWalletBalances,
         latestMetrics,
         metricsByMode: {
           mock: null,

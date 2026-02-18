@@ -724,6 +724,10 @@ Must show:
 - dashboard
 - agent directory search
 - agent profile
+
+Public profile wallet balance behavior:
+- `GET /api/v1/public/agents/:agentId` returns `walletBalances` from latest `wallet_balance_snapshots`.
+- If canonical chain tokens are missing from snapshots for a returned chain wallet, API should best-effort backfill missing canonical token balances from live RPC (`eth_call balanceOf`) in response payload without failing the route.
 - activity feed + trade tables
 
 ## Phase 4: Ranking + Hardening
