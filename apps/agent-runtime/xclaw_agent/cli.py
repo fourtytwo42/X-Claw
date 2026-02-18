@@ -228,6 +228,18 @@ def _env_timeout_sec(name: str, default: int) -> int:
     return value
 
 
+def _env_positive_int(name: str, default: int) -> int:
+    raw = (os.environ.get(name) or "").strip()
+    if not raw:
+        return default
+    if not re.fullmatch(r"[0-9]+", raw):
+        raise WalletStoreError(f"{name} must be an integer.")
+    parsed = int(raw)
+    if parsed < 1:
+        raise WalletStoreError(f"{name} must be >= 1.")
+    return parsed
+
+
 def _cast_call_timeout_sec() -> int:
     return _env_timeout_sec("XCLAW_CAST_CALL_TIMEOUT_SEC", 30)
 
@@ -238,6 +250,10 @@ def _cast_receipt_timeout_sec() -> int:
 
 def _cast_send_timeout_sec() -> int:
     return _env_timeout_sec("XCLAW_CAST_SEND_TIMEOUT_SEC", 90)
+
+
+def _transfer_executing_stale_sec() -> int:
+    return _env_positive_int("XCLAW_TRANSFER_EXECUTING_STALE_SEC", 45)
 
 
 def _run_subprocess(cmd: list[str], *, timeout_sec: int, kind: str) -> subprocess.CompletedProcess[str]:
@@ -1804,6 +1820,33 @@ def _remove_pending_transfer_flow(approval_id: str) -> None:
         _save_pending_transfer_flows(state)
 
 
+def _parse_iso_utc(value: str | None) -> datetime | None:
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    normalized = raw.replace("Z", "+00:00")
+    try:
+        parsed = datetime.fromisoformat(normalized)
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
+    except Exception:
+        return None
+
+
+def _is_stale_executing_transfer_flow(flow: dict[str, Any]) -> bool:
+    status = str(flow.get("status") or "")
+    if status not in {"executing", "verifying"}:
+        return False
+    if str(flow.get("txHash") or "").strip():
+        return False
+    updated_at = _parse_iso_utc(str(flow.get("updatedAt") or flow.get("decidedAt") or flow.get("createdAt") or ""))
+    if updated_at is None:
+        return True
+    age_sec = (datetime.now(timezone.utc) - updated_at).total_seconds()
+    return age_sec >= float(_transfer_executing_stale_sec())
+
+
 def _default_transfer_policy() -> dict[str, Any]:
     return {
         "schemaVersion": 1,
@@ -3028,6 +3071,22 @@ def cmd_approvals_resume_transfer(args: argparse.Namespace) -> int:
             reasonCode=flow.get("reasonCode"),
             reasonMessage=flow.get("reasonMessage"),
             skipped=True,
+        )
+    if status in {"executing", "verifying"}:
+        if _is_stale_executing_transfer_flow(flow):
+            flow["status"] = "approved"
+            flow["updatedAt"] = utc_now()
+            _record_pending_transfer_flow(approval_id, flow)
+            _mirror_transfer_approval(flow)
+            return emit(_execute_pending_transfer_flow(flow))
+        return ok(
+            "Transfer resume skipped: approval already in progress.",
+            approvalId=approval_id,
+            chain=chain,
+            status=status,
+            txHash=flow.get("txHash"),
+            skipped=True,
+            inProgress=True,
         )
     if status == "approved":
         return emit(_execute_pending_transfer_flow(flow))

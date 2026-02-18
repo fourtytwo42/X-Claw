@@ -1043,6 +1043,60 @@ class TradePathRuntimeTests(unittest.TestCase):
         self.assertEqual(approval.get("approvalId"), approval_id)
         self.assertEqual(approval.get("status"), "filled")
 
+    def test_approvals_resume_transfer_recovers_stale_executing_without_txhash(self) -> None:
+        approval_id = "xfr_resume_stale"
+        cli._record_pending_transfer_flow(
+            approval_id,
+            {
+                "approvalId": approval_id,
+                "chainKey": "base_sepolia",
+                "status": "executing",
+                "transferType": "token",
+                "tokenAddress": "0x" + "11" * 20,
+                "tokenSymbol": "WETH",
+                "tokenDecimals": 18,
+                "toAddress": "0x" + "22" * 20,
+                "amountWei": "1000000000000000",
+                "createdAt": "2026-02-18T00:00:00+00:00",
+                "updatedAt": "2026-02-18T00:00:00+00:00",
+            },
+        )
+        args = argparse.Namespace(approval_id=approval_id, chain="base_sepolia", json=True)
+        with mock.patch.object(cli, "_is_stale_executing_transfer_flow", return_value=True), mock.patch.object(
+            cli,
+            "_execute_pending_transfer_flow",
+            return_value={"ok": True, "code": "ok", "status": "filled", "approvalId": approval_id, "txHash": "0x" + "ab" * 32},
+        ), mock.patch.object(cli, "_mirror_transfer_approval"):
+            payload = self._run_and_parse_stdout(lambda: cli.cmd_approvals_resume_transfer(args))
+        self.assertTrue(payload.get("ok"))
+        self.assertEqual(payload.get("status"), "filled")
+
+    def test_approvals_resume_transfer_skips_recent_executing_without_txhash(self) -> None:
+        approval_id = "xfr_resume_recent"
+        now = cli.utc_now()
+        cli._record_pending_transfer_flow(
+            approval_id,
+            {
+                "approvalId": approval_id,
+                "chainKey": "base_sepolia",
+                "status": "executing",
+                "transferType": "token",
+                "tokenAddress": "0x" + "11" * 20,
+                "tokenSymbol": "WETH",
+                "tokenDecimals": 18,
+                "toAddress": "0x" + "22" * 20,
+                "amountWei": "1000000000000000",
+                "createdAt": now,
+                "updatedAt": now,
+            },
+        )
+        args = argparse.Namespace(approval_id=approval_id, chain="base_sepolia", json=True)
+        with mock.patch.object(cli, "_transfer_executing_stale_sec", return_value=9999):
+            payload = self._run_and_parse_stdout(lambda: cli.cmd_approvals_resume_transfer(args))
+        self.assertTrue(payload.get("ok"))
+        self.assertEqual(payload.get("status"), "executing")
+        self.assertEqual(payload.get("inProgress"), True)
+
     def test_execute_pending_transfer_flow_blocks_without_override_when_policy_now_blocked(self) -> None:
         flow = {
             "approvalId": "xfr_test_3",

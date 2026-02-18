@@ -6,6 +6,7 @@ import { chainRpcUrl, getChainConfig, supportedChainHint } from '@/lib/chains';
 import { requireManagementSession, sessionHasAgentAccess } from '@/lib/management-auth';
 import { getRequestId } from '@/lib/request-id';
 import { resolveTokenMetadata } from '@/lib/token-metadata';
+import { kickStaleTransferRecovery } from '@/lib/transfer-recovery';
 
 export const runtime = 'nodejs';
 
@@ -159,6 +160,9 @@ export async function GET(req: NextRequest) {
         requestId
       );
     }
+    try {
+      await kickStaleTransferRecovery(agentId, chainKey);
+    } catch {}
 
     const chainTokens = await Promise.all(
       Object.entries(chainCfg.canonicalTokens ?? {}).map(async ([symbol, address]) => {

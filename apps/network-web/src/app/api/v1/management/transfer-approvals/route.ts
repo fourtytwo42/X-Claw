@@ -5,6 +5,7 @@ import { dbQuery } from '@/lib/db';
 import { errorResponse, internalErrorResponse, successResponse } from '@/lib/errors';
 import { requireManagementSession, sessionHasAgentAccess } from '@/lib/management-auth';
 import { getRequestId } from '@/lib/request-id';
+import { kickStaleTransferRecovery } from '@/lib/transfer-recovery';
 
 export const runtime = 'nodejs';
 
@@ -100,6 +101,9 @@ export async function GET(req: NextRequest) {
     }
 
     const chainKey = req.nextUrl.searchParams.get('chainKey')?.trim() || 'base_sepolia';
+    try {
+      await kickStaleTransferRecovery(agentId, chainKey);
+    } catch {}
     const [queue, history] = await Promise.all([
       dbQuery<{
         approval_id: string;
