@@ -282,7 +282,7 @@ fi
 ensure_python_runtime_deps "$XCLAW_PYTHON_BIN"
 export XCLAW_AGENT_PYTHON_BIN="$XCLAW_PYTHON_BIN"
 echo "[xclaw] running setup_agent_skill.py"
-xclaw_telegram_force_management=0
+xclaw_telegram_force_management="disabled"
 set +e
 setup_output="$("$XCLAW_PYTHON_BIN" skills/xclaw-agent/scripts/setup_agent_skill.py 2>&1)"
 setup_status=$?
@@ -310,7 +310,7 @@ if [ "$setup_status" -ne 0 ]; then
       printf '%s\n' "$setup_output"
     fi
     if [ "$setup_status" -eq 0 ]; then
-      xclaw_telegram_force_management=1
+      xclaw_telegram_force_management="enabled"
     fi
   fi
   if [ "$setup_status" -ne 0 ]; then
@@ -761,7 +761,7 @@ if [ "$(id -u)" -eq 0 ] && [ -n "\${SUDO_USER:-}" ] && [ "$SUDO_USER" != "root" 
   chown -R "$XCLAW_INSTALL_TARGET_USER":"$XCLAW_INSTALL_TARGET_USER" "$HOME/.openclaw" "$HOME/.xclaw-agent" "$HOME/.foundry" "$XCLAW_WORKDIR" 2>/dev/null || true
 fi
 
-if [ "$xclaw_telegram_force_management" = "1" ]; then
+if [ "$xclaw_telegram_force_management" = "enabled" ]; then
   printf '\n\\033[1;37;41m[xclaw] TELEGRAM FALLBACK MODE ENABLED\\033[0m\n'
   printf '\\033[1;33m[xclaw] Inline Approve/Deny buttons are disabled in this install context.\\033[0m\n'
   printf '\\033[1;33m[xclaw] Agent will route Telegram approvals through X-Claw management links.\\033[0m\n'

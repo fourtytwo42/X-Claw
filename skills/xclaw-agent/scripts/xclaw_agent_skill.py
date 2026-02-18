@@ -172,7 +172,7 @@ def _env_truthy(name: str, default: bool = False) -> bool:
     raw = os.environ.get(name, "").strip().lower()
     if not raw:
         return default
-    return raw in {"1", "true", "yes", "on"}
+    return raw in {"1", "true", "yes", "on", "enabled"}
 
 
 def _normalize_non_terminal_approval(runtime_json: dict) -> Optional[dict]:
