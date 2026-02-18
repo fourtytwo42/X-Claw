@@ -1079,14 +1079,26 @@ export default function AgentPublicProfilePage() {
   }, [preferredWithdrawDestination]);
   const tokenDecimalsBySymbol = useMemo(() => {
     const map = new Map<string, number>();
+    if (management.phase === 'ready') {
+      for (const token of management.data.chainTokens ?? []) {
+        const symbol = normalizeTokenSelectionSymbol(token.symbol);
+        if (!symbol) {
+          continue;
+        }
+        const decimals = typeof token.decimals === 'number' && Number.isFinite(token.decimals) ? token.decimals : null;
+        if (decimals !== null && decimals >= 0) {
+          map.set(symbol, decimals);
+        }
+      }
+    }
     for (const holding of holdings) {
       const symbol = normalizeTokenSelectionSymbol(holding.token);
-      if (symbol) {
+      if (symbol && !map.has(symbol)) {
         map.set(symbol, holding.decimals);
       }
     }
     return map;
-  }, [holdings]);
+  }, [holdings, management]);
 
   const explorerTxBaseUrl = useMemo(() => {
     const base = activeDepositChain?.explorerBaseUrl ?? null;
@@ -1146,6 +1158,16 @@ export default function AgentPublicProfilePage() {
       return `${formatDecimalText(amount)} ${tokenLabel}`;
     },
     []
+  );
+
+  const formatX402AtomicAmount = useCallback(
+    (amountAtomic: string | null | undefined, assetKind: 'native' | 'erc20', assetSymbol: string | null | undefined) => {
+      const symbol = assetKind === 'native' ? activeNativeSymbol : normalizeTokenSelectionSymbol(assetSymbol) || 'TOKEN';
+      const tokenLabel = assetKind === 'native' ? `${activeChainLabel} ${activeNativeSymbol}` : symbol;
+      const decimals = assetKind === 'native' ? 18 : tokenDecimalsBySymbol.get(symbol);
+      return formatHumanAmount(amountAtomic, tokenLabel, decimals);
+    },
+    [activeChainLabel, activeNativeSymbol, formatHumanAmount, tokenDecimalsBySymbol]
   );
 
   const transferApprovedState = useCallback((status: string) => {
@@ -1226,12 +1248,12 @@ export default function AgentPublicProfilePage() {
       for (const payment of x402Payments?.history ?? []) {
         const symbol = normalizeTokenSelectionSymbol(payment.asset_symbol || (payment.asset_kind === 'native' ? activeNativeSymbol : 'TOKEN'));
         const directionLabel = payment.direction === 'inbound' ? 'Received' : 'Sent';
-        const titleToken = payment.asset_symbol || (payment.asset_kind === 'native' ? `${activeChainLabel} ${activeNativeSymbol}` : 'Token');
+        const amountLabel = formatX402AtomicAmount(payment.amount_atomic, payment.asset_kind, payment.asset_symbol);
         items.push({
           id: `x402-${payment.payment_id}`,
           at: payment.terminal_at ?? payment.updated_at ?? payment.created_at,
           kind: payment.direction === 'inbound' ? 'deposits' : 'transfers',
-          title: `x402 ${directionLabel} ${formatDecimalText(payment.amount_atomic)} ${titleToken}`,
+          title: `x402 ${directionLabel} ${amountLabel}`,
           subtitle: `Status: ${displayStatusLabel(payment.status)}; Network: ${humanizeKeyLabel(payment.network_key)}; Facilitator: ${humanizeKeyLabel(payment.facilitator_key)}`,
           status: payment.status,
           txHash: payment.tx_hash ?? null,
@@ -1246,6 +1268,11 @@ export default function AgentPublicProfilePage() {
         const transferDecimals =
           item.transfer_type === 'native' ? 18 : (tokenDecimalsBySymbol.get(normalizeTokenSelectionSymbol(item.token_symbol)) ?? 18);
         const transferAmount = formatHumanAmount(item.amount_wei, transferTokenLabel, transferDecimals);
+        const x402AmountLabel = formatX402AtomicAmount(
+          item.x402_amount_atomic ?? item.amount_wei,
+          item.transfer_type === 'native' ? 'native' : 'erc20',
+          item.token_symbol
+        );
         items.push({
           id: `xfrh-${item.approval_id}`,
           at: item.terminal_at ?? item.decided_at ?? item.created_at,
@@ -1253,7 +1280,7 @@ export default function AgentPublicProfilePage() {
           title: item.approval_source === 'x402' ? `x402 outbound approval` : `${transferTokenLabel} transfer`,
           subtitle:
             item.approval_source === 'x402'
-              ? `Payment link: ${item.x402_url ?? 'n/a'}; Amount: ${item.x402_amount_atomic ?? item.amount_wei}; Approved: ${transferApprovedState(item.status)}`
+              ? `Payment link: ${item.x402_url ?? 'n/a'}; Amount: ${x402AmountLabel}; Approved: ${transferApprovedState(item.status)}`
               : `To: ${shortenAddress(item.to_address)}; Amount: ${transferAmount}; Approved: ${transferApprovedState(item.status)}; Confirmations: ${item.confirmations ?? 'n/a'}`,
           status: item.status,
           txHash: item.tx_hash ?? null,
@@ -1268,6 +1295,11 @@ export default function AgentPublicProfilePage() {
         const transferDecimals =
           item.transfer_type === 'native' ? 18 : (tokenDecimalsBySymbol.get(normalizeTokenSelectionSymbol(item.token_symbol)) ?? 18);
         const transferAmount = formatHumanAmount(item.amount_wei, transferTokenLabel, transferDecimals);
+        const x402AmountLabel = formatX402AtomicAmount(
+          item.x402_amount_atomic ?? item.amount_wei,
+          item.transfer_type === 'native' ? 'native' : 'erc20',
+          item.token_symbol
+        );
         items.push({
           id: `xfrq-${item.approval_id}`,
           at: item.created_at,
@@ -1275,7 +1307,7 @@ export default function AgentPublicProfilePage() {
           title: item.approval_source === 'x402' ? 'Pending x402 approval' : 'Pending transfer approval',
           subtitle:
             item.approval_source === 'x402'
-              ? `Payment link: ${item.x402_url ?? 'n/a'}; Amount: ${item.x402_amount_atomic ?? item.amount_wei}; Approved: Pending`
+              ? `Payment link: ${item.x402_url ?? 'n/a'}; Amount: ${x402AmountLabel}; Approved: Pending`
               : `To: ${shortenAddress(item.to_address)}; Amount: ${transferAmount}; Approved: Pending; Confirmations: ${item.confirmations ?? 'n/a'}`,
           status: item.status,
           txHash: null,
@@ -1344,6 +1376,7 @@ export default function AgentPublicProfilePage() {
     activity,
     chainTokenSymbolByAddress,
     formatHumanAmount,
+    formatX402AtomicAmount,
     management,
     toTxExplorerUrl,
     tokenDecimalsBySymbol,
@@ -1448,6 +1481,11 @@ export default function AgentPublicProfilePage() {
     }
     for (const item of management.data.transferApprovalsQueue ?? []) {
       const transferSymbol = item.transfer_type === 'native' ? activeNativeSymbol : normalizeTokenSelectionSymbol(item.token_symbol);
+      const x402AmountLabel = formatX402AtomicAmount(
+        item.x402_amount_atomic ?? item.amount_wei,
+        item.transfer_type === 'native' ? 'native' : 'erc20',
+        item.token_symbol
+      );
       rows.push({
         id: `transfer-pending-${item.approval_id}`,
         at: item.created_at,
@@ -1455,7 +1493,7 @@ export default function AgentPublicProfilePage() {
         status: item.status,
         subtitle:
           item.approval_source === 'x402'
-            ? `Payment link: ${item.x402_url ?? 'n/a'}; Amount: ${item.x402_amount_atomic ?? item.amount_wei}; Network: ${humanizeKeyLabel(
+            ? `Payment link: ${item.x402_url ?? 'n/a'}; Amount: ${x402AmountLabel}; Network: ${humanizeKeyLabel(
                 item.x402_network_key ?? item.chain_key
               )}`
             : `Amount: ${item.amount_wei}`,
@@ -1466,6 +1504,11 @@ export default function AgentPublicProfilePage() {
     }
     for (const item of management.data.transferApprovalsHistory ?? []) {
       const transferSymbol = item.transfer_type === 'native' ? activeNativeSymbol : normalizeTokenSelectionSymbol(item.token_symbol);
+      const x402AmountLabel = formatX402AtomicAmount(
+        item.x402_amount_atomic ?? item.amount_wei,
+        item.transfer_type === 'native' ? 'native' : 'erc20',
+        item.token_symbol
+      );
       rows.push({
         id: `transfer-history-${item.approval_id}`,
         at: item.terminal_at ?? item.decided_at ?? item.created_at,
@@ -1473,7 +1516,7 @@ export default function AgentPublicProfilePage() {
         status: item.status,
         subtitle:
           item.approval_source === 'x402'
-            ? `Payment link: ${item.x402_url ?? 'n/a'}; Amount: ${item.x402_amount_atomic ?? item.amount_wei}; Network: ${humanizeKeyLabel(
+            ? `Payment link: ${item.x402_url ?? 'n/a'}; Amount: ${x402AmountLabel}; Network: ${humanizeKeyLabel(
                 item.x402_network_key ?? item.chain_key
               )}`
             : `Amount: ${item.amount_wei}`,
@@ -1484,7 +1527,7 @@ export default function AgentPublicProfilePage() {
     }
     rows.sort((a, b) => Number(new Date(b.at).getTime()) - Number(new Date(a.at).getTime()));
     return rows;
-  }, [management, chainTokenSymbolByAddress]);
+  }, [activeNativeSymbol, chainTokenSymbolByAddress, formatX402AtomicAmount, management]);
 
   const filteredApprovalHistory = useMemo(() => {
     const tokenFiltered =
@@ -2387,8 +2430,7 @@ export default function AgentPublicProfilePage() {
                     <div key={request.payment_id} className={styles.railQueueRow}>
                       <div>
                         <div className={styles.listTitle}>
-                          {request.amount_atomic} (
-                          {request.asset_kind === 'native' ? `${activeChainLabel} ${activeNativeSymbol}` : (request.asset_symbol ?? 'Token')}) ·{' '}
+                          {formatX402AtomicAmount(request.amount_atomic, request.asset_kind, request.asset_symbol)} ·{' '}
                           {displayStatusLabel(request.status)}
                         </div>
                         <div className={styles.muted}>{formatUtc(request.created_at)} UTC</div>

@@ -259,6 +259,7 @@ x402 payment actions:
 
 ```bash
 python3 {baseDir}/scripts/xclaw_agent_skill.py request-x402-payment
+python3 {baseDir}/scripts/xclaw_agent_skill.py request-x402-payment --network <network> --facilitator <facilitator> --amount-atomic <amount_atomic> --asset-kind <native|erc20> [--asset-symbol <symbol>] [--asset-address <0x...>] [--resource-description <text>]
 python3 {baseDir}/scripts/xclaw_agent_skill.py x402-pay <url> <network> <facilitator> <amount_atomic>
 python3 {baseDir}/scripts/xclaw_agent_skill.py x402-pay-resume <approval_id>
 python3 {baseDir}/scripts/xclaw_agent_skill.py x402-pay-decide <approval_id> <approve|deny>
@@ -269,6 +270,7 @@ python3 {baseDir}/scripts/xclaw_agent_skill.py x402-networks
 
 x402 runtime contract:
 - `request-x402-payment` creates a hosted receive request URL on `xclaw.trade` and returns `paymentUrl`, `network`, `facilitator`, `assetKind`, `assetSymbol`, `amountAtomic`, `timeLimitNotice`.
+- `request-x402-payment` only accepts explicit `--flag value` overrides; positional free text is rejected to avoid accidental default-native requests.
 - receive URLs are website-hosted; no local tunnel/serve command path is used by the skill.
 - x402 payment approvals use `xfr_...` IDs with statuses: `proposed`, `approval_pending`, `approved`, `rejected`, `executing`, `filled`, `failed`.
 - Slice 79 enables `base_sepolia` and `base`; `kite_ai_testnet`/`kite_ai_mainnet` remain disabled by default.

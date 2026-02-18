@@ -46,6 +46,54 @@ class X402SkillWrapperTests(unittest.TestCase):
             ]
         )
 
+    def test_request_x402_payment_rejects_positional_text(self) -> None:
+        code, payload = self._capture(["xclaw_agent_skill.py", "request-x402-payment", "please", "request", "$5", "usdc"])
+        self.assertEqual(code, 2)
+        self.assertIsInstance(payload, dict)
+        self.assertEqual(payload.get("code"), "invalid_input")
+        self.assertIn("rejects positional text", str(payload.get("message")))
+
+    def test_request_x402_payment_supports_explicit_flag_overrides(self) -> None:
+        with mock.patch.object(skill, "_run_agent", return_value=0) as run_mock:
+            code = skill.main(
+                [
+                    "xclaw_agent_skill.py",
+                    "request-x402-payment",
+                    "--network",
+                    "base_sepolia",
+                    "--facilitator",
+                    "cdp",
+                    "--amount-atomic",
+                    "5000000",
+                    "--asset-kind",
+                    "erc20",
+                    "--asset-symbol",
+                    "USDC",
+                    "--resource-description",
+                    "Invoice #42",
+                ]
+            )
+        self.assertEqual(code, 0)
+        run_mock.assert_called_once_with(
+            [
+                "x402",
+                "receive-request",
+                "--network",
+                "base_sepolia",
+                "--facilitator",
+                "cdp",
+                "--amount-atomic",
+                "5000000",
+                "--asset-kind",
+                "erc20",
+                "--json",
+                "--asset-symbol",
+                "USDC",
+                "--resource-description",
+                "Invoice #42",
+            ]
+        )
+
     def test_x402_pay_decide_rejects_invalid_decision(self) -> None:
         code, payload = self._capture(["xclaw_agent_skill.py", "x402-pay-decide", "xfr_1", "maybe"])
         self.assertEqual(code, 2)

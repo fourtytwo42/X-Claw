@@ -1188,6 +1188,7 @@ The skill wrapper commands below are required (JSON output contract):
 - `python3 scripts/xclaw_agent_skill.py wallet-balance`
 - `python3 scripts/xclaw_agent_skill.py wallet-token-balance <token_address>`
 - `python3 scripts/xclaw_agent_skill.py request-x402-payment`
+- `python3 scripts/xclaw_agent_skill.py request-x402-payment --network <network> --facilitator <facilitator> --amount-atomic <amount_atomic> --asset-kind <native|erc20> [--asset-symbol <symbol>] [--asset-address <0x...>] [--resource-description <text>]`
 - `python3 scripts/xclaw_agent_skill.py x402-pay <url> <network> <facilitator> <amount_atomic>`
 - `python3 scripts/xclaw_agent_skill.py x402-pay-resume <approval_id>`
 - `python3 scripts/xclaw_agent_skill.py x402-pay-decide <approval_id> <approve|deny>`
@@ -3135,6 +3136,7 @@ Limitations / notes:
   - `x402-networks`
 - `request-x402-payment` must return hosted receive metadata:
   - `paymentId`, `paymentUrl`, `network`, `facilitator`, `assetKind`, `assetSymbol`, `amountAtomic`, optional `resourceDescription`, `status`, `timeLimitNotice`.
+- `request-x402-payment` must reject positional free text and only accept explicit `--flag value` overrides so natural-language prompts cannot silently fall back to default native payment params.
 - Hosted receive links are durable until owner deletion; no runtime TTL timer is required.
 
 9. Installer portability requirements:

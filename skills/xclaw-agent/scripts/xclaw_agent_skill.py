@@ -135,11 +135,14 @@ def _require_env(*keys: str) -> Optional[int]:
     )
 
 
-def _build_hosted_x402_receive_args(resource_description: Optional[str] = None) -> list[str]:
-    network = os.environ.get("XCLAW_X402_DEFAULT_NETWORK", os.environ.get("XCLAW_DEFAULT_CHAIN", "base_sepolia")).strip()
-    facilitator = os.environ.get("XCLAW_X402_DEFAULT_FACILITATOR", "cdp").strip()
-    amount = os.environ.get("XCLAW_X402_DEFAULT_AMOUNT_ATOMIC", "0.01").strip()
-    asset_kind = os.environ.get("XCLAW_X402_DEFAULT_ASSET_KIND", "native").strip().lower()
+def _build_hosted_x402_receive_args(
+    resource_description: Optional[str] = None, overrides: Optional[dict[str, str]] = None
+) -> list[str]:
+    values = overrides or {}
+    network = values.get("network", os.environ.get("XCLAW_X402_DEFAULT_NETWORK", os.environ.get("XCLAW_DEFAULT_CHAIN", "base_sepolia"))).strip()
+    facilitator = values.get("facilitator", os.environ.get("XCLAW_X402_DEFAULT_FACILITATOR", "cdp")).strip()
+    amount = values.get("amount_atomic", os.environ.get("XCLAW_X402_DEFAULT_AMOUNT_ATOMIC", "0.01")).strip()
+    asset_kind = values.get("asset_kind", os.environ.get("XCLAW_X402_DEFAULT_ASSET_KIND", "native")).strip().lower()
     if asset_kind not in {"native", "erc20"}:
         asset_kind = "native"
     args = [
@@ -155,16 +158,102 @@ def _build_hosted_x402_receive_args(resource_description: Optional[str] = None) 
         asset_kind,
         "--json",
     ]
-    asset_symbol = os.environ.get("XCLAW_X402_DEFAULT_ASSET_SYMBOL", "").strip()
+    asset_symbol = values.get("asset_symbol", os.environ.get("XCLAW_X402_DEFAULT_ASSET_SYMBOL", "")).strip()
     if asset_symbol:
         args.extend(["--asset-symbol", asset_symbol])
-    asset_address = os.environ.get("XCLAW_X402_DEFAULT_ASSET_ADDRESS", "").strip()
+    asset_address = values.get("asset_address", os.environ.get("XCLAW_X402_DEFAULT_ASSET_ADDRESS", "")).strip()
     if asset_address:
         args.extend(["--asset-address", asset_address])
-    resolved_description = (resource_description or "").strip() or os.environ.get("XCLAW_X402_DEFAULT_RESOURCE_DESCRIPTION", "").strip()
+    resolved_description = (resource_description or "").strip() or values.get(
+        "resource_description", os.environ.get("XCLAW_X402_DEFAULT_RESOURCE_DESCRIPTION", "")
+    ).strip()
     if resolved_description:
         args.extend(["--resource-description", resolved_description])
     return args
+
+
+def _parse_request_x402_payment_args(raw_args: list[str]) -> tuple[Optional[dict[str, str]], Optional[int], Optional[dict]]:
+    if not raw_args:
+        return {}, None, None
+
+    idx = 0
+    overrides: dict[str, str] = {}
+    allowed = {
+        "--network",
+        "--facilitator",
+        "--amount-atomic",
+        "--asset-kind",
+        "--asset-symbol",
+        "--asset-address",
+        "--resource-description",
+    }
+    while idx < len(raw_args):
+        key = raw_args[idx].strip()
+        if not key.startswith("--"):
+            return (
+                None,
+                2,
+                {
+                    "code": "invalid_input",
+                    "message": "request-x402-payment rejects positional text; use explicit --resource-description and other flags.",
+                    "action_hint": (
+                        "usage: request-x402-payment [--network <key>] [--facilitator <key>] [--amount-atomic <value>] "
+                        "[--asset-kind <native|erc20>] [--asset-symbol <symbol>] [--asset-address <0x...>] "
+                        "[--resource-description <text>]"
+                    ),
+                },
+            )
+        if key not in allowed:
+            return (
+                None,
+                2,
+                {
+                    "code": "invalid_input",
+                    "message": f"request-x402-payment does not support flag: {key}",
+                    "action_hint": (
+                        "usage: request-x402-payment [--network <key>] [--facilitator <key>] [--amount-atomic <value>] "
+                        "[--asset-kind <native|erc20>] [--asset-symbol <symbol>] [--asset-address <0x...>] "
+                        "[--resource-description <text>]"
+                    ),
+                },
+            )
+        if idx + 1 >= len(raw_args):
+            return (
+                None,
+                2,
+                {
+                    "code": "invalid_input",
+                    "message": f"request-x402-payment missing value for {key}",
+                    "action_hint": "All request-x402-payment flags require a value.",
+                },
+            )
+        value = str(raw_args[idx + 1]).strip()
+        if not value:
+            return (
+                None,
+                2,
+                {
+                    "code": "invalid_input",
+                    "message": f"request-x402-payment received empty value for {key}",
+                    "action_hint": "Provide a non-empty value for each request-x402-payment flag.",
+                },
+            )
+        if key == "--resource-description":
+            overrides["resource_description"] = value
+        elif key == "--asset-kind" and value.lower() not in {"native", "erc20"}:
+            return (
+                None,
+                2,
+                {
+                    "code": "invalid_input",
+                    "message": "request-x402-payment --asset-kind must be native or erc20.",
+                    "action_hint": "usage: request-x402-payment --asset-kind <native|erc20>",
+                },
+            )
+        mapped_key = key[2:].replace("-", "_")
+        overrides[mapped_key] = value
+        idx += 2
+    return overrides, None, None
 
 
 def _run_agent(args: Iterable[str]) -> int:
@@ -533,8 +622,10 @@ def main(argv: List[str]) -> int:
         return _run_agent(args)
 
     if cmd == "request-x402-payment":
-        memo = " ".join(argv[2:]).strip() if len(argv) > 2 else ""
-        return _run_agent(_build_hosted_x402_receive_args(memo or None))
+        overrides, parse_exit_code, parse_error = _parse_request_x402_payment_args(argv[2:])
+        if parse_exit_code is not None and parse_error is not None:
+            return _err(parse_error["code"], parse_error["message"], parse_error.get("action_hint"), exit_code=parse_exit_code)
+        return _run_agent(_build_hosted_x402_receive_args((overrides or {}).get("resource_description"), overrides))
 
     if cmd == "x402-pay":
         if len(argv) < 6:

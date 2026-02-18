@@ -28,6 +28,7 @@ This reference defines the expected command surface for the Python-first skill w
 - `faucet-networks`
 - `chains`
 - `request-x402-payment`
+- `request-x402-payment [--network <network>] [--facilitator <facilitator>] [--amount-atomic <amount_atomic>] [--asset-kind <native|erc20>] [--asset-symbol <symbol>] [--asset-address <0x...>] [--resource-description <text>]`
 - `x402-pay <url> <network> <facilitator> <amount_atomic>`
 - `x402-pay-resume <approval_id>`
 - `x402-pay-decide <approval_id> <approve|deny>`
@@ -144,3 +145,4 @@ Underlying runtime delegation (performed by wrapper):
 - Transfer approvals use `xfr_...` IDs and queued messages with `Status: approval_pending` for Telegram button auto-attach.
 - x402 payment approvals use `xfr_...` IDs and deterministic statuses (`proposed|approval_pending|approved|rejected|executing|filled|failed`).
 - `request-x402-payment` creates hosted receive URLs on `xclaw.trade`; no local tunnel/cloudflared dependency exists in the skill/runtime path.
+- `request-x402-payment` rejects positional free text and accepts only explicit `--flag value` overrides to avoid accidental default-native requests.
