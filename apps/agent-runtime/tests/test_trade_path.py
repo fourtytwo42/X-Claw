@@ -1037,7 +1037,7 @@ class TradePathRuntimeTests(unittest.TestCase):
         args = argparse.Namespace(
             token="usdc",
             to="0x" + "22" * 20,
-            amount_wei="100",
+            amount_wei="1000000000000",
             chain="base_sepolia",
             json=True,
         )
@@ -1066,6 +1066,34 @@ class TradePathRuntimeTests(unittest.TestCase):
         resolve_mock.assert_called_once_with("base_sepolia", "usdc")
         details = payload.get("details") or {}
         self.assertIn("(0x1111111111111111111111111111111111111111)", str(details.get("queuedMessage") or ""))
+
+    def test_wallet_send_token_rejects_suspicious_tiny_symbol_amount(self) -> None:
+        args = argparse.Namespace(
+            token="USDC",
+            to="0x" + "22" * 20,
+            amount_wei="10",
+            chain="base_sepolia",
+            json=True,
+        )
+        with mock.patch.object(
+            cli, "_resolve_token_address", return_value="0x" + "11" * 20
+        ) as resolve_mock, mock.patch.object(
+            cli, "_fetch_erc20_metadata", return_value={"symbol": "USDC", "decimals": 18}
+        ), mock.patch.object(
+            cli, "_enforce_spend_preconditions"
+        ) as spend_mock, mock.patch.object(
+            cli, "_evaluate_outbound_transfer_policy"
+        ) as policy_mock:
+            payload = self._run_and_parse_stdout(lambda: cli.cmd_wallet_send_token(args))
+        self.assertEqual(payload.get("ok"), False)
+        self.assertEqual(payload.get("code"), "invalid_input")
+        resolve_mock.assert_called_once_with("base_sepolia", "USDC")
+        spend_mock.assert_not_called()
+        policy_mock.assert_not_called()
+        details = payload.get("details") or {}
+        self.assertEqual(details.get("amountWei"), "10")
+        self.assertEqual(details.get("tokenSymbol"), "USDC")
+        self.assertEqual(details.get("tokenDecimals"), 18)
 
     def test_wallet_send_token_policy_blocked_routes_to_transfer_approval(self) -> None:
         args = argparse.Namespace(

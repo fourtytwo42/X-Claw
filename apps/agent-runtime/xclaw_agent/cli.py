@@ -6619,15 +6619,36 @@ def cmd_wallet_send_token(args: argparse.Namespace) -> int:
     try:
         token_input = str(args.token or "").strip()
         token_address = _resolve_token_address(chain, token_input)
-        _enforce_spend_preconditions(chain, amount_wei)
-        outbound_eval = _evaluate_outbound_transfer_policy(chain, args.to)
-
         token_meta = _fetch_erc20_metadata(chain, token_address)
         token_symbol = str(token_meta.get("symbol") or "").strip() or "TOKEN"
         try:
             token_decimals = int(token_meta.get("decimals", 18))
         except Exception:
             token_decimals = 18
+        if not is_hex_address(token_input):
+            # Guard against common natural-language mistakes where "10 USDC" is sent as amount_wei=10.
+            min_symbol_wei = 10 ** max(token_decimals - 6, 0)
+            if amount_wei < min_symbol_wei:
+                one_token_wei = 10**max(token_decimals, 0)
+                return fail(
+                    "invalid_input",
+                    "Amount is too small for symbol-based transfer and looks like a base-unit mistake.",
+                    "Use base-unit integer amount. Example: 10 tokens => 10 * (10^decimals) wei. "
+                    f"For {token_symbol}, 1 token = {one_token_wei} wei.",
+                    {
+                        "chain": chain,
+                        "token": token_input,
+                        "tokenAddress": token_address,
+                        "tokenSymbol": token_symbol,
+                        "tokenDecimals": token_decimals,
+                        "amountWei": str(amount_wei),
+                        "minSuggestedWeiForSymbolInput": str(min_symbol_wei),
+                    },
+                    exit_code=2,
+                )
+        _enforce_spend_preconditions(chain, amount_wei)
+        outbound_eval = _evaluate_outbound_transfer_policy(chain, args.to)
+
         amount_human, amount_unit = _transfer_amount_display(str(args.amount_wei), "token", token_symbol, token_decimals)
         amount_display = f"{amount_human} {amount_unit}"
         approval_required, transfer_policy = _transfer_requires_approval(chain, "token", token_address)

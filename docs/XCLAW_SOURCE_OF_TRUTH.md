@@ -2830,6 +2830,8 @@ Limitations / notes:
      - if transfer is terminal (`filled|failed|rejected`), decision returns converged terminal success,
    - final deterministic transfer result message is always sent to chat (`status`, `approvalId`, `chain`, `txHash` when available),
    - synthetic `[X-CLAW TRANSFER RESULT]` message is routed to agent pipeline for narrative follow-up,
+   - callback failure notices must be sent as new chat messages and must not overwrite/edit the original queued approval prompt text,
+   - callback success/converged decisions must clear inline buttons on the original queued prompt while preserving message text,
    - transfer approval creation sends an out-of-band Telegram approval prompt only when OpenClaw `lastChannel == telegram`,
    - if active channel is not Telegram, no transfer approval prompt is pushed to chat (approval remains web-manageable),
    - when transfer status is `approval_pending`, user-facing skill reply must be concise (queued for management approval), must not dump raw queued transfer message text.
@@ -2838,6 +2840,7 @@ Limitations / notes:
    - before broadcasting approved transfers, runtime must run balance preflight checks:
      - native sends: fail fast when wallet native balance is insufficient,
      - token sends: fail fast when token balance is insufficient for `amountWei`,
+     - for symbol-based token sends, suspicious dust-sized `amountWei` values must fail fast with base-unit conversion guidance (to prevent accidental test transfers),
      - failure message must include wallet context (and token address for ERC-20) so operator can diagnose wallet/agent mismatch.
    - stale transfer recovery:
      - if a transfer remains `executing|verifying` without `txHash` beyond stale threshold, runtime may recover by re-entering execution from approved state,
