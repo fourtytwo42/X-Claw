@@ -105,6 +105,38 @@ class TradePathRuntimeTests(unittest.TestCase):
 
         self.assertIn("after 2 attempts", str(ctx.exception))
 
+    def test_wait_for_trade_approval_telegram_returns_quick_pending(self) -> None:
+        with mock.patch.object(cli, "_maybe_send_telegram_approval_prompt"), mock.patch.object(
+            cli, "_last_delivery_is_telegram", return_value=True
+        ), mock.patch.object(cli, "_trade_approval_inline_wait_sec", return_value=1), mock.patch.object(
+            cli, "_read_trade_details", return_value={"tradeId": "trd_1", "status": "approval_pending"}
+        ), mock.patch.object(cli.time, "sleep"), mock.patch.object(cli.time, "time", side_effect=[0, 0, 2]):
+            with self.assertRaises(cli.WalletPolicyError) as ctx:
+                cli._wait_for_trade_approval("trd_1", "base_sepolia", {"tokenInSymbol": "WETH", "tokenOutSymbol": "USDC"})
+        self.assertEqual(ctx.exception.code, "approval_required")
+        self.assertEqual(ctx.exception.details.get("lastStatus"), "approval_pending")
+        self.assertIn("resumes automatically", str(ctx.exception.action_hint or "").lower())
+
+    def test_wait_for_trade_approval_approved_path_returns_trade(self) -> None:
+        with mock.patch.object(cli, "_maybe_send_telegram_approval_prompt"), mock.patch.object(
+            cli, "_last_delivery_is_telegram", return_value=False
+        ), mock.patch.object(
+            cli,
+            "_read_trade_details",
+            side_effect=[
+                {"tradeId": "trd_1", "status": "approval_pending"},
+                {"tradeId": "trd_1", "status": "approved"},
+            ],
+        ), mock.patch.object(cli.time, "sleep"), mock.patch.object(
+            cli.time, "time", side_effect=[0, 0, 1]
+        ), mock.patch.object(cli, "_maybe_delete_telegram_approval_prompt"), mock.patch.object(
+            cli, "_maybe_send_telegram_decision_message"
+        ), mock.patch.object(cli, "_remove_pending_spot_trade_flow"), mock.patch.object(
+            cli, "_remove_approval_prompt"
+        ):
+            trade = cli._wait_for_trade_approval("trd_1", "base_sepolia", {"tokenInSymbol": "WETH", "tokenOutSymbol": "USDC"})
+        self.assertEqual(str(trade.get("status")), "approved")
+
     def test_intents_poll_success(self) -> None:
         args = argparse.Namespace(chain="hardhat_local", json=True)
         with mock.patch.object(

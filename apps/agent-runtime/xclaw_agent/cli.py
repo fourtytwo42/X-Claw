@@ -256,6 +256,12 @@ def _transfer_executing_stale_sec() -> int:
     return _env_positive_int("XCLAW_TRANSFER_EXECUTING_STALE_SEC", 45)
 
 
+def _trade_approval_inline_wait_sec() -> int:
+    # Telegram chat UX should never hang waiting for owner action.
+    # Keep a tiny inline wait window for racey "already approved" updates.
+    return _env_positive_int("XCLAW_TRADE_APPROVAL_INLINE_WAIT_SEC", 2)
+
+
 def _run_subprocess(cmd: list[str], *, timeout_sec: int, kind: str) -> subprocess.CompletedProcess[str]:
     try:
         return subprocess.run(cmd, text=True, capture_output=True, timeout=timeout_sec)
@@ -2341,7 +2347,11 @@ def _wait_for_trade_approval(trade_id: str, chain: str, summary: dict[str, Any] 
         _maybe_send_telegram_approval_prompt(trade_id, chain, summary or {})
     except Exception:
         pass
-    deadline_ms = int(time.time() * 1000) + (APPROVAL_WAIT_TIMEOUT_SEC * 1000)
+    wait_timeout_sec = APPROVAL_WAIT_TIMEOUT_SEC
+    if _last_delivery_is_telegram():
+        # Do not block active Telegram chats for owner decisions.
+        wait_timeout_sec = min(wait_timeout_sec, _trade_approval_inline_wait_sec())
+    deadline_ms = int(time.time() * 1000) + (wait_timeout_sec * 1000)
     last_status: str | None = None
     while int(time.time() * 1000) <= deadline_ms:
         trade = _read_trade_details(trade_id)
@@ -2423,7 +2433,7 @@ def _wait_for_trade_approval(trade_id: str, chain: str, summary: dict[str, Any] 
     raise WalletPolicyError(
         "approval_required",
         "Trade is waiting for management approval.",
-        "Approve the pending trade (Telegram or web), then re-run the same trade command to resume without creating a new approval.",
+        "Approve the pending trade in Telegram or web management; execution resumes automatically after approval.",
         {"tradeId": trade_id, "chain": chain, "lastStatus": last_status},
     )
 
@@ -2548,6 +2558,13 @@ def _read_openclaw_last_delivery() -> dict[str, Any] | None:
         return best
     except Exception:
         return None
+
+
+def _last_delivery_is_telegram() -> bool:
+    delivery = _read_openclaw_last_delivery()
+    if not delivery:
+        return False
+    return str(delivery.get("lastChannel") or "").strip().lower() == "telegram"
 
 
 def _require_openclaw_bin() -> str:

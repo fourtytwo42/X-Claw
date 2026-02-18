@@ -2612,7 +2612,7 @@ Limitations / notes:
    - runtime clears local Telegram prompt state once the trade leaves `approval_pending` (even if message deletion is already handled by OpenClaw).
 7. Pending approval de-dupe:
    - for server-first `trade spot`, the runtime must not create multiple identical `approval_pending` trades.
-   - if a matching trade is already `approval_pending`, runtime reuses the existing `tradeId` and waits/resumes (no new proposals, no prompt spam).
+   - if a matching trade is already `approval_pending`, runtime reuses the existing `tradeId` and returns immediately with `approval_required` (no new proposals, no prompt spam).
    - once the matching trade is no longer `approval_pending` (approved/rejected/expired/filled/etc), a repeated identical request creates a new tradeId.
 8. Canonical endpoints:
    - `POST /api/v1/management/approval-channels/update` (owner-auth):
@@ -2635,7 +2635,9 @@ Limitations / notes:
    - after approve/deny in web while runtime is waiting on the trade, runtime posts a confirmation message into the active Telegram chat with the same details.
    - if active channel is non-Telegram, confirmation and next-step instructions should reference web management approval status (not Telegram callbacks/buttons).
 11. Approval wait latency:
-   - while waiting for `approval_pending` to resolve, the runtime polls trade status every 1 second to minimize perceived delay after Telegram/web decisions.
+   - Telegram-focused behavior is non-blocking: once a trade is `approval_pending`, the runtime should send/ensure prompt delivery and return control quickly (no long-running chat "typing").
+   - callback/web approval continues to auto-resume execution (`xappr approve`) without requiring a second user message.
+   - for non-Telegram channels, runtime may use bounded short polling while waiting for a just-issued decision to converge.
 
 ---
 
