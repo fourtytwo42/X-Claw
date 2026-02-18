@@ -4244,3 +4244,27 @@ Issue mapping: `#32` (`https://github.com/fourtytwo42/ETHDenver2026/issues/32`)
   - dispatch requires `nextStatus !== priorStatus`
 - Dispatch is best-effort only and does not change business failure semantics:
   - dispatch results are captured in response/audit payloads; routes do not throw on dispatch failure.
+
+## Telegram Transfer Prompt + Owner-Link Guard Fix (UTC 2026-02-18)
+
+### Objective
+- Ensure transfer approval inline buttons are cleared after approve/deny and prevent owner-link direct-send spam in Telegram-active sessions.
+
+### Runtime/skill verification
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS (80 tests)
+  - includes:
+    - `test_delete_telegram_transfer_prompt_uses_saved_message_id`
+    - `test_owner_link_direct_send_skips_telegram_channel`
+    - `test_telegram_transfer_prompt_includes_details_and_callbacks`
+- `python3 -m unittest apps/agent-runtime/tests/test_x402_skill_wrapper.py -v` -> PASS (17 tests)
+  - includes:
+    - `test_run_agent_transfer_pending_skips_owner_link_lookup_when_telegram_active`
+    - `test_run_agent_transfer_pending_includes_management_url` (non-Telegram behavior preserved)
+
+### Required gates (sequential)
+- `npm run db:parity` -> PASS
+- `npm run seed:reset` -> PASS
+- `npm run seed:load` -> PASS
+- `npm run seed:verify` -> PASS
+- `npm run build` -> PASS
+- `pm2 restart all` -> PASS

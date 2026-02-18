@@ -2941,6 +2941,8 @@ Note:
 - [ ] Verify inbox aggregation across linked agents and chain filter behavior.
 - [x] Verify non-Telegram prod dispatch attempted on web decision/terminal paths.
 - [x] Verify Telegram guard skip (`lastChannel=telegram`) produces no extra Telegram messages.
+- [x] Verify transfer approval Telegram inline buttons are removed on approve/deny convergence.
+- [x] Verify owner-link direct-send is skipped when active channel is Telegram (button-first handoff).
 
 ## 88) Slice 88: Approvals Full UX Flush (Batch + Risk)
 

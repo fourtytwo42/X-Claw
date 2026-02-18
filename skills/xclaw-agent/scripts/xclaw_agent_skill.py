@@ -134,6 +134,39 @@ def _extract_json_payload(stdout: str) -> Optional[dict]:
     return None
 
 
+def _last_delivery_is_telegram() -> bool:
+    agent_id = (os.environ.get("XCLAW_OPENCLAW_AGENT_ID", "main") or "main").strip().lower()
+    if not re.fullmatch(r"[a-z0-9_-]{1,64}", agent_id):
+        agent_id = "main"
+    state_dir = (os.environ.get("OPENCLAW_STATE_DIR") or "").strip() or str(Path.home() / ".openclaw")
+    sessions_path = Path(state_dir) / "agents" / agent_id / "sessions" / "sessions.json"
+    if not sessions_path.exists():
+        return False
+    try:
+        payload = json.loads(sessions_path.read_text(encoding="utf-8") or "{}")
+    except Exception:
+        return False
+    if not isinstance(payload, dict):
+        return False
+    best_updated = -1
+    best_channel = ""
+    for value in payload.values():
+        if not isinstance(value, dict):
+            continue
+        channel = str(value.get("lastChannel") or "").strip().lower()
+        target = str(value.get("lastTo") or "").strip()
+        if not channel or not target:
+            continue
+        try:
+            updated = int(value.get("updatedAt")) if value.get("updatedAt") is not None else 0
+        except Exception:
+            updated = 0
+        if updated >= best_updated:
+            best_updated = updated
+            best_channel = channel
+    return best_channel == "telegram"
+
+
 def _normalize_non_terminal_approval(runtime_json: dict) -> Optional[dict]:
     code = str(runtime_json.get("code") or "").strip().lower()
     if code != "approval_required":
@@ -153,16 +186,17 @@ def _normalize_non_terminal_approval(runtime_json: dict) -> Optional[dict]:
         sanitized_details = dict(details)
         sanitized_details.pop("queuedMessage", None)
         sanitized_details["nextAction"] = "Approval is queued in X-Claw management. Wait for owner decision."
-        owner_link = _fetch_owner_link_payload()
-        if isinstance(owner_link, dict):
-            management_url = str(owner_link.get("managementUrl") or "").strip()
-            if management_url:
-                sanitized_details["managementUrl"] = management_url
-            elif owner_link.get("managementUrlOmitted") is True:
-                sanitized_details["managementUrlOmitted"] = True
-                delivery = owner_link.get("delivery")
-                if isinstance(delivery, dict):
-                    sanitized_details["managementDelivery"] = delivery
+        if not _last_delivery_is_telegram():
+            owner_link = _fetch_owner_link_payload()
+            if isinstance(owner_link, dict):
+                management_url = str(owner_link.get("managementUrl") or "").strip()
+                if management_url:
+                    sanitized_details["managementUrl"] = management_url
+                elif owner_link.get("managementUrlOmitted") is True:
+                    sanitized_details["managementUrlOmitted"] = True
+                    delivery = owner_link.get("delivery")
+                    if isinstance(delivery, dict):
+                        sanitized_details["managementDelivery"] = delivery
         normalized["details"] = sanitized_details
         normalized["message"] = "Transfer queued for management approval."
         if str(sanitized_details.get("managementUrl") or "").strip():

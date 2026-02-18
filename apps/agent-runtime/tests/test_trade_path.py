@@ -786,6 +786,10 @@ class TradePathRuntimeTests(unittest.TestCase):
             callback_data = [b.get("callback_data") for b in row0 if isinstance(b, dict)]
             self.assertIn("xfer|a|xfr_abc|base_sepolia", callback_data)
             self.assertIn("xfer|r|xfr_abc|base_sepolia", callback_data)
+            entry = cli._get_transfer_approval_prompt("xfr_abc")
+            self.assertIsInstance(entry, dict)
+            self.assertEqual((entry or {}).get("messageId"), "777")
+            self.assertEqual((entry or {}).get("channel"), "telegram")
 
     def test_telegram_transfer_prompt_skips_when_last_channel_not_telegram(self) -> None:
         with mock.patch.object(cli, "_read_openclaw_last_delivery", return_value={"lastChannel": "web", "lastTo": "123", "lastThreadId": None}), mock.patch.object(
@@ -802,6 +806,49 @@ class TradePathRuntimeTests(unittest.TestCase):
                     "toAddress": "0x9099d24d55c105818b4e9ee117d87bc11063cf10",
                 }
             )
+        run_mock.assert_not_called()
+
+    def test_delete_telegram_transfer_prompt_uses_saved_message_id(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir, mock.patch.object(cli, "APP_DIR", pathlib.Path(tmpdir)), mock.patch.object(
+            cli, "APPROVAL_PROMPTS_FILE", pathlib.Path(tmpdir) / "approval_prompts.json"
+        ), mock.patch.object(
+            cli.shutil, "which", return_value="openclaw"
+        ):
+            cli._record_transfer_approval_prompt(
+                "xfr_abc",
+                {
+                    "channel": "telegram",
+                    "to": "123",
+                    "threadId": None,
+                    "messageId": "777",
+                    "createdAt": "2026-02-18T00:00:00.000Z",
+                },
+            )
+            captured: dict[str, object] = {}
+
+            def fake_run(cmd: list[str], timeout_sec: int, kind: str):
+                captured["cmd"] = cmd
+                return mock.Mock(returncode=0, stdout='{"ok":true}', stderr="")
+
+            with mock.patch.object(cli, "_run_subprocess", side_effect=fake_run):
+                cli._maybe_delete_telegram_transfer_approval_prompt("xfr_abc")
+
+            cmd = captured.get("cmd") or []
+            self.assertIn("message", cmd)
+            self.assertIn("delete", cmd)
+            self.assertIn("--message-id", cmd)
+            self.assertIn("777", cmd)
+            self.assertIsNone(cli._get_transfer_approval_prompt("xfr_abc"))
+
+    def test_owner_link_direct_send_skips_telegram_channel(self) -> None:
+        with mock.patch.object(
+            cli, "_read_openclaw_last_delivery", return_value={"lastChannel": "telegram", "lastTo": "123", "lastThreadId": None}
+        ), mock.patch.object(
+            cli, "_run_subprocess"
+        ) as run_mock:
+            result = cli._maybe_send_owner_link_to_active_chat("https://xclaw.trade/agents/ag_1?token=ol1.test", "2026-02-18T16:39:52.313Z")
+        self.assertFalse(bool(result.get("sent")))
+        self.assertEqual(str(result.get("reason")), "telegram_channel_skipped")
         run_mock.assert_not_called()
 
     def test_trade_spot_does_not_reuse_after_approval(self) -> None:

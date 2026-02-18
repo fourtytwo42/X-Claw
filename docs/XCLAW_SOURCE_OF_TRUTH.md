@@ -2321,7 +2321,8 @@ Output requirements:
    - token is short-lived and one-time use.
    - managementUrl contains a bearer-style token and must be treated like a password.
    - agent behavior for explicit owner asks: generate and return the full managementUrl in active chat for immediate owner handoff (Telegram/Discord/web chat/other channels).
-   - runtime performs best-effort direct message send of the generated owner link to the OpenClaw last active delivery channel (`lastChannel`/`lastTo`) so handoff can occur via skill execution, not only model text.
+   - runtime performs best-effort direct message send of the generated owner link to the OpenClaw last active delivery channel (`lastChannel`/`lastTo`) only when the active channel is non-Telegram.
+   - Telegram guard: when `lastChannel == telegram`, runtime must not auto-send owner link message from `owner-link`; transfer/policy/trade approval handoff remains button-first.
    - when direct active-chat send succeeds, runtime command output should omit `managementUrl` to avoid duplicate model echo in the same chat.
    - when direct send fails, runtime command output must include `managementUrl` for manual handoff fallback.
    - managementUrl must resolve to the public X-Claw host (`https://xclaw.trade`) for owner-facing links; loopback/internal hosts must not be emitted to agents.
@@ -2828,7 +2829,9 @@ Limitations / notes:
    - synthetic `[X-CLAW TRANSFER RESULT]` message is routed to agent pipeline for narrative follow-up,
    - transfer approval creation sends an out-of-band Telegram approval prompt only when OpenClaw `lastChannel == telegram`,
    - if active channel is not Telegram, no transfer approval prompt is pushed to chat (approval remains web-manageable),
-   - when transfer status is `approval_pending`, user-facing skill reply must be concise (queued for management approval), must not dump raw queued transfer message text, and should include owner `managementUrl` when available from owner-link lookup.
+   - when transfer status is `approval_pending`, user-facing skill reply must be concise (queued for management approval), must not dump raw queued transfer message text.
+   - non-Telegram channels may include owner `managementUrl` from owner-link lookup when available.
+   - Telegram active-channel path should not auto-send owner-link messages during transfer `approval_pending`; rely on inline Approve/Deny buttons.
    - before broadcasting approved transfers, runtime must run balance preflight checks:
      - native sends: fail fast when wallet native balance is insufficient,
      - token sends: fail fast when token balance is insufficient for `amountWei`,

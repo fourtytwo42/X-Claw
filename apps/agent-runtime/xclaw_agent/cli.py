@@ -2504,6 +2504,21 @@ def _record_approval_prompt(trade_id: str, prompt: dict[str, Any]) -> None:
     _save_approval_prompts(state)
 
 
+def _transfer_prompt_key(approval_id: str) -> str:
+    return f"xfer:{approval_id}"
+
+
+def _record_transfer_approval_prompt(approval_id: str, prompt: dict[str, Any]) -> None:
+    _record_approval_prompt(
+        _transfer_prompt_key(approval_id),
+        {
+            **prompt,
+            "promptType": "transfer",
+            "approvalId": approval_id,
+        },
+    )
+
+
 def _get_approval_prompt(trade_id: str) -> dict[str, Any] | None:
     state = _load_approval_prompts()
     prompts = state.get("prompts")
@@ -2511,6 +2526,10 @@ def _get_approval_prompt(trade_id: str) -> dict[str, Any] | None:
         return None
     entry = prompts.get(trade_id)
     return entry if isinstance(entry, dict) else None
+
+
+def _get_transfer_approval_prompt(approval_id: str) -> dict[str, Any] | None:
+    return _get_approval_prompt(_transfer_prompt_key(approval_id))
 
 
 def _remove_approval_prompt(trade_id: str) -> None:
@@ -2521,6 +2540,10 @@ def _remove_approval_prompt(trade_id: str) -> None:
     if trade_id in prompts:
         prompts.pop(trade_id, None)
         _save_approval_prompts(state)
+
+
+def _remove_transfer_approval_prompt(approval_id: str) -> None:
+    _remove_approval_prompt(_transfer_prompt_key(approval_id))
 
 
 def _approval_channels_enabled(policy_payload: dict[str, Any], channel: str) -> bool:
@@ -2739,6 +2762,9 @@ def _maybe_send_telegram_transfer_approval_prompt(flow: dict[str, Any]) -> None:
     chain = str(flow.get("chainKey") or "").strip()
     if not approval_id or not chain:
         return
+    existing = _get_transfer_approval_prompt(approval_id)
+    if existing and str(existing.get("channel") or "") == "telegram":
+        return
 
     delivery = _read_openclaw_last_delivery()
     if not delivery or str(delivery.get("lastChannel") or "").lower() != "telegram":
@@ -2800,6 +2826,20 @@ def _maybe_send_telegram_transfer_approval_prompt(flow: dict[str, Any]) -> None:
         stderr = (proc.stderr or "").strip()
         stdout = (proc.stdout or "").strip()
         raise WalletStoreError(stderr or stdout or "openclaw message send failed.")
+    message_id = _extract_openclaw_message_id(proc.stdout or "")
+    if not message_id:
+        message_id = "unknown"
+    _record_transfer_approval_prompt(
+        approval_id,
+        {
+            "channel": "telegram",
+            "chainKey": chain,
+            "to": chat_id,
+            "threadId": thread_id,
+            "messageId": message_id,
+            "createdAt": utc_now(),
+        },
+    )
 
 
 def _maybe_send_telegram_decision_message(
@@ -2898,6 +2938,24 @@ def _maybe_delete_telegram_approval_prompt(trade_id: str) -> None:
         _remove_approval_prompt(trade_id)
 
 
+def _maybe_delete_telegram_transfer_approval_prompt(approval_id: str) -> None:
+    entry = _get_transfer_approval_prompt(approval_id)
+    if not entry or str(entry.get("channel") or "") != "telegram":
+        return
+    chat_id = str(entry.get("to") or "").strip()
+    message_id = str(entry.get("messageId") or "").strip()
+    if not chat_id or not message_id or message_id == "unknown":
+        _remove_transfer_approval_prompt(approval_id)
+        return
+    openclaw = shutil.which("openclaw")
+    if not openclaw:
+        return
+    cmd = [openclaw, "message", "delete", "--channel", "telegram", "--target", chat_id, "--message-id", message_id, "--json"]
+    proc = _run_subprocess(cmd, timeout_sec=20, kind="openclaw_delete")
+    if proc.returncode == 0:
+        _remove_transfer_approval_prompt(approval_id)
+
+
 def _maybe_send_owner_link_to_active_chat(management_url: str, expires_at: str | None) -> dict[str, Any]:
     """
     Best-effort direct owner-link handoff into the currently active chat channel.
@@ -2910,6 +2968,8 @@ def _maybe_send_owner_link_to_active_chat(management_url: str, expires_at: str |
     target = str(delivery.get("lastTo") or "").strip()
     if not channel or not target:
         return {"sent": False, "reason": "missing_channel_or_target"}
+    if channel == "telegram":
+        return {"sent": False, "reason": "telegram_channel_skipped"}
     openclaw = shutil.which("openclaw")
     if not openclaw:
         return {"sent": False, "reason": "openclaw_missing"}
@@ -3098,6 +3158,11 @@ def cmd_approvals_resume_transfer(args: argparse.Namespace) -> int:
         return fail("invalid_input", "chain is required.", "Provide --chain and retry.", {"approvalId": approval_id}, exit_code=2)
     status = str(flow.get("status") or "")
     if status in {"filled", "failed", "rejected"}:
+        try:
+            _maybe_delete_telegram_transfer_approval_prompt(approval_id)
+        except Exception:
+            pass
+        _remove_transfer_approval_prompt(approval_id)
         return ok(
             "Transfer resume skipped: approval already terminal.",
             approvalId=approval_id,
@@ -3183,6 +3248,11 @@ def cmd_approvals_decide_transfer(args: argparse.Namespace) -> int:
     )
     flow_amount_display = f"{flow_amount_human} {flow_amount_unit}"
     if status in {"filled", "failed", "rejected"}:
+        try:
+            _maybe_delete_telegram_transfer_approval_prompt(approval_id)
+        except Exception:
+            pass
+        _remove_transfer_approval_prompt(approval_id)
         return ok(
             "Transfer decision converged on terminal approval.",
             approvalId=approval_id,
@@ -3202,6 +3272,11 @@ def cmd_approvals_decide_transfer(args: argparse.Namespace) -> int:
             converged=True,
         )
     if status in {"executing", "verifying"}:
+        try:
+            _maybe_delete_telegram_transfer_approval_prompt(approval_id)
+        except Exception:
+            pass
+        _remove_transfer_approval_prompt(approval_id)
         return ok(
             "Transfer decision already in progress.",
             approvalId=approval_id,
@@ -3222,6 +3297,11 @@ def cmd_approvals_decide_transfer(args: argparse.Namespace) -> int:
             inProgress=True,
         )
     if status == "approved" and decision == "deny":
+        try:
+            _maybe_delete_telegram_transfer_approval_prompt(approval_id)
+        except Exception:
+            pass
+        _remove_transfer_approval_prompt(approval_id)
         return ok(
             "Transfer decision converged on approved approval.",
             approvalId=approval_id,
@@ -3256,6 +3336,11 @@ def cmd_approvals_decide_transfer(args: argparse.Namespace) -> int:
         flow["terminalAt"] = flow["decidedAt"]
         _record_pending_transfer_flow(approval_id, flow)
         _mirror_transfer_approval(flow)
+        try:
+            _maybe_delete_telegram_transfer_approval_prompt(approval_id)
+        except Exception:
+            pass
+        _remove_transfer_approval_prompt(approval_id)
         return ok(
             "Transfer denied.",
             approvalId=approval_id,
@@ -3283,6 +3368,11 @@ def cmd_approvals_decide_transfer(args: argparse.Namespace) -> int:
     flow["updatedAt"] = flow["decidedAt"]
     _record_pending_transfer_flow(approval_id, flow)
     _mirror_transfer_approval(flow)
+    try:
+        _maybe_delete_telegram_transfer_approval_prompt(approval_id)
+    except Exception:
+        pass
+    _remove_transfer_approval_prompt(approval_id)
     return emit(_execute_pending_transfer_flow(flow))
 
 
