@@ -55,9 +55,9 @@ function nonTelegramProdTimeoutMs(): number {
 function telegramGuardEnabled(): boolean {
   const raw = (process.env.XCLAW_NON_TG_PROD_TELEGRAM_GUARD ?? '').trim().toLowerCase();
   if (!raw) {
-    return false;
+    return true;
   }
-  return raw === '1' || raw === 'true' || raw === 'on' || raw === 'yes';
+  return raw !== '0' && raw !== 'false' && raw !== 'off' && raw !== 'no';
 }
 
 function sanitizeOpenclawAgentId(value: string | undefined): string {

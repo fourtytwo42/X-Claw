@@ -3606,7 +3606,8 @@ Limitations / notes:
 3. Delivery-channel handling:
 - Read OpenClaw last-delivery context from session store (`OPENCLAW_STATE_DIR` fallback `~/.openclaw`).
 - If a valid session exists, dispatch is allowed even when last active channel is Telegram (`lastChannel == telegram`) because `--deliver` is omitted.
-- Optional emergency guard `XCLAW_NON_TG_PROD_TELEGRAM_GUARD=1` may force skip on Telegram (`reason=telegram_guard`).
+- Telegram guard is enabled by default: when last channel is Telegram, non-Telegram bridge dispatch must skip (`reason=telegram_guard`).
+- `XCLAW_NON_TG_PROD_TELEGRAM_GUARD=0|false|off|no` may be used only as an explicit emergency override to disable the Telegram skip.
 - Bridge skip reasons are structured (`no_session`, `telegram_guard`, etc.).
 
 4. Telegram non-regression:
@@ -3619,7 +3620,7 @@ Limitations / notes:
 - Config knobs:
   - `XCLAW_NON_TG_PROD_ENABLED` (default enabled),
   - `XCLAW_NON_TG_PROD_TIMEOUT_MS` (bounded timeout default),
-  - `XCLAW_NON_TG_PROD_TELEGRAM_GUARD` (default disabled).
+  - `XCLAW_NON_TG_PROD_TELEGRAM_GUARD` (default enabled; set falsey only for emergency override).
 
 6. Synthetic envelope contract:
 - Deterministic internal envelopes are required:
