@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { getAgentAvatarPalette, getAgentInitial } from '@/lib/agent-avatar-color';
 
@@ -26,8 +26,8 @@ type ActiveAgentSidebarLinkProps = {
 
 export function ActiveAgentSidebarLink({ itemClassName, activeClassName, showLabel = false, labelClassName }: ActiveAgentSidebarLinkProps) {
   const pathname = usePathname();
-  const [agentId, setAgentId] = useState<string>('');
-  const [agentName, setAgentName] = useState<string>('');
+  const [managedAgentIds, setManagedAgentIds] = useState<string[]>([]);
+  const [agentNames, setAgentNames] = useState<Record<string, string>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -39,20 +39,36 @@ export function ActiveAgentSidebarLink({ itemClassName, activeClassName, showLab
           return;
         }
         const payload = (await response.json()) as SessionAgentsPayload;
-        const selected = payload.activeAgentId ?? payload.managedAgents?.[0] ?? '';
-        if (!selected || cancelled) {
+        const ids = Array.from(
+          new Set(
+            [payload.activeAgentId ?? '', ...(payload.managedAgents ?? [])]
+              .map((value) => String(value).trim())
+              .filter((value) => value.length > 0)
+          )
+        );
+        if (ids.length === 0 || cancelled) {
           return;
         }
-        setAgentId(selected);
+        setManagedAgentIds(ids);
 
-        const profileResponse = await fetch(`/api/v1/public/agents/${encodeURIComponent(selected)}`, { cache: 'no-store' });
-        if (!profileResponse.ok || cancelled) {
-          return;
-        }
-        const profile = (await profileResponse.json()) as PublicAgentPayload;
-        const resolvedName = (profile.agent?.agent_name ?? '').trim();
+        const names: Record<string, string> = {};
+        await Promise.all(
+          ids.map(async (id) => {
+            try {
+              const profileResponse = await fetch(`/api/v1/public/agents/${encodeURIComponent(id)}`, { cache: 'no-store' });
+              if (!profileResponse.ok) {
+                names[id] = id;
+                return;
+              }
+              const profile = (await profileResponse.json()) as PublicAgentPayload;
+              names[id] = (profile.agent?.agent_name ?? '').trim() || id;
+            } catch {
+              names[id] = id;
+            }
+          })
+        );
         if (!cancelled) {
-          setAgentName(resolvedName || selected);
+          setAgentNames(names);
         }
       } catch {
         // no-op
@@ -66,35 +82,35 @@ export function ActiveAgentSidebarLink({ itemClassName, activeClassName, showLab
     };
   }, [pathname]);
 
-  const title = useMemo(() => {
-    if (!agentId) {
-      return '';
-    }
-    return agentName || agentId;
-  }, [agentId, agentName]);
-  const avatarPalette = useMemo(() => getAgentAvatarPalette(agentId || 'unassigned-agent'), [agentId]);
-
-  if (!agentId) {
+  if (managedAgentIds.length === 0) {
     return null;
   }
 
-  const isActive = pathname === `/agents/${agentId}`;
-  const className = isActive && activeClassName ? `${itemClassName} ${activeClassName}` : itemClassName;
-  const initial = getAgentInitial(agentName, agentId);
-
   return (
-    <Link href={`/agents/${encodeURIComponent(agentId)}`} className={className} aria-label={title} title={title}>
-      <span
-        className="agent-shortcut-badge"
-        style={{
-          backgroundColor: avatarPalette.backgroundColor,
-          borderColor: avatarPalette.borderColor,
-          color: avatarPalette.textColor
-        }}
-      >
-        {initial}
-      </span>
-      {showLabel ? <span className={labelClassName}>Agent</span> : null}
-    </Link>
+    <>
+      {managedAgentIds.map((agentId) => {
+        const agentName = agentNames[agentId] ?? agentId;
+        const title = agentName || agentId;
+        const isActive = pathname === `/agents/${agentId}`;
+        const className = isActive && activeClassName ? `${itemClassName} ${activeClassName}` : itemClassName;
+        const initial = getAgentInitial(agentName, agentId);
+        const avatarPalette = getAgentAvatarPalette(agentId);
+        return (
+          <Link key={`managed-${agentId}`} href={`/agents/${encodeURIComponent(agentId)}`} className={className} aria-label={title} title={title}>
+            <span
+              className="agent-shortcut-badge"
+              style={{
+                backgroundColor: avatarPalette.backgroundColor,
+                borderColor: avatarPalette.borderColor,
+                color: avatarPalette.textColor
+              }}
+            >
+              {initial}
+            </span>
+            {showLabel ? <span className={labelClassName}>Agent</span> : null}
+          </Link>
+        );
+      })}
+    </>
   );
 }
