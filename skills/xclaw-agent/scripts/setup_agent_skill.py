@@ -289,6 +289,11 @@ def main() -> int:
                     hint = "Ensure OpenClaw is current, then rerun setup."
                     if "syntax_check_failed" in err:
                         hint = "OpenClaw bundle patch failed syntax check. Update OpenClaw and rerun setup."
+                    if "write_failed" in err and "permission denied" in err.lower():
+                        hint = (
+                            "OpenClaw appears to be installed in a root-owned location. "
+                            "Rerun the installer with sudo so gateway patching can write to the OpenClaw bundle."
+                        )
                     raise RuntimeError(f"OpenClaw gateway patch failed: {err}. {hint}")
         except Exception:
             raise

@@ -1268,6 +1268,7 @@ Runtime binary requirements for skill operation:
 - Setup script must ensure a default local wallet policy exists at `~/.xclaw-agent/policy.json` when missing (do not overwrite existing policy).
 - Setup script must install an OS-native `xclaw-agent` launcher (POSIX shell wrapper on Linux/macOS, `.cmd` launcher on Windows) without introducing Node/npm requirements for skill invocation.
 - Setup script auto-patch for Telegram callbacks must target top-level gateway reply bundles (`dist/reply-*.js`) and fail fast with explicit error when patch syntax validation fails (no silent success on broken callback patch).
+- If OpenClaw is installed in a root-owned location and gateway patch write fails with permission denied, installer/setup must fail with explicit terminal guidance to rerun installer with elevated privileges (`sudo`).
 - Hosted installers must ensure `xclaw-agent` is discoverable for future sessions by persisting launcher paths in user PATH (or equivalent stable shim path) after install.
 - Skill wrapper should normalize known safe input-guard rejections (for example symbol token unit mismatch) into non-fatal JSON responses so chat UX does not emit misleading hard-failure tool traces when no transaction was executed.
 - Token decimals used for UI/API display must be chain-scoped and resolved from on-chain ERC-20 metadata via RPC/cache when token addresses are known (avoid static per-token decimal baking across chains).
