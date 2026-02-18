@@ -57,6 +57,20 @@ export type IssueOwnerManagementLinkOutput = {
   expiresAt: string;
 };
 
+export type LinkManagementSessionAgentInput = {
+  sessionId: string;
+  agentId: string;
+  token: string;
+  userAgent: string | null;
+};
+
+export type LinkManagementSessionAgentOutput = {
+  sessionId: string;
+  activeAgentId: string;
+  linkedAgentId: string;
+  managedAgents: string[];
+};
+
 function getManagementKey(): Buffer {
   const decoded = Buffer.from(requireManagementTokenEncKey(), 'base64');
   if (decoded.length !== 32) {
@@ -161,74 +175,82 @@ function parseOwnerLinkToken(token: string): { expiresAtSec: number } | null {
   return { expiresAtSec };
 }
 
-export async function bootstrapManagementSession(input: BootstrapInput): Promise<ServiceResult<BootstrapOutput>> {
+async function verifyActiveTokenForAgent(
+  client: Parameters<Parameters<typeof withTransaction>[0]>[0],
+  input: { agentId: string; token: string; lock?: boolean }
+): Promise<{ ok: true; tokenId: string } | { ok: false; error: ServiceError }> {
   const fingerprint = fingerprintManagementToken(input.token);
+  const lockClause = input.lock ? 'for update' : '';
+  const tokenResult = await client.query<{ token_id: string; token_ciphertext: string }>(
+    `
+    select token_id, token_ciphertext
+    from management_tokens
+    where agent_id = $1
+      and status = 'active'
+      and token_fingerprint = $2
+    order by created_at desc
+    limit 1
+    ${lockClause}
+    `,
+    [input.agentId, fingerprint]
+  );
+  if (tokenResult.rowCount === 0) {
+    return {
+      ok: false,
+      error: {
+        status: 401,
+        code: 'auth_invalid',
+        message: 'Management bootstrap token is invalid.',
+        actionHint: 'Use a currently active management token for this agent.'
+      }
+    };
+  }
 
-  return withTransaction(async (client) => {
-    const tokenResult = await client.query<{
-      token_id: string;
-      token_ciphertext: string;
-    }>(
+  const row = tokenResult.rows[0];
+  const decrypted = decryptToken(row.token_ciphertext);
+  if (!decrypted || !constantTimeEqual(decrypted, input.token)) {
+    return {
+      ok: false,
+      error: {
+        status: 401,
+        code: 'auth_invalid',
+        message: 'Management bootstrap token is invalid.',
+        actionHint: 'Regenerate a management token and retry bootstrap.'
+      }
+    };
+  }
+
+  const ownerToken = parseOwnerLinkToken(decrypted);
+  if (ownerToken && ownerToken.expiresAtSec * 1000 <= Date.now()) {
+    await client.query(
       `
-      select token_id, token_ciphertext
-      from management_tokens
-      where agent_id = $1
-        and status = 'active'
-        and token_fingerprint = $2
-      order by created_at desc
-      limit 1
-      for update
+      update management_tokens
+      set status = 'rotated',
+          rotated_at = now(),
+          updated_at = now()
+      where token_id = $1
       `,
-      [input.agentId, fingerprint]
+      [row.token_id]
     );
+    return {
+      ok: false,
+      error: {
+        status: 401,
+        code: 'auth_invalid',
+        message: 'Management bootstrap token has expired.',
+        actionHint: 'Generate a fresh owner link token and retry immediately.'
+      }
+    };
+  }
 
-    if (tokenResult.rowCount === 0) {
-      return {
-        ok: false,
-        error: {
-          status: 401,
-          code: 'auth_invalid' as const,
-          message: 'Management bootstrap token is invalid.',
-          actionHint: 'Use a currently active management token for this agent.'
-        }
-      };
-    }
+  return { ok: true, tokenId: row.token_id };
+}
 
-    const row = tokenResult.rows[0];
-    const decrypted = decryptToken(row.token_ciphertext);
-    if (!decrypted || !constantTimeEqual(decrypted, input.token)) {
-      return {
-        ok: false,
-        error: {
-          status: 401,
-          code: 'auth_invalid' as const,
-          message: 'Management bootstrap token is invalid.',
-          actionHint: 'Regenerate a management token and retry bootstrap.'
-        }
-      };
-    }
-
-    const ownerToken = parseOwnerLinkToken(decrypted);
-    if (ownerToken && ownerToken.expiresAtSec * 1000 <= Date.now()) {
-      await client.query(
-        `
-        update management_tokens
-        set status = 'rotated',
-            rotated_at = now(),
-            updated_at = now()
-        where token_id = $1
-        `,
-        [row.token_id]
-      );
-      return {
-        ok: false,
-        error: {
-          status: 401,
-          code: 'auth_invalid' as const,
-          message: 'Management bootstrap token has expired.',
-          actionHint: 'Generate a fresh owner link token and retry immediately.'
-        }
-      };
+export async function bootstrapManagementSession(input: BootstrapInput): Promise<ServiceResult<BootstrapOutput>> {
+  return withTransaction(async (client) => {
+    const tokenCheck = await verifyActiveTokenForAgent(client, { agentId: input.agentId, token: input.token, lock: true });
+    if (!tokenCheck.ok) {
+      return tokenCheck;
     }
 
     const sessionCountResult = await client.query<{ total: string }>(
@@ -253,6 +275,15 @@ export async function bootstrapManagementSession(input: BootstrapInput): Promise
 
     await client.query(
       `
+      insert into management_session_agents (binding_id, session_id, agent_id, created_at)
+      values ($1, $2, $3, now())
+      on conflict (session_id, agent_id) do nothing
+      `,
+      [makeId('msa'), sessionId, input.agentId]
+    );
+
+    await client.query(
+      `
       insert into management_audit_log (
         audit_id,
         agent_id,
@@ -270,7 +301,7 @@ export async function bootstrapManagementSession(input: BootstrapInput): Promise
         input.agentId,
         sessionId,
         JSON.stringify({ sessionLabel: randomBrowserLabel(sessionIndex) }),
-        JSON.stringify({ tokenId: row.token_id }),
+        JSON.stringify({ tokenId: tokenCheck.tokenId }),
         input.userAgent
       ]
     );
@@ -283,6 +314,114 @@ export async function bootstrapManagementSession(input: BootstrapInput): Promise
         managementCookieValue: `${sessionId}.${sessionSecret}`,
         csrfToken: randomBytes(24).toString('base64url'),
         expiresAt: expiresAt.toISOString()
+      }
+    };
+  });
+}
+
+export async function linkAgentToManagementSession(
+  input: LinkManagementSessionAgentInput
+): Promise<ServiceResult<LinkManagementSessionAgentOutput>> {
+  return withTransaction(async (client) => {
+    const sessionResult = await client.query<{ session_id: string; agent_id: string; expires_at: string; revoked_at: string | null }>(
+      `
+      select session_id, agent_id, expires_at::text, revoked_at::text
+      from management_sessions
+      where session_id = $1
+      limit 1
+      for update
+      `,
+      [input.sessionId]
+    );
+    if (sessionResult.rowCount === 0) {
+      return {
+        ok: false,
+        error: {
+          status: 401,
+          code: 'auth_invalid',
+          message: 'Management session is invalid or expired.',
+          actionHint: 'Bootstrap a fresh management session and retry.'
+        }
+      };
+    }
+
+    const session = sessionResult.rows[0];
+    if (session.revoked_at || new Date(session.expires_at).getTime() <= Date.now()) {
+      return {
+        ok: false,
+        error: {
+          status: 401,
+          code: 'auth_invalid',
+          message: 'Management session is invalid or expired.',
+          actionHint: 'Bootstrap a fresh management session and retry.'
+        }
+      };
+    }
+
+    const tokenCheck = await verifyActiveTokenForAgent(client, { agentId: input.agentId, token: input.token, lock: true });
+    if (!tokenCheck.ok) {
+      return tokenCheck;
+    }
+
+    await client.query(
+      `
+      insert into management_session_agents (binding_id, session_id, agent_id, created_at)
+      values ($1, $2, $3, now())
+      on conflict (session_id, agent_id) do nothing
+      `,
+      [makeId('msa'), session.session_id, session.agent_id]
+    );
+    await client.query(
+      `
+      insert into management_session_agents (binding_id, session_id, agent_id, created_at)
+      values ($1, $2, $3, now())
+      on conflict (session_id, agent_id) do nothing
+      `,
+      [makeId('msa'), session.session_id, input.agentId]
+    );
+
+    const managed = await client.query<{ agent_id: string }>(
+      `
+      select agent_id
+      from management_session_agents
+      where session_id = $1
+      order by created_at asc
+      `,
+      [session.session_id]
+    );
+    const managedAgents = Array.from(
+      new Set(
+        managed.rows
+          .map((row) => String(row.agent_id ?? '').trim())
+          .filter((row) => row.length > 0)
+          .concat([session.agent_id, input.agentId])
+      )
+    );
+
+    await client.query(
+      `
+      insert into management_audit_log (
+        audit_id, agent_id, management_session_id, action_type, action_status,
+        public_redacted_payload, private_payload, user_agent, created_at
+      ) values ($1, $2, $3, 'session.link', 'accepted', $4::jsonb, $5::jsonb, $6, now())
+      `,
+      [
+        makeId('aud'),
+        input.agentId,
+        session.session_id,
+        JSON.stringify({ linkedAgentId: input.agentId }),
+        JSON.stringify({ tokenId: tokenCheck.tokenId }),
+        input.userAgent
+      ]
+    );
+
+    return {
+      ok: true,
+      data: {
+        sessionId: session.session_id,
+        activeAgentId: session.agent_id,
+        linkedAgentId: input.agentId,
+        managedAgents
       }
     };
   });
@@ -376,7 +515,15 @@ export async function revokeAllAndRotateManagementToken(input: RevokeAllInput): 
       update management_sessions
       set revoked_at = now(),
           updated_at = now()
-      where agent_id = $1
+      where session_id in (
+        select ms.session_id
+        from management_sessions ms
+        where ms.agent_id = $1
+        union
+        select msa.session_id
+        from management_session_agents msa
+        where msa.agent_id = $1
+      )
         and revoked_at is null
         and expires_at > now()
       returning session_id

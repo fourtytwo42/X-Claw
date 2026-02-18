@@ -2903,3 +2903,52 @@ Note:
   - [x] `npm run seed:verify`
   - [x] `npm run build`
   - [x] `pm2 restart all`
+
+---
+
+## 86) Slice 86: Multi-Agent Management Session + Chain-Scoped Policy Snapshots
+
+### 86.1 Canonical/doc sync
+- [~] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` for multi-agent management session model and chain-scoped policy snapshot contract.
+- [~] Add Slice 86 entries in `docs/XCLAW_SLICE_TRACKER.md` and this roadmap section.
+- [~] Update handoff artifacts (`docs/CONTEXT_PACK.md`, `spec.md`, `tasks.md`, `acceptance.md`).
+
+### 86.2 Implementation
+- [~] Add migration for `management_session_agents` with backfill from existing `management_sessions`.
+- [~] Extend management auth to authorize `expectedAgentId` against linked session agent set.
+- [~] Extend bootstrap flow to link an additional agent into active management session.
+- [~] Add migration and code updates for `agent_policy_snapshots.chain_key` (write/read scoped).
+
+### 86.3 Validation + evidence
+- [ ] Validate multi-agent link path (`/management/session/bootstrap`) and `GET /management/session/agents` returns linked set.
+- [ ] Validate unauthorized linked-agent write path returns 401.
+
+## 87) Slice 87: Approvals Core APIs + Permission Inventory
+
+### 87.1 Canonical/doc sync
+- [~] Update Source-of-Truth + OpenAPI + schemas for new approvals APIs and policy update `chainKey` requirement.
+
+### 87.2 Implementation
+- [~] Add `POST /api/v1/management/approvals/approve-allowlist-token`.
+- [~] Add `GET /api/v1/management/approvals/inbox`.
+- [~] Add `POST /api/v1/management/permissions/update`.
+- [~] Wire `/approvals` to inbox API and enable `Approve + Allowlist Token` action.
+- [~] Replace allowances placeholder with permissions inventory module.
+
+### 87.3 Validation + evidence
+- [ ] Verify approve+allowlist updates trade status and chain allowlist atomically.
+- [ ] Verify inbox aggregation across linked agents and chain filter behavior.
+
+## 88) Slice 88: Approvals Full UX Flush (Batch + Risk)
+
+### 88.1 Canonical/doc sync
+- [~] Update Source-of-Truth + schemas for batched decision contract.
+
+### 88.2 Implementation
+- [~] Add `POST /api/v1/management/approvals/decision-batch` with per-item result payload.
+- [~] Add `/approvals` multi-select bulk decision controls.
+- [~] Render deterministic risk labels in request cards.
+
+### 88.3 Validation + evidence
+- [ ] Verify mixed-success batch responses are stable and idempotent on retry.
+- [ ] Capture functional screenshots for `/approvals` dark/light desktop.

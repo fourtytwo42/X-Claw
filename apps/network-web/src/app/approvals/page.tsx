@@ -7,13 +7,6 @@ import { ChainHeaderControl } from '@/components/chain-header-control';
 import { PrimaryNav } from '@/components/primary-nav';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { useDashboardChainKey } from '@/lib/active-chain';
-import {
-  buildApprovalsCenterRows,
-  type ApprovalRowStatus,
-  type ApprovalsCenterManagementState,
-  type ApprovalsCenterRow,
-  type LocalDecisionMap
-} from '@/lib/approvals-center-view-model';
 import { formatNumber, formatUtc } from '@/lib/public-format';
 
 import styles from './page.module.css';
@@ -33,10 +26,53 @@ type StatusTab = 'pending' | 'approved' | 'rejected' | 'all';
 type TypeFilter = 'all' | 'trade' | 'policy' | 'transfer';
 type SortFilter = 'newest' | 'oldest';
 
-type PublicAgentPayload = {
-  agent?: {
-    agent_name?: string | null;
+type InboxRow = {
+  id: string;
+  requestId: string;
+  rowKind: 'trade' | 'policy' | 'transfer';
+  agentId: string;
+  agentName: string;
+  chainKey: string;
+  status: 'pending' | 'approved' | 'rejected';
+  title: string;
+  subtitle: string;
+  requestTypeLabel: string;
+  reasonLine: string;
+  riskLabel: 'Low' | 'Med' | 'High';
+  createdAt: string;
+};
+
+type PermissionInventoryRow = {
+  agentId: string;
+  agentName: string;
+  chainKey: string;
+  tradePermissions: {
+    approvalMode: 'per_trade' | 'auto';
+    allowedTokens: string[];
+    updatedAt: string | null;
   };
+  transferPermissions: {
+    transferApprovalMode: 'auto' | 'per_transfer';
+    nativeTransferPreapproved: boolean;
+    allowedTransferTokens: string[];
+    updatedAt: string | null;
+  };
+  outboundPermissions: {
+    outboundTransfersEnabled: boolean;
+    outboundMode: 'disabled' | 'allow_all' | 'whitelist';
+    outboundWhitelistAddresses: string[];
+    updatedAt: string | null;
+  };
+};
+
+type InboxPayload = {
+  summary?: {
+    pending?: number;
+    approved?: number;
+    rejected?: number;
+  };
+  rows?: InboxRow[];
+  permissionInventory?: PermissionInventoryRow[];
 };
 
 function getCsrfToken(): string | null {
@@ -82,26 +118,7 @@ async function managementPost(path: string, payload: Record<string, unknown>) {
   return json;
 }
 
-function parseStoredManagedAgents(): string[] {
-  if (typeof window === 'undefined') {
-    return [];
-  }
-  try {
-    const raw = window.localStorage.getItem('xclaw_managed_agent_ids');
-    if (!raw) {
-      return [];
-    }
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-    return parsed.filter((item): item is string => typeof item === 'string' && item.length > 0);
-  } catch {
-    return [];
-  }
-}
-
-function statusLabel(value: ApprovalRowStatus): string {
+function statusLabel(value: 'pending' | 'approved' | 'rejected'): string {
   if (value === 'pending') {
     return 'Pending';
   }
@@ -121,22 +138,21 @@ function humanizeKeyLabel(value: string): string {
 }
 
 export default function ApprovalsCenterPage() {
-  const [dashboardChainKey, , dashboardChainLabel] = useDashboardChainKey();
+  const [dashboardChainKey] = useDashboardChainKey();
   const [ownerContext, setOwnerContext] = useState<OwnerContext>({ phase: 'loading' });
-  const [managedAgentNames, setManagedAgentNames] = useState<Record<string, string>>({});
-  const [state, setState] = useState<ApprovalsCenterManagementState | null>(null);
+  const [state, setState] = useState<InboxPayload | null>(null);
   const [loadingState, setLoadingState] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [decisionMap, setDecisionMap] = useState<LocalDecisionMap>({});
   const [workingById, setWorkingById] = useState<Record<string, boolean>>({});
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const [activeTab, setActiveTab] = useState<StatusTab>('pending');
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<SortFilter>('newest');
 
-  const effectiveChain = dashboardChainKey === 'all' ? 'base_sepolia' : dashboardChainKey;
+  const effectiveChain = dashboardChainKey === 'all' ? 'all' : dashboardChainKey;
 
   useEffect(() => {
     let cancelled = false;
@@ -153,19 +169,15 @@ export default function ApprovalsCenterPage() {
         }
 
         const payload = (await response.json()) as SessionAgentsPayload;
-        const fromSession = Array.isArray(payload.managedAgents) ? payload.managedAgents : [];
-        const merged = Array.from(new Set([...fromSession, ...parseStoredManagedAgents()]));
-        const activeAgentId = payload.activeAgentId ?? merged[0];
+        const managed = Array.isArray(payload.managedAgents) ? payload.managedAgents : [];
+        const active = payload.activeAgentId ?? managed[0];
 
-        if (!cancelled && activeAgentId) {
-          setOwnerContext({ phase: 'ready', managedAgents: merged.length > 0 ? merged : [activeAgentId], activeAgentId });
+        if (!cancelled && active) {
+          setOwnerContext({ phase: 'ready', managedAgents: managed.length > 0 ? managed : [active], activeAgentId: active });
         }
       } catch (loadError) {
         if (!cancelled) {
-          setOwnerContext({
-            phase: 'error',
-            message: loadError instanceof Error ? loadError.message : 'Failed to resolve owner context.'
-          });
+          setOwnerContext({ phase: 'error', message: loadError instanceof Error ? loadError.message : 'Failed to resolve owner context.' });
         }
       }
     }
@@ -182,7 +194,6 @@ export default function ApprovalsCenterPage() {
       setState(null);
       return;
     }
-    const activeAgentId = ownerContext.activeAgentId;
 
     let cancelled = false;
 
@@ -191,26 +202,22 @@ export default function ApprovalsCenterPage() {
       setError(null);
       try {
         const response = await fetch(
-          `/api/v1/management/agent-state?agentId=${encodeURIComponent(activeAgentId)}&chainKey=${encodeURIComponent(effectiveChain)}`,
-          {
-            cache: 'no-store',
-            credentials: 'same-origin',
-            headers: getCsrfToken() ? { 'x-csrf-token': getCsrfToken() as string } : {}
-          }
+          `/api/v1/management/approvals/inbox?chainKey=${encodeURIComponent(effectiveChain)}&status=all&types=trade,policy,transfer&limit=400`,
+          { cache: 'no-store', credentials: 'same-origin' }
         );
 
         if (!response.ok) {
           const payload = (await response.json().catch(() => null)) as { message?: string } | null;
-          throw new Error(payload?.message ?? 'Failed to load approvals state.');
+          throw new Error(payload?.message ?? 'Failed to load approvals inbox.');
         }
 
-        const payload = (await response.json()) as ApprovalsCenterManagementState;
+        const payload = (await response.json()) as InboxPayload;
         if (!cancelled) {
           setState(payload);
         }
       } catch (loadError) {
         if (!cancelled) {
-          setError(loadError instanceof Error ? loadError.message : 'Failed to load approvals state.');
+          setError(loadError instanceof Error ? loadError.message : 'Failed to load approvals inbox.');
         }
       } finally {
         if (!cancelled) {
@@ -230,41 +237,7 @@ export default function ApprovalsCenterPage() {
     };
   }, [ownerContext, effectiveChain]);
 
-  useEffect(() => {
-    if (ownerContext.phase !== 'ready') {
-      setManagedAgentNames({});
-      return;
-    }
-    const managedAgents = ownerContext.managedAgents;
-    let cancelled = false;
-    async function loadNames() {
-      const names: Record<string, string> = {};
-      await Promise.all(
-        managedAgents.map(async (agentId) => {
-          try {
-            const response = await fetch(`/api/v1/public/agents/${encodeURIComponent(agentId)}`, { cache: 'no-store' });
-            if (!response.ok) {
-              names[agentId] = 'Unnamed Agent';
-              return;
-            }
-            const payload = (await response.json()) as PublicAgentPayload;
-            names[agentId] = payload.agent?.agent_name?.trim() || 'Unnamed Agent';
-          } catch {
-            names[agentId] = 'Unnamed Agent';
-          }
-        })
-      );
-      if (!cancelled) {
-        setManagedAgentNames(names);
-      }
-    }
-    void loadNames();
-    return () => {
-      cancelled = true;
-    };
-  }, [ownerContext]);
-
-  const rows = useMemo(() => buildApprovalsCenterRows(state ?? {}, decisionMap), [state, decisionMap]);
+  const rows = useMemo(() => state?.rows ?? [], [state]);
 
   const filteredRows = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -276,7 +249,7 @@ export default function ApprovalsCenterPage() {
       if (typeFilter !== 'all' && row.rowKind !== typeFilter) {
         return false;
       }
-      if (normalizedQuery && !`${row.title} ${row.subtitle} ${row.tokenSearch}`.toLowerCase().includes(normalizedQuery)) {
+      if (normalizedQuery && !`${row.title} ${row.subtitle} ${row.agentName} ${row.reasonLine}`.toLowerCase().includes(normalizedQuery)) {
         return false;
       }
       return true;
@@ -289,55 +262,91 @@ export default function ApprovalsCenterPage() {
   }, [activeTab, rows, sort, typeFilter, query]);
 
   const summary = useMemo(() => {
-    const pending = rows.filter((row) => row.status === 'pending').length;
-    const approved = rows.filter((row) => row.status === 'approved').length;
-    const rejected = rows.filter((row) => row.status === 'rejected').length;
-    return { pending, approved, rejected };
-  }, [rows]);
+    return {
+      pending: state?.summary?.pending ?? rows.filter((row) => row.status === 'pending').length,
+      approved: state?.summary?.approved ?? rows.filter((row) => row.status === 'approved').length,
+      rejected: state?.summary?.rejected ?? rows.filter((row) => row.status === 'rejected').length
+    };
+  }, [rows, state]);
 
-  async function handleDecision(row: ApprovalsCenterRow, decision: 'approve' | 'reject') {
-    if (ownerContext.phase !== 'ready') {
+  async function reloadInbox() {
+    const response = await fetch(
+      `/api/v1/management/approvals/inbox?chainKey=${encodeURIComponent(effectiveChain)}&status=all&types=trade,policy,transfer&limit=400`,
+      { cache: 'no-store', credentials: 'same-origin' }
+    );
+    if (!response.ok) {
       return;
     }
+    const payload = (await response.json()) as InboxPayload;
+    setState(payload);
+  }
 
+  async function handleDecision(row: InboxRow, decision: 'approve' | 'reject' | 'approve_allowlist') {
     setNotice(null);
     setError(null);
     setWorkingById((current) => ({ ...current, [row.id]: true }));
 
     try {
-      if (row.rowKind === 'trade' && row.tradeId) {
+      if (row.rowKind === 'trade' && decision === 'approve_allowlist') {
+        await managementPost('/api/v1/management/approvals/approve-allowlist-token', {
+          agentId: row.agentId,
+          tradeId: row.requestId
+        });
+      } else if (row.rowKind === 'trade') {
         await managementPost('/api/v1/management/approvals/decision', {
-          agentId: ownerContext.activeAgentId,
-          tradeId: row.tradeId,
+          agentId: row.agentId,
+          tradeId: row.requestId,
           decision
         });
-      } else if (row.rowKind === 'policy' && row.policyApprovalId) {
+      } else if (row.rowKind === 'policy') {
         await managementPost('/api/v1/management/policy-approvals/decision', {
-          agentId: ownerContext.activeAgentId,
-          policyApprovalId: row.policyApprovalId,
+          agentId: row.agentId,
+          policyApprovalId: row.requestId,
           decision
         });
-      } else if (row.rowKind === 'transfer' && row.transferApprovalId) {
+      } else {
         await managementPost('/api/v1/management/transfer-approvals/decision', {
-          agentId: ownerContext.activeAgentId,
-          approvalId: row.transferApprovalId,
+          agentId: row.agentId,
+          approvalId: row.requestId,
           decision: decision === 'approve' ? 'approve' : 'deny',
           chainKey: row.chainKey
         });
       }
 
-      setDecisionMap((current) => ({
-        ...current,
-        [row.tradeId ?? row.policyApprovalId ?? row.transferApprovalId ?? row.id]: {
-          status: decision === 'approve' ? 'approved' : 'rejected',
-          decidedAt: new Date().toISOString()
-        }
-      }));
-      setNotice(`${decision === 'approve' ? 'Approved' : 'Rejected'} ${row.requestTypeLabel.toLowerCase()} request.`);
+      setNotice(
+        decision === 'approve_allowlist'
+          ? 'Approved trade and allowlisted token.'
+          : `${decision === 'approve' ? 'Approved' : 'Rejected'} ${row.requestTypeLabel.toLowerCase()} request.`
+      );
+      await reloadInbox();
     } catch (decisionError) {
       setError(decisionError instanceof Error ? decisionError.message : 'Decision request failed.');
     } finally {
       setWorkingById((current) => ({ ...current, [row.id]: false }));
+    }
+  }
+
+  async function handleBatch(decision: 'approve' | 'reject' | 'approve_allowlist') {
+    const selectedRows = filteredRows.filter((row) => selectedIds.includes(row.id) && row.status === 'pending');
+    if (selectedRows.length === 0) {
+      return;
+    }
+
+    try {
+      await managementPost('/api/v1/management/approvals/decision-batch', {
+        items: selectedRows.map((row) => ({
+          agentId: row.agentId,
+          rowKind: row.rowKind,
+          requestId: row.requestId,
+          chainKey: row.chainKey,
+          decision
+        }))
+      });
+      setSelectedIds([]);
+      setNotice(`Batch ${decision} executed for ${selectedRows.length} request(s).`);
+      await reloadInbox();
+    } catch (decisionError) {
+      setError(decisionError instanceof Error ? decisionError.message : 'Batch decision failed.');
     }
   }
 
@@ -357,9 +366,6 @@ export default function ApprovalsCenterPage() {
           </div>
         </header>
 
-        {dashboardChainKey === 'all' ? (
-          <p className={styles.infoBanner}>All chains selected. v1 loads queue data from Base Sepolia; cross-chain aggregation is planned in a follow-up API slice.</p>
-        ) : null}
         {notice ? <p className={styles.successBanner}>{notice}</p> : null}
         {error ? <p className={styles.warningBanner}>{error}</p> : null}
 
@@ -389,24 +395,22 @@ export default function ApprovalsCenterPage() {
                 <p className={styles.summaryValue}>{formatNumber(summary.pending)}</p>
               </article>
               <article className={styles.summaryCard}>
-                <p className={styles.summaryLabel}>Approved (session)</p>
+                <p className={styles.summaryLabel}>Approved</p>
                 <p className={styles.summaryValue}>{formatNumber(summary.approved)}</p>
               </article>
               <article className={styles.summaryCard}>
-                <p className={styles.summaryLabel}>Rejected (session)</p>
+                <p className={styles.summaryLabel}>Rejected</p>
                 <p className={styles.summaryValue}>{formatNumber(summary.rejected)}</p>
               </article>
             </section>
 
-            <p className={styles.postureLine}>
-              Security posture: per-request approvals are active for the selected agent.
-            </p>
+            <p className={styles.postureLine}>Security posture: per-request approvals are active for linked agents.</p>
 
             <div className={styles.contentGrid}>
               <section className={styles.card}>
                 <div className={styles.cardHeaderRow}>
-                  <h2>Pending Approval Requests</h2>
-                  <span className={styles.agentBadge}>Agent: {managedAgentNames[ownerContext.activeAgentId] || 'Unnamed Agent'}</span>
+                  <h2>Approval Requests</h2>
+                  <span className={styles.agentBadge}>Linked agents: {ownerContext.managedAgents.length}</span>
                 </div>
 
                 <div className={styles.segmentTabs}>
@@ -419,15 +423,7 @@ export default function ApprovalsCenterPage() {
                     <button
                       key={key}
                       type="button"
-                      className={`${styles.segmentTab}${activeTab === key ? ` ${styles.segmentTabActive}` : ''}${
-                        key === 'pending'
-                          ? ` ${styles.segmentTabPending}`
-                          : key === 'approved'
-                            ? ` ${styles.segmentTabApproved}`
-                            : key === 'rejected'
-                              ? ` ${styles.segmentTabRejected}`
-                              : ` ${styles.segmentTabAll}`
-                      }`}
+                      className={`${styles.segmentTab}${activeTab === key ? ` ${styles.segmentTabActive}` : ''}`}
                       onClick={() => setActiveTab(key)}
                     >
                       {label}
@@ -449,17 +445,30 @@ export default function ApprovalsCenterPage() {
                   <input
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
-                    placeholder="Search pending approval requests..."
+                    placeholder="Search approval requests..."
                     aria-label="Search requests"
                   />
                 </div>
 
+                <div className={styles.requestActions}>
+                  <button type="button" onClick={() => void handleBatch('approve')} disabled={selectedIds.length === 0}>
+                    Bulk Approve
+                  </button>
+                  <button type="button" onClick={() => void handleBatch('approve_allowlist')} disabled={selectedIds.length === 0}>
+                    Bulk Approve + Allowlist
+                  </button>
+                  <button type="button" className={styles.dangerButton} onClick={() => void handleBatch('reject')} disabled={selectedIds.length === 0}>
+                    Bulk Reject
+                  </button>
+                </div>
+
                 {loadingState ? <p className={styles.loadingCopy}>Loading approvals...</p> : null}
-                {!loadingState && filteredRows.length === 0 ? <p className={styles.emptyCopy}>No pending approvals. Your agents are operating within limits.</p> : null}
+                {!loadingState && filteredRows.length === 0 ? <p className={styles.emptyCopy}>No matching approvals.</p> : null}
 
                 <div className={styles.requestList}>
                   {filteredRows.map((row) => {
                     const disabled = row.status !== 'pending' || Boolean(workingById[row.id]);
+                    const checked = selectedIds.includes(row.id);
                     return (
                       <article key={row.id} className={styles.requestCard}>
                         <div className={styles.requestTop}>
@@ -469,37 +478,43 @@ export default function ApprovalsCenterPage() {
                             <p className={styles.requestMeta}>{row.subtitle}</p>
                           </div>
                           <div className={styles.rightMeta}>
-                            <span
-                              className={`${styles.statusChip} ${
-                                row.status === 'pending'
-                                  ? styles.statusChipPending
-                                  : row.status === 'approved'
-                                    ? styles.statusChipApproved
-                                    : styles.statusChipRejected
-                              }`}
-                            >
+                            <span className={`${styles.statusChip} ${row.status === 'pending' ? styles.statusChipPending : row.status === 'approved' ? styles.statusChipApproved : styles.statusChipRejected}`}>
                               {statusLabel(row.status)}
                             </span>
                           </div>
                         </div>
                         <p className={styles.reasonLine}>{row.reasonLine}</p>
                         <div className={styles.metadataRow}>
+                          <span>Agent: {row.agentName}</span>
                           <span>Chain: {humanizeKeyLabel(row.chainKey)}</span>
+                          <span>Risk: {row.riskLabel}</span>
                           <span>Requested: {formatUtc(row.createdAt)} UTC</span>
                         </div>
                         <div className={styles.requestActions}>
+                          <label>
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={(event) => {
+                                setSelectedIds((current) =>
+                                  event.target.checked ? Array.from(new Set([...current, row.id])) : current.filter((item) => item !== row.id)
+                                );
+                              }}
+                              disabled={row.status !== 'pending'}
+                            />
+                            Select
+                          </label>
                           <button type="button" disabled={disabled} onClick={() => void handleDecision(row, 'approve')}>
                             Approve Once
                           </button>
-                          <button type="button" disabled className={styles.secondaryDisabled}>
-                            Approve + Allowlist Token
-                          </button>
                           <button
                             type="button"
-                            disabled={disabled}
-                            className={styles.dangerButton}
-                            onClick={() => void handleDecision(row, 'reject')}
+                            disabled={disabled || row.rowKind !== 'trade'}
+                            onClick={() => void handleDecision(row, 'approve_allowlist')}
                           >
+                            Approve + Allowlist Token
+                          </button>
+                          <button type="button" disabled={disabled} className={styles.dangerButton} onClick={() => void handleDecision(row, 'reject')}>
                             Reject
                           </button>
                         </div>
@@ -511,39 +526,43 @@ export default function ApprovalsCenterPage() {
 
               <section className={styles.card}>
                 <div className={styles.cardHeaderRow}>
-                  <h2>Allowances Inventory</h2>
+                  <h2>Permissions Inventory</h2>
                 </div>
-                <p className={styles.placeholderNote}>
-                  Awaiting dedicated allowances inventory API. This section is read-only in Slice 74 and actions remain disabled.
-                </p>
-
-                <div className={styles.allowanceToolbar}>
-                  <select disabled>
-                    <option>Allowance type (placeholder)</option>
-                  </select>
-                  <select disabled>
-                    <option>Agent (placeholder)</option>
-                  </select>
-                  <input disabled placeholder="Search allowances..." />
-                </div>
+                <p className={styles.placeholderNote}>Chain-scoped trade, transfer, and outbound permission posture for linked agents.</p>
 
                 <div className={styles.allowanceTable}>
                   <div className={styles.allowanceRowHeader}>
-                    <span>Spender</span>
-                    <span>Token</span>
-                    <span>Allowance</span>
-                    <span>Actions</span>
+                    <span>Agent / Chain</span>
+                    <span>Trade Permissions</span>
+                    <span>Transfer Permissions</span>
+                    <span>Outbound</span>
                   </div>
-                  <div className={styles.allowanceRow}>
-                    <span>Data unavailable</span>
-                    <span>--</span>
-                    <span>--</span>
-                    <span>
-                      <button type="button" disabled>
-                        Revoke
-                      </button>
-                    </span>
-                  </div>
+                  {(state?.permissionInventory ?? []).map((item) => (
+                    <div key={`${item.agentId}:${item.chainKey}`} className={styles.allowanceRow}>
+                      <span>{item.agentName} / {humanizeKeyLabel(item.chainKey)}</span>
+                      <span>
+                        {item.tradePermissions.approvalMode === 'auto' ? 'Approve all' : 'Per-trade'}
+                        <br />
+                        Tokens: {item.tradePermissions.allowedTokens.length}
+                      </span>
+                      <span>
+                        {item.transferPermissions.transferApprovalMode}
+                        <br />
+                        Native: {item.transferPermissions.nativeTransferPreapproved ? 'yes' : 'no'}
+                      </span>
+                      <span>
+                        {item.outboundPermissions.outboundTransfersEnabled ? item.outboundPermissions.outboundMode : 'disabled'}
+                      </span>
+                    </div>
+                  ))}
+                  {(state?.permissionInventory ?? []).length === 0 ? (
+                    <div className={styles.allowanceRow}>
+                      <span>No permission inventory rows yet.</span>
+                      <span>--</span>
+                      <span>--</span>
+                      <span>--</span>
+                    </div>
+                  ) : null}
                 </div>
               </section>
             </div>

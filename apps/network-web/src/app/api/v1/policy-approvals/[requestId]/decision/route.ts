@@ -156,10 +156,11 @@ export async function POST(
             max_daily_trade_count
           from agent_policy_snapshots
           where agent_id = $1
+            and chain_key = $2
           order by created_at desc
           limit 1
           `,
-          [auth.agentId]
+          [auth.agentId, row.chain_key]
         );
 
         if (latest.rowCount === 0) {
@@ -183,13 +184,14 @@ export async function POST(
         await client.query(
           `
           insert into agent_policy_snapshots (
-            snapshot_id, agent_id, mode, approval_mode, max_trade_usd, max_daily_usd, allowed_tokens,
+            snapshot_id, agent_id, chain_key, mode, approval_mode, max_trade_usd, max_daily_usd, allowed_tokens,
             daily_cap_usd_enabled, daily_trade_cap_enabled, max_daily_trade_count, created_at
-          ) values ($1, $2, $3::policy_mode, $4::policy_approval_mode, $5::numeric, $6::numeric, $7::jsonb, $8, $9, $10, now())
+          ) values ($1, $2, $3, $4::policy_mode, $5::policy_approval_mode, $6::numeric, $7::numeric, $8::jsonb, $9, $10, $11, now())
           `,
           [
             makeId('pol'),
             auth.agentId,
+            row.chain_key,
             snapshot.mode,
             nextApprovalMode,
             snapshot.max_trade_usd ?? '0',

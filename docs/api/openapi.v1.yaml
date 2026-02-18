@@ -894,6 +894,63 @@ paths:
           description: Decision accepted.
         '409':
           $ref: '#/components/responses/ErrorResponse'
+  /api/v1/management/approvals/approve-allowlist-token:
+    post:
+      summary: Approve one pending trade and add tokenIn to chain-scoped trade allowlist atomically.
+      security:
+        - managementCookie: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfTokenHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ManagementApproveAllowlistTokenRequest'
+      responses:
+        '200':
+          description: Trade approved and token allowlisted.
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+  /api/v1/management/approvals/inbox:
+    get:
+      summary: Read unified approvals inbox and permission inventory across agents linked to the active management session.
+      security:
+        - managementCookie: []
+      parameters:
+        - name: chainKey
+          in: query
+          schema:
+            type: string
+            default: base_sepolia
+            description: Chain key or `all`.
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, approved, rejected, all]
+            default: pending
+        - name: types
+          in: query
+          schema:
+            type: string
+            description: Comma-separated row kinds (`trade,policy,transfer`).
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 200
+      responses:
+        '200':
+          description: Unified inbox payload.
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
   /api/v1/management/policy-approvals/decision:
     post:
       summary: Approve or reject one pending policy approval request.
@@ -1180,6 +1237,48 @@ paths:
       responses:
         '200':
           description: Transfer policy update accepted.
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+  /api/v1/management/permissions/update:
+    post:
+      summary: Update chain-scoped permission posture (trade/transfer/outbound) for one agent.
+      security:
+        - managementCookie: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfTokenHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ManagementPermissionsUpdateRequest'
+      responses:
+        '200':
+          description: Permissions updated.
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+  /api/v1/management/approvals/decision-batch:
+    post:
+      summary: Apply batched approval decisions for trade/policy/transfer requests.
+      security:
+        - managementCookie: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfTokenHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ManagementApprovalsDecisionBatchRequest'
+      responses:
+        '200':
+          description: Batch decision accepted with per-item outcomes.
         '400':
           $ref: '#/components/responses/ErrorResponse'
         '401':
@@ -2341,6 +2440,14 @@ components:
           type: string
         reasonMessage:
           type: string
+    ManagementApproveAllowlistTokenRequest:
+      type: object
+      required: [agentId, tradeId]
+      properties:
+        agentId:
+          type: string
+        tradeId:
+          type: string
     ManagementChainUpdateRequest:
       type: object
       required: [agentId, chainKey, chainEnabled]
@@ -2714,11 +2821,75 @@ components:
           items:
             type: string
             pattern: '^0x[a-fA-F0-9]{40}$'
-    ManagementPolicyUpdateRequest:
+    ManagementPermissionsUpdateRequest:
       type: object
-      required: [agentId, mode, approvalMode, maxTradeUsd, maxDailyUsd, allowedTokens]
+      required: [agentId, chainKey]
       properties:
         agentId:
+          type: string
+        chainKey:
+          type: string
+        tradeApprovalMode:
+          type: string
+          enum: [per_trade, auto]
+        allowedTokens:
+          type: array
+          items:
+            type: string
+        transferApprovalMode:
+          type: string
+          enum: [auto, per_transfer]
+        nativeTransferPreapproved:
+          type: boolean
+        allowedTransferTokens:
+          type: array
+          items:
+            type: string
+            pattern: '^0x[a-fA-F0-9]{40}$'
+        outboundTransfersEnabled:
+          type: boolean
+        outboundMode:
+          type: string
+          enum: [disabled, allow_all, whitelist]
+        outboundWhitelistAddresses:
+          type: array
+          items:
+            type: string
+            pattern: '^0x[a-fA-F0-9]{40}$'
+    ManagementApprovalsDecisionBatchRequest:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            type: object
+            required: [agentId, rowKind, requestId, decision]
+            properties:
+              agentId:
+                type: string
+              rowKind:
+                type: string
+                enum: [trade, policy, transfer]
+              requestId:
+                type: string
+              decision:
+                type: string
+                enum: [approve, reject, approve_allowlist]
+              chainKey:
+                type: string
+              reasonMessage:
+                type: string
+                nullable: true
+    ManagementPolicyUpdateRequest:
+      type: object
+      required: [agentId, chainKey, mode, approvalMode, maxTradeUsd, maxDailyUsd, allowedTokens]
+      properties:
+        agentId:
+          type: string
+        chainKey:
           type: string
         mode:
           type: string

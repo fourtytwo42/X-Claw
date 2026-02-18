@@ -51,6 +51,8 @@ export async function POST(req: NextRequest) {
     }
 
     const body = validated.data;
+    const policyChainKey =
+      (Array.isArray(body.balances) ? String(body.balances[0]?.chainKey ?? '').trim() : '') || 'base_sepolia';
 
     const auth = requireAgentAuth(req, body.agentId, requestId);
     if (!auth.ok) {
@@ -85,14 +87,15 @@ export async function POST(req: NextRequest) {
       await client.query(
         `
         insert into agent_policy_snapshots (
-          snapshot_id, agent_id, mode, approval_mode,
+          snapshot_id, agent_id, chain_key, mode, approval_mode,
           max_trade_usd, max_daily_usd, allowed_tokens, created_at
         )
-        values ($1, $2, $3, $4, $5, $6, $7::jsonb, now())
+        values ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, now())
         `,
         [
           makeId('aps'),
           body.agentId,
+          policyChainKey,
           body.mode,
           body.approvalMode,
           body.maxTradeUsd ?? null,

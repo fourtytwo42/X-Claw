@@ -12,6 +12,7 @@ export const runtime = 'nodejs';
 
 type PolicyUpdateRequest = {
   agentId: string;
+  chainKey: string;
   mode: 'mock' | 'real';
   approvalMode: 'per_trade' | 'auto';
   maxTradeUsd: string;
@@ -99,10 +100,10 @@ export async function POST(req: NextRequest) {
       select outbound_transfers_enabled, outbound_mode::text, outbound_whitelist_addresses
       from agent_transfer_policies
       where agent_id = $1
-        and chain_key = 'base_sepolia'
+        and chain_key = $2
       limit 1
       `,
-      [body.agentId]
+      [body.agentId, body.chainKey]
     );
     const existingRow = existingTransferPolicy.rows[0];
     const outboundTransfersEnabled =
@@ -122,13 +123,14 @@ export async function POST(req: NextRequest) {
       await client.query(
         `
         insert into agent_policy_snapshots (
-          snapshot_id, agent_id, mode, approval_mode, max_trade_usd, max_daily_usd, allowed_tokens,
+          snapshot_id, agent_id, chain_key, mode, approval_mode, max_trade_usd, max_daily_usd, allowed_tokens,
           daily_cap_usd_enabled, daily_trade_cap_enabled, max_daily_trade_count, created_at
-        ) values ($1, $2, $3::policy_mode, $4::policy_approval_mode, $5::numeric, $6::numeric, $7::jsonb, $8, $9, $10, now())
+        ) values ($1, $2, $3, $4::policy_mode, $5::policy_approval_mode, $6::numeric, $7::numeric, $8::jsonb, $9, $10, $11, now())
         `,
         [
           snapshotId,
           body.agentId,
+          body.chainKey,
           body.mode,
           body.approvalMode,
           body.maxTradeUsd,
@@ -152,7 +154,7 @@ export async function POST(req: NextRequest) {
           updated_by_management_session_id,
           created_at,
           updated_at
-        ) values ($1, $2, 'base_sepolia', $3, $4::outbound_transfer_mode, $5::jsonb, $6, now(), now())
+        ) values ($1, $2, $3, $4, $5::outbound_transfer_mode, $6::jsonb, $7, now(), now())
         on conflict (agent_id, chain_key)
         do update set
           outbound_transfers_enabled = excluded.outbound_transfers_enabled,
@@ -164,6 +166,7 @@ export async function POST(req: NextRequest) {
         [
           makeId('atp'),
           body.agentId,
+          body.chainKey,
           outboundTransfersEnabled,
           outboundMode,
           JSON.stringify(outboundWhitelistAddresses),
@@ -189,7 +192,8 @@ export async function POST(req: NextRequest) {
             dailyTradeCapEnabled,
             maxDailyTradeCount,
             outboundTransfersEnabled,
-            outboundMode
+            outboundMode,
+            chainKey: body.chainKey
           })
         ]
       );
@@ -207,6 +211,7 @@ export async function POST(req: NextRequest) {
           auth.session.sessionId,
           JSON.stringify({ mode: body.mode, approvalMode: body.approvalMode }),
           JSON.stringify({
+            chainKey: body.chainKey,
             maxTradeUsd: body.maxTradeUsd,
             maxDailyUsd: body.maxDailyUsd,
             allowedTokens: body.allowedTokens,

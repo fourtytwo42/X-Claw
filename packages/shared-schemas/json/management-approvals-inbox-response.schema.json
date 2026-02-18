@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["ok", "activeAgentId", "managedAgents", "summary", "rows", "permissionInventory"],
+  "properties": {
+    "ok": { "type": "boolean", "const": true },
+    "activeAgentId": { "type": "string", "minLength": 1 },
+    "managedAgents": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["pending", "approved", "rejected"],
+      "properties": {
+        "pending": { "type": "integer", "minimum": 0 },
+        "approved": { "type": "integer", "minimum": 0 },
+        "rejected": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "rows": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "permissionInventory": {
+      "type": "array",
+      "items": { "type": "object" }
+    }
+  }
+}

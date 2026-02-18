@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
     return successResponse(
       {
         ok: true,
-        managedAgents: [auth.session.agentId],
+        managedAgents: auth.session.managedAgentIds,
         activeAgentId: auth.session.agentId
       },
       200,

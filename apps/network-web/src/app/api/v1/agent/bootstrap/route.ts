@@ -197,10 +197,10 @@ export async function POST(req: NextRequest) {
       await client.query(
         `
         insert into agent_policy_snapshots (
-          snapshot_id, agent_id, mode, approval_mode, max_trade_usd, max_daily_usd, allowed_tokens, created_at
-        ) values ($1, $2, $3, $4, null, null, '[]'::jsonb, now())
+          snapshot_id, agent_id, chain_key, mode, approval_mode, max_trade_usd, max_daily_usd, allowed_tokens, created_at
+        ) values ($1, $2, $3, $4, $5, null, null, '[]'::jsonb, now())
         `,
-        [makeId('aps'), agentId, mode, approvalMode]
+        [makeId('aps'), agentId, chainKey, mode, approvalMode]
       );
 
       await client.query(

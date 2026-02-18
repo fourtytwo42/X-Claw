@@ -4,7 +4,7 @@ import { chainRpcUrl, getChainConfig } from '@/lib/chains';
 import { dbQuery, withTransaction } from '@/lib/db';
 import { errorResponse, internalErrorResponse, successResponse } from '@/lib/errors';
 import { makeId } from '@/lib/ids';
-import { requireCsrfToken, requireManagementSession } from '@/lib/management-auth';
+import { requireCsrfToken, requireManagementSession, sessionHasAgentAccess } from '@/lib/management-auth';
 import { getRequestId } from '@/lib/request-id';
 
 export const runtime = 'nodejs';
@@ -191,7 +191,7 @@ export async function GET(req: NextRequest) {
       return csrf.response;
     }
 
-    if (auth.session.agentId !== agentId) {
+    if (!sessionHasAgentAccess(auth.session, agentId)) {
       return errorResponse(
         401,
         {

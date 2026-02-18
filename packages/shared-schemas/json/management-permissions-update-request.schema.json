@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["agentId", "chainKey"],
+  "properties": {
+    "agentId": { "type": "string", "minLength": 1 },
+    "chainKey": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "tradeApprovalMode": { "type": "string", "enum": ["per_trade", "auto"] },
+    "allowedTokens": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "maxItems": 200
+    },
+    "transferApprovalMode": { "type": "string", "enum": ["auto", "per_transfer"] },
+    "nativeTransferPreapproved": { "type": "boolean" },
+    "allowedTransferTokens": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^0x[a-fA-F0-9]{40}$" },
+      "maxItems": 200
+    },
+    "outboundTransfersEnabled": { "type": "boolean" },
+    "outboundMode": { "type": "string", "enum": ["disabled", "allow_all", "whitelist"] },
+    "outboundWhitelistAddresses": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^0x[a-fA-F0-9]{40}$" },
+      "maxItems": 200
+    }
+  },
+  "anyOf": [
+    { "required": ["tradeApprovalMode"] },
+    { "required": ["allowedTokens"] },
+    { "required": ["transferApprovalMode"] },
+    { "required": ["nativeTransferPreapproved"] },
+    { "required": ["allowedTransferTokens"] },
+    { "required": ["outboundTransfersEnabled"] },
+    { "required": ["outboundMode"] },
+    { "required": ["outboundWhitelistAddresses"] }
+  ]
+}

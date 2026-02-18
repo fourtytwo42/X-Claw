@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server';
 
 import { dbQuery } from '@/lib/db';
 import { errorResponse, internalErrorResponse, successResponse } from '@/lib/errors';
-import { requireManagementSession } from '@/lib/management-auth';
+import { requireManagementSession, sessionHasAgentAccess } from '@/lib/management-auth';
 import { getRequestId } from '@/lib/request-id';
 
 export const runtime = 'nodejs';
@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
     if (!auth.ok) {
       return auth.response;
     }
-    if (auth.session.agentId !== agentId) {
+    if (!sessionHasAgentAccess(auth.session, agentId)) {
       return errorResponse(
         401,
         {

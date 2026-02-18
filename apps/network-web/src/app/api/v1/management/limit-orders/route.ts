@@ -4,7 +4,7 @@ import { dbQuery, withTransaction } from '@/lib/db';
 import { errorResponse, internalErrorResponse, successResponse } from '@/lib/errors';
 import { parseIntQuery, parseJsonBody } from '@/lib/http';
 import { makeId } from '@/lib/ids';
-import { requireManagementSession, requireManagementWriteAuth } from '@/lib/management-auth';
+import { requireManagementSession, requireManagementWriteAuth, sessionHasAgentAccess } from '@/lib/management-auth';
 import { getRequestId } from '@/lib/request-id';
 import { validatePayload } from '@/lib/validation';
 
@@ -123,7 +123,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    if (auth.session.agentId !== agentId) {
+    if (!sessionHasAgentAccess(auth.session, agentId)) {
       return errorResponse(
         401,
         {

@@ -4129,3 +4129,20 @@ Issue mapping: `#32` (`https://github.com/fourtytwo42/ETHDenver2026/issues/32`)
 - tracked agent add/remove reflects in left rail icons -> PASS (code-path verified)
 - `/agents/[agentId]` tracked panel list/remove works -> PASS (code-path verified)
 - runtime `dashboard` includes `trackedAgents` + `trackedRecentTrades` -> PASS (unit/code-path verified)
+
+## Slice 86-88 Acceptance Addendum
+
+### API checks
+- `GET /api/v1/management/session/agents` returns linked `managedAgents` set for active session.
+- `POST /api/v1/management/approvals/approve-allowlist-token` approves pending trade and appends token to chain allowlist.
+- `GET /api/v1/management/approvals/inbox` returns multi-agent rows + permission inventory.
+- `POST /api/v1/management/permissions/update` mutates requested permission surface.
+- `POST /api/v1/management/approvals/decision-batch` returns per-item outcomes.
+
+### Required gates
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `pm2 restart all`

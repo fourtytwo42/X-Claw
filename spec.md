@@ -1662,3 +1662,21 @@ Pivot public product behavior from copy trading to tracked-agent monitoring whil
 - `npm run seed:verify`
 - `npm run build`
 - `pm2 restart all`
+
+## Slice 86-88 Spec Addendum (Approvals Center Full Flush)
+
+### Goal
+- Replace placeholder approvals-center modules with fully functional permission-native workflows and multi-agent session support.
+
+### Non-goals
+- No ERC-20 on-chain allowance crawling/revoke surface in this slice group.
+
+### Interfaces
+- `POST /api/v1/management/approvals/approve-allowlist-token`
+- `GET /api/v1/management/approvals/inbox`
+- `POST /api/v1/management/permissions/update`
+- `POST /api/v1/management/approvals/decision-batch`
+
+### Data changes
+- `management_session_agents` table.
+- `agent_policy_snapshots.chain_key` backfill + required writes.

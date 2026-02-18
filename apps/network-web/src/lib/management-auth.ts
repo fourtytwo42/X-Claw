@@ -11,6 +11,7 @@ import { enforceSensitiveManagementWriteRateLimit } from '@/lib/rate-limit';
 type ManagementSession = {
   sessionId: string;
   agentId: string;
+  managedAgentIds: string[];
   expiresAt: string;
 };
 
@@ -114,14 +115,50 @@ export async function requireManagementSession(req: NextRequest, requestId: stri
     return failManagementAuth(requestId);
   }
 
+  let managedAgentIds = [row.agent_id];
+  try {
+    const managed = await dbQuery<{ agent_id: string }>(
+      `
+      select agent_id
+      from management_session_agents
+      where session_id = $1
+      `,
+      [row.session_id]
+    );
+    if ((managed.rowCount ?? 0) > 0) {
+      managedAgentIds = Array.from(
+        new Set(
+          managed.rows
+            .map((entry) => String(entry.agent_id ?? '').trim())
+            .filter((entry) => entry.length > 0)
+            .concat([row.agent_id])
+        )
+      );
+    }
+  } catch (error) {
+    const code = error && typeof error === 'object' && 'code' in error ? String((error as { code?: unknown }).code ?? '') : '';
+    if (code !== '42P01' && code !== '42703') {
+      return failManagementAuth(requestId);
+    }
+  }
+
   return {
     ok: true,
     session: {
       sessionId: row.session_id,
       agentId: row.agent_id,
+      managedAgentIds,
       expiresAt: row.expires_at
     }
   };
+}
+
+export function sessionHasAgentAccess(session: ManagementSession, agentId: string): boolean {
+  const normalized = String(agentId).trim();
+  if (!normalized) {
+    return false;
+  }
+  return session.managedAgentIds.includes(normalized);
 }
 
 export function requireCsrfToken(req: NextRequest, requestId: string): AuthFailure | { ok: true } {
@@ -156,7 +193,7 @@ export async function requireManagementWriteAuth(
     return management;
   }
 
-  if (management.session.agentId !== expectedAgentId) {
+  if (!sessionHasAgentAccess(management.session, expectedAgentId)) {
     return {
       ok: false,
       response: errorResponse(

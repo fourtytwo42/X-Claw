@@ -1930,3 +1930,16 @@ Issue mapping: `#32`
   - [x] `npm run seed:verify`
   - [x] `npm run build`
   - [x] `pm2 restart all`
+
+## Slice 86-88 Tasks Addendum
+
+- [x] Add migration: `management_session_agents` + policy snapshot `chain_key`.
+- [x] Extend management auth to authorize linked managed agents.
+- [x] Add bootstrap-time session linking for additional agents.
+- [x] Make policy updates chain-scoped (`chainKey` required).
+- [x] Add approve+allowlist API.
+- [x] Add unified approvals inbox API with risk labels + permission inventory.
+- [x] Add permissions update API.
+- [x] Add batch decision API.
+- [x] Rewire `/approvals` to inbox API, bulk actions, and permissions inventory.
+- [ ] Run full required validation + collect evidence.

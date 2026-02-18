@@ -1641,3 +1641,47 @@ DoD:
 - [x] faucet and chain validation paths consume config/capability model instead of hardcoded chain lists.
 - [x] management agent-state chain token rows include optional resolved metadata (`name`, `decimals`, `source`, `tokenDisplay`).
 - [x] x402 scope remains unchanged and chain-gated by capability.
+
+---
+
+## Slice 86: Multi-Agent Management Session + Chain-Scoped Trade Policy Snapshots
+Status: [~]
+Issue: #86
+
+Goal:
+- Expand management-session authorization to support multiple managed agents per cookie session, and harden `agent_policy_snapshots` reads/writes to chain-scoped behavior.
+
+DoD:
+- [~] migration adds `management_session_agents` and backfills existing session->agent bindings.
+- [~] management auth loads authorized `managedAgentIds` for active session.
+- [~] bootstrap supports linking additional agent token access into existing session.
+- [~] `GET /api/v1/management/session/agents` returns linked managed agents from session bindings.
+- [~] migration adds `agent_policy_snapshots.chain_key` with backfill default `base_sepolia`.
+- [~] policy snapshot writes include `chain_key`; chain-key fallback reads removed from management views.
+
+## Slice 87: Approvals Center Core APIs + Permission Inventory
+Status: [~]
+Issue: #87
+
+Goal:
+- Make `/approvals` fully functional for approve+allowlist and permission-native inventory while preserving existing approval decision routes.
+
+DoD:
+- [~] add `POST /api/v1/management/approvals/approve-allowlist-token` (atomic trade approve + allowlist tokenIn).
+- [~] add `GET /api/v1/management/approvals/inbox` unified rows + risk labels + permission inventory.
+- [~] add `POST /api/v1/management/permissions/update` for direct permission posture updates.
+- [~] `/approvals` uses inbox API and enables `Approve + Allowlist Token`.
+- [~] allowances placeholder replaced with permissions inventory module.
+
+## Slice 88: Approvals Center Full UX Flush (Batch + Risk)
+Status: [~]
+Issue: #88
+
+Goal:
+- Complete approvals UX with deterministic risk context and batched decision operations.
+
+DoD:
+- [~] add `POST /api/v1/management/approvals/decision-batch` with per-item outcomes.
+- [~] `/approvals` supports multi-select bulk decisions.
+- [~] deterministic risk labels rendered in inbox cards.
+- [~] copy surface uses “Permissions Inventory” language (no allowances placeholder contract).

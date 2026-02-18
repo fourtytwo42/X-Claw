@@ -2,9 +2,10 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "additionalProperties": false,
-  "required": ["agentId", "mode", "approvalMode", "maxTradeUsd", "maxDailyUsd", "allowedTokens"],
+  "required": ["agentId", "chainKey", "mode", "approvalMode", "maxTradeUsd", "maxDailyUsd", "allowedTokens"],
   "properties": {
     "agentId": { "type": "string", "minLength": 1 },
+    "chainKey": { "type": "string", "minLength": 1, "maxLength": 64 },
     "mode": { "type": "string", "enum": ["mock", "real"] },
     "approvalMode": { "type": "string", "enum": ["per_trade", "auto"] },
     "maxTradeUsd": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]{1,8})?$" },

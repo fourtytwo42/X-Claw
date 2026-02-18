@@ -6,7 +6,8 @@ import { parseJsonBody } from '@/lib/http';
 import { getRequestId } from '@/lib/request-id';
 import { validatePayload } from '@/lib/validation';
 import { setCsrfCookie, setManagementCookie } from '@/lib/management-cookies';
-import { bootstrapManagementSession } from '@/lib/management-service';
+import { bootstrapManagementSession, linkAgentToManagementSession } from '@/lib/management-service';
+import { requireManagementSession } from '@/lib/management-auth';
 
 export const runtime = 'nodejs';
 
@@ -45,6 +46,33 @@ export async function POST(req: NextRequest) {
           actionHint: 'Provide both agentId and bootstrap token.',
           details: validated.details
         },
+        requestId
+      );
+    }
+
+    const linkedSession = await requireManagementSession(req, requestId);
+    if (linkedSession.ok) {
+      const linked = await linkAgentToManagementSession({
+        sessionId: linkedSession.session.sessionId,
+        agentId: validated.data.agentId,
+        token: validated.data.token,
+        userAgent: req.headers.get('user-agent')
+      });
+      if (!linked.ok) {
+        return errorResponse(linked.error.status, augmentBootstrapAuthError(linked.error), requestId);
+      }
+
+      return successResponse(
+        {
+          ok: true,
+          agentId: linked.data.activeAgentId,
+          linkedAgentId: linked.data.linkedAgentId,
+          managedAgents: linked.data.managedAgents,
+          session: {
+            expiresAt: linkedSession.session.expiresAt
+          }
+        },
+        200,
         requestId
       );
     }

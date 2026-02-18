@@ -962,6 +962,7 @@ export default function AgentPublicProfilePage() {
   function buildPolicyUpdatePayload(next: { approvalMode?: 'per_trade' | 'auto'; allowedTokens?: string[] }) {
     return {
       agentId,
+      chainKey: activeChainKey,
       mode: 'real' as const,
       approvalMode: next.approvalMode ?? policyApprovalMode,
       maxTradeUsd: policyMaxTradeUsd,

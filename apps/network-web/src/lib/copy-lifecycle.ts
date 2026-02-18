@@ -144,10 +144,11 @@ async function followerPolicyAllows(
 	    select max_trade_usd::text, max_daily_usd::text, approval_mode
 	    from agent_policy_snapshots
 	    where agent_id = $1
+	      and chain_key = $2
 	    order by created_at desc
 	    limit 1
 	    `,
-	    [followerAgentId]
+	    [followerAgentId, chainKey]
 	  );
 
   if ((policy.rowCount ?? 0) === 0) {
@@ -342,10 +343,11 @@ export async function generateCopyIntentsForLeaderFill(
       select approval_mode, allowed_tokens
       from agent_policy_snapshots
       where agent_id = $1
+        and chain_key = $2
       order by created_at desc
       limit 1
       `,
-      [sub.follower_agent_id]
+      [sub.follower_agent_id, leaderTrade.chain_key]
     );
     const approvalMode = approvalModeResult.rows[0]?.approval_mode ?? 'per_trade';
     const allowedTokenSet = new Set(

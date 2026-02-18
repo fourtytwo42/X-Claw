@@ -39,7 +39,7 @@ function asNonNegativeNumber(raw: string | null | undefined): number {
   return parsed;
 }
 
-export async function readLatestTradeCaps(client: PoolClient, agentId: string): Promise<EffectiveTradeCaps | null> {
+export async function readLatestTradeCaps(client: PoolClient, agentId: string, chainKey: string): Promise<EffectiveTradeCaps | null> {
   const row = await client.query<{
     approval_mode: 'per_trade' | 'auto';
     max_trade_usd: string | null;
@@ -62,10 +62,11 @@ export async function readLatestTradeCaps(client: PoolClient, agentId: string): 
       created_at::text
     from agent_policy_snapshots
     where agent_id = $1
+      and chain_key = $2
     order by created_at desc
     limit 1
     `,
-    [agentId]
+    [agentId, chainKey]
   );
 
   if ((row.rowCount ?? 0) === 0) {
@@ -133,7 +134,7 @@ export async function evaluateTradeCaps(
     utcDay?: string;
   }
 ): Promise<{ ok: true; caps: EffectiveTradeCaps; usage: DailyTradeUsage } | { ok: false; violation: TradeCapViolation }> {
-  const caps = await readLatestTradeCaps(client, input.agentId);
+  const caps = await readLatestTradeCaps(client, input.agentId, input.chainKey);
   if (!caps) {
     return {
       ok: false,

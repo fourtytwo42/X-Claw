@@ -72,10 +72,11 @@ export async function GET(req: NextRequest) {
         created_at::text
       from agent_policy_snapshots
       where agent_id = $1
+        and chain_key = $2
       order by created_at desc
       limit 1
       `,
-      [auth.agentId]
+      [auth.agentId, chainKey]
     );
 
     const row = policy.rows[0];

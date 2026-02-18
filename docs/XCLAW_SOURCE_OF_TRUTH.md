@@ -3476,3 +3476,56 @@ Limitations / notes:
 6. Runtime/skill introspection contract:
 - Runtime exposes `xclaw-agent chains --json` (optional `--include-disabled`) for tool routing.
 - Skill wrapper exposes `chains`.
+
+## 74) Slice 86 Multi-Agent Management Session + Chain-Scoped Policy Snapshot Contract (Locked)
+
+1. Management session authorization model:
+- A management cookie session may authorize multiple managed agents.
+- Canonical binding table: `management_session_agents(session_id, agent_id)`.
+- Active session still has a primary `management_sessions.agent_id`; linked agents extend authorization scope for management reads/writes.
+
+2. Bootstrap/link behavior:
+- `POST /api/v1/management/session/bootstrap` supports both:
+  - creating a new session, and
+  - linking an additional agent into an existing valid session when management cookie is present.
+- `GET /api/v1/management/session/agents` returns:
+  - `managedAgents[]` (all linked agents for active session),
+  - `activeAgentId` (primary session agent).
+
+3. Chain-scoped trade policy snapshot contract:
+- `agent_policy_snapshots` is chain-scoped via `chain_key`.
+- Trade policy reads/writes must include `(agent_id, chain_key)` selection semantics.
+- Management and runtime policy mutation paths must persist `chain_key` on snapshot inserts.
+
+## 75) Slice 87 Approvals Center Core API Contract (Locked)
+
+1. Approve+allowlist action:
+- Endpoint: `POST /api/v1/management/approvals/approve-allowlist-token`.
+- Atomic transaction contract:
+  - validate trade belongs to agent and is `approval_pending`,
+  - set trade to `approved`,
+  - append `token_in` to chain-scoped `allowed_tokens`,
+  - emit audit/event records.
+
+2. Unified approvals inbox:
+- Endpoint: `GET /api/v1/management/approvals/inbox`.
+- Provides normalized rows across trade/policy/transfer approval surfaces for agents linked to current management session.
+- Includes deterministic risk labels and chain-scoped permission inventory blocks.
+
+3. Direct permissions update endpoint:
+- Endpoint: `POST /api/v1/management/permissions/update`.
+- Allows explicit owner updates for chain-scoped permission posture:
+  - trade approval mode + allowed tokens,
+  - transfer approval mode/native preapproval/allowed transfer tokens,
+  - outbound transfer policy fields.
+
+## 76) Slice 88 Approvals Center Full UX Contract (Locked)
+
+1. Batch decisions:
+- Endpoint: `POST /api/v1/management/approvals/decision-batch`.
+- Accepts itemized decision payloads and returns per-item outcome records.
+
+2. UX invariants:
+- `/approvals` supports multi-select bulk decisions.
+- Request cards include deterministic risk labels (`Low|Med|High`) derived from canonical server data.
+- Approvals center inventory copy uses permission language (no allowances placeholder contract in this slice).

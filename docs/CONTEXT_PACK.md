@@ -1150,3 +1150,20 @@ Issue mapping: `#32`
   - owner tracked agents persist server-side and reflect in left rail.
   - `/agents/[agentId]` tracked panel lists/removes tracked agents and shows recent tracked filled trades.
   - runtime `dashboard` includes tracked summaries.
+
+## Context Pack Addendum: Slice 86-88 Approvals Center Full Flush
+
+### Objective
+- Deliver permission-native approvals center with multi-agent management-session authorization, chain-scoped policy snapshots, approve+allowlist action, unified inbox, permission inventory, and batch decisions.
+
+### Constraints
+- Preserve existing approval decision routes for backward compatibility.
+- Keep status vocabulary invariant (`active`, `offline`, `degraded`, `paused`, `deactivated`).
+- Keep agent runtime trust boundaries unchanged.
+
+### Canonical artifacts touched
+- `docs/XCLAW_SOURCE_OF_TRUTH.md`
+- `docs/XCLAW_SLICE_TRACKER.md`
+- `docs/XCLAW_BUILD_ROADMAP.md`
+- `docs/api/openapi.v1.yaml`
+- `packages/shared-schemas/json/*.schema.json`
