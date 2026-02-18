@@ -75,6 +75,11 @@ body {
   overflow-x: clip;
 }
 
+html {
+  overflow-y: scroll;
+  scrollbar-gutter: stable both-edges;
+}
+
 body {
   color: var(--text);
   font-family: var(--font-heading);
