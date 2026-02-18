@@ -522,6 +522,23 @@ def _load_chain_config(chain: str) -> dict[str, Any]:
     return data
 
 
+def _is_rpc_endpoint_healthy(rpc_url: str) -> bool:
+    payload = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "eth_blockNumber", "params": []}).encode("utf-8")
+    req = urllib.request.Request(
+        rpc_url,
+        data=payload,
+        headers={"content-type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=2.5) as resp:
+            body = json.loads(resp.read().decode("utf-8"))
+        result = body.get("result") if isinstance(body, dict) else None
+        return isinstance(result, str) and bool(re.fullmatch(r"0x[a-fA-F0-9]+", result))
+    except Exception:
+        return False
+
+
 def _chain_rpc_url(chain: str) -> str:
     cfg = _load_chain_config(chain)
     rpc = cfg.get("rpc")
@@ -529,10 +546,21 @@ def _chain_rpc_url(chain: str) -> str:
         raise WalletStoreError(f"Chain config for '{chain}' is missing rpc object.")
     primary = rpc.get("primary")
     fallback = rpc.get("fallback")
+    candidates: list[str] = []
     for candidate in [primary, fallback]:
         if isinstance(candidate, str) and candidate.strip():
-            return candidate.strip()
-    raise WalletStoreError(f"Chain config for '{chain}' has no usable rpc URL.")
+            normalized = candidate.strip()
+            if normalized not in candidates:
+                candidates.append(normalized)
+    if not candidates:
+        raise WalletStoreError(f"Chain config for '{chain}' has no usable rpc URL.")
+    if len(candidates) == 1:
+        return candidates[0]
+    for candidate in candidates:
+        if _is_rpc_endpoint_healthy(candidate):
+            return candidate
+    # If health probes fail for all, return the configured fallback endpoint first.
+    return candidates[-1]
 
 
 def _utc_day_key(now_utc: datetime | None = None) -> str:

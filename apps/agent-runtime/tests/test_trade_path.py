@@ -62,6 +62,32 @@ class TradePathRuntimeTests(unittest.TestCase):
         self.assertIn("50gwei", send_cmds[1])
         sleep_mock.assert_called_once_with(0.25)
 
+    def test_chain_rpc_url_prefers_primary_when_healthy(self) -> None:
+        with mock.patch.object(
+            cli,
+            "_load_chain_config",
+            return_value={"rpc": {"primary": "https://rpc-primary.example", "fallback": "https://rpc-fallback.example"}},
+        ), mock.patch.object(
+            cli,
+            "_is_rpc_endpoint_healthy",
+            side_effect=lambda url: url == "https://rpc-primary.example",
+        ):
+            selected = cli._chain_rpc_url("base_sepolia")
+        self.assertEqual(selected, "https://rpc-primary.example")
+
+    def test_chain_rpc_url_falls_back_when_primary_unhealthy(self) -> None:
+        with mock.patch.object(
+            cli,
+            "_load_chain_config",
+            return_value={"rpc": {"primary": "https://rpc-primary.example", "fallback": "https://rpc-fallback.example"}},
+        ), mock.patch.object(
+            cli,
+            "_is_rpc_endpoint_healthy",
+            side_effect=lambda url: url == "https://rpc-fallback.example",
+        ):
+            selected = cli._chain_rpc_url("base_sepolia")
+        self.assertEqual(selected, "https://rpc-fallback.example")
+
     def test_cast_send_non_retryable_error_fails_immediately(self) -> None:
         tx_obj = {
             "from": "0x1111111111111111111111111111111111111111",
