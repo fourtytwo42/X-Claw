@@ -160,7 +160,37 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const applied = child.status === 0;
+    let applied = child.status === 0;
+    let appliedVia: 'runtime' | 'mirror_fallback' | 'none' = applied ? 'runtime' : 'none';
+
+    // Deny should be deterministic from management UI even when immediate runtime application is unavailable.
+    if (!applied && body.decision === 'deny') {
+      const fallbackReason = body.reasonMessage?.trim() || 'Rejected by owner.';
+      const fallbackUpdate = await dbQuery<{ approval_id: string }>(
+        `
+        update agent_transfer_approval_mirror
+        set status = 'rejected',
+            reason_message = $1,
+            decided_at = now(),
+            terminal_at = now(),
+            updated_at = now()
+        where approval_id = $2
+          and agent_id = $3
+          and status in ('approval_pending', 'approved')
+        returning approval_id
+        `,
+        [fallbackReason, body.approvalId, body.agentId]
+      );
+      if ((fallbackUpdate.rowCount ?? 0) > 0) {
+        applied = true;
+        appliedVia = 'mirror_fallback';
+        runtimePayload = {
+          ok: true,
+          code: 'decision_applied_via_mirror',
+          message: 'Transfer deny decision applied via management mirror fallback.'
+        };
+      }
+    }
     await dbQuery(
       `
       update agent_transfer_decision_inbox
@@ -191,6 +221,7 @@ export async function POST(req: NextRequest) {
           approvalSource,
           runtimeArgs,
           runtimeExitStatus: child.status,
+          appliedVia,
           runtimePayload,
           stderr: (child.stderr || '').slice(0, 1200),
           reasonMessage: body.reasonMessage ?? null
@@ -199,12 +230,33 @@ export async function POST(req: NextRequest) {
       ]
     );
 
+    if (!applied) {
+      return errorResponse(
+        409,
+        {
+          code: 'not_actionable',
+          message: 'Transfer decision was accepted but could not be applied immediately.',
+          actionHint: 'Retry once, then refresh approvals. If it remains pending, verify runtime health.',
+          details: {
+            approvalId: body.approvalId,
+            chainKey,
+            decision: body.decision,
+            approvalSource,
+            runtimeExitStatus: child.status,
+            runtimePayload
+          }
+        },
+        requestId
+      );
+    }
+
     return successResponse(
       {
         ok: true,
         approvalId: body.approvalId,
         chainKey,
         decision: body.decision,
+        appliedVia,
         runtimeApplied: applied,
         runtimePayload
       },
