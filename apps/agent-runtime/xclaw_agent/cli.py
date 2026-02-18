@@ -91,11 +91,9 @@ MAX_TRADE_RETRIES = 3
 APPROVAL_WAIT_TIMEOUT_SEC = 1800
 # Poll faster while waiting so Telegram/web decisions feel instant.
 APPROVAL_WAIT_POLL_SEC = 1
-DEFAULT_TX_GAS_PRICE_GWEI = 10
-DEFAULT_TX_SEND_MAX_ATTEMPTS = 3
-TX_GAS_PRICE_BUMP_GWEI = 10
-DEFAULT_TX_SEND_RETRY_BASE_DELAY_SEC = 2
-DEFAULT_TX_SEND_RETRY_MAX_DELAY_SEC = 8
+DEFAULT_TX_GAS_PRICE_GWEI = 5
+DEFAULT_TX_SEND_MAX_ATTEMPTS = 5
+TX_GAS_PRICE_BUMP_GWEI = 5
 LIMIT_ORDER_STORE_VERSION = 1
 AGENT_RECOVERY_ACTION = "agent_key_recovery"
 
@@ -2230,7 +2228,7 @@ def _execute_pending_transfer_flow(flow: dict[str, Any]) -> dict[str, Any]:
             cast_bin = _require_cast_bin()
             rpc_url = _chain_rpc_url(chain)
             proc = _run_subprocess(
-                [cast_bin, "send", "--async", "--json", "--rpc-url", rpc_url, "--private-key", private_key_hex, to_address, amount_wei],
+                [cast_bin, "send", "--json", "--rpc-url", rpc_url, "--private-key", private_key_hex, to_address, amount_wei],
                 timeout_sec=_cast_send_timeout_sec(),
                 kind="cast_send",
             )
@@ -4403,40 +4401,6 @@ def _tx_gas_price_bump_gwei() -> int:
     return value
 
 
-def _tx_send_retry_base_delay_sec() -> int:
-    raw = (os.environ.get("XCLAW_TX_SEND_RETRY_BASE_DELAY_SEC") or "").strip()
-    if not raw:
-        return DEFAULT_TX_SEND_RETRY_BASE_DELAY_SEC
-    if not re.fullmatch(r"[0-9]+", raw):
-        raise WalletStoreError("XCLAW_TX_SEND_RETRY_BASE_DELAY_SEC must be an integer >= 1.")
-    value = int(raw)
-    if value < 1:
-        raise WalletStoreError("XCLAW_TX_SEND_RETRY_BASE_DELAY_SEC must be >= 1.")
-    return value
-
-
-def _tx_send_retry_max_delay_sec() -> int:
-    raw = (os.environ.get("XCLAW_TX_SEND_RETRY_MAX_DELAY_SEC") or "").strip()
-    if not raw:
-        return DEFAULT_TX_SEND_RETRY_MAX_DELAY_SEC
-    if not re.fullmatch(r"[0-9]+", raw):
-        raise WalletStoreError("XCLAW_TX_SEND_RETRY_MAX_DELAY_SEC must be an integer >= 1.")
-    value = int(raw)
-    if value < 1:
-        raise WalletStoreError("XCLAW_TX_SEND_RETRY_MAX_DELAY_SEC must be >= 1.")
-    return value
-
-
-def _tx_send_retry_delay_sec(attempt_index: int) -> int:
-    base_delay = _tx_send_retry_base_delay_sec()
-    max_delay = _tx_send_retry_max_delay_sec()
-    if max_delay < base_delay:
-        max_delay = base_delay
-    # attempt_index is the current attempt. Delay applies before next attempt.
-    retry_number = max(1, attempt_index + 1)
-    return min(max_delay, base_delay * (2 ** (retry_number - 1)))
-
-
 def _tx_gas_price_gwei(attempt_index: int) -> int:
     raw = (os.environ.get("XCLAW_TX_GAS_PRICE_GWEI") or "").strip()
     if raw:
@@ -4448,11 +4412,9 @@ def _tx_gas_price_gwei(attempt_index: int) -> int:
     if base < 1:
         raise WalletStoreError("XCLAW_TX_GAS_PRICE_GWEI must be >= 1.")
     bump = _tx_gas_price_bump_gwei()
-    # Keep escalation bounded: enough to replace pending txs without exhausting
-    # wallet ETH on retries.
-    geometric = base * (2**attempt_index)
-    additive = base + ((2**attempt_index - 1) * bump)
-    return max(geometric, additive)
+    # Exponential escalation helps clear "replacement transaction underpriced"
+    # when another pending tx already occupies the nonce with a higher gas price.
+    return base + ((2**attempt_index - 1) * bump)
 
 
 def _cast_nonce(cast_bin: str, rpc_url: str, from_addr: str, block_tag: str) -> int | None:
@@ -4484,14 +4446,20 @@ def _cast_rpc_send_transaction(rpc_url: str, tx_obj: dict[str, str], private_key
             raise WalletStoreError("cast send requires tx_obj.data as hex calldata.")
         attempts = _tx_send_max_attempts()
         last_err = "cast send failed."
-        # Prefer pending nonce so we submit after any in-flight txs instead of
-        # accidentally replacing the latest confirmed nonce at too-low gas.
-        nonce_override: int | None = _cast_nonce(cast_bin, rpc_url, from_addr, "pending")
+        nonce_override: int | None = None
         for attempt in range(attempts):
+            nonce: int | None
+            if nonce_override is not None:
+                nonce = nonce_override
+            else:
+                nonce_pending = _cast_nonce(cast_bin, rpc_url, from_addr, "pending")
+                nonce_latest = _cast_nonce(cast_bin, rpc_url, from_addr, "latest")
+                nonce_candidates = [value for value in (nonce_pending, nonce_latest) if value is not None]
+                nonce = max(nonce_candidates) if nonce_candidates else None
+
             send_cmd = [
                 cast_bin,
                 "send",
-                "--async",
                 "--json",
                 "--rpc-url",
                 rpc_url,
@@ -4500,8 +4468,8 @@ def _cast_rpc_send_transaction(rpc_url: str, tx_obj: dict[str, str], private_key
                 "--gas-price",
                 f"{_tx_gas_price_gwei(attempt)}gwei",
             ]
-            if nonce_override is not None:
-                send_cmd.extend(["--nonce", str(nonce_override)])
+            if nonce is not None:
+                send_cmd.extend(["--nonce", str(nonce)])
             send_cmd.extend(
                 [
                     "--from",
@@ -4520,16 +4488,10 @@ def _cast_rpc_send_transaction(rpc_url: str, tx_obj: dict[str, str], private_key
             next_nonce = _parse_next_nonce_from_error(last_err)
             if attempt < (attempts - 1) and next_nonce is not None:
                 nonce_override = next_nonce
-                pending_nonce = _cast_nonce(cast_bin, rpc_url, from_addr, "pending")
-                if pending_nonce is not None and pending_nonce > nonce_override:
-                    nonce_override = pending_nonce
-                time.sleep(_tx_send_retry_delay_sec(attempt))
+                time.sleep(0.25)
                 continue
             if attempt < (attempts - 1) and _retryable_send_error(last_err):
-                pending_nonce = _cast_nonce(cast_bin, rpc_url, from_addr, "pending")
-                if pending_nonce is not None and (nonce_override is None or pending_nonce > nonce_override):
-                    nonce_override = pending_nonce
-                time.sleep(_tx_send_retry_delay_sec(attempt))
+                time.sleep(0.25)
                 continue
             if attempt < (attempts - 1):
                 raise WalletStoreError(last_err)

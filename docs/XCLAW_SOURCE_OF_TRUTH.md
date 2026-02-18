@@ -2641,7 +2641,6 @@ Limitations / notes:
 12. Real-mode transaction send robustness:
    - runtime send path must prefer `pending` nonce for signed transactions to avoid replacing an in-flight nonce unintentionally.
    - retryable send errors (`replacement transaction underpriced`, `transaction underpriced`, `nonce too low`, `already known`) must trigger bounded gas escalation across attempts before final failure.
-   - default retry budget must stay conservative (`3` attempts total) with seconds-level backoff between retries (not rapid sub-second bursts), prioritizing first-submit success and reducing nonce-replacement churn.
 
 ---
 
