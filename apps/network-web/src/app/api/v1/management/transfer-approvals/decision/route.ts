@@ -21,6 +21,21 @@ type ManagementTransferApprovalDecisionRequest = {
   chainKey?: string;
 };
 
+function transferDecisionRuntimeTimeoutMs(): number {
+  const raw = (process.env.XCLAW_TRANSFER_DECISION_TIMEOUT_MS ?? '').trim();
+  if (raw.length === 0) {
+    return 240_000;
+  }
+  if (!/^\d+$/.test(raw)) {
+    return 240_000;
+  }
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed < 1_000) {
+    return 240_000;
+  }
+  return parsed;
+}
+
 function resolveRuntimeBin(): string {
   const candidates = [
     process.env.XCLAW_AGENT_RUNTIME_BIN?.trim() ?? '',
@@ -142,7 +157,10 @@ export async function POST(req: NextRequest) {
             '--json'
           ];
 
-    const child = spawnSync(runtimeBin, runtimeArgs, { encoding: 'utf8', timeout: 60_000 });
+    const child = spawnSync(runtimeBin, runtimeArgs, {
+      encoding: 'utf8',
+      timeout: transferDecisionRuntimeTimeoutMs()
+    });
 
     let runtimePayload: Record<string, unknown> | null = null;
     if (child.stdout) {
