@@ -215,7 +215,22 @@ fi
 ensure_python_runtime_deps "$XCLAW_PYTHON_BIN"
 export XCLAW_AGENT_PYTHON_BIN="$XCLAW_PYTHON_BIN"
 echo "[xclaw] running setup_agent_skill.py"
-"$XCLAW_PYTHON_BIN" skills/xclaw-agent/scripts/setup_agent_skill.py
+set +e
+setup_output="$("$XCLAW_PYTHON_BIN" skills/xclaw-agent/scripts/setup_agent_skill.py 2>&1)"
+setup_status=$?
+set -e
+if [ -n "$setup_output" ]; then
+  printf '%s\n' "$setup_output"
+fi
+if [ "$setup_status" -ne 0 ]; then
+  if printf '%s' "$setup_output" | grep -qi 'write_failed:.*permission denied'; then
+    printf '\n\\033[1;37;41m[xclaw] INSTALLER ACTION REQUIRED\\033[0m\n'
+    printf '\\033[1;31m[xclaw] OpenClaw is installed in a root-owned location.\\033[0m\n'
+    printf '\\033[1;31m[xclaw] Re-run installer with sudo:\\033[0m\n'
+    printf '\\033[1;33m  curl -fsSL https://xclaw.trade/skill-install.sh | sudo bash\\033[0m\n\n'
+  fi
+  exit "$setup_status"
+fi
 
 resolve_xclaw_agent_bin() {
   export PATH="$HOME/.xclaw-agent/bin:$PATH"
