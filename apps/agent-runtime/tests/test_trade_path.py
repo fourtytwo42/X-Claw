@@ -898,6 +898,46 @@ class TradePathRuntimeTests(unittest.TestCase):
         self.assertEqual(details.get("policyBlockReasonCode"), "outbound_disabled")
         self.assertIn("one-off override", str(details.get("queuedMessage") or "").lower())
 
+    def test_wallet_send_token_redacts_private_key_in_error_payload(self) -> None:
+        args = argparse.Namespace(
+            token="0x" + "11" * 20,
+            to="0x" + "22" * 20,
+            amount_wei="100",
+            chain="base_sepolia",
+            json=True,
+        )
+        leaked_key = "97d95b56039c758bbee53449741de26fc2dc76ae2a82506bbb90e5a9e7a14972"
+        with mock.patch.object(
+            cli,
+            "_evaluate_outbound_transfer_policy",
+            return_value={
+                "allowed": True,
+                "policyBlockedAtCreate": False,
+                "policyBlockReasonCode": None,
+                "policyBlockReasonMessage": None,
+            },
+        ), mock.patch.object(
+            cli, "_enforce_spend_preconditions", return_value=({}, "2026-02-16", 0, 10**30)
+        ), mock.patch.object(
+            cli, "_sync_transfer_policy_from_remote", return_value={"transferApprovalMode": "auto", "nativeTransferPreapproved": True, "allowedTransferTokens": []}
+        ), mock.patch.object(
+            cli, "_fetch_erc20_metadata", return_value={"symbol": "USDC", "decimals": 18}
+        ), mock.patch.object(
+            cli, "_mirror_transfer_approval"
+        ), mock.patch.object(
+            cli,
+            "_execute_pending_transfer_flow",
+            side_effect=cli.WalletStoreError(
+                f"Timed out after 30s running: cast send --private-key {leaked_key} --rpc-url https://sepolia.base.org"
+            ),
+        ):
+            payload = self._run_and_parse_stdout(lambda: cli.cmd_wallet_send_token(args))
+        self.assertEqual(payload.get("ok"), False)
+        self.assertEqual(payload.get("code"), "send_failed")
+        serialized = json.dumps(payload)
+        self.assertNotIn(leaked_key, serialized)
+        self.assertIn("<REDACTED>", serialized)
+
     def test_approvals_decide_transfer_approve_executes(self) -> None:
         approval_id = "xfr_test_1"
         cli._record_pending_transfer_flow(

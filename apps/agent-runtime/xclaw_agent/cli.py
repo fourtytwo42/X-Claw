@@ -124,10 +124,65 @@ class SubprocessTimeout(WalletStoreError):
     """A subprocess operation timed out (cast call/receipt/send/etc)."""
 
     def __init__(self, kind: str, timeout_sec: int, cmd: list[str]):
-        super().__init__(f"Timed out after {timeout_sec}s running: {' '.join(cmd)}")
+        super().__init__(f"Timed out after {timeout_sec}s running: {_redact_cmd_for_display(cmd)}")
         self.kind = kind
         self.timeout_sec = timeout_sec
-        self.cmd = cmd
+        self.cmd = _redact_cmd_args(cmd)
+
+
+def _redact_sensitive_text(value: str) -> str:
+    text = str(value or "")
+    # Common CLI secret forms.
+    text = re.sub(r"(?i)(--private-key)\s+\S+", r"\1 <REDACTED>", text)
+    text = re.sub(r"(?i)(--private-key=)\S+", r"\1<REDACTED>", text)
+    # Key-like field assignments.
+    text = re.sub(
+        r'(?i)((?:private[_ -]?key|wallet[_ -]?private[_ -]?key)\s*[:=]\s*)(?:0x)?[a-f0-9]{64}',
+        r"\1<REDACTED>",
+        text,
+    )
+    text = re.sub(
+        r'(?i)(\"(?:private[_-]?key|wallet[_-]?private[_-]?key)\"\s*:\s*\")(?:0x)?[a-f0-9]{64}(\"?)',
+        r"\1<REDACTED>\2",
+        text,
+    )
+    return text
+
+
+def _redact_cmd_args(cmd: list[str]) -> list[str]:
+    redacted: list[str] = []
+    i = 0
+    while i < len(cmd):
+        part = str(cmd[i])
+        if part.lower() in {"--private-key"}:
+            redacted.append(part)
+            if i + 1 < len(cmd):
+                redacted.append("<REDACTED>")
+                i += 2
+                continue
+            i += 1
+            continue
+        if part.lower().startswith("--private-key="):
+            redacted.append("--private-key=<REDACTED>")
+            i += 1
+            continue
+        redacted.append(_redact_sensitive_text(part))
+        i += 1
+    return redacted
+
+
+def _redact_cmd_for_display(cmd: list[str]) -> str:
+    return " ".join(_redact_cmd_args(cmd))
+
+
+def _sanitize_output_payload(value: Any) -> Any:
+    if isinstance(value, str):
+        return _redact_sensitive_text(value)
+    if isinstance(value, dict):
+        return {k: _sanitize_output_payload(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_sanitize_output_payload(item) for item in value]
+    return value
 
 
 def utc_now() -> str:
@@ -135,7 +190,7 @@ def utc_now() -> str:
 
 
 def emit(payload: dict) -> int:
-    print(json.dumps(payload, separators=(",", ":")))
+    print(json.dumps(_sanitize_output_payload(payload), separators=(",", ":")))
     return 0
 
 
@@ -182,7 +237,7 @@ def _cast_receipt_timeout_sec() -> int:
 
 
 def _cast_send_timeout_sec() -> int:
-    return _env_timeout_sec("XCLAW_CAST_SEND_TIMEOUT_SEC", 30)
+    return _env_timeout_sec("XCLAW_CAST_SEND_TIMEOUT_SEC", 90)
 
 
 def _run_subprocess(cmd: list[str], *, timeout_sec: int, kind: str) -> subprocess.CompletedProcess[str]:
