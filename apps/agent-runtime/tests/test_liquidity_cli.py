@@ -383,6 +383,48 @@ class LiquidityCliTests(unittest.TestCase):
         self.assertEqual(mocked_post.call_args_list[1].args[1], "verifying")
         self.assertEqual(mocked_post.call_args_list[2].args[1], "filled")
 
+    def test_execute_liquidity_v2_remove_allows_pair_id_fallback_without_snapshot(self) -> None:
+        adapter = mock.Mock()
+        adapter.protocol_family = "amm_v2"
+        adapter.dex = "saucerswap"
+        adapter.quote_remove.return_value = {"ok": True}
+        pair = "0x" + "bb" * 20
+        lp_token = "0x" + "99" * 20
+        with mock.patch.object(
+            cli, "build_liquidity_adapter_for_request", return_value=adapter
+        ), mock.patch.object(
+            cli, "_read_liquidity_position", side_effect=cli.WalletStoreError("missing position")
+        ), mock.patch.object(
+            cli, "_cast_call_stdout", side_effect=["0x" + "11" * 20, "0x" + "22" * 20, lp_token]
+        ), mock.patch.object(
+            cli, "_require_chain_contract_address", return_value="0x" + "44" * 20
+        ), mock.patch.object(
+            cli, "_resolve_factory_from_router", return_value="0x" + "aa" * 20
+        ), mock.patch.object(
+            cli, "_execution_wallet", return_value=("0x" + "33" * 20, "11" * 32)
+        ), mock.patch.object(
+            cli, "_estimate_remove_amount_out_min", return_value=(1, 1)
+        ), mock.patch.object(
+            cli, "_ensure_token_allowance", return_value=None
+        ) as mocked_allowance, mock.patch.object(
+            cli, "_fetch_token_balance_wei", return_value="100000"
+        ), mock.patch.object(
+            cli, "_cast_rpc_send_transaction", return_value="0xabc"
+        ):
+            out = cli._execute_liquidity_v2_remove(
+                {
+                    "dex": "saucerswap",
+                    "positionType": "v2",
+                    "positionRef": pair,
+                    "amountA": "50",
+                    "slippageBps": 100,
+                },
+                "hedera_testnet",
+            )
+        self.assertEqual(mocked_allowance.call_args.kwargs.get("token_address"), lp_token)
+        self.assertEqual(out.get("txHash"), "0xabc")
+        self.assertEqual(out.get("positionId"), pair)
+
     def test_liquidity_execute_hts_missing_dependency_fails_closed(self) -> None:
         args = argparse.Namespace(intent="liq_1", chain="hedera_testnet", json=True)
         adapter = mock.Mock()
@@ -448,6 +490,247 @@ class LiquidityCliTests(unittest.TestCase):
             (payload.get("details") or {}).get("reasonCode"),
             "liquidity_preflight_insufficient_token_balance",
         )
+
+    def test_preflight_transfer_probe_token_a_failure_is_deterministic(self) -> None:
+        with mock.patch.object(cli, "_fetch_token_balance_wei", side_effect=["1000", "1000"]), mock.patch.object(
+            cli, "_fetch_token_allowance_wei", side_effect=["1000", "1000"]
+        ), mock.patch.object(
+            cli, "_fetch_native_balance_wei", return_value=str(10**18)
+        ), mock.patch.object(
+            cli, "_resolve_factory_from_router", return_value="0x" + "aa" * 20
+        ), mock.patch.object(
+            cli, "_resolve_pair_from_factory", return_value="0x" + "bb" * 20
+        ), mock.patch.object(
+            cli, "_cast_call_stdout", return_value="(1000,1000,1)"
+        ), mock.patch.object(
+            cli,
+            "_probe_transfer_from_eth_call",
+            side_effect=[
+                {"ok": False, "kind": "revert", "token": "0x" + "11" * 20, "error": "transfer blocked"},
+            ],
+        ):
+            with self.assertRaises(cli.LiquidityExecutionError) as ctx:
+                cli._preflight_liquidity_v2_add_execution(
+                    chain="hedera_testnet",
+                    token_a="0x" + "11" * 20,
+                    token_b="0x" + "22" * 20,
+                    amount_a_units=10,
+                    amount_b_units=10,
+                    min_a_units=1,
+                    min_b_units=1,
+                    wallet_address="0x" + "33" * 20,
+                    router="0x" + "44" * 20,
+                    deadline="9999999999",
+                )
+        self.assertEqual(ctx.exception.reason_code, "liquidity_preflight_token_transfer_blocked_token_a")
+        self.assertIn("tokenProbeA", ctx.exception.details)
+        self.assertEqual((ctx.exception.details.get("tokenProbeA") or {}).get("kind"), "revert")
+
+    def test_preflight_transfer_probe_token_b_failure_is_deterministic(self) -> None:
+        with mock.patch.object(cli, "_fetch_token_balance_wei", side_effect=["1000", "1000"]), mock.patch.object(
+            cli, "_fetch_token_allowance_wei", side_effect=["1000", "1000"]
+        ), mock.patch.object(
+            cli, "_fetch_native_balance_wei", return_value=str(10**18)
+        ), mock.patch.object(
+            cli, "_resolve_factory_from_router", return_value="0x" + "aa" * 20
+        ), mock.patch.object(
+            cli, "_resolve_pair_from_factory", return_value="0x" + "bb" * 20
+        ), mock.patch.object(
+            cli, "_cast_call_stdout", return_value="(1000,1000,1)"
+        ), mock.patch.object(
+            cli,
+            "_probe_transfer_from_eth_call",
+            side_effect=[
+                {"ok": True, "kind": "ok"},
+                {"ok": False, "kind": "return_false", "token": "0x" + "22" * 20},
+            ],
+        ):
+            with self.assertRaises(cli.LiquidityExecutionError) as ctx:
+                cli._preflight_liquidity_v2_add_execution(
+                    chain="hedera_testnet",
+                    token_a="0x" + "11" * 20,
+                    token_b="0x" + "22" * 20,
+                    amount_a_units=10,
+                    amount_b_units=10,
+                    min_a_units=1,
+                    min_b_units=1,
+                    wallet_address="0x" + "33" * 20,
+                    router="0x" + "44" * 20,
+                    deadline="9999999999",
+                )
+        self.assertEqual(ctx.exception.reason_code, "liquidity_preflight_token_transfer_blocked_token_b")
+        self.assertEqual((ctx.exception.details.get("tokenProbeB") or {}).get("kind"), "return_false")
+
+    def test_preflight_transfer_probe_falls_back_when_rpc_forbidden(self) -> None:
+        with mock.patch.object(cli, "_fetch_token_balance_wei", side_effect=["1000", "1000"]), mock.patch.object(
+            cli, "_fetch_token_allowance_wei", side_effect=["1000", "1000"]
+        ), mock.patch.object(
+            cli, "_fetch_native_balance_wei", return_value=str(10**18)
+        ), mock.patch.object(
+            cli, "_resolve_factory_from_router", return_value="0x" + "aa" * 20
+        ), mock.patch.object(
+            cli, "_resolve_pair_from_factory", return_value="0x" + "bb" * 20
+        ), mock.patch.object(
+            cli, "_cast_call_stdout", side_effect=["(1000,1000,1)", "0x1"]
+        ), mock.patch.object(
+            cli,
+            "_probe_transfer_from_eth_call",
+            side_effect=[
+                {"ok": False, "kind": "rpc_forbidden", "error": "403"},
+                {"ok": False, "kind": "rpc_forbidden", "error": "403"},
+            ],
+        ), mock.patch.object(
+            cli,
+            "_probe_transfer_eth_call",
+            side_effect=[{"ok": True, "kind": "ok"}, {"ok": True, "kind": "ok"}],
+        ):
+            details = cli._preflight_liquidity_v2_add_execution(
+                chain="hedera_testnet",
+                token_a="0x" + "11" * 20,
+                token_b="0x" + "22" * 20,
+                amount_a_units=10,
+                amount_b_units=10,
+                min_a_units=1,
+                min_b_units=1,
+                wallet_address="0x" + "33" * 20,
+                router="0x" + "44" * 20,
+                deadline="9999999999",
+            )
+        self.assertEqual((details.get("tokenProbeA") or {}).get("kind"), "rpc_forbidden_fallback_transfer_ok")
+        self.assertEqual((details.get("tokenProbeB") or {}).get("kind"), "rpc_forbidden_fallback_transfer_ok")
+
+    def test_preflight_transfer_probe_forbidden_unverifiable_does_not_block(self) -> None:
+        with mock.patch.object(cli, "_fetch_token_balance_wei", side_effect=["1000", "1000"]), mock.patch.object(
+            cli, "_fetch_token_allowance_wei", side_effect=["1000", "1000"]
+        ), mock.patch.object(
+            cli, "_fetch_native_balance_wei", return_value=str(10**18)
+        ), mock.patch.object(
+            cli, "_resolve_factory_from_router", return_value="0x" + "aa" * 20
+        ), mock.patch.object(
+            cli, "_resolve_pair_from_factory", return_value="0x" + "bb" * 20
+        ), mock.patch.object(
+            cli, "_cast_call_stdout", side_effect=["(1000,1000,1)", "0x1"]
+        ), mock.patch.object(
+            cli,
+            "_probe_transfer_from_eth_call",
+            side_effect=[
+                {"ok": False, "kind": "rpc_forbidden", "error": "HTTP Error 403"},
+                {"ok": False, "kind": "rpc_forbidden", "error": "HTTP Error 403"},
+            ],
+        ), mock.patch.object(
+            cli,
+            "_probe_transfer_eth_call",
+            side_effect=[
+                {"ok": False, "kind": "revert", "error": "HTTP Error 403"},
+                {"ok": False, "kind": "revert", "error": "HTTP Error 403"},
+            ],
+        ):
+            details = cli._preflight_liquidity_v2_add_execution(
+                chain="hedera_testnet",
+                token_a="0x" + "11" * 20,
+                token_b="0x" + "22" * 20,
+                amount_a_units=10,
+                amount_b_units=10,
+                min_a_units=1,
+                min_b_units=1,
+                wallet_address="0x" + "33" * 20,
+                router="0x" + "44" * 20,
+                deadline="9999999999",
+            )
+        self.assertEqual((details.get("tokenProbeA") or {}).get("kind"), "rpc_forbidden_unverifiable")
+        self.assertEqual((details.get("tokenProbeB") or {}).get("kind"), "rpc_forbidden_unverifiable")
+
+    def test_preflight_hedera_simulation_bypass_enabled(self) -> None:
+        sim_err = cli.WalletStoreError("execution reverted: Safe token transfer failed!")
+        with mock.patch.object(cli, "_fetch_token_balance_wei", side_effect=["1000", "1000"]), mock.patch.object(
+            cli, "_fetch_token_allowance_wei", side_effect=["1000", "1000"]
+        ), mock.patch.object(
+            cli, "_fetch_native_balance_wei", return_value=str(10**18)
+        ), mock.patch.object(
+            cli, "_resolve_factory_from_router", return_value="0x" + "aa" * 20
+        ), mock.patch.object(
+            cli, "_resolve_pair_from_factory", return_value="0x" + "bb" * 20
+        ), mock.patch.object(
+            cli, "_cast_call_stdout", side_effect=["(1000,1000,1)", sim_err]
+        ), mock.patch.object(
+            cli,
+            "_probe_transfer_from_eth_call",
+            side_effect=[{"ok": True, "kind": "ok"}, {"ok": True, "kind": "ok"}],
+        ), mock.patch.dict(
+            cli.os.environ,
+            {"XCLAW_LIQUIDITY_ALLOW_SIMULATION_BYPASS": "1"},
+            clear=False,
+        ):
+            details = cli._preflight_liquidity_v2_add_execution(
+                chain="hedera_testnet",
+                token_a="0x" + "11" * 20,
+                token_b="0x" + "22" * 20,
+                amount_a_units=10,
+                amount_b_units=10,
+                min_a_units=1,
+                min_b_units=1,
+                wallet_address="0x" + "33" * 20,
+                router="0x" + "44" * 20,
+                deadline="9999999999",
+            )
+        self.assertEqual((details.get("simulationWarning") or {}).get("code"), "liquidity_preflight_router_revert_bypassed")
+
+    def test_preflight_hedera_simulation_bypass_disabled_raises(self) -> None:
+        sim_err = cli.WalletStoreError("execution reverted: Safe token transfer failed!")
+        with mock.patch.object(cli, "_fetch_token_balance_wei", side_effect=["1000", "1000"]), mock.patch.object(
+            cli, "_fetch_token_allowance_wei", side_effect=["1000", "1000"]
+        ), mock.patch.object(
+            cli, "_fetch_native_balance_wei", return_value=str(10**18)
+        ), mock.patch.object(
+            cli, "_resolve_factory_from_router", return_value="0x" + "aa" * 20
+        ), mock.patch.object(
+            cli, "_resolve_pair_from_factory", return_value="0x" + "bb" * 20
+        ), mock.patch.object(
+            cli, "_cast_call_stdout", side_effect=["(1000,1000,1)", sim_err]
+        ), mock.patch.object(
+            cli,
+            "_probe_transfer_from_eth_call",
+            side_effect=[{"ok": True, "kind": "ok"}, {"ok": True, "kind": "ok"}],
+        ), mock.patch.dict(
+            cli.os.environ,
+            {"XCLAW_LIQUIDITY_ALLOW_SIMULATION_BYPASS": "0"},
+            clear=False,
+        ):
+            with self.assertRaises(cli.LiquidityExecutionError) as ctx:
+                cli._preflight_liquidity_v2_add_execution(
+                    chain="hedera_testnet",
+                    token_a="0x" + "11" * 20,
+                    token_b="0x" + "22" * 20,
+                    amount_a_units=10,
+                    amount_b_units=10,
+                    min_a_units=1,
+                    min_b_units=1,
+                    wallet_address="0x" + "33" * 20,
+                    router="0x" + "44" * 20,
+                    deadline="9999999999",
+                )
+        self.assertEqual(ctx.exception.reason_code, "liquidity_preflight_router_revert")
+
+    def test_resolve_token_address_applies_chain_alias_mapping(self) -> None:
+        with mock.patch.object(
+            cli,
+            "_canonical_token_address_aliases",
+            return_value={"0x" + "11" * 20: "0x" + "22" * 20},
+        ):
+            resolved = cli._resolve_token_address("hedera_testnet", "0x" + "11" * 20)
+        self.assertEqual(resolved.lower(), "0x" + "22" * 20)
+
+    def test_hedera_hts_readiness_reports_missing_components(self) -> None:
+        missing_run = mock.Mock(returncode=1, stdout="", stderr="missing")
+        with mock.patch.object(cli.shutil, "which", side_effect=[None, None]), mock.patch.object(
+            cli.subprocess, "run", return_value=missing_run
+        ):
+            readiness = cli._hedera_hts_readiness()
+        self.assertEqual(readiness.get("ready"), False)
+        missing = readiness.get("missing") or []
+        self.assertIn("java", missing)
+        self.assertIn("javac", missing)
+        self.assertIn("hedera_sdk_py", missing)
 
 
 if __name__ == "__main__":

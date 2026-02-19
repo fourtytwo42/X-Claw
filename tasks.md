@@ -2580,3 +2580,18 @@ Active slice context: Slice 90 close-out -> Slice 95 hardening/evidence sequence
 ## 3) Validation
 - [x] `python3 -m unittest apps/agent-runtime/tests/test_auth_recover_cli.py -v`
 - [x] `python3 -m unittest apps/agent-runtime/tests/test_x402_skill_wrapper.py -v`
+
+# Slice 95B-EVM/HTS Tasks Update (UTC 2026-02-19)
+
+## Completed
+- [x] Add deterministic token transfer probe diagnostics for Hedera v2 add preflight.
+- [x] Add legacy->canonical WHBAR alias resolution on Hedera testnet.
+- [x] Add HTS readiness summary to `wallet health` output.
+- [x] Add guarded Hedera simulation bypass env gate (`XCLAW_LIQUIDITY_ALLOW_SIMULATION_BYPASS=1`).
+- [x] Add v2 remove pair fallback + Hedera `lpToken()` handling.
+- [x] Capture Hedera EVM add tx hash evidence.
+- [x] Capture Hedera EVM remove tx hash evidence.
+
+## Remaining
+- [!] Configure `XCLAW_HEDERA_HTS_BRIDGE_CMD` to a real bridge executable and capture HTS add/remove tx hashes.
+- [~] Final Slice 95 closure status/docs after HTS tx-hash evidence or accepted explicit blocker disposition.

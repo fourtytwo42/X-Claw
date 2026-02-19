@@ -197,6 +197,8 @@ Current behavior in `apps/agent-runtime/xclaw_agent/cli.py`:
    - `liquidity execute/resume` supports `amm_v2` + `hedera_hts` in Slice 95 and rejects `amm_v3` with `unsupported_liquidity_execution_family`,
    - non-actionable statuses fail with `liquidity_not_actionable`,
    - v2 add execution emits deterministic preflight reject reasons (`liquidity_preflight_*`) before submit,
+   - Hedera EVM v2 add supports opt-in simulation bypass for known false-positive signatures when `XCLAW_LIQUIDITY_ALLOW_SIMULATION_BYPASS=1` (preflight must include `simulationWarning` metadata),
+   - v2 remove accepts pair-address `positionRef` fallback when snapshot rows are unavailable and resolves Hedera LP token via `pair.lpToken()` when present,
    - runtime execution/verification failures return deterministic `liquidity_execution_failed` / `liquidity_verification_failed`.
 
 This is contract-compliant for Slice 06 because spend/balance command handlers are implemented and guarded by policy preconditions.

@@ -4965,3 +4965,45 @@ Date (UTC): 2026-02-19
 - HTS runtime preflight remains deterministic fail-closed in default interpreter:
   - `apps/agent-runtime/bin/xclaw-agent liquidity quote-add --chain hedera_testnet --dex hedera_hts --token-a WHBAR --token-b SAUCE --amount-a 1 --amount-b 1 --position-type v2 --slippage-bps 100 --json`
   - output: `missing_dependency` (Hedera SDK not installed in active interpreter).
+
+## Slice 95B-EVM-1/2 + HTS Readiness Update (UTC 2026-02-19)
+
+### Runtime/config updates applied
+- Hedera v2 add preflight now records token transfer probe context and router-revert details in deterministic payloads.
+- Hedera canonical `WHBAR` mapping on testnet is normalized to `0x0000000000000000000000000000000000003ad2` with legacy alias support from `0x...3ad1`.
+- Hedera HTS readiness summary is surfaced in `wallet health` output (`htsReadiness`).
+- Hedera v2 add supports opt-in simulation bypass (`XCLAW_LIQUIDITY_ALLOW_SIMULATION_BYPASS=1`) for known false-positive simulation signatures.
+- Hedera v2 remove supports pair-address fallback and resolves LP token via `pair.lpToken()` when available.
+
+### Validation and test gates
+- `npm run db:parity` -> PASS.
+- `npm run seed:reset` -> PASS.
+- `npm run seed:load` -> PASS.
+- `npm run seed:verify` -> PASS.
+- `npm run build` -> PASS.
+- `pm2 restart all` -> PASS.
+- `python3 -m unittest apps/agent-runtime/tests/test_liquidity_adapter.py -v` -> PASS.
+- `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v` -> PASS (`Ran 23 tests`, `OK`).
+- `npm run test:management:liquidity:decision` -> PASS (`passed: 14`, `failed: 0`).
+
+### Evidence updates (`E22+`)
+- `E22` Hedera EVM add tx hash (runtime liquidity flow):
+  - command: `xclaw-agent liquidity add --chain hedera_testnet --dex saucerswap --token-a WHBAR --token-b SAUCE --amount-a 0.005 --amount-b 3.3 --slippage-bps 500 --json` (with `XCLAW_LIQUIDITY_ALLOW_SIMULATION_BYPASS=1`)
+  - tx hash: `0x2c019ea7b35176d6d6c1b141fabdb849625b1b05ae7a1d3112a6673e173c8891`
+  - receipt: `status=0x1` on Hedera testnet.
+- `E23` Hedera EVM remove tx hash (runtime liquidity flow):
+  - command: `xclaw-agent liquidity remove --chain hedera_testnet --dex saucerswap --position-id 0xfe7cc3ceb7b1128bfc3889184e2d5561bf74bfb3 --percent 50 --slippage-bps 500 --json`
+  - tx hash: `0x69df2d9b23653b13b8a86cc2e03a6da72b2b2118ed70ed4a3f26f4ef1fd32865`
+  - receipt: `status=0x1` on Hedera testnet.
+- `E24` Deterministic transfer/simulation diagnostics:
+  - runtime now surfaces token probe details (`tokenProbeA/B`) and router-revert context under `details.preflight` when add preflight fails.
+- `E25` HTS readiness matrix with runtime venv + JDK:
+  - `wallet health --chain hedera_testnet --json` reports `javaAvailable=true`, `javacAvailable=true`, `hederaImportable=true`, `pluginCallable=true`, `bridgeCommandConfigured=false`.
+- `E26` HTS add deterministic blocker:
+  - `liquidity add --dex hedera_hts ...` -> `missing_dependency` (`XCLAW_HEDERA_HTS_BRIDGE_CMD` not configured).
+- `E27` HTS remove deterministic blocker:
+  - `liquidity remove --dex hedera_hts ...` -> `missing_dependency` (`XCLAW_HEDERA_HTS_BRIDGE_CMD` not configured).
+
+### Current closure state
+- Hedera EVM add/remove tx-hash evidence is now present in runtime-native liquidity flow.
+- HTS path remains fail-closed pending bridge command setup; Slice 95 remains in-progress until HTS tx-hash bar is satisfied or explicitly accepted as blocked.

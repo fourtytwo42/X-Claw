@@ -1811,5 +1811,5 @@ DoD:
 - [x] Hedera evidence pass captures both EVM (`saucerswap`) and HTS-native (`hedera_hts`) runtime attempts with deterministic outcomes (`policy_denied|approved|missing_dependency`) and explicit rerun blockers.
 - [x] runtime adds deterministic Hedera EVM pair discovery utility (`liquidity discover-pairs`) with reserve filtering and failure codes (`liquidity_pair_discovery_failed`, `liquidity_no_viable_pair`).
 - [x] runtime auto-executes approved liquidity intents (`liquidity execute/resume`) with lifecycle transitions and deterministic v3 execution reject (`unsupported_liquidity_execution_family`).
-- [~] tx-hash-grade Hedera liquidity proof remains blocked by signing/runtime prerequisites in this session: active shell does not yet have the wallet decryption passphrase for signing (`wallet-sign-challenge` -> `sign_failed`), and HTS path still fail-closes in the default interpreter when Hedera SDK runtime prerequisites are missing (`missing_dependency`).
+- [~] tx-hash-grade Hedera liquidity proof is partially closed: EVM add/remove tx hashes are captured in runtime flow, while HTS add/remove remains fail-closed on missing bridge command configuration (`XCLAW_HEDERA_HTS_BRIDGE_CMD`).
 - [x] final docs sync + issue evidence posts with commit hashes.

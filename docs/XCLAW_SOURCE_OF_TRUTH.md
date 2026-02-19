@@ -1270,7 +1270,9 @@ Liquidity adapter execution contract:
 - `liquidity execute/resume` runtime execution scope for Slice 95 is limited to `amm_v2` and `hedera_hts`; `amm_v3` execution must fail with `unsupported_liquidity_execution_family`.
 - Runtime liquidity execution must persist lifecycle transitions through `/api/v1/liquidity/{intentId}/status`: `approved -> executing -> verifying -> filled|failed|verification_timeout` with `txHash` when available.
 - `amm_v2` add execution must run deterministic pre-submit checks (wallet token/native balance, pair reserves, router simulation) and emit explicit preflight reason codes (`liquidity_preflight_*`) when blocked.
-- `liquidity remove` execution derives token pair and LP amount from stored position snapshot + on-chain LP balance percent.
+- Hedera EVM `amm_v2` add supports opt-in simulation bypass for known false-positive simulation signatures when `XCLAW_LIQUIDITY_ALLOW_SIMULATION_BYPASS=1`; bypass metadata must be returned in preflight details.
+- `liquidity remove` execution derives token pair and LP amount from stored position snapshot + on-chain LP balance percent; when snapshot is unavailable and `positionRef` is a pair address, runtime may resolve `token0/token1` directly from pair.
+- Hedera pair remove path must resolve LP token via `pair.lpToken()` when available (fallback to pair contract token model otherwise).
 - Unsupported adapter combinations must return `unsupported_liquidity_adapter`.
 - Hedera HTS-native liquidity paths use plugin bridge module `xclaw_agent.hedera_hts_plugin:execute_liquidity` by default (override with `XCLAW_HEDERA_HTS_PLUGIN`) and may dispatch to an external bridge command via `XCLAW_HEDERA_HTS_BRIDGE_CMD`; missing SDK/bridge prerequisites must fail closed with `missing_dependency`.
 

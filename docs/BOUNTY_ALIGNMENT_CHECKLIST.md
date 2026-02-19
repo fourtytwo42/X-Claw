@@ -60,6 +60,12 @@ Notes:
 - `E9`: HTS fail-closed unit test proof remains passing (`test_quote_add_fails_closed_when_hedera_sdk_missing`).
 - `E10`: Hedera pair-discovery matrix now returns ranked live pairs for both `saucerswap` and `pangolin` via factory scan (`candidateCount:13` in sampled scan).
 - `E11`: Hosted installer rerun yields Hedera wallet readiness (`hasWallet:true`) in this environment.
+- `E22`: Hedera EVM runtime liquidity add submitted on-chain from `xclaw-agent liquidity add` (tx hash `0x2c019ea7b35176d6d6c1b141fabdb849625b1b05ae7a1d3112a6673e173c8891`, receipt `status=0x1`).
+- `E23`: Hedera EVM runtime liquidity remove submitted on-chain from `xclaw-agent liquidity remove` (tx hash `0x69df2d9b23653b13b8a86cc2e03a6da72b2b2118ed70ed4a3f26f4ef1fd32865`, receipt `status=0x1`).
+- `E24`: Deterministic EVM preflight diagnostics now include token probe outcomes + router revert payload context (`liquidity_preflight_router_revert`, `liquidity_preflight_token_transfer_blocked_token_a|b`).
+- `E25`: HTS readiness matrix now reports only bridge-command gap when runtime venv + JDK are configured (`missing: XCLAW_HEDERA_HTS_BRIDGE_CMD`).
+- `E26`: HTS add remains deterministic fail-closed `missing_dependency` until bridge command is configured.
+- `E27`: HTS remove remains deterministic fail-closed `missing_dependency` until bridge command is configured.
 
 ---
 

@@ -132,9 +132,10 @@ class WalletPolicyError(Exception):
 class LiquidityExecutionError(WalletStoreError):
     """Liquidity execution failed with deterministic reason code."""
 
-    def __init__(self, reason_code: str, message: str):
+    def __init__(self, reason_code: str, message: str, *, details: dict[str, Any] | None = None):
         super().__init__(message)
         self.reason_code = str(reason_code or "liquidity_execution_failed").strip() or "liquidity_execution_failed"
+        self.details = details or {}
 
 
 class SubprocessTimeout(WalletStoreError):
@@ -4754,6 +4755,174 @@ def _estimate_remove_amount_out_min(
     return max(0, min_a), max(0, min_b)
 
 
+def _is_truthy_solidity_bool_output(raw_result: str) -> bool:
+    text = str(raw_result or "").strip().lower()
+    if text in {"0x1", "0x01"}:
+        return True
+    if text in {"0x", "0x0", "0x00"}:
+        return False
+    if not text.startswith("0x"):
+        raise WalletStoreError("eth_call bool output is malformed.")
+    hex_body = text[2:]
+    if not re.fullmatch(r"[0-9a-f]+", hex_body):
+        raise WalletStoreError("eth_call bool output is malformed.")
+    try:
+        return int(hex_body or "0", 16) != 0
+    except Exception as exc:
+        raise WalletStoreError("eth_call bool output is malformed.") from exc
+
+
+def _probe_transfer_from_eth_call(
+    *,
+    chain: str,
+    token_address: str,
+    owner: str,
+    recipient: str,
+    amount_units: int,
+    spender: str,
+) -> dict[str, Any]:
+    calldata = _cast_calldata(
+        "transferFrom(address,address,uint256)(bool)",
+        [owner, recipient, str(amount_units)],
+    )
+    rpc_url = _chain_rpc_url(chain)
+    try:
+        result = _rpc_json_call(
+            rpc_url,
+            "eth_call",
+            [
+                {"from": spender, "to": token_address, "data": calldata},
+                "latest",
+            ],
+        )
+    except WalletStoreError as exc:
+        message = str(exc)
+        if "403" in message.lower() or "forbidden" in message.lower():
+            return {
+                "ok": False,
+                "kind": "rpc_forbidden",
+                "error": message[:300],
+                "token": token_address.lower(),
+                "owner": owner.lower(),
+                "recipient": recipient.lower(),
+                "spender": spender.lower(),
+                "amount": str(amount_units),
+            }
+        return {
+            "ok": False,
+            "kind": "revert",
+            "error": message[:300],
+            "token": token_address.lower(),
+            "owner": owner.lower(),
+            "recipient": recipient.lower(),
+            "spender": spender.lower(),
+            "amount": str(amount_units),
+        }
+    raw = str(result or "").strip()
+    try:
+        truthy = _is_truthy_solidity_bool_output(raw)
+    except WalletStoreError as exc:
+        return {
+            "ok": False,
+            "kind": "malformed_return",
+            "error": str(exc),
+            "rawResult": raw[:160],
+            "token": token_address.lower(),
+            "owner": owner.lower(),
+            "recipient": recipient.lower(),
+            "spender": spender.lower(),
+            "amount": str(amount_units),
+        }
+    if not truthy:
+        return {
+            "ok": False,
+            "kind": "return_false",
+            "rawResult": raw[:160],
+            "token": token_address.lower(),
+            "owner": owner.lower(),
+            "recipient": recipient.lower(),
+            "spender": spender.lower(),
+            "amount": str(amount_units),
+        }
+    return {
+        "ok": True,
+        "kind": "ok",
+        "rawResult": raw[:160],
+        "token": token_address.lower(),
+        "owner": owner.lower(),
+        "recipient": recipient.lower(),
+        "spender": spender.lower(),
+        "amount": str(amount_units),
+    }
+
+
+def _probe_transfer_eth_call(
+    *,
+    chain: str,
+    token_address: str,
+    owner: str,
+    recipient: str,
+    amount_units: int,
+) -> dict[str, Any]:
+    calldata = _cast_calldata(
+        "transfer(address,uint256)(bool)",
+        [recipient, str(amount_units)],
+    )
+    rpc_url = _chain_rpc_url(chain)
+    try:
+        result = _rpc_json_call(
+            rpc_url,
+            "eth_call",
+            [
+                {"from": owner, "to": token_address, "data": calldata},
+                "latest",
+            ],
+        )
+    except WalletStoreError as exc:
+        return {
+            "ok": False,
+            "kind": "revert",
+            "error": str(exc)[:300],
+            "token": token_address.lower(),
+            "owner": owner.lower(),
+            "recipient": recipient.lower(),
+            "amount": str(amount_units),
+        }
+    raw = str(result or "").strip()
+    try:
+        truthy = _is_truthy_solidity_bool_output(raw)
+    except WalletStoreError as exc:
+        return {
+            "ok": False,
+            "kind": "malformed_return",
+            "error": str(exc),
+            "rawResult": raw[:160],
+            "token": token_address.lower(),
+            "owner": owner.lower(),
+            "recipient": recipient.lower(),
+            "amount": str(amount_units),
+        }
+    if not truthy:
+        return {
+            "ok": False,
+            "kind": "return_false",
+            "rawResult": raw[:160],
+            "token": token_address.lower(),
+            "owner": owner.lower(),
+            "recipient": recipient.lower(),
+            "amount": str(amount_units),
+        }
+    return {
+        "ok": True,
+        "kind": "ok",
+        "rawResult": raw[:160],
+        "token": token_address.lower(),
+        "owner": owner.lower(),
+        "recipient": recipient.lower(),
+        "amount": str(amount_units),
+    }
+
+
 def _preflight_liquidity_v2_add_execution(
     *,
     chain: str,
@@ -4775,6 +4944,8 @@ def _preflight_liquidity_v2_add_execution(
 
     token_a_balance = int(_fetch_token_balance_wei(chain, wallet_address, token_a))
     token_b_balance = int(_fetch_token_balance_wei(chain, wallet_address, token_b))
+    token_a_allowance = int(_fetch_token_allowance_wei(chain, token_a, wallet_address, router))
+    token_b_allowance = int(_fetch_token_allowance_wei(chain, token_b, wallet_address, router))
     if token_a_balance < amount_a_units:
         raise LiquidityExecutionError(
             "liquidity_preflight_insufficient_token_balance",
@@ -4811,6 +4982,89 @@ def _preflight_liquidity_v2_add_execution(
             "Pair reserves are empty; choose a liquid pair before execution.",
         )
 
+    probe_a = _probe_transfer_from_eth_call(
+        chain=chain,
+        token_address=token_a,
+        owner=wallet_address,
+        recipient=pair,
+        amount_units=amount_a_units,
+        spender=router,
+    )
+    if (not bool(probe_a.get("ok"))) and str(probe_a.get("kind") or "") == "rpc_forbidden":
+        transfer_probe_a = _probe_transfer_eth_call(
+            chain=chain,
+            token_address=token_a,
+            owner=wallet_address,
+            recipient=pair,
+            amount_units=amount_a_units,
+        )
+        probe_a["fallbackTransferProbe"] = transfer_probe_a
+        if bool(transfer_probe_a.get("ok")):
+            probe_a["ok"] = True
+            probe_a["kind"] = "rpc_forbidden_fallback_transfer_ok"
+        else:
+            fallback_err = str(transfer_probe_a.get("error") or "").lower()
+            if "403" in fallback_err or "forbidden" in fallback_err:
+                probe_a["ok"] = True
+                probe_a["kind"] = "rpc_forbidden_unverifiable"
+    if not bool(probe_a.get("ok")):
+        raise LiquidityExecutionError(
+            "liquidity_preflight_token_transfer_blocked_token_a",
+            "TokenA transferFrom probe failed before addLiquidity simulation.",
+            details={
+                "pair": pair.lower(),
+                "factory": factory.lower(),
+                "tokenProbeA": probe_a,
+                "tokenProbeB": None,
+                "tokenAAllowance": str(token_a_allowance),
+                "tokenBAllowance": str(token_b_allowance),
+                "tokenABalance": str(token_a_balance),
+                "tokenBBalance": str(token_b_balance),
+            },
+        )
+
+    probe_b = _probe_transfer_from_eth_call(
+        chain=chain,
+        token_address=token_b,
+        owner=wallet_address,
+        recipient=pair,
+        amount_units=amount_b_units,
+        spender=router,
+    )
+    if (not bool(probe_b.get("ok"))) and str(probe_b.get("kind") or "") == "rpc_forbidden":
+        transfer_probe_b = _probe_transfer_eth_call(
+            chain=chain,
+            token_address=token_b,
+            owner=wallet_address,
+            recipient=pair,
+            amount_units=amount_b_units,
+        )
+        probe_b["fallbackTransferProbe"] = transfer_probe_b
+        if bool(transfer_probe_b.get("ok")):
+            probe_b["ok"] = True
+            probe_b["kind"] = "rpc_forbidden_fallback_transfer_ok"
+        else:
+            fallback_err = str(transfer_probe_b.get("error") or "").lower()
+            if "403" in fallback_err or "forbidden" in fallback_err:
+                probe_b["ok"] = True
+                probe_b["kind"] = "rpc_forbidden_unverifiable"
+    if not bool(probe_b.get("ok")):
+        raise LiquidityExecutionError(
+            "liquidity_preflight_token_transfer_blocked_token_b",
+            "TokenB transferFrom probe failed before addLiquidity simulation.",
+            details={
+                "pair": pair.lower(),
+                "factory": factory.lower(),
+                "tokenProbeA": probe_a,
+                "tokenProbeB": probe_b,
+                "tokenAAllowance": str(token_a_allowance),
+                "tokenBAllowance": str(token_b_allowance),
+                "tokenABalance": str(token_a_balance),
+                "tokenBBalance": str(token_b_balance),
+            },
+        )
+
+    simulation_warning: dict[str, Any] | None = None
     try:
         _cast_call_stdout(
             chain,
@@ -4826,10 +5080,35 @@ def _preflight_liquidity_v2_add_execution(
             deadline,
         )
     except WalletStoreError as exc:
-        raise LiquidityExecutionError(
-            "liquidity_preflight_router_revert",
-            f"addLiquidity simulation failed before submit: {exc}",
-        ) from exc
+        msg_lower = str(exc).lower()
+        allow_bypass = (
+            chain.startswith("hedera")
+            and str(os.environ.get("XCLAW_LIQUIDITY_ALLOW_SIMULATION_BYPASS") or "").strip() == "1"
+            and (
+                "safe token transfer failed" in msg_lower
+                or "sender account is a smart contract" in msg_lower
+            )
+        )
+        if allow_bypass:
+            simulation_warning = {
+                "code": "liquidity_preflight_router_revert_bypassed",
+                "message": str(exc)[:500],
+            }
+        else:
+            raise LiquidityExecutionError(
+                "liquidity_preflight_router_revert",
+                f"addLiquidity simulation failed before submit: {exc}",
+                details={
+                    "pair": pair.lower(),
+                    "factory": factory.lower(),
+                    "tokenProbeA": probe_a,
+                    "tokenProbeB": probe_b,
+                    "tokenAAllowance": str(token_a_allowance),
+                    "tokenBAllowance": str(token_b_allowance),
+                    "tokenABalance": str(token_a_balance),
+                    "tokenBBalance": str(token_b_balance),
+                },
+            ) from exc
 
     return {
         "pair": pair.lower(),
@@ -4838,6 +5117,11 @@ def _preflight_liquidity_v2_add_execution(
         "reserve1": str(reserve1),
         "tokenABalance": str(token_a_balance),
         "tokenBBalance": str(token_b_balance),
+        "tokenAAllowance": str(token_a_allowance),
+        "tokenBAllowance": str(token_b_allowance),
+        "tokenProbeA": probe_a,
+        "tokenProbeB": probe_b,
+        "simulationWarning": simulation_warning,
         "nativeBalanceWei": str(native_balance),
     }
 
@@ -4953,18 +5237,46 @@ def _execute_liquidity_v2_remove(intent: dict[str, Any], chain: str) -> dict[str
     if slippage_bps < 0 or slippage_bps > 5000:
         raise WalletStoreError("slippageBps must be between 0 and 5000 for liquidity execution.")
 
-    snapshot = _read_liquidity_position(chain, position_id)
-    token_a = _resolve_token_address(chain, str(snapshot.get("tokenA") or intent.get("tokenA") or ""))
-    token_b = _resolve_token_address(chain, str(snapshot.get("tokenB") or intent.get("tokenB") or ""))
+    snapshot: dict[str, Any] | None = None
+    pair_from_position: str | None = None
+    try:
+        snapshot = _read_liquidity_position(chain, position_id)
+    except WalletStoreError:
+        if is_hex_address(position_id):
+            pair_from_position = position_id
+        else:
+            raise
+    if snapshot is not None:
+        token_a = _resolve_token_address(chain, str(snapshot.get("tokenA") or intent.get("tokenA") or ""))
+        token_b = _resolve_token_address(chain, str(snapshot.get("tokenB") or intent.get("tokenB") or ""))
+    elif pair_from_position:
+        token_a = _parse_address_from_cast_output(_cast_call_stdout(chain, pair_from_position, "token0()(address)"))
+        token_b = _parse_address_from_cast_output(_cast_call_stdout(chain, pair_from_position, "token1()(address)"))
+    else:
+        raise WalletStoreError(f"Unable to resolve liquidity position '{position_id}'.")
     adapter.quote_remove({"positionId": position_id, "percent": percent, "slippageBps": slippage_bps})
 
     router = _require_chain_contract_address(chain, "router")
-    factory = _resolve_factory_from_router(chain, router)
-    pair = _resolve_pair_from_factory(chain, factory, token_a, token_b)
+    if pair_from_position:
+        factory = _resolve_factory_from_router(chain, router)
+        pair = pair_from_position
+    else:
+        factory = _resolve_factory_from_router(chain, router)
+        pair = _resolve_pair_from_factory(chain, factory, token_a, token_b)
+
+    lp_token = pair
+    if chain.startswith("hedera"):
+        try:
+            lp_token_out = _cast_call_stdout(chain, pair, "lpToken()(address)")
+            lp_token_candidate = _parse_address_from_cast_output(lp_token_out)
+            if is_hex_address(lp_token_candidate):
+                lp_token = lp_token_candidate
+        except Exception:
+            lp_token = pair
 
     store = load_wallet_store()
     wallet_address, private_key_hex = _execution_wallet(store, chain)
-    lp_balance = int(_fetch_token_balance_wei(chain, wallet_address, pair))
+    lp_balance = int(_fetch_token_balance_wei(chain, wallet_address, lp_token))
     liquidity_units = (lp_balance * percent) // 100
     if liquidity_units <= 0:
         raise WalletStoreError("Computed LP liquidity amount is zero; increase percent or ensure position has liquidity.")
@@ -4978,7 +5290,7 @@ def _execute_liquidity_v2_remove(intent: dict[str, Any], chain: str) -> dict[str
     )
     _ensure_token_allowance(
         chain=chain,
-        token_address=pair,
+        token_address=lp_token,
         owner=wallet_address,
         spender=router,
         required_units=liquidity_units,
@@ -5010,6 +5322,7 @@ def _execute_liquidity_v2_remove(intent: dict[str, Any], chain: str) -> dict[str
             "dex": adapter.dex,
             "action": "remove",
             "pair": pair.lower(),
+            "lpToken": lp_token.lower(),
             "percent": percent,
             "liquidityUnits": str(liquidity_units),
             "minAmountA": str(min_a_units),
@@ -5310,7 +5623,8 @@ def _format_eth_cost_from_wei(cost_wei: int | None) -> str | None:
 def _resolve_token_address(chain: str, token_or_symbol: str) -> str:
     candidate = str(token_or_symbol or "").strip()
     if is_hex_address(candidate):
-        return candidate
+        alias_map = _canonical_token_address_aliases(chain)
+        return str(alias_map.get(candidate.lower()) or candidate)
     symbol = candidate.upper()
     token_map = _canonical_token_map(chain)
     value = token_map.get(symbol)
@@ -5326,7 +5640,8 @@ def _token_symbol_for_display(chain: str, token_or_symbol: str) -> str:
     if not is_hex_address(value):
         return value
     token_map = _canonical_token_map(chain)
-    normalized = value.lower()
+    alias_map = _canonical_token_address_aliases(chain)
+    normalized = str(alias_map.get(value.lower()) or value).lower()
     for symbol, address in token_map.items():
         if str(address or "").strip().lower() == normalized:
             return str(symbol or "").strip() or value
@@ -6130,12 +6445,18 @@ def cmd_liquidity_execute(args: argparse.Namespace) -> int:
         )
     except LiquidityExecutionError as exc:
         reason_code = str(exc.reason_code or "liquidity_execution_failed")
+        failure_details = exc.details if isinstance(getattr(exc, "details", None), dict) else {}
         if transition_state in {"executing", "verifying"}:
             try:
                 _post_liquidity_status(
                     liquidity_intent_id,
                     "failed",
-                    {"reasonCode": reason_code, "reasonMessage": str(exc), "txHash": last_tx_hash},
+                    {
+                        "reasonCode": reason_code,
+                        "reasonMessage": str(exc),
+                        "txHash": last_tx_hash,
+                        "details": failure_details if failure_details else None,
+                    },
                 )
             except Exception:
                 pass
@@ -6143,7 +6464,13 @@ def cmd_liquidity_execute(args: argparse.Namespace) -> int:
             "liquidity_execution_failed",
             str(exc),
             "Verify intent payload, wallet balances, pair liquidity, and chain contracts, then retry.",
-            {"liquidityIntentId": liquidity_intent_id, "chain": chain, "txHash": last_tx_hash, "reasonCode": reason_code},
+            {
+                "liquidityIntentId": liquidity_intent_id,
+                "chain": chain,
+                "txHash": last_tx_hash,
+                "reasonCode": reason_code,
+                "preflight": failure_details if failure_details else None,
+            },
             exit_code=1,
         )
     except (LiquidityAdapterError, WalletStoreError) as exc:
@@ -7966,6 +8293,23 @@ def _canonical_token_map(chain: str) -> dict[str, str]:
     return out
 
 
+def _canonical_token_address_aliases(chain: str) -> dict[str, str]:
+    cfg = _load_chain_config(chain)
+    aliases = cfg.get("canonicalTokenAddressAliases")
+    if not isinstance(aliases, dict):
+        return {}
+    out: dict[str, str] = {}
+    for alias, canonical in aliases.items():
+        if (
+            isinstance(alias, str)
+            and isinstance(canonical, str)
+            and is_hex_address(alias)
+            and is_hex_address(canonical)
+        ):
+            out[alias.lower()] = canonical
+    return out
+
+
 def _native_symbol_for_chain(chain: str) -> str:
     cfg = _load_chain_config(chain)
     native = cfg.get("nativeCurrency")
@@ -8575,6 +8919,87 @@ def cmd_limit_orders_run_loop(args: argparse.Namespace) -> int:
         return ok("Limit-order loop interrupted.", chain=args.chain, iterations=completed, interrupted=True, totals=totals, lastRun=last_run)
 
 
+def _hedera_hts_readiness() -> dict[str, Any]:
+    runtime_python = (os.environ.get("XCLAW_AGENT_PYTHON_BIN") or sys.executable or "python3").strip()
+    bridge_cmd = str(os.environ.get("XCLAW_HEDERA_HTS_BRIDGE_CMD") or "").strip()
+    runtime_root = pathlib.Path(__file__).resolve().parents[1]
+    py_env = os.environ.copy()
+    existing_path = str(py_env.get("PYTHONPATH") or "").strip()
+    py_env["PYTHONPATH"] = (
+        f"{runtime_root}:{existing_path}" if existing_path else str(runtime_root)
+    )
+
+    java_available = shutil.which("java") is not None
+    javac_available = shutil.which("javac") is not None
+    hedera_importable = False
+    plugin_importable = False
+    plugin_callable = False
+
+    try:
+        hedera_probe = subprocess.run(
+            [runtime_python, "-c", "import hedera"],
+            timeout=10,
+            env=py_env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        hedera_importable = hedera_probe.returncode == 0
+    except Exception:
+        hedera_importable = False
+
+    try:
+        plugin_probe = subprocess.run(
+            [
+                runtime_python,
+                "-c",
+                "import importlib; m=importlib.import_module('xclaw_agent.hedera_hts_plugin'); "
+                "print(1 if callable(getattr(m,'execute_liquidity',None)) else 0)",
+            ],
+            timeout=10,
+            env=py_env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        plugin_importable = plugin_probe.returncode == 0
+        plugin_callable = plugin_importable and (plugin_probe.stdout or "").strip().endswith("1")
+    except Exception:
+        plugin_importable = False
+        plugin_callable = False
+
+    checks = {
+        "javaAvailable": java_available,
+        "javacAvailable": javac_available,
+        "pythonBin": runtime_python,
+        "hederaImportable": hedera_importable,
+        "pluginImportable": plugin_importable,
+        "pluginCallable": plugin_callable,
+        "bridgeCommandConfigured": bool(bridge_cmd),
+    }
+    ready = all(
+        [
+            java_available,
+            javac_available,
+            hedera_importable,
+            plugin_callable,
+            bool(bridge_cmd),
+        ]
+    )
+    missing: list[str] = []
+    if not java_available:
+        missing.append("java")
+    if not javac_available:
+        missing.append("javac")
+    if not hedera_importable:
+        missing.append("hedera_sdk_py")
+    if not plugin_callable:
+        missing.append("xclaw_agent.hedera_hts_plugin:execute_liquidity")
+    if not bridge_cmd:
+        missing.append("XCLAW_HEDERA_HTS_BRIDGE_CMD")
+    return {"ready": ready, "checks": checks, "missing": missing}
+
+
 def cmd_wallet_health(args: argparse.Namespace) -> int:
     chk = require_json_flag(args)
     if chk is not None:
@@ -8640,6 +9065,10 @@ def cmd_wallet_health(args: argparse.Namespace) -> int:
     elif not integrity_checked:
         next_action = "Integrity check skipped (no passphrase provided). If available, set XCLAW_WALLET_PASSPHRASE to enable deeper verification; do not share it."
 
+    hts_readiness: dict[str, Any] | None = None
+    if chain.startswith("hedera"):
+        hts_readiness = _hedera_hts_readiness()
+
     return ok(
         "Wallet health checked.",
         chain=chain,
@@ -8649,6 +9078,7 @@ def cmd_wallet_health(args: argparse.Namespace) -> int:
         metadataValid=metadata_valid,
         filePermissionsSafe=permission_safe,
         integrityChecked=integrity_checked,
+        htsReadiness=hts_readiness,
         actionHint=next_action,
         nextAction=next_action,
         timestamp=utc_now(),

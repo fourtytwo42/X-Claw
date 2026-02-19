@@ -2444,3 +2444,16 @@ Implement the post-Slice-88 liquidity program through runtime adapter preflight 
 - live bootstrap signer check:
   - `python3 skills/xclaw-agent/scripts/xclaw_agent_skill.py wallet-sign-challenge "<canonical challenge>" --json`
   - expected blocker (if passphrase missing): deterministic `sign_failed`.
+
+# Slice 95B-EVM/HTS Spec Addendum: Runtime Unblock Execution (UTC 2026-02-19)
+
+## Scope completed in this pass
+1. Add deterministic token transfer probe context to Hedera EVM v2 add preflight failures.
+2. Add Hedera token-address alias normalization for legacy WHBAR mapping drift.
+3. Add HTS readiness matrix in `wallet health` to report Java/python/plugin/bridge prerequisites.
+4. Add guarded Hedera-only simulation bypass (`XCLAW_LIQUIDITY_ALLOW_SIMULATION_BYPASS=1`) for known false-positive pre-submit simulation signatures.
+5. Extend v2 remove execution to support pair-address fallback and Hedera LP token resolution via `pair.lpToken()`.
+
+## Evidence objective status
+1. Hedera EVM add/remove tx-hash evidence: achieved.
+2. Hedera HTS add/remove tx-hash evidence: blocked only on missing `XCLAW_HEDERA_HTS_BRIDGE_CMD` bridge command.
