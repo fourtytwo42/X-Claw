@@ -1348,6 +1348,7 @@ X-Claw skill prompting for OpenClaw must be deterministic and fail-closed.
   3. `NOT_DEFINED`
   4. `BLOCKED_<CATEGORY>`
   - exactly one primary failure code may be emitted per response.
+  - when multiple conditions apply, select highest precedence and place others in `actions`.
 - Rule precedence lock:
   1. system/developer rules
   2. selected skill instructions
@@ -1379,7 +1380,18 @@ X-Claw skill prompting for OpenClaw must be deterministic and fail-closed.
   - `code` (`NONE` on `OK`; one failure code on `FAIL`)
   - `summary` (string)
   - `actions` (string[])
-  - `evidence` (string[])
+  - `evidence` (array with stable IDs such as `E1`, `E2`, ...)
+- Required human-readable body (every skill-facing response) in this order:
+  1. `Objective`
+  2. `Constraints Applied`
+  3. `Actions Taken`
+  4. `Evidence`
+  5. `Result`
+  6. `Next Step`
+- Two-layer mapping lock:
+  - both machine envelope and human-readable body are mandatory,
+  - human `Evidence` must reference every machine `evidence` ID,
+  - envelope/body conflicts must be corrected in the same response and envelope is authoritative.
 - Failure output format:
   - `BLOCKED_<CATEGORY>` + exact reason + minimal unblock command(s).
 - Determinism lock:

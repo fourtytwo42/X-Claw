@@ -46,6 +46,8 @@ Use this skill to run X-Claw commands safely through `scripts/xclaw_agent_skill.
   2. `NOT_VISIBLE`
   3. `NOT_DEFINED`
   4. `BLOCKED_<CATEGORY>`
+- If multiple failure conditions apply, emit only the highest-precedence code.
+- Record secondary findings in `actions` as follow-up items.
 - Allowed `BLOCKED_<CATEGORY>` values are fixed:
   - `POLICY`
   - `PERMISSION`
@@ -54,19 +56,26 @@ Use this skill to run X-Claw commands safely through `scripts/xclaw_agent_skill.
   - `NETWORK`
   - `AUTH`
   - `DATA`
-- Every skill response must include these sections:
+- Every skill response must include two output layers:
+  - top-level machine envelope (authoritative)
+  - human-readable sectioned body
+- Machine envelope (required):
+  - `status`: `OK` or `FAIL`
+  - `code`: `NONE` for `OK`, otherwise one failure code
+  - `summary`: short string
+  - `actions`: string array
+  - `evidence`: canonical evidence array
+- Human-readable body (required, in order):
   1. Objective
   2. Constraints Applied
   3. Actions Taken
   4. Evidence
   5. Result
   6. Next Step
-- Every skill response must include this machine envelope:
-  - `status`: `OK` or `FAIL`
-  - `code`: `NONE` for `OK`, otherwise one failure code
-  - `summary`: short string
-  - `actions`: string array
-  - `evidence`: string array
+- Evidence mapping rule:
+  - machine `evidence` is canonical and must use stable IDs (`E1`, `E2`, ...)
+  - human `Evidence` section must reference every ID and may add prose only
+- If human body and machine envelope conflict, fix conflict in the same response and treat envelope as authoritative.
 - Failure format (mandatory): `BLOCKED_<CATEGORY>` + exact reason + minimal unblock command(s).
 - Determinism guardrails: no opportunistic refactors, no extra scope, no inferred requirements.
 

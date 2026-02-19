@@ -20,6 +20,9 @@ Active slice context: `Slice 86` in progress (explicit user-requested prompt/doc
 - [x] `BLOCKED_<CATEGORY>` uses fixed enum (`POLICY|PERMISSION|RUNTIME|DEPENDENCY|NETWORK|AUTH|DATA`).
 - [x] `NOT_VISIBLE` usage is constrained to unavailable in-session source text/context.
 - [x] Required machine envelope fields are locked (`status`, `code`, `summary`, `actions`, `evidence`).
+- [x] Two-layer response contract is explicit (machine envelope + ordered human-readable sections).
+- [x] Human `Evidence` section must reference all machine `evidence` IDs.
+- [x] Multi-condition failures resolve to highest-precedence primary code; secondary findings go to `actions`.
 
 ## Required Validation Gates
 - [x] `npm run db:parity` -> PASS (`ok: true`)

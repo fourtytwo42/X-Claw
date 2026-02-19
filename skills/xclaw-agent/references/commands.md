@@ -117,6 +117,8 @@ Underlying runtime delegation (performed by wrapper):
   2. `NOT_VISIBLE`
   3. `NOT_DEFINED`
   4. `BLOCKED_<CATEGORY>`
+- If multiple conditions apply, emit only the highest-precedence primary code.
+- Secondary conditions must be placed in `actions[]`.
 - Rule precedence is strict:
   1. system/developer rules
   2. selected skill instructions
@@ -142,12 +144,15 @@ Underlying runtime delegation (performed by wrapper):
   - `NETWORK`
   - `AUTH`
   - `DATA`
+- Response contract requires both layers:
+  - top-level machine envelope
+  - human-readable sectioned body
 - Machine envelope is required for all replies:
   - `status`: `OK|FAIL`
   - `code`: `NONE` when `OK`, else one failure code
   - `summary`: string
   - `actions`: string[]
-  - `evidence`: string[]
+  - `evidence`: canonical array with stable IDs (`E1`, `E2`, ...)
 - Required response I/O sections for all skill replies:
   1. Objective
   2. Constraints Applied
@@ -155,6 +160,10 @@ Underlying runtime delegation (performed by wrapper):
   4. Evidence
   5. Result
   6. Next Step
+- Evidence mapping rule:
+  - human `Evidence` section must reference every machine `evidence` ID
+  - prose is allowed, but must not contradict machine envelope
+- On envelope/body conflict, envelope is authoritative and must be corrected in the same response.
 
 ## Approval Surface Routing Rules
 

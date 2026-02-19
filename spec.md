@@ -3,6 +3,7 @@
 ## Goal
 Improve X-Claw/OpenClaw skills prompting so responses are deterministic, fail-closed, and easier to operate through Telegram and other channels.
 Pass 2 hardening adds deterministic primary-code precedence, fixed blocked-category taxonomy, and required machine envelope fields.
+Pass 3 hardening adds explicit two-layer output contract (machine envelope + human sections), evidence ID mapping, and deterministic multi-condition code resolution.
 
 ## Non-goals
 1. No API route changes.

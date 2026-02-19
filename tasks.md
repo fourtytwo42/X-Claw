@@ -15,6 +15,9 @@ Active slice context: `Slice 86` is in progress; this is an explicit user-reques
 - [x] Add fixed `BLOCKED_<CATEGORY>` enum contract.
 - [x] Add explicit `NOT_VISIBLE` trigger constraints.
 - [x] Add required machine envelope (`status`, `code`, `summary`, `actions`, `evidence`).
+- [x] Add explicit two-layer response contract (machine envelope + ordered human sections).
+- [x] Add evidence mapping rule (machine `evidence` IDs must be referenced in human `Evidence` section).
+- [x] Add deterministic multi-condition code rule (highest precedence code only; others in `actions`).
 
 ## 3) Validation
 - [x] `npm run db:parity`
