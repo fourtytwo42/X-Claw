@@ -189,6 +189,7 @@ export async function GET(req: NextRequest) {
     const [
       agent,
       approvals,
+      approvalsHistory,
       policyApprovals,
       policyApprovalsHistory,
       policy,
@@ -234,6 +235,43 @@ export async function GET(req: NextRequest) {
           and status = 'approval_pending'
         order by created_at asc
         limit 50
+        `,
+        [agentId, chainKey]
+      ),
+      dbQuery<{
+        trade_id: string;
+        chain_key: string;
+        pair: string;
+        amount_in: string | null;
+        token_in: string;
+        token_out: string;
+        status: string;
+        reason: string | null;
+        reason_message: string | null;
+        tx_hash: string | null;
+        created_at: string;
+        updated_at: string;
+      }>(
+        `
+        select
+          trade_id,
+          chain_key,
+          pair,
+          amount_in::text,
+          token_in,
+          token_out,
+          status::text,
+          reason,
+          reason_message,
+          tx_hash,
+          created_at::text,
+          updated_at::text
+        from trades
+        where agent_id = $1
+          and chain_key = $2
+          and status in ('approved', 'executing', 'verifying', 'filled', 'failed', 'rejected', 'expired')
+        order by created_at desc
+        limit 100
         `,
         [agentId, chainKey]
       ),
@@ -644,6 +682,7 @@ export async function GET(req: NextRequest) {
           telegram: { enabled: telegramApprovalEnabled, updatedAt: telegramApprovalUpdatedAt }
         },
         approvalsQueue: approvals.rows,
+        approvalsHistory: approvalsHistory.rows,
         policyApprovalsQueue: policyApprovals.rows,
         policyApprovalsHistory: policyApprovalsHistory.rows,
         transferApprovalsQueue: transferApprovalsQueue.rows.map((row) => ({ ...row, confirmations: null })),

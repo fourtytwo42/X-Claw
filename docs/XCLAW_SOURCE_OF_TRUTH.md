@@ -3637,6 +3637,9 @@ Limitations / notes:
 - Provides normalized rows across trade/policy/transfer approval surfaces for agents linked to current management session.
 - Includes deterministic risk labels and chain-scoped permission inventory blocks.
 - Trade/policy/transfer token labels in inbox rows must prefer canonical token symbols and RPC-resolved metadata (fallback to shortened address when metadata is unavailable).
+- Trade rows must remain visible after approval execution transitions:
+  - include trade statuses `approved|executing|verifying|filled|failed|rejected` in inbox source selection,
+  - normalize `executing|verifying|filled|failed` into the `approved` tab so owner approval history does not disappear immediately after execution.
 
 3. Direct permissions update endpoint:
 - Endpoint: `POST /api/v1/management/permissions/update`.

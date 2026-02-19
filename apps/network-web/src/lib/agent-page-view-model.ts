@@ -124,6 +124,20 @@ export type ManagementStatePayload = {
     reason: string | null;
     created_at: string;
   }>;
+  approvalsHistory?: Array<{
+    trade_id: string;
+    chain_key: string;
+    pair: string;
+    amount_in: string | null;
+    token_in: string;
+    token_out: string;
+    status: string;
+    reason: string | null;
+    reason_message: string | null;
+    tx_hash: string | null;
+    created_at: string;
+    updated_at: string;
+  }>;
   policyApprovalsQueue?: Array<{
     request_id: string;
     chain_key: string;

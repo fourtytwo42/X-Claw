@@ -1465,6 +1465,7 @@ export default function AgentPublicProfilePage() {
         item.transfer_type === 'native' ? 18 : (tokenDecimalsBySymbol.get(normalizeTokenSelectionSymbol(item.token_symbol)) ?? 18);
       return formatHumanAmount(item.amount_wei, transferTokenLabel, transferDecimals);
     };
+    const pendingTradeIds = new Set((management.data.approvalsQueue ?? []).map((item) => item.trade_id));
     for (const item of management.data.approvalsQueue) {
       const tokenInLabel = resolveTokenLabel(item.token_in, chainTokenSymbolByAddress);
       const tokenOutLabel = resolveTokenLabel(item.token_out, chainTokenSymbolByAddress);
@@ -1476,6 +1477,32 @@ export default function AgentPublicProfilePage() {
         title: `${tokenInLabel} -> ${tokenOutLabel}`,
         status: 'pending',
         subtitle: item.reason ?? 'Waiting for trade approval',
+        type: 'trade',
+        tokenSymbols: [tokenIn, tokenOut].filter(Boolean),
+        raw: item
+      });
+    }
+    for (const item of management.data.approvalsHistory ?? []) {
+      if (pendingTradeIds.has(item.trade_id)) {
+        continue;
+      }
+      const tokenInLabel = resolveTokenLabel(item.token_in, chainTokenSymbolByAddress);
+      const tokenOutLabel = resolveTokenLabel(item.token_out, chainTokenSymbolByAddress);
+      const tokenIn = normalizeTokenSelectionSymbol(tokenInLabel);
+      const tokenOut = normalizeTokenSelectionSymbol(tokenOutLabel);
+      const normalized = String(item.status ?? '').trim().toLowerCase();
+      const status =
+        normalized === 'rejected' || normalized === 'deny' || normalized === 'denied' || normalized === 'expired'
+          ? 'rejected'
+          : normalized === 'approval_pending' || normalized === 'pending'
+            ? 'pending'
+            : 'approved';
+      rows.push({
+        id: `trade-history-${item.trade_id}`,
+        at: item.updated_at ?? item.created_at,
+        title: `${tokenInLabel} -> ${tokenOutLabel}`,
+        status,
+        subtitle: `Trade ${item.trade_id} (${item.status})`,
         type: 'trade',
         tokenSymbols: [tokenIn, tokenOut].filter(Boolean),
         raw: item

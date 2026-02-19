@@ -1,3 +1,28 @@
+# Hotfix Tasks: Preserve Trade Approval History After Execution
+
+Active slice context: `Slice 86` is in progress; this is an explicit user-reported approvals-history visibility hotfix.
+
+## 1) Scope lock
+- [x] Keep scope to approvals history read-models (inbox + agent-state views).
+- [x] Preserve trade execution and approval decision behavior.
+
+## 2) Implementation
+- [x] Expand approvals inbox trade status selection to include post-approval execution states.
+- [x] Normalize `executing|verifying|filled|failed` into Approved tab semantics in inbox.
+- [x] Add `approvalsHistory` trade feed to management agent-state payload.
+- [x] Render trade approval history rows in `/agents/[agentId]` approvals section, with pending-row dedupe.
+- [x] Sync source-of-truth and handoff artifacts.
+
+## 3) Validation
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+
+---
+
 # Hotfix Tasks: Always Prod Agent After Web Trade/Transfer Approvals
 
 Active slice context: `Slice 86` is in progress; this is an explicit user-requested workflow-continuation hotfix.

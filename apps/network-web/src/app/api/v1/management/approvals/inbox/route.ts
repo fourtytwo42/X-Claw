@@ -37,11 +37,11 @@ function parseLimit(raw: string | null): number {
 }
 
 function normalizeStatus(value: string): 'pending' | 'approved' | 'rejected' | null {
-  const raw = String(value ?? '').trim();
+  const raw = String(value ?? '').trim().toLowerCase();
   if (raw === 'approval_pending') {
     return 'pending';
   }
-  if (raw === 'approved') {
+  if (raw === 'approved' || raw === 'executing' || raw === 'verifying' || raw === 'filled' || raw === 'failed') {
     return 'approved';
   }
   if (raw === 'rejected') {
@@ -116,7 +116,7 @@ export async function GET(req: NextRequest) {
         from trades
         where agent_id = any($1::text[])
           and ($2::text = 'all' or chain_key = $2)
-          and status in ('approval_pending', 'approved', 'rejected')
+          and status in ('approval_pending', 'approved', 'executing', 'verifying', 'filled', 'failed', 'rejected')
         order by created_at desc
         limit $3
         `,
@@ -345,9 +345,9 @@ export async function GET(req: NextRequest) {
         chainKey: row.chain_key,
         status: normalizedStatus,
         title: `${tokenInLabel} -> ${tokenOutLabel}`,
-        subtitle: `Trade ${row.trade_id}`,
+        subtitle: `Trade ${row.trade_id} (${row.status})`,
         requestTypeLabel: 'Trade Approval',
-        reasonLine: row.reason || 'Token not pre-approved',
+        reasonLine: row.reason || (row.status === 'approval_pending' ? 'Token not pre-approved' : 'Trade approval history.'),
         riskLabel: riskForRow({ rowKind: 'trade', reason: row.reason }),
         createdAt: row.created_at
       });

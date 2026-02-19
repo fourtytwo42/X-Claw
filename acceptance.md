@@ -1,3 +1,34 @@
+# Hotfix Acceptance Evidence: Preserve Trade Approval History After Execution
+
+Date (UTC): 2026-02-19
+Active slice context: `Slice 86` in progress (explicit user-reported approvals-history visibility hotfix)
+
+## Objective + Scope Lock
+- Objective: prevent approved trades from disappearing from approvals history once they move to `filled/failed` quickly.
+- Scope lock:
+  - `apps/network-web/src/app/api/v1/management/approvals/inbox/route.ts`
+  - `apps/network-web/src/app/api/v1/management/agent-state/route.ts`
+  - `apps/network-web/src/lib/agent-page-view-model.ts`
+  - `apps/network-web/src/app/agents/[agentId]/page.tsx`
+  - `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - handoff artifacts (`spec.md`, `tasks.md`, `acceptance.md`)
+
+## Behavior Checks
+- [x] `GET /api/v1/management/approvals/inbox` includes trade rows after status advances beyond `approved`.
+- [x] Inbox status normalization maps `executing|verifying|filled|failed` to Approved-tab history semantics.
+- [x] `/agents/[agentId]` approvals history includes non-pending trade approvals via `approvalsHistory`.
+- [x] Pending trade queue rows are not duplicated by history rows.
+
+## Required Validation Gates
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+
+---
+
 # Hotfix Acceptance Evidence: Always Prod Agent After Web Trade/Transfer Approvals
 
 Date (UTC): 2026-02-19

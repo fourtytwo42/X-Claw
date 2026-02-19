@@ -1,3 +1,33 @@
+# Hotfix Spec: Preserve Trade Approval History After Execution
+
+## Goal
+Keep trade approvals visible in management approval history even after approved trades quickly transition to `executing/verifying/filled/failed`.
+
+## Non-goals
+1. No decision endpoint contract changes.
+2. No migration or schema change.
+3. No change to execution semantics.
+
+## Locked scope
+1. `apps/network-web/src/app/api/v1/management/approvals/inbox/route.ts`
+2. `apps/network-web/src/app/api/v1/management/agent-state/route.ts`
+3. `apps/network-web/src/lib/agent-page-view-model.ts`
+4. `apps/network-web/src/app/agents/[agentId]/page.tsx`
+5. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+6. `spec.md`
+7. `tasks.md`
+8. `acceptance.md`
+
+## Acceptance checks
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `pm2 restart all`
+
+---
+
 # Hotfix Spec: Always Prod Agent After Web Trade/Transfer Approvals
 
 ## Goal
