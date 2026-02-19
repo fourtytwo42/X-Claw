@@ -2231,3 +2231,39 @@ Implement the post-Slice-88 liquidity program through runtime adapter preflight 
 - `npm run seed:verify`
 - `npm run build`
 - `pm2 restart all`
+
+---
+
+# Continuation Spec: Slice 90 Close-Out + Slice 95 Evidence (UTC 2026-02-19)
+
+## Goal
+1. Close Slice 90 by completing and recording liquidity API contract validation.
+2. Run Slice 95 evidence pass with hardhat-local proof first, then Base Sepolia/Hedera attempts with explicit blocker capture when unavailable.
+
+## Non-goals
+1. No new public liquidity endpoint paths.
+2. No cross-slice feature expansion beyond validation/evidence/hardening scope.
+
+## Locked scope
+1. `infrastructure/scripts/liquidity-contract-tests.mjs`
+2. `package.json`
+3. `docs/XCLAW_SLICE_TRACKER.md`
+4. `docs/XCLAW_BUILD_ROADMAP.md`
+5. `docs/BOUNTY_ALIGNMENT_CHECKLIST.md`
+6. `acceptance.md`
+7. `spec.md`
+8. `tasks.md`
+
+## Acceptance checks
+- `npm run db:migrate`
+- `npm run test:liquidity:contract`
+- `XCLAW_DEFAULT_CHAIN=hardhat_local npm run test:liquidity:contract`
+- `python3 -m unittest apps/agent-runtime/tests/test_liquidity_adapter.py -v`
+- `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v`
+- Required gates (sequential):
+  - `npm run db:parity`
+  - `npm run seed:reset`
+  - `npm run seed:load`
+  - `npm run seed:verify`
+  - `npm run build`
+  - `pm2 restart all`

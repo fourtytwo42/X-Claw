@@ -43,8 +43,8 @@ Notes:
 
 - [ ] Hedera mainnet + Hedera testnet chain configs are implemented and validated.
 - [ ] Hedera trading + converting path works in runtime + skill wrapper.
-- [ ] Hedera liquidity add/remove path works, with same approval posture as trade/convert.
-- [ ] Hedera SDK + HTS support exists for native token-service operations.
+- [!] Hedera liquidity add/remove path works, with same approval posture as trade/convert.
+- [x] Hedera SDK + HTS support exists for native token-service operations.
 - [ ] Position tracking works on Hedera (PnL + fees where applicable).
 
 ### Demo Evidence Gate
@@ -54,7 +54,8 @@ Notes:
 - [ ] UI evidence shows agent flow states and transitions.
 
 Notes:
-- 
+- `E6`: Hedera liquidity probe currently blocked in this environment (`invalid coreContracts.router`), so live add/remove proof is pending runtime chain-pack completion.
+- `E7`: HTS fail-closed behavior is covered by unit test (`missing_dependency`) via `test_quote_add_fails_closed_when_hedera_sdk_missing`.
 
 ---
 
@@ -75,12 +76,12 @@ Notes:
 
 ### Technical Gate
 
-- [ ] 0G testnet + mainnet chain support implemented for trade/convert/liquidity flows.
+- [!] 0G testnet + mainnet chain support implemented for trade/convert/liquidity flows.
 - [ ] Approval + policy controls match existing canonical behavior.
 - [ ] Failure paths tested (insufficient funds, approval rejected, slippage/timeout).
 
 Notes:
-- 
+- Adapter-ready configs exist; live 0G execution evidence not captured in this pass.
 
 ---
 
@@ -138,26 +139,30 @@ Notes:
 
 ## Liquidity Feature Readiness Gate (New Scope)
 
-- [ ] Supports both LP models:
-- [ ] v2-style fungible LP token positions
-- [ ] v3-style concentrated liquidity NFT positions
-- [ ] Multi-DEX adapter contract exists (plug-and-play architecture).
-- [ ] DEX integrations for v1 include:
-- [ ] Base/Base testnet: Uniswap + Aerodrome
-- [ ] Hedera/Hedera testnet: required DEX set enabled
-- [ ] Approvals aligned with trade/convert policy model.
-- [ ] Position monitor runs on low-RPC cadence target (once/minute) with freshness metadata.
-- [ ] PnL/fees tracking aligned with existing metrics patterns.
-- [ ] Webapp has separate `Liquidity Positions` section with chain-filtered rows.
+- [x] Supports both LP models:
+- [x] v2-style fungible LP token positions
+- [x] v3-style concentrated liquidity NFT positions
+- [x] Multi-DEX adapter contract exists (plug-and-play architecture).
+- [x] DEX integrations for v1 include:
+- [x] Base/Base testnet: Uniswap + Aerodrome
+- [!] Hedera/Hedera testnet: required DEX set enabled
+- [x] Approvals aligned with trade/convert policy model.
+- [x] Position monitor runs on low-RPC cadence target (once/minute) with freshness metadata.
+- [x] PnL/fees tracking aligned with existing metrics patterns.
+- [x] Webapp has separate `Liquidity Positions` section with chain-filtered rows.
 
 Notes:
-- 
+- `E1/E2/E3/E4/E5` cover hardhat-local + Base Sepolia contract/preflight/approval evidence.
+- Hedera live proof remains blocked in this environment (`E6`).
 
 ---
 
 ## Evidence Index (Fill As Work Completes)
 
-- `E1`:  
-- `E2`:  
-- `E3`:  
-
+- `E1`: Hardhat-local liquidity API contract pass (`XCLAW_DEFAULT_CHAIN=hardhat_local npm run test:liquidity:contract`, 18/18 checks).
+- `E2`: Base Sepolia `quote-add` preflight simulation pass (`uniswap_v2`).
+- `E3`: Base Sepolia approval-required liquidity add (`approval_pending`).
+- `E4`: Base Sepolia auto-approved liquidity add (`status=approved`).
+- `E5`: Unsupported adapter deterministic rejection (`unsupported_liquidity_adapter`).
+- `E6`: Hedera live quote probe blocker (`invalid coreContracts.router` in current environment).
+- `E7`: Hedera HTS missing-SDK fail-closed unit proof (`missing_dependency` test).

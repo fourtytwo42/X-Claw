@@ -3004,45 +3004,45 @@ Note:
 ## 90) Slice 90: Liquidity + Multi-DEX Compatibility Foundation
 
 ### 90.1 Canonical/doc sync
-- [~] Add Slice 90 goal/DoD + issue mapping to `docs/XCLAW_SLICE_TRACKER.md`.
-- [~] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` with liquidity command/capability contract.
-- [~] Update `docs/api/WALLET_COMMAND_CONTRACT.md` + `skills/xclaw-agent/references/commands.md` for liquidity command surface.
-- [~] Update `docs/api/openapi.v1.yaml` with liquidity endpoints and request/response schema refs.
+- [x] Add Slice 90 goal/DoD + issue mapping to `docs/XCLAW_SLICE_TRACKER.md`.
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` with liquidity command/capability contract.
+- [x] Update `docs/api/WALLET_COMMAND_CONTRACT.md` + `skills/xclaw-agent/references/commands.md` for liquidity command surface.
+- [x] Update `docs/api/openapi.v1.yaml` with liquidity endpoints and request/response schema refs.
 
 ### 90.2 Implementation
-- [~] Add migration `0023_slice90_liquidity_foundation.sql` with:
-  - [~] `liquidity_intents`
-  - [~] `liquidity_position_snapshots`
-  - [~] `liquidity_fee_events`
-  - [~] `liquidity_protocol_configs`
-- [~] Add shared schemas:
-  - [~] `liquidity-proposed-request.schema.json`
-  - [~] `liquidity-status.schema.json`
-  - [~] `liquidity-position.schema.json`
-  - [~] `liquidity-approval.schema.json`
-- [~] Runtime CLI:
-  - [~] `liquidity add`
-  - [~] `liquidity remove`
-  - [~] `liquidity positions`
-  - [~] `liquidity quote-add`
-  - [~] `liquidity quote-remove`
-  - [~] `chains --json` includes `capabilities.liquidity`.
-- [~] Skill wrapper command delegation includes liquidity add/remove/list/quote operations.
-- [~] Chain configs include `capabilities.liquidity` and baseline `liquidityProtocols` metadata for Wave-1 and sponsor onboarding stubs.
-- [~] Mainnet+testnet chain selector availability enabled via chain config (`enabled=true`) while preserving capability gating (faucet unchanged).
-- [~] Server/API routes added:
-  - [~] `POST /api/v1/liquidity/proposed`
-  - [~] `POST /api/v1/liquidity/{intentId}/status`
-  - [~] `GET /api/v1/liquidity/pending`
-  - [~] `GET /api/v1/liquidity/positions`
-- [~] Management agent-state and `/agents/:id` wallet UI include separate Liquidity Positions section.
-- [~] Runtime default-chain contract added (`xclaw-agent default-chain get/set`) with agent-local state source-of-truth.
-- [~] Management APIs added for default-chain sync/read (`/management/default-chain`, `/management/default-chain/update-batch`).
-- [~] Web selector sync path updates managed-agent runtime defaults and reconciles local selector from runtime canonical default.
+- [x] Add migration `0023_slice90_liquidity_foundation.sql` with:
+  - [x] `liquidity_intents`
+  - [x] `liquidity_position_snapshots`
+  - [x] `liquidity_fee_events`
+  - [x] `liquidity_protocol_configs`
+- [x] Add shared schemas:
+  - [x] `liquidity-proposed-request.schema.json`
+  - [x] `liquidity-status.schema.json`
+  - [x] `liquidity-position.schema.json`
+  - [x] `liquidity-approval.schema.json`
+- [x] Runtime CLI:
+  - [x] `liquidity add`
+  - [x] `liquidity remove`
+  - [x] `liquidity positions`
+  - [x] `liquidity quote-add`
+  - [x] `liquidity quote-remove`
+  - [x] `chains --json` includes `capabilities.liquidity`.
+- [x] Skill wrapper command delegation includes liquidity add/remove/list/quote operations.
+- [x] Chain configs include `capabilities.liquidity` and baseline `liquidityProtocols` metadata for Wave-1 and sponsor onboarding stubs.
+- [x] Mainnet+testnet chain selector availability enabled via chain config (`enabled=true`) while preserving capability gating (faucet unchanged).
+- [x] Server/API routes added:
+  - [x] `POST /api/v1/liquidity/proposed`
+  - [x] `POST /api/v1/liquidity/{intentId}/status`
+  - [x] `GET /api/v1/liquidity/pending`
+  - [x] `GET /api/v1/liquidity/positions`
+- [x] Management agent-state and `/agents/:id` wallet UI include separate Liquidity Positions section.
+- [x] Runtime default-chain contract added (`xclaw-agent default-chain get/set`) with agent-local state source-of-truth.
+- [x] Management APIs added for default-chain sync/read (`/management/default-chain`, `/management/default-chain/update-batch`).
+- [x] Web selector sync path updates managed-agent runtime defaults and reconciles local selector from runtime canonical default.
 
 ### 90.3 Validation + evidence
 - [x] Runtime unit tests for liquidity command routing and negative validation paths.
-- [~] API contract tests for liquidity endpoints and transition guardrails.
+- [x] API contract tests for liquidity endpoints and transition guardrails (`npm run test:liquidity:contract`).
 - [x] Web checks for chain-scoped Liquidity Positions rendering + stale-state visibility.
 - [x] Run required gates sequentially:
   - [x] `npm run db:parity`
@@ -3107,6 +3107,6 @@ Note:
 
 ### 95.1 Pending verification/evidence pass
 - [x] Run required repo gates sequentially for this liquidity program pass.
-- [~] Capture hardhat-local + external testnet acceptance evidence.
-- [~] Update bounty checklist evidence IDs for Hedera/0G/Kite.
+- [~] Capture hardhat-local + external testnet acceptance evidence (external pending env/runtime blockers).
+- [x] Update bounty checklist evidence IDs for Hedera/0G/Kite.
 - [~] Post issue evidence + commit hashes for slices 90-95.

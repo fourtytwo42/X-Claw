@@ -1712,7 +1712,7 @@ DoD:
 ---
 
 ## Slice 90: Liquidity + Multi-DEX Compatibility Foundation
-Status: [~]
+Status: [x]
 Issue: #36
 
 Goal:
@@ -1736,6 +1736,7 @@ DoD:
 - [x] runtime default-chain commands (`default-chain get/set`) establish agent-runtime canonical default chain.
 - [x] management endpoints expose default-chain read/update + managed-session batch sync.
 - [x] global chain selector persists and synchronizes runtime default chain for all managed agents in active session.
+- [x] route-level liquidity API contract tests pass for payload/auth/transition/query validation and idempotency replay semantics.
 
 ---
 
@@ -1804,7 +1805,7 @@ Goal:
 - Produce verification evidence, harden reliability paths, and update bounty checklist artifacts.
 
 DoD:
-- [~] required validation gates rerun with latest liquidity/runtime/web changes.
-- [~] hardhat-local lifecycle evidence recorded before external testnet evidence.
-- [~] bounty checklist updated with evidence IDs for Hedera/0G/Kite paths.
-- [~] final docs sync + issue evidence posts with commit hashes.
+- [x] required validation gates rerun with latest liquidity/runtime/web changes.
+- [x] hardhat-local lifecycle evidence recorded before external testnet evidence.
+- [x] bounty checklist updated with evidence IDs for Hedera/0G/Kite paths.
+- [ ] final docs sync + issue evidence posts with commit hashes.

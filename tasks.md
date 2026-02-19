@@ -2406,3 +2406,26 @@ Active slice context: Slice 90 close-out -> Slice 95 hardening/evidence sequence
 ## 5) Slice 95 hardening/evidence sync
 - [~] Run required gate commands sequentially.
 - [~] Update bounty checklist and issue/evidence references.
+
+---
+
+# Continuation Tasks: Slice 90 Close-Out + Slice 95 Evidence (UTC 2026-02-19)
+
+## 1) Slice 90 close-out
+- [x] Diagnose and unblock liquidity API contract suite on active runtime DB (`0023` migration applied).
+- [x] Add and run liquidity API contract command (`npm run test:liquidity:contract`).
+- [x] Mark roadmap item `90.3 API contract tests` complete with concrete evidence.
+- [x] Mark Slice 90 tracker status complete.
+
+## 2) Slice 95 evidence/hardening
+- [x] Capture hardhat-local liquidity contract evidence first.
+- [x] Probe Base Sepolia runtime liquidity quote/proposal path.
+- [x] Capture approval-required and auto-approved add-intent evidence.
+- [x] Capture deterministic failure evidence (`unsupported_liquidity_adapter`, Hedera fail-closed unit path).
+- [x] Attempt Hedera live proof and document blockers with exact rerun commands.
+- [x] Update `docs/BOUNTY_ALIGNMENT_CHECKLIST.md` evidence IDs (`E1..E7`) with `[x]/[!]` state.
+
+## 3) Finalization
+- [x] Run required validation gates sequentially.
+- [x] `pm2 restart all` after successful build.
+- [ ] Commit/push and post issue evidence comments (#36/#41) with commit hash.

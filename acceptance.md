@@ -4773,3 +4773,47 @@ Date (UTC): 2026-02-19
 - [x] `npm run seed:verify`
 - [x] `npm run build`
 - [x] `pm2 restart all`
+
+## Slice 90 Close-Out + Slice 95 Evidence Pass (UTC 2026-02-19)
+
+### Scope
+- Slice 90 close-out: liquidity API contract test closure + tracker/roadmap status sync.
+- Slice 95 evidence: hardhat-local first, then Base Sepolia + Hedera attempt/probe with explicit blockers.
+
+### Slice 90 close-out evidence
+- `npm run db:migrate` -> PASS (applied through `0023_slice90_liquidity_foundation.sql` on active runtime DB).
+- `npm run test:liquidity:contract` -> PASS (`ok:true`, `passed:18`, `failed:0`, chain `base_sepolia`).
+- Contract checks covered by command output:
+  - malformed proposed payload -> `400 payload_invalid`
+  - auth mismatch -> `401 auth_invalid`
+  - idempotency replay semantics -> same `liquidityIntentId`
+  - invalid transition -> `409 liquidity_invalid_transition`
+  - query validation (`pending/positions`) -> `400` when `chainKey` missing
+  - smoke proposed/status progression -> `200` with expected keys
+
+### Slice 95 evidence matrix
+- `E1` Hardhat-local liquidity lifecycle proof:
+  - `XCLAW_DEFAULT_CHAIN=hardhat_local npm run test:liquidity:contract` -> PASS (`ok:true`, `passed:18`, `failed:0`).
+- `E2` Base Sepolia adapter preflight quote proof:
+  - `apps/agent-runtime/bin/xclaw-agent liquidity quote-add --chain base_sepolia --dex uniswap_v2 --token-a USDC --token-b WETH --amount-a 1 --amount-b 0.0001 --position-type v2 --slippage-bps 100 --json` -> PASS (`ok:true`, `simulationOnly:true`).
+- `E3` Base Sepolia approval-required path:
+  - `XCLAW_AGENT_API_KEY=slice7_token_abc12345 XCLAW_AGENT_ID=ag_slice7 apps/agent-runtime/bin/xclaw-agent liquidity add --chain base_sepolia --dex uniswap_v2 --token-a USDC --token-b WETH --amount-a 0.5 --amount-b 0.0002 --slippage-bps 100 --json` -> `approval_required` with `approval_pending` intent.
+- `E4` Base Sepolia auto-approved path:
+  - Inserted `approval_mode='auto'` snapshot for `ag_slice7/base_sepolia`, then:
+  - `XCLAW_AGENT_API_KEY=slice7_token_abc12345 XCLAW_AGENT_ID=ag_slice7 apps/agent-runtime/bin/xclaw-agent liquidity add --chain base_sepolia --dex uniswap_v2 --token-a USDC --token-b WETH --amount-a 0.55 --amount-b 0.00022 --slippage-bps 100 --json` -> PASS (`status:"approved"`).
+- `E5` Deterministic failure path: unsupported adapter:
+  - `apps/agent-runtime/bin/xclaw-agent liquidity quote-add --chain base_sepolia --dex uniswap --token-a USDC --token-b WETH --amount-a 1 --amount-b 0.0001 --position-type v2 --slippage-bps 100 --json` -> `unsupported_liquidity_adapter`.
+- `E6` Deterministic failure path: Hedera HTS/config readiness blocker:
+  - `apps/agent-runtime/bin/xclaw-agent liquidity quote-add --chain hedera_testnet --dex hedera_hts --token-a 0x0000000000000000000000000000000000000001 --token-b 0x0000000000000000000000000000000000000002 --amount-a 1 --amount-b 1 --position-type v2 --slippage-bps 100 --json` -> `liquidity_quote_add_failed` (`invalid coreContracts.router`).
+- `E7` Deterministic fail-closed unit path (`missing_dependency`):
+  - `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v` -> PASS including `test_quote_add_fails_closed_when_hedera_sdk_missing`.
+
+### Live testnet blockers captured
+- Base Sepolia on-chain tx-hash evidence: `[!]` blocked in this pass because current `liquidity add/remove` path records intents/approval lifecycle and does not submit on-chain LP tx in this route-level flow.
+- Hedera live proof: `[!]` blocked by runtime prerequisites in this environment:
+  - wallet missing for `hedera_testnet` (`wallet_missing`), and
+  - chain config/router metadata not execution-ready (`invalid coreContracts.router`).
+- Exact rerun probes:
+  - `apps/agent-runtime/bin/xclaw-agent wallet health --chain hedera_testnet --json`
+  - `apps/agent-runtime/bin/xclaw-agent liquidity quote-add --chain hedera_testnet --dex hedera_hts --token-a <tokenA> --token-b <tokenB> --amount-a <a> --amount-b <b> --position-type v2 --slippage-bps 100 --json`
+
