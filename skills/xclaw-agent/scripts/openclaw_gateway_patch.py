@@ -43,6 +43,7 @@ DECISION_ACK_MARKER_V12 = "xclaw: telegram approval decision ack v12"
 DECISION_ACK_MARKER_V13 = "xclaw: telegram approval decision ack v13"
 DECISION_ACK_MARKER_V14 = "xclaw: telegram approval decision ack v14"
 DECISION_ACK_MARKER_V15 = "xclaw: telegram approval decision ack v15"
+DECISION_ACK_MARKER_V16 = "xclaw: telegram approval decision ack v16"
 DECISION_ROUTE_MARKER_V1 = "xclaw: telegram approval decision routed to agent"
 DECISION_EXEC_MARKER_V1 = "xclaw: telegram trade resume trigger v1"
 DECISION_RESULT_ROUTE_MARKER_V1 = "xclaw: telegram trade result routed to agent"
@@ -52,7 +53,7 @@ QUEUED_BUTTONS_MARKER_V3 = "xclaw: telegram queued approval buttons v3"
 QUEUED_BUTTONS_MARKER_V4 = "xclaw: telegram queued approval buttons v4"
 LEGACY_DM_SENTINEL = 'Allow in DMs even when inlineButtonsScope is "allowlist", gated by chatId == senderId.'
 # Bump when patch semantics change so we invalidate the cached "already patched" fast-path.
-STATE_SCHEMA_VERSION = 47
+STATE_SCHEMA_VERSION = 48
 STATE_DIR = Path.home() / ".openclaw" / "xclaw"
 STATE_FILE = STATE_DIR / "openclaw_patch_state.json"
 LOCK_FILE = STATE_DIR / "openclaw_patch.lock"
@@ -300,6 +301,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         or DECISION_ACK_MARKER_V13 not in raw
         or DECISION_ACK_MARKER_V14 not in raw
         or DECISION_ACK_MARKER_V15 not in raw
+        or DECISION_ACK_MARKER_V16 not in raw
         or DECISION_ROUTE_MARKER_V1 not in raw
         or DECISION_EXEC_MARKER_V1 not in raw
         or DECISION_RESULT_ROUTE_MARKER_V1 not in raw
@@ -328,6 +330,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         or DECISION_ACK_MARKER_V13 not in raw
         or DECISION_ACK_MARKER_V14 not in raw
         or DECISION_ACK_MARKER_V15 not in raw
+        or DECISION_ACK_MARKER_V16 not in raw
         or DECISION_ROUTE_MARKER_V1 not in raw
         or DECISION_EXEC_MARKER_V1 not in raw
         or DECISION_RESULT_ROUTE_MARKER_V1 not in raw
@@ -443,6 +446,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         and DECISION_ACK_MARKER_V13 in raw
         and DECISION_ACK_MARKER_V14 in raw
         and DECISION_ACK_MARKER_V15 in raw
+        and DECISION_ACK_MARKER_V16 in raw
         and DECISION_ROUTE_MARKER_V1 in raw
         and DECISION_EXEC_MARKER_V1 in raw
         and DECISION_RESULT_ROUTE_MARKER_V1 in raw
@@ -606,13 +610,14 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V13}\n'
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V14}\n'
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V15}\n'
+        f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V16}\n'
         '\t\t\t\t\t\t\t\t// Keep queued text in chat history and only clear inline buttons.\n'
         '\t\t\t\t\t\t\t\ttry { await bot.api.editMessageReplyMarkup(chatId, callbackMessage.message_id, { inline_keyboard: [] }); } catch {}\n'
         '\t\t\t\t\t\t\t\t// Emit deterministic confirmation immediately so users always see a result.\n'
         '\t\t\t\t\t\t\t\ttry {\n'
         '\t\t\t\t\t\t\t\t\tconst subjectLabel = parts[0] === "xpol" ? "policy approval" : (parts[0] === "xfer" ? "transfer approval" : "trade");\n'
         '\t\t\t\t\t\t\t\t\tconst msg = `${action === "r" ? "Denied" : "Approved"} ${subjectLabel} ${subjectId}\\nChain: ${chainKey}`;\n'
-        '\t\t\t\t\t\t\t\t\tif (!(parts[0] === "xappr" && action !== "r")) {\n'
+        '\t\t\t\t\t\t\t\t\tif (!((parts[0] === "xappr" || parts[0] === "xpol") && action !== "r")) {\n'
         '\t\t\t\t\t\t\t\t\t\tawait bot.api.sendMessage(chatId, msg);\n'
         '\t\t\t\t\t\t\t\t\t}\n'
         '\t\t\t\t\t\t\t\t} catch {}\n'
@@ -711,6 +716,24 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         '\t\t\t\t\t\t\t\t\t\t\t}\n'
         '\t\t\t\t\t\t\t\t\t\t} catch {}\n'
         '\t\t\t\t\t\t\t\t}\n'
+        '\t\t\t\t\t\t\t\tif (parts[0] === "xpol" && action !== "r") {\n'
+        '\t\t\t\t\t\t\t\t\ttry {\n'
+        '\t\t\t\t\t\t\t\t\t\tconst instruction = "Reply to the user confirming the policy approval was applied and summarize what changed.";\n'
+        '\t\t\t\t\t\t\t\t\t\tconst syntheticText = `[X-CLAW POLICY DECISION]\\nDecision: APPROVED\\nSubject: ${subjectId}\\nChain: ${chainKey}\\nSource: telegram_callback_policy\\nInstruction: ${instruction}`;\n'
+        '\t\t\t\t\t\t\t\t\t\tconst storeAllowFrom2 = await readChannelAllowFromStore("telegram").catch(() => []);\n'
+        '\t\t\t\t\t\t\t\t\t\tconst getFile2 = typeof ctx.getFile === "function" ? ctx.getFile.bind(ctx) : async () => ({});\n'
+        '\t\t\t\t\t\t\t\t\t\tconst syntheticMessage2 = {\n'
+        '\t\t\t\t\t\t\t\t\t\t\t...callbackMessage,\n'
+        '\t\t\t\t\t\t\t\t\t\t\tfrom: callback.from,\n'
+        '\t\t\t\t\t\t\t\t\t\t\ttext: syntheticText,\n'
+        '\t\t\t\t\t\t\t\t\t\t\tcaption: void 0,\n'
+        '\t\t\t\t\t\t\t\t\t\t\tcaption_entities: void 0,\n'
+        '\t\t\t\t\t\t\t\t\t\t\tentities: void 0,\n'
+        '\t\t\t\t\t\t\t\t\t\t\tdate: Math.floor(Date.now() / 1000)\n'
+        '\t\t\t\t\t\t\t\t\t\t};\n'
+        '\t\t\t\t\t\t\t\t\t\tawait processMessage({ message: syntheticMessage2, me: ctx.me, getFile: getFile2 }, [], storeAllowFrom2, { messageIdOverride: `xclaw-policy-approve-${callback.id}` });\n'
+        '\t\t\t\t\t\t\t\t\t} catch {}\n'
+        '\t\t\t\t\t\t\t\t}\n'
         '\t\t\t\t\t\t\t}\n'
         '\t\t\t\t\t\t\t} catch (err) {\n'
         '\t\t\t\t\t\t\t\t\t// Fallback: still send minimal confirmation so the user sees feedback even if the agent pipeline fails.\n'
@@ -719,7 +742,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         '\t\t\t\t\t\t\t\t\t\tconst summary = promptLine.trim() ? `\\n${promptLine.trim()}` : \"\";\n'
         '\t\t\t\t\t\t\t\t\t\tconst subjectLabel = parts[0] === \"xpol\" ? \"policy approval\" : (parts[0] === \"xfer\" ? \"transfer approval\" : \"trade\");\n'
         '\t\t\t\t\t\t\t\t\t\tconst msg = `${action === \"r\" ? \"Denied\" : \"Approved\"} ${subjectLabel} ${subjectId}${summary}\\nChain: ${chainKey}`;\n'
-        '\t\t\t\t\t\t\t\t\t\tif (!(parts[0] === \"xappr\" && action !== \"r\")) {\n'
+        '\t\t\t\t\t\t\t\t\t\tif (!((parts[0] === \"xappr\" || parts[0] === \"xpol\") && action !== \"r\")) {\n'
         '\t\t\t\t\t\t\t\t\t\t\tawait bot.api.sendMessage(chatId, msg);\n'
         '\t\t\t\t\t\t\t\t\t\t}\n'
         '\t\t\t\t\t\t\t\t\t\ttry { logger.error({ subjectId, chainKey, chatId, action, kind: parts[0], err: String(err) }, \"xclaw: telegram approval decision route failed; fallback ack sent\"); } catch {}\n'
@@ -727,7 +750,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         '\t\t\t\t\t\t\t\t}\n'
         '\t\t\t\t\t\t\t\treturn;\n'
         '\t\t\t\t\t\t\tlet errCode = "api_error"; let errMsg = `HTTP ${res.status}`;\n'
-        '\t\t\t\t\t\t\ttry { const body = await res.json(); if (typeof body?.code === "string" && body.code.trim()) errCode = body.code.trim(); if (typeof body?.message === "string" && body.message.trim()) errMsg = body.message.trim(); if (res.status === 409 && (body?.details?.currentStatus === "approved" || body?.details?.currentStatus === "filled" || body?.details?.currentStatus === "rejected")) { try { await bot.api.editMessageReplyMarkup(chatId, callbackMessage.message_id, { inline_keyboard: [] }); } catch {} const currentStatus = String(body?.details?.currentStatus || ""); const decision = currentStatus === "rejected" ? "Denied" : "Approved"; const subjectLabel = parts[0] === "xpol" ? "policy approval" : (parts[0] === "xfer" ? "transfer approval" : "trade"); if (parts[0] !== "xappr") { await bot.api.sendMessage(chatId, `${decision} ${subjectLabel} ${subjectId}\\nChain: ${chainKey}`); } return; } } catch {}\n'
+        '\t\t\t\t\t\t\ttry { const body = await res.json(); if (typeof body?.code === "string" && body.code.trim()) errCode = body.code.trim(); if (typeof body?.message === "string" && body.message.trim()) errMsg = body.message.trim(); if (res.status === 409 && (body?.details?.currentStatus === "approved" || body?.details?.currentStatus === "filled" || body?.details?.currentStatus === "rejected")) { try { await bot.api.editMessageReplyMarkup(chatId, callbackMessage.message_id, { inline_keyboard: [] }); } catch {} const currentStatus = String(body?.details?.currentStatus || ""); const decision = currentStatus === "rejected" ? "Denied" : "Approved"; const subjectLabel = parts[0] === "xpol" ? "policy approval" : (parts[0] === "xfer" ? "transfer approval" : "trade"); if (!(parts[0] === "xappr" || (parts[0] === "xpol" && currentStatus !== "rejected"))) { await bot.api.sendMessage(chatId, `${decision} ${subjectLabel} ${subjectId}\\nChain: ${chainKey}`); } return; } } catch {}\n'
         '\t\t\t\t\t\t\ttry {\n'
         '\t\t\t\t\t\t\t\tconst kb = parts[0] === "xpol"\n'
         '\t\t\t\t\t\t\t\t\t? [[{ text: "Approve", callback_data: `xpol|a|${subjectId}|${chainKey}` }, { text: "Deny", callback_data: `xpol|r|${subjectId}|${chainKey}` }]]\n'
