@@ -1808,4 +1808,5 @@ DoD:
 - [x] required validation gates rerun with latest liquidity/runtime/web changes.
 - [x] hardhat-local lifecycle evidence recorded before external testnet evidence.
 - [x] bounty checklist updated with evidence IDs for Hedera/0G/Kite paths.
-- [ ] final docs sync + issue evidence posts with commit hashes.
+- [x] Hedera evidence pass captures both EVM (`saucerswap`) and HTS-native (`hedera_hts`) runtime attempts with deterministic outcomes (`policy_denied|approved|missing_dependency`) and explicit rerun blockers.
+- [x] final docs sync + issue evidence posts with commit hashes.

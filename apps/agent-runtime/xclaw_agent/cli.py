@@ -4860,14 +4860,6 @@ def cmd_liquidity_quote_add(args: argparse.Namespace) -> int:
         slippage_bps = int(args.slippage_bps)
         if slippage_bps < 0 or slippage_bps > 5000:
             return fail("invalid_input", "slippage-bps must be between 0 and 5000.", "Use integer bps in range.", {"slippageBps": args.slippage_bps}, exit_code=2)
-        token_a_meta = _fetch_erc20_metadata(chain, token_a)
-        token_b_meta = _fetch_erc20_metadata(chain, token_b)
-        token_a_decimals = int(token_a_meta.get("decimals", 18))
-        token_b_decimals = int(token_b_meta.get("decimals", 18))
-        amount_a_units = _to_units_uint(_decimal_text(amount_a_h), token_a_decimals)
-        quote_out_units = _router_get_amount_out(chain, amount_a_units, token_a, token_b)
-        quote_out_h = _format_units(int(quote_out_units), token_b_decimals)
-        min_b_h = _decimal_text(_to_non_negative_decimal(quote_out_h) * Decimal(max(0, 10000 - slippage_bps)) / Decimal(10000))
         preflight = adapter.quote_add(
             {
                 "tokenA": token_a,
@@ -4877,6 +4869,37 @@ def cmd_liquidity_quote_add(args: argparse.Namespace) -> int:
                 "slippageBps": slippage_bps,
             }
         )
+        if adapter.protocol_family == "hedera_hts":
+            # HTS-native quotes are adapter-preflight only; they must not require EVM router/token metadata.
+            return ok(
+                "Liquidity add quote ready.",
+                chain=chain,
+                dex=dex,
+                positionType=position_type,
+                tokenA=token_a,
+                tokenB=token_b,
+                amountA=_decimal_text(amount_a_h),
+                amountB=_decimal_text(amount_b_h),
+                quoteAmountB=None,
+                minAmountB=preflight.get("simulation", {}).get("minAmountB"),
+                slippageBps=slippage_bps,
+                tokenASymbol=_token_symbol_for_display(chain, token_a),
+                tokenBSymbol=_token_symbol_for_display(chain, token_b),
+                tokenADecimals=None,
+                tokenBDecimals=None,
+                adapterFamily=adapter.protocol_family,
+                preflight=preflight.get("simulation", {}),
+                simulationOnly=True,
+                note="HTS-native quote path uses adapter preflight and does not require EVM router metadata.",
+            )
+        token_a_meta = _fetch_erc20_metadata(chain, token_a)
+        token_b_meta = _fetch_erc20_metadata(chain, token_b)
+        token_a_decimals = int(token_a_meta.get("decimals", 18))
+        token_b_decimals = int(token_b_meta.get("decimals", 18))
+        amount_a_units = _to_units_uint(_decimal_text(amount_a_h), token_a_decimals)
+        quote_out_units = _router_get_amount_out(chain, amount_a_units, token_a, token_b)
+        quote_out_h = _format_units(int(quote_out_units), token_b_decimals)
+        min_b_h = _decimal_text(_to_non_negative_decimal(quote_out_h) * Decimal(max(0, 10000 - slippage_bps)) / Decimal(10000))
         return ok(
             "Liquidity add quote ready.",
             chain=chain,
@@ -5005,6 +5028,7 @@ def cmd_liquidity_add(args: argparse.Namespace) -> int:
                 "slippageBps": slippage_bps,
             }
         )
+        is_hts_native = adapter.protocol_family == "hedera_hts"
         payload = {
             "schemaVersion": 1,
             "agentId": agent_id,
@@ -5018,8 +5042,9 @@ def cmd_liquidity_add(args: argparse.Namespace) -> int:
             "amountB": _decimal_text(amount_b_h),
             "slippageBps": slippage_bps,
             "details": {
-                "v3Range": str(args.v3_range or "").strip() or None,
+                "v3Range": None if is_hts_native else (str(args.v3_range or "").strip() or None),
                 "adapterFamily": adapter.protocol_family,
+                "htsNative": is_hts_native,
                 "preflight": preflight.get("simulation", {}),
                 "source": "runtime_liquidity_add",
             },

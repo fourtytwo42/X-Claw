@@ -16,10 +16,14 @@
   },
   "coreContracts": {
     "dex": "saucerswap",
+    "router": "0x00000000000000000000000000000000002e7a5d",
     "deploymentStatus": "external",
-    "notes": "Wave-1 target for Hedera EVM and optional HTS SDK plugin support."
+    "notes": "Wave-1 target for Hedera EVM and optional HTS SDK plugin support. SaucerSwap mainnet router contract id 0.0.3045981 (EVM 0x...2e7a5d) and WHBAR contract id 0.0.1456985 from docs: https://docs.saucerswap.finance/v/developer/saucerswap-v1/contract-deployments ; SAUCE token id 0.0.731861 from same source. HTS-native path remains plugin-dependent and fail-closed."
   },
-  "canonicalTokens": {},
+  "canonicalTokens": {
+    "WHBAR": "0x0000000000000000000000000000000000163b59",
+    "SAUCE": "0x00000000000000000000000000000000000b2ad5"
+  },
   "capabilities": {
     "wallet": true,
     "trade": true,

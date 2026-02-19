@@ -2429,3 +2429,36 @@ Active slice context: Slice 90 close-out -> Slice 95 hardening/evidence sequence
 - [x] Run required validation gates sequentially.
 - [x] `pm2 restart all` after successful build.
 - [ ] Commit/push and post issue evidence comments (#36/#41) with commit hash.
+
+---
+
+# Slice 95 Tasks Addendum: Hedera EVM + HTS Evidence Closure (UTC 2026-02-19)
+
+## 1) Runtime HTS path separation
+- [x] Update `liquidity quote-add` to bypass EVM router/token-metadata requirements when adapter family is `hedera_hts`.
+- [x] Keep HTS missing SDK mapped to deterministic `missing_dependency`.
+- [x] Preserve existing EVM `amm_v2/amm_v3` quote behavior.
+- [x] Annotate HTS add intent payload details with `htsNative=true`.
+
+## 2) Hedera chain-pack readiness
+- [x] Add Hedera testnet/mainnet `coreContracts.router` values.
+- [x] Add Hedera canonical token mappings for runtime symbol resolution.
+- [x] Record source references in notes/evidence.
+
+## 3) Runtime regression tests
+- [x] Add test that HTS quote path is router-independent.
+- [x] Add test that EVM quote path still uses router metadata path.
+- [x] Add test that HTS add payload marks `htsNative` details.
+- [x] Extend adapter tests for Hedera EVM protocol resolution.
+
+## 4) Evidence runbook execution
+- [x] Capture Hedera wallet preflight status.
+- [x] Capture Hedera EVM quote attempt outcome.
+- [x] Capture Hedera EVM add-intent outcome (`policy_denied` and `approved` after policy snapshot).
+- [x] Capture Hedera HTS quote/add fail-closed `missing_dependency` outcomes.
+- [x] Update bounty/acceptance evidence IDs and blocker notes.
+
+## 5) Finalization
+- [x] Run required validation gates sequentially.
+- [x] `pm2 restart all` after successful build.
+- [ ] Commit/push and post updated issue #41 evidence with commit hash.

@@ -1256,6 +1256,8 @@ Delegated runtime CLI commands that must exist:
 Liquidity adapter execution contract:
 - Runtime routes liquidity commands by `(chain, dex, position_type)` using chain-config `liquidityProtocols`.
 - `liquidity add/remove` must run adapter preflight quote simulation before proposal submission.
+- `liquidity quote-add` uses EVM router quote + ERC20 metadata only for `amm_v2` / `amm_v3` families.
+- `liquidity quote-add` for `hedera_hts` is router-independent and must execute adapter preflight without requiring `coreContracts.router`/ERC20 metadata.
 - Unsupported adapter combinations must return `unsupported_liquidity_adapter`.
 - Hedera HTS-native liquidity paths must fail closed with `missing_dependency` when Hedera SDK plugin is unavailable.
 

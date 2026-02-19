@@ -4803,17 +4803,30 @@ Date (UTC): 2026-02-19
   - `XCLAW_AGENT_API_KEY=slice7_token_abc12345 XCLAW_AGENT_ID=ag_slice7 apps/agent-runtime/bin/xclaw-agent liquidity add --chain base_sepolia --dex uniswap_v2 --token-a USDC --token-b WETH --amount-a 0.55 --amount-b 0.00022 --slippage-bps 100 --json` -> PASS (`status:"approved"`).
 - `E5` Deterministic failure path: unsupported adapter:
   - `apps/agent-runtime/bin/xclaw-agent liquidity quote-add --chain base_sepolia --dex uniswap --token-a USDC --token-b WETH --amount-a 1 --amount-b 0.0001 --position-type v2 --slippage-bps 100 --json` -> `unsupported_liquidity_adapter`.
-- `E6` Deterministic failure path: Hedera HTS/config readiness blocker:
-  - `apps/agent-runtime/bin/xclaw-agent liquidity quote-add --chain hedera_testnet --dex hedera_hts --token-a 0x0000000000000000000000000000000000000001 --token-b 0x0000000000000000000000000000000000000002 --amount-a 1 --amount-b 1 --position-type v2 --slippage-bps 100 --json` -> `liquidity_quote_add_failed` (`invalid coreContracts.router`).
-- `E7` Deterministic fail-closed unit path (`missing_dependency`):
+- `E6` Hedera EVM proof attempt (runtime reached on-chain router call):
+  - `apps/agent-runtime/bin/xclaw-agent liquidity quote-add --chain hedera_testnet --dex saucerswap --token-a WHBAR --token-b SAUCE --amount-a 1 --amount-b 1 --position-type v2 --slippage-bps 100 --json` -> `liquidity_quote_add_failed` with RPC revert (`CONTRACT_REVERT_EXECUTED`).
+  - This confirms `coreContracts.router` + canonical token resolution are now execution-path ready (no config-contract failure).
+- `E7` Hedera EVM add-intent path attempt:
+  - `XCLAW_AGENT_API_KEY=slice7_token_abc12345 XCLAW_AGENT_ID=ag_slice7 apps/agent-runtime/bin/xclaw-agent liquidity add --chain hedera_testnet --dex saucerswap --token-a WHBAR --token-b SAUCE --amount-a 1 --amount-b 1 --slippage-bps 100 --json` -> first run `policy_denied`; after seeded `approval_mode=auto` snapshot for `ag_slice7/hedera_testnet`, rerun -> PASS (`status:"approved"`).
+- `E8` Hedera HTS fail-closed runtime path:
+  - `apps/agent-runtime/bin/xclaw-agent liquidity quote-add --chain hedera_testnet --dex hedera_hts --token-a WHBAR --token-b SAUCE --amount-a 1 --amount-b 1 --position-type v2 --slippage-bps 100 --json` -> `missing_dependency`.
+  - `XCLAW_AGENT_API_KEY=slice7_token_abc12345 XCLAW_AGENT_ID=ag_slice7 apps/agent-runtime/bin/xclaw-agent liquidity add --chain hedera_testnet --dex hedera_hts --token-a WHBAR --token-b SAUCE --amount-a 1 --amount-b 1 --slippage-bps 100 --json` -> `missing_dependency`.
+- `E9` Hedera HTS fail-closed unit path:
   - `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v` -> PASS including `test_quote_add_fails_closed_when_hedera_sdk_missing`.
 
 ### Live testnet blockers captured
 - Base Sepolia on-chain tx-hash evidence: `[!]` blocked in this pass because current `liquidity add/remove` path records intents/approval lifecycle and does not submit on-chain LP tx in this route-level flow.
-- Hedera live proof: `[!]` blocked by runtime prerequisites in this environment:
-  - wallet missing for `hedera_testnet` (`wallet_missing`), and
-  - chain config/router metadata not execution-ready (`invalid coreContracts.router`).
+- Hedera live proof remains `[!]` for tx-hash-grade completion in this environment:
+  - `apps/agent-runtime/bin/xclaw-agent wallet health --chain hedera_testnet --json` reports `hasWallet:false` (no installer-managed Hedera wallet available locally).
+  - HTS-native plugin dependency is not installed (`missing_dependency`).
+  - EVM quote path is now execution-ready but reverted on live router quote for selected pair (`CONTRACT_REVERT_EXECUTED`), so successful quote/tx hash evidence requires validated liquid pair metadata.
 - Exact rerun probes:
   - `apps/agent-runtime/bin/xclaw-agent wallet health --chain hedera_testnet --json`
-  - `apps/agent-runtime/bin/xclaw-agent liquidity quote-add --chain hedera_testnet --dex hedera_hts --token-a <tokenA> --token-b <tokenB> --amount-a <a> --amount-b <b> --position-type v2 --slippage-bps 100 --json`
+  - `apps/agent-runtime/bin/xclaw-agent liquidity quote-add --chain hedera_testnet --dex saucerswap --token-a <hed-era-token-a> --token-b <hed-era-token-b> --amount-a <a> --amount-b <b> --position-type v2 --slippage-bps 100 --json`
+  - `apps/agent-runtime/bin/xclaw-agent liquidity quote-add --chain hedera_testnet --dex hedera_hts --token-a <hed-era-token-a> --token-b <hed-era-token-b> --amount-a <a> --amount-b <b> --position-type v2 --slippage-bps 100 --json`
+  - `XCLAW_AGENT_API_KEY=<agent-key> XCLAW_AGENT_ID=<agent-id> apps/agent-runtime/bin/xclaw-agent liquidity add --chain hedera_testnet --dex <saucerswap|hedera_hts> --token-a <token-a> --token-b <token-b> --amount-a <a> --amount-b <b> --slippage-bps 100 --json`
 
+### Hedera chain-pack source references
+- SaucerSwap deployment/source references used for Hedera router/token metadata:
+  - https://docs.saucerswap.finance/v/developer/saucerswap-v1/contract-deployments
+  - https://docs.saucerswap.finance/v/developer/hedera-json-rpc-api

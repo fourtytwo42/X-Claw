@@ -54,8 +54,10 @@ Notes:
 - [ ] UI evidence shows agent flow states and transitions.
 
 Notes:
-- `E6`: Hedera liquidity probe currently blocked in this environment (`invalid coreContracts.router`), so live add/remove proof is pending runtime chain-pack completion.
-- `E7`: HTS fail-closed behavior is covered by unit test (`missing_dependency`) via `test_quote_add_fails_closed_when_hedera_sdk_missing`.
+- `E6`: Hedera EVM quote path now executes against configured Saucer router and reaches live RPC revert (`CONTRACT_REVERT_EXECUTED`) instead of config-contract failure.
+- `E7`: Hedera EVM add-intent path succeeds (`status=approved`) after policy snapshot is present; first attempt demonstrates deterministic `policy_denied` guardrail.
+- `E8`: HTS-native runtime path fails closed with deterministic `missing_dependency` (plugin not installed).
+- `E9`: HTS fail-closed unit test proof remains passing (`test_quote_add_fails_closed_when_hedera_sdk_missing`).
 
 ---
 
@@ -153,7 +155,7 @@ Notes:
 
 Notes:
 - `E1/E2/E3/E4/E5` cover hardhat-local + Base Sepolia contract/preflight/approval evidence.
-- Hedera live proof remains blocked in this environment (`E6`).
+- `E6/E7/E8/E9` cover Hedera EVM+HTS execution attempts and fail-closed behavior; tx-hash-grade completion remains blocked by wallet/plugin/liquid-pair prerequisites.
 
 ---
 
@@ -164,5 +166,7 @@ Notes:
 - `E3`: Base Sepolia approval-required liquidity add (`approval_pending`).
 - `E4`: Base Sepolia auto-approved liquidity add (`status=approved`).
 - `E5`: Unsupported adapter deterministic rejection (`unsupported_liquidity_adapter`).
-- `E6`: Hedera live quote probe blocker (`invalid coreContracts.router` in current environment).
-- `E7`: Hedera HTS missing-SDK fail-closed unit proof (`missing_dependency` test).
+- `E6`: Hedera EVM quote attempt hit live router revert (`CONTRACT_REVERT_EXECUTED`) after router/token config hardening.
+- `E7`: Hedera EVM add-intent path reached runtime approval flow (`policy_denied` then `approved` with policy snapshot).
+- `E8`: Hedera HTS runtime fail-closed proof (`missing_dependency` on quote-add/add).
+- `E9`: Hedera HTS missing-SDK fail-closed unit proof (`missing_dependency` test).

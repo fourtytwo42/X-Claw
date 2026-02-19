@@ -55,6 +55,12 @@ class LiquidityAdapterTests(unittest.TestCase):
         with self.assertRaises(UnsupportedLiquidityAdapter):
             build_liquidity_adapter_for_request("kite_ai_testnet", "tesseract_univ3", "v3")
 
+    def test_resolve_hedera_evm_protocols(self) -> None:
+        saucer = build_liquidity_adapter_for_request("hedera_testnet", "saucerswap", "v2")
+        pangolin = build_liquidity_adapter_for_request("hedera_testnet", "pangolin", "v2")
+        self.assertEqual(saucer.protocol_family, "amm_v2")
+        self.assertEqual(pangolin.protocol_family, "amm_v2")
+
     def test_quote_add_rejects_invalid_amount(self) -> None:
         adapter = AmmV2LiquidityAdapter(chain="base_sepolia", dex="aerodrome", protocol_family="amm_v2", position_type="v2")
         with self.assertRaises(LiquidityAdapterError):

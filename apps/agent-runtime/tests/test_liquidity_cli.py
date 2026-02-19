@@ -60,6 +60,75 @@ class LiquidityCliTests(unittest.TestCase):
         self.assertEqual(code, 2)
         self.assertEqual(payload.get("code"), "missing_dependency")
 
+    def test_quote_add_hedera_hts_is_router_independent(self) -> None:
+        args = argparse.Namespace(
+            chain="hedera_testnet",
+            dex="hedera_hts",
+            token_a="0x" + "11" * 20,
+            token_b="0x" + "22" * 20,
+            amount_a="1",
+            amount_b="1",
+            position_type="v2",
+            slippage_bps=100,
+            json=True,
+        )
+        adapter = mock.Mock()
+        adapter.dex = "hedera_hts"
+        adapter.protocol_family = "hedera_hts"
+        adapter.quote_add.return_value = {"simulation": {"minAmountA": "0.99", "minAmountB": "0.99"}}
+
+        with mock.patch.object(cli, "assert_chain_capability"), mock.patch.object(
+            cli, "build_liquidity_adapter_for_request", return_value=adapter
+        ), mock.patch.object(
+            cli, "_resolve_token_address", side_effect=["0x" + "11" * 20, "0x" + "22" * 20]
+        ), mock.patch.object(
+            cli, "_fetch_erc20_metadata"
+        ) as mocked_meta, mock.patch.object(
+            cli, "_router_get_amount_out"
+        ) as mocked_quote:
+            code, payload = self._run(lambda: cli.cmd_liquidity_quote_add(args))
+
+        self.assertEqual(code, 0)
+        self.assertEqual(payload.get("adapterFamily"), "hedera_hts")
+        self.assertEqual(payload.get("simulationOnly"), True)
+        self.assertEqual(payload.get("minAmountB"), "0.99")
+        self.assertFalse(mocked_meta.called)
+        self.assertFalse(mocked_quote.called)
+
+    def test_quote_add_evm_uses_router_path(self) -> None:
+        args = argparse.Namespace(
+            chain="hedera_testnet",
+            dex="saucerswap",
+            token_a="0x" + "11" * 20,
+            token_b="0x" + "22" * 20,
+            amount_a="1",
+            amount_b="1",
+            position_type="v2",
+            slippage_bps=100,
+            json=True,
+        )
+        adapter = mock.Mock()
+        adapter.dex = "saucerswap"
+        adapter.protocol_family = "amm_v2"
+        adapter.quote_add.return_value = {"simulation": {"minAmountA": "0.99", "minAmountB": "0.99"}}
+        token_meta = {"symbol": "TOK", "decimals": 18}
+
+        with mock.patch.object(cli, "assert_chain_capability"), mock.patch.object(
+            cli, "build_liquidity_adapter_for_request", return_value=adapter
+        ), mock.patch.object(
+            cli, "_resolve_token_address", side_effect=["0x" + "11" * 20, "0x" + "22" * 20]
+        ), mock.patch.object(
+            cli, "_fetch_erc20_metadata", side_effect=[token_meta, token_meta]
+        ) as mocked_meta, mock.patch.object(
+            cli, "_router_get_amount_out", return_value=10**18
+        ) as mocked_quote:
+            code, payload = self._run(lambda: cli.cmd_liquidity_quote_add(args))
+
+        self.assertEqual(code, 0)
+        self.assertEqual(payload.get("adapterFamily"), "amm_v2")
+        self.assertTrue(mocked_meta.called)
+        self.assertTrue(mocked_quote.called)
+
     def test_liquidity_add_runs_preflight_before_propose(self) -> None:
         args = argparse.Namespace(
             chain="base_sepolia",
@@ -94,6 +163,41 @@ class LiquidityCliTests(unittest.TestCase):
         self.assertEqual(payload.get("adapterFamily"), "amm_v2")
         self.assertEqual(payload.get("preflight", {}).get("minAmountA"), "9.9")
         self.assertTrue(adapter.quote_add.called)
+
+    def test_liquidity_add_sets_hts_native_detail(self) -> None:
+        args = argparse.Namespace(
+            chain="hedera_testnet",
+            dex="hedera_hts",
+            token_a="0x" + "11" * 20,
+            token_b="0x" + "22" * 20,
+            amount_a="1",
+            amount_b="1",
+            position_type="v2",
+            v3_range="100:200",
+            slippage_bps=100,
+            json=True,
+        )
+        adapter = mock.Mock()
+        adapter.dex = "hedera_hts"
+        adapter.protocol_family = "hedera_hts"
+        adapter.quote_add.return_value = {"simulation": {"minAmountA": "0.99", "minAmountB": "0.99"}}
+
+        with mock.patch.object(cli, "assert_chain_capability"), mock.patch.object(
+            cli, "_resolve_agent_id_or_fail", return_value="agt_1"
+        ), mock.patch.object(
+            cli, "_resolve_token_address", side_effect=["0x" + "11" * 20, "0x" + "22" * 20]
+        ), mock.patch.object(
+            cli, "build_liquidity_adapter_for_request", return_value=adapter
+        ), mock.patch.object(
+            cli, "_api_request", return_value=(200, {"liquidityIntentId": "liq_1", "status": "approved"})
+        ) as mocked_api:
+            code, payload = self._run(lambda: cli.cmd_liquidity_add(args))
+
+        self.assertEqual(code, 0)
+        self.assertEqual(payload.get("adapterFamily"), "hedera_hts")
+        api_payload = mocked_api.call_args.kwargs.get("payload", {})
+        self.assertEqual(api_payload.get("details", {}).get("htsNative"), True)
+        self.assertIsNone(api_payload.get("details", {}).get("v3Range"))
 
 
 if __name__ == "__main__":

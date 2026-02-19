@@ -3107,6 +3107,6 @@ Note:
 
 ### 95.1 Pending verification/evidence pass
 - [x] Run required repo gates sequentially for this liquidity program pass.
-- [~] Capture hardhat-local + external testnet acceptance evidence (external pending env/runtime blockers).
+- [~] Capture hardhat-local + external testnet acceptance evidence (Hedera EVM + HTS attempts captured; tx-hash-grade completion still blocked by wallet/plugin/liquid-pair prerequisites).
 - [x] Update bounty checklist evidence IDs for Hedera/0G/Kite.
-- [~] Post issue evidence + commit hashes for slices 90-95.
+- [x] Post issue evidence + commit hashes for slices 90-95.

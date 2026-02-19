@@ -2267,3 +2267,45 @@ Implement the post-Slice-88 liquidity program through runtime adapter preflight 
   - `npm run seed:verify`
   - `npm run build`
   - `pm2 restart all`
+
+---
+
+# Slice 95 Spec Addendum: Hedera EVM + HTS Evidence Closure (UTC 2026-02-19)
+
+## Goal
+1. Remove Hedera config-contract blocker from liquidity runtime proofs.
+2. Capture both Hedera EVM and Hedera HTS execution attempts with deterministic outcomes.
+3. Preserve fail-closed HTS behavior with `missing_dependency` when plugin/runtime prerequisites are absent.
+
+## Non-goals
+1. No new public API endpoints.
+2. No speculative marking of bounty readiness without reproducible evidence.
+
+## Locked scope
+1. `apps/agent-runtime/xclaw_agent/cli.py`
+2. `apps/agent-runtime/tests/test_liquidity_cli.py`
+3. `apps/agent-runtime/tests/test_liquidity_adapter.py`
+4. `config/chains/hedera_testnet.json`
+5. `config/chains/hedera_mainnet.json`
+6. `docs/BOUNTY_ALIGNMENT_CHECKLIST.md`
+7. `acceptance.md`
+8. `docs/XCLAW_SLICE_TRACKER.md`
+9. `docs/XCLAW_BUILD_ROADMAP.md`
+10. `spec.md`
+11. `tasks.md`
+
+## Acceptance checks
+- `python3 -m unittest apps/agent-runtime/tests/test_liquidity_adapter.py -v`
+- `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v`
+- `apps/agent-runtime/bin/xclaw-agent wallet health --chain hedera_testnet --json`
+- `apps/agent-runtime/bin/xclaw-agent liquidity quote-add --chain hedera_testnet --dex saucerswap --token-a WHBAR --token-b SAUCE --amount-a 1 --amount-b 1 --position-type v2 --slippage-bps 100 --json`
+- `XCLAW_AGENT_API_KEY=... XCLAW_AGENT_ID=... apps/agent-runtime/bin/xclaw-agent liquidity add --chain hedera_testnet --dex saucerswap --token-a WHBAR --token-b SAUCE --amount-a 1 --amount-b 1 --slippage-bps 100 --json`
+- `apps/agent-runtime/bin/xclaw-agent liquidity quote-add --chain hedera_testnet --dex hedera_hts --token-a WHBAR --token-b SAUCE --amount-a 1 --amount-b 1 --position-type v2 --slippage-bps 100 --json`
+- `XCLAW_AGENT_API_KEY=... XCLAW_AGENT_ID=... apps/agent-runtime/bin/xclaw-agent liquidity add --chain hedera_testnet --dex hedera_hts --token-a WHBAR --token-b SAUCE --amount-a 1 --amount-b 1 --slippage-bps 100 --json`
+- Required gates (sequential):
+  - `npm run db:parity`
+  - `npm run seed:reset`
+  - `npm run seed:load`
+  - `npm run seed:verify`
+  - `npm run build`
+  - `pm2 restart all`
