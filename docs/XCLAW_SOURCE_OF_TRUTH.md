@@ -3644,6 +3644,7 @@ Limitations / notes:
 4. Faucet rate limiting:
 - Daily limiter scope remains per-agent, per-chain, per UTC day.
 - Failed send path must roll back consumed limiter key (best effort) as currently implemented.
+- Rate-limited faucet responses must include chain-scoped details (`scope=agent_faucet_daily_chain`, `chainKey`, `retryAfterSeconds`).
 
 5. Hedera faucet reliability/error contract:
 - Hedera faucet preflight must be chain-aware and deterministic (no opaque `internal_error` for known failure classes).

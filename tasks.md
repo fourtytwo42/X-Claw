@@ -2671,3 +2671,14 @@ Active slice context: `Slice 95` closure hardening.
 ## 2) Config/runtime sync
 - [x] Update route constants and `.env.local` chain-scoped overrides.
 - [x] Update source-of-truth default drip documentation.
+
+# Slice 95J Tasks Update: Faucet Rate-Limit Reset + Chain-Scoped Clarity (UTC 2026-02-19)
+
+## 1) Rate-limit reset operation
+- [x] Add ops script to clear faucet daily limiter keys across all agents/chains.
+- [x] Add npm command alias `ops:faucet:reset-rate-limit`.
+- [x] Execute reset against live Redis.
+
+## 2) Response contract clarity
+- [x] Update faucet rate-limited response details to include chain-scoped scope key and `chainKey`.
+- [x] Sync source-of-truth limiter contract note.

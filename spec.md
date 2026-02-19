@@ -2557,3 +2557,19 @@ Set Hedera faucet warmup drip defaults to testing-friendly levels:
 
 ## Acceptance checks
 - Hedera faucet drip defaults resolve to `5000000000000000000`, `500000000`, and `10000000`.
+
+# Slice 95J Spec Addendum: Faucet Rate-Limit Reset + Chain-Scoped Response Clarity (UTC 2026-02-19)
+
+## Goal
+1. Reset existing faucet daily limiter keys for all agents/chains immediately.
+2. Preserve/clarify chain-scoped faucet rate-limit contract in response payloads.
+
+## Locked scope
+1. `apps/network-web/src/lib/rate-limit.ts`
+2. `infrastructure/scripts/faucet-rate-limit-reset.mjs`
+3. `package.json`
+4. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+
+## Acceptance checks
+- Running `npm run ops:faucet:reset-rate-limit` deletes keys matching `xclaw:ratelimit:v1:agent_faucet_daily:*`.
+- Faucet `rate_limited` response details include `scope=agent_faucet_daily_chain` and `chainKey`.

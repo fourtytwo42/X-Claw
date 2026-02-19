@@ -5143,3 +5143,15 @@ Date (UTC): 2026-02-19
 - `E42` Live faucet request deterministic self-recipient blocker:
   - command: `xclaw-agent faucet-request --chain hedera_testnet --asset native --asset wrapped --asset stable --json`
   - outcome: deterministic `faucet_send_preflight_failed` when recipient equals faucet signer (`require(false)` on wrapped transfer preflight), with `requestId` and chain details.
+
+## Slice 95J Faucet Rate-Limit Reset (UTC 2026-02-19)
+
+### Evidence updates (`E43+`)
+- `E43` Global faucet daily limiter reset:
+  - command: `set -a; source .env.local; set +a; npm run ops:faucet:reset-rate-limit`
+  - outcome: deleted all keys matching `xclaw:ratelimit:v1:agent_faucet_daily:*` (all agents/chains).
+- `E44` Chain-scoped limiter response contract:
+  - updated `rate_limited` faucet details now include:
+    - `scope=agent_faucet_daily_chain`
+    - `chainKey`
+    - `retryAfterSeconds`.

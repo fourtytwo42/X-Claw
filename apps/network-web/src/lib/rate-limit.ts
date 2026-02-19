@@ -167,10 +167,11 @@ export async function enforceAgentFaucetDailyRateLimit(
           429,
           {
             code: 'rate_limited',
-            message: 'Faucet request limit reached for today.',
-            actionHint: 'Retry after next UTC day begins.',
+            message: 'Faucet request limit reached for this chain today.',
+            actionHint: `Retry after next UTC day begins for chain ${chainKey}.`,
             details: {
-              scope: 'agent_faucet_daily',
+              scope: 'agent_faucet_daily_chain',
+              chainKey,
               limitPerDay: 1,
               retryAfterSeconds: ttlSeconds
             }
