@@ -235,6 +235,7 @@ export type ManagementStatePayload = {
     explorer_url: string | null;
     last_synced_at: string;
     updated_at: string;
+    stale?: boolean;
   }>;
   latestPolicy: {
     mode: 'real';

@@ -4741,3 +4741,35 @@ Active slice context: `Slice 90` in progress.
 - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
 - [~] `python3 -m unittest apps/agent-runtime/tests/test_wallet_core.py -v`
   - pre-existing baseline failures outside this change set persisted (wallet import/remove and cast-missing expectation drift).
+
+---
+
+# Program Acceptance Evidence: Liquidity Program Slices 90-95 (Runtime + API + Web)
+
+Date (UTC): 2026-02-19
+
+## Objective + Scope Lock
+- Objective: implement runtime adapter preflight + Wave-1 routing behavior, server-side liquidity sync/fee handling, and web stale-state UX for liquidity positions.
+- Scope lock: files listed in latest `spec.md` program block.
+
+## Behavior Checks
+- [x] Runtime adapter selection is chain-config-driven and deterministic.
+- [x] Runtime liquidity add/remove enforce preflight before proposal submission.
+- [x] Unsupported adapter routes fail with `unsupported_liquidity_adapter`.
+- [x] Hedera HTS-native path fails closed with `missing_dependency` when SDK absent.
+- [x] API status transition guard returns `liquidity_invalid_transition` on invalid edges.
+- [x] Filled-status path can persist `details.feeEvents[]` into `liquidity_fee_events`.
+- [x] Positions and management reads trigger fail-soft 60s sync helper.
+- [x] Wallet Liquidity Positions UI renders stale badge for aged snapshots.
+
+## Runtime Unit Tests
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_liquidity_adapter.py -v` -> PASS
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v` -> PASS
+
+## Required Validation Gates
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`

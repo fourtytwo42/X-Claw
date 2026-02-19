@@ -2187,3 +2187,47 @@ Make the web chain selector include enabled mainnet+testnet chains and synchroni
 - `npm run seed:verify`
 - `npm run build`
 - `pm2 restart all`
+
+---
+
+# Program Spec: Liquidity Program Slices 90-95 (Runtime + API + Web)
+
+## Goal
+Implement the post-Slice-88 liquidity program through runtime adapter preflight enforcement, Wave-1 adapter routing coverage, server-side position sync/fee event handling, and web liquidity stale-state visibility.
+
+## Non-goals
+1. Full IL decomposition/strategy automation.
+2. Mandatory non-EVM execution for 0G/ADI/Canton in this pass.
+3. New public endpoint additions beyond existing liquidity surface.
+
+## Locked scope
+1. `apps/agent-runtime/xclaw_agent/liquidity_adapter.py`
+2. `apps/agent-runtime/xclaw_agent/cli.py`
+3. `apps/agent-runtime/tests/test_liquidity_adapter.py`
+4. `apps/agent-runtime/tests/test_liquidity_cli.py`
+5. `apps/network-web/src/lib/liquidity-indexer.ts`
+6. `apps/network-web/src/app/api/v1/liquidity/[intentId]/status/route.ts`
+7. `apps/network-web/src/app/api/v1/liquidity/positions/route.ts`
+8. `apps/network-web/src/app/api/v1/liquidity/pending/route.ts`
+9. `apps/network-web/src/app/api/v1/management/agent-state/route.ts`
+10. `apps/network-web/src/lib/agent-page-view-model.ts`
+11. `apps/network-web/src/app/agents/[agentId]/page.tsx`
+12. `apps/network-web/src/app/agents/[agentId]/page.module.css`
+13. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+14. `docs/XCLAW_SLICE_TRACKER.md`
+15. `docs/XCLAW_BUILD_ROADMAP.md`
+16. `docs/api/WALLET_COMMAND_CONTRACT.md`
+17. `skills/xclaw-agent/references/commands.md`
+18. `spec.md`
+19. `tasks.md`
+20. `acceptance.md`
+
+## Acceptance checks
+- `python3 -m unittest apps/agent-runtime/tests/test_liquidity_adapter.py -v`
+- `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v`
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `pm2 restart all`

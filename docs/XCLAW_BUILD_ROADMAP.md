@@ -3041,13 +3041,72 @@ Note:
 - [~] Web selector sync path updates managed-agent runtime defaults and reconciles local selector from runtime canonical default.
 
 ### 90.3 Validation + evidence
-- [ ] Runtime unit tests for liquidity command routing and negative validation paths.
-- [ ] API contract tests for liquidity endpoints and transition guardrails.
-- [ ] Web checks for chain-scoped Liquidity Positions rendering + empty/stale states.
-- [ ] Run required gates sequentially:
-  - [ ] `npm run db:parity`
-  - [ ] `npm run seed:reset`
-  - [ ] `npm run seed:load`
-  - [ ] `npm run seed:verify`
-  - [ ] `npm run build`
-  - [ ] `pm2 restart all`
+- [x] Runtime unit tests for liquidity command routing and negative validation paths.
+- [~] API contract tests for liquidity endpoints and transition guardrails.
+- [x] Web checks for chain-scoped Liquidity Positions rendering + stale-state visibility.
+- [x] Run required gates sequentially:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `pm2 restart all`
+
+---
+
+## 91) Slice 91: Runtime Liquidity Intents + Adapter Framework Behavior
+
+### 91.1 Runtime adapter execution contract
+- [x] Adapter selection resolves from chain config `liquidityProtocols` using `(chain, dex, position_type)`.
+- [x] Runtime enforces preflight quote simulation before liquidity proposal submit on `add/remove`.
+- [x] Unsupported routes return deterministic `unsupported_liquidity_adapter`.
+- [x] Hedera HTS-native route fails closed with `missing_dependency` when SDK plugin is unavailable.
+
+### 91.2 Runtime CLI hardening
+- [x] `liquidity quote-add` emits adapter-family + preflight payload.
+- [x] `liquidity quote-remove` supports `--position-type` and emits adapter-family + preflight payload.
+- [x] `liquidity add/remove` payload details include preflight + adapter family metadata.
+
+### 91.3 Validation
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_liquidity_adapter.py -v`
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v`
+
+## 92) Slice 92: Wave 1 Protocol Adapters + Hedera HTS Plugin Depth
+
+### 92.1 Wave-1 routing readiness
+- [x] Base protocol keys resolve: `uniswap_v2`, `uniswap_v3`, `aerodrome`.
+- [x] Kite protocol keys resolve: `tesseract_univ2`; disabled `tesseract_univ3` rejected.
+- [x] Hedera protocol keys resolve: `saucerswap`, `pangolin`, `hedera_hts`.
+- [x] Disabled/unsupported protocol keys fail with deterministic adapter errors.
+
+### 92.2 Validation
+- [x] Adapter route-selection tests include Wave-1 + disabled protocol paths.
+
+## 93) Slice 93: Server APIs + Position Indexing/PnL/Fee Computation
+
+### 93.1 Position sync + refresh
+- [x] Added fail-soft `maybeSyncLiquiditySnapshots(...)` helper with 60s cadence keying by `agentId:chainKey`.
+- [x] `/api/v1/liquidity/positions` triggers non-forced sync before read.
+- [x] `/api/v1/management/agent-state` triggers non-forced sync before read.
+- [x] terminal statuses (`filled|failed|verification_timeout`) trigger forced refresh.
+
+### 93.2 Fee/pnl state handling
+- [x] `filled` status path persists optional `details.feeEvents[]` into `liquidity_fee_events`.
+- [x] position sync computes/refreshes `position_value_usd`, `unrealized_pnl_usd`, and `last_synced_at`.
+- [x] transition conflict code is liquidity-specific (`liquidity_invalid_transition`).
+
+## 94) Slice 94: Web Liquidity Positions UX Completion
+
+### 94.1 Wallet liquidity section polish
+- [x] Rows now include chain + dex + pair/pool and explicit position type labels.
+- [x] Copy updated for deposited basis/current underlying/unrealized estimate fields.
+- [x] stale badge rendered for snapshots older than 60s SLA.
+- [x] management payload now includes `stale` boolean per liquidity row.
+
+## 95) Slice 95: Verification + Hardening + Bounty Evidence Packaging
+
+### 95.1 Pending verification/evidence pass
+- [x] Run required repo gates sequentially for this liquidity program pass.
+- [~] Capture hardhat-local + external testnet acceptance evidence.
+- [~] Update bounty checklist evidence IDs for Hedera/0G/Kite.
+- [~] Post issue evidence + commit hashes for slices 90-95.

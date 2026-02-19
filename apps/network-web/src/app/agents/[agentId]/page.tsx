@@ -2175,20 +2175,21 @@ export default function AgentPublicProfilePage() {
               <div key={position.position_id} className={styles.listRow}>
                 <div>
                   <div className={styles.listTitle}>
-                    {position.dex_key.toUpperCase()} • {position.token_a}/{position.token_b}
+                    {position.chain_key} • {position.dex_key.toUpperCase()} • {position.token_a}/{position.token_b}
                   </div>
                   <div className={styles.muted}>
-                    {position.position_type.toUpperCase()} • Pool: {position.pool_ref}
+                    Type {position.position_type.toUpperCase()} • Pool/Pair {position.pool_ref}
                   </div>
                   <div className={styles.muted}>
-                    Deposited {position.deposited_a} / {position.deposited_b} • Current {position.current_a} / {position.current_b}
+                    Deposited basis {position.deposited_a} / {position.deposited_b} • Current underlying {position.current_a} / {position.current_b}
                   </div>
                   <div className={styles.muted}>
                     Unclaimed fees {position.unclaimed_fees_a} / {position.unclaimed_fees_b} • Realized fees {formatUsd(position.realized_fees_usd)}
                   </div>
                   <div className={styles.muted}>
-                    Unrealized PnL {formatUsd(position.unrealized_pnl_usd)} • Value {formatUsd(position.position_value_usd)}
+                    Unrealized PnL estimate {formatUsd(position.unrealized_pnl_usd)} • Value {formatUsd(position.position_value_usd)}
                   </div>
+                  <div className={styles.muted}>Last synced {formatUtc(position.last_synced_at)} UTC</div>
                   {position.explorer_url ? (
                     <div className={styles.muted}>
                       Explorer:{' '}
@@ -2200,6 +2201,7 @@ export default function AgentPublicProfilePage() {
                 </div>
                 <div className={styles.listMeta}>
                   <span className={styles.statusChip}>{displayStatusLabel(position.status)}</span>
+                  {position.stale ? <span className={`${styles.statusChip} ${styles.staleChip}`}>Stale</span> : null}
                   <span>{formatUtc(position.updated_at)} UTC</span>
                 </div>
               </div>

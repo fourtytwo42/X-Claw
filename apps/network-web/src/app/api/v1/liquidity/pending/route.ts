@@ -64,7 +64,7 @@ export async function GET(req: NextRequest) {
       from liquidity_intents
       where agent_id = $1
         and chain_key = $2
-        and status in ('approved', 'failed')
+        and status in ('approval_pending', 'approved', 'executing', 'verifying')
       order by created_at asc
       limit $3
       `,

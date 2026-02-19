@@ -60,7 +60,7 @@ Wrapper delegation target commands:
 - `xclaw-agent liquidity remove --chain <chain_key> --dex <dex> --position-id <position_id> [--percent <1-100>] [--slippage-bps <bps>] [--position-type <v2|v3>] --json`
 - `xclaw-agent liquidity positions --chain <chain_key> [--dex <dex>] [--status <status>] --json`
 - `xclaw-agent liquidity quote-add --chain <chain_key> --dex <dex> --token-a <token_or_symbol> --token-b <token_or_symbol> --amount-a <amount_a> --amount-b <amount_b> [--position-type <v2|v3>] [--slippage-bps <bps>] --json`
-- `xclaw-agent liquidity quote-remove --chain <chain_key> --dex <dex> --position-id <position_id> [--percent <1-100>] --json`
+- `xclaw-agent liquidity quote-remove --chain <chain_key> --dex <dex> --position-id <position_id> [--percent <1-100>] [--position-type <v2|v3>] --json`
 - `xclaw-agent default-chain get --json`
 - `xclaw-agent default-chain set --chain <chain_key> --json`
 
@@ -180,6 +180,9 @@ Current behavior in `apps/agent-runtime/xclaw_agent/cli.py`:
    - minimum priority floor is `XCLAW_TX_PRIORITY_FLOOR_GWEI` (default `1`),
    - when EIP-1559 RPC methods are unavailable/invalid, runtime falls back to `eth_gasPrice`,
    - rollback kill-switch `XCLAW_TX_FEE_MODE=legacy` restores legacy fixed `gasPrice` sender behavior.
+14. Liquidity commands enforce adapter preflight before API proposal submission:
+   - unsupported chain/dex/position combinations fail with `unsupported_liquidity_adapter`,
+   - HTS-native Hedera paths fail closed with `missing_dependency` when SDK plugin is unavailable.
 
 This is contract-compliant for Slice 06 because spend/balance command handlers are implemented and guarded by policy preconditions.
 

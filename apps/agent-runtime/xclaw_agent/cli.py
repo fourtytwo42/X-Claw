@@ -51,6 +51,12 @@ from xclaw_agent.x402_runtime import pay_decide as x402_pay_decide
 from xclaw_agent.x402_runtime import pay_resume as x402_pay_resume
 from xclaw_agent.x402_runtime import X402RuntimeError
 from xclaw_agent.dex_adapter import build_dex_adapter, DexAdapterError
+from xclaw_agent.liquidity_adapter import (
+    build_liquidity_adapter_for_request,
+    HederaSdkUnavailable,
+    LiquidityAdapterError,
+    UnsupportedLiquidityAdapter,
+)
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 try:
     from argon2.low_level import Type, hash_secret_raw
@@ -4843,6 +4849,8 @@ def cmd_liquidity_quote_add(args: argparse.Namespace) -> int:
     dex = str(args.dex or "").strip().lower()
     try:
         assert_chain_capability(chain, "liquidity")
+        position_type = str(args.position_type or "v2").strip().lower()
+        adapter = build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type=position_type)
         token_a = _resolve_token_address(chain, args.token_a)
         token_b = _resolve_token_address(chain, args.token_b)
         if token_a.lower() == token_b.lower():
@@ -4860,11 +4868,20 @@ def cmd_liquidity_quote_add(args: argparse.Namespace) -> int:
         quote_out_units = _router_get_amount_out(chain, amount_a_units, token_a, token_b)
         quote_out_h = _format_units(int(quote_out_units), token_b_decimals)
         min_b_h = _decimal_text(_to_non_negative_decimal(quote_out_h) * Decimal(max(0, 10000 - slippage_bps)) / Decimal(10000))
+        preflight = adapter.quote_add(
+            {
+                "tokenA": token_a,
+                "tokenB": token_b,
+                "amountA": _decimal_text(amount_a_h),
+                "amountB": _decimal_text(amount_b_h),
+                "slippageBps": slippage_bps,
+            }
+        )
         return ok(
             "Liquidity add quote ready.",
             chain=chain,
             dex=dex,
-            positionType=str(args.position_type or "v2"),
+            positionType=position_type,
             tokenA=token_a,
             tokenB=token_b,
             amountA=_decimal_text(amount_a_h),
@@ -4876,10 +4893,30 @@ def cmd_liquidity_quote_add(args: argparse.Namespace) -> int:
             tokenBSymbol=token_b_meta.get("symbol"),
             tokenADecimals=token_a_decimals,
             tokenBDecimals=token_b_decimals,
+            adapterFamily=adapter.protocol_family,
+            preflight=preflight.get("simulation", {}),
             simulationOnly=True,
         )
     except ChainRegistryError as exc:
         return fail("unsupported_chain_capability", str(exc), chain_supported_hint(), {"chain": chain, "requiredCapability": "liquidity"}, exit_code=2)
+    except UnsupportedLiquidityAdapter as exc:
+        return fail(
+            "unsupported_liquidity_adapter",
+            str(exc),
+            "Choose a supported chain/dex/position-type combination and retry.",
+            {"chain": chain, "dex": dex, "positionType": str(args.position_type or "v2")},
+            exit_code=2,
+        )
+    except HederaSdkUnavailable as exc:
+        return fail(
+            "missing_dependency",
+            str(exc),
+            "Install Hedera SDK extras before using HTS-native liquidity flows.",
+            {"chain": chain, "dex": dex},
+            exit_code=2,
+        )
+    except LiquidityAdapterError as exc:
+        return fail("liquidity_preflight_failed", str(exc), "Fix the request payload and retry.", {"chain": chain, "dex": dex}, exit_code=2)
     except WalletStoreError as exc:
         return fail("liquidity_quote_add_failed", str(exc), "Verify tokens/amounts and retry.", {"chain": chain, "dex": dex}, exit_code=1)
     except Exception as exc:
@@ -4894,23 +4931,47 @@ def cmd_liquidity_quote_remove(args: argparse.Namespace) -> int:
     dex = str(args.dex or "").strip().lower()
     try:
         assert_chain_capability(chain, "liquidity")
+        position_type = str(args.position_type or "v2").strip().lower()
+        adapter = build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type=position_type)
         position_id = str(args.position_id or "").strip()
         if not position_id:
             return fail("invalid_input", "position-id is required.", "Provide --position-id and retry.", {"chain": chain, "dex": dex}, exit_code=2)
         percent = int(args.percent)
         if percent < 1 or percent > 100:
             return fail("invalid_input", "percent must be between 1 and 100.", "Use --percent in [1..100].", {"percent": args.percent}, exit_code=2)
+        preflight = adapter.quote_remove({"positionId": position_id, "percent": percent})
         return ok(
             "Liquidity remove quote ready.",
             chain=chain,
             dex=dex,
+            positionType=position_type,
             positionId=position_id,
             percent=percent,
+            adapterFamily=adapter.protocol_family,
+            preflight=preflight.get("simulation", {}),
             simulationOnly=True,
             note="Exact remove outputs are adapter-specific; runtime will recompute pre-execution.",
         )
     except ChainRegistryError as exc:
         return fail("unsupported_chain_capability", str(exc), chain_supported_hint(), {"chain": chain, "requiredCapability": "liquidity"}, exit_code=2)
+    except UnsupportedLiquidityAdapter as exc:
+        return fail(
+            "unsupported_liquidity_adapter",
+            str(exc),
+            "Choose a supported chain/dex/position-type combination and retry.",
+            {"chain": chain, "dex": dex, "positionType": str(args.position_type or "v2")},
+            exit_code=2,
+        )
+    except HederaSdkUnavailable as exc:
+        return fail(
+            "missing_dependency",
+            str(exc),
+            "Install Hedera SDK extras before using HTS-native liquidity flows.",
+            {"chain": chain, "dex": dex},
+            exit_code=2,
+        )
+    except LiquidityAdapterError as exc:
+        return fail("liquidity_preflight_failed", str(exc), "Fix the request payload and retry.", {"chain": chain, "dex": dex}, exit_code=2)
     except Exception as exc:
         return fail("liquidity_quote_remove_failed", str(exc), "Inspect runtime liquidity quote-remove path and retry.", {"chain": chain, "dex": dex}, exit_code=1)
 
@@ -4923,21 +4984,34 @@ def cmd_liquidity_add(args: argparse.Namespace) -> int:
     dex = str(args.dex or "").strip().lower()
     try:
         assert_chain_capability(chain, "liquidity")
+        position_type = str(args.position_type or "v2").strip().lower()
+        adapter = build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type=position_type)
         agent_id = _resolve_agent_id_or_fail(chain)
         token_a = _resolve_token_address(chain, args.token_a)
         token_b = _resolve_token_address(chain, args.token_b)
+        if token_a.lower() == token_b.lower():
+            return fail("invalid_input", "token-a and token-b must be different.", "Provide distinct token values.", {"chain": chain}, exit_code=2)
         amount_a_h = _parse_positive_amount_text(str(args.amount_a), "amount-a")
         amount_b_h = _parse_positive_amount_text(str(args.amount_b), "amount-b")
         slippage_bps = int(args.slippage_bps)
         if slippage_bps < 0 or slippage_bps > 5000:
             return fail("invalid_input", "slippage-bps must be between 0 and 5000.", "Use integer bps in range.", {"slippageBps": args.slippage_bps}, exit_code=2)
+        preflight = adapter.quote_add(
+            {
+                "tokenA": token_a,
+                "tokenB": token_b,
+                "amountA": _decimal_text(amount_a_h),
+                "amountB": _decimal_text(amount_b_h),
+                "slippageBps": slippage_bps,
+            }
+        )
         payload = {
             "schemaVersion": 1,
             "agentId": agent_id,
             "chainKey": chain,
-            "dex": dex,
+            "dex": adapter.dex,
             "action": "add",
-            "positionType": str(args.position_type or "v2"),
+            "positionType": position_type,
             "tokenA": token_a,
             "tokenB": token_b,
             "amountA": _decimal_text(amount_a_h),
@@ -4945,6 +5019,8 @@ def cmd_liquidity_add(args: argparse.Namespace) -> int:
             "slippageBps": slippage_bps,
             "details": {
                 "v3Range": str(args.v3_range or "").strip() or None,
+                "adapterFamily": adapter.protocol_family,
+                "preflight": preflight.get("simulation", {}),
                 "source": "runtime_liquidity_add",
             },
         }
@@ -4970,13 +5046,33 @@ def cmd_liquidity_add(args: argparse.Namespace) -> int:
         return ok(
             "Liquidity add intent created.",
             chain=chain,
-            dex=dex,
+            dex=adapter.dex,
             liquidityIntentId=liquidity_intent_id,
             status=status or "approved",
             approvalMode=status != "approval_pending",
+            adapterFamily=adapter.protocol_family,
+            preflight=preflight.get("simulation", {}),
         )
     except ChainRegistryError as exc:
         return fail("unsupported_chain_capability", str(exc), chain_supported_hint(), {"chain": chain, "requiredCapability": "liquidity"}, exit_code=2)
+    except UnsupportedLiquidityAdapter as exc:
+        return fail(
+            "unsupported_liquidity_adapter",
+            str(exc),
+            "Choose a supported chain/dex/position-type combination and retry.",
+            {"chain": chain, "dex": dex, "positionType": str(args.position_type or "v2")},
+            exit_code=2,
+        )
+    except HederaSdkUnavailable as exc:
+        return fail(
+            "missing_dependency",
+            str(exc),
+            "Install Hedera SDK extras before using HTS-native liquidity flows.",
+            {"chain": chain, "dex": dex},
+            exit_code=2,
+        )
+    except LiquidityAdapterError as exc:
+        return fail("liquidity_preflight_failed", str(exc), "Fix preflight parameters and retry.", {"chain": chain, "dex": dex}, exit_code=2)
     except WalletStoreError as exc:
         return fail("liquidity_add_failed", str(exc), "Verify API env/auth, chain capability, and inputs.", {"chain": chain, "dex": dex}, exit_code=1)
     except Exception as exc:
@@ -4991,6 +5087,8 @@ def cmd_liquidity_remove(args: argparse.Namespace) -> int:
     dex = str(args.dex or "").strip().lower()
     try:
         assert_chain_capability(chain, "liquidity")
+        position_type = str(args.position_type or "v2").strip().lower()
+        adapter = build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type=position_type)
         agent_id = _resolve_agent_id_or_fail(chain)
         position_id = str(args.position_id or "").strip()
         if not position_id:
@@ -5001,13 +5099,20 @@ def cmd_liquidity_remove(args: argparse.Namespace) -> int:
         slippage_bps = int(args.slippage_bps)
         if slippage_bps < 0 or slippage_bps > 5000:
             return fail("invalid_input", "slippage-bps must be between 0 and 5000.", "Use integer bps in range.", {"slippageBps": args.slippage_bps}, exit_code=2)
+        preflight = adapter.quote_remove(
+            {
+                "positionId": position_id,
+                "percent": percent,
+                "slippageBps": slippage_bps,
+            }
+        )
         payload = {
             "schemaVersion": 1,
             "agentId": agent_id,
             "chainKey": chain,
-            "dex": dex,
+            "dex": adapter.dex,
             "action": "remove",
-            "positionType": str(args.position_type or "v2"),
+            "positionType": position_type,
             "tokenA": str(args.token_a or "POSITION").strip(),
             "tokenB": str(args.token_b or "POSITION").strip(),
             "amountA": str(percent),
@@ -5016,6 +5121,8 @@ def cmd_liquidity_remove(args: argparse.Namespace) -> int:
             "slippageBps": slippage_bps,
             "details": {
                 "percent": percent,
+                "adapterFamily": adapter.protocol_family,
+                "preflight": preflight.get("simulation", {}),
                 "source": "runtime_liquidity_remove",
             },
         }
@@ -5041,14 +5148,34 @@ def cmd_liquidity_remove(args: argparse.Namespace) -> int:
         return ok(
             "Liquidity remove intent created.",
             chain=chain,
-            dex=dex,
+            dex=adapter.dex,
             liquidityIntentId=liquidity_intent_id,
             status=status or "approved",
             positionId=position_id,
             percent=percent,
+            adapterFamily=adapter.protocol_family,
+            preflight=preflight.get("simulation", {}),
         )
     except ChainRegistryError as exc:
         return fail("unsupported_chain_capability", str(exc), chain_supported_hint(), {"chain": chain, "requiredCapability": "liquidity"}, exit_code=2)
+    except UnsupportedLiquidityAdapter as exc:
+        return fail(
+            "unsupported_liquidity_adapter",
+            str(exc),
+            "Choose a supported chain/dex/position-type combination and retry.",
+            {"chain": chain, "dex": dex, "positionType": str(args.position_type or "v2")},
+            exit_code=2,
+        )
+    except HederaSdkUnavailable as exc:
+        return fail(
+            "missing_dependency",
+            str(exc),
+            "Install Hedera SDK extras before using HTS-native liquidity flows.",
+            {"chain": chain, "dex": dex},
+            exit_code=2,
+        )
+    except LiquidityAdapterError as exc:
+        return fail("liquidity_preflight_failed", str(exc), "Fix preflight parameters and retry.", {"chain": chain, "dex": dex}, exit_code=2)
     except WalletStoreError as exc:
         return fail("liquidity_remove_failed", str(exc), "Verify API env/auth, chain capability, and inputs.", {"chain": chain, "dex": dex}, exit_code=1)
     except Exception as exc:
@@ -8539,6 +8666,7 @@ def build_parser() -> argparse.ArgumentParser:
     liquidity_quote_remove.add_argument("--dex", required=True)
     liquidity_quote_remove.add_argument("--position-id", required=True)
     liquidity_quote_remove.add_argument("--percent", default=100)
+    liquidity_quote_remove.add_argument("--position-type", default="v2", choices=["v2", "v3"])
     liquidity_quote_remove.add_argument("--json", action="store_true")
     liquidity_quote_remove.set_defaults(func=cmd_liquidity_quote_remove)
 

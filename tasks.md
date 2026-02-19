@@ -2374,3 +2374,35 @@ Issue mapping: `#32`
 - [x] `npm run seed:verify`
 - [x] `npm run build`
 - [x] `pm2 restart all`
+
+---
+
+# Program Tasks: Liquidity Program Slices 90-95 (Runtime + API + Web)
+
+Active slice context: Slice 90 close-out -> Slice 95 hardening/evidence sequence.
+
+## 1) Slice 90 close-out
+- [~] Align tracker/roadmap status to implemented Slice 90 baseline + current validation state.
+- [~] Record validation/test evidence in acceptance artifact.
+
+## 2) Slice 91/92 runtime adapter implementation
+- [x] Rework liquidity adapter module to chain-config-driven routing with explicit protocol-family classes.
+- [x] Add deterministic unsupported-adapter and fail-closed Hedera dependency error paths.
+- [x] Enforce preflight simulation before `liquidity add/remove` proposal submission.
+- [x] Add runtime tests for adapter routing + CLI preflight behavior.
+
+## 3) Slice 93 API/indexing implementation
+- [x] Add fail-soft position sync helper on 60s cadence.
+- [x] Trigger sync from liquidity positions + management agent-state read paths.
+- [x] Trigger force-sync on terminal liquidity status transitions.
+- [x] Persist optional fee events from status update payload details.
+- [x] Use liquidity-specific transition conflict code.
+
+## 4) Slice 94 web liquidity section completion
+- [x] Render required liquidity row context (chain, dex, pair/pool, type).
+- [x] Show stale indicator when snapshot exceeds SLA.
+- [x] Keep chain-filtered view behavior unchanged.
+
+## 5) Slice 95 hardening/evidence sync
+- [~] Run required gate commands sequentially.
+- [~] Update bounty checklist and issue/evidence references.

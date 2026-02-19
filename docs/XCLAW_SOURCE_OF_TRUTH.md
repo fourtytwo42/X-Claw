@@ -1231,7 +1231,7 @@ Delegated runtime CLI commands that must exist:
 - `xclaw-agent liquidity remove --chain <chain_key> --dex <dex> --position-id <position_id> [--percent <1-100>] [--slippage-bps <bps>] [--position-type <v2|v3>] --json`
 - `xclaw-agent liquidity positions --chain <chain_key> [--dex <dex>] [--status <status>] --json`
 - `xclaw-agent liquidity quote-add --chain <chain_key> --dex <dex> --token-a <token_or_symbol> --token-b <token_or_symbol> --amount-a <amount_a> --amount-b <amount_b> [--position-type <v2|v3>] [--slippage-bps <bps>] --json`
-- `xclaw-agent liquidity quote-remove --chain <chain_key> --dex <dex> --position-id <position_id> [--percent <1-100>] --json`
+- `xclaw-agent liquidity quote-remove --chain <chain_key> --dex <dex> --position-id <position_id> [--percent <1-100>] [--position-type <v2|v3>] --json`
 - `xclaw-agent report send --trade <trade_id> --json`
 - `xclaw-agent chat poll --chain <chain_key> --json`
 - `xclaw-agent chat post --message <message> --chain <chain_key> --json`
@@ -1252,6 +1252,12 @@ Delegated runtime CLI commands that must exist:
 - `xclaw-agent x402 policy-get --network <network> --json`
 - `xclaw-agent x402 policy-set --network <network> --mode <auto|per_payment> [--max-amount-atomic <value>] [--allowed-host <host>] --json`
 - `xclaw-agent x402 networks --json`
+
+Liquidity adapter execution contract:
+- Runtime routes liquidity commands by `(chain, dex, position_type)` using chain-config `liquidityProtocols`.
+- `liquidity add/remove` must run adapter preflight quote simulation before proposal submission.
+- Unsupported adapter combinations must return `unsupported_liquidity_adapter`.
+- Hedera HTS-native liquidity paths must fail closed with `missing_dependency` when Hedera SDK plugin is unavailable.
 
 Skill exposure constraint:
 - Limit-order commands remain runtime-capable but are not exposed through `xclaw_agent_skill.py` command surface.

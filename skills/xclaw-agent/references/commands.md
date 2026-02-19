@@ -18,7 +18,7 @@ This reference defines the expected command surface for the Python-first skill w
 - `liquidity-remove <dex> <position_id> [percent] [slippage_bps] [v2|v3]`
 - `liquidity-positions <dex|all> [status]`
 - `liquidity-quote-add <dex> <token_a> <token_b> <amount_a> <amount_b> <slippage_bps> [v2|v3]`
-- `liquidity-quote-remove <dex> <position_id> [percent]`
+- `liquidity-quote-remove <dex> <position_id> [percent] [v2|v3]`
 - `trade-decide <trade_id> <approve|reject>` (runtime-canonical spot approval decision path)
 - `transfer-resume <approval_id>` (internal auto-resume path for single-trigger transfer approvals)
 - `transfer-decide <approval_id> <approve|deny>` (internal callback decision command)
@@ -67,7 +67,7 @@ Underlying runtime delegation (performed by wrapper):
 - `xclaw-agent liquidity remove --chain <chain_key> --dex <dex> --position-id <position_id> [--percent <1-100>] [--slippage-bps <bps>] [--position-type <v2|v3>] --json`
 - `xclaw-agent liquidity positions --chain <chain_key> [--dex <dex>] [--status <status>] --json`
 - `xclaw-agent liquidity quote-add --chain <chain_key> --dex <dex> --token-a <token_or_symbol> --token-b <token_or_symbol> --amount-a <amount_a> --amount-b <amount_b> [--position-type <v2|v3>] [--slippage-bps <bps>] --json`
-- `xclaw-agent liquidity quote-remove --chain <chain_key> --dex <dex> --position-id <position_id> [--percent <1-100>] --json`
+- `xclaw-agent liquidity quote-remove --chain <chain_key> --dex <dex> --position-id <position_id> [--percent <1-100>] [--position-type <v2|v3>] --json`
 - `xclaw-agent approvals cleanup-spot --trade-id <trade_id> --json`
 - `xclaw-agent approvals clear-prompt --subject-type <trade|transfer|policy> --subject-id <id> [--chain <chain_key>] --json`
 - `xclaw-agent approvals resume-spot --trade-id <trade_id> --chain <chain_key> --json`

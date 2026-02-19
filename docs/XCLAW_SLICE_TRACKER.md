@@ -1713,26 +1713,98 @@ DoD:
 
 ## Slice 90: Liquidity + Multi-DEX Compatibility Foundation
 Status: [~]
-Issue: #37
+Issue: #36
 
 Goal:
 - Introduce chain-agnostic liquidity contracts and command surfaces aligned with existing trade approval/policy controls.
 
 DoD:
-- [~] docs sync first: source-of-truth + roadmap + tracker + wallet contract + commands reference aligned to Slice 90.
-- [~] migration adds liquidity core tables: `liquidity_intents`, `liquidity_position_snapshots`, `liquidity_fee_events`, `liquidity_protocol_configs`.
-- [~] shared schemas include liquidity proposed/status/position/approval contracts.
-- [~] runtime CLI adds `liquidity add/remove/positions/quote-add/quote-remove` with chain capability gating.
-- [~] skill wrapper exposes liquidity commands and delegates to runtime.
-- [~] chain config capability model includes `capabilities.liquidity` and protocol metadata.
-- [~] enabled chain registry drives mainnet+testnet selector options; faucet scope remains capability-gated to testnet chains.
-- [~] API adds liquidity endpoints:
+- [x] docs sync first: source-of-truth + roadmap + tracker + wallet contract + commands reference aligned to Slice 90.
+- [x] migration adds liquidity core tables: `liquidity_intents`, `liquidity_position_snapshots`, `liquidity_fee_events`, `liquidity_protocol_configs`.
+- [x] shared schemas include liquidity proposed/status/position/approval contracts.
+- [x] runtime CLI adds `liquidity add/remove/positions/quote-add/quote-remove` with chain capability gating.
+- [x] skill wrapper exposes liquidity commands and delegates to runtime.
+- [x] chain config capability model includes `capabilities.liquidity` and protocol metadata.
+- [x] enabled chain registry drives mainnet+testnet selector options; faucet scope remains capability-gated to testnet chains.
+- [x] API adds liquidity endpoints:
   - `POST /api/v1/liquidity/proposed`
   - `POST /api/v1/liquidity/:intentId/status`
   - `GET /api/v1/liquidity/pending`
   - `GET /api/v1/liquidity/positions`
-- [~] management `agent-state` includes chain-scoped `liquidityPositions`.
-- [~] `/agents/:id` wallet view renders separate Liquidity Positions section for active chain.
-- [~] runtime default-chain commands (`default-chain get/set`) establish agent-runtime canonical default chain.
-- [~] management endpoints expose default-chain read/update + managed-session batch sync.
-- [~] global chain selector persists and synchronizes runtime default chain for all managed agents in active session.
+- [x] management `agent-state` includes chain-scoped `liquidityPositions`.
+- [x] `/agents/:id` wallet view renders separate Liquidity Positions section for active chain.
+- [x] runtime default-chain commands (`default-chain get/set`) establish agent-runtime canonical default chain.
+- [x] management endpoints expose default-chain read/update + managed-session batch sync.
+- [x] global chain selector persists and synchronizes runtime default chain for all managed agents in active session.
+
+---
+
+## Slice 91: Runtime Liquidity Intents + Adapter Framework Behavior
+Status: [~]
+Issue: #37
+
+Goal:
+- Enforce full liquidity lifecycle parity with trade approval contracts and deterministic adapter routing by v2/v3 family.
+
+DoD:
+- [x] runtime adapter preflight runs before `liquidity add/remove` proposal submission.
+- [x] adapter selection uses chain config `liquidityProtocols` and `(chain, dex, position_type)` tuple.
+- [x] deterministic runtime errors for unsupported adapters (`unsupported_liquidity_adapter`).
+- [x] Hedera HTS adapter fails closed with `missing_dependency` when SDK plugin is missing.
+- [x] liquidity command tests cover routing + negative preflight paths.
+- [x] docs/handoff sync (`source-of-truth`, roadmap, tracker, wallet contract, spec/tasks/acceptance).
+
+## Slice 92: Wave 1 Protocol Adapters + Hedera HTS Plugin Depth
+Status: [~]
+Issue: #38
+
+Goal:
+- Deliver Wave-1 adapter coverage and runtime fail-closed behavior for HTS-native routes.
+
+DoD:
+- [x] Base adapters resolve for `uniswap_v2`, `uniswap_v3`, and `aerodrome` protocol metadata.
+- [x] Kite adapters resolve for `tesseract_univ2` with v3 disabled rejection path.
+- [x] Hedera adapters resolve for `saucerswap`, `pangolin`, and `hedera_hts` plugin route.
+- [x] unsupported/disabled DEX routes return deterministic adapter errors.
+- [x] adapter docs and chain-protocol notes synchronized in canonical docs.
+
+## Slice 93: Server APIs + Position Indexing/PnL/Fee Computation
+Status: [~]
+Issue: #40
+
+Goal:
+- Add request-safe liquidity snapshot refresh and strengthen lifecycle/state transition handling.
+
+DoD:
+- [x] positions + management reads trigger 60s-cadence fail-soft sync helper.
+- [x] terminal liquidity status transitions trigger immediate force refresh.
+- [x] filled status path persists optional `feeEvents[]` records to `liquidity_fee_events`.
+- [x] transition guard returns liquidity-specific invalid-transition code.
+- [x] API contract artifacts and evidence notes synchronized.
+
+## Slice 94: Web Liquidity Positions Section Completion
+Status: [~]
+Issue: #39
+
+Goal:
+- Complete chain-filtered wallet liquidity visibility with stale/freshness indicators.
+
+DoD:
+- [x] wallet liquidity rows include chain + dex + pair/pool + v2/v3 type context.
+- [x] row copy includes deposited basis/current underlying/fees/PnL/value fields.
+- [x] stale indicator rendered when snapshot age exceeds 60s SLA.
+- [x] chain-scoped filtering remains bound to active chain selector.
+- [x] docs/handoff sync completed.
+
+## Slice 95: Verification + Hardening + Bounty Evidence Packaging
+Status: [~]
+Issue: #41
+
+Goal:
+- Produce verification evidence, harden reliability paths, and update bounty checklist artifacts.
+
+DoD:
+- [~] required validation gates rerun with latest liquidity/runtime/web changes.
+- [~] hardhat-local lifecycle evidence recorded before external testnet evidence.
+- [~] bounty checklist updated with evidence IDs for Hedera/0G/Kite paths.
+- [~] final docs sync + issue evidence posts with commit hashes.

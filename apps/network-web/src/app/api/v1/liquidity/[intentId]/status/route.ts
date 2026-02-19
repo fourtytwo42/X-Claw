@@ -4,6 +4,8 @@ import { authenticateAgentByToken } from '@/lib/agent-auth';
 import { withTransaction } from '@/lib/db';
 import { errorResponse, internalErrorResponse, successResponse } from '@/lib/errors';
 import { parseJsonBody } from '@/lib/http';
+import { makeId } from '@/lib/ids';
+import { maybeSyncLiquiditySnapshots } from '@/lib/liquidity-indexer';
 import { getRequestId } from '@/lib/request-id';
 import { validatePayload } from '@/lib/validation';
 
@@ -17,6 +19,14 @@ type LiquidityStatusBody = {
   positionId?: string;
   amountOut?: string | number;
   details?: Record<string, unknown>;
+};
+
+type LiquidityFeeEventInput = {
+  token?: string;
+  amount?: string | number;
+  amountUsd?: string | number | null;
+  txHash?: string | null;
+  occurredAt?: string | null;
 };
 
 const ALLOWED_TRANSITIONS = new Map<string, Set<string>>([
@@ -181,9 +191,39 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ intentId: 
             current.amount_b ?? '0',
           ]
         );
+
+        const feeEvents = Array.isArray(body.details?.feeEvents) ? (body.details?.feeEvents as LiquidityFeeEventInput[]) : [];
+        for (const event of feeEvents) {
+          const token = String(event?.token ?? '').trim();
+          const amount = String(event?.amount ?? '').trim();
+          if (!token || !amount) {
+            continue;
+          }
+          await client.query(
+            `
+            insert into liquidity_fee_events (
+              fee_event_id, agent_id, chain_key, dex_key, position_id, token, amount, amount_usd, tx_hash, occurred_at, created_at
+            ) values (
+              $1, $2, $3, $4, $5, $6, $7::numeric, $8::numeric, $9, coalesce($10::timestamptz, now()), now()
+            )
+            `,
+            [
+              makeId('lfe'),
+              current.agent_id,
+              current.chain_key,
+              current.dex_key,
+              positionId,
+              token,
+              amount,
+              event?.amountUsd === undefined || event?.amountUsd === null ? null : String(event.amountUsd),
+              event?.txHash ?? body.txHash ?? null,
+              event?.occurredAt ?? null,
+            ]
+          );
+        }
       }
 
-      return { kind: 'ok' as const, status: nextStatus };
+      return { kind: 'ok' as const, status: nextStatus, agentId: current.agent_id, chainKey: current.chain_key };
     });
 
     if (updated.kind === 'missing') {
@@ -212,13 +252,17 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ intentId: 
       return errorResponse(
         409,
         {
-          code: 'trade_invalid_transition',
+          code: 'liquidity_invalid_transition',
           message: `Invalid liquidity status transition from '${updated.currentStatus}' to '${updated.requestedStatus}'.`,
           actionHint: 'Submit a valid transition and retry.',
           details: { currentStatus: updated.currentStatus, requestedStatus: updated.requestedStatus },
         },
         requestId
       );
+    }
+
+    if (updated.status === 'filled' || updated.status === 'failed' || updated.status === 'verification_timeout') {
+      await maybeSyncLiquiditySnapshots(updated.agentId, updated.chainKey, { force: true });
     }
 
     return successResponse({ ok: true, liquidityIntentId: intentId.trim(), status: updated.status }, 200, requestId);

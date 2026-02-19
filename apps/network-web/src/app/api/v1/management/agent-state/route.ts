@@ -3,6 +3,7 @@ import type { NextRequest } from 'next/server';
 import { dbQuery } from '@/lib/db';
 import { errorResponse, internalErrorResponse, successResponse } from '@/lib/errors';
 import { chainRpcUrl, getChainConfig, supportedChainHint } from '@/lib/chains';
+import { maybeSyncLiquiditySnapshots } from '@/lib/liquidity-indexer';
 import { requireManagementSession, sessionHasAgentAccess } from '@/lib/management-auth';
 import { getRequestId } from '@/lib/request-id';
 import { resolveTokenMetadata } from '@/lib/token-metadata';
@@ -160,6 +161,8 @@ export async function GET(req: NextRequest) {
         requestId
       );
     }
+
+    await maybeSyncLiquiditySnapshots(agentId, chainKey, { force: false });
     try {
       await kickStaleTransferRecovery(agentId, chainKey);
     } catch {}
@@ -733,6 +736,8 @@ export async function GET(req: NextRequest) {
     const telegramApprovalEnabled = (approvalChannel.rowCount ?? 0) > 0 ? Boolean(approvalChannel.rows[0].enabled) : false;
     const telegramApprovalUpdatedAt = (approvalChannel.rowCount ?? 0) > 0 ? approvalChannel.rows[0].updated_at ?? null : null;
     const transferConfirmationsByTx = await fetchTransferConfirmations(chainKey, transferApprovalsHistory.rows);
+    const staleCutoffMs = 60 * 1000;
+    const nowMs = Date.now();
 
     return successResponse(
       {
@@ -775,7 +780,8 @@ export async function GET(req: NextRequest) {
           status: row.status,
           explorer_url: row.explorer_url,
           last_synced_at: row.last_synced_at,
-          updated_at: row.updated_at
+          updated_at: row.updated_at,
+          stale: nowMs - new Date(row.last_synced_at).getTime() > staleCutoffMs
         })),
         transferApprovalPolicy:
           (transferPolicyMirror.rowCount ?? 0) > 0

@@ -705,6 +705,11 @@
   font-size: 0.72rem;
 }
 
+.staleChip {
+  border-color: color-mix(in srgb, #f59e0b 62%, var(--agent-border));
+  background: color-mix(in srgb, #f59e0b 16%, transparent);
+}
+
 .formGrid {
   margin-top: 0.55rem;
   display: grid;

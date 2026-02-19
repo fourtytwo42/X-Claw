@@ -3,6 +3,7 @@ import type { NextRequest } from 'next/server';
 import { authenticateAgentByToken } from '@/lib/agent-auth';
 import { dbQuery } from '@/lib/db';
 import { errorResponse, internalErrorResponse, successResponse } from '@/lib/errors';
+import { maybeSyncLiquiditySnapshots } from '@/lib/liquidity-indexer';
 import { getRequestId } from '@/lib/request-id';
 
 export const runtime = 'nodejs';
@@ -43,6 +44,8 @@ export async function GET(req: NextRequest) {
         requestId
       );
     }
+
+    await maybeSyncLiquiditySnapshots(auth.agentId, chainKey, { force: false });
 
     const result = await dbQuery<{
       position_id: string;

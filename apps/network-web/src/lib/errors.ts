@@ -18,6 +18,7 @@ export type ApiErrorCode =
   | 'chain_mismatch'
   | 'rpc_unavailable'
   | 'trade_invalid_transition'
+  | 'liquidity_invalid_transition'
   | 'idempotency_conflict'
   | 'payload_invalid'
   | 'internal_error';
