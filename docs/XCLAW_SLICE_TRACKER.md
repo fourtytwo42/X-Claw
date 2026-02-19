@@ -1815,5 +1815,6 @@ DoD:
 - [x] hosted installer auto-binds `hedera_testnet` wallet context to the portable default wallet key and performs multi-chain register upsert (`default chain` + `hedera_testnet`) with optional Hedera faucet warmup warnings on non-fatal failure.
 - [x] Hedera faucet request route now returns deterministic `faucet_*` error contracts (no opaque `internal_error` for known preflight/config/RPC failures).
 - [x] Official Hedera helper wrap path is available (`wallet wrap-native`) and faucet wrapped-asset deficits can auto-wrap via helper with deterministic `faucet_wrapped_autowrap_failed` fallback.
+- [x] Hedera faucet default drips are set to 5 HBAR / 5 WHBAR / 10 USDC for non-demo warmup reliability.
 - [x] installer warmup logs include faucet `code/message/actionHint/requestId` and explicit rerun diagnostics; install remains non-fatal on warmup failure after wallet/register invariants pass.
 - [x] final docs sync + issue evidence posts with commit hashes.

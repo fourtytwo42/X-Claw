@@ -2660,3 +2660,14 @@ Active slice context: `Slice 95` closure hardening.
 - [x] Capture runtime helper wrap tx hash (`E38`).
 - [x] Capture post-wrap WHBAR balance increase (`E39`).
 - [x] Capture deterministic faucet residual blocker for stable shortfall (`E40`).
+
+# Slice 95I Tasks Update: Hedera Faucet Drip Rebalance (UTC 2026-02-19)
+
+## 1) Drip defaults
+- [x] Set Hedera native drip to `5000000000000000000` (5 HBAR).
+- [x] Set Hedera wrapped drip to `500000000` (5 WHBAR).
+- [x] Set Hedera stable drip to `10000000` (10 USDC).
+
+## 2) Config/runtime sync
+- [x] Update route constants and `.env.local` chain-scoped overrides.
+- [x] Update source-of-truth default drip documentation.

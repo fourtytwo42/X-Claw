@@ -2541,3 +2541,19 @@ Implement the post-Slice-88 liquidity program through runtime adapter preflight 
 - `xclaw-agent wallet wrap-native --chain hedera_testnet --amount 1 --json` returns tx hash and helper/token metadata.
 - `xclaw-agent wallet balance --chain hedera_testnet --json` shows increased WHBAR after wrap.
 - `xclaw-agent faucet-request --chain hedera_testnet --asset native --asset wrapped --asset stable --json` returns deterministic contract response (success or explicit faucet_* insufficiency/error; no opaque internal error).
+
+# Slice 95I Spec Addendum: Hedera Faucet Drip Rebalance (UTC 2026-02-19)
+
+## Goal
+Set Hedera faucet warmup drip defaults to testing-friendly levels:
+- native: `5 HBAR`
+- wrapped: `5 WHBAR`
+- stable: `10 USDC`
+
+## Locked scope
+1. `apps/network-web/src/app/api/v1/agent/faucet/request/route.ts`
+2. `.env.local`
+3. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+
+## Acceptance checks
+- Hedera faucet drip defaults resolve to `5000000000000000000`, `500000000`, and `10000000`.

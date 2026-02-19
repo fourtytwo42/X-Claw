@@ -5128,3 +5128,18 @@ Date (UTC): 2026-02-19
 - `E40` Hedera faucet deterministic residual blocker proof (stable inventory):
   - command: `xclaw-agent faucet-request --chain hedera_testnet --asset native --asset wrapped --asset stable --json`
   - outcome: deterministic `faucet_stable_insufficient` with `requestId` and token balance details (no opaque `internal_error`).
+
+## Slice 95I Hedera Drip Rebalance (UTC 2026-02-19)
+
+- Updated Hedera faucet default drips to:
+  - native: `5000000000000000000` (5 HBAR)
+  - wrapped: `500000000` (5 WHBAR)
+  - stable: `10000000` (10 USDC)
+- Applied in both route defaults and `.env.local` chain-scoped overrides.
+
+### Evidence updates (`E41+`)
+- `E41` Drip contract update verification:
+  - route constants and `.env.local` now match 5 HBAR / 5 WHBAR / 10 USDC for `hedera_testnet`.
+- `E42` Live faucet request deterministic self-recipient blocker:
+  - command: `xclaw-agent faucet-request --chain hedera_testnet --asset native --asset wrapped --asset stable --json`
+  - outcome: deterministic `faucet_send_preflight_failed` when recipient equals faucet signer (`require(false)` on wrapped transfer preflight), with `requestId` and chain details.

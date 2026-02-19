@@ -3113,6 +3113,7 @@ Note:
 - [x] Hosted installer auto-binds Hedera wallet context with portable-key invariant checks and multi-chain register upsert (`default chain` + `hedera_testnet`).
 - [x] Harden Hedera faucet request path with deterministic `faucet_*` error codes, Hedera gas-floor handling, and config/preflight validation.
 - [x] Enable official Hedera wrap path (`wallet wrap-native`) and helper-based faucet auto-wrap fallback (`faucet_wrapped_autowrap_failed` deterministic contract).
+- [x] Rebalance Hedera faucet default drips to operational test values (5 HBAR / 5 WHBAR / 10 USDC) in route defaults + chain-scoped env overrides.
 - [x] Add route-level faucet contract test (`npm run test:faucet:contract`) covering demo-agent block and non-demo deterministic error semantics.
 - [x] Installer warmup diagnostics now emit faucet `code/message/actionHint/requestId` and exact rerun command.
 - [x] Update bounty checklist evidence IDs for Hedera/0G/Kite.

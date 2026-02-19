@@ -3628,9 +3628,9 @@ Limitations / notes:
   - wrapped-native helper `HBAR X Helper` (`coreContracts.wrappedNativeHelper`)
   - stable `USDC|USDT` when configured
   - default drip amounts:
-    - native `2.0 HBAR` (`2000000000000000000` wei)
-    - wrapped `0.005 WHBAR` (`500000` base units, 8 decimals)
-    - stable `0.03` (`30000` base units, expected 6 decimals)
+    - native `5.0 HBAR` (`5000000000000000000` wei)
+    - wrapped `5.0 WHBAR` (`500000000` base units, 8 decimals)
+    - stable `10.0` (`10000000` base units, expected 6 decimals)
 - Hedera unit convention:
   - `1 tinybar = 10^10 wei`
   - `1 HBAR = 10^18 wei`
