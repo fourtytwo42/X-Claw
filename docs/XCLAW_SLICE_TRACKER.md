@@ -1740,7 +1740,7 @@ DoD:
 ---
 
 ## Slice 91: Runtime Liquidity Intents + Adapter Framework Behavior
-Status: [~]
+Status: [x]
 Issue: #37
 
 Goal:
@@ -1755,7 +1755,7 @@ DoD:
 - [x] docs/handoff sync (`source-of-truth`, roadmap, tracker, wallet contract, spec/tasks/acceptance).
 
 ## Slice 92: Wave 1 Protocol Adapters + Hedera HTS Plugin Depth
-Status: [~]
+Status: [x]
 Issue: #38
 
 Goal:
@@ -1769,7 +1769,7 @@ DoD:
 - [x] adapter docs and chain-protocol notes synchronized in canonical docs.
 
 ## Slice 93: Server APIs + Position Indexing/PnL/Fee Computation
-Status: [~]
+Status: [x]
 Issue: #40
 
 Goal:
@@ -1783,7 +1783,7 @@ DoD:
 - [x] API contract artifacts and evidence notes synchronized.
 
 ## Slice 94: Web Liquidity Positions Section Completion
-Status: [~]
+Status: [x]
 Issue: #39
 
 Goal:
