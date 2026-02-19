@@ -51,6 +51,7 @@ DECISION_ACK_MARKER_V20 = "xclaw: telegram approval decision ack v20"
 DECISION_ACK_MARKER_V21 = "xclaw: telegram approval decision ack v21"
 DECISION_ACK_MARKER_V22 = "xclaw: telegram approval decision ack v22"
 DECISION_ACK_MARKER_V23 = "xclaw: telegram approval decision ack v23"
+DECISION_ACK_MARKER_V24 = "xclaw: telegram approval decision ack v24"
 DECISION_ROUTE_MARKER_V1 = "xclaw: telegram approval decision routed to agent"
 DECISION_EXEC_MARKER_V1 = "xclaw: telegram trade resume trigger v1"
 DECISION_RESULT_ROUTE_MARKER_V1 = "xclaw: telegram trade result routed to agent"
@@ -60,7 +61,7 @@ QUEUED_BUTTONS_MARKER_V3 = "xclaw: telegram queued approval buttons v3"
 QUEUED_BUTTONS_MARKER_V4 = "xclaw: telegram queued approval buttons v4"
 LEGACY_DM_SENTINEL = 'Allow in DMs even when inlineButtonsScope is "allowlist", gated by chatId == senderId.'
 # Bump when patch semantics change so we invalidate the cached "already patched" fast-path.
-STATE_SCHEMA_VERSION = 55
+STATE_SCHEMA_VERSION = 56
 STATE_DIR = Path.home() / ".openclaw" / "xclaw"
 STATE_FILE = STATE_DIR / "openclaw_patch_state.json"
 LOCK_FILE = STATE_DIR / "openclaw_patch.lock"
@@ -310,7 +311,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         or DECISION_ACK_MARKER_V14 not in raw
         or DECISION_ACK_MARKER_V15 not in raw
         or DECISION_ACK_MARKER_V16 not in raw
-        or DECISION_ACK_MARKER_V23 not in raw
+        or DECISION_ACK_MARKER_V24 not in raw
         or DECISION_ROUTE_MARKER_V1 not in raw
         or DECISION_EXEC_MARKER_V1 not in raw
         or DECISION_RESULT_ROUTE_MARKER_V1 not in raw
@@ -340,7 +341,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         or DECISION_ACK_MARKER_V14 not in raw
         or DECISION_ACK_MARKER_V15 not in raw
         or DECISION_ACK_MARKER_V16 not in raw
-        or DECISION_ACK_MARKER_V23 not in raw
+        or DECISION_ACK_MARKER_V24 not in raw
         or DECISION_ROUTE_MARKER_V1 not in raw
         or DECISION_EXEC_MARKER_V1 not in raw
         or DECISION_RESULT_ROUTE_MARKER_V1 not in raw
@@ -440,6 +441,22 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
             text6,
         )
         return text7, (n1 > 0) or (n2 > 0) or (n3 > 0) or (n4 > 0) or (n5 > 0) or (n6 > 0)
+
+    def _upgrade_approval_route_dedupe(text: str) -> tuple[str, bool]:
+        changed = False
+        text2, n1 = re.subn(
+            r'await processMessage\(\{ message: syntheticMessage, me: ctx\.me, getFile \}, \[\], storeAllowFrom, \{ messageIdOverride: `xclaw-approval-\$\{callback\.id\}` \}\);',
+            'if (!(parts[0] === "xappr" && action !== "r")) { await processMessage({ message: syntheticMessage, me: ctx.me, getFile }, [], storeAllowFrom, { messageIdOverride: `xclaw-approval-${callback.id}` }); }',
+            text,
+        )
+        changed = changed or (n1 > 0)
+        text3, n2 = re.subn(
+            r'try \{ logger\.info\(\{ subjectId, chainKey, chatId, action, kind: parts\[0\] \}, "xclaw: telegram approval decision routed to agent"\); \} catch \{\}',
+            'if (!(parts[0] === "xappr" && action !== "r")) { try { logger.info({ subjectId, chainKey, chatId, action, kind: parts[0] }, "xclaw: telegram approval decision routed to agent"); } catch {} }',
+            text2,
+        )
+        changed = changed or (n2 > 0)
+        return text3, changed
 
     def _upgrade_runtime_success_trade_resume(text: str) -> tuple[str, bool]:
         # Ensure runtime-success callback path (exitCode===0 && body.ok) also triggers
@@ -551,7 +568,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         and DECISION_ACK_MARKER_V14 in raw
         and DECISION_ACK_MARKER_V15 in raw
         and DECISION_ACK_MARKER_V16 in raw
-        and DECISION_ACK_MARKER_V23 in raw
+        and DECISION_ACK_MARKER_V24 in raw
         and DECISION_ROUTE_MARKER_V1 in raw
         and DECISION_EXEC_MARKER_V1 in raw
         and DECISION_RESULT_ROUTE_MARKER_V1 in raw
@@ -565,6 +582,8 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         changed_any = changed_any or changed_route
         raw, changed_trade_noise = _upgrade_trade_result_noise(raw)
         changed_any = changed_any or changed_trade_noise
+        raw, changed_dedupe = _upgrade_approval_route_dedupe(raw)
+        changed_any = changed_any or changed_dedupe
         raw, changed_runtime_success = _upgrade_runtime_success_trade_resume(raw)
         changed_any = changed_any or changed_runtime_success
         if QUEUED_BUTTONS_MARKER not in raw:
@@ -731,6 +750,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V21}\n'
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V22}\n'
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V23}\n'
+        f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V24}\n'
         '\t\t\t\t\t\t\t\ttry {\n'
         '\t\t\t\t\t\t\t\t\tconst subjectLabel = parts[0] === "xpol" ? "policy approval" : "trade";\n'
         '\t\t\t\t\t\t\t\t\tconst msg = `${action === "r" ? "Denied" : "Approved"} ${subjectLabel} ${subjectId}\\nChain: ${chainKey}`;\n'
@@ -871,6 +891,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V21}\n'
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V22}\n'
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V23}\n'
+        f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V24}\n'
         '\t\t\t\t\t\t\t\t// Runtime is canonical owner of queued prompt cleanup (button clear, no delete).\n'
         '\t\t\t\t\t\t\t\t// Emit deterministic confirmation immediately so users always see a result.\n'
         '\t\t\t\t\t\t\t\ttry {\n'
