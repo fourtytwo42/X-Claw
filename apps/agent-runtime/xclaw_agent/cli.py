@@ -4875,18 +4875,6 @@ def _execute_liquidity_v2_add(intent: dict[str, Any], chain: str) -> dict[str, A
     store = load_wallet_store()
     wallet_address, private_key_hex = _execution_wallet(store, chain)
     deadline = str(int(datetime.now(timezone.utc).timestamp()) + 120)
-    preflight_details = _preflight_liquidity_v2_add_execution(
-        chain=chain,
-        token_a=token_a,
-        token_b=token_b,
-        amount_a_units=amount_a_units,
-        amount_b_units=amount_b_units,
-        min_a_units=min_a_units,
-        min_b_units=min_b_units,
-        wallet_address=wallet_address,
-        router=router,
-        deadline=deadline,
-    )
     _ensure_token_allowance(
         chain=chain,
         token_address=token_a,
@@ -4902,6 +4890,18 @@ def _execute_liquidity_v2_add(intent: dict[str, Any], chain: str) -> dict[str, A
         spender=router,
         required_units=amount_b_units,
         private_key_hex=private_key_hex,
+    )
+    preflight_details = _preflight_liquidity_v2_add_execution(
+        chain=chain,
+        token_a=token_a,
+        token_b=token_b,
+        amount_a_units=amount_a_units,
+        amount_b_units=amount_b_units,
+        min_a_units=min_a_units,
+        min_b_units=min_b_units,
+        wallet_address=wallet_address,
+        router=router,
+        deadline=deadline,
     )
     calldata = _cast_calldata(
         "addLiquidity(address,address,uint256,uint256,uint256,uint256,address,uint256)(uint256,uint256,uint256)",
