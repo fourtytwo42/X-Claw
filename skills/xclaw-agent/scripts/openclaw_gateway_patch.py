@@ -48,6 +48,7 @@ DECISION_ACK_MARKER_V17 = "xclaw: telegram approval decision ack v17"
 DECISION_ACK_MARKER_V18 = "xclaw: telegram approval decision ack v18"
 DECISION_ACK_MARKER_V19 = "xclaw: telegram approval decision ack v19"
 DECISION_ACK_MARKER_V20 = "xclaw: telegram approval decision ack v20"
+DECISION_ACK_MARKER_V21 = "xclaw: telegram approval decision ack v21"
 DECISION_ROUTE_MARKER_V1 = "xclaw: telegram approval decision routed to agent"
 DECISION_EXEC_MARKER_V1 = "xclaw: telegram trade resume trigger v1"
 DECISION_RESULT_ROUTE_MARKER_V1 = "xclaw: telegram trade result routed to agent"
@@ -57,7 +58,7 @@ QUEUED_BUTTONS_MARKER_V3 = "xclaw: telegram queued approval buttons v3"
 QUEUED_BUTTONS_MARKER_V4 = "xclaw: telegram queued approval buttons v4"
 LEGACY_DM_SENTINEL = 'Allow in DMs even when inlineButtonsScope is "allowlist", gated by chatId == senderId.'
 # Bump when patch semantics change so we invalidate the cached "already patched" fast-path.
-STATE_SCHEMA_VERSION = 52
+STATE_SCHEMA_VERSION = 53
 STATE_DIR = Path.home() / ".openclaw" / "xclaw"
 STATE_FILE = STATE_DIR / "openclaw_patch_state.json"
 LOCK_FILE = STATE_DIR / "openclaw_patch.lock"
@@ -307,7 +308,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         or DECISION_ACK_MARKER_V14 not in raw
         or DECISION_ACK_MARKER_V15 not in raw
         or DECISION_ACK_MARKER_V16 not in raw
-        or DECISION_ACK_MARKER_V20 not in raw
+        or DECISION_ACK_MARKER_V21 not in raw
         or DECISION_ROUTE_MARKER_V1 not in raw
         or DECISION_EXEC_MARKER_V1 not in raw
         or DECISION_RESULT_ROUTE_MARKER_V1 not in raw
@@ -337,7 +338,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         or DECISION_ACK_MARKER_V14 not in raw
         or DECISION_ACK_MARKER_V15 not in raw
         or DECISION_ACK_MARKER_V16 not in raw
-        or DECISION_ACK_MARKER_V20 not in raw
+        or DECISION_ACK_MARKER_V21 not in raw
         or DECISION_ROUTE_MARKER_V1 not in raw
         or DECISION_EXEC_MARKER_V1 not in raw
         or DECISION_RESULT_ROUTE_MARKER_V1 not in raw
@@ -438,6 +439,99 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         )
         return text7, (n1 > 0) or (n2 > 0) or (n3 > 0) or (n4 > 0) or (n5 > 0) or (n6 > 0)
 
+    def _upgrade_runtime_success_trade_resume(text: str) -> tuple[str, bool]:
+        # Ensure runtime-success callback path (exitCode===0 && body.ok) also triggers
+        # resume-spot and synthetic trade-result routing before returning.
+        marker = 'if (parts[0] === "xappr" && action !== "r") {'
+        pattern = re.compile(
+            r'(if \(exitCode === 0 && !!body\?\.ok\) \{[\s\S]*?if \(action === "r"\) \{[\s\S]*?\}\s*)(return;\s*\})'
+        )
+        injection = (
+            '\t\t\t\t\t\t\t\tif (parts[0] === "xappr" && action !== "r") {\n'
+            f'\t\t\t\t\t\t\t\t\t\t// {DECISION_EXEC_MARKER_V1}\n'
+            '\t\t\t\t\t\t\t\t\t\ttry {\n'
+            '\t\t\t\t\t\t\t\t\t\t\tconst inflightKey = `${subjectId}|${chainKey}`;\n'
+            '\t\t\t\t\t\t\t\t\t\t\tconst __resumeSet = (globalThis.__xclawTradeResumeInflight && globalThis.__xclawTradeResumeInflight instanceof Set)\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t? globalThis.__xclawTradeResumeInflight\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t: (() => { const s = new Set(); globalThis.__xclawTradeResumeInflight = s; return s; })();\n'
+            '\t\t\t\t\t\t\t\t\t\t\tif (!__resumeSet.has(inflightKey)) {\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t__resumeSet.add(inflightKey);\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\tsetTimeout(async () => {\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\ttry {\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst childMod = await import("node:child_process");\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst fsMod = await import("node:fs");\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst runtimeCandidates = [\n'
+            f'\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t{json.dumps(REPO_RUNTIME_BIN)},\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tString(env?.XCLAW_AGENT_RUNTIME_BIN ?? process.env.XCLAW_AGENT_RUNTIME_BIN ?? "").trim(),\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t"xclaw-agent"\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\t].filter((v) => !!v);\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst runtimeBin = runtimeCandidates.find((candidate) => candidate === "xclaw-agent" || fsMod.existsSync(candidate)) || "xclaw-agent";\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst childEnv = { ...process.env, ...Object.fromEntries(Object.entries(env || {}).map(([k, v]) => [String(k), String(v)])) };\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst child = childMod.spawn(runtimeBin, ["approvals", "resume-spot", "--trade-id", subjectId, "--chain", chainKey, "--json"], { stdio: ["ignore", "pipe", "pipe"], env: childEnv });\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\tlet out = "";\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\tlet err = "";\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\tchild.stdout?.on("data", (chunk) => { if (out.length < 12000) out += String(chunk); });\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\tchild.stderr?.on("data", (chunk) => { if (err.length < 4000) err += String(chunk); });\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst exitCode = await new Promise((resolve) => child.on("close", (code) => resolve(Number(code ?? 1))));\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst lines = out.split(/\\r?\\n/).map((v) => String(v || "").trim()).filter((v) => v.length > 0);\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\tlet body = null;\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\ttry { body = lines.length > 0 ? JSON.parse(lines[lines.length - 1]) : null; } catch {}\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst statusWord = String(body?.status ?? (body?.ok ? "filled" : "failed"));\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst txHash = String(body?.txHash ?? "").trim();\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst flow = body?.flowSummary ?? {};\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst promptText = String(callbackMessage.text ?? "");\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst pairMatch = promptText.match(/\\n\\s*([0-9]+(?:\\.[0-9]+)?)\\s+([A-Z0-9_]+)\\s*->\\s*([A-Z0-9_]+)/i);\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst amountHuman = String(body?.amountIn ?? flow?.amountInHuman ?? (pairMatch?.[1] || "")).trim();\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst tokenInSym = String(body?.tokenInSymbol ?? flow?.tokenInSymbol ?? (pairMatch?.[2] || "")).trim();\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst tokenOutSym = String(body?.tokenOutSymbol ?? flow?.tokenOutSymbol ?? (pairMatch?.[3] || "")).trim();\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst head = body?.ok ? `Trade result: ${statusWord}` : `Trade result: failed`;\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst txLine = txHash ? `\\nTx: ${txHash}` : "";\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst reasonLine = !body?.ok ? `\\nReason: ${String(body?.message ?? err ?? `resume exit ${exitCode}`)}` : "";\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst pairLine = amountHuman && tokenInSym && tokenOutSym ? `\\n${amountHuman} ${tokenInSym} -> ${tokenOutSym}` : "";\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst finalMsg = `${head}${pairLine}\\nTrade: ${subjectId}\\nChain: ${chainKey}${txLine}${reasonLine}`;\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\ttry { await bot.api.sendMessage(chatId, finalMsg); } catch {}\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\ttry {\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst decisionWord = body?.ok ? "FILLED" : "FAILED";\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst instruction = body?.ok\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t? "Reply to the user confirming the trade succeeded with tx details."\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t: "Reply to the user confirming the trade failed and provide next steps.";\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst syntheticText = `[X-CLAW TRADE RESULT]\\nDecision: ${decisionWord}\\nTrade: ${subjectId}\\nChain: ${chainKey}\\nTxHash: ${txHash || "n/a"}${pairLine ? `\\nPair: ${amountHuman} ${tokenInSym} -> ${tokenOutSym}` : ""}\\nSource: telegram_callback_trade\\nInstruction: ${instruction}`;\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst getFile2 = typeof ctx.getFile === "function" ? ctx.getFile.bind(ctx) : async () => ({});\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst syntheticMessage2 = {\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t...callbackMessage,\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tfrom: callback.from,\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\ttext: syntheticText,\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tcaption: void 0,\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tcaption_entities: void 0,\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tentities: void 0,\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tdate: Math.floor(Date.now() / 1000)\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t};\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tawait processMessage({ message: syntheticMessage2, me: ctx.me, getFile: getFile2 }, [], [], { messageIdOverride: `xclaw-trade-result-${callback.id}` });\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\t} catch {}\n'
+            f'\t\t\t\t\t\t\t\t\t\t\t\t\t\ttry {{ logger.info({{ subjectId, chainKey, chatId, ok: !!body?.ok }}, "{DECISION_RESULT_ROUTE_MARKER_V1}"); }} catch {{}}\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t} catch (resumeErr) {\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\ttry { logger.error({ subjectId, chainKey, err: String(resumeErr) }, "xclaw: trade resume trigger failed"); } catch {}\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t} finally {\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\ttry { __resumeSet.delete(inflightKey); } catch {}\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t}\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t}, 0);\n'
+            '\t\t\t\t\t\t\t\t\t\t\t}\n'
+            '\t\t\t\t\t\t\t\t\t\t} catch {}\n'
+            '\t\t\t\t\t\t\t\t}\n'
+        )
+        changed = False
+
+        def _repl(match: re.Match[str]) -> str:
+            nonlocal changed
+            before = match.group(1)
+            if marker in before:
+                return match.group(0)
+            changed = True
+            return before + injection + match.group(2)
+
+        out = pattern.sub(_repl, text, count=1)
+        return out, changed
+
     if (
         MARKER in raw
         and DECISION_ACK_MARKER_V3 in raw
@@ -454,7 +548,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         and DECISION_ACK_MARKER_V14 in raw
         and DECISION_ACK_MARKER_V15 in raw
         and DECISION_ACK_MARKER_V16 in raw
-        and DECISION_ACK_MARKER_V20 in raw
+        and DECISION_ACK_MARKER_V21 in raw
         and DECISION_ROUTE_MARKER_V1 in raw
         and DECISION_EXEC_MARKER_V1 in raw
         and DECISION_RESULT_ROUTE_MARKER_V1 in raw
@@ -468,6 +562,8 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         changed_any = changed_any or changed_route
         raw, changed_trade_noise = _upgrade_trade_result_noise(raw)
         changed_any = changed_any or changed_trade_noise
+        raw, changed_runtime_success = _upgrade_runtime_success_trade_resume(raw)
+        changed_any = changed_any or changed_runtime_success
         if QUEUED_BUTTONS_MARKER not in raw:
             raw2, changed2, err2 = _patch_queued_buttons(raw)
             if not err2:
@@ -628,6 +724,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V18}\n'
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V19}\n'
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V20}\n'
+        f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V21}\n'
         '\t\t\t\t\t\t\t\ttry {\n'
         '\t\t\t\t\t\t\t\t\tconst subjectLabel = parts[0] === "xpol" ? "policy approval" : "trade";\n'
         '\t\t\t\t\t\t\t\t\tconst msg = `${action === "r" ? "Denied" : "Approved"} ${subjectLabel} ${subjectId}\\nChain: ${chainKey}`;\n'
@@ -763,6 +860,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V18}\n'
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V19}\n'
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V20}\n'
+        f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V21}\n'
         '\t\t\t\t\t\t\t\t// Runtime is canonical owner of queued prompt cleanup (button clear, no delete).\n'
         '\t\t\t\t\t\t\t\t// Emit deterministic confirmation immediately so users always see a result.\n'
         '\t\t\t\t\t\t\t\ttry {\n'
