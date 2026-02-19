@@ -1,3 +1,38 @@
+# Slice 95 Tasks: Hedera EVM + HTS Live Evidence Closure (2026-02-19)
+
+Active slice context: `Slice 95` remains in progress.
+
+## 1) Scope lock
+- [x] Keep scope to live evidence capture + canonical artifact sync.
+- [x] Do not introduce new liquidity API/public interface paths.
+
+## 2) Evidence execution
+- [x] Run hosted installer flow (`curl -fsSL https://xclaw.trade/skill-install.sh | bash`).
+- [x] Re-verify runtime readiness (`status`, `wallet health`, `chains`) for `hedera_testnet`.
+- [x] Run deterministic EVM pair-discovery probes across configured Hedera DEXes (`saucerswap`, `pangolin`) and amount tiers.
+- [x] Capture Hedera EVM liquidity add lifecycle attempt output.
+- [x] Run HTS quote/add attempts and capture deterministic fail-closed output.
+- [x] Deep-probe HTS dependency state (`hedera-sdk-py` install + `import hedera`) to localize blocker root cause (`Unable to find javac`).
+
+## 3) Canonical sync
+- [x] Update `acceptance.md` evidence matrix and rerun commands.
+- [x] Update `docs/BOUNTY_ALIGNMENT_CHECKLIST.md` notes/evidence index with new IDs.
+- [x] Update `docs/XCLAW_SLICE_TRACKER.md` Slice 95 DoD with remaining tx-hash blocker.
+- [x] Update `docs/XCLAW_BUILD_ROADMAP.md` 95.1 blocker text.
+- [x] Sync `spec.md` and `tasks.md` to this pass.
+
+## 4) Validation
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_liquidity_adapter.py -v`
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v`
+
+---
+
 # Hotfix Tasks: Preserve Trade Approval History After Execution
 
 Active slice context: `Slice 86` is in progress; this is an explicit user-reported approvals-history visibility hotfix.

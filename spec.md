@@ -1,3 +1,38 @@
+# Slice 95 Closure Spec: Hedera EVM + HTS Live Evidence (2026-02-19)
+
+## Goal
+Close remaining Slice 95 evidence by attempting live Hedera EVM + HTS liquidity proofs and documenting deterministic blockers when tx-hash-grade completion is not yet feasible.
+
+## Non-goals
+1. No new public API endpoints.
+2. No schema/migration changes.
+3. No speculative completion of blocked bounty evidence.
+
+## Locked scope
+1. `docs/BOUNTY_ALIGNMENT_CHECKLIST.md`
+2. `docs/XCLAW_SLICE_TRACKER.md`
+3. `docs/XCLAW_BUILD_ROADMAP.md`
+4. `acceptance.md`
+5. `spec.md`
+6. `tasks.md`
+
+## Acceptance checks
+- `curl -fsSL https://xclaw.trade/skill-install.sh | bash`
+- `xclaw-agent status --json`
+- `xclaw-agent wallet health --chain hedera_testnet --json`
+- `xclaw-agent chains --json`
+- Hedera probe commands (`liquidity quote-add/add`) for `saucerswap`, `pangolin`, and `hedera_hts`
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `pm2 restart all`
+- `python3 -m unittest apps/agent-runtime/tests/test_liquidity_adapter.py -v`
+- `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v`
+
+---
+
 # Hotfix Spec: Preserve Trade Approval History After Execution
 
 ## Goal

@@ -4806,23 +4806,36 @@ Date (UTC): 2026-02-19
 - `E6` Hedera EVM proof attempt (runtime reached on-chain router call):
   - `apps/agent-runtime/bin/xclaw-agent liquidity quote-add --chain hedera_testnet --dex saucerswap --token-a WHBAR --token-b SAUCE --amount-a 1 --amount-b 1 --position-type v2 --slippage-bps 100 --json` -> `liquidity_quote_add_failed` with RPC revert (`CONTRACT_REVERT_EXECUTED`).
   - This confirms `coreContracts.router` + canonical token resolution are now execution-path ready (no config-contract failure).
+- `E10` Hedera EVM pair-discovery matrix (non-reverting pair search):
+  - Probed `saucerswap` + `pangolin` with `(WHBAR,SAUCE)` and amounts `{0.01, 0.1, 1, 5}` for both sides.
+  - Every probe returned deterministic live revert (`CONTRACT_REVERT_EXECUTED`), so no tx-hash-grade liquid pair was discovered from current canonical token set in this environment.
 - `E7` Hedera EVM add-intent path attempt:
   - `XCLAW_AGENT_API_KEY=slice7_token_abc12345 XCLAW_AGENT_ID=ag_slice7 apps/agent-runtime/bin/xclaw-agent liquidity add --chain hedera_testnet --dex saucerswap --token-a WHBAR --token-b SAUCE --amount-a 1 --amount-b 1 --slippage-bps 100 --json` -> first run `policy_denied`; after seeded `approval_mode=auto` snapshot for `ag_slice7/hedera_testnet`, rerun -> PASS (`status:"approved"`).
+- `E11` Hosted installer + wallet readiness refresh:
+  - `curl -fsSL https://xclaw.trade/skill-install.sh | bash` -> PASS.
+  - `xclaw-agent wallet health --chain hedera_testnet --json` -> PASS (`hasWallet:true`).
 - `E8` Hedera HTS fail-closed runtime path:
   - `apps/agent-runtime/bin/xclaw-agent liquidity quote-add --chain hedera_testnet --dex hedera_hts --token-a WHBAR --token-b SAUCE --amount-a 1 --amount-b 1 --position-type v2 --slippage-bps 100 --json` -> `missing_dependency`.
   - `XCLAW_AGENT_API_KEY=slice7_token_abc12345 XCLAW_AGENT_ID=ag_slice7 apps/agent-runtime/bin/xclaw-agent liquidity add --chain hedera_testnet --dex hedera_hts --token-a WHBAR --token-b SAUCE --amount-a 1 --amount-b 1 --slippage-bps 100 --json` -> `missing_dependency`.
+- `E12` HTS dependency deep probe:
+  - Installed fallback runtime venv and package: `~/.xclaw-agent/runtime-venv/bin/python -m pip install hedera-sdk-py` -> PASS.
+  - Raw import probe still fails: `import hedera` -> `Exception: Unable to find javac` (from `pyjnius` JDK detection), which explains deterministic runtime `missing_dependency` in this host environment.
 - `E9` Hedera HTS fail-closed unit path:
   - `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v` -> PASS including `test_quote_add_fails_closed_when_hedera_sdk_missing`.
 
 ### Live testnet blockers captured
 - Base Sepolia on-chain tx-hash evidence: `[!]` blocked in this pass because current `liquidity add/remove` path records intents/approval lifecycle and does not submit on-chain LP tx in this route-level flow.
 - Hedera live proof remains `[!]` for tx-hash-grade completion in this environment:
-  - `apps/agent-runtime/bin/xclaw-agent wallet health --chain hedera_testnet --json` reports `hasWallet:false` (no installer-managed Hedera wallet available locally).
-  - HTS-native plugin dependency is not installed (`missing_dependency`).
-  - EVM quote path is now execution-ready but reverted on live router quote for selected pair (`CONTRACT_REVERT_EXECUTED`), so successful quote/tx hash evidence requires validated liquid pair metadata.
+  - Wallet prerequisite is now resolved (`xclaw-agent wallet health --chain hedera_testnet --json` reports `hasWallet:true`).
+  - HTS package install alone is insufficient on this host because `hedera-sdk-py` import requires JDK/JNI runtime (`Unable to find javac`), so HTS still returns deterministic `missing_dependency`.
+  - EVM quote path is execution-ready but current canonical pair probes on both `saucerswap` and `pangolin` still revert (`CONTRACT_REVERT_EXECUTED`), so successful tx-hash proof requires validated non-reverting pair metadata.
 - Exact rerun probes:
   - `apps/agent-runtime/bin/xclaw-agent wallet health --chain hedera_testnet --json`
+  - `sudo apt-get update && sudo apt-get install -y default-jdk python3-venv python3-pip`
+  - `python3 -m venv ~/.xclaw-agent/runtime-venv && ~/.xclaw-agent/runtime-venv/bin/python -m pip install -r apps/agent-runtime/requirements.txt hedera-sdk-py`
+  - `XCLAW_AGENT_PYTHON_BIN=~/.xclaw-agent/runtime-venv/bin/python apps/agent-runtime/bin/xclaw-agent liquidity quote-add --chain hedera_testnet --dex hedera_hts --token-a WHBAR --token-b SAUCE --amount-a 1 --amount-b 1 --position-type v2 --slippage-bps 100 --json`
   - `apps/agent-runtime/bin/xclaw-agent liquidity quote-add --chain hedera_testnet --dex saucerswap --token-a <hed-era-token-a> --token-b <hed-era-token-b> --amount-a <a> --amount-b <b> --position-type v2 --slippage-bps 100 --json`
+  - `apps/agent-runtime/bin/xclaw-agent liquidity quote-add --chain hedera_testnet --dex pangolin --token-a <hed-era-token-a> --token-b <hed-era-token-b> --amount-a <a> --amount-b <b> --position-type v2 --slippage-bps 100 --json`
   - `apps/agent-runtime/bin/xclaw-agent liquidity quote-add --chain hedera_testnet --dex hedera_hts --token-a <hed-era-token-a> --token-b <hed-era-token-b> --amount-a <a> --amount-b <b> --position-type v2 --slippage-bps 100 --json`
   - `XCLAW_AGENT_API_KEY=<agent-key> XCLAW_AGENT_ID=<agent-id> apps/agent-runtime/bin/xclaw-agent liquidity add --chain hedera_testnet --dex <saucerswap|hedera_hts> --token-a <token-a> --token-b <token-b> --amount-a <a> --amount-b <b> --slippage-bps 100 --json`
 

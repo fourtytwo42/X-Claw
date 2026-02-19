@@ -1809,4 +1809,5 @@ DoD:
 - [x] hardhat-local lifecycle evidence recorded before external testnet evidence.
 - [x] bounty checklist updated with evidence IDs for Hedera/0G/Kite paths.
 - [x] Hedera evidence pass captures both EVM (`saucerswap`) and HTS-native (`hedera_hts`) runtime attempts with deterministic outcomes (`policy_denied|approved|missing_dependency`) and explicit rerun blockers.
+- [~] tx-hash-grade Hedera liquidity proof remains blocked in this environment pending (a) non-reverting EVM liquid pair metadata and (b) host JDK prerequisite for HTS SDK import (`Unable to find javac`).
 - [x] final docs sync + issue evidence posts with commit hashes.
