@@ -1,0 +1,30 @@
+{
+  "chainKey": "adi_testnet",
+  "family": "evm",
+  "enabled": true,
+  "uiVisible": true,
+  "displayName": "ADI Testnet",
+  "nativeCurrency": {
+    "name": "ADI",
+    "symbol": "ADI",
+    "decimals": 18
+  },
+  "rpc": {},
+  "coreContracts": {
+    "dex": "adapter_pending",
+    "deploymentStatus": "pending_verification",
+    "notes": "Post Wave-1 chain pack."
+  },
+  "canonicalTokens": {},
+  "capabilities": {
+    "wallet": true,
+    "trade": true,
+    "liquidity": true,
+    "limitOrders": true,
+    "x402": false,
+    "faucet": false,
+    "deposits": true
+  },
+  "updatedAt": "2026-02-19T00:00:00.000Z",
+  "version": 1
+}

@@ -201,6 +201,7 @@ export async function GET(req: NextRequest) {
       transferApprovalsQueue,
       transferApprovalsHistory,
       transferPolicyMirror,
+      liquidityPositions,
       trackedAgents,
       trackedRecentTrades
     ] = await Promise.all([
@@ -543,6 +544,70 @@ export async function GET(req: NextRequest) {
         throw error;
       }),
       dbQuery<{
+        position_id: string;
+        chain_key: string;
+        dex_key: string;
+        position_type: string;
+        pool_ref: string;
+        token_a: string;
+        token_b: string;
+        deposited_a: string;
+        deposited_b: string;
+        current_a: string;
+        current_b: string;
+        unclaimed_fees_a: string;
+        unclaimed_fees_b: string;
+        realized_fees_usd: string;
+        unrealized_pnl_usd: string;
+        position_value_usd: string | null;
+        status: string;
+        explorer_url: string | null;
+        last_synced_at: string;
+        updated_at: string;
+      }>(
+        `
+        select
+          position_id,
+          chain_key,
+          dex_key,
+          position_type,
+          pool_ref,
+          token_a,
+          token_b,
+          deposited_a::text,
+          deposited_b::text,
+          current_a::text,
+          current_b::text,
+          unclaimed_fees_a::text,
+          unclaimed_fees_b::text,
+          realized_fees_usd::text,
+          unrealized_pnl_usd::text,
+          position_value_usd::text,
+          status,
+          explorer_url,
+          last_synced_at::text,
+          updated_at::text
+        from liquidity_position_snapshots
+        where agent_id = $1
+          and chain_key = $2
+        order by updated_at desc
+        limit 100
+        `,
+        [agentId, chainKey]
+      ).catch((error) => {
+        if (isMissingTrackedSchema(error)) {
+          return { rowCount: 0, rows: [] };
+        }
+        if (error && typeof error === 'object') {
+          const code = 'code' in error ? String((error as { code?: unknown }).code ?? '') : '';
+          const message = 'message' in error ? String((error as { message?: unknown }).message ?? '') : '';
+          if (code === '42P01' || message.includes('liquidity_position_snapshots')) {
+            return { rowCount: 0, rows: [] };
+          }
+        }
+        throw error;
+      }),
+      dbQuery<{
         tracking_id: string;
         tracked_agent_id: string;
         agent_name: string;
@@ -689,6 +754,28 @@ export async function GET(req: NextRequest) {
         transferApprovalsHistory: transferApprovalsHistory.rows.map((row) => ({
           ...row,
           confirmations: row.tx_hash ? (transferConfirmationsByTx.get(row.tx_hash) ?? null) : null
+        })),
+        liquidityPositions: liquidityPositions.rows.map((row) => ({
+          position_id: row.position_id,
+          chain_key: row.chain_key,
+          dex_key: row.dex_key,
+          position_type: row.position_type,
+          pool_ref: row.pool_ref,
+          token_a: row.token_a,
+          token_b: row.token_b,
+          deposited_a: row.deposited_a,
+          deposited_b: row.deposited_b,
+          current_a: row.current_a,
+          current_b: row.current_b,
+          unclaimed_fees_a: row.unclaimed_fees_a,
+          unclaimed_fees_b: row.unclaimed_fees_b,
+          realized_fees_usd: row.realized_fees_usd,
+          unrealized_pnl_usd: row.unrealized_pnl_usd,
+          position_value_usd: row.position_value_usd,
+          status: row.status,
+          explorer_url: row.explorer_url,
+          last_synced_at: row.last_synced_at,
+          updated_at: row.updated_at
         })),
         transferApprovalPolicy:
           (transferPolicyMirror.rowCount ?? 0) > 0

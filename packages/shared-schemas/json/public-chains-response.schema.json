@@ -12,7 +12,7 @@
         "required": ["chainKey", "family", "enabled", "uiVisible", "displayName", "nativeCurrency", "capabilities"],
         "properties": {
           "chainKey": { "type": "string", "minLength": 1 },
-          "family": { "type": "string", "enum": ["evm"] },
+          "family": { "type": "string", "enum": ["evm", "hedera"] },
           "enabled": { "type": "boolean" },
           "uiVisible": { "type": "boolean" },
           "displayName": { "type": "string", "minLength": 1 },
@@ -29,10 +29,11 @@
           },
           "capabilities": {
             "type": "object",
-            "required": ["wallet", "trade", "limitOrders", "x402", "faucet", "deposits"],
+            "required": ["wallet", "trade", "liquidity", "limitOrders", "x402", "faucet", "deposits"],
             "properties": {
               "wallet": { "type": "boolean" },
               "trade": { "type": "boolean" },
+              "liquidity": { "type": "boolean" },
               "limitOrders": { "type": "boolean" },
               "x402": { "type": "boolean" },
               "faucet": { "type": "boolean" },

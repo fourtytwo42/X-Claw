@@ -1,0 +1,36 @@
+{
+  "chainKey": "kite_ai_mainnet",
+  "family": "evm",
+  "enabled": true,
+  "uiVisible": true,
+  "chainId": 2369,
+  "displayName": "Kite AI",
+  "nativeCurrency": {
+    "name": "KITE",
+    "symbol": "KITE",
+    "decimals": 18
+  },
+  "explorerBaseUrl": "https://kitescan.ai",
+  "rpc": {
+    "primary": "https://rpc.gokite.ai"
+  },
+  "coreContracts": {
+    "dex": "tesseract_univ2",
+    "deploymentStatus": "external"
+  },
+  "canonicalTokens": {},
+  "capabilities": {
+    "wallet": true,
+    "trade": true,
+    "liquidity": true,
+    "limitOrders": true,
+    "x402": true,
+    "faucet": false,
+    "deposits": true
+  },
+  "liquidityProtocols": {
+    "tesseract_univ2": { "family": "amm_v2", "enabled": true }
+  },
+  "updatedAt": "2026-02-19T00:00:00.000Z",
+  "version": 1
+}

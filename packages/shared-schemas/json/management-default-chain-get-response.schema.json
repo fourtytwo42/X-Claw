@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.xclaw.trade/management-default-chain-get-response.schema.json",
+  "type": "object",
+  "required": ["ok", "agentId", "chainKey", "source"],
+  "properties": {
+    "ok": { "type": "boolean", "const": true },
+    "agentId": { "type": "string", "minLength": 1 },
+    "chainKey": { "type": "string", "minLength": 1 },
+    "source": { "type": "string", "enum": ["state", "env", "fallback"] },
+    "persistedChainKey": { "type": ["string", "null"] }
+  }
+}

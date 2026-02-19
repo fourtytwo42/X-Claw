@@ -25,6 +25,7 @@ export type ChainConfig = {
   capabilities?: {
     wallet?: boolean;
     trade?: boolean;
+    liquidity?: boolean;
     limitOrders?: boolean;
     x402?: boolean;
     faucet?: boolean;
@@ -75,7 +76,7 @@ export function isSupportedChainKey(chainKey: string): boolean {
 
 export function chainCapabilityEnabled(
   chainKey: string,
-  capability: 'wallet' | 'trade' | 'limitOrders' | 'x402' | 'faucet' | 'deposits'
+  capability: 'wallet' | 'trade' | 'liquidity' | 'limitOrders' | 'x402' | 'faucet' | 'deposits'
 ): boolean {
   const cfg = getChainConfig(chainKey);
   if (!cfg || !isChainEnabled(cfg)) {

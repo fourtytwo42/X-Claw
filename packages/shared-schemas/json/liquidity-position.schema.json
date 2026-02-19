@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://xclaw.trade/schemas/liquidity-position.schema.json",
+  "title": "Liquidity Position",
+  "type": "object",
+  "required": [
+    "positionId",
+    "chainKey",
+    "dex",
+    "positionType",
+    "pool",
+    "tokenA",
+    "tokenB",
+    "status",
+    "lastUpdatedAt"
+  ],
+  "properties": {
+    "positionId": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "chainKey": { "type": "string", "minLength": 2, "maxLength": 64 },
+    "dex": { "type": "string", "minLength": 2, "maxLength": 64 },
+    "positionType": { "type": "string", "enum": ["v2", "v3"] },
+    "pool": { "type": "string", "minLength": 2, "maxLength": 256 },
+    "tokenA": { "type": "string", "minLength": 2, "maxLength": 128 },
+    "tokenB": { "type": "string", "minLength": 2, "maxLength": 128 },
+    "depositedA": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?$" },
+    "depositedB": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?$" },
+    "currentA": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?$" },
+    "currentB": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?$" },
+    "unclaimedFeesA": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?$" },
+    "unclaimedFeesB": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?$" },
+    "realizedFeesUsd": { "type": "string", "pattern": "^-?[0-9]+(\\.[0-9]+)?$" },
+    "unrealizedPnlUsd": { "type": "string", "pattern": "^-?[0-9]+(\\.[0-9]+)?$" },
+    "positionValueUsd": { "type": "string", "pattern": "^-?[0-9]+(\\.[0-9]+)?$" },
+    "status": { "type": "string", "enum": ["active", "closed", "paused", "deactivated"] },
+    "explorerUrl": { "type": ["string", "null"], "maxLength": 2048 },
+    "lastUpdatedAt": { "type": "string", "format": "date-time" },
+    "stale": { "type": "boolean" }
+  },
+  "additionalProperties": false
+}

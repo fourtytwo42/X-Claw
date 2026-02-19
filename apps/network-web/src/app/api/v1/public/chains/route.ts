@@ -28,6 +28,7 @@ export async function GET(req: NextRequest) {
       capabilities: {
         wallet: cfg.capabilities?.wallet ?? true,
         trade: cfg.capabilities?.trade ?? false,
+        liquidity: cfg.capabilities?.liquidity ?? false,
         limitOrders: cfg.capabilities?.limitOrders ?? false,
         x402: cfg.capabilities?.x402 ?? false,
         faucet: cfg.capabilities?.faucet ?? false,
@@ -37,4 +38,3 @@ export async function GET(req: NextRequest) {
 
   return successResponse({ ok: true, chains: items }, 200, requestId);
 }
-

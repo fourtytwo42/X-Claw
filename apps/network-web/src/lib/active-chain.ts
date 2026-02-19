@@ -108,6 +108,86 @@ async function fetchAndStoreRegistry(): Promise<void> {
   }
 }
 
+function getCsrfToken(): string | null {
+  if (typeof document === 'undefined') {
+    return null;
+  }
+  const raw = document.cookie
+    .split(';')
+    .map((part) => part.trim())
+    .find((part) => part.startsWith('xclaw_csrf='));
+  if (!raw) {
+    return null;
+  }
+  return decodeURIComponent(raw.split('=')[1] ?? '');
+}
+
+async function fetchRuntimeManagedDefaultChain(): Promise<ChainKey | null> {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+  try {
+    const sessionRes = await fetch('/api/v1/management/session/agents', {
+      method: 'GET',
+      credentials: 'same-origin',
+      cache: 'no-store'
+    });
+    if (!sessionRes.ok) {
+      return null;
+    }
+    const sessionPayload = (await sessionRes.json()) as { activeAgentId?: string };
+    const activeAgentId = String(sessionPayload?.activeAgentId ?? '').trim();
+    if (!activeAgentId) {
+      return null;
+    }
+    const defaultRes = await fetch(
+      `/api/v1/management/default-chain?agentId=${encodeURIComponent(activeAgentId)}`,
+      {
+        method: 'GET',
+        credentials: 'same-origin',
+        cache: 'no-store'
+      }
+    );
+    if (!defaultRes.ok) {
+      return null;
+    }
+    const payload = (await defaultRes.json()) as { chainKey?: unknown };
+    const chainKey = typeof payload?.chainKey === 'string' ? payload.chainKey.trim() : '';
+    return chainKey || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function syncManagedAgentsDefaultChain(chainKey: ChainKey): Promise<{ ok: boolean; message?: string }> {
+  if (typeof window === 'undefined') {
+    return { ok: true };
+  }
+  const csrf = getCsrfToken();
+  try {
+    const response = await fetch('/api/v1/management/default-chain/update-batch', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'content-type': 'application/json',
+        ...(csrf ? { 'x-csrf-token': csrf } : {})
+      },
+      body: JSON.stringify({ chainKey })
+    });
+    if (!response.ok) {
+      const payload = (await response.json().catch(() => null)) as { message?: string } | null;
+      return { ok: false, message: payload?.message ?? 'Failed to sync default chain.' };
+    }
+    const payload = (await response.json()) as { failureCount?: number };
+    if (Number(payload?.failureCount ?? 0) > 0) {
+      return { ok: false, message: 'Default chain sync partially failed for managed agents.' };
+    }
+    return { ok: true };
+  } catch {
+    return { ok: false, message: 'Default chain sync request failed.' };
+  }
+}
+
 export function getStoredChainKey(): ChainKey {
   if (typeof window === 'undefined') {
     return FALLBACK_CHAIN;
@@ -163,6 +243,17 @@ export function useActiveChainKey(): [ChainKey, (next: ChainKey) => void, string
       const nextOptions = getChainOptions();
       setOptions(nextOptions);
       setChainKey((current) => (nextOptions.some((opt) => opt.key === current) ? current : FALLBACK_CHAIN));
+    });
+    fetchRuntimeManagedDefaultChain().then((runtimeChain) => {
+      if (!runtimeChain) {
+        return;
+      }
+      const optionsNow = getChainOptions();
+      if (!optionsNow.some((item) => item.key === runtimeChain)) {
+        return;
+      }
+      setChainKey(runtimeChain);
+      setStoredChainKey(runtimeChain);
     });
 
     const onRegistry = () => {

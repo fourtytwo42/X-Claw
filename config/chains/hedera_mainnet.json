@@ -1,0 +1,39 @@
+{
+  "chainKey": "hedera_mainnet",
+  "family": "hedera",
+  "enabled": true,
+  "uiVisible": true,
+  "chainId": 295,
+  "displayName": "Hedera",
+  "nativeCurrency": {
+    "name": "HBAR",
+    "symbol": "HBAR",
+    "decimals": 8
+  },
+  "explorerBaseUrl": "https://hashscan.io/mainnet",
+  "rpc": {
+    "primary": "https://mainnet.hashio.io/api"
+  },
+  "coreContracts": {
+    "dex": "saucerswap",
+    "deploymentStatus": "external",
+    "notes": "Wave-1 target for Hedera EVM and optional HTS SDK plugin support."
+  },
+  "canonicalTokens": {},
+  "capabilities": {
+    "wallet": true,
+    "trade": true,
+    "liquidity": true,
+    "limitOrders": true,
+    "x402": false,
+    "faucet": false,
+    "deposits": true
+  },
+  "liquidityProtocols": {
+    "saucerswap": { "family": "amm_v2", "enabled": true },
+    "pangolin": { "family": "amm_v2", "enabled": true },
+    "hedera_hts": { "family": "hedera_hts", "enabled": true }
+  },
+  "updatedAt": "2026-02-19T00:00:00.000Z",
+  "version": 1
+}

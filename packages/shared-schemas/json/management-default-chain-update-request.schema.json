@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.xclaw.trade/management-default-chain-update-request.schema.json",
+  "type": "object",
+  "required": ["agentId", "chainKey"],
+  "properties": {
+    "agentId": { "type": "string", "minLength": 1 },
+    "chainKey": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": false
+}

@@ -1110,6 +1110,12 @@ export default function AgentPublicProfilePage() {
   );
 
   const holdings = useMemo(() => buildHoldings(profile, depositData, activeChainKey), [profile, depositData, activeChainKey]);
+  const liquidityPositions = useMemo(() => {
+    if (management.phase !== 'ready') {
+      return [];
+    }
+    return (management.data.liquidityPositions ?? []).filter((row) => row.chain_key === activeChainKey);
+  }, [management, activeChainKey]);
   const withdrawAssetOptions = useMemo(() => {
     const nativeHolding =
       holdings.find((holding) => {
@@ -2157,6 +2163,47 @@ export default function AgentPublicProfilePage() {
                 ) : null}
               </div>
             ) : null}
+          </article>
+
+            <article className={`${styles.card} ${styles.walletCard}`}>
+            <div className={`${styles.cardHeader} ${styles.walletCardHeader}`}>
+              <h2>Liquidity Positions</h2>
+              <span className={styles.muted}>Chain-scoped LP and concentrated positions</span>
+            </div>
+            {liquidityPositions.length === 0 ? <p className={styles.muted}>No liquidity positions detected for this chain.</p> : null}
+            {liquidityPositions.map((position) => (
+              <div key={position.position_id} className={styles.listRow}>
+                <div>
+                  <div className={styles.listTitle}>
+                    {position.dex_key.toUpperCase()} • {position.token_a}/{position.token_b}
+                  </div>
+                  <div className={styles.muted}>
+                    {position.position_type.toUpperCase()} • Pool: {position.pool_ref}
+                  </div>
+                  <div className={styles.muted}>
+                    Deposited {position.deposited_a} / {position.deposited_b} • Current {position.current_a} / {position.current_b}
+                  </div>
+                  <div className={styles.muted}>
+                    Unclaimed fees {position.unclaimed_fees_a} / {position.unclaimed_fees_b} • Realized fees {formatUsd(position.realized_fees_usd)}
+                  </div>
+                  <div className={styles.muted}>
+                    Unrealized PnL {formatUsd(position.unrealized_pnl_usd)} • Value {formatUsd(position.position_value_usd)}
+                  </div>
+                  {position.explorer_url ? (
+                    <div className={styles.muted}>
+                      Explorer:{' '}
+                      <a href={position.explorer_url} target="_blank" rel="noreferrer" className={styles.inlineLink}>
+                        View position
+                      </a>
+                    </div>
+                  ) : null}
+                </div>
+                <div className={styles.listMeta}>
+                  <span className={styles.statusChip}>{displayStatusLabel(position.status)}</span>
+                  <span>{formatUtc(position.updated_at)} UTC</span>
+                </div>
+              </div>
+            ))}
           </article>
 
             <article className={`${styles.card} ${styles.walletCard}`}>

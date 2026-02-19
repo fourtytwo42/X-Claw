@@ -33,10 +33,25 @@
   "capabilities": {
     "wallet": true,
     "trade": true,
+    "liquidity": true,
     "limitOrders": true,
     "x402": true,
     "faucet": true,
     "deposits": true
+  },
+  "liquidityProtocols": {
+    "uniswap_v2": {
+      "family": "amm_v2",
+      "enabled": true
+    },
+    "uniswap_v3": {
+      "family": "amm_v3",
+      "enabled": true
+    },
+    "aerodrome": {
+      "family": "amm_v2",
+      "enabled": true
+    }
   },
   "updatedAt": "2026-02-14T07:55:51.788Z",
   "version": 1,

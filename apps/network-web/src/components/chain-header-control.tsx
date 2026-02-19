@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import {
@@ -8,7 +9,8 @@ import {
   useActiveChainKey,
   useDashboardChainKey,
   useChainOptions,
-  useDashboardChainOptions
+  useDashboardChainOptions,
+  syncManagedAgentsDefaultChain,
 } from '@/lib/active-chain';
 
 type ChainHeaderControlProps = {
@@ -19,6 +21,7 @@ type ChainHeaderControlProps = {
 
 export function ChainHeaderControl({ includeAll = false, className, id = 'chain-select' }: ChainHeaderControlProps) {
   const router = useRouter();
+  const [syncError, setSyncError] = useState<string | null>(null);
   const [chainKey, setChainKey] = useActiveChainKey();
   const [dashboardChainKey, setDashboardChainKey] = useDashboardChainKey();
   const chainOptions = useChainOptions();
@@ -51,8 +54,15 @@ export function ChainHeaderControl({ includeAll = false, className, id = 'chain-
     );
   }
 
-  const onChange = (next: ChainKey) => {
+  const onChange = async (next: ChainKey) => {
+    const previous = chainKey;
     setChainKey(next);
+    setSyncError(null);
+    const synced = await syncManagedAgentsDefaultChain(next);
+    if (!synced.ok) {
+      setChainKey(previous);
+      setSyncError(synced.message ?? 'Failed to sync selected network.');
+    }
     router.refresh();
   };
 
@@ -68,6 +78,7 @@ export function ChainHeaderControl({ includeAll = false, className, id = 'chain-
           </option>
         ))}
       </select>
+      {syncError ? <p role="status">{syncError}</p> : null}
     </div>
   );
 }

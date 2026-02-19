@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.xclaw.trade/management-default-chain-batch-update-request.schema.json",
+  "type": "object",
+  "required": ["chainKey"],
+  "properties": {
+    "chainKey": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": false
+}

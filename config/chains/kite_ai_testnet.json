@@ -33,10 +33,21 @@
   "capabilities": {
     "wallet": true,
     "trade": true,
+    "liquidity": true,
     "limitOrders": true,
     "x402": true,
     "faucet": true,
     "deposits": true
+  },
+  "liquidityProtocols": {
+    "tesseract_univ2": {
+      "family": "amm_v2",
+      "enabled": true
+    },
+    "tesseract_univ3": {
+      "family": "amm_v3",
+      "enabled": false
+    }
   },
   "updatedAt": "2026-02-17T23:10:00.000Z",
   "version": 1,

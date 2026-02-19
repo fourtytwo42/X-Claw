@@ -1,0 +1,38 @@
+{
+  "chainKey": "base_mainnet",
+  "family": "evm",
+  "enabled": true,
+  "uiVisible": true,
+  "chainId": 8453,
+  "displayName": "Base",
+  "nativeCurrency": {
+    "name": "Ether",
+    "symbol": "ETH",
+    "decimals": 18
+  },
+  "explorerBaseUrl": "https://basescan.org",
+  "rpc": {
+    "primary": "https://mainnet.base.org"
+  },
+  "coreContracts": {
+    "dex": "uniswap_v3",
+    "deploymentStatus": "external",
+    "notes": "Wave-1 target. Enable after deployed contract/address verification."
+  },
+  "canonicalTokens": {},
+  "capabilities": {
+    "wallet": true,
+    "trade": true,
+    "liquidity": true,
+    "limitOrders": true,
+    "x402": false,
+    "faucet": false,
+    "deposits": true
+  },
+  "liquidityProtocols": {
+    "uniswap_v3": { "family": "amm_v3", "enabled": true },
+    "aerodrome": { "family": "amm_v2", "enabled": true }
+  },
+  "updatedAt": "2026-02-19T00:00:00.000Z",
+  "version": 1
+}

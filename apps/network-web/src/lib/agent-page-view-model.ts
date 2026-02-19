@@ -214,6 +214,28 @@ export type ManagementStatePayload = {
     allowedTransferTokens: string[];
     updatedAt: string | null;
   };
+  liquidityPositions?: Array<{
+    position_id: string;
+    chain_key: string;
+    dex_key: string;
+    position_type: 'v2' | 'v3' | string;
+    pool_ref: string;
+    token_a: string;
+    token_b: string;
+    deposited_a: string;
+    deposited_b: string;
+    current_a: string;
+    current_b: string;
+    unclaimed_fees_a: string;
+    unclaimed_fees_b: string;
+    realized_fees_usd: string;
+    unrealized_pnl_usd: string;
+    position_value_usd: string | null;
+    status: 'active' | 'closed' | 'paused' | 'deactivated' | string;
+    explorer_url: string | null;
+    last_synced_at: string;
+    updated_at: string;
+  }>;
   latestPolicy: {
     mode: 'real';
     approval_mode: 'per_trade' | 'auto';

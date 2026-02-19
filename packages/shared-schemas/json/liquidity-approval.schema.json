@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://xclaw.trade/schemas/liquidity-approval.schema.json",
+  "title": "Liquidity Approval",
+  "type": "object",
+  "required": ["liquidityIntentId", "chainKey", "status", "scope"],
+  "properties": {
+    "liquidityIntentId": { "type": "string", "minLength": 3, "maxLength": 64 },
+    "chainKey": { "type": "string", "minLength": 2, "maxLength": 64 },
+    "status": { "type": "string", "enum": ["approval_pending", "approved", "rejected", "expired"] },
+    "scope": { "type": "string", "enum": ["trade", "global"] },
+    "tokenRef": { "type": ["string", "null"], "maxLength": 128 },
+    "reasonCode": { "type": ["string", "null"], "maxLength": 64 },
+    "reasonMessage": { "type": ["string", "null"], "maxLength": 1024 }
+  },
+  "additionalProperties": false
+}

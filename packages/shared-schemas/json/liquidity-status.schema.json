@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://xclaw.trade/schemas/liquidity-status.schema.json",
+  "title": "Liquidity Status Update",
+  "type": "object",
+  "required": ["status"],
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": [
+        "proposed",
+        "approval_pending",
+        "approved",
+        "rejected",
+        "executing",
+        "verifying",
+        "filled",
+        "failed",
+        "expired",
+        "verification_timeout"
+      ]
+    },
+    "reasonCode": { "type": "string", "maxLength": 64 },
+    "reasonMessage": { "type": "string", "maxLength": 2048 },
+    "txHash": { "type": "string", "maxLength": 96 },
+    "positionId": { "type": "string", "maxLength": 128 },
+    "amountOut": {
+      "oneOf": [
+        { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?$" },
+        { "type": "number", "minimum": 0 }
+      ]
+    },
+    "details": { "type": "object" }
+  },
+  "additionalProperties": false
+}
