@@ -3702,3 +3702,4 @@ Limitations / notes:
   - `[X-CLAW WEB TRADE RESULT]`,
   - `[X-CLAW WEB TRANSFER DECISION]`,
   - `[X-CLAW WEB TRANSFER RESULT]`.
+- Each synthetic envelope must include an explicit `Instruction:` line so the agent deterministically knows whether to send a user-facing confirmation.

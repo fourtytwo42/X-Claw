@@ -148,13 +148,19 @@ export function buildWebTradeDecisionProdMessage(input: {
   source: string;
   reasonMessage?: string | null;
 }): string {
+  const decisionWord = String(input.decision || '').trim().toUpperCase();
+  const instruction =
+    decisionWord === 'APPROVE'
+      ? 'Reply to the user confirming web approval was received and execution/resume is in progress.'
+      : 'Reply to the user confirming the trade was rejected via web management.';
   return [
     '[X-CLAW WEB TRADE DECISION]',
-    `Decision: ${String(input.decision || '').trim().toUpperCase()}`,
+    `Decision: ${decisionWord}`,
     `Trade: ${input.tradeId}`,
     `Chain: ${input.chainKey}`,
     `Source: ${input.source}`,
-    `Reason: ${String(input.reasonMessage ?? '').trim() || 'n/a'}`
+    `Reason: ${String(input.reasonMessage ?? '').trim() || 'n/a'}`,
+    `Instruction: ${instruction}`
   ].join('\n');
 }
 
@@ -166,6 +172,13 @@ export function buildWebTradeResultProdMessage(input: {
   source: string;
   reasonMessage?: string | null;
 }): string {
+  const normalized = String(input.status || '').trim().toLowerCase();
+  const instruction =
+    normalized === 'filled'
+      ? 'Reply to the user confirming the trade succeeded with tx details.'
+      : normalized === 'rejected'
+        ? 'Reply to the user confirming the trade was rejected and no execution occurred.'
+        : 'Reply to the user confirming the trade failed and provide next steps.';
   return [
     '[X-CLAW WEB TRADE RESULT]',
     `Decision: ${String(input.status || '').trim().toUpperCase()}`,
@@ -173,7 +186,8 @@ export function buildWebTradeResultProdMessage(input: {
     `Chain: ${input.chainKey}`,
     `TxHash: ${String(input.txHash ?? '').trim() || 'n/a'}`,
     `Source: ${input.source}`,
-    `Reason: ${String(input.reasonMessage ?? '').trim() || 'n/a'}`
+    `Reason: ${String(input.reasonMessage ?? '').trim() || 'n/a'}`,
+    `Instruction: ${instruction}`
   ].join('\n');
 }
 
@@ -184,13 +198,19 @@ export function buildWebTransferDecisionProdMessage(input: {
   source: string;
   reasonMessage?: string | null;
 }): string {
+  const decisionWord = String(input.decision || '').trim().toUpperCase();
+  const instruction =
+    decisionWord === 'APPROVE'
+      ? 'Reply to the user confirming web approval was received and transfer execution is in progress.'
+      : 'Reply to the user confirming the transfer was denied via web management.';
   return [
     '[X-CLAW WEB TRANSFER DECISION]',
-    `Decision: ${String(input.decision || '').trim().toUpperCase()}`,
+    `Decision: ${decisionWord}`,
     `Approval: ${input.approvalId}`,
     `Chain: ${input.chainKey}`,
     `Source: ${input.source}`,
-    `Reason: ${String(input.reasonMessage ?? '').trim() || 'n/a'}`
+    `Reason: ${String(input.reasonMessage ?? '').trim() || 'n/a'}`,
+    `Instruction: ${instruction}`
   ].join('\n');
 }
 
@@ -202,6 +222,13 @@ export function buildWebTransferResultProdMessage(input: {
   source: string;
   reasonMessage?: string | null;
 }): string {
+  const normalized = String(input.status || '').trim().toLowerCase();
+  const instruction =
+    normalized === 'filled'
+      ? 'Reply to the user confirming the transfer succeeded with tx details.'
+      : normalized === 'rejected'
+        ? 'Reply to the user confirming the transfer was denied and no transaction was executed.'
+        : 'Reply to the user confirming the transfer failed and provide next steps.';
   return [
     '[X-CLAW WEB TRANSFER RESULT]',
     `Decision: ${String(input.status || '').trim().toUpperCase()}`,
@@ -209,7 +236,8 @@ export function buildWebTransferResultProdMessage(input: {
     `Chain: ${input.chainKey}`,
     `TxHash: ${String(input.txHash ?? '').trim() || 'n/a'}`,
     `Source: ${input.source}`,
-    `Reason: ${String(input.reasonMessage ?? '').trim() || 'n/a'}`
+    `Reason: ${String(input.reasonMessage ?? '').trim() || 'n/a'}`,
+    `Instruction: ${instruction}`
   ].join('\n');
 }
 
