@@ -3117,5 +3117,7 @@ Note:
 - [x] Hedera runtime `wallet balance` merges mirror-node discovered token holdings so non-canonical owned tokens (for example USDC) appear in `tokens[]`.
 - [x] Add route-level faucet contract test (`npm run test:faucet:contract`) covering demo-agent block and non-demo deterministic error semantics.
 - [x] Installer warmup diagnostics now emit faucet `code/message/actionHint/requestId` and exact rerun command.
+- [x] Faucet self-recipient sends are hard-blocked (`faucet_recipient_not_eligible`) and success payload includes `recipientAddress` + `faucetAddress`.
+- [x] Add ops scripts to audit/fix agent wallet mappings that match faucet signer addresses (`ops:faucet:audit-mappings`, `ops:faucet:fix-mapping`).
 - [x] Update bounty checklist evidence IDs for Hedera/0G/Kite.
 - [x] Post issue evidence + commit hashes for slices 90-95.

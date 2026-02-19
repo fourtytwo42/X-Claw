@@ -22,6 +22,7 @@ export type ApiErrorCode =
   | 'faucet_config_invalid'
   | 'faucet_fee_too_low_for_chain'
   | 'faucet_native_insufficient'
+  | 'faucet_recipient_not_eligible'
   | 'faucet_wrapped_insufficient'
   | 'faucet_wrapped_autowrap_failed'
   | 'faucet_stable_insufficient'

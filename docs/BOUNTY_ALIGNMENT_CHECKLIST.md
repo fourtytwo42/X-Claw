@@ -170,6 +170,7 @@ Notes:
 - `E29/E30` capture Hedera HTS add/remove tx-hash runtime proof.
 - `E34..E37` capture Hedera faucet deterministic failure contract and installer warmup diagnostics for non-demo install flows.
 - `E38..E40` capture official Hedera helper wrapping (`wallet wrap-native`) and post-wrap faucet deterministic behavior.
+- `E46..E48` capture faucet self-recipient hard-block contract and wallet-mapping hygiene tooling evidence.
 
 ---
 
@@ -215,3 +216,6 @@ Notes:
 - `E38`: Runtime official helper wrap tx hash via `wallet wrap-native --chain hedera_testnet --amount 1 --json` (`0x1336c10e4f0a891e998d8e971f15a9702ee116bc6271cbf3b0f907e46ceebc10`).
 - `E39`: Post-wrap wallet balance confirms WHBAR increase to `1.00554979`.
 - `E40`: Hedera faucet request returns deterministic `faucet_stable_insufficient` with `requestId` and inventory details (no opaque `internal_error`).
+- `E46`: Faucet wallet mapping audit reports impacted agent/chain rows where `agent_wallets.address == faucet signer`.
+- `E47`: Faucet wallet mapping fix script dry-run proves deterministic targeted remediation contract.
+- `E48`: Faucet self-recipient hard block returns deterministic `faucet_recipient_not_eligible` (with recipient/faucet provenance fields).

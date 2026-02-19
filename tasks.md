@@ -2693,3 +2693,29 @@ Active slice context: `Slice 95` closure hardening.
 ## 2) Validation + docs
 - [x] Add wallet unit test for Hedera discovered token merge.
 - [x] Update wallet contract + source-of-truth wording for Hedera discovered token behavior.
+
+# Slice 95L Tasks Update: Hedera Faucet Self-Recipient Guard + Mapping Hygiene (UTC 2026-02-19)
+
+## 1) Faucet route hardening
+- [x] Hard-block recipient == faucet signer with deterministic `faucet_recipient_not_eligible`.
+- [x] Include recipient provenance in success payload (`recipientAddress`, `faucetAddress`).
+- [x] Add `faucet_recipient_not_eligible` to API error contract union.
+
+## 2) Ops hygiene tooling
+- [x] Add `ops:faucet:audit-mappings` script to detect agent wallet rows mapped to faucet signer addresses.
+- [x] Add `ops:faucet:fix-mapping` script (dry-run by default, explicit `--apply` for targeted update).
+- [x] Add npm script entries for audit/fix tools.
+
+## 3) Regression coverage
+- [x] Extend faucet contract test harness with self-recipient deterministic-block scenario.
+
+## 4) Validation + evidence
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+- [x] `npm run test:faucet:contract`
+- [x] `npm run ops:faucet:audit-mappings`
+- [x] `npm run ops:faucet:fix-mapping -- --agent-id ag_3cfbc4cd0949d3f4c933 --chain hedera_testnet --address 0x582f6f293e0f49855bb752ae29d6b0565c500d87` (dry-run)

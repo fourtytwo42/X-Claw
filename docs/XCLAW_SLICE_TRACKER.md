@@ -1814,8 +1814,10 @@ DoD:
 - [x] tx-hash-grade Hedera liquidity proof is complete: EVM add/remove tx hashes captured (`E22`,`E23`) and HTS add/remove tx hashes captured (`E29`,`E30`) in runtime flow.
 - [x] hosted installer auto-binds `hedera_testnet` wallet context to the portable default wallet key and performs multi-chain register upsert (`default chain` + `hedera_testnet`) with optional Hedera faucet warmup warnings on non-fatal failure.
 - [x] Hedera faucet request route now returns deterministic `faucet_*` error contracts (no opaque `internal_error` for known preflight/config/RPC failures).
+- [x] Faucet hard-blocks self-recipient sends (`faucet_recipient_not_eligible`) and success payloads include `recipientAddress` + `faucetAddress` provenance fields.
 - [x] Official Hedera helper wrap path is available (`wallet wrap-native`) and faucet wrapped-asset deficits can auto-wrap via helper with deterministic `faucet_wrapped_autowrap_failed` fallback.
 - [x] Hedera faucet default drips are set to 5 HBAR / 5 WHBAR / 10 USDC for non-demo warmup reliability.
+- [x] Ops tooling includes faucet wallet-mapping audit/fix scripts (`ops:faucet:audit-mappings`, `ops:faucet:fix-mapping`) to detect/remediate agent-chain mappings that point to faucet signer addresses.
 - [x] installer warmup logs include faucet `code/message/actionHint/requestId` and explicit rerun diagnostics; install remains non-fatal on warmup failure after wallet/register invariants pass.
 - [x] Hedera wallet balance visibility includes mirror-node discovered token holdings for the requested chain, so non-canonical owned tokens are surfaced in runtime `tokens[]`.
 - [x] final docs sync + issue evidence posts with commit hashes.

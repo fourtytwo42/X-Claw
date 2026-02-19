@@ -6,6 +6,8 @@ const DEMO_AGENT_ID = process.env.XCLAW_E2E_DEMO_AGENT_ID || 'ag_slice7';
 const DEMO_AGENT_API_KEY = process.env.XCLAW_E2E_DEMO_AGENT_API_KEY || 'slice7_token_abc12345';
 const AGENT_ID = process.env.XCLAW_E2E_AGENT_ID || '';
 const AGENT_API_KEY = process.env.XCLAW_E2E_AGENT_API_KEY || '';
+const SELF_AGENT_ID = process.env.XCLAW_E2E_SELF_FAUCET_AGENT_ID || '';
+const SELF_AGENT_API_KEY = process.env.XCLAW_E2E_SELF_FAUCET_AGENT_API_KEY || '';
 const CHAIN_KEY = process.env.XCLAW_E2E_CHAIN_KEY || 'hedera_testnet';
 
 const state = { passed: 0, failed: 0, checks: [] };
@@ -116,6 +118,7 @@ async function main() {
     const knownDeterministicFailures = new Set([
       'rate_limited',
       'payload_invalid',
+      'faucet_recipient_not_eligible',
       'faucet_fee_too_low_for_chain',
       'faucet_native_insufficient',
       'faucet_wrapped_insufficient',
@@ -131,6 +134,26 @@ async function main() {
       expect(nonDemoFaucet.body?.code !== 'internal_error', 'non_demo_failure_not_internal_error', nonDemoFaucet.body);
       expect(knownDeterministicFailures.has(String(nonDemoFaucet.body?.code || '')), 'non_demo_failure_is_deterministic_code', nonDemoFaucet.body);
       expect(typeof nonDemoFaucet.body?.requestId === 'string' && nonDemoFaucet.body.requestId.length > 0, 'non_demo_failure_has_request_id', nonDemoFaucet.body);
+    }
+
+    if (SELF_AGENT_ID && SELF_AGENT_API_KEY) {
+      const selfRecipient = await requestAgent({
+        agentId: SELF_AGENT_ID,
+        apiKey: SELF_AGENT_API_KEY,
+        routePath: '/agent/faucet/request',
+        body: {
+          schemaVersion: 1,
+          agentId: SELF_AGENT_ID,
+          chainKey: CHAIN_KEY,
+          assets: ['native'],
+        },
+      });
+      expect(selfRecipient.status === 400, 'self_recipient_block_status_400', selfRecipient);
+      expect(selfRecipient.body?.code === 'faucet_recipient_not_eligible', 'self_recipient_block_code', selfRecipient.body);
+    } else {
+      record(true, 'self_recipient_block_skipped_missing_env', {
+        requiredEnv: ['XCLAW_E2E_SELF_FAUCET_AGENT_ID', 'XCLAW_E2E_SELF_FAUCET_AGENT_API_KEY'],
+      });
     }
   }
 

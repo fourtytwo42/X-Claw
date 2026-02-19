@@ -2588,3 +2588,38 @@ Ensure `wallet balance --chain hedera_testnet` shows all owned Hedera tokens for
 ## Acceptance checks
 - Hedera `wallet balance` includes mirror-discovered non-zero token holdings merged into `tokens[]`.
 - Discovery failures remain non-fatal and are reported in `tokenErrors[]`.
+
+# Slice 95L Spec Addendum: Hedera Faucet Self-Recipient Guard + Mapping Hygiene (UTC 2026-02-19)
+
+## Goals
+1. Prevent operationally useless faucet requests where the faucet signer sends funds to itself.
+2. Make recipient provenance explicit in success responses for immediate operator verification.
+3. Add deterministic ops tooling to audit and fix agent wallet mappings that point to faucet signer addresses.
+
+## Locked scope
+1. `apps/network-web/src/app/api/v1/agent/faucet/request/route.ts`
+2. `apps/network-web/src/lib/errors.ts`
+3. `infrastructure/scripts/faucet-contract-tests.mjs`
+4. `infrastructure/scripts/faucet-audit-wallet-mappings.mjs`
+5. `infrastructure/scripts/faucet-fix-wallet-mapping.mjs`
+6. `package.json`
+7. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+8. `docs/api/WALLET_COMMAND_CONTRACT.md`
+9. `docs/XCLAW_SLICE_TRACKER.md`
+10. `docs/XCLAW_BUILD_ROADMAP.md`
+11. `acceptance.md`
+12. `tasks.md`
+
+## Contract updates
+1. `POST /api/v1/agent/faucet/request` remains path-stable.
+2. New deterministic error code:
+   - `faucet_recipient_not_eligible` (recipient equals faucet signer).
+3. Success payload includes:
+   - `recipientAddress`
+   - `faucetAddress`
+
+## Acceptance checks
+- Self-recipient request returns `400` with `code=faucet_recipient_not_eligible`.
+- Non-demo success/failure remains deterministic and does not regress to opaque `internal_error`.
+- Ops audit script reports impacted `agent_wallets` rows where recipient equals faucet signer.
+- Ops fix script supports deterministic dry-run and explicit apply for one `(agent, chain)` mapping.

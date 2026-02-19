@@ -240,7 +240,8 @@ The following non-wallet commands are part of the same Python-first wrapper cont
 2. `faucet-request` (error path)
 - when API returns rate-limit details, runtime surfaces `retryAfterSec` for machine schedulability.
 - supports chain-aware selectable assets via `--asset native|wrapped|stable` and returns resolved `requestedAssets`/`fulfilledAssets`.
-- Hedera faucet failures must preserve deterministic server codes in runtime output (`faucet_config_invalid`, `faucet_fee_too_low_for_chain`, `faucet_native_insufficient`, `faucet_wrapped_insufficient`, `faucet_wrapped_autowrap_failed`, `faucet_stable_insufficient`, `faucet_send_preflight_failed`, `faucet_rpc_unavailable`) with `requestId` passthrough for diagnostics.
+- Hedera faucet failures must preserve deterministic server codes in runtime output (`faucet_config_invalid`, `faucet_fee_too_low_for_chain`, `faucet_native_insufficient`, `faucet_wrapped_insufficient`, `faucet_wrapped_autowrap_failed`, `faucet_stable_insufficient`, `faucet_send_preflight_failed`, `faucet_rpc_unavailable`, `faucet_recipient_not_eligible`) with `requestId` passthrough for diagnostics.
+- Successful faucet responses include recipient provenance fields (`recipientAddress`, `faucetAddress`) for immediate verification.
 
 3. `faucet-networks`
 - returns supported faucet chains and per-chain asset capability metadata for agent-side tool routing.

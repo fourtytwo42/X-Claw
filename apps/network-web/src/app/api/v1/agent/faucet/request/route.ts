@@ -459,6 +459,23 @@ export async function POST(req: NextRequest) {
 
     const provider = new JsonRpcProvider(rpcUrl);
     const signer = new Wallet(faucetPrivateKey, provider);
+    const faucetAddressLower = signer.address.toLowerCase();
+    if (trimmedRecipient.toLowerCase() === faucetAddressLower) {
+      return errorResponse(
+        400,
+        {
+          code: 'faucet_recipient_not_eligible',
+          message: 'Recipient wallet is not eligible for faucet funds.',
+          actionHint: `Register a non-faucet wallet for ${chainKey} and retry.`,
+          details: {
+            chainKey,
+            recipient: trimmedRecipient,
+            faucetAddress: signer.address,
+          }
+        },
+        requestId
+      );
+    }
 
     const nativeSymbol = getChainConfig(chainKey)?.nativeCurrency?.symbol?.trim() || 'ETH';
     const dripAmounts = resolveDripAmounts(chainKey);
@@ -721,6 +738,8 @@ export async function POST(req: NextRequest) {
         ok: true,
         agentId: auth.agentId,
         chainKey,
+        recipientAddress: trimmedRecipient,
+        faucetAddress: signer.address,
         amountWei: requestedAssets.includes('native') ? dripAmounts.nativeWei : '0',
         to: trimmedRecipient,
         txHash: primaryTxHash,

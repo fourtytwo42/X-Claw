@@ -5162,3 +5162,40 @@ Date (UTC): 2026-02-19
 - `E45` Hedera wallet balance now includes non-canonical owned tokens:
   - chain check: `cast call 0x0000000000000000000000000000000000001549 "balanceOf(address)(uint256)" 0x582f6f293e0f49855bb752ae29d6b0565c500d87 --rpc-url https://testnet.hashio.io/api` -> `130000` (USDC).
   - runtime output now merges mirror-node discovered holdings into `tokens[]`, so USDC appears on `wallet balance --chain hedera_testnet --json`.
+
+## Slice 95L Hedera Faucet Self-Recipient Guard + Mapping Hygiene (UTC 2026-02-19)
+
+### Implementation updates
+- `POST /api/v1/agent/faucet/request` now hard-blocks self-recipient requests where resolved recipient equals faucet signer:
+  - deterministic `400` with `code=faucet_recipient_not_eligible`.
+- Faucet success payload now includes recipient provenance:
+  - `recipientAddress`
+  - `faucetAddress`
+- Added operations scripts for mapping hygiene:
+  - `npm run ops:faucet:audit-mappings`
+  - `npm run ops:faucet:fix-mapping`
+- Faucet contract test harness now supports explicit self-recipient validation path using optional env:
+  - `XCLAW_E2E_SELF_FAUCET_AGENT_ID`
+  - `XCLAW_E2E_SELF_FAUCET_AGENT_API_KEY`
+
+### Validation + regression
+- `npm run db:parity` -> PASS.
+- `npm run seed:reset` -> PASS.
+- `npm run seed:load` -> PASS.
+- `npm run seed:verify` -> PASS.
+- `npm run build` -> PASS.
+- `pm2 restart all` -> PASS.
+- `npm run test:faucet:contract` -> PASS (`3 passed / 0 failed` in current env; non-demo + self-recipient subtests skipped unless env keys are provided).
+- `set -a; source .env.local; set +a; npm run ops:faucet:audit-mappings` -> PASS.
+- `set -a; source .env.local; set +a; npm run ops:faucet:fix-mapping -- --agent-id ag_3cfbc4cd0949d3f4c933 --chain hedera_testnet --address 0x582f6f293e0f49855bb752ae29d6b0565c500d87` -> PASS (`code=dry_run`).
+
+### Evidence updates (`E46+`)
+- `E46` Faucet mapping audit detection:
+  - command: `set -a; source .env.local; set +a; npm run ops:faucet:audit-mappings`
+  - outcome: `impactedCount=1`; flagged mapping `ag_3cfbc4cd0949d3f4c933` on `hedera_testnet` pointing to faucet signer `0xfc072ab6c423626a38e4b67af317a4537438b2c7`.
+- `E47` Faucet mapping fix dry-run contract:
+  - command: `set -a; source .env.local; set +a; npm run ops:faucet:fix-mapping -- --agent-id ag_3cfbc4cd0949d3f4c933 --chain hedera_testnet --address 0x582f6f293e0f49855bb752ae29d6b0565c500d87`
+  - outcome: deterministic dry-run output with `beforeAddress`, `nextAddress`, and apply hint.
+- `E48` Faucet route deterministic self-recipient contract:
+  - code path now returns `400 faucet_recipient_not_eligible` and includes `chainKey`, `recipient`, `faucetAddress`.
+  - regression harness accepts this as deterministic known failure and has optional live assertion path when self-recipient test credentials are supplied.

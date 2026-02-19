@@ -3649,6 +3649,9 @@ Limitations / notes:
 
 5. Hedera faucet reliability/error contract:
 - Hedera faucet preflight must be chain-aware and deterministic (no opaque `internal_error` for known failure classes).
+- Faucet requests must hard-block self-recipient sends:
+  - if resolved recipient equals faucet signer address, return `400` with `code=faucet_recipient_not_eligible`.
+  - details must include `chainKey`, `recipient`, and `faucetAddress`.
 - For `hedera_*` chains, fee policy enforces a minimum gas price floor:
   - env override key: `XCLAW_TESTNET_FAUCET_MIN_GAS_PRICE_WEI[_<CHAIN>]`
   - default floor: `900000000000` wei (`900 gwei`).
@@ -3669,6 +3672,9 @@ Limitations / notes:
 - Wrapped/stable token faucet addresses and drip values must be validated before execution:
   - addresses must be valid EVM addresses,
   - drip values must be positive integer wei strings.
+- Success responses must include recipient provenance fields:
+  - `recipientAddress` (credited wallet),
+  - `faucetAddress` (faucet signer/sender).
 
 6. Faucet discovery contract:
 - Endpoint: `GET /api/v1/agent/faucet/networks`

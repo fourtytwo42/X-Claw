@@ -20,6 +20,8 @@
     "test:management:liquidity:decision": "node infrastructure/scripts/management-approvals-liquidity-tests.mjs",
     "test:faucet:contract": "node infrastructure/scripts/faucet-contract-tests.mjs",
     "ops:faucet:reset-rate-limit": "node infrastructure/scripts/faucet-rate-limit-reset.mjs",
+    "ops:faucet:audit-mappings": "node infrastructure/scripts/faucet-audit-wallet-mappings.mjs",
+    "ops:faucet:fix-mapping": "node infrastructure/scripts/faucet-fix-wallet-mapping.mjs",
     "db:parity": "node infrastructure/scripts/check-migration-parity.mjs",
     "db:migrate": "node infrastructure/scripts/db-migrate.mjs",
     "e2e:full": "bash infrastructure/scripts/e2e-full-pass.sh",
