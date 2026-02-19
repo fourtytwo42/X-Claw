@@ -1,7 +1,10 @@
-# Slice 95 Closure Spec: Hedera EVM + HTS Live Evidence (2026-02-19)
+# Slice 95 Closure Spec: Hedera EVM Pair Discovery + HTS JDK Auto-Setup (2026-02-19)
 
 ## Goal
-Close remaining Slice 95 evidence by attempting live Hedera EVM + HTS liquidity proofs and documenting deterministic blockers when tx-hash-grade completion is not yet feasible.
+Close remaining Slice 95 blockers by:
+1. adding deterministic Hedera EVM pair discovery (`liquidity discover-pairs`) to eliminate blind quote retries,
+2. hardening hosted installer HTS prerequisites (JDK auto-attempt + diagnostics),
+3. capturing updated live Hedera EVM + HTS evidence and documenting any residual tx-hash blocker precisely.
 
 ## Non-goals
 1. No new public API endpoints.
@@ -9,19 +12,28 @@ Close remaining Slice 95 evidence by attempting live Hedera EVM + HTS liquidity 
 3. No speculative completion of blocked bounty evidence.
 
 ## Locked scope
-1. `docs/BOUNTY_ALIGNMENT_CHECKLIST.md`
-2. `docs/XCLAW_SLICE_TRACKER.md`
-3. `docs/XCLAW_BUILD_ROADMAP.md`
-4. `acceptance.md`
-5. `spec.md`
-6. `tasks.md`
+1. `apps/agent-runtime/xclaw_agent/cli.py`
+2. `apps/agent-runtime/tests/test_liquidity_cli.py`
+3. `apps/network-web/src/app/skill-install.sh/route.ts`
+4. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+5. `docs/api/WALLET_COMMAND_CONTRACT.md`
+6. `skills/xclaw-agent/references/commands.md`
+7. `docs/BOUNTY_ALIGNMENT_CHECKLIST.md`
+8. `docs/XCLAW_SLICE_TRACKER.md`
+9. `docs/XCLAW_BUILD_ROADMAP.md`
+10. `acceptance.md`
+11. `spec.md`
+12. `tasks.md`
 
 ## Acceptance checks
 - `curl -fsSL https://xclaw.trade/skill-install.sh | bash`
 - `xclaw-agent status --json`
 - `xclaw-agent wallet health --chain hedera_testnet --json`
 - `xclaw-agent chains --json`
-- Hedera probe commands (`liquidity quote-add/add`) for `saucerswap`, `pangolin`, and `hedera_hts`
+- Hedera probe commands:
+  - `liquidity discover-pairs` for `saucerswap` and `pangolin`
+  - `liquidity quote-add/add` for discovered Hedera EVM pair
+  - `liquidity quote-add/add` for `hedera_hts` with JDK-enabled runtime env
 - `npm run db:parity`
 - `npm run seed:reset`
 - `npm run seed:load`

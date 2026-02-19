@@ -58,8 +58,8 @@ Notes:
 - `E7`: Hedera EVM add-intent path succeeds (`status=approved`) after policy snapshot is present; first attempt demonstrates deterministic `policy_denied` guardrail.
 - `E8`: HTS-native runtime path fails closed with deterministic `missing_dependency` (current host lacks JDK/JNI runtime; `hedera-sdk-py` import fails with `Unable to find javac`).
 - `E9`: HTS fail-closed unit test proof remains passing (`test_quote_add_fails_closed_when_hedera_sdk_missing`).
-- `E10`: Hedera pair-discovery matrix on `saucerswap` + `pangolin` with canonical `(WHBAR,SAUCE)` still reverts (`CONTRACT_REVERT_EXECUTED`) across tested amounts.
-- `E11`: Hosted installer rerun now yields Hedera wallet readiness (`hasWallet:true`) in this environment.
+- `E10`: Hedera pair-discovery matrix now returns ranked live pairs for both `saucerswap` and `pangolin` via factory scan (`candidateCount:13` in sampled scan).
+- `E11`: Hosted installer rerun yields Hedera wallet readiness (`hasWallet:true`) in this environment.
 
 ---
 
@@ -149,7 +149,7 @@ Notes:
 - [x] Multi-DEX adapter contract exists (plug-and-play architecture).
 - [x] DEX integrations for v1 include:
 - [x] Base/Base testnet: Uniswap + Aerodrome
-- [!] Hedera/Hedera testnet: required DEX set enabled
+- [x] Hedera/Hedera testnet: required DEX set enabled
 - [x] Approvals aligned with trade/convert policy model.
 - [x] Position monitor runs on low-RPC cadence target (once/minute) with freshness metadata.
 - [x] PnL/fees tracking aligned with existing metrics patterns.
@@ -157,7 +157,7 @@ Notes:
 
 Notes:
 - `E1/E2/E3/E4/E5` cover hardhat-local + Base Sepolia contract/preflight/approval evidence.
-- `E6/E7/E8/E9/E10/E11/E12` cover Hedera EVM+HTS execution attempts and fail-closed behavior; tx-hash-grade completion remains blocked by non-reverting EVM pair discovery and HTS host JDK prerequisite.
+- `E6/E7/E8/E9/E10/E11/E12/E13/E14/E15` cover Hedera EVM+HTS execution attempts, pair discovery, and JDK-enabled HTS runtime success; tx-hash-grade completion remains blocked by liquidity command-surface execution depth (intent lifecycle without on-chain LP submission).
 
 ---
 
@@ -172,6 +172,9 @@ Notes:
 - `E7`: Hedera EVM add-intent path reached runtime approval flow (`policy_denied` then `approved` with policy snapshot).
 - `E8`: Hedera HTS runtime fail-closed proof (`missing_dependency` on quote-add/add).
 - `E9`: Hedera HTS missing-SDK fail-closed unit proof (`missing_dependency` test).
-- `E10`: Hedera pair-discovery probes (`saucerswap` + `pangolin`, canonical tokens, multiple amount tiers) all returned deterministic live revert (`CONTRACT_REVERT_EXECUTED`).
+- `E10`: Hedera pair-discovery probes (`discover-pairs`) for `saucerswap` + `pangolin` returned viable live pairs (reserve-filtered).
 - `E11`: Hosted installer rerun + wallet health proof (`hasWallet:true` for `hedera_testnet`).
-- `E12`: HTS package deep probe: `hedera-sdk-py` installed in fallback venv but `import hedera` fails with `Unable to find javac`, so runtime remains fail-closed until JDK is installed.
+- `E12`: HTS package + JDK deep probe: with user-local JDK + runtime venv, `import hedera` passes.
+- `E13`: Hedera EVM quote-add succeeds on discovered pair (`TEST/FOOL` pair addresses from scan output).
+- `E14`: Hedera EVM liquidity add intent succeeds on discovered pair (`status=approved`).
+- `E15`: Hedera HTS quote-add/add succeed with JDK-enabled runtime (`XCLAW_AGENT_PYTHON_BIN` + `JAVA_HOME`).

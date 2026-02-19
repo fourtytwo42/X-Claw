@@ -1,4 +1,4 @@
-# Slice 95 Tasks: Hedera EVM + HTS Live Evidence Closure (2026-02-19)
+# Slice 95 Tasks: Hedera EVM Pair Discovery + HTS JDK Auto-Setup (2026-02-19)
 
 Active slice context: `Slice 95` remains in progress.
 
@@ -9,16 +9,19 @@ Active slice context: `Slice 95` remains in progress.
 ## 2) Evidence execution
 - [x] Run hosted installer flow (`curl -fsSL https://xclaw.trade/skill-install.sh | bash`).
 - [x] Re-verify runtime readiness (`status`, `wallet health`, `chains`) for `hedera_testnet`.
-- [x] Run deterministic EVM pair-discovery probes across configured Hedera DEXes (`saucerswap`, `pangolin`) and amount tiers.
-- [x] Capture Hedera EVM liquidity add lifecycle attempt output.
-- [x] Run HTS quote/add attempts and capture deterministic fail-closed output.
-- [x] Deep-probe HTS dependency state (`hedera-sdk-py` install + `import hedera`) to localize blocker root cause (`Unable to find javac`).
+- [x] Add deterministic runtime pair discovery command (`liquidity discover-pairs`) with reserve filter + deterministic error codes.
+- [x] Run Hedera EVM pair-discovery probes across configured DEXes (`saucerswap`, `pangolin`) and capture viable candidate set.
+- [x] Capture Hedera EVM quote/add intent output using discovered non-reverting pair.
+- [x] Harden installer to attempt JDK auto-provision and Java toolchain verification for HTS runtime path.
+- [x] Capture HTS quote/add success with JDK-enabled runtime (`JAVA_HOME` + runtime venv interpreter).
+- [x] Capture residual tx-hash blocker evidence if command surface still does not submit on-chain LP tx.
 
 ## 3) Canonical sync
 - [x] Update `acceptance.md` evidence matrix and rerun commands.
 - [x] Update `docs/BOUNTY_ALIGNMENT_CHECKLIST.md` notes/evidence index with new IDs.
-- [x] Update `docs/XCLAW_SLICE_TRACKER.md` Slice 95 DoD with remaining tx-hash blocker.
+- [x] Update `docs/XCLAW_SLICE_TRACKER.md` Slice 95 DoD blocker text.
 - [x] Update `docs/XCLAW_BUILD_ROADMAP.md` 95.1 blocker text.
+- [x] Sync command contracts (`docs/XCLAW_SOURCE_OF_TRUTH.md`, `docs/api/WALLET_COMMAND_CONTRACT.md`, `skills/xclaw-agent/references/commands.md`).
 - [x] Sync `spec.md` and `tasks.md` to this pass.
 
 ## 4) Validation

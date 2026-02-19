@@ -4807,8 +4807,12 @@ Date (UTC): 2026-02-19
   - `apps/agent-runtime/bin/xclaw-agent liquidity quote-add --chain hedera_testnet --dex saucerswap --token-a WHBAR --token-b SAUCE --amount-a 1 --amount-b 1 --position-type v2 --slippage-bps 100 --json` -> `liquidity_quote_add_failed` with RPC revert (`CONTRACT_REVERT_EXECUTED`).
   - This confirms `coreContracts.router` + canonical token resolution are now execution-path ready (no config-contract failure).
 - `E10` Hedera EVM pair-discovery matrix (non-reverting pair search):
-  - Probed `saucerswap` + `pangolin` with `(WHBAR,SAUCE)` and amounts `{0.01, 0.1, 1, 5}` for both sides.
-  - Every probe returned deterministic live revert (`CONTRACT_REVERT_EXECUTED`), so no tx-hash-grade liquid pair was discovered from current canonical token set in this environment.
+  - `apps/agent-runtime/bin/xclaw-agent liquidity discover-pairs --chain hedera_testnet --dex saucerswap --min-reserve 1 --limit 5 --scan-max 15 --json` -> PASS (`candidateCount:13`) with ranked live pairs.
+  - `apps/agent-runtime/bin/xclaw-agent liquidity discover-pairs --chain hedera_testnet --dex pangolin --min-reserve 1 --limit 5 --scan-max 15 --json` -> PASS (`candidateCount:13`) with same factory-backed pair set.
+- `E13` Hedera EVM quote proof on discovered liquid pair:
+  - `apps/agent-runtime/bin/xclaw-agent liquidity quote-add --chain hedera_testnet --dex saucerswap --token-a 0x0000000000000000000000000000000000001489 --token-b 0x00000000000000000000000000000000000016d4 --amount-a 1 --amount-b 1 --position-type v2 --slippage-bps 100 --json` -> PASS (`quoteAmountB:0.03948612`).
+- `E14` Hedera EVM add-intent proof on discovered pair:
+  - `XCLAW_AGENT_API_KEY=slice7_token_abc12345 XCLAW_AGENT_ID=ag_slice7 apps/agent-runtime/bin/xclaw-agent liquidity add --chain hedera_testnet --dex saucerswap --token-a 0x0000000000000000000000000000000000001489 --token-b 0x00000000000000000000000000000000000016d4 --amount-a 1 --amount-b 1 --slippage-bps 100 --json` -> PASS (`status:"approved"`).
 - `E7` Hedera EVM add-intent path attempt:
   - `XCLAW_AGENT_API_KEY=slice7_token_abc12345 XCLAW_AGENT_ID=ag_slice7 apps/agent-runtime/bin/xclaw-agent liquidity add --chain hedera_testnet --dex saucerswap --token-a WHBAR --token-b SAUCE --amount-a 1 --amount-b 1 --slippage-bps 100 --json` -> first run `policy_denied`; after seeded `approval_mode=auto` snapshot for `ag_slice7/hedera_testnet`, rerun -> PASS (`status:"approved"`).
 - `E11` Hosted installer + wallet readiness refresh:
@@ -4818,28 +4822,56 @@ Date (UTC): 2026-02-19
   - `apps/agent-runtime/bin/xclaw-agent liquidity quote-add --chain hedera_testnet --dex hedera_hts --token-a WHBAR --token-b SAUCE --amount-a 1 --amount-b 1 --position-type v2 --slippage-bps 100 --json` -> `missing_dependency`.
   - `XCLAW_AGENT_API_KEY=slice7_token_abc12345 XCLAW_AGENT_ID=ag_slice7 apps/agent-runtime/bin/xclaw-agent liquidity add --chain hedera_testnet --dex hedera_hts --token-a WHBAR --token-b SAUCE --amount-a 1 --amount-b 1 --slippage-bps 100 --json` -> `missing_dependency`.
 - `E12` HTS dependency deep probe:
-  - Installed fallback runtime venv and package: `~/.xclaw-agent/runtime-venv/bin/python -m pip install hedera-sdk-py` -> PASS.
-  - Raw import probe still fails: `import hedera` -> `Exception: Unable to find javac` (from `pyjnius` JDK detection), which explains deterministic runtime `missing_dependency` in this host environment.
+  - Installed user-local JDK (`~/.local/jdks/temurin21`) and fallback runtime venv package set (`apps/agent-runtime/requirements.txt` + `hedera-sdk-py`) -> PASS.
+  - `JAVA_HOME=~/.local/jdks/temurin21 PATH=$JAVA_HOME/bin:$PATH ~/.xclaw-agent/runtime-venv/bin/python -c "import hedera"` -> PASS.
+- `E15` HTS runtime success proof with JDK-enabled runtime:
+  - `JAVA_HOME=~/.local/jdks/temurin21 PATH=$JAVA_HOME/bin:$PATH XCLAW_AGENT_PYTHON_BIN=~/.xclaw-agent/runtime-venv/bin/python apps/agent-runtime/bin/xclaw-agent liquidity quote-add --chain hedera_testnet --dex hedera_hts --token-a WHBAR --token-b SAUCE --amount-a 1 --amount-b 1 --position-type v2 --slippage-bps 100 --json` -> PASS (`adapterFamily:"hedera_hts"`).
+  - `JAVA_HOME=~/.local/jdks/temurin21 PATH=$JAVA_HOME/bin:$PATH XCLAW_AGENT_PYTHON_BIN=~/.xclaw-agent/runtime-venv/bin/python XCLAW_AGENT_API_KEY=slice7_token_abc12345 XCLAW_AGENT_ID=ag_slice7 apps/agent-runtime/bin/xclaw-agent liquidity add --chain hedera_testnet --dex hedera_hts --token-a WHBAR --token-b SAUCE --amount-a 1 --amount-b 1 --slippage-bps 100 --json` -> PASS (`status:"approved"`).
 - `E9` Hedera HTS fail-closed unit path:
   - `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v` -> PASS including `test_quote_add_fails_closed_when_hedera_sdk_missing`.
 
 ### Live testnet blockers captured
 - Base Sepolia on-chain tx-hash evidence: `[!]` blocked in this pass because current `liquidity add/remove` path records intents/approval lifecycle and does not submit on-chain LP tx in this route-level flow.
 - Hedera live proof remains `[!]` for tx-hash-grade completion in this environment:
-  - Wallet prerequisite is now resolved (`xclaw-agent wallet health --chain hedera_testnet --json` reports `hasWallet:true`).
-  - HTS package install alone is insufficient on this host because `hedera-sdk-py` import requires JDK/JNI runtime (`Unable to find javac`), so HTS still returns deterministic `missing_dependency`.
-  - EVM quote path is execution-ready but current canonical pair probes on both `saucerswap` and `pangolin` still revert (`CONTRACT_REVERT_EXECUTED`), so successful tx-hash proof requires validated non-reverting pair metadata.
+  - Wallet + HTS runtime prerequisites are now resolved (`hasWallet:true`, `hedera` import passes with JDK-enabled runtime env).
+  - EVM pair discovery and quote/add preflight now pass with discovered liquid pairs.
+  - Remaining blocker is execution depth: current runtime `liquidity add/remove` path creates/updates intents but does not submit on-chain LP tx from this command surface, so no tx hash is emitted here.
 - Exact rerun probes:
   - `apps/agent-runtime/bin/xclaw-agent wallet health --chain hedera_testnet --json`
-  - `sudo apt-get update && sudo apt-get install -y default-jdk python3-venv python3-pip`
-  - `python3 -m venv ~/.xclaw-agent/runtime-venv && ~/.xclaw-agent/runtime-venv/bin/python -m pip install -r apps/agent-runtime/requirements.txt hedera-sdk-py`
-  - `XCLAW_AGENT_PYTHON_BIN=~/.xclaw-agent/runtime-venv/bin/python apps/agent-runtime/bin/xclaw-agent liquidity quote-add --chain hedera_testnet --dex hedera_hts --token-a WHBAR --token-b SAUCE --amount-a 1 --amount-b 1 --position-type v2 --slippage-bps 100 --json`
+  - `apps/agent-runtime/bin/xclaw-agent liquidity discover-pairs --chain hedera_testnet --dex saucerswap --min-reserve 1 --limit 5 --scan-max 15 --json`
+  - `apps/agent-runtime/bin/xclaw-agent liquidity discover-pairs --chain hedera_testnet --dex pangolin --min-reserve 1 --limit 5 --scan-max 15 --json`
   - `apps/agent-runtime/bin/xclaw-agent liquidity quote-add --chain hedera_testnet --dex saucerswap --token-a <hed-era-token-a> --token-b <hed-era-token-b> --amount-a <a> --amount-b <b> --position-type v2 --slippage-bps 100 --json`
-  - `apps/agent-runtime/bin/xclaw-agent liquidity quote-add --chain hedera_testnet --dex pangolin --token-a <hed-era-token-a> --token-b <hed-era-token-b> --amount-a <a> --amount-b <b> --position-type v2 --slippage-bps 100 --json`
-  - `apps/agent-runtime/bin/xclaw-agent liquidity quote-add --chain hedera_testnet --dex hedera_hts --token-a <hed-era-token-a> --token-b <hed-era-token-b> --amount-a <a> --amount-b <b> --position-type v2 --slippage-bps 100 --json`
+  - `JAVA_HOME=~/.local/jdks/temurin21 PATH=$JAVA_HOME/bin:$PATH XCLAW_AGENT_PYTHON_BIN=~/.xclaw-agent/runtime-venv/bin/python apps/agent-runtime/bin/xclaw-agent liquidity quote-add --chain hedera_testnet --dex hedera_hts --token-a WHBAR --token-b SAUCE --amount-a 1 --amount-b 1 --position-type v2 --slippage-bps 100 --json`
   - `XCLAW_AGENT_API_KEY=<agent-key> XCLAW_AGENT_ID=<agent-id> apps/agent-runtime/bin/xclaw-agent liquidity add --chain hedera_testnet --dex <saucerswap|hedera_hts> --token-a <token-a> --token-b <token-b> --amount-a <a> --amount-b <b> --slippage-bps 100 --json`
 
 ### Hedera chain-pack source references
 - SaucerSwap deployment/source references used for Hedera router/token metadata:
   - https://docs.saucerswap.finance/v/developer/saucerswap-v1/contract-deployments
   - https://docs.saucerswap.finance/v/developer/hedera-json-rpc-api
+
+## Slice 95 Continuation: Pair Discovery + HTS JDK Runtime (UTC 2026-02-19)
+
+### Runtime + installer implementation evidence
+- Added runtime command: `liquidity discover-pairs --chain ... --dex ... [--min-reserve] [--limit] [--scan-max] --json`.
+- Added deterministic discovery failures:
+  - `liquidity_pair_discovery_failed`
+  - `liquidity_no_viable_pair`
+- Hosted installer hardening:
+  - apt/root path now auto-attempts JDK provisioning (`default-jdk-headless`, fallback `default-jdk`) when Hedera import fails.
+  - installer now verifies Java toolchain (`javac`, `java -version`) and prints explicit rerun guidance.
+  - fixed early-return path so Hedera SDK setup/check runs even when base Python runtime deps are already present.
+
+### Live evidence updates
+- `E10` (updated): `discover-pairs` succeeds for both `saucerswap` and `pangolin` on `hedera_testnet` with viable pair candidates.
+- `E13`: Hedera EVM quote succeeds on discovered pair (`tokenA=0x...1489`, `tokenB=0x...16d4`) with non-reverting quote output.
+- `E14`: Hedera EVM add intent succeeds on discovered pair (`status=approved`, `adapterFamily=amm_v2`).
+- `E12` (updated): user-local JDK install (`~/.local/jdks/temurin21`) + runtime venv import (`import hedera`) succeeds.
+- `E15`: Hedera HTS quote/add both succeed when runtime is launched with:
+  - `JAVA_HOME=~/.local/jdks/temurin21`
+  - `PATH=$JAVA_HOME/bin:$PATH`
+  - `XCLAW_AGENT_PYTHON_BIN=~/.xclaw-agent/runtime-venv/bin/python`
+
+### Residual blocker (tx-hash bar)
+- Slice 95 remains `[~]` because tx-hash-grade liquidity proof is still blocked by execution depth in current command surface:
+  - `liquidity add/remove` creates and advances intent lifecycle, but does not submit LP tx directly from this runtime path.
+  - therefore this command surface does not emit liquidity tx hash evidence yet.

@@ -4823,6 +4823,42 @@ def _router_get_amount_out(chain: str, amount_in_units: str, token_in: str, toke
         raise WalletStoreError(str(exc)) from exc
 
 
+def _cast_call_stdout(chain: str, contract: str, signature: str, *args: str) -> str:
+    cast_bin = _require_cast_bin()
+    rpc_url = _chain_rpc_url(chain)
+    cmd = [cast_bin, "call", contract, signature]
+    cmd.extend([str(a) for a in args])
+    cmd.extend(["--rpc-url", rpc_url])
+    proc = _run_subprocess(cmd, timeout_sec=_cast_call_timeout_sec(), kind="cast_call")
+    if proc.returncode != 0:
+        stderr = (proc.stderr or "").strip()
+        stdout = (proc.stdout or "").strip()
+        msg = stderr or stdout or "cast call failed"
+        raise WalletStoreError(msg)
+    return (proc.stdout or "").strip()
+
+
+def _parse_address_from_cast_output(raw: str) -> str:
+    text = (raw or "").strip()
+    matches = re.findall(r"0x[a-fA-F0-9]{40}", text)
+    if not matches:
+        raise WalletStoreError("Unable to parse address from cast output.")
+    return matches[-1]
+
+
+def _parse_uint_tuple_from_cast_output(raw: str) -> list[int]:
+    text = (raw or "").strip()
+    if not text:
+        return []
+    values: list[int] = []
+    for token in re.findall(r"0x[a-fA-F0-9]+|\b[0-9]+\b", text):
+        if token.startswith("0x") or token.startswith("0X"):
+            values.append(int(token, 16))
+        else:
+            values.append(int(token))
+    return values
+
+
 def _parse_positive_amount_text(raw: str, field_name: str) -> Decimal:
     value = str(raw or "").strip()
     if not re.fullmatch(r"[0-9]+(\.[0-9]+)?", value):
@@ -4839,6 +4875,159 @@ def _resolve_agent_id_or_fail(chain: str) -> str:
     if not agent_id:
         raise WalletStoreError("Agent id could not be resolved. Set XCLAW_AGENT_ID or use signed agent token format.")
     return agent_id
+
+
+def cmd_liquidity_discover_pairs(args: argparse.Namespace) -> int:
+    chk = require_json_flag(args)
+    if chk is not None:
+        return chk
+    chain = str(args.chain or "").strip()
+    dex = str(args.dex or "").strip().lower()
+    try:
+        assert_chain_capability(chain, "liquidity")
+        adapter = build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type="v2")
+        if adapter.protocol_family != "amm_v2":
+            return fail(
+                "unsupported_liquidity_adapter",
+                f"Pair discovery currently supports v2-family adapters only. Resolved adapter family: {adapter.protocol_family}.",
+                "Use a v2-family DEX for discovery and retry.",
+                {"chain": chain, "dex": dex, "adapterFamily": adapter.protocol_family},
+                exit_code=2,
+            )
+
+        min_reserve = int(str(args.min_reserve or "1"))
+        limit = int(str(args.limit or "10"))
+        scan_max = int(str(getattr(args, "scan_max", None) or "50"))
+        if min_reserve < 0:
+            return fail("invalid_input", "min-reserve must be >= 0.", "Provide a non-negative integer.", {"minReserve": args.min_reserve}, exit_code=2)
+        if limit < 1 or limit > 100:
+            return fail("invalid_input", "limit must be between 1 and 100.", "Use --limit in [1..100].", {"limit": args.limit}, exit_code=2)
+        if scan_max < 1 or scan_max > 2000:
+            return fail("invalid_input", "scan-max must be between 1 and 2000.", "Use --scan-max in [1..2000].", {"scanMax": args.scan_max}, exit_code=2)
+
+        router = _require_chain_contract_address(chain, "router")
+        factory_raw = _cast_call_stdout(chain, router, "factory()(address)")
+        factory = _parse_address_from_cast_output(factory_raw)
+        if factory.lower() == "0x0000000000000000000000000000000000000000":
+            return fail(
+                "liquidity_pair_discovery_failed",
+                f"Factory address resolved to zero for router {router}.",
+                "Verify chain router/factory contract metadata and retry.",
+                {"chain": chain, "dex": dex, "router": router},
+                exit_code=1,
+            )
+
+        pair_len_raw = _cast_call_stdout(chain, factory, "allPairsLength()(uint256)")
+        pair_count = _parse_uint_from_cast_output(pair_len_raw)
+        if pair_count <= 0:
+            return fail(
+                "liquidity_no_viable_pair",
+                "Factory returned zero pairs.",
+                "Try another DEX on this chain or verify deployment state.",
+                {"chain": chain, "dex": dex, "factory": factory, "pairCount": pair_count},
+                exit_code=1,
+            )
+
+        scan_cap = min(pair_count, scan_max)
+        candidates: list[dict[str, Any]] = []
+        skipped = 0
+        failures = 0
+        error_samples: list[str] = []
+        for idx in range(scan_cap):
+            try:
+                pair_out = _cast_call_stdout(chain, factory, "allPairs(uint256)(address)", str(idx))
+                pair_addr = _parse_address_from_cast_output(pair_out)
+                token0 = _parse_address_from_cast_output(_cast_call_stdout(chain, pair_addr, "token0()(address)"))
+                token1 = _parse_address_from_cast_output(_cast_call_stdout(chain, pair_addr, "token1()(address)"))
+                reserves_out = _cast_call_stdout(chain, pair_addr, "getReserves()(uint112,uint112,uint32)")
+                reserve_values = _parse_uint_tuple_from_cast_output(reserves_out)
+                if len(reserve_values) < 2:
+                    raise WalletStoreError("Unable to parse reserves from getReserves output.")
+                reserve0 = int(reserve_values[0])
+                reserve1 = int(reserve_values[1])
+                if reserve0 < min_reserve or reserve1 < min_reserve:
+                    skipped += 1
+                    continue
+                candidates.append(
+                    {
+                        "pairAddress": pair_addr.lower(),
+                        "token0": token0.lower(),
+                        "token1": token1.lower(),
+                        "reserve0": str(reserve0),
+                        "reserve1": str(reserve1),
+                        "minReserve": str(min(reserve0, reserve1)),
+                    }
+                )
+            except Exception as exc:
+                failures += 1
+                if len(error_samples) < 5:
+                    error_samples.append(f"index={idx}: {exc}")
+                continue
+
+        if not candidates:
+            return fail(
+                "liquidity_no_viable_pair",
+                "No viable pair matched reserve filters during discovery scan.",
+                "Lower --min-reserve, try another DEX, or verify pair liquidity.",
+                {
+                    "chain": chain,
+                    "dex": dex,
+                    "factory": factory,
+                    "pairCount": pair_count,
+                    "scanCount": scan_cap,
+                    "minReserve": str(min_reserve),
+                    "skipped": skipped,
+                    "failures": failures,
+                    "errorSamples": error_samples,
+                },
+                exit_code=1,
+            )
+
+        candidates.sort(key=lambda row: int(str(row.get("minReserve") or "0")), reverse=True)
+        selected = candidates[:limit]
+        return ok(
+            "Liquidity pair discovery complete.",
+            chain=chain,
+            dex=dex,
+            adapterFamily=adapter.protocol_family,
+            router=router.lower(),
+            factory=factory.lower(),
+            pairCount=pair_count,
+            scanCount=scan_cap,
+            minReserve=str(min_reserve),
+            scanMax=scan_max,
+            candidateCount=len(candidates),
+            returnedCount=len(selected),
+            truncated=pair_count > scan_cap,
+            pairs=selected,
+            errorSamples=error_samples,
+        )
+    except ChainRegistryError as exc:
+        return fail("unsupported_chain_capability", str(exc), chain_supported_hint(), {"chain": chain, "requiredCapability": "liquidity"}, exit_code=2)
+    except UnsupportedLiquidityAdapter as exc:
+        return fail(
+            "unsupported_liquidity_adapter",
+            str(exc),
+            "Choose a supported chain/dex combination and retry.",
+            {"chain": chain, "dex": dex},
+            exit_code=2,
+        )
+    except WalletStoreError as exc:
+        return fail(
+            "liquidity_pair_discovery_failed",
+            str(exc),
+            "Verify router/factory metadata, chain RPC availability, and retry.",
+            {"chain": chain, "dex": dex},
+            exit_code=1,
+        )
+    except Exception as exc:
+        return fail(
+            "liquidity_pair_discovery_failed",
+            str(exc),
+            "Inspect runtime pair discovery path and retry.",
+            {"chain": chain, "dex": dex},
+            exit_code=1,
+        )
 
 
 def cmd_liquidity_quote_add(args: argparse.Namespace) -> int:
@@ -8694,6 +8883,15 @@ def build_parser() -> argparse.ArgumentParser:
     liquidity_quote_remove.add_argument("--position-type", default="v2", choices=["v2", "v3"])
     liquidity_quote_remove.add_argument("--json", action="store_true")
     liquidity_quote_remove.set_defaults(func=cmd_liquidity_quote_remove)
+
+    liquidity_discover_pairs = liquidity_sub.add_parser("discover-pairs")
+    liquidity_discover_pairs.add_argument("--chain", required=True)
+    liquidity_discover_pairs.add_argument("--dex", required=True)
+    liquidity_discover_pairs.add_argument("--min-reserve", default=1)
+    liquidity_discover_pairs.add_argument("--limit", default=10)
+    liquidity_discover_pairs.add_argument("--scan-max", default=50)
+    liquidity_discover_pairs.add_argument("--json", action="store_true")
+    liquidity_discover_pairs.set_defaults(func=cmd_liquidity_discover_pairs)
 
     transfers = sub.add_parser("transfers")
     transfers_sub = transfers.add_subparsers(dest="transfers_cmd")

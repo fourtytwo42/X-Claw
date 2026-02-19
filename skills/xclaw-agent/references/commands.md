@@ -68,6 +68,7 @@ Underlying runtime delegation (performed by wrapper):
 - `xclaw-agent liquidity positions --chain <chain_key> [--dex <dex>] [--status <status>] --json`
 - `xclaw-agent liquidity quote-add --chain <chain_key> --dex <dex> --token-a <token_or_symbol> --token-b <token_or_symbol> --amount-a <amount_a> --amount-b <amount_b> [--position-type <v2|v3>] [--slippage-bps <bps>] --json`
 - `xclaw-agent liquidity quote-remove --chain <chain_key> --dex <dex> --position-id <position_id> [--percent <1-100>] [--position-type <v2|v3>] --json`
+- `xclaw-agent liquidity discover-pairs --chain <chain_key> --dex <dex> [--min-reserve <base_units>] [--limit <1-100>] [--scan-max <1-2000>] --json`
 - `xclaw-agent approvals cleanup-spot --trade-id <trade_id> --json`
 - `xclaw-agent approvals clear-prompt --subject-type <trade|transfer|policy> --subject-id <id> [--chain <chain_key>] --json`
 - `xclaw-agent approvals resume-spot --trade-id <trade_id> --chain <chain_key> --json`

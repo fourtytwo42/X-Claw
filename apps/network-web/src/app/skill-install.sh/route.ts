@@ -89,6 +89,104 @@ ensure_system_python_packages() {
   apt-get install -y python3-venv python3-pip >/dev/null 2>&1
 }
 
+ensure_system_jdk_packages() {
+  if [ "$(id -u)" -ne 0 ]; then
+    return 1
+  fi
+  if ! command -v apt-get >/dev/null 2>&1; then
+    return 1
+  fi
+  echo "[xclaw] attempting to install JDK prerequisites for Hedera HTS runtime"
+  export DEBIAN_FRONTEND=noninteractive
+  apt-get update -y >/dev/null 2>&1 || true
+  if ! apt-get install -y default-jdk-headless >/dev/null 2>&1; then
+    apt-get install -y default-jdk >/dev/null 2>&1 || return 1
+  fi
+}
+
+verify_java_toolchain() {
+  if ! command -v javac >/dev/null 2>&1; then
+    return 1
+  fi
+  java -version >/dev/null 2>&1 || return 1
+  return 0
+}
+
+ensure_hedera_sdk_runtime() {
+  local py_bin="$1"
+
+  # Install Hedera SDK plugin dependency in the same interpreter the runtime will use.
+  local hedera_install_output=""
+  local hedera_install_status=0
+  set +e
+  if [ "\${XCLAW_PYTHON_IN_VENV:-0}" = "1" ]; then
+    hedera_install_output="$("$py_bin" -m pip install --disable-pip-version-check hedera-sdk-py 2>&1)"
+    hedera_install_status=$?
+  else
+    hedera_install_output="$("$py_bin" -m pip install --disable-pip-version-check --user hedera-sdk-py 2>&1)"
+    hedera_install_status=$?
+  fi
+  set -e
+  if [ "$hedera_install_status" -ne 0 ] && [ "\${XCLAW_PYTHON_IN_VENV:-0}" != "1" ] && printf '%s' "$hedera_install_output" | grep -qi "externally-managed-environment"; then
+    local venv_dir="$HOME/.xclaw-agent/runtime-venv"
+    local venv_python="$venv_dir/bin/python"
+    if [ ! -x "$venv_python" ]; then
+      ensure_system_python_packages >/dev/null 2>&1 || true
+      "$py_bin" -m venv "$venv_dir" >/dev/null 2>&1 || "$py_bin" -m venv --without-pip "$venv_dir" >/dev/null 2>&1 || true
+    fi
+    if [ ! -x "$venv_python" ]; then
+      printf '%s\n' "$hedera_install_output"
+      echo "[xclaw] unable to provision fallback venv for Hedera SDK install"
+      return 1
+    fi
+    if ! "$venv_python" -m pip --version >/dev/null 2>&1; then
+      ensure_system_python_packages >/dev/null 2>&1 || true
+      if [ ! -f "$tmp_dir/get-pip.py" ]; then
+        curl -fsSL https://bootstrap.pypa.io/get-pip.py -o "$tmp_dir/get-pip.py" || true
+      fi
+      [ -f "$tmp_dir/get-pip.py" ] && "$venv_python" "$tmp_dir/get-pip.py" >/dev/null 2>&1 || true
+    fi
+    py_bin="$venv_python"
+    export XCLAW_PYTHON_BIN="$py_bin"
+    export XCLAW_PYTHON_IN_VENV="1"
+    set +e
+    hedera_install_output="$("$py_bin" -m pip install --disable-pip-version-check hedera-sdk-py 2>&1)"
+    hedera_install_status=$?
+    set -e
+  fi
+  if [ "$hedera_install_status" -ne 0 ]; then
+    printf '%s\n' "$hedera_install_output"
+    echo "[xclaw] hedera-sdk-py install failed; HTS-native runtime paths will remain blocked until dependency install succeeds"
+  fi
+
+  if ! "$py_bin" - <<'PY' >/dev/null 2>&1
+import importlib
+importlib.import_module("hedera")
+PY
+  then
+    echo "[xclaw] hedera module import failed; attempting JDK auto-provision for HTS-native paths"
+    ensure_system_jdk_packages >/dev/null 2>&1 || true
+    if verify_java_toolchain; then
+      if "$py_bin" - <<'PY' >/dev/null 2>&1
+import importlib
+importlib.import_module("hedera")
+PY
+      then
+        echo "[xclaw] Hedera SDK import passed after JDK verification"
+      else
+        echo "[xclaw] warning: Hedera SDK module import still failing after JDK verification; HTS-native paths will remain blocked"
+        echo "[xclaw] rerun with: XCLAW_AGENT_PYTHON_BIN=\"$py_bin\" \"$py_bin\" -c 'import hedera'"
+      fi
+    else
+      echo "[xclaw] warning: JDK toolchain unavailable (javac/java). HTS-native paths will return missing_dependency until resolved"
+      echo "[xclaw] install command (apt): sudo apt-get update && sudo apt-get install -y default-jdk-headless"
+    fi
+  fi
+
+  export XCLAW_PYTHON_BIN="$py_bin"
+  return 0
+}
+
 resolve_python_bin() {
   if command -v python3 >/dev/null 2>&1; then
     command -v python3
@@ -123,6 +221,9 @@ if missing:
 PY
   then
     echo "[xclaw] python runtime deps already installed for $py_bin"
+    ensure_hedera_sdk_runtime "$py_bin" || true
+    py_bin="\${XCLAW_PYTHON_BIN:-$py_bin}"
+    export XCLAW_PYTHON_BIN="$py_bin"
     return 0
   fi
 
@@ -259,49 +360,8 @@ PY
     exit "$install_status"
   fi
 
-  # Install Hedera SDK plugin dependency in the same interpreter the runtime will use.
-  hedera_install_output=""
-  hedera_install_status=0
-  set +e
-  if [ "\${XCLAW_PYTHON_IN_VENV:-0}" = "1" ]; then
-    hedera_install_output="$("$py_bin" -m pip install --disable-pip-version-check hedera-sdk-py 2>&1)"
-    hedera_install_status=$?
-  else
-    hedera_install_output="$("$py_bin" -m pip install --disable-pip-version-check --user hedera-sdk-py 2>&1)"
-    hedera_install_status=$?
-  fi
-  set -e
-  if [ "$hedera_install_status" -ne 0 ] && [ "\${XCLAW_PYTHON_IN_VENV:-0}" != "1" ] && printf '%s' "$hedera_install_output" | grep -qi "externally-managed-environment"; then
-    local venv_dir="$HOME/.xclaw-agent/runtime-venv"
-    local venv_python="$venv_dir/bin/python"
-    if [ ! -x "$venv_python" ]; then
-      ensure_system_python_packages >/dev/null 2>&1 || true
-      "$py_bin" -m venv "$venv_dir" >/dev/null 2>&1 || "$py_bin" -m venv --without-pip "$venv_dir" >/dev/null 2>&1 || true
-    fi
-    if [ ! -x "$venv_python" ]; then
-      printf '%s\n' "$hedera_install_output"
-      echo "[xclaw] unable to provision fallback venv for Hedera SDK install"
-      exit 1
-    fi
-    if ! "$venv_python" -m pip --version >/dev/null 2>&1; then
-      ensure_system_python_packages >/dev/null 2>&1 || true
-      if [ ! -f "$tmp_dir/get-pip.py" ]; then
-        curl -fsSL https://bootstrap.pypa.io/get-pip.py -o "$tmp_dir/get-pip.py" || true
-      fi
-      [ -f "$tmp_dir/get-pip.py" ] && "$venv_python" "$tmp_dir/get-pip.py" >/dev/null 2>&1 || true
-    fi
-    py_bin="$venv_python"
-    export XCLAW_PYTHON_BIN="$py_bin"
-    export XCLAW_PYTHON_IN_VENV="1"
-    set +e
-    hedera_install_output="$("$py_bin" -m pip install --disable-pip-version-check hedera-sdk-py 2>&1)"
-    hedera_install_status=$?
-    set -e
-  fi
-  if [ "$hedera_install_status" -ne 0 ]; then
-    printf '%s\n' "$hedera_install_output"
-    echo "[xclaw] hedera-sdk-py install failed; HTS-native runtime paths will remain blocked until dependency install succeeds"
-  fi
+  ensure_hedera_sdk_runtime "$py_bin" || true
+  py_bin="\${XCLAW_PYTHON_BIN:-$py_bin}"
 
   if ! "$py_bin" - <<'PY' >/dev/null 2>&1
 import importlib
@@ -311,13 +371,6 @@ PY
   then
     echo "[xclaw] python runtime deps verification failed after install"
     exit 1
-  fi
-  if ! "$py_bin" - <<'PY' >/dev/null 2>&1
-import importlib
-importlib.import_module("hedera")
-PY
-  then
-    echo "[xclaw] warning: Hedera SDK module import failed; HTS-native paths will return missing_dependency until resolved"
   fi
 }
 

@@ -1232,6 +1232,7 @@ Delegated runtime CLI commands that must exist:
 - `xclaw-agent liquidity positions --chain <chain_key> [--dex <dex>] [--status <status>] --json`
 - `xclaw-agent liquidity quote-add --chain <chain_key> --dex <dex> --token-a <token_or_symbol> --token-b <token_or_symbol> --amount-a <amount_a> --amount-b <amount_b> [--position-type <v2|v3>] [--slippage-bps <bps>] --json`
 - `xclaw-agent liquidity quote-remove --chain <chain_key> --dex <dex> --position-id <position_id> [--percent <1-100>] [--position-type <v2|v3>] --json`
+- `xclaw-agent liquidity discover-pairs --chain <chain_key> --dex <dex> [--min-reserve <base_units>] [--limit <1-100>] [--scan-max <1-2000>] --json`
 - `xclaw-agent report send --trade <trade_id> --json`
 - `xclaw-agent chat poll --chain <chain_key> --json`
 - `xclaw-agent chat post --message <message> --chain <chain_key> --json`
@@ -1258,6 +1259,7 @@ Liquidity adapter execution contract:
 - `liquidity add/remove` must run adapter preflight quote simulation before proposal submission.
 - `liquidity quote-add` uses EVM router quote + ERC20 metadata only for `amm_v2` / `amm_v3` families.
 - `liquidity quote-add` for `hedera_hts` is router-independent and must execute adapter preflight without requiring `coreContracts.router`/ERC20 metadata.
+- `liquidity discover-pairs` must scan v2 DEX factory pairs (`allPairsLength/allPairs`) and return ranked reserve-filtered candidates with deterministic failures `liquidity_pair_discovery_failed` / `liquidity_no_viable_pair`.
 - Unsupported adapter combinations must return `unsupported_liquidity_adapter`.
 - Hedera HTS-native liquidity paths must fail closed with `missing_dependency` when Hedera SDK plugin is unavailable.
 
@@ -1293,6 +1295,7 @@ Runtime binary requirements for skill operation:
 - Linux/macOS installer must detect PEP 668 `externally-managed-environment` pip failures and automatically pivot to a user-local fallback venv (`~/.xclaw-agent/runtime-venv`) before continuing dependency install.
 - Linux/macOS installer should attempt automatic `python3-venv` / `python3-pip` provisioning when running with sudo on apt-based systems before failing for missing venv/pip primitives.
 - Hosted installer should install `hedera-sdk-py` in the same runtime interpreter by default so HTS-native paths work out-of-the-box when environment allows dependency install.
+- Linux/macOS installer should attempt JDK provisioning on apt-based systems (`default-jdk-headless`, fallback `default-jdk`) when Hedera SDK import fails, then verify `javac` and `java -version` before concluding HTS-native readiness.
 - Linux/macOS installer must be sudo-aware: when invoked via `sudo` from a non-root account, installation/configuration targets the original user home/context (not `/root`) and ownership of touched user artifacts is corrected before exit.
 - Setup script must ensure a default local wallet policy exists at `~/.xclaw-agent/policy.json` when missing (do not overwrite existing policy).
 - Setup script must install an OS-native `xclaw-agent` launcher (POSIX shell wrapper on Linux/macOS, `.cmd` launcher on Windows) without introducing Node/npm requirements for skill invocation.
