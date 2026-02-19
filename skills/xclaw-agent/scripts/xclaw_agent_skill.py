@@ -605,7 +605,7 @@ def main(argv: List[str]) -> int:
         return _err(
             "usage",
             "Missing command.",
-            "Use one of: version, status, dashboard, intents-poll, approval-check, trade-exec, trade-spot, trade-resume, transfer-resume, transfer-decide, transfer-policy-get, transfer-policy-set, report-send, chat-poll, chat-post, tracked-list, tracked-trades, username-set, owner-link, faucet-request, faucet-networks, chains, x402-pay, x402-pay-resume, x402-pay-decide, x402-policy-get, x402-policy-set, x402-networks, request-x402-payment, wallet-health, wallet-address, wallet-sign-challenge, wallet-send, wallet-send-token, wallet-balance, wallet-token-balance",
+            "Use one of: version, status, dashboard, intents-poll, approval-check, trade-exec, trade-spot, trade-resume, liquidity-add, liquidity-remove, liquidity-positions, liquidity-quote-add, liquidity-quote-remove, transfer-resume, transfer-decide, transfer-policy-get, transfer-policy-set, report-send, chat-poll, chat-post, tracked-list, tracked-trades, username-set, owner-link, faucet-request, faucet-networks, chains, default-chain-get, default-chain-set, x402-pay, x402-pay-resume, x402-pay-decide, x402-policy-get, x402-policy-set, x402-networks, request-x402-payment, wallet-health, wallet-address, wallet-sign-challenge, wallet-send, wallet-send-token, wallet-balance, wallet-token-balance",
             exit_code=2,
         )
 
@@ -626,6 +626,11 @@ def main(argv: List[str]) -> int:
         "trade-exec",
         "trade-spot",
         "trade-resume",
+        "liquidity-add",
+        "liquidity-remove",
+        "liquidity-positions",
+        "liquidity-quote-add",
+        "liquidity-quote-remove",
         "transfer-resume",
         "transfer-decide",
         "transfer-policy-get",
@@ -641,6 +646,7 @@ def main(argv: List[str]) -> int:
         "faucet-networks",
         "chains",
     }
+    default_chain_commands = {"default-chain-get", "default-chain-set"}
     wallet_commands = {
         "wallet-health",
         "wallet-address",
@@ -665,6 +671,8 @@ def main(argv: List[str]) -> int:
     elif cmd in wallet_commands:
         env_required = _require_env("XCLAW_DEFAULT_CHAIN")
     elif cmd in x402_commands:
+        env_required = None
+    elif cmd in default_chain_commands:
         env_required = None
     else:
         env_required = None
@@ -769,6 +777,148 @@ def main(argv: List[str]) -> int:
         if not trade_id:
             return _err("invalid_input", "trade_id cannot be empty.", "usage: trade-resume <trade_id>", exit_code=2)
         return _run_agent(["approvals", "resume-spot", "--trade-id", trade_id, "--chain", chain, "--json"])
+
+    if cmd == "liquidity-add":
+        if len(argv) < 8:
+            return _err(
+                "usage",
+                "liquidity-add requires <dex> <token_a> <token_b> <amount_a> <amount_b> <slippage_bps>",
+                "usage: liquidity-add <dex> <token_a> <token_b> <amount_a> <amount_b> <slippage_bps> [v2|v3] [v3_range]",
+                exit_code=2,
+            )
+        position_type = argv[8].strip().lower() if len(argv) >= 9 else "v2"
+        if position_type not in {"v2", "v3"}:
+            return _err("invalid_input", "position type must be v2 or v3.", exit_code=2)
+        args = [
+            "liquidity",
+            "add",
+            "--chain",
+            chain,
+            "--dex",
+            argv[2].strip().lower(),
+            "--token-a",
+            argv[3].strip(),
+            "--token-b",
+            argv[4].strip(),
+            "--amount-a",
+            argv[5].strip(),
+            "--amount-b",
+            argv[6].strip(),
+            "--slippage-bps",
+            argv[7].strip(),
+            "--position-type",
+            position_type,
+        ]
+        if len(argv) >= 10 and argv[9].strip():
+            args.extend(["--v3-range", argv[9].strip()])
+        args.append("--json")
+        return _run_agent(args)
+
+    if cmd == "liquidity-remove":
+        if len(argv) < 4:
+            return _err(
+                "usage",
+                "liquidity-remove requires <dex> <position_id>",
+                "usage: liquidity-remove <dex> <position_id> [percent] [slippage_bps] [v2|v3]",
+                exit_code=2,
+            )
+        percent = argv[4].strip() if len(argv) >= 5 else "100"
+        slippage = argv[5].strip() if len(argv) >= 6 else "100"
+        position_type = argv[6].strip().lower() if len(argv) >= 7 else "v2"
+        if not _is_uint_string(percent) or not _is_uint_string(slippage):
+            return _err("invalid_input", "percent and slippage_bps must be integers.", exit_code=2)
+        if position_type not in {"v2", "v3"}:
+            return _err("invalid_input", "position type must be v2 or v3.", exit_code=2)
+        return _run_agent(
+            [
+                "liquidity",
+                "remove",
+                "--chain",
+                chain,
+                "--dex",
+                argv[2].strip().lower(),
+                "--position-id",
+                argv[3].strip(),
+                "--percent",
+                percent,
+                "--slippage-bps",
+                slippage,
+                "--position-type",
+                position_type,
+                "--json",
+            ]
+        )
+
+    if cmd == "liquidity-positions":
+        args = ["liquidity", "positions", "--chain", chain]
+        if len(argv) >= 3 and argv[2].strip().lower() != "all":
+            args.extend(["--dex", argv[2].strip().lower()])
+        if len(argv) >= 4 and argv[3].strip():
+            args.extend(["--status", argv[3].strip().lower()])
+        args.append("--json")
+        return _run_agent(args)
+
+    if cmd == "liquidity-quote-add":
+        if len(argv) < 8:
+            return _err(
+                "usage",
+                "liquidity-quote-add requires <dex> <token_a> <token_b> <amount_a> <amount_b> <slippage_bps>",
+                "usage: liquidity-quote-add <dex> <token_a> <token_b> <amount_a> <amount_b> <slippage_bps> [v2|v3]",
+                exit_code=2,
+            )
+        position_type = argv[8].strip().lower() if len(argv) >= 9 else "v2"
+        if position_type not in {"v2", "v3"}:
+            return _err("invalid_input", "position type must be v2 or v3.", exit_code=2)
+        return _run_agent(
+            [
+                "liquidity",
+                "quote-add",
+                "--chain",
+                chain,
+                "--dex",
+                argv[2].strip().lower(),
+                "--token-a",
+                argv[3].strip(),
+                "--token-b",
+                argv[4].strip(),
+                "--amount-a",
+                argv[5].strip(),
+                "--amount-b",
+                argv[6].strip(),
+                "--slippage-bps",
+                argv[7].strip(),
+                "--position-type",
+                position_type,
+                "--json",
+            ]
+        )
+
+    if cmd == "liquidity-quote-remove":
+        if len(argv) < 4:
+            return _err(
+                "usage",
+                "liquidity-quote-remove requires <dex> <position_id>",
+                "usage: liquidity-quote-remove <dex> <position_id> [percent]",
+                exit_code=2,
+            )
+        percent = argv[4].strip() if len(argv) >= 5 else "100"
+        if not _is_uint_string(percent):
+            return _err("invalid_input", "percent must be an integer.", exit_code=2)
+        return _run_agent(
+            [
+                "liquidity",
+                "quote-remove",
+                "--chain",
+                chain,
+                "--dex",
+                argv[2].strip().lower(),
+                "--position-id",
+                argv[3].strip(),
+                "--percent",
+                percent,
+                "--json",
+            ]
+        )
 
     if cmd == "transfer-resume":
         if len(argv) < 3:
@@ -886,6 +1036,14 @@ def main(argv: List[str]) -> int:
             args.append("--include-disabled")
         args.append("--json")
         return _run_agent(args)
+
+    if cmd == "default-chain-get":
+        return _run_agent(["default-chain", "get", "--json"])
+
+    if cmd == "default-chain-set":
+        if len(argv) < 3 or not str(argv[2]).strip():
+            return _err("usage", "default-chain-set requires <chain_key>", "usage: default-chain-set <chain_key>", exit_code=2)
+        return _run_agent(["default-chain", "set", "--chain", str(argv[2]).strip(), "--json"])
 
     if cmd == "request-x402-payment":
         overrides, parse_exit_code, parse_error = _parse_request_x402_payment_args(argv[2:])
@@ -1045,7 +1203,7 @@ def main(argv: List[str]) -> int:
     return _err(
         "unknown_command",
         f"Unknown command: {cmd}",
-        "Use one of: version, status, dashboard, intents-poll, approval-check, trade-exec, trade-spot, trade-resume, transfer-resume, transfer-decide, transfer-policy-get, transfer-policy-set, report-send, chat-poll, chat-post, tracked-list, tracked-trades, username-set, owner-link, faucet-request, faucet-networks, chains, x402-pay, x402-pay-resume, x402-pay-decide, x402-policy-get, x402-policy-set, x402-networks, request-x402-payment, wallet-health, wallet-address, wallet-sign-challenge, wallet-send, wallet-send-token, wallet-balance, wallet-token-balance",
+        "Use one of: version, status, dashboard, intents-poll, approval-check, trade-exec, trade-spot, trade-resume, liquidity-add, liquidity-remove, liquidity-positions, liquidity-quote-add, liquidity-quote-remove, transfer-resume, transfer-decide, transfer-policy-get, transfer-policy-set, report-send, chat-poll, chat-post, tracked-list, tracked-trades, username-set, owner-link, faucet-request, faucet-networks, chains, x402-pay, x402-pay-resume, x402-pay-decide, x402-policy-get, x402-policy-set, x402-networks, request-x402-payment, wallet-health, wallet-address, wallet-sign-challenge, wallet-send, wallet-send-token, wallet-balance, wallet-token-balance",
         exit_code=2,
     )
 

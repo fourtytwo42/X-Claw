@@ -126,10 +126,16 @@ Common optional:
 - `wallet-address`
 - `wallet-balance`
 - `trade-spot <token_in> <token_out> <amount_in> <slippage_bps>`
+- `liquidity-add <dex> <token_a> <token_b> <amount_a> <amount_b> <slippage_bps> [v2|v3] [v3_range]`
+- `liquidity-remove <dex> <position_id> [percent] [slippage_bps] [v2|v3]`
+- `liquidity-positions <dex|all> [status]`
 - `wallet-send <to> <amount_wei>`
 - `wallet-send-token <token_or_symbol> <to> <amount_wei>`
 - `transfer-policy-get`
 - `transfer-policy-set <auto|per_transfer> <native_preapproved:0|1> [allowed_token ...]`
+- `default-chain-get`
+- `default-chain-set <chain_key>`
+- `chains`
 - `owner-link`
 - `faucet-request [chain] [native] [wrapped] [stable]`
 
@@ -137,12 +143,14 @@ Additional capabilities:
 - approvals: `approval-check`, `cleanup-spot`, `clear-prompt`, `trade-resume`, `trade-decide`, `transfer-resume`, `transfer-decide`, `policy-decide`
 - policy approvals: `policy-preapprove-token`, `policy-approve-all`, `policy-revoke-token`, `policy-revoke-all`
 - tracked/social: `chat-poll`, `chat-post`, `tracked-list`, `tracked-trades`, `username-set`
+- liquidity simulation: `liquidity-quote-add`, `liquidity-quote-remove`
 - x402: `request-x402-payment`, `x402-pay`, `x402-pay-resume`, `x402-pay-decide`, `x402-policy-get`, `x402-policy-set`, `x402-networks`
 
 ## Operational Notes
 
 - `wallet-balance` returns native + canonical token balances in one payload.
 - Transfer/trade policy is owner-controlled and may force approval.
+- Runtime default chain is agent-canonical (`state.json.defaultChain`); explicit `--chain` remains authoritative.
 - Runtime-canonical decision mode flag: `XCLAW_RUNTIME_CANONICAL_APPROVAL_DECISIONS=1`
   - Web management approvals route owner decisions through runtime `approvals decide-*` commands.
   - Telegram callback approvals route through runtime `approvals decide-*` commands (`xappr`, `xpol`, `xfer`) with deterministic callback idempotency metadata.

@@ -14,6 +14,11 @@ This reference defines the expected command surface for the Python-first skill w
 - `trade-exec <intent_id>`
 - `trade-spot <token_in> <token_out> <amount_in> <slippage_bps>` (`amount_in` is human token units; use `wei:<uint>` for raw base units)
 - `trade-resume <trade_id>` (internal auto-resume path for single-trigger Telegram spot approvals)
+- `liquidity-add <dex> <token_a> <token_b> <amount_a> <amount_b> <slippage_bps> [v2|v3] [v3_range]`
+- `liquidity-remove <dex> <position_id> [percent] [slippage_bps] [v2|v3]`
+- `liquidity-positions <dex|all> [status]`
+- `liquidity-quote-add <dex> <token_a> <token_b> <amount_a> <amount_b> <slippage_bps> [v2|v3]`
+- `liquidity-quote-remove <dex> <position_id> [percent]`
 - `trade-decide <trade_id> <approve|reject>` (runtime-canonical spot approval decision path)
 - `transfer-resume <approval_id>` (internal auto-resume path for single-trigger transfer approvals)
 - `transfer-decide <approval_id> <approve|deny>` (internal callback decision command)
@@ -30,6 +35,8 @@ This reference defines the expected command surface for the Python-first skill w
 - `faucet-request`
 - `faucet-networks`
 - `chains`
+- `default-chain-get`
+- `default-chain-set <chain_key>`
 - `request-x402-payment`
 - `request-x402-payment [--network <network>] [--facilitator <facilitator>] [--amount-atomic <amount_atomic>] [--asset-kind <native|erc20>] [--asset-symbol <symbol>] [--asset-address <0x...>] [--resource-description <text>]`
 - `x402-pay <url> <network> <facilitator> <amount_atomic>`
@@ -56,6 +63,11 @@ Underlying runtime delegation (performed by wrapper):
 - `xclaw-agent approvals check --intent <intent_id> --chain <chain_key> --json`
 - `xclaw-agent trade execute --intent <intent_id> --chain <chain_key> --json`
 - `xclaw-agent trade spot --chain <chain_key> --token-in <token_or_symbol> --token-out <token_or_symbol> --amount-in <amount_in> --slippage-bps <bps> --json`
+- `xclaw-agent liquidity add --chain <chain_key> --dex <dex> --token-a <token_or_symbol> --token-b <token_or_symbol> --amount-a <amount_a> --amount-b <amount_b> [--position-type <v2|v3>] [--v3-range <range>] [--slippage-bps <bps>] --json`
+- `xclaw-agent liquidity remove --chain <chain_key> --dex <dex> --position-id <position_id> [--percent <1-100>] [--slippage-bps <bps>] [--position-type <v2|v3>] --json`
+- `xclaw-agent liquidity positions --chain <chain_key> [--dex <dex>] [--status <status>] --json`
+- `xclaw-agent liquidity quote-add --chain <chain_key> --dex <dex> --token-a <token_or_symbol> --token-b <token_or_symbol> --amount-a <amount_a> --amount-b <amount_b> [--position-type <v2|v3>] [--slippage-bps <bps>] --json`
+- `xclaw-agent liquidity quote-remove --chain <chain_key> --dex <dex> --position-id <position_id> [--percent <1-100>] --json`
 - `xclaw-agent approvals cleanup-spot --trade-id <trade_id> --json`
 - `xclaw-agent approvals clear-prompt --subject-type <trade|transfer|policy> --subject-id <id> [--chain <chain_key>] --json`
 - `xclaw-agent approvals resume-spot --trade-id <trade_id> --chain <chain_key> --json`
@@ -77,6 +89,8 @@ Underlying runtime delegation (performed by wrapper):
 - `xclaw-agent faucet-networks --json`
 - `xclaw-agent chains --json`
 - `xclaw-agent chains --include-disabled --json`
+- `xclaw-agent default-chain get --json`
+- `xclaw-agent default-chain set --chain <chain_key> --json`
 - `xclaw-agent x402 receive-request --network <network> --facilitator <facilitator> --amount-atomic <amount_atomic> [--asset-kind <native|erc20>] [--asset-symbol <symbol>] [--asset-address <0x...>] [--resource-description <text>] --json`
 - `xclaw-agent x402 pay --url <url> --network <network> --facilitator <facilitator> --amount-atomic <amount_atomic> --json`
 - `xclaw-agent x402 pay-resume --approval-id <xfr_id> --json`

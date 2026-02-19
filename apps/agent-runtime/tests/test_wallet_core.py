@@ -132,6 +132,35 @@ class WalletCoreCliTests(unittest.TestCase):
             self.assertIsInstance(payload.get("actionHint"), str)
             self.assertEqual(payload.get("nextAction"), payload.get("actionHint"))
 
+    def test_default_chain_get_returns_fallback_when_unset(self) -> None:
+        with tempfile.TemporaryDirectory() as home:
+            code, payload = self._run("default-chain", "get", "--json", home=home)
+            self.assertEqual(code, 0)
+            self.assertTrue(payload.get("ok"))
+            self.assertEqual(payload.get("chainKey"), "base_sepolia")
+            self.assertEqual(payload.get("source"), "fallback")
+
+    def test_default_chain_set_and_get_roundtrip(self) -> None:
+        with tempfile.TemporaryDirectory() as home:
+            set_code, set_payload = self._run("default-chain", "set", "--chain", "kite_ai_testnet", "--json", home=home)
+            self.assertEqual(set_code, 0)
+            self.assertTrue(set_payload.get("ok"))
+            self.assertEqual(set_payload.get("chainKey"), "kite_ai_testnet")
+            self.assertEqual(set_payload.get("source"), "state")
+
+            get_code, get_payload = self._run("default-chain", "get", "--json", home=home)
+            self.assertEqual(get_code, 0)
+            self.assertTrue(get_payload.get("ok"))
+            self.assertEqual(get_payload.get("chainKey"), "kite_ai_testnet")
+            self.assertEqual(get_payload.get("source"), "state")
+
+    def test_default_chain_set_rejects_unsupported_chain(self) -> None:
+        with tempfile.TemporaryDirectory() as home:
+            code, payload = self._run("default-chain", "set", "--chain", "ethereum_mainnet", "--json", home=home)
+            self.assertEqual(code, 2)
+            self.assertFalse(payload.get("ok"))
+            self.assertEqual(payload.get("code"), "unsupported_chain")
+
     def _seed_multi_chain_wallet(self, home: str) -> str:
         private_key_hex = "33" * 32
         address = cli._derive_address(private_key_hex)

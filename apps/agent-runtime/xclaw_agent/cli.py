@@ -38,6 +38,7 @@ from xclaw_agent.chains import (
     ChainRegistryError,
     assert_capability as assert_chain_capability,
     assert_chain_supported,
+    chain_enabled,
     chain_capability,
     list_chains as list_chain_registry,
     supported_chain_hint as chain_supported_hint,
@@ -317,6 +318,44 @@ def load_state() -> dict[str, Any]:
 
 def save_state(state: dict[str, Any]) -> None:
     _write_json(STATE_FILE, state)
+
+
+def _read_runtime_default_chain() -> str | None:
+    state = load_state()
+    raw = state.get("defaultChain")
+    if not isinstance(raw, str):
+        return None
+    normalized = raw.strip()
+    if not normalized:
+        return None
+    return normalized
+
+
+def _resolve_runtime_default_chain() -> tuple[str, str]:
+    stored = _read_runtime_default_chain()
+    if stored and chain_enabled(stored):
+        return stored, "state"
+
+    from_env = str(os.environ.get("XCLAW_DEFAULT_CHAIN") or "").strip()
+    if from_env and chain_enabled(from_env):
+        return from_env, "env"
+
+    if chain_enabled("base_sepolia"):
+        return "base_sepolia", "fallback"
+
+    enabled_rows = list_chain_registry()
+    if enabled_rows:
+        first = str(enabled_rows[0].get("chainKey") or "").strip()
+        if first:
+            return first, "fallback"
+    return "base_sepolia", "fallback"
+
+
+def _set_runtime_default_chain(chain: str) -> None:
+    assert_chain_supported(chain)
+    state = load_state()
+    state["defaultChain"] = chain
+    save_state(state)
 
 
 def _default_wallet_store() -> dict[str, Any]:
@@ -1243,7 +1282,7 @@ def _api_request(
     is_auth_failure = status == 401 and str(body.get("code", "")) == "auth_invalid"
     is_recovery_endpoint = url.endswith("/agent/auth/challenge") or url.endswith("/agent/auth/recover")
     if allow_auth_recovery and is_auth_failure and not is_recovery_endpoint:
-        chain = (os.environ.get("XCLAW_DEFAULT_CHAIN") or "").strip() or "base_sepolia"
+        chain, _ = _resolve_runtime_default_chain()
         recovered_key = _recover_api_key_with_wallet_signature(base_url, api_key, chain)
         status, body = _http_json_request(
             method,
@@ -4778,6 +4817,289 @@ def _router_get_amount_out(chain: str, amount_in_units: str, token_in: str, toke
         raise WalletStoreError(str(exc)) from exc
 
 
+def _parse_positive_amount_text(raw: str, field_name: str) -> Decimal:
+    value = str(raw or "").strip()
+    if not re.fullmatch(r"[0-9]+(\.[0-9]+)?", value):
+        raise WalletStoreError(f"{field_name} must be a non-negative decimal string.")
+    parsed = _to_non_negative_decimal(value)
+    if parsed <= Decimal("0"):
+        raise WalletStoreError(f"{field_name} must be greater than zero.")
+    return parsed
+
+
+def _resolve_agent_id_or_fail(chain: str) -> str:
+    api_key = _resolve_api_key()
+    agent_id = _resolve_agent_id(api_key)
+    if not agent_id:
+        raise WalletStoreError("Agent id could not be resolved. Set XCLAW_AGENT_ID or use signed agent token format.")
+    return agent_id
+
+
+def cmd_liquidity_quote_add(args: argparse.Namespace) -> int:
+    chk = require_json_flag(args)
+    if chk is not None:
+        return chk
+    chain = str(args.chain or "").strip()
+    dex = str(args.dex or "").strip().lower()
+    try:
+        assert_chain_capability(chain, "liquidity")
+        token_a = _resolve_token_address(chain, args.token_a)
+        token_b = _resolve_token_address(chain, args.token_b)
+        if token_a.lower() == token_b.lower():
+            return fail("invalid_input", "token-a and token-b must be different.", "Provide distinct token values.", {"chain": chain}, exit_code=2)
+        amount_a_h = _parse_positive_amount_text(str(args.amount_a), "amount-a")
+        amount_b_h = _parse_positive_amount_text(str(args.amount_b), "amount-b")
+        slippage_bps = int(args.slippage_bps)
+        if slippage_bps < 0 or slippage_bps > 5000:
+            return fail("invalid_input", "slippage-bps must be between 0 and 5000.", "Use integer bps in range.", {"slippageBps": args.slippage_bps}, exit_code=2)
+        token_a_meta = _fetch_erc20_metadata(chain, token_a)
+        token_b_meta = _fetch_erc20_metadata(chain, token_b)
+        token_a_decimals = int(token_a_meta.get("decimals", 18))
+        token_b_decimals = int(token_b_meta.get("decimals", 18))
+        amount_a_units = _to_units_uint(_decimal_text(amount_a_h), token_a_decimals)
+        quote_out_units = _router_get_amount_out(chain, amount_a_units, token_a, token_b)
+        quote_out_h = _format_units(int(quote_out_units), token_b_decimals)
+        min_b_h = _decimal_text(_to_non_negative_decimal(quote_out_h) * Decimal(max(0, 10000 - slippage_bps)) / Decimal(10000))
+        return ok(
+            "Liquidity add quote ready.",
+            chain=chain,
+            dex=dex,
+            positionType=str(args.position_type or "v2"),
+            tokenA=token_a,
+            tokenB=token_b,
+            amountA=_decimal_text(amount_a_h),
+            amountB=_decimal_text(amount_b_h),
+            quoteAmountB=quote_out_h,
+            minAmountB=min_b_h,
+            slippageBps=slippage_bps,
+            tokenASymbol=token_a_meta.get("symbol"),
+            tokenBSymbol=token_b_meta.get("symbol"),
+            tokenADecimals=token_a_decimals,
+            tokenBDecimals=token_b_decimals,
+            simulationOnly=True,
+        )
+    except ChainRegistryError as exc:
+        return fail("unsupported_chain_capability", str(exc), chain_supported_hint(), {"chain": chain, "requiredCapability": "liquidity"}, exit_code=2)
+    except WalletStoreError as exc:
+        return fail("liquidity_quote_add_failed", str(exc), "Verify tokens/amounts and retry.", {"chain": chain, "dex": dex}, exit_code=1)
+    except Exception as exc:
+        return fail("liquidity_quote_add_failed", str(exc), "Inspect runtime liquidity quote-add path and retry.", {"chain": chain, "dex": dex}, exit_code=1)
+
+
+def cmd_liquidity_quote_remove(args: argparse.Namespace) -> int:
+    chk = require_json_flag(args)
+    if chk is not None:
+        return chk
+    chain = str(args.chain or "").strip()
+    dex = str(args.dex or "").strip().lower()
+    try:
+        assert_chain_capability(chain, "liquidity")
+        position_id = str(args.position_id or "").strip()
+        if not position_id:
+            return fail("invalid_input", "position-id is required.", "Provide --position-id and retry.", {"chain": chain, "dex": dex}, exit_code=2)
+        percent = int(args.percent)
+        if percent < 1 or percent > 100:
+            return fail("invalid_input", "percent must be between 1 and 100.", "Use --percent in [1..100].", {"percent": args.percent}, exit_code=2)
+        return ok(
+            "Liquidity remove quote ready.",
+            chain=chain,
+            dex=dex,
+            positionId=position_id,
+            percent=percent,
+            simulationOnly=True,
+            note="Exact remove outputs are adapter-specific; runtime will recompute pre-execution.",
+        )
+    except ChainRegistryError as exc:
+        return fail("unsupported_chain_capability", str(exc), chain_supported_hint(), {"chain": chain, "requiredCapability": "liquidity"}, exit_code=2)
+    except Exception as exc:
+        return fail("liquidity_quote_remove_failed", str(exc), "Inspect runtime liquidity quote-remove path and retry.", {"chain": chain, "dex": dex}, exit_code=1)
+
+
+def cmd_liquidity_add(args: argparse.Namespace) -> int:
+    chk = require_json_flag(args)
+    if chk is not None:
+        return chk
+    chain = str(args.chain or "").strip()
+    dex = str(args.dex or "").strip().lower()
+    try:
+        assert_chain_capability(chain, "liquidity")
+        agent_id = _resolve_agent_id_or_fail(chain)
+        token_a = _resolve_token_address(chain, args.token_a)
+        token_b = _resolve_token_address(chain, args.token_b)
+        amount_a_h = _parse_positive_amount_text(str(args.amount_a), "amount-a")
+        amount_b_h = _parse_positive_amount_text(str(args.amount_b), "amount-b")
+        slippage_bps = int(args.slippage_bps)
+        if slippage_bps < 0 or slippage_bps > 5000:
+            return fail("invalid_input", "slippage-bps must be between 0 and 5000.", "Use integer bps in range.", {"slippageBps": args.slippage_bps}, exit_code=2)
+        payload = {
+            "schemaVersion": 1,
+            "agentId": agent_id,
+            "chainKey": chain,
+            "dex": dex,
+            "action": "add",
+            "positionType": str(args.position_type or "v2"),
+            "tokenA": token_a,
+            "tokenB": token_b,
+            "amountA": _decimal_text(amount_a_h),
+            "amountB": _decimal_text(amount_b_h),
+            "slippageBps": slippage_bps,
+            "details": {
+                "v3Range": str(args.v3_range or "").strip() or None,
+                "source": "runtime_liquidity_add",
+            },
+        }
+        status_code, body = _api_request("POST", "/liquidity/proposed", payload=payload, include_idempotency=True)
+        if status_code < 200 or status_code >= 300:
+            return fail(
+                str(body.get("code", "api_error")),
+                str(body.get("message", f"liquidity proposed failed ({status_code})")),
+                str(body.get("actionHint", "Verify policy/approval settings and retry.")),
+                _api_error_details(status_code, body, "/liquidity/proposed", chain=chain),
+                exit_code=1,
+            )
+        liquidity_intent_id = str(body.get("liquidityIntentId") or "").strip()
+        status = str(body.get("status") or "")
+        if status == "approval_pending":
+            return fail(
+                "approval_required",
+                "Liquidity add is waiting for management approval.",
+                "Approve from authorized management view, then run liquidity add again or use resume flow.",
+                {"liquidityIntentId": liquidity_intent_id, "chain": chain, "dex": dex, "status": status},
+                exit_code=1,
+            )
+        return ok(
+            "Liquidity add intent created.",
+            chain=chain,
+            dex=dex,
+            liquidityIntentId=liquidity_intent_id,
+            status=status or "approved",
+            approvalMode=status != "approval_pending",
+        )
+    except ChainRegistryError as exc:
+        return fail("unsupported_chain_capability", str(exc), chain_supported_hint(), {"chain": chain, "requiredCapability": "liquidity"}, exit_code=2)
+    except WalletStoreError as exc:
+        return fail("liquidity_add_failed", str(exc), "Verify API env/auth, chain capability, and inputs.", {"chain": chain, "dex": dex}, exit_code=1)
+    except Exception as exc:
+        return fail("liquidity_add_failed", str(exc), "Inspect runtime liquidity add path and retry.", {"chain": chain, "dex": dex}, exit_code=1)
+
+
+def cmd_liquidity_remove(args: argparse.Namespace) -> int:
+    chk = require_json_flag(args)
+    if chk is not None:
+        return chk
+    chain = str(args.chain or "").strip()
+    dex = str(args.dex or "").strip().lower()
+    try:
+        assert_chain_capability(chain, "liquidity")
+        agent_id = _resolve_agent_id_or_fail(chain)
+        position_id = str(args.position_id or "").strip()
+        if not position_id:
+            return fail("invalid_input", "position-id is required.", "Provide --position-id and retry.", {"chain": chain, "dex": dex}, exit_code=2)
+        percent = int(args.percent)
+        if percent < 1 or percent > 100:
+            return fail("invalid_input", "percent must be between 1 and 100.", "Use --percent in [1..100].", {"percent": args.percent}, exit_code=2)
+        slippage_bps = int(args.slippage_bps)
+        if slippage_bps < 0 or slippage_bps > 5000:
+            return fail("invalid_input", "slippage-bps must be between 0 and 5000.", "Use integer bps in range.", {"slippageBps": args.slippage_bps}, exit_code=2)
+        payload = {
+            "schemaVersion": 1,
+            "agentId": agent_id,
+            "chainKey": chain,
+            "dex": dex,
+            "action": "remove",
+            "positionType": str(args.position_type or "v2"),
+            "tokenA": str(args.token_a or "POSITION").strip(),
+            "tokenB": str(args.token_b or "POSITION").strip(),
+            "amountA": str(percent),
+            "amountB": "0",
+            "positionId": position_id,
+            "slippageBps": slippage_bps,
+            "details": {
+                "percent": percent,
+                "source": "runtime_liquidity_remove",
+            },
+        }
+        status_code, body = _api_request("POST", "/liquidity/proposed", payload=payload, include_idempotency=True)
+        if status_code < 200 or status_code >= 300:
+            return fail(
+                str(body.get("code", "api_error")),
+                str(body.get("message", f"liquidity proposed failed ({status_code})")),
+                str(body.get("actionHint", "Verify policy/approval settings and retry.")),
+                _api_error_details(status_code, body, "/liquidity/proposed", chain=chain),
+                exit_code=1,
+            )
+        liquidity_intent_id = str(body.get("liquidityIntentId") or "").strip()
+        status = str(body.get("status") or "")
+        if status == "approval_pending":
+            return fail(
+                "approval_required",
+                "Liquidity remove is waiting for management approval.",
+                "Approve from authorized management view, then run liquidity remove again or use resume flow.",
+                {"liquidityIntentId": liquidity_intent_id, "chain": chain, "dex": dex, "status": status},
+                exit_code=1,
+            )
+        return ok(
+            "Liquidity remove intent created.",
+            chain=chain,
+            dex=dex,
+            liquidityIntentId=liquidity_intent_id,
+            status=status or "approved",
+            positionId=position_id,
+            percent=percent,
+        )
+    except ChainRegistryError as exc:
+        return fail("unsupported_chain_capability", str(exc), chain_supported_hint(), {"chain": chain, "requiredCapability": "liquidity"}, exit_code=2)
+    except WalletStoreError as exc:
+        return fail("liquidity_remove_failed", str(exc), "Verify API env/auth, chain capability, and inputs.", {"chain": chain, "dex": dex}, exit_code=1)
+    except Exception as exc:
+        return fail("liquidity_remove_failed", str(exc), "Inspect runtime liquidity remove path and retry.", {"chain": chain, "dex": dex}, exit_code=1)
+
+
+def cmd_liquidity_positions(args: argparse.Namespace) -> int:
+    chk = require_json_flag(args)
+    if chk is not None:
+        return chk
+    chain = str(args.chain or "").strip()
+    dex = str(args.dex or "").strip().lower()
+    status_filter = str(args.status or "").strip().lower()
+    try:
+        assert_chain_capability(chain, "liquidity")
+        agent_id = _resolve_agent_id_or_fail(chain)
+        status_code, body = _api_request(
+            "GET",
+            f"/liquidity/positions?agentId={urllib.parse.quote(agent_id)}&chainKey={urllib.parse.quote(chain)}",
+        )
+        if status_code < 200 or status_code >= 300:
+            return fail(
+                str(body.get("code", "api_error")),
+                str(body.get("message", f"liquidity positions request failed ({status_code})")),
+                str(body.get("actionHint", "Verify API auth and retry.")),
+                _api_error_details(status_code, body, "/liquidity/positions", chain=chain),
+                exit_code=1,
+            )
+        items = body.get("items")
+        if not isinstance(items, list):
+            items = []
+        if dex:
+            items = [row for row in items if str((row or {}).get("dex") or "").strip().lower() == dex]
+        if status_filter:
+            items = [row for row in items if str((row or {}).get("status") or "").strip().lower() == status_filter]
+        return ok(
+            "Liquidity positions loaded.",
+            chain=chain,
+            dex=dex or None,
+            status=status_filter or None,
+            count=len(items),
+            positions=items,
+        )
+    except ChainRegistryError as exc:
+        return fail("unsupported_chain_capability", str(exc), chain_supported_hint(), {"chain": chain, "requiredCapability": "liquidity"}, exit_code=2)
+    except WalletStoreError as exc:
+        return fail("liquidity_positions_failed", str(exc), "Verify API env/auth and retry.", {"chain": chain, "dex": dex}, exit_code=1)
+    except Exception as exc:
+        return fail("liquidity_positions_failed", str(exc), "Inspect runtime liquidity positions path and retry.", {"chain": chain, "dex": dex}, exit_code=1)
+
+
 def cmd_trade_spot(args: argparse.Namespace) -> int:
     chk = require_json_flag(args)
     if chk is not None:
@@ -5563,7 +5885,7 @@ def cmd_status(args: argparse.Namespace) -> int:
     chk = require_json_flag(args)
     if chk is not None:
         return chk
-    default_chain = (os.environ.get("XCLAW_DEFAULT_CHAIN") or "").strip() or None
+    default_chain, default_chain_source = _resolve_runtime_default_chain()
     has_cast = cast_exists()
     hostname: str | None
     try:
@@ -5575,31 +5897,30 @@ def cmd_status(args: argparse.Namespace) -> int:
     wallet_address: str | None = None
     agent_name: str | None = None
     identity_warnings: list[dict[str, str]] = []
-    if default_chain:
+    try:
+        agent_id = _resolve_agent_id(_resolve_api_key())
+    except Exception:
+        agent_id = None
+    try:
+        wallet_address = _wallet_address_for_chain(default_chain)
+    except Exception:
+        wallet_address = None
+    if agent_id:
         try:
-            agent_id = _resolve_agent_id(_resolve_api_key())
-        except Exception:
-            agent_id = None
-        try:
-            wallet_address = _wallet_address_for_chain(default_chain)
-        except Exception:
-            wallet_address = None
-        if agent_id:
-            try:
-                base_url = _require_api_base_url()
-                status_code, body = _http_json_request("GET", f"{base_url}/public/agents/{urllib.parse.quote(agent_id)}")
-                if 200 <= status_code < 300:
-                    agent_obj = body.get("agent")
-                    if isinstance(agent_obj, dict):
-                        raw_name = agent_obj.get("agent_name") or agent_obj.get("agentName")
-                        if isinstance(raw_name, str) and raw_name.strip():
-                            agent_name = raw_name.strip()
-                else:
-                    identity_warnings.append(
-                        {"code": str(body.get("code", "api_error")), "message": str(body.get("message", f"profile read failed ({status_code})"))}
-                    )
-            except Exception as exc:
-                identity_warnings.append({"code": "agent_name_unavailable", "message": str(exc)})
+            base_url = _require_api_base_url()
+            status_code, body = _http_json_request("GET", f"{base_url}/public/agents/{urllib.parse.quote(agent_id)}")
+            if 200 <= status_code < 300:
+                agent_obj = body.get("agent")
+                if isinstance(agent_obj, dict):
+                    raw_name = agent_obj.get("agent_name") or agent_obj.get("agentName")
+                    if isinstance(raw_name, str) and raw_name.strip():
+                        agent_name = raw_name.strip()
+            else:
+                identity_warnings.append(
+                    {"code": str(body.get("code", "api_error")), "message": str(body.get("message", f"profile read failed ({status_code})"))}
+                )
+        except Exception as exc:
+            identity_warnings.append({"code": "agent_name_unavailable", "message": str(exc)})
 
     return ok(
         "Agent runtime scaffold is healthy.",
@@ -5607,6 +5928,7 @@ def cmd_status(args: argparse.Namespace) -> int:
         timestamp=utc_now(),
         scaffold=True,
         defaultChain=default_chain,
+        defaultChainSource=default_chain_source,
         agentId=agent_id,
         agentName=agent_name,
         walletAddress=wallet_address,
@@ -6370,6 +6692,7 @@ def cmd_chains(args: argparse.Namespace) -> int:
                     "capabilities": {
                         "wallet": chain_capability(chain_key, "wallet"),
                         "trade": chain_capability(chain_key, "trade"),
+                        "liquidity": chain_capability(chain_key, "liquidity"),
                         "limitOrders": chain_capability(chain_key, "limitOrders"),
                         "x402": chain_capability(chain_key, "x402"),
                         "faucet": chain_capability(chain_key, "faucet"),
@@ -6380,6 +6703,34 @@ def cmd_chains(args: argparse.Namespace) -> int:
         return ok("Chains loaded.", chains=rows, count=len(rows))
     except ChainRegistryError as exc:
         return fail("chain_registry_error", str(exc), "Verify config/chains/*.json and retry.", exit_code=1)
+
+
+def cmd_default_chain_get(args: argparse.Namespace) -> int:
+    chk = require_json_flag(args)
+    if chk is not None:
+        return chk
+    chain, source = _resolve_runtime_default_chain()
+    stored = _read_runtime_default_chain()
+    return ok(
+        "Runtime default chain loaded.",
+        chainKey=chain,
+        source=source,
+        persistedChainKey=stored,
+    )
+
+
+def cmd_default_chain_set(args: argparse.Namespace) -> int:
+    chk = require_json_flag(args)
+    if chk is not None:
+        return chk
+    chain = str(args.chain or "").strip()
+    if not chain:
+        return fail("invalid_input", "chain is required.", "Provide --chain <chainKey> and retry.", exit_code=2)
+    try:
+        _set_runtime_default_chain(chain)
+    except ChainRegistryError as exc:
+        return fail("unsupported_chain", str(exc), chain_supported_hint(), {"chain": chain}, exit_code=2)
+    return ok("Runtime default chain updated.", chainKey=chain, source="state")
 
 
 def _fetch_native_balance_wei(chain: str, address: str) -> str:
@@ -8136,6 +8487,61 @@ def build_parser() -> argparse.ArgumentParser:
     trade_spot.add_argument("--json", action="store_true")
     trade_spot.set_defaults(func=cmd_trade_spot)
 
+    liquidity = sub.add_parser("liquidity")
+    liquidity_sub = liquidity.add_subparsers(dest="liquidity_cmd")
+
+    liquidity_add = liquidity_sub.add_parser("add")
+    liquidity_add.add_argument("--chain", required=True)
+    liquidity_add.add_argument("--dex", required=True)
+    liquidity_add.add_argument("--token-a", required=True)
+    liquidity_add.add_argument("--token-b", required=True)
+    liquidity_add.add_argument("--amount-a", required=True)
+    liquidity_add.add_argument("--amount-b", required=True)
+    liquidity_add.add_argument("--position-type", default="v2", choices=["v2", "v3"])
+    liquidity_add.add_argument("--v3-range")
+    liquidity_add.add_argument("--slippage-bps", default=100)
+    liquidity_add.add_argument("--json", action="store_true")
+    liquidity_add.set_defaults(func=cmd_liquidity_add)
+
+    liquidity_remove = liquidity_sub.add_parser("remove")
+    liquidity_remove.add_argument("--chain", required=True)
+    liquidity_remove.add_argument("--dex", required=True)
+    liquidity_remove.add_argument("--position-id", required=True)
+    liquidity_remove.add_argument("--percent", default=100)
+    liquidity_remove.add_argument("--slippage-bps", default=100)
+    liquidity_remove.add_argument("--position-type", default="v2", choices=["v2", "v3"])
+    liquidity_remove.add_argument("--token-a")
+    liquidity_remove.add_argument("--token-b")
+    liquidity_remove.add_argument("--json", action="store_true")
+    liquidity_remove.set_defaults(func=cmd_liquidity_remove)
+
+    liquidity_positions = liquidity_sub.add_parser("positions")
+    liquidity_positions.add_argument("--chain", required=True)
+    liquidity_positions.add_argument("--dex")
+    liquidity_positions.add_argument("--status")
+    liquidity_positions.add_argument("--json", action="store_true")
+    liquidity_positions.set_defaults(func=cmd_liquidity_positions)
+
+    liquidity_quote_add = liquidity_sub.add_parser("quote-add")
+    liquidity_quote_add.add_argument("--chain", required=True)
+    liquidity_quote_add.add_argument("--dex", required=True)
+    liquidity_quote_add.add_argument("--token-a", required=True)
+    liquidity_quote_add.add_argument("--token-b", required=True)
+    liquidity_quote_add.add_argument("--amount-a", required=True)
+    liquidity_quote_add.add_argument("--amount-b", required=True)
+    liquidity_quote_add.add_argument("--position-type", default="v2", choices=["v2", "v3"])
+    liquidity_quote_add.add_argument("--slippage-bps", default=100)
+    liquidity_quote_add.add_argument("--json", action="store_true")
+    liquidity_quote_add.set_defaults(func=cmd_liquidity_quote_add)
+
+    liquidity_quote_remove = liquidity_sub.add_parser("quote-remove")
+    liquidity_quote_remove.add_argument("--chain", required=True)
+    liquidity_quote_remove.add_argument("--dex", required=True)
+    liquidity_quote_remove.add_argument("--position-id", required=True)
+    liquidity_quote_remove.add_argument("--percent", default=100)
+    liquidity_quote_remove.add_argument("--json", action="store_true")
+    liquidity_quote_remove.set_defaults(func=cmd_liquidity_quote_remove)
+
     transfers = sub.add_parser("transfers")
     transfers_sub = transfers.add_subparsers(dest="transfers_cmd")
 
@@ -8217,6 +8623,18 @@ def build_parser() -> argparse.ArgumentParser:
     chains_cmd.add_argument("--include-disabled", action="store_true")
     chains_cmd.add_argument("--json", action="store_true")
     chains_cmd.set_defaults(func=cmd_chains)
+
+    default_chain = sub.add_parser("default-chain")
+    default_chain_sub = default_chain.add_subparsers(dest="default_chain_cmd")
+
+    default_chain_get = default_chain_sub.add_parser("get")
+    default_chain_get.add_argument("--json", action="store_true")
+    default_chain_get.set_defaults(func=cmd_default_chain_get)
+
+    default_chain_set = default_chain_sub.add_parser("set")
+    default_chain_set.add_argument("--chain", required=True)
+    default_chain_set.add_argument("--json", action="store_true")
+    default_chain_set.set_defaults(func=cmd_default_chain_set)
 
     x402 = sub.add_parser("x402")
     x402_sub = x402.add_subparsers(dest="x402_cmd")
@@ -8397,6 +8815,8 @@ def main(argv: list[str] | None = None) -> int:
         capability = "wallet"
         if top == "trade":
             capability = "trade"
+        elif top == "liquidity":
+            capability = "liquidity"
         elif top == "limit-orders":
             capability = "limitOrders"
         elif top == "faucet-request":
