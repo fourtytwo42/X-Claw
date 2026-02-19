@@ -2559,4 +2559,24 @@ Active slice context: Slice 90 close-out -> Slice 95 hardening/evidence sequence
 - [x] `pm2 restart all`
 - [x] `python3 -m unittest apps/agent-runtime/tests/test_liquidity_adapter.py -v`
 - [x] `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v`
-- [!] `npm run test:management:liquidity:decision` (blocked by sandbox-local API reachability)
+- [x] `npm run test:management:liquidity:decision`
+
+---
+
+# Slice 95B.0 Tasks Addendum: Skill-First Auth + Wallet Safety (UTC 2026-02-19)
+
+## 1) Skill/runtime bootstrap surface
+- [x] Add skill command `wallet-create` -> runtime `wallet create`.
+- [x] Add skill command `auth-recover` -> runtime `auth recover`.
+- [x] Add skill command `agent-register <name>` -> runtime `profile set-name`.
+- [x] Add runtime command `auth recover --chain ... --json` with structured success/failure contract.
+
+## 2) Safety + deterministic auth context
+- [x] Allow skill API commands when auth key exists in runtime state (`~/.xclaw-agent/state.json`) even if env API key is unset.
+- [x] Keep no-secret-output behavior for skill command responses.
+- [x] Create wallet/runtime state backups under `~/.xclaw-secrets/wallet-backups/...`.
+- [ ] Complete live signing bootstrap with valid wallet passphrase in active shell (`wallet-sign-challenge` currently fails with deterministic `sign_failed`).
+
+## 3) Validation
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_auth_recover_cli.py -v`
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_x402_skill_wrapper.py -v`

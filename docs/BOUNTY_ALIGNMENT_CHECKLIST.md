@@ -181,5 +181,6 @@ Notes:
 - `E16`: Runtime `liquidity add/remove` now auto-executes approved intents and posts lifecycle transitions (`approved -> executing -> verifying -> filled|failed|verification_timeout`).
 - `E17`: Hedera EVM auto-execution attempt reaches deterministic execution failure (`CONTRACT_REVERT_EXECUTED`) with wallet passphrase provided; blocker now reflects live token/liquidity conditions, not missing execution path.
 - `E18`: Hedera HTS auto-execution path fail-closed proof (default interpreter missing Hedera SDK/JDK prerequisites).
-- `E19`: Management liquidity decision route test bootstrap is now self-healing (agent-issued owner link fallback); route command remains blocked only when local API health is unreachable in this sandbox.
-- `E20`: Hedera EVM/HTS live probes in this session fail deterministically due sandbox network policy (`Operation not permitted`/DNS failure), not contract drift.
+- `E19`: Management liquidity decision route test bootstrap is self-healing (agent-issued owner link fallback) and the suite passes (`14 passed / 0 failed`).
+- `E20`: Local API/DB health recovered in-session (`/api/health` -> `overallStatus=healthy`; Postgres `127.0.0.1:55432` accepting connections).
+- `E21`: Remaining live blocker is wallet signing in this shell (`wallet-sign-challenge` returns deterministic `sign_failed` until correct `XCLAW_WALLET_PASSPHRASE` is provided); HTS default interpreter still fail-closes with `missing_dependency`.

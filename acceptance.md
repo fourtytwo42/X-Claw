@@ -4952,16 +4952,16 @@ Date (UTC): 2026-02-19
 - `pm2 restart all` -> PASS.
 - `python3 -m unittest apps/agent-runtime/tests/test_liquidity_adapter.py -v` -> PASS.
 - `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v` -> PASS.
-- `npm run test:management:liquidity:decision` -> BLOCKED by sandbox connectivity to local API host:
-  - blocker output: `Server health check request failed at http://127.0.0.1:3000/api/health` with `fetch failed`.
+- `npm run test:management:liquidity:decision` -> PASS after harness fix (`14 passed / 0 failed`).
 
 ### Evidence updates
 - `E19`: management liquidity decision test harness now self-heals bootstrap token via agent-issued owner link fallback.
-- `E20`: session-level live blockers are environment constraints:
-  - `apps/agent-runtime/bin/xclaw-agent liquidity discover-pairs --chain hedera_testnet --dex saucerswap --min-reserve 1 --limit 3 --scan-max 10 --json`
-  - output: `liquidity_pair_discovery_failed` with DNS failure to `https://testnet.hashio.io/api`.
-  - `XCLAW_AGENT_API_KEY=... XCLAW_AGENT_ID=... apps/agent-runtime/bin/xclaw-agent liquidity add --chain hedera_testnet --dex saucerswap --token-a WHBAR --token-b SAUCE --amount-a 1 --amount-b 1 --slippage-bps 100 --json`
-  - output: `liquidity_add_failed` with `API request failed: [Errno 1] Operation not permitted`.
+- `E20`: local API and DB recovered in-session (`/api/health` reports `overallStatus=healthy`; local Postgres on `127.0.0.1:55432` accepting connections).
+- `E21`: management approvals liquidity route contract suite now passes:
+  - `npm run test:management:liquidity:decision` -> `ok: true`, `passed: 14`, `failed: 0`.
+- `E22`: skill-first signing bootstrap remains blocked on wallet decryption passphrase in this shell:
+  - `python3 skills/xclaw-agent/scripts/xclaw_agent_skill.py wallet-sign-challenge "<canonical challenge>" --json`
+  - output: deterministic `sign_failed` (decrypt/sign step), while wallet address read still succeeds.
 - HTS runtime preflight remains deterministic fail-closed in default interpreter:
   - `apps/agent-runtime/bin/xclaw-agent liquidity quote-add --chain hedera_testnet --dex hedera_hts --token-a WHBAR --token-b SAUCE --amount-a 1 --amount-b 1 --position-type v2 --slippage-bps 100 --json`
   - output: `missing_dependency` (Hedera SDK not installed in active interpreter).

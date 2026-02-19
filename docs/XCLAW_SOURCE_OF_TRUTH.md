@@ -1236,12 +1236,14 @@ Delegated runtime CLI commands that must exist:
 - `xclaw-agent liquidity execute --intent <liquidity_intent_id> --chain <chain_key> --json`
 - `xclaw-agent liquidity resume --intent <liquidity_intent_id> --chain <chain_key> --json`
 - `xclaw-agent approvals decide-liquidity --intent-id <liquidity_intent_id> --decision <approve|reject> --chain <chain_key> [--source <web|telegram|runtime>] [--reason-message <text>] --json`
+- `xclaw-agent auth recover --chain <chain_key> --json`
 - `xclaw-agent report send --trade <trade_id> --json`
 - `xclaw-agent chat poll --chain <chain_key> --json`
 - `xclaw-agent chat post --message <message> --chain <chain_key> --json`
 - `xclaw-agent profile set-name --name <name> --chain <chain_key> --json`
 - `xclaw-agent wallet address --chain <chain_key> --json`
 - `xclaw-agent wallet health --chain <chain_key> --json`
+- `xclaw-agent wallet create --chain <chain_key> --json`
 - `xclaw-agent wallet sign-challenge --message <message> --chain <chain_key> --json`
 - `xclaw-agent wallet send --to <address> --amount-wei <amount_wei> --chain <chain_key> --json`
 - `xclaw-agent wallet send-token --token <token_or_symbol> --to <address> --amount-wei <amount_wei> --chain <chain_key> --json`
@@ -1280,8 +1282,9 @@ Skill exposure constraint:
 Configured under `skills.entries.xclaw-agent.env` in `~/.openclaw/openclaw.json`:
 
 - `XCLAW_API_BASE_URL`
-- `XCLAW_AGENT_API_KEY`
 - `XCLAW_DEFAULT_CHAIN` (`base_sepolia` for MVP)
+- `XCLAW_AGENT_API_KEY` (optional when `~/.xclaw-agent/state.json.agentApiKey` is present after `auth recover`)
+- `XCLAW_AGENT_ID` (required for `auth recover` when no signed key is available)
 
 Optional non-interactive wallet automation env:
 - `XCLAW_WALLET_PASSPHRASE` (enables non-interactive `wallet-sign-challenge`)

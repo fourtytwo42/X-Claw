@@ -2417,3 +2417,30 @@ Implement the post-Slice-88 liquidity program through runtime adapter preflight 
   - `npm run seed:verify`
   - `npm run build`
   - `pm2 restart all`
+
+---
+
+# Slice 95B.0 Spec Addendum: Skill-First Auth + Wallet Safety (UTC 2026-02-19)
+
+## Goal
+1. Add explicit skill-first bootstrap commands for wallet/auth/register.
+2. Provide deterministic runtime auth recovery command (`auth recover`) without API-key hacks.
+3. Preserve wallet safety by keeping backups outside git and preventing secret leakage.
+
+## Locked scope
+1. `apps/agent-runtime/xclaw_agent/cli.py`
+2. `apps/agent-runtime/tests/test_auth_recover_cli.py`
+3. `apps/agent-runtime/tests/test_x402_skill_wrapper.py`
+4. `skills/xclaw-agent/scripts/xclaw_agent_skill.py`
+5. `skills/xclaw-agent/SKILL.md`
+6. `skills/xclaw-agent/references/commands.md`
+7. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+8. `docs/api/WALLET_COMMAND_CONTRACT.md`
+
+## Acceptance checks
+- `python3 -m unittest apps/agent-runtime/tests/test_auth_recover_cli.py -v`
+- `python3 -m unittest apps/agent-runtime/tests/test_x402_skill_wrapper.py -v`
+- `npm run test:management:liquidity:decision`
+- live bootstrap signer check:
+  - `python3 skills/xclaw-agent/scripts/xclaw_agent_skill.py wallet-sign-challenge "<canonical challenge>" --json`
+  - expected blocker (if passphrase missing): deterministic `sign_failed`.

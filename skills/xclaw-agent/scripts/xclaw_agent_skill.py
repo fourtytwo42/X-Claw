@@ -304,6 +304,43 @@ def _require_env(*keys: str) -> Optional[int]:
     )
 
 
+def _runtime_state_api_key_present() -> bool:
+    app_dir = Path(os.environ.get("XCLAW_AGENT_HOME", str(Path.home() / ".xclaw-agent"))).expanduser()
+    state_path = app_dir / "state.json"
+    if not state_path.exists():
+        return False
+    try:
+        payload = json.loads(state_path.read_text(encoding="utf-8") or "{}")
+    except Exception:
+        return False
+    if not isinstance(payload, dict):
+        return False
+    return bool(str(payload.get("agentApiKey") or "").strip())
+
+
+def _require_api_context() -> Optional[int]:
+    missing = [k for k in ("XCLAW_API_BASE_URL", "XCLAW_DEFAULT_CHAIN") if not os.environ.get(k)]
+    if missing:
+        return _err(
+            "missing_env",
+            f"Missing required environment variable(s): {', '.join(missing)}",
+            "Set required env vars in skills.entries.xclaw-agent.env in ~/.openclaw/openclaw.json and restart session.",
+            {"missing": missing},
+            exit_code=2,
+        )
+    if os.environ.get("XCLAW_AGENT_API_KEY"):
+        return None
+    if _runtime_state_api_key_present():
+        return None
+    return _err(
+        "missing_env",
+        "Missing agent auth context: XCLAW_AGENT_API_KEY is unset and no recovered key exists in runtime state.",
+        "Run auth-recover first or set XCLAW_AGENT_API_KEY in the environment.",
+        {"missing": ["XCLAW_AGENT_API_KEY"]},
+        exit_code=2,
+    )
+
+
 def _build_hosted_x402_receive_args(
     resource_description: Optional[str] = None, overrides: Optional[dict[str, str]] = None
 ) -> list[str]:
@@ -605,7 +642,7 @@ def main(argv: List[str]) -> int:
         return _err(
             "usage",
             "Missing command.",
-            "Use one of: version, status, dashboard, intents-poll, approval-check, trade-exec, trade-spot, trade-resume, liquidity-add, liquidity-remove, liquidity-positions, liquidity-quote-add, liquidity-quote-remove, transfer-resume, transfer-decide, transfer-policy-get, transfer-policy-set, report-send, chat-poll, chat-post, tracked-list, tracked-trades, username-set, owner-link, faucet-request, faucet-networks, chains, default-chain-get, default-chain-set, x402-pay, x402-pay-resume, x402-pay-decide, x402-policy-get, x402-policy-set, x402-networks, request-x402-payment, wallet-health, wallet-address, wallet-sign-challenge, wallet-send, wallet-send-token, wallet-balance, wallet-token-balance",
+            "Use one of: version, status, dashboard, intents-poll, approval-check, trade-exec, trade-spot, trade-resume, liquidity-add, liquidity-remove, liquidity-positions, liquidity-quote-add, liquidity-quote-remove, transfer-resume, transfer-decide, transfer-policy-get, transfer-policy-set, report-send, chat-poll, chat-post, tracked-list, tracked-trades, username-set, agent-register, auth-recover, owner-link, faucet-request, faucet-networks, chains, default-chain-get, default-chain-set, x402-pay, x402-pay-resume, x402-pay-decide, x402-policy-get, x402-policy-set, x402-networks, request-x402-payment, wallet-health, wallet-address, wallet-sign-challenge, wallet-send, wallet-send-token, wallet-balance, wallet-token-balance, wallet-create",
             exit_code=2,
         )
 
@@ -641,6 +678,7 @@ def main(argv: List[str]) -> int:
         "tracked-list",
         "tracked-trades",
         "username-set",
+        "agent-register",
         "owner-link",
         "faucet-request",
         "faucet-networks",
@@ -655,6 +693,7 @@ def main(argv: List[str]) -> int:
         "wallet-send-token",
         "wallet-balance",
         "wallet-token-balance",
+        "wallet-create",
     }
     x402_commands = {
         "x402-pay",
@@ -667,13 +706,15 @@ def main(argv: List[str]) -> int:
     }
 
     if cmd in api_commands:
-        env_required = _require_env("XCLAW_API_BASE_URL", "XCLAW_AGENT_API_KEY", "XCLAW_DEFAULT_CHAIN")
+        env_required = _require_api_context()
     elif cmd in wallet_commands:
         env_required = _require_env("XCLAW_DEFAULT_CHAIN")
     elif cmd in x402_commands:
         env_required = None
     elif cmd in default_chain_commands:
         env_required = None
+    elif cmd == "auth-recover":
+        env_required = _require_env("XCLAW_API_BASE_URL", "XCLAW_DEFAULT_CHAIN", "XCLAW_AGENT_ID")
     else:
         env_required = None
 
@@ -998,6 +1039,14 @@ def main(argv: List[str]) -> int:
             return _err("usage", "username-set requires <name>", "usage: username-set <name>", exit_code=2)
         return _run_agent(["profile", "set-name", "--name", argv[2], "--chain", chain, "--json"])
 
+    if cmd == "agent-register":
+        if len(argv) < 3:
+            return _err("usage", "agent-register requires <name>", "usage: agent-register <name>", exit_code=2)
+        return _run_agent(["profile", "set-name", "--name", argv[2], "--chain", chain, "--json"])
+
+    if cmd == "auth-recover":
+        return _run_agent(["auth", "recover", "--chain", chain, "--json"])
+
     if cmd == "owner-link":
         args = ["management-link", "--json"]
         ttl = os.environ.get("XCLAW_OWNER_LINK_TTL_SECONDS")
@@ -1200,10 +1249,13 @@ def main(argv: List[str]) -> int:
             return _err("invalid_input", "Invalid token address format.", "Use 0x-prefixed 20-byte hex address.", {"token": token_addr}, exit_code=2)
         return _run_agent(["wallet", "token-balance", "--token", token_addr, "--chain", chain, "--json"])
 
+    if cmd == "wallet-create":
+        return _run_agent(["wallet", "create", "--chain", chain, "--json"])
+
     return _err(
         "unknown_command",
         f"Unknown command: {cmd}",
-        "Use one of: version, status, dashboard, intents-poll, approval-check, trade-exec, trade-spot, trade-resume, liquidity-add, liquidity-remove, liquidity-positions, liquidity-quote-add, liquidity-quote-remove, transfer-resume, transfer-decide, transfer-policy-get, transfer-policy-set, report-send, chat-poll, chat-post, tracked-list, tracked-trades, username-set, owner-link, faucet-request, faucet-networks, chains, x402-pay, x402-pay-resume, x402-pay-decide, x402-policy-get, x402-policy-set, x402-networks, request-x402-payment, wallet-health, wallet-address, wallet-sign-challenge, wallet-send, wallet-send-token, wallet-balance, wallet-token-balance",
+        "Use one of: version, status, dashboard, intents-poll, approval-check, trade-exec, trade-spot, trade-resume, liquidity-add, liquidity-remove, liquidity-positions, liquidity-quote-add, liquidity-quote-remove, transfer-resume, transfer-decide, transfer-policy-get, transfer-policy-set, report-send, chat-poll, chat-post, tracked-list, tracked-trades, username-set, agent-register, auth-recover, owner-link, faucet-request, faucet-networks, chains, x402-pay, x402-pay-resume, x402-pay-decide, x402-policy-get, x402-policy-set, x402-networks, request-x402-payment, wallet-health, wallet-address, wallet-sign-challenge, wallet-send, wallet-send-token, wallet-balance, wallet-token-balance, wallet-create",
         exit_code=2,
     )
 

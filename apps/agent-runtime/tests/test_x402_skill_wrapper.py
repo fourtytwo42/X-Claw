@@ -1,5 +1,6 @@
 import json
 import io
+import os
 import pathlib
 import sys
 import tempfile
@@ -158,6 +159,22 @@ class X402SkillWrapperTests(unittest.TestCase):
         self.assertEqual(code, 0)
         run_mock.assert_called_once_with(["tracked", "trades", "--chain", "base_sepolia", "--json", "--agent", "ag_test", "--limit", "15"])
 
+    def test_api_commands_accept_runtime_state_api_key_when_env_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            state_dir = pathlib.Path(tmp_dir) / ".xclaw-agent"
+            state_dir.mkdir(parents=True, exist_ok=True)
+            (state_dir / "state.json").write_text(json.dumps({"agentApiKey": "state-key", "agentId": "ag_state"}), encoding="utf-8")
+            env = {
+                "XCLAW_API_BASE_URL": "https://xclaw.trade/api/v1",
+                "XCLAW_DEFAULT_CHAIN": "base_sepolia",
+                "HOME": tmp_dir,
+            }
+            with mock.patch.dict(os.environ, env, clear=True):
+                with mock.patch.object(skill, "_run_agent", return_value=0) as run_mock:
+                    code = skill.main(["xclaw_agent_skill.py", "tracked-list"])
+        self.assertEqual(code, 0)
+        run_mock.assert_called_once_with(["tracked", "list", "--chain", "base_sepolia", "--json"])
+
     def test_wallet_send_token_accepts_symbol_and_delegates(self) -> None:
         with mock.patch.dict("os.environ", self._ENV, clear=False):
             with mock.patch.object(skill, "_run_agent", return_value=0) as run_mock:
@@ -186,6 +203,37 @@ class X402SkillWrapperTests(unittest.TestCase):
                 "--json",
             ]
         )
+
+    def test_wallet_create_delegates_to_runtime(self) -> None:
+        with mock.patch.dict("os.environ", {"XCLAW_DEFAULT_CHAIN": "hedera_testnet"}, clear=False):
+            with mock.patch.object(skill, "_run_agent", return_value=0) as run_mock:
+                code = skill.main(["xclaw_agent_skill.py", "wallet-create"])
+        self.assertEqual(code, 0)
+        run_mock.assert_called_once_with(["wallet", "create", "--chain", "hedera_testnet", "--json"])
+
+    def test_auth_recover_delegates_to_runtime(self) -> None:
+        env = {
+            "XCLAW_API_BASE_URL": "https://xclaw.trade/api/v1",
+            "XCLAW_DEFAULT_CHAIN": "hedera_testnet",
+            "XCLAW_AGENT_ID": "ag_demo",
+        }
+        with mock.patch.dict("os.environ", env, clear=False):
+            with mock.patch.object(skill, "_run_agent", return_value=0) as run_mock:
+                code = skill.main(["xclaw_agent_skill.py", "auth-recover"])
+        self.assertEqual(code, 0)
+        run_mock.assert_called_once_with(["auth", "recover", "--chain", "hedera_testnet", "--json"])
+
+    def test_agent_register_delegates_to_profile_set_name(self) -> None:
+        env = {
+            "XCLAW_API_BASE_URL": "https://xclaw.trade/api/v1",
+            "XCLAW_DEFAULT_CHAIN": "hedera_testnet",
+            "XCLAW_AGENT_API_KEY": "test-key",
+        }
+        with mock.patch.dict("os.environ", env, clear=False):
+            with mock.patch.object(skill, "_run_agent", return_value=0) as run_mock:
+                code = skill.main(["xclaw_agent_skill.py", "agent-register", "Slice95Runner"])
+        self.assertEqual(code, 0)
+        run_mock.assert_called_once_with(["profile", "set-name", "--name", "Slice95Runner", "--chain", "hedera_testnet", "--json"])
 
     def test_wallet_send_token_rejects_empty_token(self) -> None:
         with mock.patch.dict("os.environ", self._ENV, clear=False):

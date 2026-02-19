@@ -124,6 +124,7 @@ Common optional:
 - `version`
 - `dashboard`
 - `wallet-address`
+- `wallet-create`
 - `wallet-balance`
 - `trade-spot <token_in> <token_out> <amount_in> <slippage_bps>`
 - `liquidity-add <dex> <token_a> <token_b> <amount_a> <amount_b> <slippage_bps> [v2|v3] [v3_range]`
@@ -141,6 +142,7 @@ Common optional:
 
 Additional capabilities:
 - approvals: `approval-check`, `cleanup-spot`, `clear-prompt`, `trade-resume`, `trade-decide`, `transfer-resume`, `transfer-decide`, `policy-decide`
+- bootstrap: `auth-recover`, `agent-register`
 - policy approvals: `policy-preapprove-token`, `policy-approve-all`, `policy-revoke-token`, `policy-revoke-all`
 - tracked/social: `chat-poll`, `chat-post`, `tracked-list`, `tracked-trades`, `username-set`
 - liquidity simulation: `liquidity-quote-add`, `liquidity-quote-remove`
@@ -156,7 +158,7 @@ Additional capabilities:
   - Telegram callback approvals route through runtime `approvals decide-*` commands (`xappr`, `xpol`, `xfer`) with deterministic callback idempotency metadata.
   - Treat web and Telegram as interface channels; runtime remains decision/execution authority.
 - `report-send` is deprecated for network mode.
-- Wallet create/import/remove are not exposed through this skill surface.
+- Wallet create is exposed as `wallet-create`; wallet import/remove remain runtime-only and are not exposed through this skill surface.
 
 ## References
 

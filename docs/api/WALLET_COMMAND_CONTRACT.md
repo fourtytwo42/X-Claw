@@ -65,6 +65,7 @@ Wrapper delegation target commands:
 - `xclaw-agent liquidity execute --intent <liquidity_intent_id> --chain <chain_key> --json`
 - `xclaw-agent liquidity resume --intent <liquidity_intent_id> --chain <chain_key> --json`
 - `xclaw-agent approvals decide-liquidity --intent-id <liquidity_intent_id> --decision <approve|reject> --chain <chain_key> [--source <web|telegram|runtime>] [--reason-message <text>] --json`
+- `xclaw-agent auth recover --chain <chain_key> --json`
 - `xclaw-agent default-chain get --json`
 - `xclaw-agent default-chain set --chain <chain_key> --json`
 
@@ -178,13 +179,18 @@ Current behavior in `apps/agent-runtime/xclaw_agent/cli.py`:
 10. Missing cast dependency returns structured `missing_dependency` error.
 11. Wrapper-level input validation executes before runtime delegation.
 12. On delegated non-zero exits, wrapper passes runtime JSON through unchanged when stdout is parseable JSON payload with `ok` and `code`; otherwise wrapper emits structured `agent_command_failed`.
-13. Runtime transaction fee planning for wallet/trade sends is EIP-1559-first by default:
+13. Wrapper API command env gate accepts either:
+   - `XCLAW_AGENT_API_KEY` in environment, or
+   - previously recovered runtime auth stored in `~/.xclaw-agent/state.json`.
+14. Runtime auth recovery command:
+   - `auth recover` performs challenge/sign/recover with local wallet keys and persists recovered key to runtime state.
+15. Runtime transaction fee planning for wallet/trade sends is EIP-1559-first by default:
    - default mode (`XCLAW_TX_FEE_MODE=rpc`) derives EIP-1559 fee caps from chain RPC (`eth_feeHistory`, `eth_maxPriorityFeePerGas`, reward fallback),
    - retry attempts apply bounded fee escalation via `XCLAW_TX_RETRY_BUMP_BPS` (default `1250`),
    - minimum priority floor is `XCLAW_TX_PRIORITY_FLOOR_GWEI` (default `1`),
    - when EIP-1559 RPC methods are unavailable/invalid, runtime falls back to `eth_gasPrice`,
    - rollback kill-switch `XCLAW_TX_FEE_MODE=legacy` restores legacy fixed `gasPrice` sender behavior.
-14. Liquidity commands enforce adapter preflight before API proposal submission:
+16. Liquidity commands enforce adapter preflight before API proposal submission:
    - unsupported chain/dex/position combinations fail with `unsupported_liquidity_adapter`,
    - HTS-native Hedera paths fail closed with `missing_dependency` when SDK/plugin bridge is unavailable,
    - HTS plugin bridge defaults to `xclaw_agent.hedera_hts_plugin:execute_liquidity` and may use `XCLAW_HEDERA_HTS_BRIDGE_CMD` for external bridge execution,

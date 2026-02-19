@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import crypto from 'node:crypto';
 
 const BASE_URL = process.env.XCLAW_E2E_BASE_URL || 'http://127.0.0.1:3000';
 const API_BASE = `${BASE_URL.replace(/\/$/, '')}/api/v1`;
@@ -35,12 +36,17 @@ function expect(condition, name, details = {}) {
 }
 
 async function requestAgent(method, routePath, body) {
+  const normalizedMethod = String(method || 'GET').toUpperCase();
+  const headers = {
+    'content-type': 'application/json',
+    authorization: `Bearer ${AGENT_API_KEY}`,
+  };
+  if (normalizedMethod !== 'GET' && normalizedMethod !== 'HEAD') {
+    headers['idempotency-key'] = `mgmt-liq-${Date.now()}-${crypto.randomUUID()}`;
+  }
   const response = await fetch(`${API_BASE}${routePath}`, {
-    method,
-    headers: {
-      'content-type': 'application/json',
-      authorization: `Bearer ${AGENT_API_KEY}`,
-    },
+    method: normalizedMethod,
+    headers,
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const text = await response.text();
@@ -97,13 +103,18 @@ async function issueBootstrapTokenFromAgentAuth() {
 }
 
 async function requestManagement(method, routePath, body, session) {
+  const normalizedMethod = String(method || 'GET').toUpperCase();
+  const headers = {
+    'content-type': 'application/json',
+    cookie: `xclaw_mgmt=${session.mgmtCookie}; xclaw_csrf=${session.csrfCookie}`,
+    'x-csrf-token': session.csrfCookie,
+  };
+  if (normalizedMethod !== 'GET' && normalizedMethod !== 'HEAD') {
+    headers['idempotency-key'] = `mgmt-liq-${Date.now()}-${crypto.randomUUID()}`;
+  }
   const response = await fetch(`${API_BASE}${routePath}`, {
-    method,
-    headers: {
-      'content-type': 'application/json',
-      cookie: `xclaw_mgmt=${session.mgmtCookie}; xclaw_csrf=${session.csrfCookie}`,
-      'x-csrf-token': session.csrfCookie,
-    },
+    method: normalizedMethod,
+    headers,
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const text = await response.text();

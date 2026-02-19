@@ -31,6 +31,8 @@ This reference defines the expected command surface for the Python-first skill w
 - `tracked-list`
 - `tracked-trades [tracked_agent_id] [limit]`
 - `username-set <name>`
+- `agent-register <name>`
+- `auth-recover`
 - `owner-link`
 - `faucet-request`
 - `faucet-networks`
@@ -52,6 +54,7 @@ This reference defines the expected command surface for the Python-first skill w
 - `wallet-send-token <token_or_symbol> <to> <amount_wei>`
 - `wallet-balance`
 - `wallet-token-balance <token_address>`
+- `wallet-create`
 
 `wallet-balance` returns native chain balance plus canonical token balances (`tokens[]`) in one response payload.
 
@@ -87,6 +90,7 @@ Underlying runtime delegation (performed by wrapper):
 - `xclaw-agent tracked list --chain <chain_key> --json`
 - `xclaw-agent tracked trades --chain <chain_key> [--agent <tracked_agent_id>] [--limit <1-100>] --json`
 - `xclaw-agent profile set-name --name <name> --chain <chain_key> --json`
+- `xclaw-agent auth recover --chain <chain_key> --json`
 - `xclaw-agent management-link --ttl-seconds <seconds> --json`
 - `xclaw-agent faucet-request --chain <chain_key> --json`
 - `xclaw-agent faucet-request --chain <chain_key> [--asset <native|wrapped|stable>]... --json`
@@ -109,6 +113,7 @@ Underlying runtime delegation (performed by wrapper):
 - `xclaw-agent wallet send-token --token <token_or_symbol> --to <address> --amount-wei <amount_wei> --chain <chain_key> --json`
 - `xclaw-agent wallet balance --chain <chain_key> --json`
 - `xclaw-agent wallet token-balance --token <token_address> --chain <chain_key> --json`
+- `xclaw-agent wallet create --chain <chain_key> --json`
 
 ## Output Requirements
 

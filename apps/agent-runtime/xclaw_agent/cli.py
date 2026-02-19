@@ -1309,6 +1309,47 @@ def _api_request(
     return status, body
 
 
+def cmd_auth_recover(args: argparse.Namespace) -> int:
+    chk = require_json_flag(args)
+    if chk is not None:
+        return chk
+    chain = str(args.chain or "").strip()
+    if not chain:
+        return fail("invalid_input", "chain is required.", "Provide --chain <chainKey> and retry.", exit_code=2)
+    try:
+        base_url = _require_api_base_url()
+        stale_api_key = ""
+        try:
+            stale_api_key = _resolve_api_key()
+        except WalletStoreError:
+            stale_api_key = ""
+        recovered_key = _recover_api_key_with_wallet_signature(base_url, stale_api_key, chain)
+        resolved_agent_id = _resolve_agent_id(recovered_key)
+        return ok(
+            "Agent auth recovered with wallet signature.",
+            chain=chain,
+            recovered=True,
+            persisted=True,
+            agentId=resolved_agent_id,
+        )
+    except WalletStoreError as exc:
+        return fail(
+            "auth_recovery_failed",
+            str(exc),
+            "Set XCLAW_API_BASE_URL, XCLAW_AGENT_ID, and XCLAW_WALLET_PASSPHRASE, then retry.",
+            {"chain": chain},
+            exit_code=1,
+        )
+    except Exception as exc:
+        return fail(
+            "auth_recovery_failed",
+            str(exc),
+            "Inspect runtime auth recovery path and retry.",
+            {"chain": chain},
+            exit_code=1,
+        )
+
+
 def _normalize_address(value: str) -> str:
     return value.strip().lower()
 
@@ -9448,6 +9489,13 @@ def cmd_x402_networks(args: argparse.Namespace) -> int:
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="xclaw-agent", add_help=True)
     sub = p.add_subparsers(dest="top")
+
+    auth = sub.add_parser("auth")
+    auth_sub = auth.add_subparsers(dest="auth_cmd")
+    auth_recover = auth_sub.add_parser("recover")
+    auth_recover.add_argument("--chain", required=True)
+    auth_recover.add_argument("--json", action="store_true")
+    auth_recover.set_defaults(func=cmd_auth_recover)
 
     st = sub.add_parser("status")
     st.add_argument("--json", action="store_true")
