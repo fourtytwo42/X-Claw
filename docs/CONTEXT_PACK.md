@@ -1243,3 +1243,35 @@ Issue mapping: `#32`
   - `npm run seed:verify`
   - `npm run build`
   - `pm2 restart all`
+
+## Context Pack Addendum: Slice 90 Liquidity + Multi-DEX Foundation
+
+### Objective
+- Introduce canonical liquidity intent/position model and bridge it into runtime + skill + management wallet visibility.
+
+### Scope lock
+- In scope:
+  - liquidity intents (`add`/`remove`) with trade-aligned approval semantics,
+  - chain capability extension (`capabilities.liquidity`),
+  - chain-scoped liquidity positions read model in management agent-state,
+  - wallet UI liquidity section.
+- Out of scope:
+  - IL decomposition and strategy automation,
+  - mandatory enablement for all sponsor chains in this slice.
+
+### Canonical artifacts touched
+- `docs/XCLAW_SOURCE_OF_TRUTH.md`
+- `docs/XCLAW_SLICE_TRACKER.md`
+- `docs/XCLAW_BUILD_ROADMAP.md`
+- `docs/api/openapi.v1.yaml`
+- `docs/api/WALLET_COMMAND_CONTRACT.md`
+- `skills/xclaw-agent/references/commands.md`
+
+### Expected implementation files
+- `infrastructure/migrations/0023_slice90_liquidity_foundation.sql`
+- `packages/shared-schemas/json/liquidity-*.schema.json`
+- `apps/agent-runtime/xclaw_agent/cli.py`
+- `skills/xclaw-agent/scripts/xclaw_agent_skill.py`
+- `apps/network-web/src/app/api/v1/liquidity/**/route.ts`
+- `apps/network-web/src/app/api/v1/management/agent-state/route.ts`
+- `apps/network-web/src/app/agents/[agentId]/page.tsx`

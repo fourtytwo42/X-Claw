@@ -2315,3 +2315,62 @@ Issue mapping: `#32`
   - [x] EIP-1559 cast send args
 - [x] Sync docs/handoff artifacts in same change.
 - [ ] Run full required validation sequence and capture evidence.
+
+## Slice 90 Tasks Addendum (Liquidity + Multi-DEX Foundation)
+
+- [x] Add migration `0023_slice90_liquidity_foundation.sql`.
+- [x] Add shared schemas for liquidity proposed/status/position/approval.
+- [x] Add API routes:
+  - [x] `POST /api/v1/liquidity/proposed`
+  - [x] `POST /api/v1/liquidity/{intentId}/status`
+  - [x] `GET /api/v1/liquidity/pending`
+  - [x] `GET /api/v1/liquidity/positions`
+- [x] Add runtime liquidity command tree and capability gating.
+- [x] Add skill wrapper liquidity command delegation.
+- [x] Extend chain config contract with `capabilities.liquidity` + protocol metadata.
+- [x] Extend management agent-state with `liquidityPositions`.
+- [x] Add `/agents/[agentId]` separate Liquidity Positions section (chain-scoped).
+- [x] Sync canonical docs/artifacts (tracker/roadmap/source/openapi/wallet contract/commands).
+- [x] Required gates:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `pm2 restart all`
+
+---
+
+# Slice 90 Tasks: Mainnet/Testnet Dropdown + Agent-Canonical Default Chain Sync
+
+## 1) Scope lock
+- [x] Keep explicit command `--chain` precedence unchanged.
+- [x] Keep faucet support constrained to capability-enabled testnets.
+- [x] Keep source-of-truth for default chain in runtime state.
+
+## 2) Implementation
+- [x] Add runtime commands: `default-chain get`, `default-chain set --chain ...`.
+- [x] Persist runtime default chain in agent-local `state.json.defaultChain`.
+- [x] Add skill wrapper commands: `default-chain-get`, `default-chain-set <chain_key>`.
+- [x] Add management endpoints:
+  - [x] `GET /api/v1/management/default-chain`
+  - [x] `POST /api/v1/management/default-chain`
+  - [x] `POST /api/v1/management/default-chain/update-batch`
+- [x] Update selector to sync default chain across all managed agents and rollback on sync failure.
+- [x] Add startup reconciliation from runtime canonical default chain.
+- [x] Enable configured mainnet+testnet chain configs for selector visibility.
+- [x] Extend `/api/v1/public/chains` capabilities payload with `liquidity`.
+- [x] Add shared schemas for default-chain management endpoints.
+- [x] Sync canonical docs (`source-of-truth`, wallet command contract, openapi, roadmap, tracker, skill command refs).
+
+## 3) Validation
+- [x] `python3 -m py_compile apps/agent-runtime/xclaw_agent/cli.py skills/xclaw-agent/scripts/xclaw_agent_skill.py apps/agent-runtime/tests/test_wallet_core.py`
+- [~] `python3 -m unittest apps/agent-runtime/tests/test_wallet_core.py -v`
+  - baseline repo suite includes pre-existing wallet import/remove and cast expectation failures outside this slice scope.
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`

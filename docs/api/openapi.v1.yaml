@@ -541,6 +541,121 @@ paths:
           $ref: '#/components/responses/ErrorResponse'
         '401':
           $ref: '#/components/responses/ErrorResponse'
+  /api/v1/liquidity/proposed:
+    post:
+      summary: Ingest proposed liquidity action and return normalized liquidity intent ID.
+      security:
+        - agentBearer: []
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LiquidityProposedRequest'
+      responses:
+        '200':
+          description: Proposed liquidity intent accepted.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [ok, liquidityIntentId, status]
+                properties:
+                  ok:
+                    type: boolean
+                    enum: [true]
+                  liquidityIntentId:
+                    type: string
+                  status:
+                    type: string
+                    enum: [approved, approval_pending]
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+  /api/v1/liquidity/pending:
+    get:
+      summary: List actionable liquidity intents for one authenticated agent and chain.
+      security:
+        - agentBearer: []
+      parameters:
+        - name: chainKey
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 25
+      responses:
+        '200':
+          description: Pending actionable liquidity intents.
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+  /api/v1/liquidity/positions:
+    get:
+      summary: List persisted liquidity positions for one authenticated agent and chain.
+      security:
+        - agentBearer: []
+      parameters:
+        - name: agentId
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: chainKey
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Liquidity positions.
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+  /api/v1/liquidity/{intentId}/status:
+    post:
+      summary: Submit liquidity status transition and execution metadata.
+      security:
+        - agentBearer: []
+      parameters:
+        - name: intentId
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LiquidityStatusUpdate'
+      responses:
+        '200':
+          description: Liquidity status transition accepted.
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
   /api/v1/limit-orders:
     post:
       summary: Create an agent-owned limit order.
@@ -820,6 +935,73 @@ paths:
       responses:
         '200':
           description: Chain access updated.
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+  /api/v1/management/default-chain:
+    get:
+      summary: Read runtime-canonical default chain for one managed agent.
+      security:
+        - managementCookie: []
+      parameters:
+        - name: agentId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Runtime default chain payload.
+          content:
+            application/json:
+              schema:
+                $ref: ../../packages/shared-schemas/json/management-default-chain-get-response.schema.json
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+    post:
+      summary: Update runtime-canonical default chain for one managed agent.
+      security:
+        - managementCookie: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfTokenHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../../packages/shared-schemas/json/management-default-chain-update-request.schema.json
+      responses:
+        '200':
+          description: Runtime default chain updated.
+          content:
+            application/json:
+              schema:
+                $ref: ../../packages/shared-schemas/json/management-default-chain-update-response.schema.json
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+  /api/v1/management/default-chain/update-batch:
+    post:
+      summary: Update runtime-canonical default chain for all agents linked to current management session.
+      security:
+        - managementCookie: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfTokenHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../../packages/shared-schemas/json/management-default-chain-batch-update-request.schema.json
+      responses:
+        '200':
+          description: Batch update outcome across managed agents.
+          content:
+            application/json:
+              schema:
+                $ref: ../../packages/shared-schemas/json/management-default-chain-batch-update-response.schema.json
         '400':
           $ref: '#/components/responses/ErrorResponse'
         '401':
@@ -2463,6 +2645,61 @@ components:
         at:
           type: string
           format: date-time
+    LiquidityProposedRequest:
+      type: object
+      required: [schemaVersion, agentId, chainKey, dex, action, positionType, tokenA, tokenB, amountA, amountB, slippageBps]
+      properties:
+        schemaVersion:
+          type: integer
+          minimum: 1
+        agentId:
+          type: string
+        chainKey:
+          type: string
+        dex:
+          type: string
+        action:
+          type: string
+          enum: [add, remove]
+        positionType:
+          type: string
+          enum: [v2, v3]
+        tokenA:
+          type: string
+        tokenB:
+          type: string
+        amountA:
+          type: string
+        amountB:
+          type: string
+        slippageBps:
+          type: integer
+        positionId:
+          type: string
+          nullable: true
+        details:
+          type: object
+    LiquidityStatusUpdate:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [proposed, approval_pending, approved, rejected, executing, verifying, filled, failed, expired, verification_timeout]
+        reasonCode:
+          type: string
+        reasonMessage:
+          type: string
+        txHash:
+          type: string
+        amountOut:
+          type: string
+          nullable: true
+        positionId:
+          type: string
+          nullable: true
+        details:
+          type: object
     EventIngestRequest:
       type: object
       required: [schemaVersion, agentId, eventType, createdAt]

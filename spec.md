@@ -2108,3 +2108,82 @@ Pivot public product behavior from copy trading to tracked-agent monitoring whil
   - EIP-1559 happy path
   - fallback to legacy path
   - cast send flag coverage + retry behavior
+
+## Slice 90 Spec Addendum (Liquidity + Multi-DEX Foundation)
+
+### Goal
+- Add first-class liquidity intent/position contracts and command surfaces aligned to existing trade approvals and chain-capability gates.
+
+### Non-goals
+1. No full IL decomposition or strategy automation in this slice.
+2. No mandatory enablement of all sponsor chains in this slice.
+3. No x402 expansion on unsupported chains.
+
+### Interfaces
+- Runtime commands:
+  - `xclaw-agent liquidity add`
+  - `xclaw-agent liquidity remove`
+  - `xclaw-agent liquidity positions`
+  - `xclaw-agent liquidity quote-add`
+  - `xclaw-agent liquidity quote-remove`
+- Skill commands:
+  - `liquidity-add`
+  - `liquidity-remove`
+  - `liquidity-positions`
+  - `liquidity-quote-add`
+  - `liquidity-quote-remove`
+- API:
+  - `POST /api/v1/liquidity/proposed`
+  - `POST /api/v1/liquidity/{intentId}/status`
+  - `GET /api/v1/liquidity/pending`
+  - `GET /api/v1/liquidity/positions`
+
+### Data changes
+- Migration `0023_slice90_liquidity_foundation.sql` adds:
+  - `liquidity_intents`
+  - `liquidity_position_snapshots`
+  - `liquidity_fee_events`
+  - `liquidity_protocol_configs`
+
+### Acceptance checks
+- `python3 -m unittest apps/agent-runtime/tests/test_dex_adapter.py -v`
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `pm2 restart all`
+
+---
+
+# Slice 90 Spec: Mainnet/Testnet Dropdown + Agent-Canonical Default Chain Sync
+
+## Goal
+Make the web chain selector include enabled mainnet+testnet chains and synchronize the selected chain as the runtime-canonical default chain for all managed agents in the active management session.
+
+## Non-goals
+1. No faucet capability expansion.
+2. No override of explicit `--chain` execution paths.
+3. No approval model semantic changes.
+
+## Locked scope
+1. Runtime default chain contract (`xclaw-agent default-chain get/set`) in `apps/agent-runtime/xclaw_agent/cli.py`.
+2. Skill wrapper command surface additions in `skills/xclaw-agent/scripts/xclaw_agent_skill.py`.
+3. Management API sync/read endpoints:
+   - `GET/POST /api/v1/management/default-chain`
+   - `POST /api/v1/management/default-chain/update-batch`
+4. Selector synchronization and reconcile flow in `apps/network-web/src/lib/active-chain.ts` and `apps/network-web/src/components/chain-header-control.tsx`.
+5. Chain registry exposure + capabilities shape (`/api/v1/public/chains` + shared schema).
+6. Canonical docs/artifacts sync.
+
+## Acceptance checks
+- `python3 -m py_compile apps/agent-runtime/xclaw_agent/cli.py skills/xclaw-agent/scripts/xclaw_agent_skill.py apps/agent-runtime/tests/test_wallet_core.py`
+- `python3 -m unittest apps/agent-runtime/tests/test_wallet_core.py -v` (known baseline failures outside this scope may persist)
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `pm2 restart all`

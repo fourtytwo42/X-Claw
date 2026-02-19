@@ -24,9 +24,17 @@ Required wallet commands:
 12. `transfer-policy-set`
 13. `transfer-resume`
 14. `transfer-decide`
+15. `liquidity-add`
+16. `liquidity-remove`
+17. `liquidity-positions`
+18. `liquidity-quote-add`
+19. `liquidity-quote-remove`
+20. `default-chain-get`
+21. `default-chain-set <chain_key>`
 
 Notes:
-- `chain` is sourced from `XCLAW_DEFAULT_CHAIN`.
+- explicit `--chain` remains authoritative for chain-scoped commands.
+- runtime default chain is canonical in agent state (`state.json.defaultChain`) and used for chain-optional fallback behavior.
 - `wallet-send` uses base-unit amount for deterministic automation.
 - Supported chain keys for this contract include `base_sepolia`, `kite_ai_testnet`, and `hardhat_local` (where configured).
 
@@ -48,6 +56,13 @@ Wrapper delegation target commands:
 - `xclaw-agent transfers policy-set --chain <chain_key> --global <auto|per_transfer> --native-preapproved <0|1> [--allowed-token <0x...>] --json`
 - `xclaw-agent approvals resume-transfer --approval-id <xfr_id> --chain <chain_key> --json`
 - `xclaw-agent approvals decide-transfer --approval-id <xfr_id> --decision <approve|deny> --chain <chain_key> --json`
+- `xclaw-agent liquidity add --chain <chain_key> --dex <dex> --token-a <token_or_symbol> --token-b <token_or_symbol> --amount-a <amount_a> --amount-b <amount_b> [--position-type <v2|v3>] [--v3-range <range>] [--slippage-bps <bps>] --json`
+- `xclaw-agent liquidity remove --chain <chain_key> --dex <dex> --position-id <position_id> [--percent <1-100>] [--slippage-bps <bps>] [--position-type <v2|v3>] --json`
+- `xclaw-agent liquidity positions --chain <chain_key> [--dex <dex>] [--status <status>] --json`
+- `xclaw-agent liquidity quote-add --chain <chain_key> --dex <dex> --token-a <token_or_symbol> --token-b <token_or_symbol> --amount-a <amount_a> --amount-b <amount_b> [--position-type <v2|v3>] [--slippage-bps <bps>] --json`
+- `xclaw-agent liquidity quote-remove --chain <chain_key> --dex <dex> --position-id <position_id> [--percent <1-100>] --json`
+- `xclaw-agent default-chain get --json`
+- `xclaw-agent default-chain set --chain <chain_key> --json`
 
 Wrapper binary resolution order:
 1. PATH lookup (`shutil.which("xclaw-agent")`)

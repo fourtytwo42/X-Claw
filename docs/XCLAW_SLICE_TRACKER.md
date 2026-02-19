@@ -1708,3 +1708,31 @@ DoD:
 - [x] env controls added: `XCLAW_TX_FEE_MODE`, `XCLAW_TX_RETRY_BUMP_BPS`, `XCLAW_TX_PRIORITY_FLOOR_GWEI`.
 - [x] docs/handoff sync complete in same change (source-of-truth, roadmap, wallet contract, context/spec/tasks/acceptance).
 - [x] runtime tests cover EIP-1559 happy path, fallback legacy path, and EIP-1559 cast flag emission.
+
+---
+
+## Slice 90: Liquidity + Multi-DEX Compatibility Foundation
+Status: [~]
+Issue: #37
+
+Goal:
+- Introduce chain-agnostic liquidity contracts and command surfaces aligned with existing trade approval/policy controls.
+
+DoD:
+- [~] docs sync first: source-of-truth + roadmap + tracker + wallet contract + commands reference aligned to Slice 90.
+- [~] migration adds liquidity core tables: `liquidity_intents`, `liquidity_position_snapshots`, `liquidity_fee_events`, `liquidity_protocol_configs`.
+- [~] shared schemas include liquidity proposed/status/position/approval contracts.
+- [~] runtime CLI adds `liquidity add/remove/positions/quote-add/quote-remove` with chain capability gating.
+- [~] skill wrapper exposes liquidity commands and delegates to runtime.
+- [~] chain config capability model includes `capabilities.liquidity` and protocol metadata.
+- [~] enabled chain registry drives mainnet+testnet selector options; faucet scope remains capability-gated to testnet chains.
+- [~] API adds liquidity endpoints:
+  - `POST /api/v1/liquidity/proposed`
+  - `POST /api/v1/liquidity/:intentId/status`
+  - `GET /api/v1/liquidity/pending`
+  - `GET /api/v1/liquidity/positions`
+- [~] management `agent-state` includes chain-scoped `liquidityPositions`.
+- [~] `/agents/:id` wallet view renders separate Liquidity Positions section for active chain.
+- [~] runtime default-chain commands (`default-chain get/set`) establish agent-runtime canonical default chain.
+- [~] management endpoints expose default-chain read/update + managed-session batch sync.
+- [~] global chain selector persists and synchronizes runtime default chain for all managed agents in active session.

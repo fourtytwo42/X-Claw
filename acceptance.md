@@ -4672,3 +4672,72 @@ Issue mapping: `#32` (`https://github.com/fourtytwo42/ETHDenver2026/issues/32`)
 - `npm run seed:verify` -> PASS (`ok: true`)
 - `npm run build` -> PASS (Next.js production build succeeded)
 - `pm2 restart all` -> PASS (`xclaw-web` online)
+
+## Slice 90 Acceptance Addendum: Liquidity + Multi-DEX Foundation (UTC 2026-02-19)
+
+### Objective
+- Validate foundational liquidity contracts/surfaces across runtime, API, and web wallet view with chain-scoped behavior.
+
+### Runtime/API checks
+- `python3 -m py_compile apps/agent-runtime/xclaw_agent/cli.py skills/xclaw-agent/scripts/xclaw_agent_skill.py` -> PASS
+- `python3 -m unittest apps/agent-runtime/tests/test_dex_adapter.py -v` -> PASS
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS
+- `npm run build` includes new routes:
+  - `/api/v1/liquidity/proposed`
+  - `/api/v1/liquidity/{intentId}/status`
+  - `/api/v1/liquidity/pending`
+  - `/api/v1/liquidity/positions`
+
+### Required gates (sequential)
+- `npm run db:parity` -> PASS (`ok: true`, migration includes `0023_slice90_liquidity_foundation.sql`)
+- `npm run seed:reset` -> PASS
+- `npm run seed:load` -> PASS
+- `npm run seed:verify` -> PASS
+- `npm run build` -> PASS
+- `pm2 restart all` -> PASS (`xclaw-web` online)
+
+### Functional evidence (code-level)
+- Runtime command surface includes `liquidity add/remove/positions/quote-add/quote-remove` and `chains` capability output adds `liquidity`.
+- Skill wrapper exposes `liquidity-add`, `liquidity-remove`, `liquidity-positions`, `liquidity-quote-add`, `liquidity-quote-remove`.
+- Management `agent-state` includes `liquidityPositions`.
+- `/agents/[agentId]` renders dedicated `Liquidity Positions` wallet section filtered by active chain.
+
+---
+
+# Slice 90 Acceptance Evidence: Mainnet/Testnet Dropdown + Agent-Canonical Default Chain Sync
+
+Date (UTC): 2026-02-19
+Active slice context: `Slice 90` in progress.
+
+## Objective + Scope Lock
+- Objective: selector includes enabled mainnet+testnet networks and selected network syncs to runtime-canonical default chain for all managed agents.
+- Scope lock:
+  - runtime default-chain command contract,
+  - management default-chain API endpoints,
+  - selector sync/reconcile behavior,
+  - chain registry capability payload expansion,
+  - canonical docs/contracts synchronization.
+
+## Behavior checks
+- [x] Runtime exposes `xclaw-agent default-chain get/set` and persists to runtime state.
+- [x] Wrapper exposes `default-chain-get` and `default-chain-set`.
+- [x] Management API supports default-chain read/update + managed-session batch sync.
+- [x] Selector persists choice and attempts managed-agent runtime sync with rollback on failed sync.
+- [x] Selector bootstrap reconciles local chain against runtime canonical default when management session exists.
+- [x] Public chain registry payload includes `capabilities.liquidity`.
+- [x] Chain configs for Base/Kite/Hedera/0G/ADI/Canton mainnet+testnet set enabled for selector availability.
+- [x] Faucet capability unchanged (`true` only on Base Sepolia and Kite AI Testnet).
+
+## Required validation gates
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+
+## Additional validation
+- [x] `python3 -m py_compile apps/agent-runtime/xclaw_agent/cli.py skills/xclaw-agent/scripts/xclaw_agent_skill.py apps/agent-runtime/tests/test_wallet_core.py`
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- [~] `python3 -m unittest apps/agent-runtime/tests/test_wallet_core.py -v`
+  - pre-existing baseline failures outside this change set persisted (wallet import/remove and cast-missing expectation drift).

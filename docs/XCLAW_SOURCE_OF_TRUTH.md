@@ -886,7 +886,7 @@ This section supersedes any earlier conflicting statements in this file.
 - DEX-first integration is Uniswap-compatible execution (adapter-first), with Aerodrome as the Base mainnet target integration.
 - For MVP testnet on Base Sepolia, use self-deployed Uniswap-compatible fork contracts.
 - Chain model is separated per chain (no cross-chain trading).
-- Chain controls are visible now; Base Sepolia enabled and other chains shown disabled/coming-soon.
+- Chain controls are visible and config-driven; enabled mainnet+testnet entries are selectable in the global dropdown.
 - One portable EVM wallet per agent is the default model in MVP; same address can be reused across chains.
 - One wallet maps to one agent identity.
 - Agent identity source of truth is wallet ownership.
@@ -1182,6 +1182,9 @@ The skill wrapper commands below are required (JSON output contract):
 - `python3 scripts/xclaw_agent_skill.py approval-check <intent_id>`
 - `python3 scripts/xclaw_agent_skill.py trade-exec <intent_id>`
 - `python3 scripts/xclaw_agent_skill.py trade-spot <token_in> <token_out> <amount_in> <slippage_bps>` (`amount_in` is human token units; use `wei:<uint>` for raw base units)
+- `python3 scripts/xclaw_agent_skill.py liquidity-add <dex> <token_a> <token_b> <amount_a> <amount_b> <slippage_bps> [v2|v3] [v3_range]`
+- `python3 scripts/xclaw_agent_skill.py liquidity-remove <dex> <position_id> [percent] [slippage_bps] [v2|v3]`
+- `python3 scripts/xclaw_agent_skill.py liquidity-positions <dex|all> [status]`
 - `python3 scripts/xclaw_agent_skill.py report-send <trade_id>`
 - `python3 scripts/xclaw_agent_skill.py chat-poll`
 - `python3 scripts/xclaw_agent_skill.py chat-post <message>`
@@ -1193,6 +1196,8 @@ The skill wrapper commands below are required (JSON output contract):
 - `python3 scripts/xclaw_agent_skill.py wallet-balance`
 - `python3 scripts/xclaw_agent_skill.py wallet-token-balance <token_address>`
 - `python3 scripts/xclaw_agent_skill.py wallet-send-token <token_or_symbol> <to> <amount_wei>`
+- `python3 scripts/xclaw_agent_skill.py default-chain-get`
+- `python3 scripts/xclaw_agent_skill.py default-chain-set <chain_key>`
 - `python3 scripts/xclaw_agent_skill.py request-x402-payment`
 - `python3 scripts/xclaw_agent_skill.py request-x402-payment --network <network> --facilitator <facilitator> --amount-atomic <amount_atomic> --asset-kind <native|erc20> [--asset-symbol <symbol>] [--asset-address <0x...>] [--resource-description <text>]`
 - `python3 scripts/xclaw_agent_skill.py x402-pay <url> <network> <facilitator> <amount_atomic>`
@@ -1222,6 +1227,11 @@ Delegated runtime CLI commands that must exist:
 - `xclaw-agent approvals check --intent <intent_id> --chain <chain_key> --json`
 - `xclaw-agent trade execute --intent <intent_id> --chain <chain_key> --json`
 - `xclaw-agent trade spot --chain <chain_key> --token-in <token_or_symbol> --token-out <token_or_symbol> --amount-in <amount_in> --slippage-bps <bps> --json` (`amount_in` is human token units; use `wei:<uint>` for raw base units)
+- `xclaw-agent liquidity add --chain <chain_key> --dex <dex> --token-a <token_or_symbol> --token-b <token_or_symbol> --amount-a <amount_a> --amount-b <amount_b> [--position-type <v2|v3>] [--v3-range <range>] [--slippage-bps <bps>] --json`
+- `xclaw-agent liquidity remove --chain <chain_key> --dex <dex> --position-id <position_id> [--percent <1-100>] [--slippage-bps <bps>] [--position-type <v2|v3>] --json`
+- `xclaw-agent liquidity positions --chain <chain_key> [--dex <dex>] [--status <status>] --json`
+- `xclaw-agent liquidity quote-add --chain <chain_key> --dex <dex> --token-a <token_or_symbol> --token-b <token_or_symbol> --amount-a <amount_a> --amount-b <amount_b> [--position-type <v2|v3>] [--slippage-bps <bps>] --json`
+- `xclaw-agent liquidity quote-remove --chain <chain_key> --dex <dex> --position-id <position_id> [--percent <1-100>] --json`
 - `xclaw-agent report send --trade <trade_id> --json`
 - `xclaw-agent chat poll --chain <chain_key> --json`
 - `xclaw-agent chat post --message <message> --chain <chain_key> --json`
@@ -1233,6 +1243,8 @@ Delegated runtime CLI commands that must exist:
 - `xclaw-agent wallet send-token --token <token_or_symbol> --to <address> --amount-wei <amount_wei> --chain <chain_key> --json`
 - `xclaw-agent wallet balance --chain <chain_key> --json`
 - `xclaw-agent wallet token-balance --token <token_address> --chain <chain_key> --json`
+- `xclaw-agent default-chain get --json`
+- `xclaw-agent default-chain set --chain <chain_key> --json`
 - `xclaw-agent x402 receive-request --network <network> --facilitator <facilitator> --amount-atomic <amount_atomic> [--asset-kind <native|erc20>] [--asset-symbol <symbol>] [--asset-address <0x...>] [--resource-description <text>] --json`
 - `xclaw-agent x402 pay --url <url> --network <network> --facilitator <facilitator> --amount-atomic <amount_atomic> --json`
 - `xclaw-agent x402 pay-resume --approval-id <approval_id> --json`
@@ -2653,6 +2665,9 @@ Limitations / notes:
    - management session cookie + CSRF is sufficient for enable/disable (Slice 36 removed step-up).
 5. Canonical endpoints:
    - `POST /api/v1/management/chains/update` upserts per-agent chain access.
+   - `GET /api/v1/management/default-chain?agentId=...` reads runtime-canonical default chain for one managed agent.
+   - `POST /api/v1/management/default-chain` sets runtime-canonical default chain for one managed agent.
+   - `POST /api/v1/management/default-chain/update-batch` applies selected default chain to all agents linked to current management session.
    - `GET /api/v1/management/agent-state?agentId=...&chainKey=...` returns `chainPolicy` for active chain context.
    - `GET /api/v1/agent/transfers/policy?chainKey=...` returns `chainEnabled` for runtime enforcement.
 
@@ -3598,13 +3613,13 @@ Limitations / notes:
 
 1. Scope boundary:
 - Chain onboarding is config-driven for EVM networks.
-- This slice does not add new live chains; it removes hardcoded chain assumptions.
-- x402 remains chain-scoped and unchanged in capability surface (no new x402 networks enabled by this slice).
+- Enabled+visible chain registry entries drive selector options for both mainnet and testnet surfaces.
+- x402 remains chain-scoped by capability flags; no faucet/x402 capability expansion is implied.
 
 2. Chain config contract:
 - `config/chains/<chain>.json` must support:
   - `chainKey`
-  - `family` (`evm`)
+  - `family` (`evm|hedera`)
   - `enabled` (boolean)
   - `uiVisible` (boolean)
   - `displayName`
@@ -3612,7 +3627,7 @@ Limitations / notes:
   - `nativeCurrency` (`name`, `symbol`, `decimals`)
   - `rpc` (`primary`, `fallback`)
   - `explorerBaseUrl`
-  - `capabilities` (`wallet`, `trade`, `limitOrders`, `x402`, `faucet`, `deposits`)
+  - `capabilities` (`wallet`, `trade`, `liquidity`, `limitOrders`, `x402`, `faucet`, `deposits`)
   - optional `canonicalTokens`
 - Capability default behavior when omitted:
   - `wallet=true`
@@ -3622,6 +3637,7 @@ Limitations / notes:
 - Runtime and web must reject unsupported operations with structured capability errors.
 - Wallet flows may run only when `capabilities.wallet=true`.
 - Trade flows require `capabilities.trade=true`.
+- Liquidity flows require `capabilities.liquidity=true`.
 - Limit-order flows require `capabilities.limitOrders=true`.
 - Faucet flows require `capabilities.faucet=true`.
 - x402 flows require `capabilities.x402=true`.
@@ -3644,6 +3660,10 @@ Limitations / notes:
 6. Runtime/skill introspection contract:
 - Runtime exposes `xclaw-agent chains --json` (optional `--include-disabled`) for tool routing.
 - Skill wrapper exposes `chains`.
+- Runtime default-chain source-of-truth is agent-local state (`state.json.defaultChain`) managed by:
+  - `xclaw-agent default-chain get --json`
+  - `xclaw-agent default-chain set --chain <chain_key> --json`
+- Explicit command `--chain` remains authoritative; default chain is fallback-only for chain-optional contexts.
 
 ## 74) Slice 86 Multi-Agent Management Session + Chain-Scoped Policy Snapshot Contract (Locked)
 
