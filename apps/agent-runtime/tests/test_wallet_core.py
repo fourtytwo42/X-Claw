@@ -126,6 +126,40 @@ class WalletCoreUnitTests(unittest.TestCase):
         code = cli.cmd_wallet_wrap_native(args)
         self.assertEqual(code, 2)
 
+    def test_fetch_wallet_holdings_includes_hedera_discovered_tokens(self) -> None:
+        wallet = {"address": "0x" + "11" * 20, "crypto": {"enc": "aes-256-gcm", "kdf": "argon2id", "kdfParams": {}, "saltB64": "AA==", "nonceB64": "AA==", "ciphertextB64": "AA=="}}
+        with (
+            mock.patch.object(cli, "load_wallet_store", return_value={"chains": {"hedera_testnet": "w1"}, "wallets": {"w1": wallet}}),
+            mock.patch.object(cli, "_chain_wallet", return_value=("w1", wallet)),
+            mock.patch.object(cli, "_validate_wallet_entry_shape"),
+            mock.patch.object(cli, "_fetch_native_balance_wei", return_value=str(2 * 10**18)),
+            mock.patch.object(cli, "_canonical_token_map", return_value={"WHBAR": "0x" + "22" * 20}),
+            mock.patch.object(cli, "_fetch_token_balance_wei", return_value=str(500000000)),
+            mock.patch.object(cli, "_fetch_erc20_metadata", return_value={"symbol": "WHBAR", "decimals": 8}),
+            mock.patch.object(
+                cli,
+                "_discover_hedera_wallet_tokens",
+                return_value=(
+                    [
+                        {
+                            "symbol": "USDC",
+                            "token": "0x" + "33" * 20,
+                            "balanceWei": "130000",
+                            "balance": "0.13",
+                            "balancePretty": "0.13",
+                            "decimals": 6,
+                            "tokenId": "0.0.5449",
+                        }
+                    ],
+                    [],
+                ),
+            ),
+        ):
+            holdings = cli._fetch_wallet_holdings("hedera_testnet")
+        symbols = {str(t.get("symbol")) for t in holdings.get("tokens", []) if isinstance(t, dict)}
+        self.assertIn("WHBAR", symbols)
+        self.assertIn("USDC", symbols)
+
 
 class WalletCoreCliTests(unittest.TestCase):
     def _run(self, *args: str, home: str, extra_env: dict[str, str] | None = None) -> tuple[int, dict]:

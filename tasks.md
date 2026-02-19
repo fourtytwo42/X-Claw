@@ -2682,3 +2682,14 @@ Active slice context: `Slice 95` closure hardening.
 ## 2) Response contract clarity
 - [x] Update faucet rate-limited response details to include chain-scoped scope key and `chainKey`.
 - [x] Sync source-of-truth limiter contract note.
+
+# Slice 95K Tasks Update: Hedera Wallet Full Token Visibility (UTC 2026-02-19)
+
+## 1) Runtime token discovery
+- [x] Add Hedera mirror-node token discovery in runtime wallet holdings path.
+- [x] Merge discovered non-zero tokens into `wallet balance` output beyond canonical token map.
+- [x] Preserve non-fatal failures via `tokenErrors[]`.
+
+## 2) Validation + docs
+- [x] Add wallet unit test for Hedera discovered token merge.
+- [x] Update wallet contract + source-of-truth wording for Hedera discovered token behavior.

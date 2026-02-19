@@ -2573,3 +2573,18 @@ Set Hedera faucet warmup drip defaults to testing-friendly levels:
 ## Acceptance checks
 - Running `npm run ops:faucet:reset-rate-limit` deletes keys matching `xclaw:ratelimit:v1:agent_faucet_daily:*`.
 - Faucet `rate_limited` response details include `scope=agent_faucet_daily_chain` and `chainKey`.
+
+# Slice 95K Spec Addendum: Hedera Wallet Full Token Visibility (UTC 2026-02-19)
+
+## Goal
+Ensure `wallet balance --chain hedera_testnet` shows all owned Hedera tokens for the wallet account (not only canonical map tokens).
+
+## Locked scope
+1. `apps/agent-runtime/xclaw_agent/cli.py`
+2. `apps/agent-runtime/tests/test_wallet_core.py`
+3. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+4. `docs/api/WALLET_COMMAND_CONTRACT.md`
+
+## Acceptance checks
+- Hedera `wallet balance` includes mirror-discovered non-zero token holdings merged into `tokens[]`.
+- Discovery failures remain non-fatal and are reported in `tokenErrors[]`.

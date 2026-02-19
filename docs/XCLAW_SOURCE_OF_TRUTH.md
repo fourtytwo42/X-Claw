@@ -1216,6 +1216,7 @@ Additional locked reliability requirements for skill/runtime usage:
 - `status` output should include `agentName` best-effort when resolvable without making the command fail on profile lookup issues.
 - `wallet-health` ok responses should include actionable guidance (`nextAction` and `actionHint`).
 - `wallet-balance` should return combined holdings in one payload: native fields plus canonical token balances (`tokens[]`) and non-fatal token fetch failures (`tokenErrors[]`).
+- Hedera chain behavior: `wallet-balance` must merge mirror-node discovered token holdings (non-zero balances for the wallet account) into `tokens[]` so owned tokens are visible even when not present in chain canonical token map.
 - `faucet-request` rate-limit failures should surface machine-readable retry timing when available (`retryAfterSec` from server details).
 - `trade-spot` gas output should include both exact numeric ETH (`totalGasCostEthExact`) and display-friendly pretty form (`totalGasCostEthPretty`), while keeping backward-compatible `totalGasCostEth`.
 

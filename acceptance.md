@@ -5155,3 +5155,10 @@ Date (UTC): 2026-02-19
     - `scope=agent_faucet_daily_chain`
     - `chainKey`
     - `retryAfterSeconds`.
+
+## Slice 95K Hedera Wallet Full Token Visibility (UTC 2026-02-19)
+
+### Evidence updates (`E45+`)
+- `E45` Hedera wallet balance now includes non-canonical owned tokens:
+  - chain check: `cast call 0x0000000000000000000000000000000000001549 "balanceOf(address)(uint256)" 0x582f6f293e0f49855bb752ae29d6b0565c500d87 --rpc-url https://testnet.hashio.io/api` -> `130000` (USDC).
+  - runtime output now merges mirror-node discovered holdings into `tokens[]`, so USDC appears on `wallet balance --chain hedera_testnet --json`.

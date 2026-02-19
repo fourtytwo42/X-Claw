@@ -177,7 +177,8 @@ Current behavior in `apps/agent-runtime/xclaw_agent/cli.py`:
 8. `wallet-balance` returns combined holdings for wallet address and chain RPC:
    - native balance fields (`balanceWei`, `balanceEth`, `symbol`, `decimals`),
    - canonical token balances in `tokens[]` (best effort per configured chain canonical tokens),
-   - token query failures in `tokenErrors[]` without failing native balance fetch.
+   - Hedera chains additionally include discovered token holdings from mirror-node account token relationships (non-zero balances) merged into `tokens[]`,
+   - token query/discovery failures in `tokenErrors[]` without failing native balance fetch.
 9. `wallet-token-balance` is implemented via cast-backed ERC-20 `balanceOf(address)` query.
 10. `wallet-wrap-native` is implemented for Hedera chains and calls payable `deposit()` on `coreContracts.wrappedNativeHelper`, verifies receipt, then reports `txHash`, helper address, wrapped token address, and wrapped balance delta.
 11. Missing cast dependency returns structured `missing_dependency` error.

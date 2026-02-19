@@ -8293,6 +8293,145 @@ def _canonical_token_map(chain: str) -> dict[str, str]:
     return out
 
 
+def _is_hedera_chain(chain: str) -> bool:
+    if chain.startswith("hedera"):
+        return True
+    try:
+        cfg = _load_chain_config(chain)
+    except Exception:
+        return False
+    family = str(cfg.get("family") or "").strip().lower()
+    return family == "hedera"
+
+
+def _chain_env_suffix(chain: str) -> str:
+    return re.sub(r"[^A-Za-z0-9]", "_", str(chain or "").strip()).upper()
+
+
+def _hedera_mirror_api_base(chain: str) -> str:
+    env_key = f"XCLAW_HEDERA_MIRROR_API_URL_{_chain_env_suffix(chain)}"
+    scoped = str(os.environ.get(env_key) or "").strip().rstrip("/")
+    if scoped:
+        return scoped
+    default_env = str(os.environ.get("XCLAW_HEDERA_MIRROR_API_URL") or "").strip().rstrip("/")
+    if default_env:
+        return default_env
+    if chain.endswith("mainnet"):
+        return "https://mainnet-public.mirrornode.hedera.com/api/v1"
+    return "https://testnet.mirrornode.hedera.com/api/v1"
+
+
+def _http_get_json_object(url: str, *, timeout_sec: float = 20.0) -> dict[str, Any]:
+    req = urllib.request.Request(
+        url=url,
+        method="GET",
+        headers={
+            "Accept": "application/json",
+            "User-Agent": "xclaw-agent-runtime/1.0 (+https://xclaw.trade/skill.md)",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
+            body = resp.read().decode("utf-8")
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode("utf-8") if exc.fp else ""
+        raise WalletStoreError(f"HTTP {exc.code} for {url}: {body or exc.reason}") from exc
+    except urllib.error.URLError as exc:
+        raise WalletStoreError(f"HTTP request failed for {url}: {exc.reason}") from exc
+    try:
+        parsed = json.loads(body) if body else {}
+    except Exception as exc:
+        raise WalletStoreError(f"Non-JSON response from {url}.") from exc
+    if not isinstance(parsed, dict):
+        raise WalletStoreError(f"JSON response from {url} is not an object.")
+    return parsed
+
+
+def _hedera_entity_id_to_evm_address(entity_id: str) -> str:
+    parts = str(entity_id or "").strip().split(".")
+    if len(parts) != 3:
+        raise WalletStoreError(f"Invalid Hedera entity id '{entity_id}'.")
+    try:
+        shard = int(parts[0], 10)
+        realm = int(parts[1], 10)
+        num = int(parts[2], 10)
+    except Exception as exc:
+        raise WalletStoreError(f"Invalid Hedera entity id '{entity_id}'.") from exc
+    if shard < 0 or realm < 0 or num < 0:
+        raise WalletStoreError(f"Invalid Hedera entity id '{entity_id}'.")
+    if shard > 0xFFFFFFFF or realm > 0xFFFFFFFFFFFFFFFF or num > 0xFFFFFFFFFFFFFFFF:
+        raise WalletStoreError(f"Hedera entity id '{entity_id}' is out of range.")
+    packed = shard.to_bytes(4, "big") + realm.to_bytes(8, "big") + num.to_bytes(8, "big")
+    return "0x" + packed.hex()
+
+
+def _discover_hedera_wallet_tokens(chain: str, address: str) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    base = _hedera_mirror_api_base(chain)
+    next_url = f"{base}/accounts/{address}/tokens?limit=100"
+    discovered: list[dict[str, Any]] = []
+    errors: list[dict[str, Any]] = []
+    token_meta_cache: dict[str, dict[str, Any]] = {}
+    visited = 0
+
+    while next_url and visited < 20:
+        visited += 1
+        page = _http_get_json_object(next_url)
+        rows = page.get("tokens")
+        if not isinstance(rows, list):
+            break
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            token_id = str(row.get("token_id") or "").strip()
+            if not token_id:
+                continue
+            try:
+                balance_units = int(str(row.get("balance") or "0"))
+            except Exception:
+                errors.append({"tokenId": token_id, "message": "Invalid token balance in Hedera mirror response."})
+                continue
+            if balance_units <= 0:
+                continue
+            try:
+                token_address = _hedera_entity_id_to_evm_address(token_id)
+            except WalletStoreError as exc:
+                errors.append({"tokenId": token_id, "message": str(exc)})
+                continue
+
+            meta = token_meta_cache.get(token_id)
+            if meta is None:
+                try:
+                    meta = _http_get_json_object(f"{base}/tokens/{token_id}")
+                except Exception as exc:
+                    meta = {}
+                    errors.append({"tokenId": token_id, "token": token_address, "message": str(exc)})
+                token_meta_cache[token_id] = meta
+
+            symbol = str(meta.get("symbol") or token_id).strip() or token_id
+            decimals_raw = meta.get("decimals", row.get("decimals", 0))
+            try:
+                decimals = int(str(decimals_raw))
+            except Exception:
+                decimals = 0
+            discovered.append(
+                {
+                    "symbol": symbol,
+                    "token": token_address.lower(),
+                    "balanceWei": str(balance_units),
+                    "balance": _format_units(balance_units, decimals),
+                    "balancePretty": _format_units_pretty(balance_units, decimals),
+                    "decimals": decimals,
+                    "tokenId": token_id,
+                }
+            )
+        links = page.get("links")
+        raw_next = ""
+        if isinstance(links, dict):
+            raw_next = str(links.get("next") or "").strip()
+        next_url = urllib.parse.urljoin(base + "/", raw_next) if raw_next else ""
+    return discovered, errors
+
+
 def _canonical_token_address_aliases(chain: str) -> dict[str, str]:
     cfg = _load_chain_config(chain)
     aliases = cfg.get("canonicalTokenAddressAliases")
@@ -8349,6 +8488,19 @@ def _fetch_wallet_holdings(chain: str) -> dict[str, Any]:
             )
         except Exception as exc:
             token_errors.append({"symbol": symbol, "token": token_address, "message": str(exc)})
+    if _is_hedera_chain(chain):
+        try:
+            discovered, discover_errors = _discover_hedera_wallet_tokens(chain, address)
+            known = {str(item.get("token") or "").lower() for item in token_balances if isinstance(item, dict)}
+            for item in discovered:
+                token_addr = str(item.get("token") or "").lower()
+                if token_addr and token_addr not in known:
+                    token_balances.append(item)
+                    known.add(token_addr)
+            token_errors.extend(discover_errors)
+        except Exception as exc:
+            token_errors.append({"source": "hedera_mirror", "message": str(exc)})
+
     return {
         "address": address,
         "native": {

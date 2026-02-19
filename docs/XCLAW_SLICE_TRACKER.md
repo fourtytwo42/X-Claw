@@ -1817,4 +1817,5 @@ DoD:
 - [x] Official Hedera helper wrap path is available (`wallet wrap-native`) and faucet wrapped-asset deficits can auto-wrap via helper with deterministic `faucet_wrapped_autowrap_failed` fallback.
 - [x] Hedera faucet default drips are set to 5 HBAR / 5 WHBAR / 10 USDC for non-demo warmup reliability.
 - [x] installer warmup logs include faucet `code/message/actionHint/requestId` and explicit rerun diagnostics; install remains non-fatal on warmup failure after wallet/register invariants pass.
+- [x] Hedera wallet balance visibility includes mirror-node discovered token holdings for the requested chain, so non-canonical owned tokens are surfaced in runtime `tokens[]`.
 - [x] final docs sync + issue evidence posts with commit hashes.
