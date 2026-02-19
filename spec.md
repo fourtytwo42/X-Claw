@@ -95,6 +95,30 @@ Align policy approval flows with trade/transfer behavior so policy requests auto
 
 # Hotfix Spec: Force-Upgrade Gateway Callback Patch (v15) For Trade-Approve Ack Suppression
 
+# Runtime-Canonical Approval Decisions (Trade/Transfer/Policy)
+
+## Goal
+Unify decision handling so runtime is source-of-truth for approval decisions while web/telegram act as interface channels.
+
+## Flag
+- `XCLAW_RUNTIME_CANONICAL_APPROVAL_DECISIONS=1`
+
+## Runtime command surface
+- `approvals decide-spot`
+- `approvals decide-transfer` (normalized envelope + source field)
+- `approvals decide-policy`
+- deterministic callback metadata supported on all decide commands:
+  - `--idempotency-key <key>`
+  - `--decision-at <iso8601>`
+
+## Web route behavior under flag
+- `/api/v1/management/approvals/decision` dispatches runtime `decide-spot`
+- `/api/v1/management/policy-approvals/decision` dispatches runtime `decide-policy`
+- `/api/v1/management/transfer-approvals/decision` continues runtime dispatch and includes `--source web`
+- Telegram callback behavior:
+  - `xappr|...`, `xpol|...`, `xfer|...` dispatch runtime `approvals decide-*` commands.
+  - direct callback fetch/status mutation logic for trade/policy is no longer primary path.
+
 ## Goal
 Ensure existing OpenClaw installs with older callback patch blocks are upgraded in-place so `xappr approve` no longer emits intermediate `Approved trade ...` Telegram messages.
 

@@ -2669,8 +2669,9 @@ Limitations / notes:
    - Telegram cannot color inline buttons; use text labels only.
 4. Execution boundary:
    - clicking a Telegram inline button must trigger approval **without LLM/tool mediation**.
-   - OpenClaw intercepts the callback payload and performs an agent-authenticated approval transition using the existing `xclaw-agent` API key (no separate Telegram secret).
+   - OpenClaw intercepts the callback payload and dispatches runtime `xclaw-agent approvals decide-*` using existing skill/runtime credentials (no separate Telegram secret).
    - Deployment note (gateway): the intercept must occur in the Telegram `callback_query` handler before any routing into the model/message pipeline.
+   - Runtime binary resolution in callback path must prefer `XCLAW_AGENT_RUNTIME_BIN`; fallback may use `xclaw-agent` from PATH only (no hardcoded machine-home launcher paths).
    - Portability rule: X-Claw provides a Python-first patcher that auto-applies the OpenClaw gateway patch:
      - when installing/updating the xclaw-agent skill, and
      - on the next skill use after an OpenClaw update overwrites the installed gateway bundle.
@@ -2705,8 +2706,7 @@ Limitations / notes:
 8. Canonical endpoints:
    - `POST /api/v1/management/approval-channels/update` (owner-auth):
      - enables/disables Telegram approval prompts (no secret issuance).
-   - Telegram approve action uses `POST /api/v1/trades/:tradeId/status` (agent-auth):
-     - idempotently transitions `approval_pending -> approved` when actionable (requires `Idempotency-Key`).
+   - Telegram callback trade/policy decisions dispatch runtime commands (`approvals decide-spot|decide-policy`) and runtime performs canonical server transitions.
      - Telegram callback idempotency must not conflict on retries:
        - use `Idempotency-Key: tg-cb-<callbackId>` (Telegram callback_query id),
        - set `at` deterministically from the callback/query timestamp so replays are byte-stable.
@@ -2767,7 +2767,7 @@ Limitations / notes:
 8. Canonical endpoints:
    - `POST /api/v1/agent/policy-approvals/proposed` (agent-auth) creates a pending request.
      - Runtime idempotency for propose requests must be per-attempt (nonce-suffixed key), not a long-lived deterministic key, to avoid replaying stale terminal approvals from idempotency cache.
-   - `POST /api/v1/policy-approvals/:policyApprovalId/decision` (agent-auth) applies approve/deny for Telegram callbacks.
+   - `POST /api/v1/policy-approvals/:policyApprovalId/decision` (agent-auth) is called by runtime `approvals decide-policy` for Telegram/web callbacks.
    - `POST /api/v1/management/policy-approvals/decision` (owner-auth) applies approve/deny from the web UI.
 9. De-dupe semantics (locked):
    - If an identical policy approval request is already `approval_pending` for the same:
@@ -3033,6 +3033,37 @@ Limitations / notes:
 4. API preservation:
 - Slice 74 reuses existing routes as-is:
   - `GET /api/v1/management/session/agents`,
+
+---
+
+## 87) Runtime-Canonical Approval Decisions (Locked)
+
+1. Runtime authority:
+- `xclaw-agent` is canonical for trade/policy/transfer approval decision execution paths.
+- Web and Telegram are interface channels that submit owner decisions.
+
+2. Canonical decision commands:
+- `approvals decide-spot --trade-id <trd_...> --decision <approve|reject> --chain <chain> --source <web|telegram|runtime> [--idempotency-key <key>] [--decision-at <iso8601>] --json`
+- `approvals decide-transfer --approval-id <xfr_...> --decision <approve|deny> --chain <chain> --source <web|telegram|runtime> [--idempotency-key <key>] [--decision-at <iso8601>] --json`
+- `approvals decide-policy --approval-id <ppr_...> --decision <approve|reject> --chain <chain> --source <web|telegram|runtime> [--idempotency-key <key>] [--decision-at <iso8601>] --json`
+
+3. Feature-flagged rollout:
+- flag: `XCLAW_RUNTIME_CANONICAL_APPROVAL_DECISIONS`.
+- when enabled, management decision routes dispatch runtime `approvals decide-*` commands and treat runtime output as authoritative.
+- Telegram callback routing (`xappr`/`xpol`/`xfer`) must dispatch runtime `approvals decide-*` commands and not directly mutate trade/policy status via bespoke callback fetch logic.
+- legacy web-canonical decision mutation path remains fallback when flag is disabled.
+
+4. Prompt cleanup contract:
+- runtime/server must persist approval prompt transport metadata (`channel`, `target`, `thread`, `messageId`) keyed by subject ID.
+- cleanup must report deterministic status (`deleted`, `missing_message_id`, `prompt_not_found`, `delete_failed`).
+- existing rows with historical `messageId=unknown` are forward-only cleanup gaps and must not block execution/prod.
+
+5. Output envelope requirement:
+- runtime decision commands must return structured decision metadata:
+  - `subjectType`, `subjectId`, `decision`, `fromStatus`, `toStatus`, `executionStatus`,
+  - `txHash` when available,
+  - `promptCleanup`,
+  - `actionHint`.
   - `GET /api/v1/management/agent-state`,
   - `POST /api/v1/management/approvals/decision`,
   - `POST /api/v1/management/policy-approvals/decision`,

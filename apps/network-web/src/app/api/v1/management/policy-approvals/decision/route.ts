@@ -1,6 +1,11 @@
+import { existsSync } from 'node:fs';
+import { spawn, spawnSync } from 'node:child_process';
+import { join } from 'node:path';
 import type { NextRequest } from 'next/server';
 
 import { dbQuery, withTransaction } from '@/lib/db';
+import { issueSignedAgentToken } from '@/lib/agent-token';
+import { getEnv } from '@/lib/env';
 import { errorResponse, internalErrorResponse, successResponse } from '@/lib/errors';
 import { parseJsonBody } from '@/lib/http';
 import { makeId } from '@/lib/ids';
@@ -16,6 +21,70 @@ type ManagementPolicyApprovalDecisionRequest = {
   decision: 'approve' | 'reject';
   reasonMessage?: string | null;
 };
+
+function runtimeCanonicalApprovalDecisionsEnabled(): boolean {
+  const raw = (process.env.XCLAW_RUNTIME_CANONICAL_APPROVAL_DECISIONS ?? '').trim().toLowerCase();
+  if (!raw) {
+    return false;
+  }
+  return !['0', 'false', 'off', 'no'].includes(raw);
+}
+
+function runtimeDecisionTimeoutMs(): number {
+  const raw = (process.env.XCLAW_RUNTIME_DECISION_TIMEOUT_MS ?? '').trim();
+  if (!raw || !/^\d+$/.test(raw)) {
+    return 12000;
+  }
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed < 1000) {
+    return 12000;
+  }
+  return parsed;
+}
+
+function resolveRuntimeBin(): string {
+  const cwd = process.cwd();
+  const candidates = [
+    process.env.XCLAW_AGENT_RUNTIME_BIN?.trim() ?? '',
+    join(cwd, 'apps', 'agent-runtime', 'bin', 'xclaw-agent'),
+    join(cwd, '..', 'agent-runtime', 'bin', 'xclaw-agent')
+  ].filter((value) => value.length > 0);
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  throw new Error('xclaw-agent runtime binary not found. Set XCLAW_AGENT_RUNTIME_BIN or deploy apps/agent-runtime/bin/xclaw-agent.');
+}
+
+function resolveRuntimeApiBase(req: NextRequest): string {
+  const explicit = (process.env.XCLAW_API_BASE_URL ?? '').trim();
+  if (explicit.length > 0) {
+    return explicit;
+  }
+  return `${req.nextUrl.origin}/api/v1`;
+}
+
+function runtimeSpawnEnv(req: NextRequest, agentId: string, chainKey: string): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    XCLAW_API_BASE_URL: resolveRuntimeApiBase(req),
+    XCLAW_AGENT_ID: agentId,
+    XCLAW_DEFAULT_CHAIN: chainKey
+  };
+  if (!(env.XCLAW_AGENT_API_KEY ?? '').trim()) {
+    const mapped = getEnv().agentApiKeys[agentId];
+    if (mapped) {
+      env.XCLAW_AGENT_API_KEY = mapped;
+    } else {
+      const signed = issueSignedAgentToken(agentId);
+      if (signed) {
+        env.XCLAW_AGENT_API_KEY = signed;
+      }
+    }
+  }
+  return env;
+}
 
 function normalizeTokenSet(values: unknown): Set<string> {
   if (!Array.isArray(values)) {
@@ -61,6 +130,105 @@ export async function POST(req: NextRequest) {
     const auth = await requireManagementWriteAuth(req, requestId, body.agentId);
     if (!auth.ok) {
       return auth.response;
+    }
+
+    if (runtimeCanonicalApprovalDecisionsEnabled()) {
+      const approvalRow = await dbQuery<{ chain_key: string }>(
+        `
+        select chain_key
+        from agent_policy_approval_requests
+        where request_id = $1 and agent_id = $2
+        limit 1
+        `,
+        [body.policyApprovalId, body.agentId]
+      );
+      if ((approvalRow.rowCount ?? 0) === 0) {
+        return errorResponse(
+          404,
+          {
+            code: 'payload_invalid',
+            message: 'Policy approval request was not found.',
+            actionHint: 'Verify policyApprovalId and retry.'
+          },
+          requestId
+        );
+      }
+      const chainKey = approvalRow.rows[0].chain_key;
+      const runtimeBin = resolveRuntimeBin();
+      const runtimeArgs = [
+        'approvals',
+        'decide-policy',
+        '--approval-id',
+        body.policyApprovalId,
+        '--decision',
+        body.decision,
+        '--chain',
+        chainKey,
+        '--source',
+        'web',
+        '--json'
+      ];
+      const reason = String(body.reasonMessage ?? '').trim();
+      if (reason) {
+        runtimeArgs.push('--reason-message', reason);
+      }
+      const child = spawnSync(runtimeBin, runtimeArgs, {
+        encoding: 'utf8',
+        timeout: runtimeDecisionTimeoutMs(),
+        env: runtimeSpawnEnv(req, body.agentId, chainKey)
+      });
+      let payload: Record<string, unknown> | null = null;
+      const lines = String(child.stdout ?? '')
+        .split(/\r?\n/)
+        .map((value) => value.trim())
+        .filter((value) => value.length > 0);
+      if (lines.length > 0) {
+        try {
+          const parsedLast = JSON.parse(lines[lines.length - 1]);
+          if (parsedLast && typeof parsedLast === 'object') {
+            payload = parsedLast as Record<string, unknown>;
+          }
+        } catch {}
+      }
+      await dbQuery(
+        `
+        insert into management_audit_log (
+          audit_id, agent_id, management_session_id, action_type, action_status,
+          public_redacted_payload, private_payload, user_agent, created_at
+        ) values ($1, $2, $3, 'policy_approval.decision.runtime', $4, $5::jsonb, $6::jsonb, $7, now())
+        `,
+        [
+          makeId('aud'),
+          body.agentId,
+          auth.session.sessionId,
+          child.status === 0 ? 'accepted' : 'failed',
+          JSON.stringify({ policyApprovalId: body.policyApprovalId, decision: body.decision, mode: 'runtime_canonical' }),
+          JSON.stringify({ reasonMessage: body.reasonMessage ?? null, runtime: payload ?? null }),
+          req.headers.get('user-agent')
+        ]
+      );
+      if (child.status === 0 && payload?.ok) {
+        return successResponse({ ok: true, source: 'runtime', policyApprovalId: body.policyApprovalId, runtimeDecision: payload }, 200, requestId);
+      }
+      try {
+        const bg = spawn(runtimeBin, runtimeArgs, {
+          detached: true,
+          stdio: 'ignore',
+          env: runtimeSpawnEnv(req, body.agentId, chainKey)
+        });
+        bg.unref();
+      } catch {}
+      return successResponse(
+        {
+          ok: true,
+          source: 'runtime',
+          policyApprovalId: body.policyApprovalId,
+          runtimeDecision: payload,
+          queued: true
+        },
+        202,
+        requestId
+      );
     }
 
     const decisionAt = new Date().toISOString();

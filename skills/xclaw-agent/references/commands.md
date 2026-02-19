@@ -14,8 +14,10 @@ This reference defines the expected command surface for the Python-first skill w
 - `trade-exec <intent_id>`
 - `trade-spot <token_in> <token_out> <amount_in> <slippage_bps>` (`amount_in` is human token units; use `wei:<uint>` for raw base units)
 - `trade-resume <trade_id>` (internal auto-resume path for single-trigger Telegram spot approvals)
+- `trade-decide <trade_id> <approve|reject>` (runtime-canonical spot approval decision path)
 - `transfer-resume <approval_id>` (internal auto-resume path for single-trigger transfer approvals)
 - `transfer-decide <approval_id> <approve|deny>` (internal callback decision command)
+- `policy-decide <approval_id> <approve|reject>` (runtime-canonical policy approval decision path)
 - `transfer-policy-get`
 - `transfer-policy-set <auto|per_transfer> <native_preapproved:0|1> [allowed_token ...]`
 - `report-send <trade_id>`
@@ -55,8 +57,10 @@ Underlying runtime delegation (performed by wrapper):
 - `xclaw-agent trade execute --intent <intent_id> --chain <chain_key> --json`
 - `xclaw-agent trade spot --chain <chain_key> --token-in <token_or_symbol> --token-out <token_or_symbol> --amount-in <amount_in> --slippage-bps <bps> --json`
 - `xclaw-agent approvals resume-spot --trade-id <trade_id> --chain <chain_key> --json`
+- `xclaw-agent approvals decide-spot --trade-id <trade_id> --decision <approve|reject> --chain <chain_key> [--source <web|telegram|runtime>] [--idempotency-key <key>] [--decision-at <iso8601>] --json`
 - `xclaw-agent approvals resume-transfer --approval-id <approval_id> --chain <chain_key> --json`
-- `xclaw-agent approvals decide-transfer --approval-id <approval_id> --decision <approve|deny> --chain <chain_key> --json`
+- `xclaw-agent approvals decide-transfer --approval-id <approval_id> --decision <approve|deny> --chain <chain_key> [--source <web|telegram|runtime>] [--idempotency-key <key>] [--decision-at <iso8601>] --json`
+- `xclaw-agent approvals decide-policy --approval-id <approval_id> --decision <approve|reject> --chain <chain_key> [--source <web|telegram|runtime>] [--idempotency-key <key>] [--decision-at <iso8601>] --json`
 - `xclaw-agent transfers policy-get --chain <chain_key> --json`
 - `xclaw-agent transfers policy-set --chain <chain_key> --global <auto|per_transfer> --native-preapproved <0|1> [--allowed-token <0x...>] --json`
 - `xclaw-agent report send --trade <trade_id> --json`

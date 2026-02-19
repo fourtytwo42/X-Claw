@@ -913,14 +913,76 @@ export default function AgentPublicProfilePage() {
     };
   }, [agentId, isOwner, refreshViewerTracked]);
 
-  async function runManagementAction(action: () => Promise<void>, successMessage: string) {
+  function applyOptimisticTradeDecision(tradeId: string, nextStatus: 'approved' | 'rejected') {
+    setManagement((current) => {
+      if (current.phase !== 'ready') {
+        return current;
+      }
+      const nowIso = new Date().toISOString();
+      const queueItem = current.data.approvalsQueue.find((item) => item.trade_id === tradeId) ?? null;
+      const nextQueue = current.data.approvalsQueue.filter((item) => item.trade_id !== tradeId);
+      const existingHistory = current.data.approvalsHistory ?? [];
+      const already = existingHistory.find((item) => item.trade_id === tradeId);
+      const nextHistoryRow =
+        already ??
+        (queueItem
+          ? {
+              trade_id: queueItem.trade_id,
+              chain_key: queueItem.chain_key,
+              pair: queueItem.pair,
+              amount_in: queueItem.amount_in,
+              token_in: queueItem.token_in,
+              token_out: queueItem.token_out,
+              status: nextStatus,
+              reason: queueItem.reason ?? null,
+              reason_message: nextStatus === 'rejected' ? 'Rejected by owner.' : null,
+              tx_hash: null,
+              created_at: queueItem.created_at,
+              updated_at: nowIso
+            }
+          : null);
+
+      let nextHistory = existingHistory;
+      if (already) {
+        nextHistory = existingHistory.map((item) =>
+          item.trade_id === tradeId
+            ? {
+                ...item,
+                status: nextStatus,
+                reason_message: nextStatus === 'rejected' ? item.reason_message ?? 'Rejected by owner.' : item.reason_message,
+                updated_at: nowIso
+              }
+            : item
+        );
+      } else if (nextHistoryRow) {
+        nextHistory = [nextHistoryRow, ...existingHistory];
+      }
+
+      return {
+        phase: 'ready',
+        data: {
+          ...current.data,
+          approvalsQueue: nextQueue,
+          approvalsHistory: nextHistory
+        }
+      };
+    });
+  }
+
+  async function runManagementAction(action: () => Promise<void>, successMessage: string, onSuccess?: () => void) {
     try {
       await action();
+      onSuccess?.();
       showToast(successMessage, 'success');
-      await refreshAll({ showLoading: false });
+      // Refresh in background so transient backend stalls do not freeze action UX.
+      window.setTimeout(() => {
+        void refreshAll({ showLoading: false });
+      }, 0);
     } catch (actionError) {
       showToast(actionError instanceof Error ? actionError.message : 'Management action failed.', 'error', 3600);
-      await refreshAll({ showLoading: false });
+      window.setTimeout(() => {
+        void refreshAll({ showLoading: false });
+      }, 0);
     }
   }
 
@@ -2290,7 +2352,8 @@ export default function AgentPublicProfilePage() {
                                   tradeId: row.raw.trade_id,
                                   decision: 'approve'
                                 }).then(() => Promise.resolve()),
-                              'Trade approved.'
+                              'Trade approved.',
+                              () => applyOptimisticTradeDecision(row.raw.trade_id, 'approved')
                             )
                           }
                         >
@@ -2309,7 +2372,8 @@ export default function AgentPublicProfilePage() {
                                   reasonCode: 'approval_rejected',
                                   reasonMessage: (approvalRejectReasons[row.raw.trade_id] ?? '').trim() || 'Rejected by owner.'
                                 }).then(() => Promise.resolve()),
-                              'Trade rejected.'
+                              'Trade rejected.',
+                              () => applyOptimisticTradeDecision(row.raw.trade_id, 'rejected')
                             )
                           }
                         >

@@ -1,6 +1,7 @@
 import argparse
 import io
 import json
+import os
 import tempfile
 import unittest
 from unittest import mock
@@ -869,6 +870,32 @@ class TradePathRuntimeTests(unittest.TestCase):
                 }
             )
         run_mock.assert_not_called()
+
+    def test_extract_openclaw_message_id_accepts_nested_snake_case(self) -> None:
+        stdout = json.dumps(
+            {
+                "ok": True,
+                "payload": {
+                    "result": {
+                        "message": {
+                            "message_id": 4242,
+                        }
+                    }
+                },
+            }
+        )
+        self.assertEqual(cli._extract_openclaw_message_id(stdout), "4242")
+
+    def test_extract_openclaw_message_id_accepts_prefixed_log_output(self) -> None:
+        stdout = (
+            "[telegram] autoSelectFamily=true (default-node22)\n"
+            + json.dumps({"action": "send", "payload": {"ok": True, "messageId": "1162", "chatId": "6321549254"}})
+        )
+        self.assertEqual(cli._extract_openclaw_message_id(stdout), "1162")
+
+    def test_require_api_base_url_defaults_to_localhost_when_missing(self) -> None:
+        with mock.patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(cli._require_api_base_url(), "http://127.0.0.1:3000/api/v1")
 
     def test_delete_telegram_transfer_prompt_uses_saved_message_id(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir, mock.patch.object(cli, "APP_DIR", pathlib.Path(tmpdir)), mock.patch.object(
@@ -1912,6 +1939,95 @@ class TradePathRuntimeTests(unittest.TestCase):
         self.assertTrue(payload.get("ok"))
         self.assertEqual(payload.get("policyApprovalId"), "ppr_fail")
         self.assertEqual(payload.get("promptSent"), False)
+
+    def test_approvals_decide_spot_approve_emits_runtime_envelope(self) -> None:
+        args = argparse.Namespace(
+            trade_id="trd_1",
+            decision="approve",
+            chain="base_sepolia",
+            source="web",
+            idempotency_key="tg-cb-123",
+            decision_at="2026-02-19T20:00:00Z",
+            reason_message="",
+            json=True,
+        )
+        with mock.patch.object(
+            cli, "_read_trade_details", return_value={"tradeId": "trd_1", "status": "approval_pending", "chainKey": "base_sepolia"}
+        ), mock.patch.object(
+            cli, "_post_trade_status"
+        ) as post_status_mock, mock.patch.object(
+            cli, "_cleanup_trade_approval_prompt", return_value={"ok": True, "code": "deleted"}
+        ), mock.patch.object(
+            cli, "_maybe_send_telegram_decision_message"
+        ), mock.patch.object(
+            cli, "_run_resume_spot_inline", return_value=(0, {"ok": True, "code": "ok", "status": "filled", "txHash": "0x" + "ab" * 32})
+        ):
+            payload = self._run_and_parse_stdout(lambda: cli.cmd_approvals_decide_spot(args))
+        self.assertTrue(payload.get("ok"))
+        self.assertEqual(payload.get("subjectType"), "trade")
+        self.assertEqual(payload.get("subjectId"), "trd_1")
+        self.assertEqual(payload.get("decision"), "approve")
+        self.assertEqual(payload.get("source"), "web")
+        self.assertEqual(payload.get("toStatus"), "approved")
+        self.assertEqual(payload.get("executionStatus"), "filled")
+        post_status_mock.assert_called_once()
+        _, kwargs = post_status_mock.call_args
+        self.assertEqual(kwargs.get("idempotency_key"), "tg-cb-123")
+        self.assertEqual(kwargs.get("decision_at"), "2026-02-19T20:00:00+00:00")
+
+    def test_approvals_decide_policy_posts_decision_and_envelope(self) -> None:
+        args = argparse.Namespace(
+            approval_id="ppr_1",
+            decision="reject",
+            chain="base_sepolia",
+            source="web",
+            idempotency_key="tg-cb-456",
+            decision_at="2026-02-19T20:01:00Z",
+            reason_message="Denied",
+            json=True,
+        )
+
+        captured: dict[str, object] = {}
+
+        def fake_api_request(
+            method: str,
+            path: str,
+            payload: dict | None = None,
+            include_idempotency: bool = False,
+            idempotency_key: str | None = None,
+            allow_auth_recovery: bool = True,
+        ):
+            captured["idempotency_key"] = idempotency_key
+            captured["payload"] = payload or {}
+            return 200, {"ok": True, "policyApprovalId": "ppr_1", "status": "rejected", "chainKey": "base_sepolia"}
+
+        with mock.patch.object(cli, "_api_request", side_effect=fake_api_request), mock.patch.object(
+            cli, "_cleanup_policy_approval_prompt", return_value={"ok": False, "code": "prompt_not_found"}
+        ):
+            payload = self._run_and_parse_stdout(lambda: cli.cmd_approvals_decide_policy(args))
+        self.assertTrue(payload.get("ok"))
+        self.assertEqual(payload.get("subjectType"), "policy")
+        self.assertEqual(payload.get("subjectId"), "ppr_1")
+        self.assertEqual(payload.get("decision"), "reject")
+        self.assertEqual(payload.get("source"), "web")
+        self.assertEqual(payload.get("toStatus"), "rejected")
+        self.assertEqual(captured.get("idempotency_key"), "tg-cb-456")
+        self.assertEqual((captured.get("payload") or {}).get("at"), "2026-02-19T20:01:00+00:00")
+
+    def test_approvals_decide_spot_invalid_decision_at_rejected(self) -> None:
+        args = argparse.Namespace(
+            trade_id="trd_1",
+            decision="approve",
+            chain="base_sepolia",
+            source="telegram",
+            idempotency_key="tg-cb-1",
+            decision_at="not-an-iso",
+            reason_message="",
+            json=True,
+        )
+        payload = self._run_and_parse_stdout(lambda: cli.cmd_approvals_decide_spot(args))
+        self.assertFalse(payload.get("ok"))
+        self.assertEqual(payload.get("code"), "invalid_input")
 
     def test_management_link_normalizes_loopback_host_to_public_domain(self) -> None:
         args = argparse.Namespace(ttl_seconds=600, json=True)

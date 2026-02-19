@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 
 type DeliveryContext = {
   lastChannel: string;
@@ -44,11 +44,11 @@ function nonTelegramProdEnabled(): boolean {
 function nonTelegramProdTimeoutMs(): number {
   const raw = (process.env.XCLAW_NON_TG_PROD_TIMEOUT_MS ?? '').trim();
   if (!raw || !/^\d+$/.test(raw)) {
-    return 10_000;
+    return 25_000;
   }
   const parsed = Number.parseInt(raw, 10);
   if (!Number.isFinite(parsed) || parsed < 1_000) {
-    return 10_000;
+    return 25_000;
   }
   return parsed;
 }
@@ -89,6 +89,72 @@ function resolveOpenclawBin(): string | null {
     }
   }
   return null;
+}
+
+type AsyncExecResult = {
+  status: number | null;
+  stdout: string;
+  stderr: string;
+  timedOut: boolean;
+  errorMessage?: string;
+};
+
+function runCommandAsync(bin: string, args: string[], timeoutMs: number): Promise<AsyncExecResult> {
+  return new Promise((resolve) => {
+    let stdout = '';
+    let stderr = '';
+    let settled = false;
+    let timedOut = false;
+    let timeoutId: NodeJS.Timeout | null = null;
+
+    const child = spawn(bin, args, {
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+
+    child.stdout.on('data', (chunk) => {
+      stdout += String(chunk);
+    });
+    child.stderr.on('data', (chunk) => {
+      stderr += String(chunk);
+    });
+
+    const finish = (result: AsyncExecResult) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      resolve(result);
+    };
+
+    timeoutId = setTimeout(() => {
+      timedOut = true;
+      try {
+        child.kill('SIGKILL');
+      } catch {}
+    }, timeoutMs);
+
+    child.on('error', (error) => {
+      finish({
+        status: null,
+        stdout,
+        stderr,
+        timedOut,
+        errorMessage: String(error.message || error)
+      });
+    });
+
+    child.on('close', (code) => {
+      finish({
+        status: code,
+        stdout,
+        stderr,
+        timedOut
+      });
+    });
+  });
 }
 
 function readLatestDeliveryContext(): DeliveryContext | null {
@@ -151,7 +217,7 @@ export function buildWebTradeDecisionProdMessage(input: {
   const decisionWord = String(input.decision || '').trim().toUpperCase();
   const instruction =
     decisionWord === 'APPROVE'
-      ? 'Reply to the user confirming web approval was received and execution/resume is in progress.'
+      ? `Immediately run trade-resume ${input.tradeId}, then reply to the user with progress.`
       : 'Reply to the user confirming the trade was rejected via web management.';
   return [
     '[X-CLAW WEB TRADE DECISION]',
@@ -201,7 +267,7 @@ export function buildWebTransferDecisionProdMessage(input: {
   const decisionWord = String(input.decision || '').trim().toUpperCase();
   const instruction =
     decisionWord === 'APPROVE'
-      ? 'Reply to the user confirming web approval was received and transfer execution is in progress.'
+      ? `Immediately run transfer-resume ${input.approvalId}, then reply to the user with progress.`
       : 'Reply to the user confirming the transfer was denied via web management.';
   return [
     '[X-CLAW WEB TRANSFER DECISION]',
@@ -242,46 +308,70 @@ export function buildWebTransferResultProdMessage(input: {
 }
 
 export async function dispatchNonTelegramAgentProd(input: NonTelegramAgentProdInput): Promise<NonTelegramAgentProdDispatchResult> {
+  const head = String(input.message ?? '').split('\n')[0] ?? '';
   if (!nonTelegramProdEnabled()) {
+    console.info('[non_tg_prod] skipped disabled', { head });
     return { attempted: false, skipped: true, reason: 'disabled' };
   }
 
   const message = String(input.message ?? '').trim();
   if (message.length === 0) {
+    console.info('[non_tg_prod] skipped empty_message');
     return { attempted: false, skipped: true, reason: 'empty_message' };
   }
 
   const delivery = readLatestDeliveryContext();
   if (!delivery) {
+    console.warn('[non_tg_prod] skipped no_session', { head });
     return { attempted: false, skipped: true, reason: 'no_session' };
   }
   const allowTelegramLastChannel = input.allowTelegramLastChannel === true;
   if (delivery.lastChannel === 'telegram' && telegramGuardEnabled() && !allowTelegramLastChannel) {
+    console.info('[non_tg_prod] skipped telegram_guard', { head, lastTo: delivery.lastTo });
     return { attempted: false, skipped: true, reason: 'telegram_guard' };
   }
 
   const openclawBin = resolveOpenclawBin();
   if (!openclawBin) {
+    console.error('[non_tg_prod] openclaw_missing', { head });
     return { attempted: true, skipped: false, reason: 'openclaw_missing', exitStatus: null };
   }
 
   const agentId = sanitizeOpenclawAgentId(process.env.XCLAW_OPENCLAW_AGENT_ID);
-  const child = spawnSync(openclawBin, ['agent', '--agent', agentId, '--channel', 'last', '--message', message, '--json'], {
-    encoding: 'utf8',
-    timeout: nonTelegramProdTimeoutMs()
-  });
+  const dispatchArgs = ['agent', '--agent', agentId, '--channel', 'last', '--message', message, '--json'];
+  const runDispatch = (timeoutMs: number) => runCommandAsync(openclawBin, dispatchArgs, timeoutMs);
+  const timeoutMs = nonTelegramProdTimeoutMs();
+  let child = await runDispatch(timeoutMs);
 
-  const errorMessage = child.error ? summarize(child.error.message) : '';
+  const errorMessage = summarize(child.errorMessage ?? '');
   const stderrSummary = summarize(child.stderr);
   const stdoutSummary = summarize(child.stdout);
-  const timeout = errorMessage.toLowerCase().includes('timed out') || errorMessage.toLowerCase().includes('etimedout');
+  const timeout = child.timedOut || errorMessage.toLowerCase().includes('timed out') || errorMessage.toLowerCase().includes('etimedout');
+  if (timeout) {
+    const retryTimeoutMs = Math.min(60_000, timeoutMs * 2);
+    console.warn('[non_tg_prod] retry_timeout', { head, timeoutMs, retryTimeoutMs });
+    child = await runDispatch(retryTimeoutMs);
+  }
+  const finalErrorMessage = summarize(child.errorMessage ?? '');
+  const finalStderrSummary = summarize(child.stderr);
+  const finalStdoutSummary = summarize(child.stdout);
+  const finalTimeout = child.timedOut || finalErrorMessage.toLowerCase().includes('timed out') || finalErrorMessage.toLowerCase().includes('etimedout');
+  console.info('[non_tg_prod] dispatched', {
+    head,
+    allowTelegramLastChannel,
+    lastChannel: delivery.lastChannel,
+    lastTo: delivery.lastTo,
+    exitStatus: child.status,
+    timeout: finalTimeout,
+    stderrSummary: (finalErrorMessage || finalStderrSummary).slice(0, 280)
+  });
 
   return {
     attempted: true,
     skipped: false,
-    reason: timeout ? 'timeout' : child.error ? 'spawn_error' : undefined,
+    reason: finalTimeout ? 'timeout' : child.errorMessage ? 'spawn_error' : undefined,
     exitStatus: child.status,
-    stdoutSummary,
-    stderrSummary: errorMessage || stderrSummary
+    stdoutSummary: finalStdoutSummary,
+    stderrSummary: finalErrorMessage || finalStderrSummary
   };
 }

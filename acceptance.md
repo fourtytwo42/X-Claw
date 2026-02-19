@@ -103,6 +103,24 @@ Active slice context: `Slice 86` in progress (explicit user-requested Telegram a
 
 # Hotfix Acceptance Evidence: Force-Upgrade Gateway Callback Patch (v15) For Trade-Approve Ack Suppression
 
+# Runtime-Canonical Approval Decisions (Trade/Transfer/Policy)
+
+## Validation
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v -k decide_transfer`
+- [x] Added runtime tests for `decide-spot` and `decide-policy`.
+- [x] Added runtime test for invalid `--decision-at` failure path.
+- [x] `python3 skills/xclaw-agent/scripts/openclaw_gateway_patch.py --json` (callback runtime-dispatch patch applies cleanly)
+- [ ] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` (full sweep after merge window)
+- [ ] `npm run build`
+- [ ] `pm2 restart all`
+
+## Notes
+- Runtime-canonical management dispatch is feature-flagged by `XCLAW_RUNTIME_CANONICAL_APPROVAL_DECISIONS`.
+- Historical prompt rows with `message_id='unknown'` remain forward-only cleanup gaps.
+- Telegram callback cutover note:
+  - callback decision branches now use runtime `approvals decide-*` dispatch for `xappr`/`xpol`/`xfer`;
+  - runtime bin resolution for callback dispatch uses `XCLAW_AGENT_RUNTIME_BIN` then PATH (`xclaw-agent`) only.
+
 Date (UTC): 2026-02-19
 Active slice context: `Slice 86` in progress (explicit user-reported rollout reliability hotfix)
 

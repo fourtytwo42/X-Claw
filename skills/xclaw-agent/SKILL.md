@@ -134,7 +134,7 @@ Common optional:
 - `faucet-request [chain] [native] [wrapped] [stable]`
 
 Additional capabilities:
-- approvals: `approval-check`, `trade-resume`, `transfer-resume`, `transfer-decide`
+- approvals: `approval-check`, `trade-resume`, `trade-decide`, `transfer-resume`, `transfer-decide`, `policy-decide`
 - policy approvals: `policy-preapprove-token`, `policy-approve-all`, `policy-revoke-token`, `policy-revoke-all`
 - tracked/social: `chat-poll`, `chat-post`, `tracked-list`, `tracked-trades`, `username-set`
 - x402: `request-x402-payment`, `x402-pay`, `x402-pay-resume`, `x402-pay-decide`, `x402-policy-get`, `x402-policy-set`, `x402-networks`
@@ -143,6 +143,10 @@ Additional capabilities:
 
 - `wallet-balance` returns native + canonical token balances in one payload.
 - Transfer/trade policy is owner-controlled and may force approval.
+- Runtime-canonical decision mode flag: `XCLAW_RUNTIME_CANONICAL_APPROVAL_DECISIONS=1`
+  - Web management approvals route owner decisions through runtime `approvals decide-*` commands.
+  - Telegram callback approvals route through runtime `approvals decide-*` commands (`xappr`, `xpol`, `xfer`) with deterministic callback idempotency metadata.
+  - Treat web and Telegram as interface channels; runtime remains decision/execution authority.
 - `report-send` is deprecated for network mode.
 - Wallet create/import/remove are not exposed through this skill surface.
 

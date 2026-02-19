@@ -81,6 +81,18 @@ Active slice context: `Slice 86` is in progress; this is an explicit user-reques
 
 # Hotfix Tasks: Force-Upgrade Gateway Callback Patch (v15) For Trade-Approve Ack Suppression
 
+# Runtime-Canonical Approval Decisions (Trade/Transfer/Policy)
+
+## Scope
+- [x] Add runtime decision commands: `decide-spot`, `decide-policy`.
+- [x] Normalize `decide-transfer` envelope with source metadata.
+- [x] Feature-flag runtime-canonical web dispatch for trade/policy decisions.
+- [x] Keep transfer web path runtime-dispatched and pass `--source web`.
+- [x] Add runtime tests for new decision commands.
+- [x] Telegram callback path migrated to runtime `decide-*` commands (`xappr`, `xpol`, `xfer`) in gateway patch.
+- [x] Callback runtime command calls include deterministic metadata passthrough (`--source telegram`, `--idempotency-key tg-cb-<callbackId>`, `--decision-at <iso8601>`).
+- [x] Callback runtime binary resolution hardened to env/PATH only (no hardcoded home-path launcher fallbacks).
+
 Active slice context: `Slice 86` is in progress; this is an explicit user-reported rollout reliability hotfix.
 
 ## 1) Scope lock

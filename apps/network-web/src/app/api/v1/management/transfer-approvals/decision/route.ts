@@ -1,9 +1,12 @@
 import { existsSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
+import { join } from 'node:path';
 
 import type { NextRequest } from 'next/server';
 
 import { dbQuery } from '@/lib/db';
+import { issueSignedAgentToken } from '@/lib/agent-token';
+import { getEnv } from '@/lib/env';
 import { errorResponse, internalErrorResponse, successResponse } from '@/lib/errors';
 import { parseJsonBody } from '@/lib/http';
 import { makeId } from '@/lib/ids';
@@ -56,18 +59,47 @@ function transferDecisionRuntimeTimeoutMs(): number {
 }
 
 function resolveRuntimeBin(): string {
+  const cwd = process.cwd();
   const candidates = [
     process.env.XCLAW_AGENT_RUNTIME_BIN?.trim() ?? '',
-    `${process.env.HOME ?? ''}/.local/bin/xclaw-agent`,
-    `${process.env.HOME ?? ''}/.nvm/current/bin/xclaw-agent`,
-    'xclaw-agent'
+    join(cwd, 'apps', 'agent-runtime', 'bin', 'xclaw-agent'),
+    join(cwd, '..', 'agent-runtime', 'bin', 'xclaw-agent')
   ].filter((value) => value.length > 0);
   for (const candidate of candidates) {
-    if (candidate === 'xclaw-agent' || existsSync(candidate)) {
+    if (existsSync(candidate)) {
       return candidate;
     }
   }
-  return 'xclaw-agent';
+  throw new Error('xclaw-agent runtime binary not found. Set XCLAW_AGENT_RUNTIME_BIN or deploy apps/agent-runtime/bin/xclaw-agent.');
+}
+
+function resolveRuntimeApiBase(req: NextRequest): string {
+  const explicit = (process.env.XCLAW_API_BASE_URL ?? '').trim();
+  if (explicit.length > 0) {
+    return explicit;
+  }
+  return `${req.nextUrl.origin}/api/v1`;
+}
+
+function runtimeSpawnEnv(req: NextRequest, agentId: string, chainKey: string): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    XCLAW_API_BASE_URL: resolveRuntimeApiBase(req),
+    XCLAW_AGENT_ID: agentId,
+    XCLAW_DEFAULT_CHAIN: chainKey
+  };
+  if (!(env.XCLAW_AGENT_API_KEY ?? '').trim()) {
+    const mapped = getEnv().agentApiKeys[agentId];
+    if (mapped) {
+      env.XCLAW_AGENT_API_KEY = mapped;
+    } else {
+      const signed = issueSignedAgentToken(agentId);
+      if (signed) {
+        env.XCLAW_AGENT_API_KEY = signed;
+      }
+    }
+  }
+  return env;
 }
 
 export async function POST(req: NextRequest) {
@@ -171,6 +203,8 @@ export async function POST(req: NextRequest) {
             body.decision,
             '--chain',
             chainKey,
+            '--source',
+            'web',
             '--reason-message',
             body.reasonMessage ?? '',
             '--json'
@@ -178,7 +212,8 @@ export async function POST(req: NextRequest) {
 
     const child = spawnSync(runtimeBin, runtimeArgs, {
       encoding: 'utf8',
-      timeout: transferDecisionRuntimeTimeoutMs()
+      timeout: transferDecisionRuntimeTimeoutMs(),
+      env: runtimeSpawnEnv(req, body.agentId, chainKey)
     });
 
     let runtimePayload: Record<string, unknown> | null = null;
@@ -301,6 +336,13 @@ export async function POST(req: NextRequest) {
           reasonMessage: body.reasonMessage ?? null
         })
       });
+      console.info('[management.transfer_approvals.decision] prod decision dispatch', {
+        requestId,
+        approvalId: body.approvalId,
+        chainKey,
+        decision: body.decision,
+        agentProdDecision
+      });
 
       let terminalStatus = '';
       if (isTransferTerminalStatus(reconciledStatus ?? '')) {
@@ -320,8 +362,28 @@ export async function POST(req: NextRequest) {
             reasonMessage: String(runtimePayload?.reasonMessage ?? '').trim() || (body.reasonMessage ?? null)
           })
         });
+        console.info('[management.transfer_approvals.decision] prod terminal dispatch', {
+          requestId,
+          approvalId: body.approvalId,
+          chainKey,
+          terminalStatus,
+          agentProdTerminal
+        });
       }
     }
+
+    console.info('[management.transfer_approvals.decision] runtime decision result', {
+      requestId,
+      approvalId: body.approvalId,
+      chainKey,
+      approvalSource,
+      runtimeBin,
+      runtimeArgs,
+      runtimeExitStatus: child.status,
+      applied,
+      appliedVia,
+      runtimePayload
+    });
 
     await dbQuery(
       `

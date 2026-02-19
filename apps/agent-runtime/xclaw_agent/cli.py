@@ -1012,7 +1012,8 @@ def _cast_sign_message(private_key_hex: str, message: str) -> str:
 def _require_api_base_url() -> str:
     base_url = (os.environ.get("XCLAW_API_BASE_URL") or "").strip()
     if not base_url:
-        raise WalletStoreError("Missing required env: XCLAW_API_BASE_URL.")
+        # Local fail-safe for runtime subprocesses that may not inherit web env.
+        base_url = "http://127.0.0.1:3000/api/v1"
     normalized = base_url.rstrip("/")
     parsed = urllib.parse.urlparse(normalized)
     path = (parsed.path or "").rstrip("/")
@@ -2661,23 +2662,52 @@ def _require_openclaw_bin() -> str:
 
 
 def _extract_openclaw_message_id(stdout: str) -> str | None:
+    def _walk(value: Any) -> str | None:
+        if isinstance(value, dict):
+            for key in ("messageId", "message_id"):
+                raw = value.get(key)
+                if isinstance(raw, str) and raw.strip():
+                    return raw.strip()
+                if isinstance(raw, int):
+                    return str(raw)
+            for nested in value.values():
+                found = _walk(nested)
+                if found:
+                    return found
+        elif isinstance(value, list):
+            for nested in value:
+                found = _walk(nested)
+                if found:
+                    return found
+        return None
+
+    raw = (stdout or "").strip()
+    if not raw:
+        return None
+    payload: Any = None
     try:
-        payload = json.loads((stdout or "").strip() or "{}")
+        payload = json.loads(raw)
     except Exception:
+        # Some OpenClaw builds prepend transport logs before JSON.
+        brace = raw.find("{")
+        if brace >= 0:
+            try:
+                payload = json.loads(raw[brace:])
+            except Exception:
+                payload = None
+        if payload is None:
+            for line in reversed(raw.splitlines()):
+                line_trimmed = line.strip()
+                if not line_trimmed:
+                    continue
+                try:
+                    payload = json.loads(line_trimmed)
+                    break
+                except Exception:
+                    continue
+    if payload is None:
         return None
-    if not isinstance(payload, dict):
-        return None
-    inner = payload.get("payload")
-    if isinstance(inner, dict):
-        direct = inner.get("messageId")
-        if isinstance(direct, str) and direct.strip():
-            return direct.strip()
-        nested = inner.get("result")
-        if isinstance(nested, dict):
-            nested_id = nested.get("messageId")
-            if isinstance(nested_id, str) and nested_id.strip():
-                return nested_id.strip()
-    return None
+    return _walk(payload)
 
 
 def _post_approval_prompt_metadata(trade_id: str, chain: str, to_addr: str, thread_id: str | None, message_id: str) -> None:
@@ -3047,6 +3077,32 @@ def _maybe_delete_telegram_approval_prompt(trade_id: str) -> None:
         _remove_approval_prompt(trade_id)
 
 
+def _cleanup_trade_approval_prompt(trade_id: str) -> dict[str, Any]:
+    entry = _get_approval_prompt(trade_id)
+    if not entry:
+        return {"ok": False, "code": "prompt_not_found"}
+    if str(entry.get("channel") or "") != "telegram":
+        _remove_approval_prompt(trade_id)
+        return {"ok": True, "code": "non_telegram_removed"}
+    chat_id = str(entry.get("to") or "").strip()
+    message_id = str(entry.get("messageId") or "").strip()
+    if not chat_id:
+        _remove_approval_prompt(trade_id)
+        return {"ok": False, "code": "missing_target"}
+    if not message_id or message_id == "unknown":
+        _remove_approval_prompt(trade_id)
+        return {"ok": False, "code": "missing_message_id"}
+    openclaw = shutil.which("openclaw")
+    if not openclaw:
+        return {"ok": False, "code": "openclaw_missing"}
+    cmd = [openclaw, "message", "delete", "--channel", "telegram", "--target", chat_id, "--message-id", message_id, "--json"]
+    proc = _run_subprocess(cmd, timeout_sec=20, kind="openclaw_delete")
+    if proc.returncode == 0:
+        _remove_approval_prompt(trade_id)
+        return {"ok": True, "code": "deleted"}
+    return {"ok": False, "code": "delete_failed", "stderr": (proc.stderr or "").strip()[:300]}
+
+
 def _maybe_delete_telegram_transfer_approval_prompt(approval_id: str) -> None:
     entry = _get_transfer_approval_prompt(approval_id)
     if not entry or str(entry.get("channel") or "") != "telegram":
@@ -3063,6 +3119,58 @@ def _maybe_delete_telegram_transfer_approval_prompt(approval_id: str) -> None:
     proc = _run_subprocess(cmd, timeout_sec=20, kind="openclaw_delete")
     if proc.returncode == 0:
         _remove_transfer_approval_prompt(approval_id)
+
+
+def _cleanup_transfer_approval_prompt(approval_id: str) -> dict[str, Any]:
+    entry = _get_transfer_approval_prompt(approval_id)
+    if not entry:
+        return {"ok": False, "code": "prompt_not_found"}
+    if str(entry.get("channel") or "") != "telegram":
+        _remove_transfer_approval_prompt(approval_id)
+        return {"ok": True, "code": "non_telegram_removed"}
+    chat_id = str(entry.get("to") or "").strip()
+    message_id = str(entry.get("messageId") or "").strip()
+    if not chat_id:
+        _remove_transfer_approval_prompt(approval_id)
+        return {"ok": False, "code": "missing_target"}
+    if not message_id or message_id == "unknown":
+        _remove_transfer_approval_prompt(approval_id)
+        return {"ok": False, "code": "missing_message_id"}
+    openclaw = shutil.which("openclaw")
+    if not openclaw:
+        return {"ok": False, "code": "openclaw_missing"}
+    cmd = [openclaw, "message", "delete", "--channel", "telegram", "--target", chat_id, "--message-id", message_id, "--json"]
+    proc = _run_subprocess(cmd, timeout_sec=20, kind="openclaw_delete")
+    if proc.returncode == 0:
+        _remove_transfer_approval_prompt(approval_id)
+        return {"ok": True, "code": "deleted"}
+    return {"ok": False, "code": "delete_failed", "stderr": (proc.stderr or "").strip()[:300]}
+
+
+def _cleanup_policy_approval_prompt(approval_id: str) -> dict[str, Any]:
+    entry = _get_policy_approval_prompt(approval_id)
+    if not entry:
+        return {"ok": False, "code": "prompt_not_found"}
+    if str(entry.get("channel") or "") != "telegram":
+        _remove_policy_approval_prompt(approval_id)
+        return {"ok": True, "code": "non_telegram_removed"}
+    chat_id = str(entry.get("to") or "").strip()
+    message_id = str(entry.get("messageId") or "").strip()
+    if not chat_id:
+        _remove_policy_approval_prompt(approval_id)
+        return {"ok": False, "code": "missing_target"}
+    if not message_id or message_id == "unknown":
+        _remove_policy_approval_prompt(approval_id)
+        return {"ok": False, "code": "missing_message_id"}
+    openclaw = shutil.which("openclaw")
+    if not openclaw:
+        return {"ok": False, "code": "openclaw_missing"}
+    cmd = [openclaw, "message", "delete", "--channel", "telegram", "--target", chat_id, "--message-id", message_id, "--json"]
+    proc = _run_subprocess(cmd, timeout_sec=20, kind="openclaw_delete")
+    if proc.returncode == 0:
+        _remove_policy_approval_prompt(approval_id)
+        return {"ok": True, "code": "deleted"}
+    return {"ok": False, "code": "delete_failed", "stderr": (proc.stderr or "").strip()[:300]}
 
 
 def _maybe_send_owner_link_to_active_chat(management_url: str, expires_at: str | None) -> dict[str, Any]:
@@ -3138,6 +3246,29 @@ def cmd_approvals_sync(args: argparse.Namespace) -> int:
         return ok("Approval prompts synced.", chain=chain, checked=checked, deleted=deleted, skipped=skipped, failures=failures or None)
     except Exception as exc:
         return fail("approvals_sync_failed", str(exc), "Verify API auth and OpenClaw availability, then retry.", {"chain": chain}, exit_code=1)
+
+
+def _run_resume_spot_inline(trade_id: str, chain: str) -> tuple[int, dict[str, Any]]:
+    nested = argparse.Namespace(trade_id=trade_id, chain=chain, json=True)
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        code = cmd_approvals_resume_spot(nested)
+    raw = buf.getvalue().strip()
+    payload: dict[str, Any] = {
+        "ok": bool(code == 0),
+        "code": "resume_result_unavailable",
+        "message": "Resume result unavailable.",
+        "tradeId": trade_id,
+        "chain": chain,
+    }
+    if raw:
+        try:
+            parsed = json.loads(raw)
+            if isinstance(parsed, dict):
+                payload = parsed
+        except Exception:
+            payload = {"ok": False, "code": "resume_parse_failed", "message": raw[:400], "tradeId": trade_id, "chain": chain}
+    return code, payload
 
 
 def cmd_approvals_resume_spot(args: argparse.Namespace) -> int:
@@ -3309,12 +3440,224 @@ def cmd_approvals_resume_transfer(args: argparse.Namespace) -> int:
     )
 
 
+def cmd_approvals_decide_spot(args: argparse.Namespace) -> int:
+    chk = require_json_flag(args)
+    if chk is not None:
+        return chk
+    trade_id = str(args.trade_id or "").strip()
+    decision = str(args.decision or "").strip().lower()
+    chain = str(args.chain or "").strip()
+    source = str(getattr(args, "source", "") or "").strip().lower() or "runtime"
+    reason_message = str(args.reason_message or "").strip()
+    idempotency_key = str(getattr(args, "idempotency_key", "") or "").strip() or None
+    decision_at_raw = str(getattr(args, "decision_at", "") or "").strip()
+    decision_at = None
+    if decision_at_raw:
+        try:
+            decision_at = _parse_decision_at(decision_at_raw)
+        except Exception:
+            return fail("invalid_input", "decision_at must be ISO-8601.", "Use --decision-at <iso8601>.", {"decisionAt": decision_at_raw}, exit_code=2)
+    if not trade_id:
+        return fail("invalid_input", "trade_id is required.", "Provide --trade-id trd_... and retry.", exit_code=2)
+    if decision not in {"approve", "reject"}:
+        return fail("invalid_input", "decision must be approve|reject.", "Use --decision approve|reject.", exit_code=2)
+
+    trade = _read_trade_details(trade_id)
+    status = str(trade.get("status") or "").strip().lower()
+    if not chain:
+        chain = str(trade.get("chainKey") or "").strip()
+    if not chain:
+        return fail("invalid_input", "chain is required.", "Provide --chain and retry.", {"tradeId": trade_id}, exit_code=2)
+
+    if status in {"filled", "failed", "rejected", "expired", "verification_timeout"}:
+        cleanup = _cleanup_trade_approval_prompt(trade_id)
+        return ok(
+            "Trade decision converged on terminal state.",
+            subjectType="trade",
+            subjectId=trade_id,
+            decision=decision,
+            source=source,
+            chain=chain,
+            fromStatus=status,
+            toStatus=status,
+            executionStatus=status,
+            txHash=trade.get("txHash"),
+            promptCleanup=cleanup,
+            prodDispatch={"mode": "handled_by_web_or_callback"},
+            actionHint="No additional action required.",
+            converged=True,
+            status=status,
+            resume=None,
+        )
+
+    if decision == "reject":
+        from_status = "approval_pending" if status == "approval_pending" else status
+        if status == "approval_pending":
+            _post_trade_status(
+                trade_id,
+                "approval_pending",
+                "rejected",
+                {
+                    "reasonCode": "approval_rejected",
+                    "reasonMessage": reason_message or "Denied by owner.",
+                },
+                idempotency_key=idempotency_key,
+                decision_at=decision_at,
+            )
+            trade = _read_trade_details(trade_id)
+            status = str(trade.get("status") or "").strip().lower()
+        cleanup = _cleanup_trade_approval_prompt(trade_id)
+        try:
+            _maybe_send_telegram_decision_message(
+                trade_id=trade_id,
+                chain=chain,
+                decision="rejected",
+                summary=None,
+                trade=trade if isinstance(trade, dict) else None,
+            )
+        except Exception:
+            pass
+        return ok(
+            "Trade rejected.",
+            subjectType="trade",
+            subjectId=trade_id,
+            decision=decision,
+            source=source,
+            chain=chain,
+            fromStatus=from_status,
+            toStatus="rejected",
+            executionStatus="rejected",
+            txHash=trade.get("txHash"),
+            promptCleanup=cleanup,
+            prodDispatch={"mode": "handled_by_web_or_callback"},
+            actionHint="Trade was denied and will not execute.",
+            status="rejected",
+            resume=None,
+        )
+
+    from_status = status
+    if status == "approval_pending":
+        _post_trade_status(
+            trade_id,
+            "approval_pending",
+            "approved",
+            {"reasonCode": None, "reasonMessage": None},
+            idempotency_key=idempotency_key,
+            decision_at=decision_at,
+        )
+        status = "approved"
+    cleanup = _cleanup_trade_approval_prompt(trade_id)
+    try:
+        _maybe_send_telegram_decision_message(
+            trade_id=trade_id,
+            chain=chain,
+            decision="approved",
+            summary=None,
+            trade=_read_trade_details(trade_id),
+        )
+    except Exception:
+        pass
+    resume_code, resume_payload = _run_resume_spot_inline(trade_id, chain)
+    exec_status = str(resume_payload.get("status") or ("filled" if bool(resume_payload.get("ok")) else "failed")).strip().lower()
+    return emit(
+        {
+            "ok": bool(resume_code == 0),
+            "code": str(resume_payload.get("code") or ("ok" if resume_code == 0 else "resume_failed")),
+            "message": str(resume_payload.get("message") or ("Trade approved and resumed." if resume_code == 0 else "Trade resume failed.")),
+            "subjectType": "trade",
+            "subjectId": trade_id,
+            "decision": decision,
+            "source": source,
+            "chain": chain,
+            "fromStatus": from_status,
+            "toStatus": "approved",
+            "executionStatus": exec_status,
+            "txHash": resume_payload.get("txHash"),
+            "promptCleanup": cleanup,
+            "prodDispatch": {"mode": "handled_by_web_or_callback"},
+            "actionHint": "Execution resumed; monitor terminal status.",
+            "status": exec_status,
+            "resume": resume_payload,
+        }
+    )
+
+
+def cmd_approvals_decide_policy(args: argparse.Namespace) -> int:
+    chk = require_json_flag(args)
+    if chk is not None:
+        return chk
+    approval_id = str(args.approval_id or "").strip()
+    decision = str(args.decision or "").strip().lower()
+    chain = str(args.chain or "").strip()
+    source = str(getattr(args, "source", "") or "").strip().lower() or "runtime"
+    reason_message = str(args.reason_message or "").strip()
+    idempotency_key = str(getattr(args, "idempotency_key", "") or "").strip() or None
+    decision_at_raw = str(getattr(args, "decision_at", "") or "").strip()
+    try:
+        decision_at = _parse_decision_at(decision_at_raw or None)
+    except Exception:
+        return fail("invalid_input", "decision_at must be ISO-8601.", "Use --decision-at <iso8601>.", {"decisionAt": decision_at_raw}, exit_code=2)
+    if not approval_id:
+        return fail("invalid_input", "approval_id is required.", "Provide --approval-id ppr_... and retry.", exit_code=2)
+    if decision not in {"approve", "reject"}:
+        return fail("invalid_input", "decision must be approve|reject.", "Use --decision approve|reject.", exit_code=2)
+
+    path = f"/policy-approvals/{urllib.parse.quote(approval_id)}/decision"
+    to_status = "approved" if decision == "approve" else "rejected"
+    payload: dict[str, Any] = {
+        "policyApprovalId": approval_id,
+        "fromStatus": "approval_pending",
+        "toStatus": to_status,
+        "at": decision_at,
+    }
+    if reason_message:
+        payload["reasonMessage"] = reason_message
+    status_code, body = _api_request("POST", path, payload=payload, include_idempotency=True, idempotency_key=idempotency_key)
+    if status_code < 200 or status_code >= 300:
+        return fail(
+            str(body.get("code", "api_error")),
+            str(body.get("message", f"policy decision failed ({status_code})")),
+            str(body.get("actionHint", "Refresh policy approvals and retry.")),
+            {"approvalId": approval_id, "status": status_code, "source": source},
+            exit_code=1,
+        )
+    cleanup = _cleanup_policy_approval_prompt(approval_id)
+    return ok(
+        "Policy decision applied.",
+        subjectType="policy",
+        subjectId=approval_id,
+        decision=decision,
+        source=source,
+        chain=chain or body.get("chainKey"),
+        fromStatus="approval_pending",
+        toStatus=to_status,
+        executionStatus=to_status,
+        promptCleanup=cleanup,
+        prodDispatch={"mode": "handled_by_web_or_callback"},
+        actionHint=(
+            "Policy update was applied."
+            if to_status == "approved"
+            else "Policy update was rejected."
+        ),
+        status=to_status,
+        txHash=body.get("txHash"),
+        resume=None,
+    )
+
+
 def cmd_approvals_decide_transfer(args: argparse.Namespace) -> int:
     chk = require_json_flag(args)
     if chk is not None:
         return chk
     approval_id = str(args.approval_id or "").strip()
     decision = str(args.decision or "").strip().lower()
+    source = str(getattr(args, "source", "") or "").strip().lower() or "runtime"
+    decision_at_raw = str(getattr(args, "decision_at", "") or "").strip()
+    if decision_at_raw:
+        try:
+            _parse_decision_at(decision_at_raw)
+        except Exception:
+            return fail("invalid_input", "decision_at must be ISO-8601.", "Use --decision-at <iso8601>.", {"decisionAt": decision_at_raw}, exit_code=2)
     if not approval_id:
         return fail("invalid_input", "approval_id is required.", "Provide --approval-id xfr_... and retry.", exit_code=2)
     if decision not in {"approve", "deny"}:
@@ -3364,9 +3707,14 @@ def cmd_approvals_decide_transfer(args: argparse.Namespace) -> int:
         _remove_transfer_approval_prompt(approval_id)
         return ok(
             "Transfer decision converged on terminal approval.",
+            subjectType="transfer",
+            subjectId=approval_id,
+            decision=decision,
+            source=source,
             approvalId=approval_id,
             chain=chain,
             status=status,
+            executionStatus=status,
             txHash=flow.get("txHash"),
             reasonCode=flow.get("reasonCode"),
             reasonMessage=flow.get("reasonMessage"),
@@ -3379,6 +3727,11 @@ def cmd_approvals_decide_transfer(args: argparse.Namespace) -> int:
             policyBlockReasonMessage=flow.get("policyBlockReasonMessage"),
             executionMode=flow.get("executionMode"),
             converged=True,
+            fromStatus=status,
+            toStatus=status,
+            promptCleanup={"ok": True, "code": "already_terminal"},
+            prodDispatch={"mode": "handled_by_web_or_callback"},
+            actionHint="No additional action required.",
         )
     if status in {"executing", "verifying"}:
         try:
@@ -3388,9 +3741,14 @@ def cmd_approvals_decide_transfer(args: argparse.Namespace) -> int:
         _remove_transfer_approval_prompt(approval_id)
         return ok(
             "Transfer decision already in progress.",
+            subjectType="transfer",
+            subjectId=approval_id,
+            decision=decision,
+            source=source,
             approvalId=approval_id,
             chain=chain,
             status=status,
+            executionStatus=status,
             txHash=flow.get("txHash"),
             reasonCode=flow.get("reasonCode"),
             reasonMessage=flow.get("reasonMessage"),
@@ -3404,6 +3762,11 @@ def cmd_approvals_decide_transfer(args: argparse.Namespace) -> int:
             executionMode=flow.get("executionMode"),
             converged=True,
             inProgress=True,
+            fromStatus=status,
+            toStatus=status,
+            promptCleanup={"ok": True, "code": "already_in_progress"},
+            prodDispatch={"mode": "handled_by_web_or_callback"},
+            actionHint="Transfer already in progress.",
         )
     if status == "approved" and decision == "deny":
         try:
@@ -3413,9 +3776,14 @@ def cmd_approvals_decide_transfer(args: argparse.Namespace) -> int:
         _remove_transfer_approval_prompt(approval_id)
         return ok(
             "Transfer decision converged on approved approval.",
+            subjectType="transfer",
+            subjectId=approval_id,
+            decision=decision,
+            source=source,
             approvalId=approval_id,
             chain=chain,
             status="approved",
+            executionStatus="approved",
             txHash=flow.get("txHash"),
             amountWei=flow.get("amountWei"),
             amount=flow_amount_human,
@@ -3426,6 +3794,11 @@ def cmd_approvals_decide_transfer(args: argparse.Namespace) -> int:
             policyBlockReasonMessage=flow.get("policyBlockReasonMessage"),
             executionMode=flow.get("executionMode"),
             converged=True,
+            fromStatus="approved",
+            toStatus="approved",
+            promptCleanup={"ok": True, "code": "already_approved"},
+            prodDispatch={"mode": "handled_by_web_or_callback"},
+            actionHint="Transfer already approved.",
         )
     if status not in {"approval_pending", "approved"}:
         return fail(
@@ -3452,9 +3825,14 @@ def cmd_approvals_decide_transfer(args: argparse.Namespace) -> int:
         _remove_transfer_approval_prompt(approval_id)
         return ok(
             "Transfer denied.",
+            subjectType="transfer",
+            subjectId=approval_id,
+            decision=decision,
+            source=source,
             approvalId=approval_id,
             chain=chain,
             status="rejected",
+            executionStatus="rejected",
             reasonCode=flow.get("reasonCode"),
             reasonMessage=flow.get("reasonMessage"),
             transferType=flow.get("transferType"),
@@ -3470,6 +3848,11 @@ def cmd_approvals_decide_transfer(args: argparse.Namespace) -> int:
             policyBlockReasonCode=flow.get("policyBlockReasonCode"),
             policyBlockReasonMessage=flow.get("policyBlockReasonMessage"),
             executionMode=flow.get("executionMode"),
+            fromStatus=status,
+            toStatus="rejected",
+            promptCleanup={"ok": True, "code": "deleted"},
+            prodDispatch={"mode": "handled_by_web_or_callback"},
+            actionHint="Transfer was denied and will not execute.",
         )
 
     flow["status"] = "approved"
@@ -3482,7 +3865,19 @@ def cmd_approvals_decide_transfer(args: argparse.Namespace) -> int:
     except Exception:
         pass
     _remove_transfer_approval_prompt(approval_id)
-    return emit(_execute_pending_transfer_flow(flow))
+    payload = _execute_pending_transfer_flow(flow)
+    if isinstance(payload, dict):
+        payload.setdefault("subjectType", "transfer")
+        payload.setdefault("subjectId", approval_id)
+        payload.setdefault("decision", decision)
+        payload.setdefault("source", source)
+        payload.setdefault("executionStatus", str(payload.get("status") or "unknown"))
+        payload.setdefault("fromStatus", status)
+        payload.setdefault("toStatus", "approved")
+        payload.setdefault("promptCleanup", {"ok": True, "code": "deleted"})
+        payload.setdefault("prodDispatch", {"mode": "handled_by_web_or_callback"})
+        payload.setdefault("actionHint", "Execution continued; monitor terminal status.")
+    return emit(payload)
 
 
 def cmd_transfers_policy_get(args: argparse.Namespace) -> int:
@@ -3807,16 +4202,46 @@ def cmd_approvals_revoke_global(args: argparse.Namespace) -> int:
         return fail("policy_approval_request_failed", str(exc), "Inspect runtime policy revoke request and retry.", {"chain": args.chain}, exit_code=1)
 
 
-def _post_trade_status(trade_id: str, from_status: str, to_status: str, extra: dict[str, Any] | None = None) -> None:
+def _parse_decision_at(value: str | None) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return datetime.now(timezone.utc).isoformat()
+    candidate = raw
+    if candidate.endswith("Z"):
+        candidate = candidate[:-1] + "+00:00"
+    try:
+        dt = datetime.fromisoformat(candidate)
+    except Exception as exc:
+        raise WalletStoreError(f"invalid decision_at: {raw}") from exc
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc).isoformat()
+
+
+def _post_trade_status(
+    trade_id: str,
+    from_status: str,
+    to_status: str,
+    extra: dict[str, Any] | None = None,
+    *,
+    idempotency_key: str | None = None,
+    decision_at: str | None = None,
+) -> None:
     payload: dict[str, Any] = {
         "tradeId": trade_id,
         "fromStatus": from_status,
         "toStatus": to_status,
-        "at": datetime.now(timezone.utc).isoformat(),
+        "at": _parse_decision_at(decision_at),
     }
     if extra:
         payload.update(extra)
-    status_code, body = _api_request("POST", f"/trades/{trade_id}/status", payload=payload, include_idempotency=True)
+    status_code, body = _api_request(
+        "POST",
+        f"/trades/{trade_id}/status",
+        payload=payload,
+        include_idempotency=True,
+        idempotency_key=idempotency_key,
+    )
     if status_code < 200 or status_code >= 300:
         code = str(body.get("code", "api_error"))
         message = str(body.get("message", f"trade status update failed ({status_code})"))
@@ -7252,16 +7677,41 @@ def build_parser() -> argparse.ArgumentParser:
     approvals_resume_spot.add_argument("--json", action="store_true")
     approvals_resume_spot.set_defaults(func=cmd_approvals_resume_spot)
 
+    approvals_decide_spot = approvals_sub.add_parser("decide-spot")
+    approvals_decide_spot.add_argument("--trade-id", required=True)
+    approvals_decide_spot.add_argument("--decision", required=True, choices=["approve", "reject"])
+    approvals_decide_spot.add_argument("--reason-message")
+    approvals_decide_spot.add_argument("--source")
+    approvals_decide_spot.add_argument("--idempotency-key")
+    approvals_decide_spot.add_argument("--decision-at")
+    approvals_decide_spot.add_argument("--chain")
+    approvals_decide_spot.add_argument("--json", action="store_true")
+    approvals_decide_spot.set_defaults(func=cmd_approvals_decide_spot)
+
     approvals_resume_transfer = approvals_sub.add_parser("resume-transfer")
     approvals_resume_transfer.add_argument("--approval-id", required=True)
     approvals_resume_transfer.add_argument("--chain")
     approvals_resume_transfer.add_argument("--json", action="store_true")
     approvals_resume_transfer.set_defaults(func=cmd_approvals_resume_transfer)
 
+    approvals_decide_policy = approvals_sub.add_parser("decide-policy")
+    approvals_decide_policy.add_argument("--approval-id", required=True)
+    approvals_decide_policy.add_argument("--decision", required=True, choices=["approve", "reject"])
+    approvals_decide_policy.add_argument("--reason-message")
+    approvals_decide_policy.add_argument("--source")
+    approvals_decide_policy.add_argument("--idempotency-key")
+    approvals_decide_policy.add_argument("--decision-at")
+    approvals_decide_policy.add_argument("--chain")
+    approvals_decide_policy.add_argument("--json", action="store_true")
+    approvals_decide_policy.set_defaults(func=cmd_approvals_decide_policy)
+
     approvals_decide_transfer = approvals_sub.add_parser("decide-transfer")
     approvals_decide_transfer.add_argument("--approval-id", required=True)
     approvals_decide_transfer.add_argument("--decision", required=True, choices=["approve", "deny"])
     approvals_decide_transfer.add_argument("--reason-message")
+    approvals_decide_transfer.add_argument("--source")
+    approvals_decide_transfer.add_argument("--idempotency-key")
+    approvals_decide_transfer.add_argument("--decision-at")
     approvals_decide_transfer.add_argument("--chain")
     approvals_decide_transfer.add_argument("--json", action="store_true")
     approvals_decide_transfer.set_defaults(func=cmd_approvals_decide_transfer)
