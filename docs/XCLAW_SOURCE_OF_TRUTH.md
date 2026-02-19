@@ -3676,9 +3676,9 @@ Limitations / notes:
 
 3. Delivery-channel handling:
 - Read OpenClaw last-delivery context from session store (`OPENCLAW_STATE_DIR` fallback `~/.openclaw`).
-- If a valid session exists, dispatch is allowed even when last active channel is Telegram (`lastChannel == telegram`) because `--deliver` is omitted.
-- Telegram guard is enabled by default: when last channel is Telegram, non-Telegram bridge dispatch must skip (`reason=telegram_guard`).
-- `XCLAW_NON_TG_PROD_TELEGRAM_GUARD=0|false|off|no` may be used only as an explicit emergency override to disable the Telegram skip.
+- Telegram guard is enabled by default: when last channel is Telegram, non-Telegram bridge dispatch skips (`reason=telegram_guard`).
+- Explicit override is allowed per dispatch call for web management trade/transfer decision/result prod messages so post-approval workflows continue even when last channel is Telegram.
+- `XCLAW_NON_TG_PROD_TELEGRAM_GUARD=0|false|off|no` remains an emergency global override to disable Telegram skip for all bridge dispatches.
 - Bridge skip reasons are structured (`no_session`, `telegram_guard`, etc.).
 
 4. Telegram non-regression:

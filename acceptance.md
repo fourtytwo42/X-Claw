@@ -1,3 +1,36 @@
+# Hotfix Acceptance Evidence: Always Prod Agent After Web Trade/Transfer Approvals
+
+Date (UTC): 2026-02-19
+Active slice context: `Slice 86` in progress (explicit user-requested workflow-continuation hotfix)
+
+## Objective + Scope Lock
+- Objective: guarantee that web approval decisions for trade/transfer continue agent workflows even when last channel is Telegram.
+- Scope lock:
+  - `apps/network-web/src/lib/non-telegram-agent-prod.ts`
+  - `apps/network-web/src/app/api/v1/management/approvals/decision/route.ts`
+  - `apps/network-web/src/app/api/v1/management/approvals/approve-allowlist-token/route.ts`
+  - `apps/network-web/src/app/api/v1/management/transfer-approvals/decision/route.ts`
+  - `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - handoff artifacts (`spec.md`, `tasks.md`, `acceptance.md`)
+- Out of scope: callback logic changes and API schema changes.
+
+## Behavior Checks
+- [x] Web trade approval decision prod dispatch forces continuation even when last channel is Telegram.
+- [x] Web trade terminal-result prod dispatch forces continuation even when last channel is Telegram.
+- [x] Web transfer decision/result prod dispatch forces continuation even when last channel is Telegram.
+- [x] Web allowlist trade approval prod dispatch forces continuation even when last channel is Telegram.
+- [x] Default Telegram guard remains active for generic/non-overridden dispatch paths.
+
+## Required Validation Gates
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+
+---
+
 # Hotfix Acceptance Evidence: Policy Approval Telegram Auto-Prompt Parity (Preapprove/Revoke/Global)
 
 Date (UTC): 2026-02-19

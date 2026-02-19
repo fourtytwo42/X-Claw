@@ -1,3 +1,28 @@
+# Hotfix Tasks: Always Prod Agent After Web Trade/Transfer Approvals
+
+Active slice context: `Slice 86` is in progress; this is an explicit user-requested workflow-continuation hotfix.
+
+## 1) Scope lock
+- [x] Restrict changes to web decision prod-dispatch behavior.
+- [x] Preserve Telegram callback execution semantics.
+
+## 2) Implementation
+- [x] Add per-dispatch override in `dispatchNonTelegramAgentProd` to allow Telegram-last-channel prod dispatch for selected flows.
+- [x] Enable override in web trade decision + terminal result dispatch path.
+- [x] Enable override in web transfer decision + terminal result dispatch path.
+- [x] Enable override in web trade allowlist-approve decision dispatch path.
+- [x] Sync source-of-truth and handoff artifacts.
+
+## 3) Validation
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+
+---
+
 # Hotfix Tasks: Policy Approval Telegram Auto-Prompt Parity (Preapprove/Revoke/Global)
 
 Active slice context: `Slice 86` is in progress; this is an explicit user-requested Telegram approval UX alignment hotfix.

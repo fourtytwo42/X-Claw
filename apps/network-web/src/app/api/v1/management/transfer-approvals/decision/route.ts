@@ -292,6 +292,7 @@ export async function POST(req: NextRequest) {
 
     if (applied) {
       agentProdDecision = await dispatchNonTelegramAgentProd({
+        allowTelegramLastChannel: true,
         message: buildWebTransferDecisionProdMessage({
           decision: body.decision,
           approvalId: body.approvalId,
@@ -309,6 +310,7 @@ export async function POST(req: NextRequest) {
       }
       if (terminalStatus) {
         agentProdTerminal = await dispatchNonTelegramAgentProd({
+          allowTelegramLastChannel: true,
           message: buildWebTransferResultProdMessage({
             status: terminalStatus,
             approvalId: body.approvalId,

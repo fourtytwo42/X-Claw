@@ -233,6 +233,7 @@ export async function POST(req: NextRequest) {
     }
 
     const agentProdDecision = await dispatchNonTelegramAgentProd({
+      allowTelegramLastChannel: true,
       message: buildWebTradeDecisionProdMessage({
         decision: 'approved_allowlist',
         tradeId: result.tradeId,

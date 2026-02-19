@@ -1,3 +1,33 @@
+# Hotfix Spec: Always Prod Agent After Web Trade/Transfer Approvals
+
+## Goal
+Ensure web approval actions for trades/transfers always prod the agent continuation pipeline, even when the last active channel is Telegram.
+
+## Non-goals
+1. No change to Telegram callback execution logic.
+2. No API/schema/migration changes.
+3. No UI redesign.
+
+## Locked scope
+1. `apps/network-web/src/lib/non-telegram-agent-prod.ts`
+2. `apps/network-web/src/app/api/v1/management/approvals/decision/route.ts`
+3. `apps/network-web/src/app/api/v1/management/approvals/approve-allowlist-token/route.ts`
+4. `apps/network-web/src/app/api/v1/management/transfer-approvals/decision/route.ts`
+5. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+6. `spec.md`
+7. `tasks.md`
+8. `acceptance.md`
+
+## Acceptance checks
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `pm2 restart all`
+
+---
+
 # Hotfix Spec: Policy Approval Telegram Auto-Prompt Parity (Preapprove/Revoke/Global)
 
 ## Goal

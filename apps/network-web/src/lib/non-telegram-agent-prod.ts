@@ -20,6 +20,7 @@ export type NonTelegramAgentProdDispatchResult = {
 
 type NonTelegramAgentProdInput = {
   message: string;
+  allowTelegramLastChannel?: boolean;
 };
 
 const TRADE_TERMINAL_STATUSES = new Set(['filled', 'failed', 'rejected']);
@@ -226,7 +227,8 @@ export async function dispatchNonTelegramAgentProd(input: NonTelegramAgentProdIn
   if (!delivery) {
     return { attempted: false, skipped: true, reason: 'no_session' };
   }
-  if (delivery.lastChannel === 'telegram' && telegramGuardEnabled()) {
+  const allowTelegramLastChannel = input.allowTelegramLastChannel === true;
+  if (delivery.lastChannel === 'telegram' && telegramGuardEnabled() && !allowTelegramLastChannel) {
     return { attempted: false, skipped: true, reason: 'telegram_guard' };
   }
 

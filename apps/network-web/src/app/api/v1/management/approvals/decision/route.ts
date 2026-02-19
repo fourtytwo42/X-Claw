@@ -189,6 +189,7 @@ export async function POST(req: NextRequest) {
 
     let runtimeResume: Record<string, unknown> | null = null;
     const agentProdDecision = await dispatchNonTelegramAgentProd({
+      allowTelegramLastChannel: true,
       message: buildWebTradeDecisionProdMessage({
         decision: body.decision,
         tradeId: body.tradeId,
@@ -232,6 +233,7 @@ export async function POST(req: NextRequest) {
       const terminalStatus = String(runtimeResume.status ?? '').trim().toLowerCase();
       if (isTradeTerminalStatus(terminalStatus)) {
         agentProdTerminal = await dispatchNonTelegramAgentProd({
+          allowTelegramLastChannel: true,
           message: buildWebTradeResultProdMessage({
             status: terminalStatus,
             tradeId: body.tradeId,
