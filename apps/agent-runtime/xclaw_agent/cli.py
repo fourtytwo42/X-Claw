@@ -3037,6 +3037,8 @@ def _maybe_send_telegram_decision_message(
     amount = str(summary.get("amountInHuman") or "").strip() or str(trade.get("amountIn") or "").strip() or "?"
     token_in = str(summary.get("tokenInSymbol") or "").strip() or str(trade.get("tokenIn") or "").strip() or "TOKEN_IN"
     token_out = str(summary.get("tokenOutSymbol") or "").strip() or str(trade.get("tokenOut") or "").strip() or "TOKEN_OUT"
+    token_in = _token_symbol_for_display(chain, token_in)
+    token_out = _token_symbol_for_display(chain, token_out)
     slip = summary.get("slippageBps")
     slip_str = ""
     try:
@@ -4723,6 +4725,20 @@ def _resolve_token_address(chain: str, token_or_symbol: str) -> str:
     if value and is_hex_address(value):
         return value
     raise WalletStoreError("token must be a 0x address or a canonical token symbol for the active chain.")
+
+
+def _token_symbol_for_display(chain: str, token_or_symbol: str) -> str:
+    value = str(token_or_symbol or "").strip()
+    if not value:
+        return value
+    if not is_hex_address(value):
+        return value
+    token_map = _canonical_token_map(chain)
+    normalized = value.lower()
+    for symbol, address in token_map.items():
+        if str(address or "").strip().lower() == normalized:
+            return str(symbol or "").strip() or value
+    return value
 
 
 def _projected_trade_spend_usd(

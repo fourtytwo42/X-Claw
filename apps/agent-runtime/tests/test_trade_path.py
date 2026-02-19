@@ -941,6 +941,44 @@ class TradePathRuntimeTests(unittest.TestCase):
         self.assertEqual(str(result.get("reason")), "telegram_channel_skipped")
         run_mock.assert_not_called()
 
+    def test_telegram_decision_message_prefers_symbols_over_addresses(self) -> None:
+        captured: dict[str, object] = {}
+
+        def fake_run(cmd: list[str], timeout_sec: int, kind: str):
+            captured["cmd"] = cmd
+            return mock.Mock(returncode=0, stdout='{"ok":true}', stderr="")
+
+        with mock.patch.object(
+            cli, "_get_approval_prompt", return_value={"channel": "telegram", "to": "123", "threadId": None}
+        ), mock.patch.object(
+            cli, "_canonical_token_map", return_value={
+                "WETH": "0xC97e903056f679ea1Db80893008A92578aDfE609",
+                "USDC": "0x39A0C0D1b3dDcE1B49fAa5c6e1D300C14012F4E2",
+            }
+        ), mock.patch.object(
+            cli.shutil, "which", return_value="openclaw"
+        ), mock.patch.object(
+            cli, "_run_subprocess", side_effect=fake_run
+        ):
+            cli._maybe_send_telegram_decision_message(
+                trade_id="trd_1",
+                chain="base_sepolia",
+                decision="approved",
+                summary=None,
+                trade={
+                    "amountIn": "0.11",
+                    "tokenIn": "0xC97e903056f679ea1Db80893008A92578aDfE609",
+                    "tokenOut": "0x39A0C0D1b3dDcE1B49fAa5c6e1D300C14012F4E2",
+                },
+            )
+
+        cmd = captured.get("cmd") or []
+        self.assertIn("--message", cmd)
+        message = str(cmd[cmd.index("--message") + 1])
+        self.assertIn("0.11 WETH -> USDC", message)
+        self.assertNotIn("0xC97e903056f679ea1Db80893008A92578aDfE609", message)
+        self.assertNotIn("0x39A0C0D1b3dDcE1B49fAa5c6e1D300C14012F4E2", message)
+
     def test_trade_spot_does_not_reuse_after_approval(self) -> None:
         # De-dupe only applies while approval is pending; once approved, a repeated identical request
         # should propose a new tradeId.
