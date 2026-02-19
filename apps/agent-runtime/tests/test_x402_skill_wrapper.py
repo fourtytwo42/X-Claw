@@ -211,6 +211,13 @@ class X402SkillWrapperTests(unittest.TestCase):
         self.assertEqual(code, 0)
         run_mock.assert_called_once_with(["wallet", "create", "--chain", "hedera_testnet", "--json"])
 
+    def test_wallet_wrap_native_delegates_to_runtime(self) -> None:
+        with mock.patch.dict("os.environ", {"XCLAW_DEFAULT_CHAIN": "hedera_testnet"}, clear=False):
+            with mock.patch.object(skill, "_run_agent", return_value=0) as run_mock:
+                code = skill.main(["xclaw_agent_skill.py", "wallet-wrap-native", "1"])
+        self.assertEqual(code, 0)
+        run_mock.assert_called_once_with(["wallet", "wrap-native", "--amount", "1", "--chain", "hedera_testnet", "--json"])
+
     def test_auth_recover_delegates_to_runtime(self) -> None:
         env = {
             "XCLAW_API_BASE_URL": "https://xclaw.trade/api/v1",

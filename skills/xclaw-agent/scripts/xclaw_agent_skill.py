@@ -642,7 +642,7 @@ def main(argv: List[str]) -> int:
         return _err(
             "usage",
             "Missing command.",
-            "Use one of: version, status, dashboard, intents-poll, approval-check, trade-exec, trade-spot, trade-resume, liquidity-add, liquidity-remove, liquidity-positions, liquidity-quote-add, liquidity-quote-remove, transfer-resume, transfer-decide, transfer-policy-get, transfer-policy-set, report-send, chat-poll, chat-post, tracked-list, tracked-trades, username-set, agent-register, auth-recover, owner-link, faucet-request, faucet-networks, chains, default-chain-get, default-chain-set, x402-pay, x402-pay-resume, x402-pay-decide, x402-policy-get, x402-policy-set, x402-networks, request-x402-payment, wallet-health, wallet-address, wallet-sign-challenge, wallet-send, wallet-send-token, wallet-balance, wallet-token-balance, wallet-create",
+            "Use one of: version, status, dashboard, intents-poll, approval-check, trade-exec, trade-spot, trade-resume, liquidity-add, liquidity-remove, liquidity-positions, liquidity-quote-add, liquidity-quote-remove, transfer-resume, transfer-decide, transfer-policy-get, transfer-policy-set, report-send, chat-poll, chat-post, tracked-list, tracked-trades, username-set, agent-register, auth-recover, owner-link, faucet-request, faucet-networks, chains, default-chain-get, default-chain-set, x402-pay, x402-pay-resume, x402-pay-decide, x402-policy-get, x402-policy-set, x402-networks, request-x402-payment, wallet-health, wallet-address, wallet-sign-challenge, wallet-send, wallet-send-token, wallet-balance, wallet-token-balance, wallet-wrap-native, wallet-create",
             exit_code=2,
         )
 
@@ -693,6 +693,7 @@ def main(argv: List[str]) -> int:
         "wallet-send-token",
         "wallet-balance",
         "wallet-token-balance",
+        "wallet-wrap-native",
         "wallet-create",
     }
     x402_commands = {
@@ -1249,13 +1250,26 @@ def main(argv: List[str]) -> int:
             return _err("invalid_input", "Invalid token address format.", "Use 0x-prefixed 20-byte hex address.", {"token": token_addr}, exit_code=2)
         return _run_agent(["wallet", "token-balance", "--token", token_addr, "--chain", chain, "--json"])
 
+    if cmd == "wallet-wrap-native":
+        if len(argv) < 3:
+            return _err(
+                "usage",
+                "wallet-wrap-native requires <amount>",
+                "usage: wallet-wrap-native <amount>",
+                exit_code=2,
+            )
+        amount = argv[2].strip()
+        if not amount:
+            return _err("invalid_input", "Amount must not be empty.", "usage: wallet-wrap-native <amount>", exit_code=2)
+        return _run_agent(["wallet", "wrap-native", "--amount", amount, "--chain", chain, "--json"])
+
     if cmd == "wallet-create":
         return _run_agent(["wallet", "create", "--chain", chain, "--json"])
 
     return _err(
         "unknown_command",
         f"Unknown command: {cmd}",
-        "Use one of: version, status, dashboard, intents-poll, approval-check, trade-exec, trade-spot, trade-resume, liquidity-add, liquidity-remove, liquidity-positions, liquidity-quote-add, liquidity-quote-remove, transfer-resume, transfer-decide, transfer-policy-get, transfer-policy-set, report-send, chat-poll, chat-post, tracked-list, tracked-trades, username-set, agent-register, auth-recover, owner-link, faucet-request, faucet-networks, chains, x402-pay, x402-pay-resume, x402-pay-decide, x402-policy-get, x402-policy-set, x402-networks, request-x402-payment, wallet-health, wallet-address, wallet-sign-challenge, wallet-send, wallet-send-token, wallet-balance, wallet-token-balance, wallet-create",
+        "Use one of: version, status, dashboard, intents-poll, approval-check, trade-exec, trade-spot, trade-resume, liquidity-add, liquidity-remove, liquidity-positions, liquidity-quote-add, liquidity-quote-remove, transfer-resume, transfer-decide, transfer-policy-get, transfer-policy-set, report-send, chat-poll, chat-post, tracked-list, tracked-trades, username-set, agent-register, auth-recover, owner-link, faucet-request, faucet-networks, chains, x402-pay, x402-pay-resume, x402-pay-decide, x402-policy-get, x402-policy-set, x402-networks, request-x402-payment, wallet-health, wallet-address, wallet-sign-challenge, wallet-send, wallet-send-token, wallet-balance, wallet-token-balance, wallet-wrap-native, wallet-create",
         exit_code=2,
     )
 

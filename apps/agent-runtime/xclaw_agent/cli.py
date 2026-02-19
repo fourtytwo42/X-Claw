@@ -9710,6 +9710,107 @@ def cmd_wallet_token_balance(args: argparse.Namespace) -> int:
         return fail("token_balance_failed", str(exc), "Inspect runtime token balance configuration and retry.", {"chain": chain, "token": args.token}, exit_code=1)
 
 
+def cmd_wallet_wrap_native(args: argparse.Namespace) -> int:
+    chk = require_json_flag(args)
+    if chk is not None:
+        return chk
+    chain = args.chain
+    if not chain.startswith("hedera"):
+        return fail(
+            "unsupported_chain_capability",
+            "wallet wrap-native is currently supported on Hedera chains only.",
+            "Use --chain hedera_testnet (or hedera mainnet) for wrap-native operations.",
+            {"chain": chain, "requiredCapability": "wallet"},
+            exit_code=2,
+        )
+    try:
+        amount_in_units, amount_mode = _parse_amount_in_units(str(args.amount), 18)
+        amount_in_int = int(amount_in_units)
+        if amount_in_int <= 0:
+            return fail("invalid_amount", "Amount must be positive.", "Provide an amount > 0.", {"amount": str(args.amount)}, exit_code=2)
+
+        store = load_wallet_store()
+        wallet_address, private_key_hex = _execution_wallet(store, chain)
+        helper = _require_chain_contract_address(chain, "wrappedNativeHelper")
+        wrapped_token = _chain_token_address(chain, "WHBAR")
+        cast_bin = _require_cast_bin()
+        rpc_url = _chain_rpc_url(chain)
+
+        wrapped_before = int(_fetch_token_balance_wei(chain, wallet_address, wrapped_token))
+        calldata = _cast_calldata("deposit()", [])
+        tx_hash = _cast_rpc_send_transaction(
+            rpc_url,
+            {
+                "from": wallet_address,
+                "to": helper,
+                "data": calldata,
+                "value": amount_in_units,
+            },
+            private_key_hex,
+        )
+        receipt_proc = _run_subprocess(
+            [cast_bin, "receipt", "--json", "--rpc-url", rpc_url, tx_hash],
+            timeout_sec=_cast_receipt_timeout_sec(),
+            kind="cast_receipt",
+        )
+        if receipt_proc.returncode != 0:
+            stderr = (receipt_proc.stderr or "").strip()
+            stdout = (receipt_proc.stdout or "").strip()
+            raise WalletStoreError(stderr or stdout or "cast receipt failed.")
+        receipt_payload = json.loads((receipt_proc.stdout or "{}").strip() or "{}")
+        receipt_status = str(receipt_payload.get("status", "0x0")).lower()
+        if receipt_status not in {"0x1", "1"}:
+            raise WalletStoreError(f"On-chain receipt indicates failure status '{receipt_status}'.")
+
+        wrapped_after = int(_fetch_token_balance_wei(chain, wallet_address, wrapped_token))
+        wrapped_delta = max(0, wrapped_after - wrapped_before)
+        wrapped_meta = _fetch_erc20_metadata(chain, wrapped_token)
+        wrapped_decimals = int(wrapped_meta.get("decimals", 18))
+        wrapped_symbol = str(wrapped_meta.get("symbol") or "WHBAR").strip() or "WHBAR"
+        return ok(
+            "Native asset wrapped via official helper contract.",
+            chain=chain,
+            address=wallet_address,
+            helper=helper,
+            wrappedToken=wrapped_token,
+            txHash=tx_hash,
+            amountInWei=amount_in_units,
+            amountIn=_format_units(int(amount_in_units), 18),
+            amountInInputMode=amount_mode,
+            amountWrappedUnits=str(wrapped_delta),
+            amountWrapped=_format_units(int(wrapped_delta), wrapped_decimals),
+            wrappedDecimals=wrapped_decimals,
+            wrappedSymbol=wrapped_symbol,
+        )
+    except WalletSecurityError as exc:
+        return fail("unsafe_permissions", str(exc), "Restrict permissions to owner-only (0700/0600) and retry.", {"chain": chain}, exit_code=1)
+    except WalletStoreError as exc:
+        msg = str(exc)
+        if "coreContracts.wrappedNativeHelper" in msg:
+            return fail(
+                "wrapped_native_helper_missing",
+                msg,
+                "Set coreContracts.wrappedNativeHelper in config/chains/<chain>.json and retry.",
+                {"chain": chain},
+                exit_code=1,
+            )
+        if "Amount" in msg and ("too small" in msg or "must be positive" in msg):
+            return fail("invalid_amount", msg, "Provide a positive amount and retry.", {"amount": str(args.amount), "chain": chain}, exit_code=2)
+        if "Missing dependency: cast" in msg:
+            return fail(
+                "missing_dependency",
+                msg,
+                "Install Foundry and ensure `cast` is on PATH.",
+                {"dependency": "cast"},
+                exit_code=1,
+            )
+        if "Chain config" in msg:
+            return fail("chain_config_invalid", msg, "Repair config/chains/<chain>.json and retry.", {"chain": chain}, exit_code=1)
+        return fail("wrap_native_failed", msg, "Verify wallet passphrase, helper contract, and RPC connectivity, then retry.", {"chain": chain}, exit_code=1)
+    except Exception as exc:
+        return fail("wrap_native_failed", str(exc), "Inspect runtime wrap-native path and retry.", {"chain": chain}, exit_code=1)
+
+
 def cmd_wallet_remove(args: argparse.Namespace) -> int:
     chk = require_json_flag(args)
     if chk is not None:
@@ -10388,6 +10489,12 @@ def build_parser() -> argparse.ArgumentParser:
     w_tbal.add_argument("--json", action="store_true")
     w_tbal.set_defaults(func=cmd_wallet_token_balance)
 
+    w_wrap = wallet_sub.add_parser("wrap-native")
+    w_wrap.add_argument("--amount", required=True)
+    w_wrap.add_argument("--chain", required=True)
+    w_wrap.add_argument("--json", action="store_true")
+    w_wrap.set_defaults(func=cmd_wallet_wrap_native)
+
     # Wallet lifecycle commands are intentionally not exposed via the OpenClaw skill wrapper,
     # but the installer/bootstrap flow relies on the runtime being able to create a wallet
     # non-interactively when missing.
@@ -10395,6 +10502,16 @@ def build_parser() -> argparse.ArgumentParser:
     w_create.add_argument("--chain", required=True)
     w_create.add_argument("--json", action="store_true")
     w_create.set_defaults(func=cmd_wallet_create)
+
+    w_import = wallet_sub.add_parser("import")
+    w_import.add_argument("--chain", required=True)
+    w_import.add_argument("--json", action="store_true")
+    w_import.set_defaults(func=cmd_wallet_import)
+
+    w_remove = wallet_sub.add_parser("remove")
+    w_remove.add_argument("--chain", required=True)
+    w_remove.add_argument("--json", action="store_true")
+    w_remove.set_defaults(func=cmd_wallet_remove)
 
     return p
 

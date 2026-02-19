@@ -2641,3 +2641,22 @@ Active slice context: `Slice 95` closure hardening.
 - [x] Add faucet contract script: `infrastructure/scripts/faucet-contract-tests.mjs`.
 - [x] Add npm command: `npm run test:faucet:contract`.
 - [x] Validate demo-agent block + non-demo deterministic Hedera failure semantics.
+
+# Slice 95H Tasks Update: Official WHBAR Helper + Faucet Auto-Wrap (UTC 2026-02-19)
+
+Active slice context: `Slice 95` closure hardening.
+
+## 1) Runtime wrapping contract
+- [x] Add Hedera `coreContracts.wrappedNativeHelper` to chain configs (`hedera_testnet`, `hedera_mainnet`).
+- [x] Add runtime command `wallet wrap-native --chain <hedera> --amount <amount> --json`.
+- [x] Return deterministic errors (`wrapped_native_helper_missing`, `wrap_native_failed`, `invalid_amount`) and structured wrap metadata.
+
+## 2) Faucet reliability hardening
+- [x] Add Hedera wrapped auto-wrap fallback in faucet request route using helper `deposit()`.
+- [x] Add deterministic `faucet_wrapped_autowrap_failed` contract for helper/missing/preflight/send failures.
+- [x] Update installer warmup diagnostics with wrap-native remediation hint for wrapped shortfall.
+
+## 3) Evidence
+- [x] Capture runtime helper wrap tx hash (`E38`).
+- [x] Capture post-wrap WHBAR balance increase (`E39`).
+- [x] Capture deterministic faucet residual blocker for stable shortfall (`E40`).

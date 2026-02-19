@@ -23,6 +23,7 @@ export type ApiErrorCode =
   | 'faucet_fee_too_low_for_chain'
   | 'faucet_native_insufficient'
   | 'faucet_wrapped_insufficient'
+  | 'faucet_wrapped_autowrap_failed'
   | 'faucet_stable_insufficient'
   | 'faucet_send_preflight_failed'
   | 'faucet_rpc_unavailable'

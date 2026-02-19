@@ -32,9 +32,9 @@ const BASE_DRIP_STABLE_WEI = '20000000000000000000000'; // 20000 USDC
 const KITE_DRIP_NATIVE_WEI = '50000000000000000'; // 0.05 KITE
 const KITE_DRIP_WRAPPED_WEI = '50000000000000000'; // 0.05 WKITE
 const KITE_DRIP_STABLE_WEI = '100000000000000000'; // 0.10 USDT
-const HEDERA_DRIP_NATIVE_WEI = '200000000'; // 2.0 HBAR (8 decimals)
-const HEDERA_DRIP_WRAPPED_WEI = '200000000'; // 2.0 WHBAR (8 decimals)
-const HEDERA_DRIP_STABLE_WEI = '5000000'; // 5.0 stable (6 decimals expected)
+const HEDERA_DRIP_NATIVE_WEI = '2000000000000000000'; // 2.0 HBAR (wei-scaled)
+const HEDERA_DRIP_WRAPPED_WEI = '500000'; // 0.005 WHBAR (8 decimals)
+const HEDERA_DRIP_STABLE_WEI = '30000'; // 0.03 stable (6 decimals expected)
 
 const GAS_BUFFER_MULTIPLIER_BPS = 12000; // 1.2x
 const HEDERA_MIN_GAS_PRICE_WEI_DEFAULT = '900000000000'; // 900 gwei
@@ -43,6 +43,7 @@ const ERC20_ABI = [
   'function balanceOf(address owner) view returns (uint256)',
   'function transfer(address to, uint256 value) returns (bool)'
 ];
+const WRAPPED_NATIVE_HELPER_ABI = ['function deposit() payable'];
 
 type FaucetRouteErrorInput = {
   status: number;
@@ -206,6 +207,20 @@ function resolveStableToken(chainKey: string): { symbol: string; address: string
   }
   const symbol = (tokens.USDC ? 'USDC' : 'USDT') as string;
   return { symbol, address: stable };
+}
+
+function resolveWrappedNativeHelper(chainKey: string): string | null {
+  const envAddress = resolveChainScopedEnv('XCLAW_TESTNET_FAUCET_WRAPPED_NATIVE_HELPER', chainKey);
+  if (envAddress && isAddress(envAddress)) {
+    return envAddress;
+  }
+  const cfg = getChainConfig(chainKey);
+  const contracts = cfg?.coreContracts || {};
+  const helper = typeof contracts?.wrappedNativeHelper === 'string' ? contracts.wrappedNativeHelper.trim() : '';
+  if (helper && isAddress(helper)) {
+    return helper;
+  }
+  return null;
 }
 
 function resolveDripAmounts(chainKey: string): { nativeWei: string; wrappedWei: string; stableWei: string } {
@@ -389,6 +404,7 @@ export async function POST(req: NextRequest) {
 
     const wrappedToken = requestedAssets.includes('wrapped') ? resolveWrappedToken(chainKey) : null;
     const stableToken = requestedAssets.includes('stable') ? resolveStableToken(chainKey) : null;
+    const wrappedNativeHelper = isHederaChain(chainKey) ? resolveWrappedNativeHelper(chainKey) : null;
 
     if (requestedAssets.includes('wrapped') && !wrappedToken) {
       return errorResponse(
@@ -452,18 +468,59 @@ export async function POST(req: NextRequest) {
 
     const wrapped = wrappedToken ? new Contract(wrappedToken.address, ERC20_ABI, signer) : null;
     const stable = stableToken ? new Contract(stableToken.address, ERC20_ABI, signer) : null;
+    const wrappedNativeHelperContract = wrappedNativeHelper ? new Contract(wrappedNativeHelper, WRAPPED_NATIVE_HELPER_ABI, signer) : null;
+    let wrappedAutoWrapDeficit = BigInt(0);
+    let wrappedAutoWrapEstimate = BigInt(0);
+    let wrappedAutoWrapTxHash: string | null = null;
 
     try {
       if (wrapped) {
         const wrappedBal = (await wrapped.balanceOf(signer.address)) as bigint;
         if (wrappedBal < dripWrapped) {
-          throw new FaucetRouteError({
-            status: 503,
-            code: 'faucet_wrapped_insufficient',
-            message: 'Faucet wrapped-token balance is insufficient.',
-            actionHint: `Top up faucet ${wrappedToken?.symbol || 'wrapped'} balance and retry.`,
-            details: { tokenAddress: wrappedToken?.address, requiredWei: dripWrapped.toString(), balanceWei: wrappedBal.toString() },
-          });
+          wrappedAutoWrapDeficit = dripWrapped - wrappedBal;
+          if (!isHederaChain(chainKey)) {
+            throw new FaucetRouteError({
+              status: 503,
+              code: 'faucet_wrapped_insufficient',
+              message: 'Faucet wrapped-token balance is insufficient.',
+              actionHint: `Top up faucet ${wrappedToken?.symbol || 'wrapped'} balance and retry.`,
+              details: { tokenAddress: wrappedToken?.address, requiredWei: dripWrapped.toString(), balanceWei: wrappedBal.toString() },
+            });
+          }
+          if (!wrappedNativeHelper || !wrappedNativeHelperContract) {
+            throw new FaucetRouteError({
+              status: 503,
+              code: 'faucet_wrapped_autowrap_failed',
+              message: 'Wrapped token balance is insufficient and no wrapped-native helper is configured.',
+              actionHint: `Set XCLAW_TESTNET_FAUCET_WRAPPED_NATIVE_HELPER_${toEnvSuffix(chainKey)} or coreContracts.wrappedNativeHelper.`,
+              details: {
+                chainKey,
+                helperAddress: wrappedNativeHelper,
+                requiredWei: dripWrapped.toString(),
+                balanceWei: wrappedBal.toString(),
+                deficitWei: wrappedAutoWrapDeficit.toString(),
+              },
+            });
+          }
+          try {
+            wrappedAutoWrapEstimate = await signer.estimateGas(
+              await wrappedNativeHelperContract.deposit.populateTransaction({ value: wrappedAutoWrapDeficit })
+            );
+          } catch (error) {
+            throw new FaucetRouteError({
+              status: 503,
+              code: 'faucet_wrapped_autowrap_failed',
+              message: error instanceof Error ? error.message : 'Auto-wrap preflight failed.',
+              actionHint: 'Verify wrapped-native helper contract and faucet signer permissions, then retry.',
+              details: {
+                chainKey,
+                helperAddress: wrappedNativeHelper,
+                requiredWei: dripWrapped.toString(),
+                balanceWei: wrappedBal.toString(),
+                deficitWei: wrappedAutoWrapDeficit.toString(),
+              },
+            });
+          }
         }
       }
       if (stable) {
@@ -508,6 +565,9 @@ export async function POST(req: NextRequest) {
 
     const estimates: bigint[] = [];
     try {
+      if (wrappedAutoWrapEstimate > BigInt(0)) {
+        estimates.push(wrappedAutoWrapEstimate);
+      }
       if (wrapped) {
         estimates.push(await signer.estimateGas(await wrapped.transfer.populateTransaction(trimmedRecipient, dripWrapped)));
       }
@@ -572,6 +632,15 @@ export async function POST(req: NextRequest) {
         const fees = buildFeeOverrides(chainKey, feeData, attempt);
         try {
           let nonceOffset = 0;
+          if (wrappedAutoWrapDeficit > BigInt(0) && wrappedNativeHelperContract) {
+            const wrapTx = (await wrappedNativeHelperContract.deposit({
+              value: wrappedAutoWrapDeficit,
+              nonce: baseNonce + nonceOffset,
+              ...fees,
+            })) as { hash: string };
+            wrappedAutoWrapTxHash = wrapTx.hash;
+            nonceOffset += 1;
+          }
           if (wrapped) {
             const tx = (await wrapped.transfer(trimmedRecipient, dripWrapped, { nonce: baseNonce + nonceOffset, ...fees })) as { hash: string };
             txByAsset.wrapped = tx.hash;
@@ -598,6 +667,20 @@ export async function POST(req: NextRequest) {
             msg.includes('already known');
           if (attempt < sendAttempts - 1 && retryable) {
             continue;
+          }
+          if (wrappedAutoWrapDeficit > BigInt(0)) {
+            throw new FaucetRouteError({
+              status: 503,
+              code: 'faucet_wrapped_autowrap_failed',
+              message: msg,
+              actionHint: 'Auto-wrap was attempted but wrapped transfer still failed. Verify helper/token contracts and retry.',
+              details: {
+                chainKey,
+                helperAddress: wrappedNativeHelper,
+                wrappedAutoWrapTxHash,
+                requiredWei: dripWrapped.toString(),
+              },
+            });
           }
           throw err;
         }

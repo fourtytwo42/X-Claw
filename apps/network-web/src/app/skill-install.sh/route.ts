@@ -1011,6 +1011,17 @@ fi
 
 if [ -n "\${XCLAW_AGENT_API_KEY:-}" ] && [ -n "\${XCLAW_AGENT_ID:-}" ] && [ "$XCLAW_INSTALL_AUTO_HEDERA_FAUCET" = "1" ]; then
   echo "[xclaw] optional hedera faucet warmup (chain=$XCLAW_HEDERA_CHAIN_KEY)"
+  faucet_pk_local="$(printenv XCLAW_TESTNET_FAUCET_PRIVATE_KEY_HEDERA_TESTNET || printenv XCLAW_TESTNET_FAUCET_PRIVATE_KEY || true)"
+  if [ -n "$faucet_pk_local" ] && command -v cast >/dev/null 2>&1; then
+    faucet_signer_addr="$(cast wallet address --private-key "$faucet_pk_local" 2>/dev/null || true)"
+    faucet_signer_addr_lc="$(printf '%s' "$faucet_signer_addr" | tr '[:upper:]' '[:lower:]')"
+    hedera_wallet_address_lc="$(printf '%s' "$hedera_wallet_address" | tr '[:upper:]' '[:lower:]')"
+    if [ -n "$faucet_signer_addr" ] && [ -n "$hedera_wallet_address" ] && [ "$faucet_signer_addr_lc" = "$hedera_wallet_address_lc" ]; then
+      echo "[xclaw] warning: hedera warmup target wallet matches faucet signer address"
+      echo "[xclaw] code=hedera_faucet_self_recipient_risk chain=$XCLAW_HEDERA_CHAIN_KEY"
+      echo "[xclaw] actionHint: use a non-faucet recipient wallet for warmup verification to avoid token transfer edge cases"
+    fi
+  fi
   set +e
   hedera_faucet_json="$("$XCLAW_AGENT_BIN" faucet-request --chain "$XCLAW_HEDERA_CHAIN_KEY" --asset native --asset wrapped --asset stable --json 2>&1)"
   hedera_faucet_rc=$?
@@ -1050,6 +1061,10 @@ except Exception:
     fi
     if [ -n "$faucet_request_id" ]; then
       echo "[xclaw] requestId: $faucet_request_id"
+    fi
+    if [ "$faucet_code" = "faucet_wrapped_insufficient" ]; then
+      echo "[xclaw] hint: wrap native using official helper path:"
+      echo "[xclaw]   $XCLAW_AGENT_BIN wallet wrap-native --chain $XCLAW_HEDERA_CHAIN_KEY --amount 1 --json"
     fi
     echo "[xclaw] rerun: $XCLAW_AGENT_BIN faucet-request --chain $XCLAW_HEDERA_CHAIN_KEY --asset native --asset wrapped --asset stable --json"
     echo "[xclaw] diagnostics: ensure XCLAW_AGENT_API_KEY/XCLAW_AGENT_ID are set and faucet envs (RPC/private key/token addresses) are configured for $XCLAW_HEDERA_CHAIN_KEY"

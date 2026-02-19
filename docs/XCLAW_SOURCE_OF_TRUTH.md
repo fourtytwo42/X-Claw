@@ -3625,11 +3625,15 @@ Limitations / notes:
 - Hedera testnet:
   - native `HBAR`
   - wrapped `WHBAR`
+  - wrapped-native helper `HBAR X Helper` (`coreContracts.wrappedNativeHelper`)
   - stable `USDC|USDT` when configured
   - default drip amounts:
-    - native `2.0 HBAR` (`200000000` base units)
-    - wrapped `2.0 WHBAR` (`200000000` base units)
-    - stable `5.0` (`5000000` base units, expected 6 decimals)
+    - native `2.0 HBAR` (`2000000000000000000` wei)
+    - wrapped `0.005 WHBAR` (`500000` base units, 8 decimals)
+    - stable `0.03` (`30000` base units, expected 6 decimals)
+- Hedera unit convention:
+  - `1 tinybar = 10^10 wei`
+  - `1 HBAR = 10^18 wei`
 - Runtime config overrides are supported per chain via env:
   - `XCLAW_TESTNET_FAUCET_WRAPPED_TOKEN_ADDRESS[_<CHAIN>]`, `XCLAW_TESTNET_FAUCET_WRAPPED_TOKEN_SYMBOL[_<CHAIN>]`
   - `XCLAW_TESTNET_FAUCET_STABLE_TOKEN_ADDRESS[_<CHAIN>]`, `XCLAW_TESTNET_FAUCET_STABLE_TOKEN_SYMBOL[_<CHAIN>]`
@@ -3653,9 +3657,13 @@ Limitations / notes:
   - `faucet_config_invalid`
   - `faucet_native_insufficient`
   - `faucet_wrapped_insufficient`
+  - `faucet_wrapped_autowrap_failed`
   - `faucet_stable_insufficient`
   - `faucet_send_preflight_failed`
   - `faucet_rpc_unavailable`.
+- Hedera wrapped faucet self-heal:
+  - if wrapped inventory is insufficient and native inventory can cover deficit + gas, faucet signer auto-wraps via helper `deposit()` before wrapped transfer.
+  - helper missing/invalid or failed auto-wrap must return deterministic `faucet_wrapped_autowrap_failed` with helper/deficit details.
 - Wrapped/stable token faucet addresses and drip values must be validated before execution:
   - addresses must be valid EVM addresses,
   - drip values must be positive integer wei strings.
@@ -3673,9 +3681,11 @@ Limitations / notes:
 - Runtime commands:
   - `faucet-request --chain <chain> [--asset native|wrapped|stable]... --json`
   - `faucet-networks --json`
+  - `wallet wrap-native --chain <chain> --amount <human_or_wei> --json` (Hedera-only helper `deposit()` path)
 - Skill wrapper commands:
   - `faucet-request [chain] [asset ...]`
   - `faucet-networks`
+  - `wallet-wrap-native <amount>`
 
 ## 73) Slice 85 EVM-Wide Portability Foundation Contract (Locked)
 

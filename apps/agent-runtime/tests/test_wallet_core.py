@@ -1,4 +1,5 @@
 import json
+import argparse
 import os
 import pathlib
 import stat
@@ -83,6 +84,47 @@ class WalletCoreUnitTests(unittest.TestCase):
     def test_parse_uint_from_cast_output_handles_bracketed_arrays(self) -> None:
         raw = "[1000000000000000000 [1e18], 2057515000000000000000 [2.057e21]]"
         self.assertEqual(cli._parse_uint_from_cast_output(raw), 2057515000000000000000)
+
+    def test_wallet_wrap_native_success(self) -> None:
+        args = argparse.Namespace(chain="hedera_testnet", amount="1", json=True)
+        with (
+            mock.patch.object(cli, "load_wallet_store", return_value={}),
+            mock.patch.object(cli, "_execution_wallet", return_value=("0x" + "11" * 20, "aa" * 32)),
+            mock.patch.object(cli, "_require_chain_contract_address", return_value="0x" + "22" * 20),
+            mock.patch.object(cli, "_chain_token_address", return_value="0x" + "33" * 20),
+            mock.patch.object(cli, "_fetch_token_balance_wei", side_effect=["100", "200"]),
+            mock.patch.object(cli, "_cast_calldata", return_value="0x1234"),
+            mock.patch.object(cli, "_cast_rpc_send_transaction", return_value="0x" + "44" * 32),
+            mock.patch.object(cli, "_require_cast_bin", return_value="cast"),
+            mock.patch.object(cli, "_chain_rpc_url", return_value="https://rpc"),
+            mock.patch.object(
+                cli,
+                "_run_subprocess",
+                return_value=mock.Mock(returncode=0, stdout='{"status":"0x1"}', stderr=""),
+            ),
+            mock.patch.object(cli, "_fetch_erc20_metadata", return_value={"decimals": 8, "symbol": "WHBAR"}),
+        ):
+            code = cli.cmd_wallet_wrap_native(args)
+        self.assertEqual(code, 0)
+
+    def test_wallet_wrap_native_missing_helper_is_deterministic(self) -> None:
+        args = argparse.Namespace(chain="hedera_testnet", amount="1", json=True)
+        with (
+            mock.patch.object(cli, "load_wallet_store", return_value={}),
+            mock.patch.object(cli, "_execution_wallet", return_value=("0x" + "11" * 20, "aa" * 32)),
+            mock.patch.object(
+                cli,
+                "_require_chain_contract_address",
+                side_effect=cli.WalletStoreError("Chain config for 'hedera_testnet' has invalid coreContracts.wrappedNativeHelper."),
+            ),
+        ):
+            code = cli.cmd_wallet_wrap_native(args)
+        self.assertEqual(code, 1)
+
+    def test_wallet_wrap_native_rejects_non_hedera_chain(self) -> None:
+        args = argparse.Namespace(chain="base_sepolia", amount="1", json=True)
+        code = cli.cmd_wallet_wrap_native(args)
+        self.assertEqual(code, 2)
 
 
 class WalletCoreCliTests(unittest.TestCase):

@@ -31,6 +31,7 @@ Required wallet commands:
 19. `liquidity-quote-remove`
 20. `default-chain-get`
 21. `default-chain-set <chain_key>`
+22. `wallet-wrap-native <amount>`
 
 Notes:
 - explicit `--chain` remains authoritative for chain-scoped commands.
@@ -51,6 +52,7 @@ Wrapper delegation target commands:
 - `xclaw-agent wallet send-token --token <token_or_symbol> --to <address> --amount-wei <amount_wei> --chain <chain_key> --json`
 - `xclaw-agent wallet balance --chain <chain_key> --json`
 - `xclaw-agent wallet token-balance --token <token_address> --chain <chain_key> --json`
+- `xclaw-agent wallet wrap-native --amount <amount> --chain <chain_key> --json`
 - `xclaw-agent wallet remove --chain <chain_key> --json`
 - `xclaw-agent transfers policy-get --chain <chain_key> --json`
 - `xclaw-agent transfers policy-set --chain <chain_key> --global <auto|per_transfer> --native-preapproved <0|1> [--allowed-token <0x...>] --json`
@@ -121,6 +123,7 @@ Errors MUST be machine-parseable and human-readable:
 8. `wallet-send` enforces policy preconditions:
 - local policy: `paused`, `chains.<chain>.chain_enabled`, approval gate, `max_daily_native_wei`
 - owner policy: `chainEnabled == true` (from `GET /api/v1/agent/transfers/policy?chainKey=...`).
+9. `wallet-wrap-native` requires a Hedera chain and a positive amount; it fails deterministically with `invalid_amount`, `wrapped_native_helper_missing`, or `wrap_native_failed` when runtime preconditions are not met.
 
 ## 6) Canonical Challenge Format (`wallet-sign-challenge`)
 
@@ -176,21 +179,22 @@ Current behavior in `apps/agent-runtime/xclaw_agent/cli.py`:
    - canonical token balances in `tokens[]` (best effort per configured chain canonical tokens),
    - token query failures in `tokenErrors[]` without failing native balance fetch.
 9. `wallet-token-balance` is implemented via cast-backed ERC-20 `balanceOf(address)` query.
-10. Missing cast dependency returns structured `missing_dependency` error.
-11. Wrapper-level input validation executes before runtime delegation.
-12. On delegated non-zero exits, wrapper passes runtime JSON through unchanged when stdout is parseable JSON payload with `ok` and `code`; otherwise wrapper emits structured `agent_command_failed`.
-13. Wrapper API command env gate accepts either:
+10. `wallet-wrap-native` is implemented for Hedera chains and calls payable `deposit()` on `coreContracts.wrappedNativeHelper`, verifies receipt, then reports `txHash`, helper address, wrapped token address, and wrapped balance delta.
+11. Missing cast dependency returns structured `missing_dependency` error.
+12. Wrapper-level input validation executes before runtime delegation.
+13. On delegated non-zero exits, wrapper passes runtime JSON through unchanged when stdout is parseable JSON payload with `ok` and `code`; otherwise wrapper emits structured `agent_command_failed`.
+14. Wrapper API command env gate accepts either:
    - `XCLAW_AGENT_API_KEY` in environment, or
    - previously recovered runtime auth stored in `~/.xclaw-agent/state.json`.
-14. Runtime auth recovery command:
+15. Runtime auth recovery command:
    - `auth recover` performs challenge/sign/recover with local wallet keys and persists recovered key to runtime state.
-15. Runtime transaction fee planning for wallet/trade sends is EIP-1559-first by default:
+16. Runtime transaction fee planning for wallet/trade sends is EIP-1559-first by default:
    - default mode (`XCLAW_TX_FEE_MODE=rpc`) derives EIP-1559 fee caps from chain RPC (`eth_feeHistory`, `eth_maxPriorityFeePerGas`, reward fallback),
    - retry attempts apply bounded fee escalation via `XCLAW_TX_RETRY_BUMP_BPS` (default `1250`),
    - minimum priority floor is `XCLAW_TX_PRIORITY_FLOOR_GWEI` (default `1`),
    - when EIP-1559 RPC methods are unavailable/invalid, runtime falls back to `eth_gasPrice`,
    - rollback kill-switch `XCLAW_TX_FEE_MODE=legacy` restores legacy fixed `gasPrice` sender behavior.
-16. Liquidity commands enforce adapter preflight before API proposal submission:
+17. Liquidity commands enforce adapter preflight before API proposal submission:
    - unsupported chain/dex/position combinations fail with `unsupported_liquidity_adapter`,
    - HTS-native Hedera paths fail closed with `missing_dependency` when SDK/plugin bridge is unavailable,
    - HTS plugin bridge defaults to `xclaw_agent.hedera_hts_plugin:execute_liquidity` and resolves bridge command from `XCLAW_HEDERA_HTS_BRIDGE_CMD` or fallback in-repo bridge (`XCLAW_AGENT_PYTHON_BIN .../xclaw_agent/bridges/hedera_hts_bridge.py`),
@@ -200,7 +204,7 @@ Current behavior in `apps/agent-runtime/xclaw_agent/cli.py`:
    - Hedera EVM v2 add supports opt-in simulation bypass for known false-positive signatures when `XCLAW_LIQUIDITY_ALLOW_SIMULATION_BYPASS=1` (preflight must include `simulationWarning` metadata),
    - v2 remove accepts pair-address `positionRef` fallback when snapshot rows are unavailable and resolves Hedera LP token via `pair.lpToken()` when present,
    - runtime execution/verification failures return deterministic `liquidity_execution_failed` / `liquidity_verification_failed`.
-17. Hosted installer (`/skill-install.sh`) wallet bootstrap behavior:
+18. Hosted installer (`/skill-install.sh`) wallet bootstrap behavior:
    - creates/binds wallet on `XCLAW_DEFAULT_CHAIN`,
    - auto-attempts wallet bind on `hedera_testnet` using the same portable wallet key,
    - aborts registration on cross-chain address mismatch (`portable_wallet_invariant_failed`),
@@ -235,7 +239,7 @@ The following non-wallet commands are part of the same Python-first wrapper cont
 2. `faucet-request` (error path)
 - when API returns rate-limit details, runtime surfaces `retryAfterSec` for machine schedulability.
 - supports chain-aware selectable assets via `--asset native|wrapped|stable` and returns resolved `requestedAssets`/`fulfilledAssets`.
-- Hedera faucet failures must preserve deterministic server codes in runtime output (`faucet_config_invalid`, `faucet_fee_too_low_for_chain`, `faucet_native_insufficient`, `faucet_wrapped_insufficient`, `faucet_stable_insufficient`, `faucet_send_preflight_failed`, `faucet_rpc_unavailable`) with `requestId` passthrough for diagnostics.
+- Hedera faucet failures must preserve deterministic server codes in runtime output (`faucet_config_invalid`, `faucet_fee_too_low_for_chain`, `faucet_native_insufficient`, `faucet_wrapped_insufficient`, `faucet_wrapped_autowrap_failed`, `faucet_stable_insufficient`, `faucet_send_preflight_failed`, `faucet_rpc_unavailable`) with `requestId` passthrough for diagnostics.
 
 3. `faucet-networks`
 - returns supported faucet chains and per-chain asset capability metadata for agent-side tool routing.

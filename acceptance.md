@@ -5102,3 +5102,29 @@ Date (UTC): 2026-02-19
   - same installer run completes with existing wallet, registers agent, and preserves chain wallet bindings.
 - `E37` Warmup deterministic failure contract proof:
   - installer captures warmup blocker as `hedera_faucet_warmup_failed` with structured hint fields instead of opaque failure.
+
+## Slice 95 Official WHBAR Helper Enablement (UTC 2026-02-19)
+
+### Implementation updates
+- Hedera chain configs now define official wrapped-native helper contracts under `coreContracts.wrappedNativeHelper`:
+  - testnet `0x0000000000000000000000000000000000003ad1` (HBAR X Helper)
+  - mainnet `0x0000000000000000000000000000000000163b58`
+- Runtime command added:
+  - `xclaw-agent wallet wrap-native --chain <hedera_chain> --amount <human_or_wei> --json`
+  - command performs helper `deposit()` call and returns `txHash`, helper/token metadata, and wrapped delta.
+- Faucet route now supports Hedera wrapped auto-wrap fallback:
+  - when wrapped inventory is short and helper/native balance are sufficient, faucet signer auto-wraps deficit via helper before token transfer.
+  - deterministic failure code on auto-wrap failure: `faucet_wrapped_autowrap_failed`.
+- Installer warmup diagnostics include explicit wrap-native hint when wrapped inventory is short.
+
+### Evidence updates (`E38+`)
+- `E38` Runtime official helper wrap success:
+  - command: `xclaw-agent wallet wrap-native --chain hedera_testnet --amount 1 --json`
+  - tx hash: `0x1336c10e4f0a891e998d8e971f15a9702ee116bc6271cbf3b0f907e46ceebc10`
+  - output confirms helper `0x...3ad1`, wrapped token `0x...3ad2`, and `amountWrapped=1`.
+- `E39` Post-wrap wallet balance proof:
+  - command: `xclaw-agent wallet balance --chain hedera_testnet --json`
+  - outcome: WHBAR balance increased to `1.00554979`.
+- `E40` Hedera faucet deterministic residual blocker proof (stable inventory):
+  - command: `xclaw-agent faucet-request --chain hedera_testnet --asset native --asset wrapped --asset stable --json`
+  - outcome: deterministic `faucet_stable_insufficient` with `requestId` and token balance details (no opaque `internal_error`).

@@ -2514,3 +2514,30 @@ Implement the post-Slice-88 liquidity program through runtime adapter preflight 
 
 ## Validation
 - `npm run test:faucet:contract` is the route-level regression command for faucet error contract behavior.
+
+# Slice 95H Spec Addendum: Official WHBAR Helper + Faucet Auto-Wrap (UTC 2026-02-19)
+
+## Goal
+1. Use official Hedera WHBAR helper flow (`HBAR X Helper`) instead of swap workarounds for runtime wrapping.
+2. Add faucet signer auto-wrap fallback for wrapped-token deficits on Hedera.
+3. Preserve existing API paths and deterministic error contracts.
+
+## Locked scope
+1. `config/chains/hedera_testnet.json`
+2. `config/chains/hedera_mainnet.json`
+3. `apps/agent-runtime/xclaw_agent/cli.py`
+4. `apps/network-web/src/app/api/v1/agent/faucet/request/route.ts`
+5. `apps/network-web/src/lib/errors.ts`
+6. `apps/network-web/src/app/skill-install.sh/route.ts`
+7. `skills/xclaw-agent/scripts/xclaw_agent_skill.py`
+8. `skills/xclaw-agent/SKILL.md`
+9. `skills/xclaw-agent/references/commands.md`
+10. `docs/api/WALLET_COMMAND_CONTRACT.md`
+11. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+12. `acceptance.md`
+13. `tasks.md`
+
+## Acceptance checks
+- `xclaw-agent wallet wrap-native --chain hedera_testnet --amount 1 --json` returns tx hash and helper/token metadata.
+- `xclaw-agent wallet balance --chain hedera_testnet --json` shows increased WHBAR after wrap.
+- `xclaw-agent faucet-request --chain hedera_testnet --asset native --asset wrapped --asset stable --json` returns deterministic contract response (success or explicit faucet_* insufficiency/error; no opaque internal error).

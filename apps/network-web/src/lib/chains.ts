@@ -21,6 +21,7 @@ export type ChainConfig = {
   coreContracts?: {
     router?: string;
     quoter?: string;
+    wrappedNativeHelper?: string;
   };
   capabilities?: {
     wallet?: boolean;

@@ -169,6 +169,7 @@ Notes:
 - `E22/E23` capture Hedera EVM add/remove tx-hash runtime proof.
 - `E29/E30` capture Hedera HTS add/remove tx-hash runtime proof.
 - `E34..E37` capture Hedera faucet deterministic failure contract and installer warmup diagnostics for non-demo install flows.
+- `E38..E40` capture official Hedera helper wrapping (`wallet wrap-native`) and post-wrap faucet deterministic behavior.
 
 ---
 
@@ -211,3 +212,6 @@ Notes:
 - `E35`: Installer warmup output includes `faucetCode`, `faucetMessage`, `actionHint`, and rerun command.
 - `E36`: Reinstall path preserves existing wallet and register upsert behavior.
 - `E37`: Warmup failure remains deterministic and non-fatal (`hedera_faucet_warmup_failed`).
+- `E38`: Runtime official helper wrap tx hash via `wallet wrap-native --chain hedera_testnet --amount 1 --json` (`0x1336c10e4f0a891e998d8e971f15a9702ee116bc6271cbf3b0f907e46ceebc10`).
+- `E39`: Post-wrap wallet balance confirms WHBAR increase to `1.00554979`.
+- `E40`: Hedera faucet request returns deterministic `faucet_stable_insufficient` with `requestId` and inventory details (no opaque `internal_error`).
