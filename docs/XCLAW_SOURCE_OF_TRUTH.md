@@ -1291,6 +1291,8 @@ Runtime binary requirements for skill operation:
 - Hosted installer entrypoints are `GET /skill-install.sh` (Linux/macOS) and `GET /skill-install.ps1` (Windows) on the network-web host.
 - Hosted installers must ensure runtime Python dependencies from `apps/agent-runtime/requirements.txt` are installed for the same interpreter used to run `xclaw-agent`/setup (`python3 -m pip` or `python -m pip`), including pip bootstrap when missing (`ensurepip`, then `get-pip.py` fallback).
 - Linux/macOS installer must detect PEP 668 `externally-managed-environment` pip failures and automatically pivot to a user-local fallback venv (`~/.xclaw-agent/runtime-venv`) before continuing dependency install.
+- Linux/macOS installer should attempt automatic `python3-venv` / `python3-pip` provisioning when running with sudo on apt-based systems before failing for missing venv/pip primitives.
+- Hosted installer should install `hedera-sdk-py` in the same runtime interpreter by default so HTS-native paths work out-of-the-box when environment allows dependency install.
 - Linux/macOS installer must be sudo-aware: when invoked via `sudo` from a non-root account, installation/configuration targets the original user home/context (not `/root`) and ownership of touched user artifacts is corrected before exit.
 - Setup script must ensure a default local wallet policy exists at `~/.xclaw-agent/policy.json` when missing (do not overwrite existing policy).
 - Setup script must install an OS-native `xclaw-agent` launcher (POSIX shell wrapper on Linux/macOS, `.cmd` launcher on Windows) without introducing Node/npm requirements for skill invocation.
