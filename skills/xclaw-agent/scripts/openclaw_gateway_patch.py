@@ -45,6 +45,8 @@ DECISION_ACK_MARKER_V14 = "xclaw: telegram approval decision ack v14"
 DECISION_ACK_MARKER_V15 = "xclaw: telegram approval decision ack v15"
 DECISION_ACK_MARKER_V16 = "xclaw: telegram approval decision ack v16"
 DECISION_ACK_MARKER_V17 = "xclaw: telegram approval decision ack v17"
+DECISION_ACK_MARKER_V18 = "xclaw: telegram approval decision ack v18"
+DECISION_ACK_MARKER_V19 = "xclaw: telegram approval decision ack v19"
 DECISION_ROUTE_MARKER_V1 = "xclaw: telegram approval decision routed to agent"
 DECISION_EXEC_MARKER_V1 = "xclaw: telegram trade resume trigger v1"
 DECISION_RESULT_ROUTE_MARKER_V1 = "xclaw: telegram trade result routed to agent"
@@ -54,7 +56,7 @@ QUEUED_BUTTONS_MARKER_V3 = "xclaw: telegram queued approval buttons v3"
 QUEUED_BUTTONS_MARKER_V4 = "xclaw: telegram queued approval buttons v4"
 LEGACY_DM_SENTINEL = 'Allow in DMs even when inlineButtonsScope is "allowlist", gated by chatId == senderId.'
 # Bump when patch semantics change so we invalidate the cached "already patched" fast-path.
-STATE_SCHEMA_VERSION = 49
+STATE_SCHEMA_VERSION = 51
 STATE_DIR = Path.home() / ".openclaw" / "xclaw"
 STATE_FILE = STATE_DIR / "openclaw_patch_state.json"
 LOCK_FILE = STATE_DIR / "openclaw_patch.lock"
@@ -66,6 +68,7 @@ LEGACY_SOURCE_SNIPPET_RE = re.compile(
 # Match either older "approve-only" wording or newer "inline button handling" wording.
 CANONICAL_BLOCK_START = "// X-Claw Telegram approvals:"
 PAGINATION_ANCHOR = "const paginationMatch = data.match(/^commands_page_"
+REPO_RUNTIME_BIN = (Path(__file__).resolve().parents[3] / "apps" / "agent-runtime" / "bin" / "xclaw-agent").as_posix()
 
 
 def _utc_now() -> str:
@@ -303,7 +306,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         or DECISION_ACK_MARKER_V14 not in raw
         or DECISION_ACK_MARKER_V15 not in raw
         or DECISION_ACK_MARKER_V16 not in raw
-        or DECISION_ACK_MARKER_V17 not in raw
+        or DECISION_ACK_MARKER_V19 not in raw
         or DECISION_ROUTE_MARKER_V1 not in raw
         or DECISION_EXEC_MARKER_V1 not in raw
         or DECISION_RESULT_ROUTE_MARKER_V1 not in raw
@@ -333,7 +336,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         or DECISION_ACK_MARKER_V14 not in raw
         or DECISION_ACK_MARKER_V15 not in raw
         or DECISION_ACK_MARKER_V16 not in raw
-        or DECISION_ACK_MARKER_V17 not in raw
+        or DECISION_ACK_MARKER_V19 not in raw
         or DECISION_ROUTE_MARKER_V1 not in raw
         or DECISION_EXEC_MARKER_V1 not in raw
         or DECISION_RESULT_ROUTE_MARKER_V1 not in raw
@@ -450,7 +453,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         and DECISION_ACK_MARKER_V14 in raw
         and DECISION_ACK_MARKER_V15 in raw
         and DECISION_ACK_MARKER_V16 in raw
-        and DECISION_ACK_MARKER_V17 in raw
+        and DECISION_ACK_MARKER_V19 in raw
         and DECISION_ROUTE_MARKER_V1 in raw
         and DECISION_EXEC_MARKER_V1 in raw
         and DECISION_RESULT_ROUTE_MARKER_V1 in raw
@@ -500,9 +503,8 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         '\t\t\t\t\tconst skill = cfg?.skills?.entries?.["xclaw-agent"];\n'
         '\t\t\t\t\tconst env = skill?.env ?? {};\n'
         '\t\t\t\t\tconst apiKey = String(skill?.apiKey ?? env?.XCLAW_API_KEY ?? process.env.XCLAW_API_KEY ?? "").trim();\n'
-        '\t\t\t\t\t// Reduce perceived latency: best-effort stop spinner + remove buttons immediately.\n'
+        '\t\t\t\t\t// Reduce perceived latency: best-effort stop spinner while runtime applies canonical clear.\n'
         '\t\t\t\t\ttry { bot.api.answerCallbackQuery(callback.id, { text: action === "r" ? "Denying..." : "Approving...", show_alert: false }); } catch {}\n'
-        '\t\t\t\t\ttry { await bot.api.editMessageReplyMarkup(chatId, callbackMessage.message_id, { inline_keyboard: [] }); } catch {}\n'
         '\t\t\t\t\ttry {\n'
         '\t\t\t\t\t\tconst atEpochSec = (typeof callback?.date === "number" ? callback.date : (typeof callbackMessage?.date === "number" ? callbackMessage.date : Math.floor(Date.now() / 1000)));\n'
         '\t\t\t\t\t\tconst atIso = (/* @__PURE__ */ new Date(atEpochSec * 1000)).toISOString();\n'
@@ -511,6 +513,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         '\t\t\t\t\t\t\tconst childMod = await import("node:child_process");\n'
         '\t\t\t\t\t\t\tconst fsMod = await import("node:fs");\n'
         '\t\t\t\t\t\t\tconst runtimeCandidates = [\n'
+        f'\t\t\t\t\t\t\t\t{json.dumps(REPO_RUNTIME_BIN)},\n'
         '\t\t\t\t\t\t\t\tString(env?.XCLAW_AGENT_RUNTIME_BIN ?? process.env.XCLAW_AGENT_RUNTIME_BIN ?? "").trim(),\n'
         '\t\t\t\t\t\t\t\t"xclaw-agent"\n'
         '\t\t\t\t\t\t\t].filter((v) => !!v);\n'
@@ -584,6 +587,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         '\t\t\t\t\t\t\tconst childMod = await import("node:child_process");\n'
         '\t\t\t\t\t\t\tconst fsMod = await import("node:fs");\n'
         '\t\t\t\t\t\t\tconst runtimeCandidates = [\n'
+        f'\t\t\t\t\t\t\t\t{json.dumps(REPO_RUNTIME_BIN)},\n'
         '\t\t\t\t\t\t\t\tString(env?.XCLAW_AGENT_RUNTIME_BIN ?? process.env.XCLAW_AGENT_RUNTIME_BIN ?? "").trim(),\n'
         '\t\t\t\t\t\t\t\t"xclaw-agent"\n'
         '\t\t\t\t\t\t\t].filter((v) => !!v);\n'
@@ -620,7 +624,8 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V15}\n'
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V16}\n'
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V17}\n'
-        '\t\t\t\t\t\t\t\ttry { await bot.api.editMessageReplyMarkup(chatId, callbackMessage.message_id, { inline_keyboard: [] }); } catch {}\n'
+        f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V18}\n'
+        f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V19}\n'
         '\t\t\t\t\t\t\t\ttry {\n'
         '\t\t\t\t\t\t\t\t\tconst subjectLabel = parts[0] === "xpol" ? "policy approval" : "trade";\n'
         '\t\t\t\t\t\t\t\t\tconst msg = `${action === "r" ? "Denied" : "Approved"} ${subjectLabel} ${subjectId}\\nChain: ${chainKey}`;\n'
@@ -682,8 +687,9 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V15}\n'
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V16}\n'
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V17}\n'
-        '\t\t\t\t\t\t\t\t// Keep queued text in chat history and only clear inline buttons.\n'
-        '\t\t\t\t\t\t\t\ttry { await bot.api.editMessageReplyMarkup(chatId, callbackMessage.message_id, { inline_keyboard: [] }); } catch {}\n'
+        f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V18}\n'
+        f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V19}\n'
+        '\t\t\t\t\t\t\t\t// Runtime is canonical owner of queued prompt cleanup (button clear, no delete).\n'
         '\t\t\t\t\t\t\t\t// Emit deterministic confirmation immediately so users always see a result.\n'
         '\t\t\t\t\t\t\t\ttry {\n'
         '\t\t\t\t\t\t\t\t\tconst subjectLabel = parts[0] === "xpol" ? "policy approval" : (parts[0] === "xfer" ? "transfer approval" : "trade");\n'
@@ -728,6 +734,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst childMod = await import("node:child_process");\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst fsMod = await import("node:fs");\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst runtimeCandidates = [\n'
+        f'\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t{json.dumps(REPO_RUNTIME_BIN)},\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tString(env?.XCLAW_AGENT_RUNTIME_BIN ?? process.env.XCLAW_AGENT_RUNTIME_BIN ?? "").trim(),\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t"xclaw-agent"\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\t].filter((v) => !!v);\n'
@@ -819,7 +826,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         '\t\t\t\t\t\t\t\t}\n'
         '\t\t\t\t\t\t\t\treturn;\n'
         '\t\t\t\t\t\t\tlet errCode = "api_error"; let errMsg = `HTTP ${res.status}`;\n'
-        '\t\t\t\t\t\t\ttry { const body = await res.json(); if (typeof body?.code === "string" && body.code.trim()) errCode = body.code.trim(); if (typeof body?.message === "string" && body.message.trim()) errMsg = body.message.trim(); if (res.status === 409 && (body?.details?.currentStatus === "approved" || body?.details?.currentStatus === "filled" || body?.details?.currentStatus === "rejected")) { try { await bot.api.editMessageReplyMarkup(chatId, callbackMessage.message_id, { inline_keyboard: [] }); } catch {} const currentStatus = String(body?.details?.currentStatus || ""); const decision = currentStatus === "rejected" ? "Denied" : "Approved"; const subjectLabel = parts[0] === "xpol" ? "policy approval" : (parts[0] === "xfer" ? "transfer approval" : "trade"); if (!(parts[0] === "xappr" || (parts[0] === "xpol" && currentStatus !== "rejected"))) { await bot.api.sendMessage(chatId, `${decision} ${subjectLabel} ${subjectId}\\nChain: ${chainKey}`); } return; } } catch {}\n'
+        '\t\t\t\t\t\t\ttry { const body = await res.json(); if (typeof body?.code === "string" && body.code.trim()) errCode = body.code.trim(); if (typeof body?.message === "string" && body.message.trim()) errMsg = body.message.trim(); if (res.status === 409 && (body?.details?.currentStatus === "approved" || body?.details?.currentStatus === "filled" || body?.details?.currentStatus === "rejected")) { const currentStatus = String(body?.details?.currentStatus || ""); const decision = currentStatus === "rejected" ? "Denied" : "Approved"; const subjectLabel = parts[0] === "xpol" ? "policy approval" : (parts[0] === "xfer" ? "transfer approval" : "trade"); if (!(parts[0] === "xappr" || (parts[0] === "xpol" && currentStatus !== "rejected"))) { await bot.api.sendMessage(chatId, `${decision} ${subjectLabel} ${subjectId}\\nChain: ${chainKey}`); } return; } } catch {}\n'
         '\t\t\t\t\t\t\ttry {\n'
         '\t\t\t\t\t\t\t\tconst kb = parts[0] === "xpol"\n'
         '\t\t\t\t\t\t\t\t\t? [[{ text: "Approve", callback_data: `xpol|a|${subjectId}|${chainKey}` }, { text: "Deny", callback_data: `xpol|r|${subjectId}|${chainKey}` }]]\n'

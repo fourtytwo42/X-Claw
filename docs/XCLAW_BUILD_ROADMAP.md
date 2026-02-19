@@ -2936,6 +2936,7 @@ Note:
 - [~] Replace allowances placeholder with permissions inventory module.
 - [x] Add web synthetic agent prod bridge for trade/transfer decisions + terminal outcomes with no-deliver dispatch (Telegram-safe by default; optional Telegram guard override).
 - [x] Keep Telegram transfer callback deterministic result delivery and route synthetic transfer-result envelope into agent pipeline for completion follow-up.
+- [x] Centralize approval prompt cleanup under runtime command `approvals clear-prompt` for trade/transfer/policy, with button-clear-only (no message delete) behavior across web + Telegram callback flows.
 - [x] Shell installer uses capability-gated gateway patching: on patch permission failure it auto-degrades (no patch), enables Telegram management-link fallback mode, and emits explicit sudo rerun guidance for inline-button support.
 
 ### 87.3 Validation + evidence
@@ -2944,6 +2945,7 @@ Note:
 - [x] Verify non-Telegram prod dispatch attempted on web decision/terminal paths.
 - [x] Verify Telegram-last synthetic prod dispatch runs without `--deliver` and does not emit extra Telegram messages.
 - [x] Verify transfer approval Telegram inline buttons are removed on approve/deny convergence.
+- [x] Verify no approval prompt cleanup path invokes Telegram/OpenClaw message delete; runtime clear codes are surfaced as `promptCleanup` metadata.
 - [x] Verify owner-link direct-send is skipped when active channel is Telegram (button-first handoff).
 
 ## 88) Slice 88: Approvals Full UX Flush (Batch + Risk)

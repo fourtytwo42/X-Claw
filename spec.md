@@ -95,6 +95,29 @@ Align policy approval flows with trade/transfer behavior so policy requests auto
 
 # Hotfix Spec: Force-Upgrade Gateway Callback Patch (v15) For Trade-Approve Ack Suppression
 
+# Hotfix Spec: Web Approval Prompt Cleanup Recovery + Message ID Extraction Hardening
+
+## Goal
+Reduce web/Telegram approval divergence by:
+1. hardening runtime OpenClaw message-id extraction so new prompts avoid `message_id='unknown'`,
+2. adding web decision fallback to runtime `approvals cleanup-spot` when DB-side cleanup cannot delete due stale prompt metadata.
+
+## Non-goals
+1. No API schema/migration changes.
+2. No change to trade execution semantics.
+3. No retroactive guarantee for historical prompts with unknown IDs and no local runtime prompt record.
+
+## Locked scope
+1. `apps/agent-runtime/xclaw_agent/cli.py`
+2. `apps/agent-runtime/tests/test_trade_path.py`
+3. `apps/network-web/src/app/api/v1/management/approvals/decision/route.ts`
+4. `skills/xclaw-agent/SKILL.md`
+5. `skills/xclaw-agent/references/commands.md`
+6. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+7. `spec.md`
+8. `tasks.md`
+9. `acceptance.md`
+
 # Runtime-Canonical Approval Decisions (Trade/Transfer/Policy)
 
 ## Goal
@@ -115,6 +138,34 @@ Unify decision handling so runtime is source-of-truth for approval decisions whi
 - `/api/v1/management/approvals/decision` dispatches runtime `decide-spot`
 - `/api/v1/management/policy-approvals/decision` dispatches runtime `decide-policy`
 - `/api/v1/management/transfer-approvals/decision` continues runtime dispatch and includes `--source web`
+
+---
+
+# Hotfix Spec: Runtime-Canonical Approval Prompt Button Clear (Trade/Transfer/Policy)
+
+## Goal
+Unify approval prompt cleanup for web + Telegram callback + runtime decision flows behind one runtime command that clears Telegram inline buttons only and never deletes prompt messages.
+
+## Non-goals
+1. No migration/schema changes.
+2. No change to trade/transfer/policy decision semantics beyond cleanup convergence.
+3. No new dependencies.
+
+## Locked scope
+1. `apps/agent-runtime/xclaw_agent/cli.py`
+2. `apps/agent-runtime/tests/test_trade_path.py`
+3. `apps/network-web/src/app/api/v1/management/approvals/decision/route.ts`
+4. `apps/network-web/src/app/api/v1/management/transfer-approvals/decision/route.ts`
+5. `apps/network-web/src/app/api/v1/management/policy-approvals/decision/route.ts`
+6. `skills/xclaw-agent/scripts/openclaw_gateway_patch.py`
+7. `skills/xclaw-agent/SKILL.md`
+8. `skills/xclaw-agent/references/commands.md`
+9. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+10. `docs/XCLAW_BUILD_ROADMAP.md`
+11. `docs/XCLAW_SLICE_TRACKER.md`
+12. `spec.md`
+13. `tasks.md`
+14. `acceptance.md`
 - Telegram callback behavior:
   - `xappr|...`, `xpol|...`, `xfer|...` dispatch runtime `approvals decide-*` commands.
   - direct callback fetch/status mutation logic for trade/policy is no longer primary path.

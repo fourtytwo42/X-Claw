@@ -102,6 +102,54 @@ function runtimeSpawnEnv(req: NextRequest, agentId: string, chainKey: string): N
   return env;
 }
 
+function invokeRuntimePromptCleanupSync(input: {
+  req: NextRequest;
+  agentId: string;
+  approvalId: string;
+  chainKey: string;
+}): { ok: boolean; code: string; payload?: Record<string, unknown>; runtimeExitStatus?: number | null; stderrSummary?: string } {
+  const runtimeBin = resolveRuntimeBin();
+  const runtimeArgs = [
+    'approvals',
+    'clear-prompt',
+    '--subject-type',
+    'transfer',
+    '--subject-id',
+    input.approvalId,
+    '--chain',
+    input.chainKey,
+    '--json'
+  ];
+  const child = spawnSync(runtimeBin, runtimeArgs, {
+    encoding: 'utf8',
+    timeout: transferDecisionRuntimeTimeoutMs(),
+    env: runtimeSpawnEnv(input.req, input.agentId, input.chainKey)
+  });
+  const stdout = String(child.stdout ?? '');
+  const stderr = String(child.stderr ?? '');
+  let payload: Record<string, unknown> | undefined;
+  const lines = stdout
+    .split(/\r?\n/)
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0);
+  if (lines.length > 0) {
+    try {
+      const parsed = JSON.parse(lines[lines.length - 1]);
+      if (parsed && typeof parsed === 'object') {
+        payload = parsed as Record<string, unknown>;
+      }
+    } catch {}
+  }
+  const ok = child.status === 0 && Boolean(payload?.ok);
+  return {
+    ok,
+    code: ok ? 'runtime_cleanup_applied' : 'runtime_cleanup_failed',
+    payload,
+    runtimeExitStatus: child.status,
+    stderrSummary: stderr.slice(0, 500)
+  };
+}
+
 export async function POST(req: NextRequest) {
   const requestId = getRequestId(req);
   try {
@@ -234,6 +282,7 @@ export async function POST(req: NextRequest) {
 
     let applied = child.status === 0;
     let appliedVia: 'runtime' | 'mirror_fallback' | 'none' = applied ? 'runtime' : 'none';
+    let promptCleanup: Record<string, unknown> | null = null;
 
     // Deny should be deterministic from management UI even when immediate runtime application is unavailable.
     if (!applied && body.decision === 'deny') {
@@ -326,6 +375,20 @@ export async function POST(req: NextRequest) {
     let agentProdTerminal: Awaited<ReturnType<typeof dispatchNonTelegramAgentProd>> | null = null;
 
     if (applied) {
+      const runtimeCleanup = invokeRuntimePromptCleanupSync({
+        req,
+        agentId: body.agentId,
+        approvalId: body.approvalId,
+        chainKey
+      });
+      promptCleanup =
+        (runtimeCleanup.payload?.promptCleanup && typeof runtimeCleanup.payload.promptCleanup === 'object')
+          ? (runtimeCleanup.payload.promptCleanup as Record<string, unknown>)
+          : {
+              ok: runtimeCleanup.ok,
+              code: runtimeCleanup.code
+            };
+
       agentProdDecision = await dispatchNonTelegramAgentProd({
         allowTelegramLastChannel: true,
         message: buildWebTransferDecisionProdMessage({
@@ -382,7 +445,8 @@ export async function POST(req: NextRequest) {
       runtimeExitStatus: child.status,
       applied,
       appliedVia,
-      runtimePayload
+      runtimePayload,
+      promptCleanup
     });
 
     await dbQuery(
@@ -405,6 +469,7 @@ export async function POST(req: NextRequest) {
           runtimeExitStatus: child.status,
           appliedVia,
           runtimePayload,
+          promptCleanup,
           agentProdDecision,
           agentProdTerminal,
           stderr: (child.stderr || '').slice(0, 1200),
@@ -427,7 +492,8 @@ export async function POST(req: NextRequest) {
             decision: body.decision,
             approvalSource,
             runtimeExitStatus: child.status,
-            runtimePayload
+            runtimePayload,
+            promptCleanup
           }
         },
         requestId
@@ -443,6 +509,7 @@ export async function POST(req: NextRequest) {
         appliedVia,
         runtimeApplied: applied,
         runtimePayload,
+        promptCleanup,
         agentProdDecision,
         agentProdTerminal
       },

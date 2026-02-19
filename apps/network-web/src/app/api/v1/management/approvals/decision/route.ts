@@ -68,128 +68,6 @@ function resolveRuntimeApiBase(req: NextRequest): string {
   return `${req.nextUrl.origin}/api/v1`;
 }
 
-function resolveOpenclawBin(): string | null {
-  const candidates = [
-    process.env.OPENCLAW_BIN?.trim() ?? '',
-    '/usr/local/bin/openclaw',
-    '/usr/bin/openclaw',
-    `${process.env.HOME ?? ''}/.local/bin/openclaw`
-  ].filter((value) => value.length > 0);
-  for (const candidate of candidates) {
-    if (existsSync(candidate)) {
-      return candidate;
-    }
-  }
-  return null;
-}
-
-function normalizeTelegramTarget(value: string): string {
-  const raw = String(value || '').trim();
-  if (!raw) {
-    return raw;
-  }
-  if (raw.startsWith('telegram:')) {
-    return raw.slice('telegram:'.length);
-  }
-  return raw;
-}
-
-function runCommandAsync(bin: string, args: string[], env: NodeJS.ProcessEnv): Promise<{ status: number | null; stdout: string; stderr: string }> {
-  return new Promise((resolve) => {
-    let stdout = '';
-    let stderr = '';
-    const child = spawn(bin, args, { stdio: ['ignore', 'pipe', 'pipe'], env });
-    child.stdout.on('data', (chunk) => {
-      stdout += String(chunk);
-    });
-    child.stderr.on('data', (chunk) => {
-      stderr += String(chunk);
-    });
-    child.on('error', (error) => {
-      resolve({ status: null, stdout, stderr: String(error?.message || error || '') });
-    });
-    child.on('close', (status) => {
-      resolve({ status, stdout, stderr });
-    });
-  });
-}
-
-async function cleanupTradeApprovalPrompt(input: { tradeId: string; requestId: string }): Promise<Record<string, unknown>> {
-  const row = await dbQuery<{
-    to_address: string;
-    thread_id: string | null;
-    message_id: string;
-    deleted_at: string | null;
-  }>(
-    `
-    select to_address, thread_id, message_id, deleted_at
-    from trade_approval_prompts
-    where trade_id = $1 and channel = 'telegram'
-    limit 1
-    `,
-    [input.tradeId]
-  );
-  if (row.rowCount === 0) {
-    return { ok: false, code: 'prompt_not_found', tradeId: input.tradeId };
-  }
-  const prompt = row.rows[0];
-  if (prompt.deleted_at) {
-    return { ok: true, code: 'already_deleted', tradeId: input.tradeId };
-  }
-
-  const messageId = String(prompt.message_id || '').trim();
-  const target = normalizeTelegramTarget(String(prompt.to_address || '').trim());
-  if (!messageId || !target || messageId === 'unknown') {
-    const reason = !messageId || messageId === 'unknown' ? 'missing_message_id' : 'missing_target';
-    await dbQuery(
-      `
-      update trade_approval_prompts
-      set delete_error = $2
-      where trade_id = $1 and channel = 'telegram'
-      `,
-      [input.tradeId, reason]
-    );
-    return { ok: false, code: reason, tradeId: input.tradeId };
-  }
-
-  const openclawBin = resolveOpenclawBin();
-  if (!openclawBin) {
-    await dbQuery(
-      `
-      update trade_approval_prompts
-      set delete_error = $2
-      where trade_id = $1 and channel = 'telegram'
-      `,
-      [input.tradeId, 'openclaw_missing']
-    );
-    return { ok: false, code: 'openclaw_missing', tradeId: input.tradeId };
-  }
-
-  const args = ['message', 'delete', '--channel', 'telegram', '--target', target, '--message-id', messageId, '--json'];
-  const proc = await runCommandAsync(openclawBin, args, process.env);
-  if (proc.status === 0) {
-    await dbQuery(
-      `
-      update trade_approval_prompts
-      set deleted_at = now(), delete_error = null
-      where trade_id = $1 and channel = 'telegram'
-      `,
-      [input.tradeId]
-    );
-    return { ok: true, code: 'deleted', tradeId: input.tradeId };
-  }
-  const errorText = String(proc.stderr || proc.stdout || '').trim().slice(0, 500) || `delete_exit_${String(proc.status)}`;
-  await dbQuery(
-    `
-    update trade_approval_prompts
-    set delete_error = $2
-    where trade_id = $1 and channel = 'telegram'
-    `,
-    [input.tradeId, errorText]
-  );
-  return { ok: false, code: 'delete_failed', tradeId: input.tradeId, error: errorText };
-}
-
 function runtimeSpawnEnv(req: NextRequest, agentId: string, chainKey: string): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {
     ...process.env,
@@ -392,6 +270,54 @@ function spawnApprovalPromptSyncInBackground(input: {
       runtimeArgs
     };
   }
+}
+
+function invokeRuntimePromptCleanupSync(input: {
+  req: NextRequest;
+  agentId: string;
+  tradeId: string;
+  chainKey: string;
+}): { ok: boolean; code: string; payload?: Record<string, unknown>; runtimeExitStatus?: number | null; stderrSummary?: string } {
+  const runtimeBin = resolveRuntimeBin();
+  const runtimeArgs = [
+    'approvals',
+    'clear-prompt',
+    '--subject-type',
+    'trade',
+    '--subject-id',
+    input.tradeId,
+    '--chain',
+    input.chainKey,
+    '--json'
+  ];
+  const child = spawnSync(runtimeBin, runtimeArgs, {
+    encoding: 'utf8',
+    timeout: runtimeDecisionTimeoutMs(),
+    env: runtimeSpawnEnv(input.req, input.agentId, input.chainKey)
+  });
+  const stdout = String(child.stdout ?? '');
+  const stderr = String(child.stderr ?? '');
+  let payload: Record<string, unknown> | undefined;
+  const lines = stdout
+    .split(/\r?\n/)
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0);
+  if (lines.length > 0) {
+    try {
+      const parsed = JSON.parse(lines[lines.length - 1]);
+      if (parsed && typeof parsed === 'object') {
+        payload = parsed as Record<string, unknown>;
+      }
+    } catch {}
+  }
+  const ok = child.status === 0 && Boolean(payload?.ok);
+  return {
+    ok,
+    code: ok ? 'runtime_cleanup_applied' : 'runtime_cleanup_failed',
+    payload,
+    runtimeExitStatus: child.status,
+    stderrSummary: stderr.slice(0, 500)
+  };
 }
 
 export async function POST(req: NextRequest) {
@@ -627,6 +553,78 @@ export async function POST(req: NextRequest) {
     };
     setImmediate(() => {
       void (async () => {
+        const runtimeCleanup = invokeRuntimePromptCleanupSync({
+          req,
+          agentId: queued.agentId,
+          tradeId: queued.tradeId,
+          chainKey: queued.chainKey
+        });
+        let promptCleanup: Record<string, unknown> = (runtimeCleanup.payload?.promptCleanup && typeof runtimeCleanup.payload.promptCleanup === 'object')
+          ? (runtimeCleanup.payload.promptCleanup as Record<string, unknown>)
+          : {
+              ok: runtimeCleanup.ok,
+              code: runtimeCleanup.code
+            };
+        let cleanupOk = promptCleanup.ok === true;
+        let cleanupCode = String(promptCleanup.code ?? '');
+
+        if (cleanupOk) {
+          await dbQuery(
+            `
+            update trade_approval_prompts
+            set deleted_at = coalesce(deleted_at, now()), delete_error = null
+            where trade_id = $1 and channel = 'telegram'
+            `,
+            [queued.tradeId]
+          );
+        } else {
+          const cleanupError = String((promptCleanup.error ?? runtimeCleanup.stderrSummary ?? cleanupCode) || 'runtime_clear_failed').slice(0, 500);
+          await dbQuery(
+            `
+            update trade_approval_prompts
+            set delete_error = $2
+            where trade_id = $1 and channel = 'telegram'
+            `,
+            [queued.tradeId, cleanupError]
+          );
+        }
+
+        if (!cleanupOk) {
+          const promptSync = spawnApprovalPromptSyncInBackground({
+            req,
+            agentId: queued.agentId,
+            chainKey: queued.chainKey
+          });
+          console.info('[management.approvals.decision] approval prompt sync dispatch', {
+            requestId: queued.requestId,
+            tradeId: queued.tradeId,
+            chainKey: queued.chainKey,
+            promptSync
+          });
+        }
+        console.info('[management.approvals.decision] approval prompt cleanup result', {
+          requestId: queued.requestId,
+          tradeId: queued.tradeId,
+          chainKey: queued.chainKey,
+          promptCleanup
+        });
+
+        if (queued.decision === 'approve') {
+          const runtimeResume = spawnResumeSpotInBackground({
+            req,
+            agentId: queued.agentId,
+            tradeId: queued.tradeId,
+            chainKey: queued.chainKey
+          });
+          console.info('[management.approvals.decision] runtime resume dispatch', {
+            requestId: queued.requestId,
+            tradeId: queued.tradeId,
+            chainKey: queued.chainKey,
+            runtimeResume
+          });
+          return;
+        }
+
         const agentProdDecision = await dispatchNonTelegramAgentProd({
           allowTelegramLastChannel: true,
           message: buildWebTradeDecisionProdMessage({
@@ -642,47 +640,6 @@ export async function POST(req: NextRequest) {
           tradeId: queued.tradeId,
           chainKey: queued.chainKey,
           agentProdDecision
-        });
-        if (queued.decision === 'approve') {
-          const decisionProdExitStatus =
-            typeof agentProdDecision.exitStatus === 'number' ? agentProdDecision.exitStatus : null;
-          const runtimeResume =
-            decisionProdExitStatus !== 0
-              ? spawnResumeSpotInBackground({
-                  req,
-                  agentId: queued.agentId,
-                  tradeId: queued.tradeId,
-                  chainKey: queued.chainKey
-                })
-              : {
-                  ok: true,
-                  code: 'resume_expected_via_agent_prod',
-                  message: 'Agent prod dispatch succeeded; agent is expected to run trade-resume.'
-                };
-          console.info('[management.approvals.decision] runtime resume dispatch', {
-            requestId: queued.requestId,
-            tradeId: queued.tradeId,
-            chainKey: queued.chainKey,
-            runtimeResume
-          });
-        }
-        const promptSync = spawnApprovalPromptSyncInBackground({
-          req,
-          agentId: queued.agentId,
-          chainKey: queued.chainKey
-        });
-        console.info('[management.approvals.decision] approval prompt sync dispatch', {
-          requestId: queued.requestId,
-          tradeId: queued.tradeId,
-          chainKey: queued.chainKey,
-          promptSync
-        });
-        const promptCleanup = await cleanupTradeApprovalPrompt({ tradeId: queued.tradeId, requestId: queued.requestId });
-        console.info('[management.approvals.decision] approval prompt cleanup result', {
-          requestId: queued.requestId,
-          tradeId: queued.tradeId,
-          chainKey: queued.chainKey,
-          promptCleanup
         });
       })().catch((error) => {
         console.error('[management.approvals.decision] async dispatch failure', {

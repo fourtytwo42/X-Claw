@@ -1675,6 +1675,7 @@ DoD:
 - [~] allowances placeholder replaced with permissions inventory module.
 - [x] web synthetic prod bridge dispatches trade/transfer decision + terminal notifications with no-deliver dispatch (Telegram-safe by default; optional Telegram guard override).
 - [x] transfer Telegram approval prompts are tracked and cleared on approve/deny convergence.
+- [x] approval prompt cleanup is runtime-canonical across trade/transfer/policy (`approvals clear-prompt`) and removes inline buttons only (no prompt message delete).
 - [x] owner-link direct-send is disabled for Telegram-active channel (button-first approval UX).
 - [x] transfer Telegram callback path sends deterministic transfer result and routes synthetic transfer-result envelope to agent pipeline for completion follow-up.
 - [x] shell installer capability-gates Telegram gateway patching; permission-denied patch paths auto-degrade to management-link Telegram fallback mode with explicit sudo rerun guidance for inline-button support.

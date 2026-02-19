@@ -320,6 +320,7 @@ export async function POST(
     let agentProdTerminal: Awaited<ReturnType<typeof dispatchNonTelegramAgentProd>> | null = null;
     if (isTradeTerminalStatus(body.toStatus)) {
       agentProdTerminal = await dispatchNonTelegramAgentProd({
+        allowTelegramLastChannel: true,
         message: buildWebTradeResultProdMessage({
           status: body.toStatus,
           tradeId: pathTradeId,

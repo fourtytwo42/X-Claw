@@ -3046,6 +3046,8 @@ Limitations / notes:
 - `approvals decide-spot --trade-id <trd_...> --decision <approve|reject> --chain <chain> --source <web|telegram|runtime> [--idempotency-key <key>] [--decision-at <iso8601>] --json`
 - `approvals decide-transfer --approval-id <xfr_...> --decision <approve|deny> --chain <chain> --source <web|telegram|runtime> [--idempotency-key <key>] [--decision-at <iso8601>] --json`
 - `approvals decide-policy --approval-id <ppr_...> --decision <approve|reject> --chain <chain> --source <web|telegram|runtime> [--idempotency-key <key>] [--decision-at <iso8601>] --json`
+- `approvals clear-prompt --subject-type <trade|transfer|policy> --subject-id <id> [--chain <chain>] --json`
+- `approvals cleanup-spot --trade-id <trd_...> --json` remains compatibility alias for spot flows.
 
 3. Feature-flagged rollout:
 - flag: `XCLAW_RUNTIME_CANONICAL_APPROVAL_DECISIONS`.
@@ -3055,7 +3057,10 @@ Limitations / notes:
 
 4. Prompt cleanup contract:
 - runtime/server must persist approval prompt transport metadata (`channel`, `target`, `thread`, `messageId`) keyed by subject ID.
-- cleanup must report deterministic status (`deleted`, `missing_message_id`, `prompt_not_found`, `delete_failed`).
+- prompt cleanup is runtime-owned for web and Telegram callback flows (`approvals clear-prompt`).
+- cleanup must clear Telegram inline buttons while preserving original message text/history (non-destructive).
+- approval prompt cleanup must never call Telegram/OpenClaw message delete APIs.
+- deterministic cleanup codes include (`buttons_cleared`, `already_cleared`, `prompt_not_found`, `missing_message_id`, `missing_target`, `telegram_api_failed`, `openclaw_missing`, `non_telegram_removed`, `state_removed_non_destructive`).
 - existing rows with historical `messageId=unknown` are forward-only cleanup gaps and must not block execution/prod.
 
 5. Output envelope requirement:
@@ -3064,6 +3069,9 @@ Limitations / notes:
   - `txHash` when available,
   - `promptCleanup`,
   - `actionHint`.
+6. Web/Telegram parity:
+- all management decision routes (trade/transfer/policy) must dispatch runtime cleanup and surface `promptCleanup` metadata in runtime/web decision output.
+- Telegram callback handlers must not perform immediate pre-clear; runtime decision path performs canonical clear.
   - `GET /api/v1/management/agent-state`,
   - `POST /api/v1/management/approvals/decision`,
   - `POST /api/v1/management/policy-approvals/decision`,

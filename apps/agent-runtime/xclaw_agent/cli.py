@@ -2705,9 +2705,24 @@ def _extract_openclaw_message_id(stdout: str) -> str | None:
                     break
                 except Exception:
                     continue
-    if payload is None:
-        return None
-    return _walk(payload)
+    if payload is not None:
+        found = _walk(payload)
+        if found:
+            return found
+
+    # Fallback for non-JSON/mixed stdout variants emitted by some OpenClaw builds.
+    patterns = (
+        r'["\']messageId["\']\s*[:=]\s*["\']?([0-9]{1,20})["\']?',
+        r'["\']message_id["\']\s*[:=]\s*["\']?([0-9]{1,20})["\']?',
+        r"\bmessage[_\s-]?id\b\s*[:=]\s*([0-9]{1,20})\b",
+    )
+    for pattern in patterns:
+        matches = list(re.finditer(pattern, raw, flags=re.IGNORECASE))
+        if matches:
+            value = (matches[-1].group(1) or "").strip()
+            if value:
+                return value
+    return None
 
 
 def _post_approval_prompt_metadata(trade_id: str, chain: str, to_addr: str, thread_id: str | None, message_id: str) -> None:
@@ -3063,114 +3078,227 @@ def _maybe_delete_telegram_approval_prompt(trade_id: str) -> None:
     entry = _get_approval_prompt(trade_id)
     if not entry or str(entry.get("channel") or "") != "telegram":
         return
-    chat_id = str(entry.get("to") or "").strip()
+    # Telegram inline buttons should be cleared in callback/web paths;
+    # do not delete the original message here.
+    _remove_approval_prompt(trade_id)
+
+
+def _normalize_telegram_target(value: str) -> str:
+    raw = str(value or "").strip()
+    if raw.startswith("telegram:"):
+        return raw[len("telegram:") :]
+    return raw
+
+
+def _resolve_telegram_bot_token() -> str | None:
+    for candidate in (
+        os.environ.get("XCLAW_TELEGRAM_BOT_TOKEN"),
+        os.environ.get("TELEGRAM_BOT_TOKEN"),
+    ):
+        token = str(candidate or "").strip()
+        if token:
+            return token
+
+    try:
+        openclaw = _require_openclaw_bin()
+    except Exception:
+        return None
+    proc = _run_subprocess(
+        [openclaw, "config", "get", "channels.telegram.botToken", "--json"],
+        timeout_sec=5,
+        kind="openclaw_config_get",
+    )
+    if proc.returncode != 0:
+        return None
+    raw = str(proc.stdout or "").strip()
+    if not raw:
+        return None
+    try:
+        parsed = json.loads(raw)
+        if isinstance(parsed, str) and parsed.strip():
+            return parsed.strip()
+    except Exception:
+        pass
+    if raw.startswith('"') and raw.endswith('"'):
+        raw = raw[1:-1]
+    raw = raw.strip()
+    return raw or None
+
+
+def _approval_prompt_store_ops(subject_type: str) -> tuple[Any, Any]:
+    normalized = str(subject_type or "").strip().lower()
+    if normalized == "trade":
+        return _get_approval_prompt, _remove_approval_prompt
+    if normalized == "transfer":
+        return _get_transfer_approval_prompt, _remove_transfer_approval_prompt
+    if normalized == "policy":
+        return _get_policy_approval_prompt, _remove_policy_approval_prompt
+    raise WalletStoreError(f"Unsupported subject_type '{subject_type}'.")
+
+
+def _clear_telegram_approval_buttons(subject_type: str, subject_id: str) -> dict[str, Any]:
+    get_prompt, remove_prompt = _approval_prompt_store_ops(subject_type)
+    entry = get_prompt(subject_id)
+    if not entry:
+        return {
+            "ok": False,
+            "code": "prompt_not_found",
+            "subjectType": subject_type,
+            "subjectId": subject_id,
+            "promptCleanup": {"ok": False, "code": "prompt_not_found", "channel": "telegram"},
+        }
+    if str(entry.get("channel") or "") != "telegram":
+        remove_prompt(subject_id)
+        return {
+            "ok": True,
+            "code": "non_telegram_removed",
+            "subjectType": subject_type,
+            "subjectId": subject_id,
+            "promptCleanup": {"ok": True, "code": "non_telegram_removed", "channel": str(entry.get("channel") or "")},
+        }
+    chat_id = _normalize_telegram_target(str(entry.get("to") or ""))
     message_id = str(entry.get("messageId") or "").strip()
-    if not chat_id or not message_id or message_id == "unknown":
-        _remove_approval_prompt(trade_id)
-        return
-    openclaw = shutil.which("openclaw")
-    if not openclaw:
-        return
-    cmd = [openclaw, "message", "delete", "--channel", "telegram", "--target", chat_id, "--message-id", message_id, "--json"]
-    proc = _run_subprocess(cmd, timeout_sec=20, kind="openclaw_delete")
-    if proc.returncode == 0:
-        _remove_approval_prompt(trade_id)
+    if not chat_id:
+        remove_prompt(subject_id)
+        return {
+            "ok": False,
+            "code": "missing_target",
+            "subjectType": subject_type,
+            "subjectId": subject_id,
+            "promptCleanup": {"ok": False, "code": "missing_target", "channel": "telegram", "messageId": message_id or None},
+        }
+    if not message_id or message_id == "unknown":
+        remove_prompt(subject_id)
+        return {
+            "ok": False,
+            "code": "missing_message_id",
+            "subjectType": subject_type,
+            "subjectId": subject_id,
+            "promptCleanup": {"ok": False, "code": "missing_message_id", "channel": "telegram", "messageId": message_id or None},
+        }
+    try:
+        numeric_message_id = int(message_id)
+    except Exception:
+        remove_prompt(subject_id)
+        return {
+            "ok": False,
+            "code": "invalid_message_id",
+            "subjectType": subject_type,
+            "subjectId": subject_id,
+            "promptCleanup": {"ok": False, "code": "invalid_message_id", "channel": "telegram", "messageId": message_id},
+        }
+    bot_token = _resolve_telegram_bot_token()
+    if not bot_token:
+        openclaw_missing = shutil.which("openclaw") is None
+        return {
+            "ok": False,
+            "code": "openclaw_missing" if openclaw_missing else "telegram_bot_token_missing",
+            "subjectType": subject_type,
+            "subjectId": subject_id,
+            "promptCleanup": {
+                "ok": False,
+                "code": "openclaw_missing" if openclaw_missing else "telegram_bot_token_missing",
+                "channel": "telegram",
+                "messageId": message_id,
+            },
+        }
+
+    endpoint = f"https://api.telegram.org/bot{urllib.parse.quote(bot_token, safe='')}/editMessageReplyMarkup"
+    req_payload = {
+        "chat_id": chat_id,
+        "message_id": numeric_message_id,
+        "reply_markup": {"inline_keyboard": []},
+    }
+    request = urllib.request.Request(
+        url=endpoint,
+        data=json.dumps(req_payload).encode("utf-8"),
+        headers={"content-type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=10) as response:
+            response_body = response.read().decode("utf-8", errors="replace").strip()
+        remove_prompt(subject_id)
+        return {
+            "ok": True,
+            "code": "buttons_cleared",
+            "subjectType": subject_type,
+            "subjectId": subject_id,
+            "promptCleanup": {
+                "ok": True,
+                "code": "buttons_cleared",
+                "channel": "telegram",
+                "messageId": message_id,
+                "response": response_body[:300] if response_body else None,
+            },
+        }
+    except urllib.error.HTTPError as exc:
+        body = ""
+        try:
+            body = exc.read().decode("utf-8", errors="replace")
+        except Exception:
+            body = ""
+        body_trimmed = body.strip()
+        if "message is not modified" in body_trimmed.lower():
+            remove_prompt(subject_id)
+            return {
+                "ok": True,
+                "code": "already_cleared",
+                "subjectType": subject_type,
+                "subjectId": subject_id,
+                "promptCleanup": {
+                    "ok": True,
+                    "code": "already_cleared",
+                    "channel": "telegram",
+                    "messageId": message_id,
+                },
+            }
+        return {
+            "ok": False,
+            "code": "telegram_api_failed",
+            "subjectType": subject_type,
+            "subjectId": subject_id,
+            "promptCleanup": {
+                "ok": False,
+                "code": "telegram_api_failed",
+                "channel": "telegram",
+                "messageId": message_id,
+                "error": (body_trimmed or str(exc))[:300],
+            },
+        }
+    except Exception as exc:
+        return {
+            "ok": False,
+            "code": "telegram_api_failed",
+            "subjectType": subject_type,
+            "subjectId": subject_id,
+            "promptCleanup": {
+                "ok": False,
+                "code": "telegram_api_failed",
+                "channel": "telegram",
+                "messageId": message_id,
+                "error": str(exc)[:300],
+            },
+        }
 
 
 def _cleanup_trade_approval_prompt(trade_id: str) -> dict[str, Any]:
-    entry = _get_approval_prompt(trade_id)
-    if not entry:
-        return {"ok": False, "code": "prompt_not_found"}
-    if str(entry.get("channel") or "") != "telegram":
-        _remove_approval_prompt(trade_id)
-        return {"ok": True, "code": "non_telegram_removed"}
-    chat_id = str(entry.get("to") or "").strip()
-    message_id = str(entry.get("messageId") or "").strip()
-    if not chat_id:
-        _remove_approval_prompt(trade_id)
-        return {"ok": False, "code": "missing_target"}
-    if not message_id or message_id == "unknown":
-        _remove_approval_prompt(trade_id)
-        return {"ok": False, "code": "missing_message_id"}
-    openclaw = shutil.which("openclaw")
-    if not openclaw:
-        return {"ok": False, "code": "openclaw_missing"}
-    cmd = [openclaw, "message", "delete", "--channel", "telegram", "--target", chat_id, "--message-id", message_id, "--json"]
-    proc = _run_subprocess(cmd, timeout_sec=20, kind="openclaw_delete")
-    if proc.returncode == 0:
-        _remove_approval_prompt(trade_id)
-        return {"ok": True, "code": "deleted"}
-    return {"ok": False, "code": "delete_failed", "stderr": (proc.stderr or "").strip()[:300]}
+    result = _clear_telegram_approval_buttons("trade", trade_id)
+    return dict(result.get("promptCleanup") or {"ok": bool(result.get("ok")), "code": str(result.get("code") or "unknown")})
 
 
 def _maybe_delete_telegram_transfer_approval_prompt(approval_id: str) -> None:
-    entry = _get_transfer_approval_prompt(approval_id)
-    if not entry or str(entry.get("channel") or "") != "telegram":
-        return
-    chat_id = str(entry.get("to") or "").strip()
-    message_id = str(entry.get("messageId") or "").strip()
-    if not chat_id or not message_id or message_id == "unknown":
-        _remove_transfer_approval_prompt(approval_id)
-        return
-    openclaw = shutil.which("openclaw")
-    if not openclaw:
-        return
-    cmd = [openclaw, "message", "delete", "--channel", "telegram", "--target", chat_id, "--message-id", message_id, "--json"]
-    proc = _run_subprocess(cmd, timeout_sec=20, kind="openclaw_delete")
-    if proc.returncode == 0:
-        _remove_transfer_approval_prompt(approval_id)
+    _ = _clear_telegram_approval_buttons("transfer", approval_id)
 
 
 def _cleanup_transfer_approval_prompt(approval_id: str) -> dict[str, Any]:
-    entry = _get_transfer_approval_prompt(approval_id)
-    if not entry:
-        return {"ok": False, "code": "prompt_not_found"}
-    if str(entry.get("channel") or "") != "telegram":
-        _remove_transfer_approval_prompt(approval_id)
-        return {"ok": True, "code": "non_telegram_removed"}
-    chat_id = str(entry.get("to") or "").strip()
-    message_id = str(entry.get("messageId") or "").strip()
-    if not chat_id:
-        _remove_transfer_approval_prompt(approval_id)
-        return {"ok": False, "code": "missing_target"}
-    if not message_id or message_id == "unknown":
-        _remove_transfer_approval_prompt(approval_id)
-        return {"ok": False, "code": "missing_message_id"}
-    openclaw = shutil.which("openclaw")
-    if not openclaw:
-        return {"ok": False, "code": "openclaw_missing"}
-    cmd = [openclaw, "message", "delete", "--channel", "telegram", "--target", chat_id, "--message-id", message_id, "--json"]
-    proc = _run_subprocess(cmd, timeout_sec=20, kind="openclaw_delete")
-    if proc.returncode == 0:
-        _remove_transfer_approval_prompt(approval_id)
-        return {"ok": True, "code": "deleted"}
-    return {"ok": False, "code": "delete_failed", "stderr": (proc.stderr or "").strip()[:300]}
+    result = _clear_telegram_approval_buttons("transfer", approval_id)
+    return dict(result.get("promptCleanup") or {"ok": bool(result.get("ok")), "code": str(result.get("code") or "unknown")})
 
 
 def _cleanup_policy_approval_prompt(approval_id: str) -> dict[str, Any]:
-    entry = _get_policy_approval_prompt(approval_id)
-    if not entry:
-        return {"ok": False, "code": "prompt_not_found"}
-    if str(entry.get("channel") or "") != "telegram":
-        _remove_policy_approval_prompt(approval_id)
-        return {"ok": True, "code": "non_telegram_removed"}
-    chat_id = str(entry.get("to") or "").strip()
-    message_id = str(entry.get("messageId") or "").strip()
-    if not chat_id:
-        _remove_policy_approval_prompt(approval_id)
-        return {"ok": False, "code": "missing_target"}
-    if not message_id or message_id == "unknown":
-        _remove_policy_approval_prompt(approval_id)
-        return {"ok": False, "code": "missing_message_id"}
-    openclaw = shutil.which("openclaw")
-    if not openclaw:
-        return {"ok": False, "code": "openclaw_missing"}
-    cmd = [openclaw, "message", "delete", "--channel", "telegram", "--target", chat_id, "--message-id", message_id, "--json"]
-    proc = _run_subprocess(cmd, timeout_sec=20, kind="openclaw_delete")
-    if proc.returncode == 0:
-        _remove_policy_approval_prompt(approval_id)
-        return {"ok": True, "code": "deleted"}
-    return {"ok": False, "code": "delete_failed", "stderr": (proc.stderr or "").strip()[:300]}
+    result = _clear_telegram_approval_buttons("policy", approval_id)
+    return dict(result.get("promptCleanup") or {"ok": bool(result.get("ok")), "code": str(result.get("code") or "unknown")})
 
 
 def _maybe_send_owner_link_to_active_chat(management_url: str, expires_at: str | None) -> dict[str, Any]:
@@ -3246,6 +3374,78 @@ def cmd_approvals_sync(args: argparse.Namespace) -> int:
         return ok("Approval prompts synced.", chain=chain, checked=checked, deleted=deleted, skipped=skipped, failures=failures or None)
     except Exception as exc:
         return fail("approvals_sync_failed", str(exc), "Verify API auth and OpenClaw availability, then retry.", {"chain": chain}, exit_code=1)
+
+
+def cmd_approvals_cleanup_spot(args: argparse.Namespace) -> int:
+    chk = require_json_flag(args)
+    if chk is not None:
+        return chk
+    trade_id = str(args.trade_id or "").strip()
+    if not trade_id:
+        return fail("invalid_input", "trade_id is required.", "Provide --trade-id trd_... and retry.", exit_code=2)
+
+    result = _clear_telegram_approval_buttons("trade", trade_id)
+    cleanup = dict(result.get("promptCleanup") or {})
+    if bool(result.get("ok")):
+        return ok(
+            "Spot approval prompt cleanup completed.",
+            tradeId=trade_id,
+            subjectType="trade",
+            subjectId=trade_id,
+            promptCleanup=cleanup,
+            actionHint="No additional action required.",
+        )
+    return fail(
+        str(result.get("code") or "approval_prompt_cleanup_failed"),
+        "Spot approval prompt button clear failed.",
+        "Retry approvals cleanup after prompt metadata sync.",
+        {"tradeId": trade_id, "subjectType": "trade", "subjectId": trade_id, "promptCleanup": cleanup},
+        exit_code=1,
+    )
+
+
+def cmd_approvals_clear_prompt(args: argparse.Namespace) -> int:
+    chk = require_json_flag(args)
+    if chk is not None:
+        return chk
+    subject_type = str(args.subject_type or "").strip().lower()
+    subject_id = str(args.subject_id or "").strip()
+    if subject_type not in {"trade", "transfer", "policy"}:
+        return fail(
+            "invalid_input",
+            "subject_type must be trade|transfer|policy.",
+            "Use --subject-type trade|transfer|policy.",
+            {"subjectType": subject_type},
+            exit_code=2,
+        )
+    if not subject_id:
+        return fail(
+            "invalid_input",
+            "subject_id is required.",
+            "Use --subject-id <trd_|xfr_|ppr_...>.",
+            {"subjectType": subject_type},
+            exit_code=2,
+        )
+    result = _clear_telegram_approval_buttons(subject_type, subject_id)
+    if bool(result.get("ok")):
+        return ok(
+            "Approval prompt button clear completed.",
+            subjectType=subject_type,
+            subjectId=subject_id,
+            promptCleanup=result.get("promptCleanup"),
+            actionHint="No additional action required.",
+        )
+    return fail(
+        str(result.get("code") or "approval_prompt_cleanup_failed"),
+        "Approval prompt button clear failed.",
+        "Retry clear-prompt after prompt metadata sync.",
+        {
+            "subjectType": subject_type,
+            "subjectId": subject_id,
+            "promptCleanup": result.get("promptCleanup"),
+        },
+        exit_code=1,
+    )
 
 
 def _run_resume_spot_inline(trade_id: str, chain: str) -> tuple[int, dict[str, Any]]:
@@ -3398,11 +3598,7 @@ def cmd_approvals_resume_transfer(args: argparse.Namespace) -> int:
         return fail("invalid_input", "chain is required.", "Provide --chain and retry.", {"approvalId": approval_id}, exit_code=2)
     status = str(flow.get("status") or "")
     if status in {"filled", "failed", "rejected"}:
-        try:
-            _maybe_delete_telegram_transfer_approval_prompt(approval_id)
-        except Exception:
-            pass
-        _remove_transfer_approval_prompt(approval_id)
+        cleanup = _cleanup_transfer_approval_prompt(approval_id)
         return ok(
             "Transfer resume skipped: approval already terminal.",
             approvalId=approval_id,
@@ -3700,11 +3896,7 @@ def cmd_approvals_decide_transfer(args: argparse.Namespace) -> int:
     )
     flow_amount_display = f"{flow_amount_human} {flow_amount_unit}"
     if status in {"filled", "failed", "rejected"}:
-        try:
-            _maybe_delete_telegram_transfer_approval_prompt(approval_id)
-        except Exception:
-            pass
-        _remove_transfer_approval_prompt(approval_id)
+        cleanup = _cleanup_transfer_approval_prompt(approval_id)
         return ok(
             "Transfer decision converged on terminal approval.",
             subjectType="transfer",
@@ -3729,16 +3921,12 @@ def cmd_approvals_decide_transfer(args: argparse.Namespace) -> int:
             converged=True,
             fromStatus=status,
             toStatus=status,
-            promptCleanup={"ok": True, "code": "already_terminal"},
+            promptCleanup=cleanup,
             prodDispatch={"mode": "handled_by_web_or_callback"},
             actionHint="No additional action required.",
         )
     if status in {"executing", "verifying"}:
-        try:
-            _maybe_delete_telegram_transfer_approval_prompt(approval_id)
-        except Exception:
-            pass
-        _remove_transfer_approval_prompt(approval_id)
+        cleanup = _cleanup_transfer_approval_prompt(approval_id)
         return ok(
             "Transfer decision already in progress.",
             subjectType="transfer",
@@ -3764,16 +3952,12 @@ def cmd_approvals_decide_transfer(args: argparse.Namespace) -> int:
             inProgress=True,
             fromStatus=status,
             toStatus=status,
-            promptCleanup={"ok": True, "code": "already_in_progress"},
+            promptCleanup=cleanup,
             prodDispatch={"mode": "handled_by_web_or_callback"},
             actionHint="Transfer already in progress.",
         )
     if status == "approved" and decision == "deny":
-        try:
-            _maybe_delete_telegram_transfer_approval_prompt(approval_id)
-        except Exception:
-            pass
-        _remove_transfer_approval_prompt(approval_id)
+        cleanup = _cleanup_transfer_approval_prompt(approval_id)
         return ok(
             "Transfer decision converged on approved approval.",
             subjectType="transfer",
@@ -3796,7 +3980,7 @@ def cmd_approvals_decide_transfer(args: argparse.Namespace) -> int:
             converged=True,
             fromStatus="approved",
             toStatus="approved",
-            promptCleanup={"ok": True, "code": "already_approved"},
+            promptCleanup=cleanup,
             prodDispatch={"mode": "handled_by_web_or_callback"},
             actionHint="Transfer already approved.",
         )
@@ -3818,11 +4002,7 @@ def cmd_approvals_decide_transfer(args: argparse.Namespace) -> int:
         flow["terminalAt"] = flow["decidedAt"]
         _record_pending_transfer_flow(approval_id, flow)
         _mirror_transfer_approval(flow)
-        try:
-            _maybe_delete_telegram_transfer_approval_prompt(approval_id)
-        except Exception:
-            pass
-        _remove_transfer_approval_prompt(approval_id)
+        cleanup = _cleanup_transfer_approval_prompt(approval_id)
         return ok(
             "Transfer denied.",
             subjectType="transfer",
@@ -3850,7 +4030,7 @@ def cmd_approvals_decide_transfer(args: argparse.Namespace) -> int:
             executionMode=flow.get("executionMode"),
             fromStatus=status,
             toStatus="rejected",
-            promptCleanup={"ok": True, "code": "deleted"},
+            promptCleanup=cleanup,
             prodDispatch={"mode": "handled_by_web_or_callback"},
             actionHint="Transfer was denied and will not execute.",
         )
@@ -3860,11 +4040,7 @@ def cmd_approvals_decide_transfer(args: argparse.Namespace) -> int:
     flow["updatedAt"] = flow["decidedAt"]
     _record_pending_transfer_flow(approval_id, flow)
     _mirror_transfer_approval(flow)
-    try:
-        _maybe_delete_telegram_transfer_approval_prompt(approval_id)
-    except Exception:
-        pass
-    _remove_transfer_approval_prompt(approval_id)
+    cleanup = _cleanup_transfer_approval_prompt(approval_id)
     payload = _execute_pending_transfer_flow(flow)
     if isinstance(payload, dict):
         payload.setdefault("subjectType", "transfer")
@@ -3874,7 +4050,7 @@ def cmd_approvals_decide_transfer(args: argparse.Namespace) -> int:
         payload.setdefault("executionStatus", str(payload.get("status") or "unknown"))
         payload.setdefault("fromStatus", status)
         payload.setdefault("toStatus", "approved")
-        payload.setdefault("promptCleanup", {"ok": True, "code": "deleted"})
+        payload.setdefault("promptCleanup", cleanup)
         payload.setdefault("prodDispatch", {"mode": "handled_by_web_or_callback"})
         payload.setdefault("actionHint", "Execution continued; monitor terminal status.")
     return emit(payload)
@@ -7670,6 +7846,18 @@ def build_parser() -> argparse.ArgumentParser:
     approvals_sync.add_argument("--chain", required=True)
     approvals_sync.add_argument("--json", action="store_true")
     approvals_sync.set_defaults(func=cmd_approvals_sync)
+
+    approvals_cleanup_spot = approvals_sub.add_parser("cleanup-spot")
+    approvals_cleanup_spot.add_argument("--trade-id", required=True)
+    approvals_cleanup_spot.add_argument("--json", action="store_true")
+    approvals_cleanup_spot.set_defaults(func=cmd_approvals_cleanup_spot)
+
+    approvals_clear_prompt = approvals_sub.add_parser("clear-prompt")
+    approvals_clear_prompt.add_argument("--subject-type", required=True, choices=["trade", "transfer", "policy"])
+    approvals_clear_prompt.add_argument("--subject-id", required=True)
+    approvals_clear_prompt.add_argument("--chain")
+    approvals_clear_prompt.add_argument("--json", action="store_true")
+    approvals_clear_prompt.set_defaults(func=cmd_approvals_clear_prompt)
 
     approvals_resume_spot = approvals_sub.add_parser("resume-spot")
     approvals_resume_spot.add_argument("--trade-id", required=True)

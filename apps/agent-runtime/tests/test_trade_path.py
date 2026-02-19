@@ -893,15 +893,17 @@ class TradePathRuntimeTests(unittest.TestCase):
         )
         self.assertEqual(cli._extract_openclaw_message_id(stdout), "1162")
 
+    def test_extract_openclaw_message_id_accepts_non_json_fallback_pattern(self) -> None:
+        stdout = "openclaw send complete :: message_id=99887766 channel=telegram"
+        self.assertEqual(cli._extract_openclaw_message_id(stdout), "99887766")
+
     def test_require_api_base_url_defaults_to_localhost_when_missing(self) -> None:
         with mock.patch.dict(os.environ, {}, clear=True):
             self.assertEqual(cli._require_api_base_url(), "http://127.0.0.1:3000/api/v1")
 
-    def test_delete_telegram_transfer_prompt_uses_saved_message_id(self) -> None:
+    def test_clear_telegram_transfer_prompt_uses_saved_message_id_without_delete(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir, mock.patch.object(cli, "APP_DIR", pathlib.Path(tmpdir)), mock.patch.object(
             cli, "APPROVAL_PROMPTS_FILE", pathlib.Path(tmpdir) / "approval_prompts.json"
-        ), mock.patch.object(
-            cli.shutil, "which", return_value="openclaw"
         ):
             cli._record_transfer_approval_prompt(
                 "xfr_abc",
@@ -913,20 +915,19 @@ class TradePathRuntimeTests(unittest.TestCase):
                     "createdAt": "2026-02-18T00:00:00.000Z",
                 },
             )
-            captured: dict[str, object] = {}
+            fake_resp = mock.MagicMock()
+            fake_ctx = mock.MagicMock()
+            fake_ctx.__enter__.return_value = fake_resp
+            fake_resp.read.return_value = b'{"ok":true}'
 
-            def fake_run(cmd: list[str], timeout_sec: int, kind: str):
-                captured["cmd"] = cmd
-                return mock.Mock(returncode=0, stdout='{"ok":true}', stderr="")
-
-            with mock.patch.object(cli, "_run_subprocess", side_effect=fake_run):
+            with mock.patch.dict(os.environ, {"XCLAW_TELEGRAM_BOT_TOKEN": "token"}, clear=False), mock.patch(
+                "urllib.request.urlopen", return_value=fake_ctx
+            ), mock.patch.object(
+                cli, "_run_subprocess"
+            ) as run_subprocess:
                 cli._maybe_delete_telegram_transfer_approval_prompt("xfr_abc")
 
-            cmd = captured.get("cmd") or []
-            self.assertIn("message", cmd)
-            self.assertIn("delete", cmd)
-            self.assertIn("--message-id", cmd)
-            self.assertIn("777", cmd)
+            run_subprocess.assert_not_called()
             self.assertIsNone(cli._get_transfer_approval_prompt("xfr_abc"))
 
     def test_owner_link_direct_send_skips_telegram_channel(self) -> None:
@@ -1956,7 +1957,7 @@ class TradePathRuntimeTests(unittest.TestCase):
         ), mock.patch.object(
             cli, "_post_trade_status"
         ) as post_status_mock, mock.patch.object(
-            cli, "_cleanup_trade_approval_prompt", return_value={"ok": True, "code": "deleted"}
+            cli, "_cleanup_trade_approval_prompt", return_value={"ok": True, "code": "buttons_cleared"}
         ), mock.patch.object(
             cli, "_maybe_send_telegram_decision_message"
         ), mock.patch.object(
@@ -2013,6 +2014,54 @@ class TradePathRuntimeTests(unittest.TestCase):
         self.assertEqual(payload.get("toStatus"), "rejected")
         self.assertEqual(captured.get("idempotency_key"), "tg-cb-456")
         self.assertEqual((captured.get("payload") or {}).get("at"), "2026-02-19T20:01:00+00:00")
+
+    def test_approvals_cleanup_spot_returns_buttons_cleared_when_prompt_removed(self) -> None:
+        args = argparse.Namespace(trade_id="trd_1", json=True)
+        with mock.patch.object(
+            cli,
+            "_clear_telegram_approval_buttons",
+            return_value={"ok": True, "code": "buttons_cleared", "promptCleanup": {"ok": True, "code": "buttons_cleared"}},
+        ):
+            payload = self._run_and_parse_stdout(lambda: cli.cmd_approvals_cleanup_spot(args))
+        self.assertTrue(payload.get("ok"))
+        self.assertEqual(payload.get("tradeId"), "trd_1")
+        prompt_cleanup = payload.get("promptCleanup") or {}
+        self.assertEqual(prompt_cleanup.get("code"), "buttons_cleared")
+
+    def test_approvals_clear_prompt_returns_cleanup_payload(self) -> None:
+        args = argparse.Namespace(subject_type="transfer", subject_id="xfr_1", chain="base_sepolia", json=True)
+        with mock.patch.object(
+            cli,
+            "_clear_telegram_approval_buttons",
+            return_value={"ok": True, "code": "buttons_cleared", "promptCleanup": {"ok": True, "code": "buttons_cleared"}},
+        ):
+            payload = self._run_and_parse_stdout(lambda: cli.cmd_approvals_clear_prompt(args))
+        self.assertTrue(payload.get("ok"))
+        self.assertEqual(payload.get("subjectType"), "transfer")
+        self.assertEqual(payload.get("subjectId"), "xfr_1")
+        self.assertEqual((payload.get("promptCleanup") or {}).get("code"), "buttons_cleared")
+
+    def test_clear_telegram_approval_buttons_uses_non_destructive_api_path(self) -> None:
+        entry = {"channel": "telegram", "to": "telegram:123456", "messageId": "777"}
+        fake_resp = mock.MagicMock()
+        fake_ctx = mock.MagicMock()
+        fake_ctx.__enter__.return_value = fake_resp
+        fake_resp.read.return_value = b'{"ok":true}'
+
+        with mock.patch.dict(os.environ, {"XCLAW_TELEGRAM_BOT_TOKEN": "token"}, clear=False), mock.patch.object(
+            cli, "_get_approval_prompt", return_value=entry
+        ), mock.patch.object(
+            cli, "_remove_approval_prompt"
+        ) as remove_prompt, mock.patch(
+            "urllib.request.urlopen", return_value=fake_ctx
+        ), mock.patch.object(
+            cli, "_run_subprocess"
+        ) as run_subprocess:
+            result = cli._clear_telegram_approval_buttons("trade", "trd_1")
+        self.assertTrue(result.get("ok"))
+        self.assertEqual(result.get("code"), "buttons_cleared")
+        remove_prompt.assert_called_once_with("trd_1")
+        run_subprocess.assert_not_called()
 
     def test_approvals_decide_spot_invalid_decision_at_rejected(self) -> None:
         args = argparse.Namespace(

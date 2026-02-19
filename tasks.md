@@ -23,6 +23,35 @@ Active slice context: `Slice 86` is in progress; this is an explicit user-report
 
 ---
 
+# Hotfix Tasks: Runtime-Canonical Approval Prompt Button Clear (Trade/Transfer/Policy)
+
+Active slice context: `Slice 87` in progress.
+
+## 1) Scope lock
+- [x] Centralize cleanup into runtime command `approvals clear-prompt`.
+- [x] Preserve non-destructive contract (clear buttons only, keep message text).
+
+## 2) Implementation
+- [x] Added runtime helper + command `approvals clear-prompt --subject-type --subject-id [--chain] --json`.
+- [x] Updated runtime `decide-spot|decide-transfer|decide-policy` cleanup to use shared clear helper.
+- [x] Removed approval prompt delete-command behavior from runtime cleanup paths.
+- [x] Updated web trade/transfer/policy decision routes to dispatch runtime cleanup and return `promptCleanup`.
+- [x] Updated gateway callback patch to runtime-owned clear path (removed immediate callback pre-clear).
+- [x] Synced source-of-truth, roadmap, tracker, and skill command docs.
+
+## 3) Validation
+- [x] `python3 -m py_compile apps/agent-runtime/xclaw_agent/cli.py apps/agent-runtime/tests/test_trade_path.py skills/xclaw-agent/scripts/openclaw_gateway_patch.py`
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- [x] `python3 skills/xclaw-agent/scripts/openclaw_gateway_patch.py --json`
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+
+---
+
 # Hotfix Tasks: Always Prod Agent After Web Trade/Transfer Approvals
 
 Active slice context: `Slice 86` is in progress; this is an explicit user-requested workflow-continuation hotfix.
@@ -80,6 +109,35 @@ Active slice context: `Slice 86` is in progress; this is an explicit user-reques
 ---
 
 # Hotfix Tasks: Force-Upgrade Gateway Callback Patch (v15) For Trade-Approve Ack Suppression
+
+# Hotfix Tasks: Web Approval Prompt Cleanup Recovery + Message ID Extraction Hardening
+
+Active slice context: `Slice 87` is in progress; this is an explicit user-reported web-vs-Telegram approval convergence fix.
+
+## 1) Scope lock
+- [x] Keep scope to runtime message-id extraction + web decision cleanup fallback.
+- [x] Preserve trade execution semantics and callback behavior.
+
+## 2) Implementation
+- [x] Harden `_extract_openclaw_message_id` with non-JSON fallback patterns.
+- [x] Add runtime command `approvals cleanup-spot --trade-id ... --json`.
+- [x] Add web decision fallback: when DB cleanup fails with `missing_message_id|prompt_not_found`, call runtime cleanup command and reconcile prompt row on success.
+- [x] Allow terminal trade-result prod dispatch (`web_trade_status`) to deliver to Telegram-last-channel for web approval parity.
+- [x] Switch web prompt cleanup from full message delete to Telegram inline-button clear (`editMessageReplyMarkup`), preserving message text/history.
+- [x] Enable delivery in web/terminal prod dispatcher (`openclaw agent ... --deliver`) so fulfill/reject prods reach chat.
+- [x] Add runtime tests for extraction fallback + cleanup command.
+- [x] Sync source-of-truth and skill command docs.
+
+## 3) Validation
+- [x] `python3 -m py_compile apps/agent-runtime/xclaw_agent/cli.py apps/agent-runtime/tests/test_trade_path.py skills/xclaw-agent/scripts/openclaw_gateway_patch.py`
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- [x] `python3 skills/xclaw-agent/scripts/openclaw_gateway_patch.py --json`
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
 
 # Runtime-Canonical Approval Decisions (Trade/Transfer/Policy)
 

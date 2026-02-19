@@ -86,6 +86,54 @@ function runtimeSpawnEnv(req: NextRequest, agentId: string, chainKey: string): N
   return env;
 }
 
+function invokeRuntimePromptCleanupSync(input: {
+  req: NextRequest;
+  agentId: string;
+  approvalId: string;
+  chainKey: string;
+}): { ok: boolean; code: string; payload?: Record<string, unknown>; runtimeExitStatus?: number | null; stderrSummary?: string } {
+  const runtimeBin = resolveRuntimeBin();
+  const runtimeArgs = [
+    'approvals',
+    'clear-prompt',
+    '--subject-type',
+    'policy',
+    '--subject-id',
+    input.approvalId,
+    '--chain',
+    input.chainKey,
+    '--json'
+  ];
+  const child = spawnSync(runtimeBin, runtimeArgs, {
+    encoding: 'utf8',
+    timeout: runtimeDecisionTimeoutMs(),
+    env: runtimeSpawnEnv(input.req, input.agentId, input.chainKey)
+  });
+  const stdout = String(child.stdout ?? '');
+  const stderr = String(child.stderr ?? '');
+  let payload: Record<string, unknown> | undefined;
+  const lines = stdout
+    .split(/\r?\n/)
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0);
+  if (lines.length > 0) {
+    try {
+      const parsed = JSON.parse(lines[lines.length - 1]);
+      if (parsed && typeof parsed === 'object') {
+        payload = parsed as Record<string, unknown>;
+      }
+    } catch {}
+  }
+  const ok = child.status === 0 && Boolean(payload?.ok);
+  return {
+    ok,
+    code: ok ? 'runtime_cleanup_applied' : 'runtime_cleanup_failed',
+    payload,
+    runtimeExitStatus: child.status,
+    stderrSummary: stderr.slice(0, 500)
+  };
+}
+
 function normalizeTokenSet(values: unknown): Set<string> {
   if (!Array.isArray(values)) {
     return new Set<string>();
@@ -208,7 +256,27 @@ export async function POST(req: NextRequest) {
         ]
       );
       if (child.status === 0 && payload?.ok) {
-        return successResponse({ ok: true, source: 'runtime', policyApprovalId: body.policyApprovalId, runtimeDecision: payload }, 200, requestId);
+        const cleanup = invokeRuntimePromptCleanupSync({
+          req,
+          agentId: body.agentId,
+          approvalId: body.policyApprovalId,
+          chainKey
+        });
+        const promptCleanup =
+          (cleanup.payload?.promptCleanup && typeof cleanup.payload.promptCleanup === 'object')
+            ? (cleanup.payload.promptCleanup as Record<string, unknown>)
+            : { ok: cleanup.ok, code: cleanup.code };
+        return successResponse(
+          {
+            ok: true,
+            source: 'runtime',
+            policyApprovalId: body.policyApprovalId,
+            runtimeDecision: payload,
+            promptCleanup
+          },
+          200,
+          requestId
+        );
       }
       try {
         const bg = spawn(runtimeBin, runtimeArgs, {
@@ -384,7 +452,7 @@ export async function POST(req: NextRequest) {
         ]
       );
 
-      return { ok: true as const };
+      return { ok: true as const, chainKey: row.chain_key };
     });
 
     if (!result.ok) {
@@ -427,7 +495,27 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    return successResponse({ ok: true, policyApprovalId: body.policyApprovalId, status: toStatus }, 200, requestId);
+    const cleanup = invokeRuntimePromptCleanupSync({
+      req,
+      agentId: body.agentId,
+      approvalId: body.policyApprovalId,
+      chainKey: result.chainKey
+    });
+    const promptCleanup =
+      (cleanup.payload?.promptCleanup && typeof cleanup.payload.promptCleanup === 'object')
+        ? (cleanup.payload.promptCleanup as Record<string, unknown>)
+        : { ok: cleanup.ok, code: cleanup.code };
+
+    return successResponse(
+      {
+        ok: true,
+        policyApprovalId: body.policyApprovalId,
+        status: toStatus,
+        promptCleanup
+      },
+      200,
+      requestId
+    );
   } catch {
     return internalErrorResponse(requestId);
   }

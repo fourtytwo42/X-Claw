@@ -338,7 +338,7 @@ export async function dispatchNonTelegramAgentProd(input: NonTelegramAgentProdIn
   }
 
   const agentId = sanitizeOpenclawAgentId(process.env.XCLAW_OPENCLAW_AGENT_ID);
-  const dispatchArgs = ['agent', '--agent', agentId, '--channel', 'last', '--message', message, '--json'];
+  const dispatchArgs = ['agent', '--agent', agentId, '--channel', 'last', '--message', message, '--deliver', '--json'];
   const runDispatch = (timeoutMs: number) => runCommandAsync(openclawBin, dispatchArgs, timeoutMs);
   const timeoutMs = nonTelegramProdTimeoutMs();
   let child = await runDispatch(timeoutMs);

@@ -29,6 +29,42 @@ Active slice context: `Slice 86` in progress (explicit user-reported approvals-h
 
 ---
 
+# Hotfix Acceptance Evidence: Runtime-Canonical Approval Prompt Button Clear (Trade/Transfer/Policy)
+
+Date (UTC): 2026-02-19  
+Active slice context: `Slice 87` in progress.
+
+## Objective + Scope Lock
+- Objective: remove cleanup drift by routing web + Telegram callback prompt cleanup through runtime `approvals clear-prompt`, with button-clear-only behavior.
+- Scope lock:
+  - `apps/agent-runtime/xclaw_agent/cli.py`
+  - `apps/agent-runtime/tests/test_trade_path.py`
+  - `apps/network-web/src/app/api/v1/management/approvals/decision/route.ts`
+  - `apps/network-web/src/app/api/v1/management/transfer-approvals/decision/route.ts`
+  - `apps/network-web/src/app/api/v1/management/policy-approvals/decision/route.ts`
+  - `skills/xclaw-agent/scripts/openclaw_gateway_patch.py`
+  - docs/artifacts (`docs/XCLAW_SOURCE_OF_TRUTH.md`, `docs/XCLAW_BUILD_ROADMAP.md`, `docs/XCLAW_SLICE_TRACKER.md`, `spec.md`, `tasks.md`, `acceptance.md`)
+
+## Behavior Checks
+- [x] Runtime exposes `approvals clear-prompt --subject-type <trade|transfer|policy> --subject-id <id> [--chain ...] --json`.
+- [x] Runtime decision commands return normalized `promptCleanup`.
+- [x] Runtime cleanup paths do not invoke `openclaw message delete` for approval prompts.
+- [x] Web trade/transfer/policy decision routes dispatch runtime cleanup and surface `promptCleanup`.
+- [x] Gateway callback patch no longer performs immediate callback pre-clear; runtime remains canonical clear owner.
+
+## Required Validation Gates
+- [x] `python3 -m py_compile apps/agent-runtime/xclaw_agent/cli.py apps/agent-runtime/tests/test_trade_path.py skills/xclaw-agent/scripts/openclaw_gateway_patch.py`
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- [x] `python3 skills/xclaw-agent/scripts/openclaw_gateway_patch.py --json`
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+
+---
+
 # Hotfix Acceptance Evidence: Always Prod Agent After Web Trade/Transfer Approvals
 
 Date (UTC): 2026-02-19
@@ -102,6 +138,49 @@ Active slice context: `Slice 86` in progress (explicit user-requested Telegram a
 ---
 
 # Hotfix Acceptance Evidence: Force-Upgrade Gateway Callback Patch (v15) For Trade-Approve Ack Suppression
+
+# Hotfix Acceptance Evidence: Web Approval Prompt Cleanup Recovery + Message ID Extraction Hardening
+
+Date (UTC): 2026-02-19  
+Active slice context: `Slice 87` in progress (explicit user-reported web approval parity issue)
+
+## Objective + Scope Lock
+- Objective: improve web approval Telegram button cleanup reliability by avoiding new unknown message IDs and adding runtime cleanup fallback from web decision path.
+- Scope lock:
+  - `apps/agent-runtime/xclaw_agent/cli.py`
+  - `apps/agent-runtime/tests/test_trade_path.py`
+  - `apps/network-web/src/app/api/v1/management/approvals/decision/route.ts`
+  - `skills/xclaw-agent/SKILL.md`
+  - `skills/xclaw-agent/references/commands.md`
+  - `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - handoff artifacts (`spec.md`, `tasks.md`, `acceptance.md`)
+
+## Behavior Checks
+- [x] Runtime parses OpenClaw message IDs from structured and non-JSON stdout patterns.
+- [x] Runtime exposes `approvals cleanup-spot --trade-id ... --json` for deterministic single-trade prompt cleanup attempts.
+- [x] Web approval decision async path retries cleanup via runtime when DB-side cleanup fails with `missing_message_id|prompt_not_found`.
+- [x] Web fallback success marks DB prompt row as deleted (`deleted_at`) to avoid repeated stale cleanup errors.
+- [x] Terminal trade-status prod dispatch allows Telegram-last-channel delivery (`allowTelegramLastChannel=true`) so web approvals can emit deterministic filled/rejected follow-up.
+- [x] Web cleanup clears inline buttons (without deleting the underlying Telegram message) when `message_id` is available.
+- [x] Prod dispatcher includes delivery (`--deliver`) so terminal trade result updates are posted to chat, not only computed in stdout.
+- [x] Historical rows with `message_id='unknown'` and no local runtime prompt record remain non-recoverable by design (forward-only gap).
+
+## Required Validation Gates
+- [x] `python3 -m py_compile apps/agent-runtime/xclaw_agent/cli.py apps/agent-runtime/tests/test_trade_path.py skills/xclaw-agent/scripts/openclaw_gateway_patch.py`
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- [x] `python3 skills/xclaw-agent/scripts/openclaw_gateway_patch.py --json`
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+
+## Trade-Specific Evidence
+- `trd_07c042844df95a43163c` currently has DB prompt row:
+  - `message_id='unknown'`
+  - `delete_error='missing_message_id'`
+- Runtime local prompt record for that trade is absent, so cleanup fallback cannot recover this historical prompt.
 
 # Runtime-Canonical Approval Decisions (Trade/Transfer/Policy)
 

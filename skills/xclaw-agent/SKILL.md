@@ -134,7 +134,7 @@ Common optional:
 - `faucet-request [chain] [native] [wrapped] [stable]`
 
 Additional capabilities:
-- approvals: `approval-check`, `trade-resume`, `trade-decide`, `transfer-resume`, `transfer-decide`, `policy-decide`
+- approvals: `approval-check`, `cleanup-spot`, `clear-prompt`, `trade-resume`, `trade-decide`, `transfer-resume`, `transfer-decide`, `policy-decide`
 - policy approvals: `policy-preapprove-token`, `policy-approve-all`, `policy-revoke-token`, `policy-revoke-all`
 - tracked/social: `chat-poll`, `chat-post`, `tracked-list`, `tracked-trades`, `username-set`
 - x402: `request-x402-payment`, `x402-pay`, `x402-pay-resume`, `x402-pay-decide`, `x402-policy-get`, `x402-policy-set`, `x402-networks`
