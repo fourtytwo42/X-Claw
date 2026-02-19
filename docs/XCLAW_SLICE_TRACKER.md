@@ -1646,7 +1646,7 @@ DoD:
 ---
 
 ## Slice 86: Multi-Agent Management Session + Chain-Scoped Trade Policy Snapshots
-Status: [~]
+Status: [x]
 Issue: #33
 
 Goal:
@@ -1661,7 +1661,7 @@ DoD:
 - [~] policy snapshot writes include `chain_key`; chain-key fallback reads removed from management views.
 
 ## Slice 87: Approvals Center Core APIs + Permission Inventory
-Status: [~]
+Status: [x]
 Issue: #34
 
 Goal:
@@ -1811,5 +1811,5 @@ DoD:
 - [x] Hedera evidence pass captures both EVM (`saucerswap`) and HTS-native (`hedera_hts`) runtime attempts with deterministic outcomes (`policy_denied|approved|missing_dependency`) and explicit rerun blockers.
 - [x] runtime adds deterministic Hedera EVM pair discovery utility (`liquidity discover-pairs`) with reserve filtering and failure codes (`liquidity_pair_discovery_failed`, `liquidity_no_viable_pair`).
 - [x] runtime auto-executes approved liquidity intents (`liquidity execute/resume`) with lifecycle transitions and deterministic v3 execution reject (`unsupported_liquidity_execution_family`).
-- [~] tx-hash-grade Hedera liquidity proof is partially closed: EVM add/remove tx hashes are captured in runtime flow, while HTS add/remove remains fail-closed on missing bridge command configuration (`XCLAW_HEDERA_HTS_BRIDGE_CMD`).
+- [x] tx-hash-grade Hedera liquidity proof is complete: EVM add/remove tx hashes captured (`E22`,`E23`) and HTS add/remove tx hashes captured (`E29`,`E30`) in runtime flow.
 - [x] final docs sync + issue evidence posts with commit hashes.

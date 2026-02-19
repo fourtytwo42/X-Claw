@@ -732,6 +732,18 @@ class LiquidityCliTests(unittest.TestCase):
         self.assertIn("javac", missing)
         self.assertIn("hedera_sdk_py", missing)
 
+    def test_hedera_hts_readiness_uses_default_bridge_source(self) -> None:
+        ok_run = mock.Mock(returncode=0, stdout="1", stderr="")
+        with mock.patch.object(cli.shutil, "which", side_effect=["/usr/bin/java", "/usr/bin/javac"]), mock.patch.object(
+            cli.subprocess, "run", return_value=ok_run
+        ), mock.patch.object(cli.pathlib.Path, "exists", return_value=True), mock.patch.dict(
+            cli.os.environ, {"XCLAW_HEDERA_HTS_BRIDGE_CMD": ""}, clear=False
+        ):
+            readiness = cli._hedera_hts_readiness()
+        checks = readiness.get("checks") or {}
+        self.assertEqual(checks.get("bridgeCommandSource"), "default")
+        self.assertEqual(checks.get("bridgeCommandConfigured"), True)
+
 
 if __name__ == "__main__":
     unittest.main()

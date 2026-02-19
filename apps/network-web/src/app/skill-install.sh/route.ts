@@ -195,6 +195,11 @@ PY
     echo "[xclaw] verify path with: XCLAW_AGENT_PYTHON_BIN=\"$py_bin\" \"$py_bin\" -c 'import pathlib,sys;sys.path.insert(0,str(pathlib.Path(\"$XCLAW_WORKDIR/apps/agent-runtime\").resolve()));import xclaw_agent.hedera_hts_plugin'"
   fi
 
+  local bridge_path="$XCLAW_WORKDIR/apps/agent-runtime/xclaw_agent/bridges/hedera_hts_bridge.py"
+  if [ ! -f "$bridge_path" ]; then
+    echo "[xclaw] warning: HTS bridge script missing at $bridge_path"
+  fi
+
   export XCLAW_PYTHON_BIN="$py_bin"
   return 0
 }
@@ -519,10 +524,12 @@ echo "[xclaw] using runtime launcher: $XCLAW_AGENT_BIN"
 persist_runtime_path
 
 echo "[xclaw] configuring OpenClaw skill env defaults"
+XCLAW_HEDERA_HTS_BRIDGE_CMD="\${XCLAW_HEDERA_HTS_BRIDGE_CMD:-$XCLAW_AGENT_PYTHON_BIN $XCLAW_WORKDIR/apps/agent-runtime/xclaw_agent/bridges/hedera_hts_bridge.py}"
 openclaw config set skills.entries.xclaw-agent.env.XCLAW_AGENT_RUNTIME_BIN "$XCLAW_AGENT_BIN" || true
 openclaw config set skills.entries.xclaw-agent.env.XCLAW_API_BASE_URL "$XCLAW_API_BASE_URL" || true
 openclaw config set skills.entries.xclaw-agent.env.XCLAW_DEFAULT_CHAIN "$XCLAW_DEFAULT_CHAIN" || true
 openclaw config set skills.entries.xclaw-agent.env.XCLAW_AGENT_PYTHON_BIN "$XCLAW_AGENT_PYTHON_BIN" || true
+openclaw config set skills.entries.xclaw-agent.env.XCLAW_HEDERA_HTS_BRIDGE_CMD "$XCLAW_HEDERA_HTS_BRIDGE_CMD" || true
 openclaw config set skills.entries.xclaw-agent.env.XCLAW_TELEGRAM_APPROVALS_FORCE_MANAGEMENT "$xclaw_telegram_force_management" || true
 if [ -n "\${XCLAW_AGENT_ID:-}" ]; then
   openclaw config set skills.entries.xclaw-agent.env.XCLAW_AGENT_ID "$XCLAW_AGENT_ID" || true

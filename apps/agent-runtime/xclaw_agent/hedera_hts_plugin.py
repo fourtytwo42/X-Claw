@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import json
 import os
+import pathlib
 import shlex
 import subprocess
+import sys
 from typing import Any
 
 from xclaw_agent.liquidity_adapter import HederaSdkUnavailable
@@ -21,10 +23,14 @@ def _require_hedera_sdk() -> None:
 def _bridge_command() -> list[str]:
     raw = str(os.environ.get("XCLAW_HEDERA_HTS_BRIDGE_CMD") or "").strip()
     if not raw:
-        raise HederaSdkUnavailable(
-            "Hedera HTS plugin bridge command is not configured. "
-            "Set XCLAW_HEDERA_HTS_BRIDGE_CMD to a JSON-IO bridge executable."
-        )
+        runtime_python = str(os.environ.get("XCLAW_AGENT_PYTHON_BIN") or sys.executable or "python3").strip()
+        bridge_path = pathlib.Path(__file__).resolve().parent / "bridges" / "hedera_hts_bridge.py"
+        if not bridge_path.exists():
+            raise HederaSdkUnavailable(
+                "Hedera HTS plugin bridge is unavailable. "
+                "Set XCLAW_HEDERA_HTS_BRIDGE_CMD or install xclaw_agent.bridges.hedera_hts_bridge."
+            )
+        return [runtime_python, str(bridge_path)]
     parts = shlex.split(raw)
     if not parts:
         raise HederaSdkUnavailable(

@@ -176,7 +176,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ intentId: 
             updated_at = now()
           `,
           [
-            `lps_${intentId.trim()}`,
+            makeId('lps'),
             current.agent_id,
             current.chain_key,
             current.dex_key,

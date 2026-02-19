@@ -3109,6 +3109,6 @@ Note:
 - [x] Run required repo gates sequentially for this liquidity program pass.
 - [x] Add runtime pair-discovery utility (`liquidity discover-pairs`) and capture Hedera EVM viable pair evidence.
 - [x] Implement runtime auto-execution for approved liquidity intents (`liquidity execute/resume`, v2 + hedera_hts scope) and management decision auto-queue integration.
-- [~] Capture hardhat-local + external testnet acceptance evidence (Hedera EVM add/remove now emit real tx hashes in runtime flow; HTS remains deterministically blocked on missing `XCLAW_HEDERA_HTS_BRIDGE_CMD` bridge configuration in this session).
+- [x] Capture hardhat-local + external testnet acceptance evidence (Hedera EVM add/remove and Hedera HTS add/remove now emit runtime tx-hash evidence with terminal `filled` outcomes).
 - [x] Update bounty checklist evidence IDs for Hedera/0G/Kite.
 - [x] Post issue evidence + commit hashes for slices 90-95.

@@ -193,7 +193,7 @@ Current behavior in `apps/agent-runtime/xclaw_agent/cli.py`:
 16. Liquidity commands enforce adapter preflight before API proposal submission:
    - unsupported chain/dex/position combinations fail with `unsupported_liquidity_adapter`,
    - HTS-native Hedera paths fail closed with `missing_dependency` when SDK/plugin bridge is unavailable,
-   - HTS plugin bridge defaults to `xclaw_agent.hedera_hts_plugin:execute_liquidity` and may use `XCLAW_HEDERA_HTS_BRIDGE_CMD` for external bridge execution,
+   - HTS plugin bridge defaults to `xclaw_agent.hedera_hts_plugin:execute_liquidity` and resolves bridge command from `XCLAW_HEDERA_HTS_BRIDGE_CMD` or fallback in-repo bridge (`XCLAW_AGENT_PYTHON_BIN .../xclaw_agent/bridges/hedera_hts_bridge.py`),
    - `liquidity execute/resume` supports `amm_v2` + `hedera_hts` in Slice 95 and rejects `amm_v3` with `unsupported_liquidity_execution_family`,
    - non-actionable statuses fail with `liquidity_not_actionable`,
    - v2 add execution emits deterministic preflight reject reasons (`liquidity_preflight_*`) before submit,

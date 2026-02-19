@@ -43,7 +43,7 @@ Notes:
 
 - [ ] Hedera mainnet + Hedera testnet chain configs are implemented and validated.
 - [ ] Hedera trading + converting path works in runtime + skill wrapper.
-- [!] Hedera liquidity add/remove path works, with same approval posture as trade/convert.
+- [x] Hedera liquidity add/remove path works, with same approval posture as trade/convert.
 - [x] Hedera SDK + HTS support exists for native token-service operations.
 - [ ] Position tracking works on Hedera (PnL + fees where applicable).
 
@@ -66,6 +66,9 @@ Notes:
 - `E25`: HTS readiness matrix now reports only bridge-command gap when runtime venv + JDK are configured (`missing: XCLAW_HEDERA_HTS_BRIDGE_CMD`).
 - `E26`: HTS add remains deterministic fail-closed `missing_dependency` until bridge command is configured.
 - `E27`: HTS remove remains deterministic fail-closed `missing_dependency` until bridge command is configured.
+- `E28`: HTS readiness passes with in-repo bridge default (`ready=true`, `bridgeCommandSource=default`).
+- `E29`: HTS add executed with terminal `filled` and tx hash `4fce8accb8103ceadbb20865a9020222189d3606c309b6896c77bc8b97cb928fdbcc012933a5c373fa7f2922bccfd62f`.
+- `E30`: HTS remove executed with terminal `filled` and tx hash `41428b5b6519e0c710d1aa80b796819a690ed6211ab7cce6052937cc9c89c6508b2c43813ce2ec7d0deb9cdddb9fea88`.
 
 ---
 

@@ -2595,3 +2595,12 @@ Active slice context: Slice 90 close-out -> Slice 95 hardening/evidence sequence
 ## Remaining
 - [!] Configure `XCLAW_HEDERA_HTS_BRIDGE_CMD` to a real bridge executable and capture HTS add/remove tx hashes.
 - [~] Final Slice 95 closure status/docs after HTS tx-hash evidence or accepted explicit blocker disposition.
+
+# Slice 95 Final Tasks Update: HTS Bridge Closure (UTC 2026-02-19)
+
+- [x] Add in-repo HTS bridge executable and default command resolution.
+- [x] Persist bridge command in installer skill env setup.
+- [x] Extend HTS readiness diagnostics with bridge source/config details.
+- [x] Capture HTS add tx hash (`E29`).
+- [x] Capture HTS remove tx hash (`E30`).
+- [x] Move Slice 95 to complete across tracker/roadmap/checklist.

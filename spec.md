@@ -2457,3 +2457,12 @@ Implement the post-Slice-88 liquidity program through runtime adapter preflight 
 ## Evidence objective status
 1. Hedera EVM add/remove tx-hash evidence: achieved.
 2. Hedera HTS add/remove tx-hash evidence: blocked only on missing `XCLAW_HEDERA_HTS_BRIDGE_CMD` bridge command.
+
+# Slice 95 Final Addendum: HTS Bridge Closure (UTC 2026-02-19)
+
+## Completed
+1. Added in-repo HTS bridge executable (`apps/agent-runtime/xclaw_agent/bridges/hedera_hts_bridge.py`) with stdin/stdout JSON contract and tx-hash return.
+2. Wired default bridge command resolution in plugin when `XCLAW_HEDERA_HTS_BRIDGE_CMD` is unset.
+3. Wired installer env defaults to persist `XCLAW_HEDERA_HTS_BRIDGE_CMD` for skill runtime.
+4. Extended `wallet health` HTS readiness details with bridge source/config state.
+5. Captured live HTS add/remove tx-hash evidence (`E29`, `E30`).

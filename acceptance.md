@@ -5007,3 +5007,35 @@ Date (UTC): 2026-02-19
 ### Current closure state
 - Hedera EVM add/remove tx-hash evidence is now present in runtime-native liquidity flow.
 - HTS path remains fail-closed pending bridge command setup; Slice 95 remains in-progress until HTS tx-hash bar is satisfied or explicitly accepted as blocked.
+
+## Slice 95 Final HTS Bridge Closure (UTC 2026-02-19)
+
+### HTS bridge/runtime implementation
+- Added in-repo bridge executable: `apps/agent-runtime/xclaw_agent/bridges/hedera_hts_bridge.py`.
+- Bridge input contract:
+  - stdin JSON object with `action`, `chain`, `dex`, `positionType`, `payload`.
+- Bridge output contract:
+  - stdout JSON object with required `txHash`, optional `positionId`, `details`.
+- Default bridge command now resolves automatically when env override is absent:
+  - `XCLAW_AGENT_PYTHON_BIN <repo>/apps/agent-runtime/xclaw_agent/bridges/hedera_hts_bridge.py`
+- Installer now writes canonical bridge command to skill env:
+  - `skills.entries.xclaw-agent.env.XCLAW_HEDERA_HTS_BRIDGE_CMD`.
+- `wallet health` HTS diagnostics now include:
+  - `bridgeCommandConfigured`
+  - `bridgeCommandSource` (`env|default`).
+
+### Live HTS evidence (`E28+`)
+- `E28` HTS readiness pass:
+  - command: `xclaw-agent wallet health --chain hedera_testnet --json`
+  - outcome: `htsReadiness.ready=true`, `bridgeCommandConfigured=true`, `bridgeCommandSource=default`.
+- `E29` HTS add tx hash:
+  - command: `xclaw-agent liquidity add --chain hedera_testnet --dex hedera_hts --token-a WHBAR --token-b SAUCE --amount-a 1 --amount-b 1 --slippage-bps 100 --json`
+  - outcome: `status=filled`, `txHash=4fce8accb8103ceadbb20865a9020222189d3606c309b6896c77bc8b97cb928fdbcc012933a5c373fa7f2922bccfd62f`.
+- `E30` HTS remove tx hash:
+  - command: `xclaw-agent liquidity remove --chain hedera_testnet --dex hedera_hts --position-id 4fce8accb8103ceadbb20865a9020222189d3606c309b6896c77bc8b97cb928fdbcc012933a5c373fa7f2922bccfd62f --percent 50 --slippage-bps 100 --json`
+  - outcome: `status=filled`, `txHash=41428b5b6519e0c710d1aa80b796819a690ed6211ab7cce6052937cc9c89c6508b2c43813ce2ec7d0deb9cdddb9fea88`.
+
+### Slice 95 closure status
+- Hedera EVM tx-hash evidence: complete (`E22`, `E23`).
+- Hedera HTS tx-hash evidence: complete (`E29`, `E30`).
+- Slice 95 verification bar is met in this session.

@@ -8922,6 +8922,9 @@ def cmd_limit_orders_run_loop(args: argparse.Namespace) -> int:
 def _hedera_hts_readiness() -> dict[str, Any]:
     runtime_python = (os.environ.get("XCLAW_AGENT_PYTHON_BIN") or sys.executable or "python3").strip()
     bridge_cmd = str(os.environ.get("XCLAW_HEDERA_HTS_BRIDGE_CMD") or "").strip()
+    bridge_source = "env" if bridge_cmd else "default"
+    default_bridge = pathlib.Path(__file__).resolve().parent / "bridges" / "hedera_hts_bridge.py"
+    bridge_configured = bool(bridge_cmd) or default_bridge.exists()
     runtime_root = pathlib.Path(__file__).resolve().parents[1]
     py_env = os.environ.copy()
     existing_path = str(py_env.get("PYTHONPATH") or "").strip()
@@ -8975,7 +8978,8 @@ def _hedera_hts_readiness() -> dict[str, Any]:
         "hederaImportable": hedera_importable,
         "pluginImportable": plugin_importable,
         "pluginCallable": plugin_callable,
-        "bridgeCommandConfigured": bool(bridge_cmd),
+        "bridgeCommandConfigured": bridge_configured,
+        "bridgeCommandSource": bridge_source,
     }
     ready = all(
         [
@@ -8983,7 +8987,7 @@ def _hedera_hts_readiness() -> dict[str, Any]:
             javac_available,
             hedera_importable,
             plugin_callable,
-            bool(bridge_cmd),
+            bridge_configured,
         ]
     )
     missing: list[str] = []
@@ -8995,7 +8999,7 @@ def _hedera_hts_readiness() -> dict[str, Any]:
         missing.append("hedera_sdk_py")
     if not plugin_callable:
         missing.append("xclaw_agent.hedera_hts_plugin:execute_liquidity")
-    if not bridge_cmd:
+    if not bridge_configured:
         missing.append("XCLAW_HEDERA_HTS_BRIDGE_CMD")
     return {"ready": ready, "checks": checks, "missing": missing}
 

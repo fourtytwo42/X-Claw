@@ -1274,7 +1274,10 @@ Liquidity adapter execution contract:
 - `liquidity remove` execution derives token pair and LP amount from stored position snapshot + on-chain LP balance percent; when snapshot is unavailable and `positionRef` is a pair address, runtime may resolve `token0/token1` directly from pair.
 - Hedera pair remove path must resolve LP token via `pair.lpToken()` when available (fallback to pair contract token model otherwise).
 - Unsupported adapter combinations must return `unsupported_liquidity_adapter`.
-- Hedera HTS-native liquidity paths use plugin bridge module `xclaw_agent.hedera_hts_plugin:execute_liquidity` by default (override with `XCLAW_HEDERA_HTS_PLUGIN`) and may dispatch to an external bridge command via `XCLAW_HEDERA_HTS_BRIDGE_CMD`; missing SDK/bridge prerequisites must fail closed with `missing_dependency`.
+- Hedera HTS-native liquidity paths use plugin bridge module `xclaw_agent.hedera_hts_plugin:execute_liquidity` by default (override with `XCLAW_HEDERA_HTS_PLUGIN`) and dispatch to a bridge command via:
+  - env override `XCLAW_HEDERA_HTS_BRIDGE_CMD`, or
+  - default in-repo command `XCLAW_AGENT_PYTHON_BIN <repo>/apps/agent-runtime/xclaw_agent/bridges/hedera_hts_bridge.py` when env override is absent.
+- Missing SDK/bridge prerequisites must fail closed with `missing_dependency`.
 
 Skill exposure constraint:
 - Limit-order commands remain runtime-capable but are not exposed through `xclaw_agent_skill.py` command surface.

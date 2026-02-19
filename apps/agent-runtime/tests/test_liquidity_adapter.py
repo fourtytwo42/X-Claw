@@ -18,9 +18,25 @@ from xclaw_agent.liquidity_adapter import (  # noqa: E402
     build_liquidity_adapter,
     build_liquidity_adapter_for_request,
 )
+from xclaw_agent import hedera_hts_plugin  # noqa: E402
 
 
 class LiquidityAdapterTests(unittest.TestCase):
+    def test_hts_bridge_command_defaults_to_repo_bridge(self) -> None:
+        with mock.patch.dict(hedera_hts_plugin.os.environ, {"XCLAW_HEDERA_HTS_BRIDGE_CMD": ""}, clear=False):
+            cmd = hedera_hts_plugin._bridge_command()
+        self.assertGreaterEqual(len(cmd), 2)
+        self.assertTrue(cmd[1].endswith("xclaw_agent/bridges/hedera_hts_bridge.py"))
+
+    def test_hts_bridge_command_env_override_honored(self) -> None:
+        with mock.patch.dict(
+            hedera_hts_plugin.os.environ,
+            {"XCLAW_HEDERA_HTS_BRIDGE_CMD": "python /tmp/custom_bridge.py --flag"},
+            clear=False,
+        ):
+            cmd = hedera_hts_plugin._bridge_command()
+        self.assertEqual(cmd, ["python", "/tmp/custom_bridge.py", "--flag"])
+
     def test_build_selects_v2_default(self) -> None:
         adapter = build_liquidity_adapter("base_sepolia", "uniswap_v2", "amm_v2")
         self.assertIsInstance(adapter, AmmV2LiquidityAdapter)
