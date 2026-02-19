@@ -49,6 +49,7 @@ DECISION_ACK_MARKER_V18 = "xclaw: telegram approval decision ack v18"
 DECISION_ACK_MARKER_V19 = "xclaw: telegram approval decision ack v19"
 DECISION_ACK_MARKER_V20 = "xclaw: telegram approval decision ack v20"
 DECISION_ACK_MARKER_V21 = "xclaw: telegram approval decision ack v21"
+DECISION_ACK_MARKER_V22 = "xclaw: telegram approval decision ack v22"
 DECISION_ROUTE_MARKER_V1 = "xclaw: telegram approval decision routed to agent"
 DECISION_EXEC_MARKER_V1 = "xclaw: telegram trade resume trigger v1"
 DECISION_RESULT_ROUTE_MARKER_V1 = "xclaw: telegram trade result routed to agent"
@@ -58,7 +59,7 @@ QUEUED_BUTTONS_MARKER_V3 = "xclaw: telegram queued approval buttons v3"
 QUEUED_BUTTONS_MARKER_V4 = "xclaw: telegram queued approval buttons v4"
 LEGACY_DM_SENTINEL = 'Allow in DMs even when inlineButtonsScope is "allowlist", gated by chatId == senderId.'
 # Bump when patch semantics change so we invalidate the cached "already patched" fast-path.
-STATE_SCHEMA_VERSION = 53
+STATE_SCHEMA_VERSION = 54
 STATE_DIR = Path.home() / ".openclaw" / "xclaw"
 STATE_FILE = STATE_DIR / "openclaw_patch_state.json"
 LOCK_FILE = STATE_DIR / "openclaw_patch.lock"
@@ -308,7 +309,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         or DECISION_ACK_MARKER_V14 not in raw
         or DECISION_ACK_MARKER_V15 not in raw
         or DECISION_ACK_MARKER_V16 not in raw
-        or DECISION_ACK_MARKER_V21 not in raw
+        or DECISION_ACK_MARKER_V22 not in raw
         or DECISION_ROUTE_MARKER_V1 not in raw
         or DECISION_EXEC_MARKER_V1 not in raw
         or DECISION_RESULT_ROUTE_MARKER_V1 not in raw
@@ -338,7 +339,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         or DECISION_ACK_MARKER_V14 not in raw
         or DECISION_ACK_MARKER_V15 not in raw
         or DECISION_ACK_MARKER_V16 not in raw
-        or DECISION_ACK_MARKER_V21 not in raw
+        or DECISION_ACK_MARKER_V22 not in raw
         or DECISION_ROUTE_MARKER_V1 not in raw
         or DECISION_EXEC_MARKER_V1 not in raw
         or DECISION_RESULT_ROUTE_MARKER_V1 not in raw
@@ -401,7 +402,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         )
         text8, n7 = re.subn(
             r'try \{ logger\.info\(\{ subjectId, chainKey, chatId \}, "xclaw: telegram transfer result delivered \(no synthetic route\)"\); \} catch \{\}\s*return;',
-            'try { const transferStatus = String(body?.status ?? (body?.ok ? "filled" : "failed")).toLowerCase(); const isRejected = transferStatus === "rejected"; const isFilled = transferStatus === "filled"; const decisionWord = isFilled ? "FILLED" : (isRejected ? "REJECTED" : "FAILED"); const instruction = isFilled ? "Reply to the user confirming the transfer succeeded with tx details." : (isRejected ? "Reply to the user confirming the transfer was denied and no transaction was executed." : "Reply to the user confirming the transfer failed and provide next steps."); const syntheticText = `[X-CLAW TRANSFER RESULT]\\nDecision: ${decisionWord}\\nApproval: ${subjectId}\\nChain: ${chainKey}\\nTxHash: ${txHash || "n/a"}\\nAmount: ${amountLine}\\nTo: ${toAddress}\\nSource: telegram_callback_transfer\\nInstruction: ${instruction}`; const getFile2 = typeof ctx.getFile === "function" ? ctx.getFile.bind(ctx) : async () => ({}); const syntheticMessage2 = { ...callbackMessage, from: callback.from, text: syntheticText, caption: void 0, caption_entities: void 0, entities: void 0, date: Math.floor(Date.now() / 1000) }; await processMessage({ message: syntheticMessage2, me: ctx.me, getFile: getFile2 }, [], [], { messageIdOverride: `xclaw-transfer-result-${callback.id}` }); } catch {} try { logger.info({ subjectId, chainKey, chatId, ok: !!body?.ok }, "xclaw: telegram transfer result routed to agent"); } catch {} return;',
+            'try { const transferStatus = String(body?.status ?? (body?.ok ? "filled" : "failed")).toLowerCase(); const isRejected = transferStatus === "rejected"; const isFilled = transferStatus === "filled"; const decisionWord = isFilled ? "FILLED" : (isRejected ? "REJECTED" : "FAILED"); const instruction = isFilled ? "Reply to the user confirming the transfer succeeded with tx details." : (isRejected ? "Reply to the user confirming the transfer was denied and no transaction was executed." : "Reply to the user confirming the transfer failed and provide next steps."); const syntheticText = `[X-CLAW TRANSFER RESULT]\\nDecision: ${decisionWord}\\nApproval: ${subjectId}\\nChain: ${chainKey}\\nTxHash: ${txHash || "n/a"}\\nAmount: ${amountLine}\\nTo: ${toAddress}\\nSource: telegram_callback_transfer\\nInstruction: ${instruction}`; const storeAllowFrom2 = await readChannelAllowFromStore("telegram").catch(() => []); const syntheticAllowFrom = Array.from(new Set([...(Array.isArray(storeAllowFrom2) ? storeAllowFrom2.map((v) => String(v)) : []), String(callback?.from?.id ?? ""), String(chatId ?? "")])).filter((v) => !!v); const getFile2 = typeof ctx.getFile === "function" ? ctx.getFile.bind(ctx) : async () => ({}); const syntheticMessage2 = { ...callbackMessage, from: callback.from, text: syntheticText, caption: void 0, caption_entities: void 0, entities: void 0, date: Math.floor(Date.now() / 1000) }; await processMessage({ message: syntheticMessage2, me: ctx.me, getFile: getFile2 }, [], syntheticAllowFrom, { messageIdOverride: `xclaw-transfer-result-${callback.id}` }); } catch {} try { logger.info({ subjectId, chainKey, chatId, ok: !!body?.ok }, "xclaw: telegram transfer result routed to agent"); } catch {} return;',
             text7,
         )
         return text8, (n > 0) or (n2 > 0) or (n3 > 0) or (n4 > 0) or (n5 > 0) or (n6 > 0) or (n7 > 0)
@@ -429,7 +430,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         )
         text6, n5 = re.subn(
             r'(const finalMsg = `\$\{head\}\$\{pairLine\}\\nTrade: \$\{subjectId\}\\nChain: \$\{chainKey\}\$\{txLine\}\$\{reasonLine\}`;)',
-            r'\1 try { await bot.api.sendMessage(chatId, finalMsg); } catch {} try { const decisionWord = body?.ok ? "FILLED" : "FAILED"; const instruction = body?.ok ? "Reply to the user confirming the trade succeeded with tx details." : "Reply to the user confirming the trade failed and provide next steps."; const syntheticText = `[X-CLAW TRADE RESULT]\\nDecision: ${decisionWord}\\nTrade: ${subjectId}\\nChain: ${chainKey}\\nTxHash: ${txHash || "n/a"}${pairLine ? `\\nPair: ${amountHuman} ${tokenInSym} -> ${tokenOutSym}` : ""}\\nSource: telegram_callback_trade\\nInstruction: ${instruction}`; const getFile2 = typeof ctx.getFile === "function" ? ctx.getFile.bind(ctx) : async () => ({}); const syntheticMessage2 = { ...callbackMessage, from: callback.from, text: syntheticText, caption: void 0, caption_entities: void 0, entities: void 0, date: Math.floor(Date.now() / 1000) }; await processMessage({ message: syntheticMessage2, me: ctx.me, getFile: getFile2 }, [], [], { messageIdOverride: `xclaw-trade-result-${callback.id}` }); } catch {}',
+            r'\1 try { await bot.api.sendMessage(chatId, finalMsg); } catch {} try { const decisionWord = body?.ok ? "FILLED" : "FAILED"; const instruction = body?.ok ? "Reply to the user confirming the trade succeeded with tx details." : "Reply to the user confirming the trade failed and provide next steps."; const syntheticText = `[X-CLAW TRADE RESULT]\\nDecision: ${decisionWord}\\nTrade: ${subjectId}\\nChain: ${chainKey}\\nTxHash: ${txHash || "n/a"}${pairLine ? `\\nPair: ${amountHuman} ${tokenInSym} -> ${tokenOutSym}` : ""}\\nSource: telegram_callback_trade\\nInstruction: ${instruction}`; const storeAllowFrom2 = await readChannelAllowFromStore("telegram").catch(() => []); const syntheticAllowFrom = Array.from(new Set([...(Array.isArray(storeAllowFrom2) ? storeAllowFrom2.map((v) => String(v)) : []), String(callback?.from?.id ?? ""), String(chatId ?? "")])).filter((v) => !!v); const getFile2 = typeof ctx.getFile === "function" ? ctx.getFile.bind(ctx) : async () => ({}); const syntheticMessage2 = { ...callbackMessage, from: callback.from, text: syntheticText, caption: void 0, caption_entities: void 0, entities: void 0, date: Math.floor(Date.now() / 1000) }; await processMessage({ message: syntheticMessage2, me: ctx.me, getFile: getFile2 }, [], syntheticAllowFrom, { messageIdOverride: `xclaw-trade-result-${callback.id}` }); } catch {}',
             text5,
         )
         text7, n6 = re.subn(
@@ -496,6 +497,8 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
             '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t? "Reply to the user confirming the trade succeeded with tx details."\n'
             '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t: "Reply to the user confirming the trade failed and provide next steps.";\n'
             '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst syntheticText = `[X-CLAW TRADE RESULT]\\nDecision: ${decisionWord}\\nTrade: ${subjectId}\\nChain: ${chainKey}\\nTxHash: ${txHash || "n/a"}${pairLine ? `\\nPair: ${amountHuman} ${tokenInSym} -> ${tokenOutSym}` : ""}\\nSource: telegram_callback_trade\\nInstruction: ${instruction}`;\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst storeAllowFrom2 = await readChannelAllowFromStore("telegram").catch(() => []);\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst syntheticAllowFrom = Array.from(new Set([...(Array.isArray(storeAllowFrom2) ? storeAllowFrom2.map((v) => String(v)) : []), String(callback?.from?.id ?? ""), String(chatId ?? "")])).filter((v) => !!v);\n'
             '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst getFile2 = typeof ctx.getFile === "function" ? ctx.getFile.bind(ctx) : async () => ({});\n'
             '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst syntheticMessage2 = {\n'
             '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t...callbackMessage,\n'
@@ -506,7 +509,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
             '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tentities: void 0,\n'
             '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tdate: Math.floor(Date.now() / 1000)\n'
             '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t};\n'
-            '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tawait processMessage({ message: syntheticMessage2, me: ctx.me, getFile: getFile2 }, [], [], { messageIdOverride: `xclaw-trade-result-${callback.id}` });\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tawait processMessage({ message: syntheticMessage2, me: ctx.me, getFile: getFile2 }, [], syntheticAllowFrom, { messageIdOverride: `xclaw-trade-result-${callback.id}` });\n'
             '\t\t\t\t\t\t\t\t\t\t\t\t\t\t} catch {}\n'
             f'\t\t\t\t\t\t\t\t\t\t\t\t\t\ttry {{ logger.info({{ subjectId, chainKey, chatId, ok: !!body?.ok }}, "{DECISION_RESULT_ROUTE_MARKER_V1}"); }} catch {{}}\n'
             '\t\t\t\t\t\t\t\t\t\t\t\t\t} catch (resumeErr) {\n'
@@ -548,7 +551,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         and DECISION_ACK_MARKER_V14 in raw
         and DECISION_ACK_MARKER_V15 in raw
         and DECISION_ACK_MARKER_V16 in raw
-        and DECISION_ACK_MARKER_V21 in raw
+        and DECISION_ACK_MARKER_V22 in raw
         and DECISION_ROUTE_MARKER_V1 in raw
         and DECISION_EXEC_MARKER_V1 in raw
         and DECISION_RESULT_ROUTE_MARKER_V1 in raw
@@ -664,6 +667,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         '\t\t\t\t\t\t\t\t\t\t: "Reply to the user confirming the transfer failed and provide next steps.");\n'
         '\t\t\t\t\t\t\t\tconst syntheticText = `[X-CLAW TRANSFER RESULT]\\nDecision: ${decisionWord}\\nApproval: ${subjectId}\\nChain: ${chainKey}\\nTxHash: ${txHash || "n/a"}\\nAmount: ${amountLine}\\nTo: ${toAddress}\\nSource: telegram_callback_transfer\\nInstruction: ${instruction}`;\n'
         '\t\t\t\t\t\t\t\tconst storeAllowFrom2 = await readChannelAllowFromStore("telegram").catch(() => []);\n'
+        '\t\t\t\t\t\t\t\tconst syntheticAllowFrom = Array.from(new Set([...(Array.isArray(storeAllowFrom2) ? storeAllowFrom2.map((v) => String(v)) : []), String(callback?.from?.id ?? ""), String(chatId ?? "")])).filter((v) => !!v);\n'
         '\t\t\t\t\t\t\t\tconst getFile2 = typeof ctx.getFile === "function" ? ctx.getFile.bind(ctx) : async () => ({});\n'
         '\t\t\t\t\t\t\t\tconst syntheticMessage2 = {\n'
         '\t\t\t\t\t\t\t\t\t...callbackMessage,\n'
@@ -674,7 +678,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         '\t\t\t\t\t\t\t\t\tentities: void 0,\n'
         '\t\t\t\t\t\t\t\t\tdate: Math.floor(Date.now() / 1000)\n'
         '\t\t\t\t\t\t\t\t};\n'
-        '\t\t\t\t\t\t\t\tawait processMessage({ message: syntheticMessage2, me: ctx.me, getFile: getFile2 }, [], [], { messageIdOverride: `xclaw-transfer-result-${callback.id}` });\n'
+        '\t\t\t\t\t\t\t\tawait processMessage({ message: syntheticMessage2, me: ctx.me, getFile: getFile2 }, [], syntheticAllowFrom, { messageIdOverride: `xclaw-transfer-result-${callback.id}` });\n'
         '\t\t\t\t\t\t\t} catch {}\n'
         '\t\t\t\t\t\t\ttry { logger.info({ subjectId, chainKey, chatId, ok: !!body?.ok }, "xclaw: telegram transfer result routed to agent"); } catch {}\n'
         '\t\t\t\t\t\t\treturn;\n'
@@ -725,6 +729,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V19}\n'
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V20}\n'
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V21}\n'
+        f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V22}\n'
         '\t\t\t\t\t\t\t\ttry {\n'
         '\t\t\t\t\t\t\t\t\tconst subjectLabel = parts[0] === "xpol" ? "policy approval" : "trade";\n'
         '\t\t\t\t\t\t\t\t\tconst msg = `${action === "r" ? "Denied" : "Approved"} ${subjectLabel} ${subjectId}\\nChain: ${chainKey}`;\n'
@@ -739,9 +744,10 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         '\t\t\t\t\t\t\t\t\t\t\t: "Reply to the user confirming the trade was denied and no execution occurred.";\n'
         '\t\t\t\t\t\t\t\t\t\tconst syntheticText = `[X-CLAW ${parts[0] === "xpol" ? "POLICY" : "TRADE"} DECISION]\\nDecision: REJECTED\\nSubject: ${subjectId}\\nChain: ${chainKey}\\nSource: telegram_callback_${parts[0] === "xpol" ? "policy" : "trade"}\\nInstruction: ${instruction}`;\n'
         '\t\t\t\t\t\t\t\t\t\tconst storeAllowFrom2 = await readChannelAllowFromStore("telegram").catch(() => []);\n'
+        '\t\t\t\t\t\t\t\t\t\tconst syntheticAllowFrom = Array.from(new Set([...(Array.isArray(storeAllowFrom2) ? storeAllowFrom2.map((v) => String(v)) : []), String(callback?.from?.id ?? ""), String(chatId ?? "")])).filter((v) => !!v);\n'
         '\t\t\t\t\t\t\t\t\t\tconst getFile2 = typeof ctx.getFile === "function" ? ctx.getFile.bind(ctx) : async () => ({});\n'
         '\t\t\t\t\t\t\t\t\t\tconst syntheticMessage2 = { ...callbackMessage, from: callback.from, text: syntheticText, caption: void 0, caption_entities: void 0, entities: void 0, date: Math.floor(Date.now() / 1000) };\n'
-        '\t\t\t\t\t\t\t\t\t\tawait processMessage({ message: syntheticMessage2, me: ctx.me, getFile: getFile2 }, [], [], { messageIdOverride: `xclaw-${parts[0]}-reject-${callback.id}` });\n'
+        '\t\t\t\t\t\t\t\t\t\tawait processMessage({ message: syntheticMessage2, me: ctx.me, getFile: getFile2 }, [], syntheticAllowFrom, { messageIdOverride: `xclaw-${parts[0]}-reject-${callback.id}` });\n'
         '\t\t\t\t\t\t\t\t\t} catch {}\n'
         '\t\t\t\t\t\t\t\t}\n'
         '\t\t\t\t\t\t\t\tif (parts[0] === "xappr" && action !== "r") {\n'
@@ -793,6 +799,8 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t? "Reply to the user confirming the trade succeeded with tx details."\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t: "Reply to the user confirming the trade failed and provide next steps.";\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst syntheticText = `[X-CLAW TRADE RESULT]\\nDecision: ${decisionWord}\\nTrade: ${subjectId}\\nChain: ${chainKey}\\nTxHash: ${txHash || "n/a"}${pairLine ? `\\nPair: ${amountHuman} ${tokenInSym} -> ${tokenOutSym}` : ""}\\nSource: telegram_callback_trade\\nInstruction: ${instruction}`;\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst storeAllowFrom2 = await readChannelAllowFromStore("telegram").catch(() => []);\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst syntheticAllowFrom = Array.from(new Set([...(Array.isArray(storeAllowFrom2) ? storeAllowFrom2.map((v) => String(v)) : []), String(callback?.from?.id ?? ""), String(chatId ?? "")])).filter((v) => !!v);\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst getFile2 = typeof ctx.getFile === "function" ? ctx.getFile.bind(ctx) : async () => ({});\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst syntheticMessage2 = {\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t...callbackMessage,\n'
@@ -803,7 +811,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tentities: void 0,\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tdate: Math.floor(Date.now() / 1000)\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t};\n'
-        '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tawait processMessage({ message: syntheticMessage2, me: ctx.me, getFile: getFile2 }, [], [], { messageIdOverride: `xclaw-trade-result-${callback.id}` });\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tawait processMessage({ message: syntheticMessage2, me: ctx.me, getFile: getFile2 }, [], syntheticAllowFrom, { messageIdOverride: `xclaw-trade-result-${callback.id}` });\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\t} catch {}\n'
         f'\t\t\t\t\t\t\t\t\t\t\t\t\t\ttry {{ logger.info({{ subjectId, chainKey, chatId, ok: !!body?.ok }}, "{DECISION_RESULT_ROUTE_MARKER_V1}"); }} catch {{}}\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t} catch (resumeErr) {\n'
@@ -861,6 +869,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V19}\n'
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V20}\n'
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V21}\n'
+        f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V22}\n'
         '\t\t\t\t\t\t\t\t// Runtime is canonical owner of queued prompt cleanup (button clear, no delete).\n'
         '\t\t\t\t\t\t\t\t// Emit deterministic confirmation immediately so users always see a result.\n'
         '\t\t\t\t\t\t\t\ttry {\n'
@@ -879,6 +888,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         '\t\t\t\t\t\t\t\t\t\t\t: "Reply to the user confirming the trade was denied and no execution occurred.";\n'
         '\t\t\t\t\t\t\t\t\t\tconst syntheticText = `[X-CLAW ${parts[0] === "xpol" ? "POLICY" : "TRADE"} DECISION]\\nDecision: REJECTED\\nSubject: ${subjectId}\\nChain: ${chainKey}\\nSource: telegram_callback_${parts[0] === "xpol" ? "policy" : "trade"}\\nInstruction: ${instruction}`;\n'
         '\t\t\t\t\t\t\t\t\t\tconst storeAllowFrom2 = await readChannelAllowFromStore("telegram").catch(() => []);\n'
+        '\t\t\t\t\t\t\t\t\t\tconst syntheticAllowFrom = Array.from(new Set([...(Array.isArray(storeAllowFrom2) ? storeAllowFrom2.map((v) => String(v)) : []), String(callback?.from?.id ?? ""), String(chatId ?? "")])).filter((v) => !!v);\n'
         '\t\t\t\t\t\t\t\t\t\tconst getFile2 = typeof ctx.getFile === "function" ? ctx.getFile.bind(ctx) : async () => ({});\n'
         '\t\t\t\t\t\t\t\t\t\tconst syntheticMessage2 = {\n'
         '\t\t\t\t\t\t\t\t\t\t\t...callbackMessage,\n'
@@ -889,7 +899,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         '\t\t\t\t\t\t\t\t\t\t\tentities: void 0,\n'
         '\t\t\t\t\t\t\t\t\t\t\tdate: Math.floor(Date.now() / 1000)\n'
         '\t\t\t\t\t\t\t\t\t\t};\n'
-        '\t\t\t\t\t\t\t\t\t\tawait processMessage({ message: syntheticMessage2, me: ctx.me, getFile: getFile2 }, [], [], { messageIdOverride: `xclaw-${parts[0]}-reject-${callback.id}` });\n'
+        '\t\t\t\t\t\t\t\t\t\tawait processMessage({ message: syntheticMessage2, me: ctx.me, getFile: getFile2 }, [], syntheticAllowFrom, { messageIdOverride: `xclaw-${parts[0]}-reject-${callback.id}` });\n'
         '\t\t\t\t\t\t\t\t\t} catch {}\n'
         '\t\t\t\t\t\t\t\t}\n'
         '\t\t\t\t\t\t\t\tif (parts[0] === "xappr" && action !== "r") {\n'
@@ -942,6 +952,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t: "Reply to the user confirming the trade failed and provide next steps.";\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst syntheticText = `[X-CLAW TRADE RESULT]\\nDecision: ${decisionWord}\\nTrade: ${subjectId}\\nChain: ${chainKey}\\nTxHash: ${txHash || "n/a"}${pairLine ? `\\nPair: ${amountHuman} ${tokenInSym} -> ${tokenOutSym}` : ""}\\nSource: telegram_callback_trade\\nInstruction: ${instruction}`;\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst storeAllowFrom2 = await readChannelAllowFromStore("telegram").catch(() => []);\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst syntheticAllowFrom = Array.from(new Set([...(Array.isArray(storeAllowFrom2) ? storeAllowFrom2.map((v) => String(v)) : []), String(callback?.from?.id ?? ""), String(chatId ?? "")])).filter((v) => !!v);\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst getFile2 = typeof ctx.getFile === "function" ? ctx.getFile.bind(ctx) : async () => ({});\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst syntheticMessage2 = {\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t...callbackMessage,\n'
@@ -952,7 +963,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tentities: void 0,\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tdate: Math.floor(Date.now() / 1000)\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t};\n'
-        '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tawait processMessage({ message: syntheticMessage2, me: ctx.me, getFile: getFile2 }, [], [], { messageIdOverride: `xclaw-trade-result-${callback.id}` });\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tawait processMessage({ message: syntheticMessage2, me: ctx.me, getFile: getFile2 }, [], syntheticAllowFrom, { messageIdOverride: `xclaw-trade-result-${callback.id}` });\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\t} catch {}\n'
         f'\t\t\t\t\t\t\t\t\t\t\t\t\t\ttry {{ logger.info({{ subjectId, chainKey, chatId, ok: !!body?.ok }}, "{DECISION_RESULT_ROUTE_MARKER_V1}"); }} catch {{}}\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t} catch (resumeErr) {\n'
@@ -969,6 +980,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         '\t\t\t\t\t\t\t\t\t\tconst instruction = "Reply to the user confirming the policy approval was applied and summarize what changed.";\n'
         '\t\t\t\t\t\t\t\t\t\tconst syntheticText = `[X-CLAW POLICY DECISION]\\nDecision: APPROVED\\nSubject: ${subjectId}\\nChain: ${chainKey}\\nSource: telegram_callback_policy\\nInstruction: ${instruction}`;\n'
         '\t\t\t\t\t\t\t\t\t\tconst storeAllowFrom2 = await readChannelAllowFromStore("telegram").catch(() => []);\n'
+        '\t\t\t\t\t\t\t\t\t\tconst syntheticAllowFrom = Array.from(new Set([...(Array.isArray(storeAllowFrom2) ? storeAllowFrom2.map((v) => String(v)) : []), String(callback?.from?.id ?? ""), String(chatId ?? "")])).filter((v) => !!v);\n'
         '\t\t\t\t\t\t\t\t\t\tconst getFile2 = typeof ctx.getFile === "function" ? ctx.getFile.bind(ctx) : async () => ({});\n'
         '\t\t\t\t\t\t\t\t\t\tconst syntheticMessage2 = {\n'
         '\t\t\t\t\t\t\t\t\t\t\t...callbackMessage,\n'
@@ -979,7 +991,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         '\t\t\t\t\t\t\t\t\t\t\tentities: void 0,\n'
         '\t\t\t\t\t\t\t\t\t\t\tdate: Math.floor(Date.now() / 1000)\n'
         '\t\t\t\t\t\t\t\t\t\t};\n'
-        '\t\t\t\t\t\t\t\t\t\tawait processMessage({ message: syntheticMessage2, me: ctx.me, getFile: getFile2 }, [], [], { messageIdOverride: `xclaw-policy-approve-${callback.id}` });\n'
+        '\t\t\t\t\t\t\t\t\t\tawait processMessage({ message: syntheticMessage2, me: ctx.me, getFile: getFile2 }, [], syntheticAllowFrom, { messageIdOverride: `xclaw-policy-approve-${callback.id}` });\n'
         '\t\t\t\t\t\t\t\t\t} catch {}\n'
         '\t\t\t\t\t\t\t\t}\n'
         '\t\t\t\t\t\t\t}\n'
