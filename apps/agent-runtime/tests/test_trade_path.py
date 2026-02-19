@@ -976,6 +976,9 @@ class TradePathRuntimeTests(unittest.TestCase):
         self.assertIn("--message", cmd)
         message = str(cmd[cmd.index("--message") + 1])
         self.assertIn("0.11 WETH -> USDC", message)
+        self.assertIn("Approved — swap accepted ✅", message)
+        self.assertIn("• Trade ID: `trd_1`", message)
+        self.assertIn("• Chain: `base_sepolia`", message)
         self.assertNotIn("0xC97e903056f679ea1Db80893008A92578aDfE609", message)
         self.assertNotIn("0x39A0C0D1b3dDcE1B49fAa5c6e1D300C14012F4E2", message)
 

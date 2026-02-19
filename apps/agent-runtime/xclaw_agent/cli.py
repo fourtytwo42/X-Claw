@@ -3048,22 +3048,24 @@ def _maybe_send_telegram_decision_message(
         slip_str = ""
 
     if decision == "approved":
-        title = "Approved"
-        suffix = "Executing now."
+        text = (
+            "Approved — swap accepted ✅\n\n"
+            f"• Pair: {amount} {token_in} -> {token_out}{slip_str}\n"
+            f"• Trade ID: `{trade_id}`\n"
+            f"• Chain: `{chain}`\n\n"
+            "Executing now."
+        )
     else:
-        title = "Denied"
         reason_code = str(trade.get("reasonCode") or "").strip()
         reason_message = str(trade.get("reasonMessage") or "").strip()
         reason = reason_message or reason_code or "Denied."
-        suffix = f"Reason: {reason}"
-
-    text = (
-        f"{title} swap\n"
-        f"{amount} {token_in} -> {token_out}{slip_str}\n"
-        f"Chain: {chain}\n"
-        f"Trade: {trade_id}\n\n"
-        f"{suffix}"
-    )
+        text = (
+            "Denied swap\n"
+            f"{amount} {token_in} -> {token_out}{slip_str}\n"
+            f"Chain: {chain}\n"
+            f"Trade: {trade_id}\n\n"
+            f"Reason: {reason}"
+        )
 
     openclaw = shutil.which("openclaw")
     if not openclaw:
