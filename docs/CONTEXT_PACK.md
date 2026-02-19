@@ -1213,3 +1213,33 @@ Issue mapping: `#32`
 - `apps/network-web/src/app/api/v1/management/transfer-approvals/decision/route.ts`
 - `apps/network-web/src/app/api/v1/trades/[tradeId]/status/route.ts`
 - `apps/network-web/src/app/api/v1/agent/transfer-approvals/mirror/route.ts`
+
+## Context Pack Addendum: Slice 89 MetaMask-Style Gas Estimation
+
+### Objective
+- Replace fixed runtime gas-price strategy with RPC-native EIP-1559-first fee planning for signed wallet/trade sends.
+
+### Scope lock
+- In scope: `wallet-send`, `wallet-send-token`, and `trade-spot` execution sender path.
+- Out of scope: server/web faucet sender strategy and non-EVM runtime surfaces.
+
+### Canonical artifacts touched
+- `docs/XCLAW_SOURCE_OF_TRUTH.md`
+- `docs/XCLAW_SLICE_TRACKER.md`
+- `docs/XCLAW_BUILD_ROADMAP.md`
+- `docs/api/WALLET_COMMAND_CONTRACT.md`
+
+### Expected implementation files
+- `apps/agent-runtime/xclaw_agent/cli.py`
+- `apps/agent-runtime/tests/test_trade_path.py`
+
+### Verification plan
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- `python3 -m unittest apps/agent-runtime/tests/test_wallet_core.py -v`
+- required gates sequence:
+  - `npm run db:parity`
+  - `npm run seed:reset`
+  - `npm run seed:load`
+  - `npm run seed:verify`
+  - `npm run build`
+  - `pm2 restart all`

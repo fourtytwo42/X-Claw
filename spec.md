@@ -2083,3 +2083,28 @@ Pivot public product behavior from copy trading to tracked-agent monitoring whil
 - `POST /api/v1/management/transfer-approvals/decision`
 - `POST /api/v1/trades/:tradeId/status` (terminal only)
 - `POST /api/v1/agent/transfer-approvals/mirror` (terminal status-change only)
+
+## Slice 89 Spec Addendum (MetaMask-Style Gas Estimation)
+
+### Goal
+- Make runtime wallet/trade transaction submission use RPC-native EIP-1559 fee planning by default, with deterministic retry escalation and legacy rollback.
+
+### Non-goals
+1. No API/OpenAPI/schema/db migration changes.
+2. No external gas-oracle dependency addition.
+3. No x402 transfer policy behavior changes.
+
+### Interfaces / env contract
+- `XCLAW_TX_FEE_MODE=rpc|legacy` (default `rpc`)
+- `XCLAW_TX_RETRY_BUMP_BPS` (default `1250`)
+- `XCLAW_TX_PRIORITY_FLOOR_GWEI` (default `1`)
+
+### Implementation surface
+- `apps/agent-runtime/xclaw_agent/cli.py`
+  - `_estimate_tx_fees(rpc_url, attempt_index)`
+  - `_cast_rpc_send_transaction(...)` (calldata + value send support)
+  - `_execute_pending_transfer_flow(...)` native send path via unified sender
+- `apps/agent-runtime/tests/test_trade_path.py`
+  - EIP-1559 happy path
+  - fallback to legacy path
+  - cast send flag coverage + retry behavior

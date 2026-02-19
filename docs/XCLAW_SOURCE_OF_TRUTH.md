@@ -2733,6 +2733,10 @@ Limitations / notes:
 12. Real-mode transaction send robustness:
    - runtime send path must let RPC assign nonce on first signed-submit attempt; retries may pin nonce from pending/latest reads to recover deterministically.
    - retryable send errors (`replacement transaction underpriced`, `transaction underpriced`, `nonce too low`, `already known`) must trigger bounded gas escalation across attempts before final failure.
+   - gas fee selection must be RPC-native and EIP-1559-first by default:
+     - default fee mode `rpc`: runtime derives `maxFeePerGas`/`maxPriorityFeePerGas` from chain RPC (`eth_feeHistory` + `eth_maxPriorityFeePerGas`, with `eth_feeHistory.reward` fallback), then applies bounded retry bumping.
+     - EIP-1559 unavailable/invalid fallback: runtime uses `eth_gasPrice` + bounded retry bumping.
+     - kill-switch `XCLAW_TX_FEE_MODE=legacy` restores fixed legacy `gasPrice` send behavior for rollback.
 
 ---
 

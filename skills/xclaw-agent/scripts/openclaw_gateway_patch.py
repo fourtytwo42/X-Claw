@@ -52,6 +52,10 @@ DECISION_ACK_MARKER_V21 = "xclaw: telegram approval decision ack v21"
 DECISION_ACK_MARKER_V22 = "xclaw: telegram approval decision ack v22"
 DECISION_ACK_MARKER_V23 = "xclaw: telegram approval decision ack v23"
 DECISION_ACK_MARKER_V24 = "xclaw: telegram approval decision ack v24"
+DECISION_ACK_MARKER_V25 = "xclaw: telegram approval decision ack v25"
+DECISION_ACK_MARKER_V26 = "xclaw: telegram approval decision ack v26"
+DECISION_ACK_MARKER_V27 = "xclaw: telegram approval decision ack v27"
+DECISION_ACK_MARKER_V28 = "xclaw: telegram approval decision ack v28"
 DECISION_ROUTE_MARKER_V1 = "xclaw: telegram approval decision routed to agent"
 DECISION_EXEC_MARKER_V1 = "xclaw: telegram trade resume trigger v1"
 DECISION_RESULT_ROUTE_MARKER_V1 = "xclaw: telegram trade result routed to agent"
@@ -61,7 +65,7 @@ QUEUED_BUTTONS_MARKER_V3 = "xclaw: telegram queued approval buttons v3"
 QUEUED_BUTTONS_MARKER_V4 = "xclaw: telegram queued approval buttons v4"
 LEGACY_DM_SENTINEL = 'Allow in DMs even when inlineButtonsScope is "allowlist", gated by chatId == senderId.'
 # Bump when patch semantics change so we invalidate the cached "already patched" fast-path.
-STATE_SCHEMA_VERSION = 56
+STATE_SCHEMA_VERSION = 60
 STATE_DIR = Path.home() / ".openclaw" / "xclaw"
 STATE_FILE = STATE_DIR / "openclaw_patch_state.json"
 LOCK_FILE = STATE_DIR / "openclaw_patch.lock"
@@ -311,7 +315,10 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         or DECISION_ACK_MARKER_V14 not in raw
         or DECISION_ACK_MARKER_V15 not in raw
         or DECISION_ACK_MARKER_V16 not in raw
-        or DECISION_ACK_MARKER_V24 not in raw
+        or DECISION_ACK_MARKER_V25 not in raw
+        or DECISION_ACK_MARKER_V26 not in raw
+        or DECISION_ACK_MARKER_V27 not in raw
+        or DECISION_ACK_MARKER_V28 not in raw
         or DECISION_ROUTE_MARKER_V1 not in raw
         or DECISION_EXEC_MARKER_V1 not in raw
         or DECISION_RESULT_ROUTE_MARKER_V1 not in raw
@@ -341,7 +348,10 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         or DECISION_ACK_MARKER_V14 not in raw
         or DECISION_ACK_MARKER_V15 not in raw
         or DECISION_ACK_MARKER_V16 not in raw
-        or DECISION_ACK_MARKER_V24 not in raw
+        or DECISION_ACK_MARKER_V25 not in raw
+        or DECISION_ACK_MARKER_V26 not in raw
+        or DECISION_ACK_MARKER_V27 not in raw
+        or DECISION_ACK_MARKER_V28 not in raw
         or DECISION_ROUTE_MARKER_V1 not in raw
         or DECISION_EXEC_MARKER_V1 not in raw
         or DECISION_RESULT_ROUTE_MARKER_V1 not in raw
@@ -407,7 +417,12 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
             'try { const transferStatus = String(body?.status ?? (body?.ok ? "filled" : "failed")).toLowerCase(); const isRejected = transferStatus === "rejected"; const isFilled = transferStatus === "filled"; const decisionWord = isFilled ? "FILLED" : (isRejected ? "REJECTED" : "FAILED"); const instruction = isFilled ? "Reply to the user confirming the transfer succeeded with tx details." : (isRejected ? "Reply to the user confirming the transfer was denied and no transaction was executed." : "Reply to the user confirming the transfer failed and provide next steps."); const syntheticText = `[X-CLAW TRANSFER RESULT]\\nDecision: ${decisionWord}\\nApproval: ${subjectId}\\nChain: ${chainKey}\\nTxHash: ${txHash || "n/a"}\\nAmount: ${amountLine}\\nTo: ${toAddress}\\nSource: telegram_callback_transfer\\nInstruction: ${instruction}`; const storeAllowFrom2 = await readChannelAllowFromStore("telegram").catch(() => []); const syntheticAllowFrom = Array.from(new Set([...(Array.isArray(storeAllowFrom2) ? storeAllowFrom2.map((v) => String(v)) : []), String(callback?.from?.id ?? ""), String(chatId ?? "")])).filter((v) => !!v); const getFile2 = typeof ctx.getFile === "function" ? ctx.getFile.bind(ctx) : async () => ({}); const syntheticMessage2 = { ...callbackMessage, from: callback.from, text: syntheticText, caption: void 0, caption_entities: void 0, entities: void 0, date: Math.floor(Date.now() / 1000) }; await processMessage({ message: syntheticMessage2, me: ctx.me, getFile: getFile2 }, [], syntheticAllowFrom, { messageIdOverride: `xclaw-transfer-result-${callback.id}` }); } catch {} try { logger.info({ subjectId, chainKey, chatId, ok: !!body?.ok }, "xclaw: telegram transfer result routed to agent"); } catch {} return;',
             text7,
         )
-        return text8, (n > 0) or (n2 > 0) or (n3 > 0) or (n4 > 0) or (n5 > 0) or (n6 > 0) or (n7 > 0)
+        text9, n8 = re.subn(
+            r'• To: \$\{toAddress\}\\n• Approval ID: \\`\$\{subjectId\}\\`\\n• Chain: \\`\$\{chainKey\}\\`',
+            '• To: \\`${toAddress}\\`\\n• Approval ID: \\`${subjectId}\\`\\n• Chain: \\`${chainKey}\\`',
+            text8,
+        )
+        return text9, (n > 0) or (n2 > 0) or (n3 > 0) or (n4 > 0) or (n5 > 0) or (n6 > 0) or (n7 > 0) or (n8 > 0)
 
     def _upgrade_trade_result_noise(text: str) -> tuple[str, bool]:
         text2, n1 = re.subn(
@@ -568,7 +583,10 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         and DECISION_ACK_MARKER_V14 in raw
         and DECISION_ACK_MARKER_V15 in raw
         and DECISION_ACK_MARKER_V16 in raw
-        and DECISION_ACK_MARKER_V24 in raw
+        and DECISION_ACK_MARKER_V25 in raw
+        and DECISION_ACK_MARKER_V26 in raw
+        and DECISION_ACK_MARKER_V27 in raw
+        and DECISION_ACK_MARKER_V28 in raw
         and DECISION_ROUTE_MARKER_V1 in raw
         and DECISION_EXEC_MARKER_V1 in raw
         and DECISION_RESULT_ROUTE_MARKER_V1 in raw
@@ -654,10 +672,6 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         '\t\t\t\t\t\t\tconst amountDisplay = String(body?.amountDisplay ?? "").trim();\n'
         '\t\t\t\t\t\t\tconst toAddress = String(body?.to ?? "?");\n'
         '\t\t\t\t\t\t\tconst executionMode = String(body?.executionMode ?? "normal");\n'
-        '\t\t\t\t\t\t\tconst head = body?.ok ? `Transfer result: ${currentStatus}` : `Transfer result: failed`;\n'
-        '\t\t\t\t\t\t\tconst txLine = txHash ? `\\nTx: ${txHash}` : "";\n'
-        '\t\t\t\t\t\t\tconst modeLine = executionMode === "policy_override" ? `\\nMode: policy override (one-off)` : "";\n'
-        '\t\t\t\t\t\t\tconst reasonLine = !body?.ok ? `\\nReason: ${String(body?.message ?? err ?? `transfer exit ${exitCode}`)}` : "";\n'
         '\t\t\t\t\t\t\tlet normalizedAmount = "";\n'
         '\t\t\t\t\t\t\tif (!amountDisplay && /^[0-9]+$/.test(amountWei)) {\n'
         '\t\t\t\t\t\t\t\tconst tokenDecimalsRaw = Number(body?.tokenDecimals);\n'
@@ -672,8 +686,12 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         '\t\t\t\t\t\t\t\t}\n'
         '\t\t\t\t\t\t\t}\n'
         '\t\t\t\t\t\t\tconst amountLine = amountDisplay ? amountDisplay : (normalizedAmount || `${amountWei} ${tokenSymbol}`);\n'
-        '\t\t\t\t\t\t\tconst finalMsg = `${head}\\n${amountLine}\\nTo: ${toAddress}\\nApproval: ${subjectId}\\nChain: ${chainKey}${modeLine}${txLine}${reasonLine}`;\n'
-        '\t\t\t\t\t\t\ttry { await bot.api.sendMessage(chatId, finalMsg); } catch {}\n'
+        '\t\t\t\t\t\t\tif (action !== "r") {\n'
+        '\t\t\t\t\t\t\t\ttry {\n'
+        '\t\t\t\t\t\t\t\t\tconst approvedMsg = `Approved — transfer accepted ✅\\n\\n• Amount: ${amountLine}\\n• To: \\`${toAddress}\\`\\n• Approval ID: \\`${subjectId}\\`\\n• Chain: \\`${chainKey}\\`\\n\\nExecuting now.`;\n'
+        '\t\t\t\t\t\t\t\t\tawait bot.api.sendMessage(chatId, approvedMsg);\n'
+        '\t\t\t\t\t\t\t\t} catch {}\n'
+        '\t\t\t\t\t\t\t}\n'
         '\t\t\t\t\t\t\ttry {\n'
         '\t\t\t\t\t\t\t\tconst transferStatus = String(body?.status ?? (body?.ok ? "filled" : "failed")).toLowerCase();\n'
         '\t\t\t\t\t\t\t\tconst isRejected = transferStatus === "rejected";\n'
@@ -751,6 +769,10 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V22}\n'
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V23}\n'
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V24}\n'
+        f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V25}\n'
+        f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V26}\n'
+        f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V27}\n'
+        f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V28}\n'
         '\t\t\t\t\t\t\t\ttry {\n'
         '\t\t\t\t\t\t\t\t\tconst subjectLabel = parts[0] === "xpol" ? "policy approval" : "trade";\n'
         '\t\t\t\t\t\t\t\t\tconst msg = `${action === "r" ? "Denied" : "Approved"} ${subjectLabel} ${subjectId}\\nChain: ${chainKey}`;\n'
@@ -892,6 +914,10 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V22}\n'
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V23}\n'
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V24}\n'
+        f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V25}\n'
+        f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V26}\n'
+        f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V27}\n'
+        f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V28}\n'
         '\t\t\t\t\t\t\t\t// Runtime is canonical owner of queued prompt cleanup (button clear, no delete).\n'
         '\t\t\t\t\t\t\t\t// Emit deterministic confirmation immediately so users always see a result.\n'
         '\t\t\t\t\t\t\t\ttry {\n'
@@ -1099,13 +1125,13 @@ def _patch_queued_buttons(raw: str) -> tuple[str, bool, str | None]:
         "\t// If the agent posts an approval_pending trade summary (queued message), attach inline Approve/Deny buttons.\n"
         "\t// This avoids sending a second Telegram prompt message.\n"
         "\tif (!replyMarkup && typeof text === \"string\" && (/\\bStatus:\\s*approval_pending\\b/i.test(text) || /\\bppr_[a-z0-9]+\\b/i.test(text))) {\n"
-        "\t\tconst tradeMatch = text.match(/\\bTrade ID:\\s*(trd_[a-z0-9]+)\\b/i) ?? text.match(/\\bTrade:\\s*(trd_[a-z0-9]+)\\b/i);\n"
-        "\t\tconst policyMatch = text.match(/\\bApproval ID:\\s*(ppr_[a-z0-9]+)\\b/i) ?? text.match(/\\bPolicy Approval ID:\\s*(ppr_[a-z0-9]+)\\b/i);\n"
-        "\t\tconst transferMatch = text.match(/\\bApproval ID:\\s*(xfr(?:\\\\_|[_-])?[a-z0-9]+)\\b/i) ?? text.match(/\\bTransfer Approval ID:\\s*(xfr(?:\\\\_|[_-])?[a-z0-9]+)\\b/i);\n"
+        "\t\tconst tradeMatch = text.match(/\\bTrade ID:\\s*`?(trd_[a-z0-9]+)`?\\b/i) ?? text.match(/\\bTrade:\\s*`?(trd_[a-z0-9]+)`?\\b/i);\n"
+        "\t\tconst policyMatch = text.match(/\\bApproval ID:\\s*`?(ppr_[a-z0-9]+)`?\\b/i) ?? text.match(/\\bPolicy Approval ID:\\s*`?(ppr_[a-z0-9]+)`?\\b/i);\n"
+        "\t\tconst transferMatch = text.match(/\\bApproval ID:\\s*`?(xfr(?:\\\\_|[_-])?[a-z0-9]+)`?\\b/i) ?? text.match(/\\bTransfer Approval ID:\\s*`?(xfr(?:\\\\_|[_-])?[a-z0-9]+)`?\\b/i) ?? text.match(/\\bApproval:\\s*`?(xfr(?:\\\\_|[_-])?[a-z0-9]+)`?\\b/i);\n"
         "\t\tif (tradeMatch && tradeMatch[1]) {\n"
         "\t\t\tconst tradeId = tradeMatch[1];\n"
         "\t\t\tlet chainKey = \"\";\n"
-        "\t\t\tconst cm = text.match(/\\bChain:\\s*([a-z0-9_]+)\\b/i);\n"
+        "\t\t\tconst cm = text.match(/\\bChain:\\s*`?([a-z0-9_]+)`?\\b/i);\n"
         "\t\t\tif (cm && cm[1]) chainKey = cm[1];\n"
         "\t\t\tif (!chainKey) {\n"
         "\t\t\t\tconst skill = cfg?.skills?.entries?.[\"xclaw-agent\"]; const env = skill?.env ?? {};\n"
@@ -1115,7 +1141,7 @@ def _patch_queued_buttons(raw: str) -> tuple[str, bool, str | None]:
         "\t\t} else if (policyMatch && policyMatch[1]) {\n"
         "\t\t\tconst approvalId = policyMatch[1];\n"
         "\t\t\tlet chainKey = \"\";\n"
-        "\t\t\tconst cm = text.match(/\\bChain:\\s*([a-z0-9_]+)\\b/i);\n"
+        "\t\t\tconst cm = text.match(/\\bChain:\\s*`?([a-z0-9_]+)`?\\b/i);\n"
         "\t\t\tif (cm && cm[1]) chainKey = cm[1];\n"
         "\t\t\tif (!chainKey) {\n"
         "\t\t\t\tconst skill = cfg?.skills?.entries?.[\"xclaw-agent\"]; const env = skill?.env ?? {};\n"
@@ -1125,7 +1151,7 @@ def _patch_queued_buttons(raw: str) -> tuple[str, bool, str | None]:
         "\t\t} else if (transferMatch && transferMatch[1]) {\n"
         "\t\t\tconst approvalId = `xfr_${String(transferMatch[1] || \"\").replace(/^xfr(?:\\\\_|[_-])?/i, \"\").toLowerCase()}`;\n"
         "\t\t\tlet chainKey = \"\";\n"
-        "\t\t\tconst cm = text.match(/\\bChain:\\s*([a-z0-9_]+)\\b/i);\n"
+        "\t\t\tconst cm = text.match(/\\bChain:\\s*`?([a-z0-9_]+)`?\\b/i);\n"
         "\t\t\tif (cm && cm[1]) chainKey = cm[1];\n"
         "\t\t\tif (!chainKey) {\n"
         "\t\t\t\tconst skill = cfg?.skills?.entries?.[\"xclaw-agent\"]; const env = skill?.env ?? {};\n"
@@ -1206,13 +1232,13 @@ def _patch_queued_buttons_v2(raw: str) -> tuple[str, bool, str | None]:
         "\tconst __xclawHasPolicyPending = /\\bppr_[a-z0-9]+\\b/i.test(__xclawNormalized);\n"
         "\tconst __xclawHasPending = /\\bStatus:\\s*approval_pending\\b/i.test(__xclawNormalized) || __xclawHasPolicyPending;\n"
         "\tif (__xclawHasPending && !opts?.replyMarkup) {\n"
-        "\t\tconst tradeMatch = __xclawNormalized.match(/\\bTrade ID:\\s*(trd_[a-z0-9]+)\\b/i) ?? __xclawNormalized.match(/\\bTrade:\\s*(trd_[a-z0-9]+)\\b/i) ?? __xclawNormalized.match(/\\b(trd_[a-z0-9]+)\\b/i);\n"
-        "\t\tconst policyMatch = __xclawNormalized.match(/\\bApproval ID:\\s*(ppr_[a-z0-9]+)\\b/i) ?? __xclawNormalized.match(/\\bPolicy Approval ID:\\s*(ppr_[a-z0-9]+)\\b/i) ?? __xclawNormalized.match(/\\b(ppr_[a-z0-9]+)\\b/i);\n"
-        "\t\tconst transferMatch = __xclawNormalized.match(/\\bApproval ID:\\s*(xfr(?:\\\\_|[_-])?[a-z0-9]+)\\b/i) ?? __xclawNormalized.match(/\\bTransfer Approval ID:\\s*(xfr(?:\\\\_|[_-])?[a-z0-9]+)\\b/i) ?? __xclawNormalized.match(/\\b(xfr(?:\\\\_|[_-])?[a-z0-9]{10,})\\b/i);\n"
+        "\t\tconst tradeMatch = __xclawNormalized.match(/\\bTrade ID:\\s*`?(trd_[a-z0-9]+)`?\\b/i) ?? __xclawNormalized.match(/\\bTrade:\\s*`?(trd_[a-z0-9]+)`?\\b/i) ?? __xclawNormalized.match(/\\b(trd_[a-z0-9]+)\\b/i);\n"
+        "\t\tconst policyMatch = __xclawNormalized.match(/\\bApproval ID:\\s*`?(ppr_[a-z0-9]+)`?\\b/i) ?? __xclawNormalized.match(/\\bPolicy Approval ID:\\s*`?(ppr_[a-z0-9]+)`?\\b/i) ?? __xclawNormalized.match(/\\b(ppr_[a-z0-9]+)\\b/i);\n"
+        "\t\tconst transferMatch = __xclawNormalized.match(/\\bApproval ID:\\s*`?(xfr(?:\\\\_|[_-])?[a-z0-9]+)`?\\b/i) ?? __xclawNormalized.match(/\\bTransfer Approval ID:\\s*`?(xfr(?:\\\\_|[_-])?[a-z0-9]+)`?\\b/i) ?? __xclawNormalized.match(/\\bApproval:\\s*`?(xfr(?:\\\\_|[_-])?[a-z0-9]+)`?\\b/i) ?? __xclawNormalized.match(/\\b(xfr(?:\\\\_|[_-])?[a-z0-9]{10,})\\b/i);\n"
         "\t\tif (tradeMatch && tradeMatch[1]) {\n"
         "\t\t\tconst tradeId = tradeMatch[1];\n"
         "\t\t\tlet chainKey = \"\";\n"
-        "\t\t\tconst cm = __xclawNormalized.match(/\\bChain:\\s*([a-z0-9_]+)\\b/i);\n"
+        "\t\t\tconst cm = __xclawNormalized.match(/\\bChain:\\s*`?([a-z0-9_]+)`?\\b/i);\n"
         "\t\t\tif (cm && cm[1]) chainKey = cm[1];\n"
         "\t\t\tif (!chainKey) chainKey = String(process.env.XCLAW_DEFAULT_CHAIN ?? \"base_sepolia\").trim() || \"base_sepolia\";\n"
         "\t\t\ttry {\n"
@@ -1226,7 +1252,7 @@ def _patch_queued_buttons_v2(raw: str) -> tuple[str, bool, str | None]:
         "\t\t} else if (policyMatch && policyMatch[1]) {\n"
         "\t\t\tconst approvalId = policyMatch[1];\n"
         "\t\t\tlet chainKey = \"\";\n"
-        "\t\t\tconst cm = __xclawNormalized.match(/\\bChain:\\s*([a-z0-9_]+)\\b/i);\n"
+        "\t\t\tconst cm = __xclawNormalized.match(/\\bChain:\\s*`?([a-z0-9_]+)`?\\b/i);\n"
         "\t\t\tif (cm && cm[1]) chainKey = cm[1];\n"
         "\t\t\tif (!chainKey) chainKey = String(process.env.XCLAW_DEFAULT_CHAIN ?? \"base_sepolia\").trim() || \"base_sepolia\";\n"
         "\t\t\ttry {\n"
@@ -1239,7 +1265,7 @@ def _patch_queued_buttons_v2(raw: str) -> tuple[str, bool, str | None]:
         "\t\t} else if (transferMatch && transferMatch[1]) {\n"
         "\t\t\tconst approvalId = `xfr_${String(transferMatch[1] || \"\").replace(/^xfr(?:\\\\_|[_-])?/i, \"\").toLowerCase()}`;\n"
         "\t\t\tlet chainKey = \"\";\n"
-        "\t\t\tconst cm = __xclawNormalized.match(/\\bChain:\\s*([a-z0-9_]+)\\b/i);\n"
+        "\t\t\tconst cm = __xclawNormalized.match(/\\bChain:\\s*`?([a-z0-9_]+)`?\\b/i);\n"
         "\t\t\tif (cm && cm[1]) chainKey = cm[1];\n"
         "\t\t\tif (!chainKey) chainKey = String(process.env.XCLAW_DEFAULT_CHAIN ?? \"base_sepolia\").trim() || \"base_sepolia\";\n"
         "\t\t\ttry {\n"

@@ -94,6 +94,8 @@ APPROVAL_WAIT_POLL_SEC = 1
 DEFAULT_TX_GAS_PRICE_GWEI = 30
 DEFAULT_TX_SEND_MAX_ATTEMPTS = 5
 TX_GAS_PRICE_BUMP_GWEI = 20
+DEFAULT_TX_RETRY_BUMP_BPS = 1250
+DEFAULT_TX_PRIORITY_FLOOR_GWEI = 1
 LIMIT_ORDER_STORE_VERSION = 1
 AGENT_RECOVERY_ACTION = "agent_key_recovery"
 
@@ -2254,18 +2256,18 @@ def _execute_pending_transfer_flow(flow: dict[str, Any]) -> dict[str, Any]:
 
         tx_hash: str
         if transfer_type == "native":
-            cast_bin = _require_cast_bin()
             rpc_url = _chain_rpc_url(chain)
-            proc = _run_subprocess(
-                [cast_bin, "send", "--json", "--rpc-url", rpc_url, "--private-key", private_key_hex, to_address, amount_wei],
-                timeout_sec=_cast_send_timeout_sec(),
-                kind="cast_send",
+            tx_hash = _cast_rpc_send_transaction(
+                rpc_url,
+                {
+                    "from": from_address,
+                    "to": to_address,
+                    "value": amount_wei,
+                    "data": "0x",
+                },
+                private_key_hex,
             )
-            if proc.returncode != 0:
-                stderr = (proc.stderr or "").strip()
-                stdout = (proc.stdout or "").strip()
-                raise WalletStoreError(stderr or stdout or "cast send failed.")
-            tx_hash = _extract_tx_hash(proc.stdout)
+            cast_bin = _require_cast_bin()
             receipt_proc = _run_subprocess(
                 [cast_bin, "receipt", "--json", "--rpc-url", rpc_url, tx_hash],
                 timeout_sec=_cast_receipt_timeout_sec(),
@@ -2782,8 +2784,8 @@ def _maybe_send_telegram_approval_prompt(trade_id: str, chain: str, summary: dic
     text = (
         "Approve swap\n"
         f"{amount} {token_in_symbol} -> {token_out_symbol}\n"
-        f"Chain: {chain}\n"
-        f"Trade: {trade_id}\n\n"
+        f"Chain: `{chain}`\n"
+        f"Trade: `{trade_id}`\n\n"
         "Tap Approve to continue (or Deny to reject). This will submit an on-chain transaction from the agent wallet."
     )
     # Telegram does not support per-button colors; use text labels only.
@@ -2869,9 +2871,9 @@ def _maybe_send_telegram_transfer_approval_prompt(flow: dict[str, Any]) -> None:
     text = (
         "Approve transfer\n"
         f"Amount: {amount_display}\n"
-        f"To: {to_address}\n"
-        f"Chain: {chain}\n"
-        f"Approval: {approval_id}\n\n"
+        f"To: `{to_address}`\n"
+        f"Chain: `{chain}`\n"
+        f"Approval: `{approval_id}`\n\n"
         "Tap Approve to execute (or Deny to reject)."
     )
     if bool(flow.get("policyBlockedAtCreate")):
@@ -5289,6 +5291,154 @@ def _tx_gas_price_gwei(attempt_index: int) -> int:
     return base + ((2**attempt_index - 1) * bump)
 
 
+def _tx_fee_mode() -> str:
+    raw = (os.environ.get("XCLAW_TX_FEE_MODE") or "").strip().lower()
+    if raw == "":
+        return "rpc"
+    if raw not in {"rpc", "legacy"}:
+        raise WalletStoreError("XCLAW_TX_FEE_MODE must be rpc|legacy.")
+    return raw
+
+
+def _tx_retry_bump_bps() -> int:
+    raw = (os.environ.get("XCLAW_TX_RETRY_BUMP_BPS") or "").strip()
+    if raw == "":
+        return DEFAULT_TX_RETRY_BUMP_BPS
+    if not re.fullmatch(r"[0-9]+", raw):
+        raise WalletStoreError("XCLAW_TX_RETRY_BUMP_BPS must be an integer >= 0.")
+    value = int(raw)
+    if value < 0:
+        raise WalletStoreError("XCLAW_TX_RETRY_BUMP_BPS must be >= 0.")
+    return value
+
+
+def _tx_priority_floor_gwei() -> int:
+    raw = (os.environ.get("XCLAW_TX_PRIORITY_FLOOR_GWEI") or "").strip()
+    if raw == "":
+        return DEFAULT_TX_PRIORITY_FLOOR_GWEI
+    if not re.fullmatch(r"[0-9]+", raw):
+        raise WalletStoreError("XCLAW_TX_PRIORITY_FLOOR_GWEI must be an integer >= 0.")
+    value = int(raw)
+    if value < 0:
+        raise WalletStoreError("XCLAW_TX_PRIORITY_FLOOR_GWEI must be >= 0.")
+    return value
+
+
+def _rpc_hex_to_int(value: Any, field_name: str) -> int:
+    if isinstance(value, int):
+        if value < 0:
+            raise WalletStoreError(f"RPC field '{field_name}' must be non-negative.")
+        return value
+    text = str(value or "").strip()
+    if text == "":
+        raise WalletStoreError(f"RPC field '{field_name}' is missing.")
+    try:
+        if text.lower().startswith("0x"):
+            return int(text, 16)
+        return int(text)
+    except Exception as exc:
+        raise WalletStoreError(f"RPC field '{field_name}' is not a valid integer.") from exc
+
+
+def _rpc_json_call(rpc_url: str, method: str, params: list[Any]) -> Any:
+    payload = {"jsonrpc": "2.0", "id": 1, "method": method, "params": params}
+    data = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    req = urllib.request.Request(
+        rpc_url,
+        data=data,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        timeout_sec = max(2, _cast_call_timeout_sec())
+        with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
+            raw = resp.read().decode("utf-8", errors="replace")
+    except Exception as exc:
+        raise WalletStoreError(f"RPC call failed for {method}: {exc}") from exc
+    try:
+        body = json.loads(raw or "{}")
+    except Exception as exc:
+        raise WalletStoreError(f"RPC call returned invalid JSON for {method}.") from exc
+    if not isinstance(body, dict):
+        raise WalletStoreError(f"RPC call returned invalid payload for {method}.")
+    if isinstance(body.get("error"), dict):
+        err = body.get("error") or {}
+        code = err.get("code")
+        message = err.get("message")
+        raise WalletStoreError(f"RPC {method} error ({code}): {message}")
+    if "result" not in body:
+        raise WalletStoreError(f"RPC response missing result for {method}.")
+    return body.get("result")
+
+
+def _apply_retry_bump_wei(value_wei: int, attempt_index: int, bump_bps: int) -> int:
+    if value_wei < 0:
+        raise WalletStoreError("fee value must be non-negative.")
+    if attempt_index <= 0 or bump_bps <= 0:
+        return value_wei
+    multiplier = 10_000 + (bump_bps * attempt_index)
+    return (value_wei * multiplier + 9_999) // 10_000
+
+
+def _estimate_legacy_gas_price_wei(rpc_url: str, attempt_index: int) -> int:
+    bump_bps = _tx_retry_bump_bps()
+    try:
+        rpc_gas_price = _rpc_json_call(rpc_url, "eth_gasPrice", [])
+        base_wei = _rpc_hex_to_int(rpc_gas_price, "gasPrice")
+    except Exception:
+        base_wei = _tx_gas_price_gwei(attempt_index=0) * (10**9)
+    return _apply_retry_bump_wei(base_wei, attempt_index, bump_bps)
+
+
+def _estimate_tx_fees(rpc_url: str, attempt_index: int) -> dict[str, Any]:
+    if attempt_index < 0:
+        raise WalletStoreError("attempt_index must be >= 0.")
+    mode = _tx_fee_mode()
+    if mode == "legacy":
+        gas_price_wei = _tx_gas_price_gwei(attempt_index) * (10**9)
+        return {"mode": "legacy", "gasPrice": gas_price_wei}
+
+    bump_bps = _tx_retry_bump_bps()
+    priority_floor_wei = _tx_priority_floor_gwei() * (10**9)
+
+    try:
+        history = _rpc_json_call(rpc_url, "eth_feeHistory", ["0x5", "latest", [10, 50, 90]])
+        if not isinstance(history, dict):
+            raise WalletStoreError("eth_feeHistory returned invalid payload.")
+
+        base_fee_values = history.get("baseFeePerGas")
+        if not isinstance(base_fee_values, list) or len(base_fee_values) == 0:
+            raise WalletStoreError("eth_feeHistory missing baseFeePerGas.")
+        latest_base_fee_wei = _rpc_hex_to_int(base_fee_values[-1], "baseFeePerGas")
+
+        observed_priority_wei: int
+        try:
+            max_priority = _rpc_json_call(rpc_url, "eth_maxPriorityFeePerGas", [])
+            observed_priority_wei = _rpc_hex_to_int(max_priority, "maxPriorityFeePerGas")
+        except Exception:
+            rewards = history.get("reward")
+            if not isinstance(rewards, list) or len(rewards) == 0 or not isinstance(rewards[-1], list) or len(rewards[-1]) == 0:
+                raise WalletStoreError("eth_feeHistory missing reward fallback values.")
+            reward_sample = rewards[-1]
+            reward_values = [_rpc_hex_to_int(item, "reward") for item in reward_sample]
+            observed_priority_wei = max(reward_values)
+
+        max_priority_fee_per_gas_wei = max(priority_floor_wei, observed_priority_wei)
+        max_fee_per_gas_wei = (latest_base_fee_wei * 2) + max_priority_fee_per_gas_wei
+
+        max_priority_fee_per_gas_wei = _apply_retry_bump_wei(max_priority_fee_per_gas_wei, attempt_index, bump_bps)
+        max_fee_per_gas_wei = _apply_retry_bump_wei(max_fee_per_gas_wei, attempt_index, bump_bps)
+
+        return {
+            "mode": "eip1559",
+            "maxFeePerGas": max_fee_per_gas_wei,
+            "maxPriorityFeePerGas": max_priority_fee_per_gas_wei,
+        }
+    except Exception:
+        gas_price_wei = _estimate_legacy_gas_price_wei(rpc_url, attempt_index)
+        return {"mode": "legacy", "gasPrice": gas_price_wei}
+
+
 def _cast_nonce(cast_bin: str, rpc_url: str, from_addr: str, block_tag: str) -> int | None:
     nonce_proc = _run_subprocess(
         [cast_bin, "nonce", "--rpc-url", rpc_url, from_addr, "--block", block_tag],
@@ -5304,17 +5454,29 @@ def _cast_nonce(cast_bin: str, rpc_url: str, from_addr: str, block_tag: str) -> 
         return None
 
 
-def _cast_rpc_send_transaction(rpc_url: str, tx_obj: dict[str, str], private_key_hex: str | None = None) -> str:
+def _cast_rpc_send_transaction(rpc_url: str, tx_obj: dict[str, Any], private_key_hex: str | None = None) -> str:
     cast_bin = _require_cast_bin()
     if private_key_hex:
         from_addr = tx_obj.get("from")
         to_addr = tx_obj.get("to")
-        data = tx_obj.get("data")
+        data_raw = tx_obj.get("data")
+        data = str(data_raw).strip() if data_raw is not None else "0x"
+        if data == "":
+            data = "0x"
+        value_raw = tx_obj.get("value")
+        value_wei: str | None = None
+        if value_raw is not None:
+            value_text = str(value_raw).strip()
+            if value_text == "":
+                value_text = "0"
+            if not re.fullmatch(r"[0-9]+", value_text):
+                raise WalletStoreError("cast send requires tx_obj.value as uint string.")
+            value_wei = value_text
         if not isinstance(from_addr, str) or not is_hex_address(from_addr):
             raise WalletStoreError("cast send requires tx_obj.from as hex address.")
         if not isinstance(to_addr, str) or not is_hex_address(to_addr):
             raise WalletStoreError("cast send requires tx_obj.to as hex address.")
-        if not isinstance(data, str) or not re.fullmatch(r"0x[a-fA-F0-9]*", data):
+        if not re.fullmatch(r"0x[a-fA-F0-9]*", data):
             raise WalletStoreError("cast send requires tx_obj.data as hex calldata.")
         attempts = _tx_send_max_attempts()
         last_err = "cast send failed."
@@ -5333,6 +5495,7 @@ def _cast_rpc_send_transaction(rpc_url: str, tx_obj: dict[str, str], private_key
                 nonce_candidates = [value for value in (nonce_pending, nonce_latest) if value is not None]
                 nonce = max(nonce_candidates) if nonce_candidates else None
 
+            fee_plan = _estimate_tx_fees(rpc_url, attempt)
             send_cmd = [
                 cast_bin,
                 "send",
@@ -5341,9 +5504,16 @@ def _cast_rpc_send_transaction(rpc_url: str, tx_obj: dict[str, str], private_key
                 rpc_url,
                 "--private-key",
                 private_key_hex,
-                "--gas-price",
-                f"{_tx_gas_price_gwei(attempt)}gwei",
             ]
+            if str(fee_plan.get("mode")) == "eip1559":
+                max_fee = int(fee_plan.get("maxFeePerGas", 0))
+                max_priority = int(fee_plan.get("maxPriorityFeePerGas", 0))
+                send_cmd.extend(["--max-fee-per-gas", str(max_fee), "--priority-gas-price", str(max_priority)])
+            else:
+                gas_price = int(fee_plan.get("gasPrice", 0))
+                if gas_price <= 0:
+                    raise WalletStoreError("Legacy fee estimation returned invalid gas price.")
+                send_cmd.extend(["--gas-price", str(gas_price)])
             if nonce is not None:
                 send_cmd.extend(["--nonce", str(nonce)])
             send_cmd.extend(
@@ -5351,9 +5521,12 @@ def _cast_rpc_send_transaction(rpc_url: str, tx_obj: dict[str, str], private_key
                     "--from",
                     from_addr,
                     to_addr,
-                    data,
                 ]
             )
+            if data != "0x":
+                send_cmd.append(data)
+            if value_wei is not None and value_wei != "0":
+                send_cmd.extend(["--value", value_wei])
             proc = _run_subprocess(send_cmd, timeout_sec=_cast_send_timeout_sec(), kind="cast_send")
             if proc.returncode == 0:
                 return _extract_tx_hash(proc.stdout)
@@ -7304,9 +7477,9 @@ def cmd_wallet_send(args: argparse.Namespace) -> int:
                 "Approval required (transfer)\n\n"
                 "Request: Send native token\n"
                 f"Amount: {amount_display} ({args.amount_wei} base units)\n"
-                f"To: {args.to.lower()}\n"
-                f"Chain: {chain}\n"
-                f"Approval ID: {approval_id}\n"
+                f"To: `{args.to.lower()}`\n"
+                f"Chain: `{chain}`\n"
+                f"Approval ID: `{approval_id}`\n"
                 "Status: approval_pending\n\n"
                 "Tap Approve or Deny."
             )
@@ -7442,9 +7615,9 @@ def cmd_wallet_send_token(args: argparse.Namespace) -> int:
                 "Request: Send token\n"
                 f"Token: {token_symbol} ({token_address.lower()})\n"
                 f"Amount: {amount_display} ({args.amount_wei} wei)\n"
-                f"To: {args.to.lower()}\n"
-                f"Chain: {chain}\n"
-                f"Approval ID: {approval_id}\n"
+                f"To: `{args.to.lower()}`\n"
+                f"Chain: `{chain}`\n"
+                f"Approval ID: `{approval_id}`\n"
                 "Status: approval_pending\n\n"
                 "Tap Approve or Deny."
             )

@@ -159,6 +159,12 @@ Current behavior in `apps/agent-runtime/xclaw_agent/cli.py`:
 10. Missing cast dependency returns structured `missing_dependency` error.
 11. Wrapper-level input validation executes before runtime delegation.
 12. On delegated non-zero exits, wrapper passes runtime JSON through unchanged when stdout is parseable JSON payload with `ok` and `code`; otherwise wrapper emits structured `agent_command_failed`.
+13. Runtime transaction fee planning for wallet/trade sends is EIP-1559-first by default:
+   - default mode (`XCLAW_TX_FEE_MODE=rpc`) derives EIP-1559 fee caps from chain RPC (`eth_feeHistory`, `eth_maxPriorityFeePerGas`, reward fallback),
+   - retry attempts apply bounded fee escalation via `XCLAW_TX_RETRY_BUMP_BPS` (default `1250`),
+   - minimum priority floor is `XCLAW_TX_PRIORITY_FLOOR_GWEI` (default `1`),
+   - when EIP-1559 RPC methods are unavailable/invalid, runtime falls back to `eth_gasPrice`,
+   - rollback kill-switch `XCLAW_TX_FEE_MODE=legacy` restores legacy fixed `gasPrice` sender behavior.
 
 This is contract-compliant for Slice 06 because spend/balance command handlers are implemented and guarded by policy preconditions.
 

@@ -2961,3 +2961,40 @@ Note:
 ### 88.3 Validation + evidence
 - [ ] Verify mixed-success batch responses are stable and idempotent on retry.
 - [ ] Capture functional screenshots for `/approvals` dark/light desktop.
+
+---
+
+## 89) Slice 89: MetaMask-Style Gas Estimation For Agent Wallet Runtime
+
+### 89.1 Canonical/doc sync
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` runtime send robustness contract for EIP-1559-first fee planning.
+- [x] Add Slice 89 entries to `docs/XCLAW_SLICE_TRACKER.md` and this roadmap section.
+- [x] Update `docs/api/WALLET_COMMAND_CONTRACT.md` with fee planner + env controls.
+- [x] Update handoff artifacts: `docs/CONTEXT_PACK.md`, `spec.md`, `tasks.md`, `acceptance.md`.
+
+### 89.2 Implementation
+- [x] Add runtime helper `_estimate_tx_fees(rpc_url, attempt_index)`:
+  - [x] EIP-1559 primary path (`eth_feeHistory`, `eth_maxPriorityFeePerGas`, reward fallback).
+  - [x] bounded retry bump application (`XCLAW_TX_RETRY_BUMP_BPS`).
+  - [x] legacy fallback (`eth_gasPrice`) when EIP-1559 path is unavailable.
+- [x] Refactor `_cast_rpc_send_transaction(...)`:
+  - [x] support both calldata sends and native value sends.
+  - [x] emit EIP-1559 send args (`--max-fee-per-gas`, `--priority-gas-price`) or legacy `--gas-price`.
+  - [x] preserve nonce handling and retryable error semantics.
+- [x] Route native transfer execution through unified sender path in `_execute_pending_transfer_flow`.
+- [x] Add rollout controls:
+  - [x] `XCLAW_TX_FEE_MODE=rpc|legacy` (default `rpc`),
+  - [x] `XCLAW_TX_RETRY_BUMP_BPS` (default `1250`),
+  - [x] `XCLAW_TX_PRIORITY_FLOOR_GWEI` (default `1`).
+
+### 89.3 Validation + evidence
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- [~] `python3 -m unittest apps/agent-runtime/tests/test_wallet_core.py -v`
+  - current repo baseline includes unrelated CLI-surface failures in this suite (`wallet import/remove` command expectations and cast-missing expectation drift); Slice 89 runtime fee tests remain passing.
+- [x] Required gates execution evidence captured in acceptance:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `pm2 restart all`

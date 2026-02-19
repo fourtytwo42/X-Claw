@@ -1692,3 +1692,19 @@ DoD:
 - [~] `/approvals` supports multi-select bulk decisions.
 - [~] deterministic risk labels rendered in inbox cards.
 - [~] copy surface uses “Permissions Inventory” language (no allowances placeholder contract).
+
+## Slice 89: MetaMask-Style Gas Estimation For Agent Wallet Runtime
+Status: [x]
+Issue: #36
+
+Goal:
+- Make runtime-signed wallet/trade transactions use RPC-native, EIP-1559-first fee planning with bounded retry escalation and legacy rollback controls.
+
+DoD:
+- [x] `wallet-send`, `wallet-send-token`, and `trade-spot` execution paths share the unified sender fee planner.
+- [x] default fee mode uses RPC-native EIP-1559 estimation (`eth_feeHistory` + `eth_maxPriorityFeePerGas`, with reward fallback).
+- [x] fallback path uses `eth_gasPrice` when EIP-1559 methods are unavailable/invalid.
+- [x] retryable send failures keep nonce policy (RPC-assigned first attempt, deterministic pinned retries) and escalate fees by retry bump.
+- [x] env controls added: `XCLAW_TX_FEE_MODE`, `XCLAW_TX_RETRY_BUMP_BPS`, `XCLAW_TX_PRIORITY_FLOOR_GWEI`.
+- [x] docs/handoff sync complete in same change (source-of-truth, roadmap, wallet contract, context/spec/tasks/acceptance).
+- [x] runtime tests cover EIP-1559 happy path, fallback legacy path, and EIP-1559 cast flag emission.

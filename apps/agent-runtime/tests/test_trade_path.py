@@ -60,7 +60,9 @@ class TradePathRuntimeTests(unittest.TestCase):
                 return mock.Mock(returncode=0, stdout='{"transactionHash":"0x' + "ab" * 32 + '"}', stderr="")
             raise AssertionError(f"Unexpected command {cmd}")
 
-        with mock.patch.object(cli, "_require_cast_bin", return_value="cast"), mock.patch.object(
+        with mock.patch.dict(cli.os.environ, {"XCLAW_TX_FEE_MODE": "legacy"}, clear=False), mock.patch.object(
+            cli, "_require_cast_bin", return_value="cast"
+        ), mock.patch.object(
             cli.subprocess, "run", side_effect=fake_run
         ), mock.patch.object(cli.time, "sleep") as sleep_mock:
             tx_hash = cli._cast_rpc_send_transaction("https://rpc.example", tx_obj, "0x" + "11" * 32)
@@ -71,8 +73,8 @@ class TradePathRuntimeTests(unittest.TestCase):
         self.assertNotIn("--nonce", send_cmds[0])
         self.assertIn("--nonce", send_cmds[1])
         self.assertIn("1", send_cmds[1])
-        self.assertIn("30gwei", send_cmds[0])
-        self.assertIn("50gwei", send_cmds[1])
+        self.assertIn(str(30 * (10**9)), send_cmds[0])
+        self.assertIn(str(50 * (10**9)), send_cmds[1])
         sleep_mock.assert_called_once_with(0.25)
 
     def test_chain_rpc_url_prefers_primary_when_healthy(self) -> None:
@@ -117,7 +119,9 @@ class TradePathRuntimeTests(unittest.TestCase):
                 return mock.Mock(returncode=1, stdout="", stderr="execution reverted")
             raise AssertionError(f"Unexpected command {cmd}")
 
-        with mock.patch.object(cli, "_require_cast_bin", return_value="cast"), mock.patch.object(
+        with mock.patch.dict(cli.os.environ, {"XCLAW_TX_FEE_MODE": "legacy"}, clear=False), mock.patch.object(
+            cli, "_require_cast_bin", return_value="cast"
+        ), mock.patch.object(
             cli.subprocess, "run", side_effect=fake_run
         ):
             with self.assertRaises(cli.WalletStoreError):
@@ -140,13 +144,80 @@ class TradePathRuntimeTests(unittest.TestCase):
                 return mock.Mock(returncode=1, stdout="", stderr="nonce too low")
             raise AssertionError(f"Unexpected command {cmd}")
 
-        with mock.patch.dict(cli.os.environ, {"XCLAW_TX_SEND_MAX_ATTEMPTS": "2"}, clear=False), mock.patch.object(
+        with mock.patch.dict(
+            cli.os.environ, {"XCLAW_TX_SEND_MAX_ATTEMPTS": "2", "XCLAW_TX_FEE_MODE": "legacy"}, clear=False
+        ), mock.patch.object(
             cli, "_require_cast_bin", return_value="cast"
         ), mock.patch.object(cli.subprocess, "run", side_effect=fake_run):
             with self.assertRaises(cli.WalletStoreError) as ctx:
                 cli._cast_rpc_send_transaction("https://rpc.example", tx_obj, "0x" + "33" * 32)
 
         self.assertIn("after 2 attempts", str(ctx.exception))
+
+    def test_estimate_tx_fees_eip1559_happy_path(self) -> None:
+        with mock.patch.dict(
+            cli.os.environ,
+            {"XCLAW_TX_FEE_MODE": "rpc", "XCLAW_TX_RETRY_BUMP_BPS": "1250", "XCLAW_TX_PRIORITY_FLOOR_GWEI": "1"},
+            clear=False,
+        ), mock.patch.object(
+            cli,
+            "_rpc_json_call",
+            side_effect=[
+                {"baseFeePerGas": ["0x3b9aca00"], "reward": [["0x59682f00"]]},
+                "0x77359400",
+                {"baseFeePerGas": ["0x3b9aca00"], "reward": [["0x59682f00"]]},
+                "0x77359400",
+            ],
+        ):
+            fee0 = cli._estimate_tx_fees("https://rpc.example", 0)
+            fee1 = cli._estimate_tx_fees("https://rpc.example", 1)
+
+        self.assertEqual(fee0.get("mode"), "eip1559")
+        self.assertEqual(fee0.get("maxPriorityFeePerGas"), int("0x77359400", 16))
+        self.assertEqual(fee0.get("maxFeePerGas"), int("0x3b9aca00", 16) * 2 + int("0x77359400", 16))
+        self.assertGreater(int(fee1.get("maxFeePerGas", 0)), int(fee0.get("maxFeePerGas", 0)))
+        self.assertGreater(int(fee1.get("maxPriorityFeePerGas", 0)), int(fee0.get("maxPriorityFeePerGas", 0)))
+
+    def test_estimate_tx_fees_falls_back_to_legacy_rpc_gas_price(self) -> None:
+        with mock.patch.dict(cli.os.environ, {"XCLAW_TX_FEE_MODE": "rpc"}, clear=False), mock.patch.object(
+            cli,
+            "_rpc_json_call",
+            side_effect=[cli.WalletStoreError("fee history unsupported"), "0x3b9aca00"],
+        ):
+            fee = cli._estimate_tx_fees("https://rpc.example", 2)
+        self.assertEqual(fee.get("mode"), "legacy")
+        self.assertGreater(int(fee.get("gasPrice", 0)), int("0x3b9aca00", 16))
+
+    def test_cast_send_uses_eip1559_flags(self) -> None:
+        tx_obj = {
+            "from": "0x1111111111111111111111111111111111111111",
+            "to": "0x2222222222222222222222222222222222222222",
+            "data": "0xdeadbeef",
+        }
+        commands: list[list[str]] = []
+
+        def fake_run(cmd: list[str], text: bool = True, capture_output: bool = True, **kwargs):  # type: ignore[override]
+            commands.append(cmd)
+            if cmd[1] == "send":
+                return mock.Mock(returncode=0, stdout='{"transactionHash":"0x' + "ab" * 32 + '"}', stderr="")
+            raise AssertionError(f"Unexpected command {cmd}")
+
+        with mock.patch.object(cli, "_require_cast_bin", return_value="cast"), mock.patch.object(
+            cli.subprocess, "run", side_effect=fake_run
+        ), mock.patch.object(
+            cli,
+            "_estimate_tx_fees",
+            return_value={"mode": "eip1559", "maxFeePerGas": 123, "maxPriorityFeePerGas": 77},
+        ):
+            tx_hash = cli._cast_rpc_send_transaction("https://rpc.example", tx_obj, "0x" + "11" * 32)
+
+        self.assertEqual(tx_hash, "0x" + "ab" * 32)
+        send_cmd = [entry for entry in commands if len(entry) > 1 and entry[1] == "send"][0]
+        self.assertIn("--max-fee-per-gas", send_cmd)
+        self.assertIn("123", send_cmd)
+        self.assertIn("--priority-gas-price", send_cmd)
+        self.assertIn("77", send_cmd)
+        self.assertNotIn("--gas-price", send_cmd)
 
     def test_wait_for_trade_approval_telegram_returns_quick_pending(self) -> None:
         with mock.patch.object(cli, "_maybe_send_telegram_approval_prompt"), mock.patch.object(
@@ -719,7 +790,7 @@ class TradePathRuntimeTests(unittest.TestCase):
             self.assertIsNotNone(message_arg)
             self.assertIn("Approve swap", message_arg)
             self.assertIn("5 WETH -> USDC", message_arg)
-            self.assertIn("Trade: trd_abc", message_arg)
+            self.assertIn("Trade: `trd_abc`", message_arg)
 
             # Buttons include both Approve and Deny.
             buttons_arg = None
@@ -780,7 +851,7 @@ class TradePathRuntimeTests(unittest.TestCase):
             self.assertIsNotNone(message_arg)
             self.assertIn("Approve transfer", message_arg)
             self.assertIn("Amount: 0.001 WETH", message_arg)
-            self.assertIn("Approval: xfr_abc", message_arg)
+            self.assertIn("Approval: `xfr_abc`", message_arg)
             self.assertIsNotNone(buttons_arg)
             buttons = json.loads(buttons_arg or "[]")
             row0 = buttons[0]

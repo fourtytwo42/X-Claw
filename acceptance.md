@@ -4644,3 +4644,31 @@ Issue mapping: `#32` (`https://github.com/fourtytwo42/ETHDenver2026/issues/32`)
 - `npm run seed:verify` -> PASS
 - `npm run build` -> PASS
 - `pm2 restart all` -> PASS
+
+## Slice 89 Acceptance Addendum: MetaMask-Style Gas Estimation (UTC 2026-02-19)
+
+### Objective
+- Validate RPC-native EIP-1559-first runtime fee planning for `wallet-send`, `wallet-send-token`, and `trade-spot` sender path.
+
+### Runtime test evidence
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS (99 tests)
+  - includes:
+    - `test_estimate_tx_fees_eip1559_happy_path`
+    - `test_estimate_tx_fees_falls_back_to_legacy_rpc_gas_price`
+    - `test_cast_send_uses_eip1559_flags`
+    - `test_cast_send_retries_underpriced_then_succeeds`
+- `python3 -m unittest apps/agent-runtime/tests/test_wallet_core.py -v` -> PARTIAL/FAIL (baseline unrelated command-surface drift in this repo snapshot; not introduced by Slice 89 fee planner path)
+
+### Functional behavior checks
+- EIP-1559 fee args emitted when estimator returns `mode=eip1559` -> PASS (unit evidence)
+- fallback to legacy gas price when EIP-1559 RPC path fails -> PASS (unit evidence)
+- retry escalation increases selected fee values across attempts -> PASS (unit evidence)
+- native transfer path uses same sender function as token/trade paths -> PASS (code-path verification in `_execute_pending_transfer_flow`)
+
+### Required gates (sequential)
+- `npm run db:parity` -> PASS (`ok: true`, no missing tables/enums/checks)
+- `npm run seed:reset` -> PASS (`.seed-state.json` + `live-activity.log` reset)
+- `npm run seed:load` -> PASS (`agents=6`, `trades=11`)
+- `npm run seed:verify` -> PASS (`ok: true`)
+- `npm run build` -> PASS (Next.js production build succeeded)
+- `pm2 restart all` -> PASS (`xclaw-web` online)

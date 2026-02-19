@@ -2295,3 +2295,23 @@ Issue mapping: `#32`
 - [x] Add Telegram guard and no-`--deliver`/no-`message send` invariants.
 - [x] Update source-of-truth + roadmap + tracker + handoff docs.
 - [ ] Run required validation sequence and capture evidence.
+
+## Slice 89 Tasks Addendum (MetaMask-Style Gas Estimation)
+
+- [x] Add runtime fee planner `_estimate_tx_fees(rpc_url, attempt_index)` with EIP-1559 primary + legacy fallback.
+- [x] Add RPC JSON helper path for gas estimation calls (`eth_feeHistory`, `eth_maxPriorityFeePerGas`, `eth_gasPrice`).
+- [x] Refactor `_cast_rpc_send_transaction(...)` to:
+  - [x] support native value sends and contract calldata sends,
+  - [x] emit EIP-1559 send args when available,
+  - [x] preserve nonce assignment and retry/error handling.
+- [x] Route native `wallet-send` execution through unified sender in `_execute_pending_transfer_flow(...)`.
+- [x] Add env controls:
+  - [x] `XCLAW_TX_FEE_MODE`
+  - [x] `XCLAW_TX_RETRY_BUMP_BPS`
+  - [x] `XCLAW_TX_PRIORITY_FLOOR_GWEI`
+- [x] Update runtime tests (`apps/agent-runtime/tests/test_trade_path.py`) for:
+  - [x] EIP-1559 estimate path
+  - [x] fallback legacy estimate path
+  - [x] EIP-1559 cast send args
+- [x] Sync docs/handoff artifacts in same change.
+- [ ] Run full required validation sequence and capture evidence.
