@@ -1,3 +1,32 @@
+# Hotfix Spec: X-Claw Skill Prompt Contract Hardening (Fail-Closed Determinism)
+
+## Goal
+Improve X-Claw/OpenClaw skills prompting so responses are deterministic, fail-closed, and easier to operate through Telegram and other channels.
+Pass 2 hardening adds deterministic primary-code precedence, fixed blocked-category taxonomy, and required machine envelope fields.
+
+## Non-goals
+1. No API route changes.
+2. No schema/migration changes.
+3. No runtime execution logic changes.
+
+## Locked scope
+1. `skills/xclaw-agent/SKILL.md`
+2. `skills/xclaw-agent/references/commands.md`
+3. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+4. `spec.md`
+5. `tasks.md`
+6. `acceptance.md`
+
+## Acceptance checks
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `pm2 restart all`
+
+---
+
 # Hotfix Spec: Capability-Gated Telegram Patch + Management-Link Fallback
 
 ## Goal

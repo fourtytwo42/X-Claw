@@ -1,3 +1,31 @@
+# Hotfix Tasks: X-Claw Skill Prompt Contract Hardening (Fail-Closed Determinism)
+
+Active slice context: `Slice 86` is in progress; this is an explicit user-requested prompt-contract hotfix.
+
+## 1) Scope lock
+- [x] Skills/docs-only change; no runtime/API logic change.
+- [x] Keep prompt behavior deterministic and fail-closed.
+
+## 2) Implementation
+- [x] Add locked fail-closed response contract to `skills/xclaw-agent/SKILL.md`.
+- [x] Add deterministic prompting contract to `skills/xclaw-agent/references/commands.md`.
+- [x] Sync canonical source-of-truth with locked skill prompting/response contract.
+- [x] Add/update handoff artifacts (`spec.md`, `tasks.md`, `acceptance.md`).
+- [x] Add deterministic single primary-code precedence across skill prompt contracts.
+- [x] Add fixed `BLOCKED_<CATEGORY>` enum contract.
+- [x] Add explicit `NOT_VISIBLE` trigger constraints.
+- [x] Add required machine envelope (`status`, `code`, `summary`, `actions`, `evidence`).
+
+## 3) Validation
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+
+---
+
 # Hotfix Tasks: Capability-Gated Telegram Patch + Management-Link Fallback
 
 Active slice context: `Slice 87` remains in progress; this is an explicit owner-requested installer reliability hotfix.

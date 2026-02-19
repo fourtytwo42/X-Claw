@@ -1,3 +1,36 @@
+# Hotfix Acceptance Evidence: X-Claw Skill Prompt Contract Hardening (Fail-Closed Determinism)
+
+Date (UTC): 2026-02-19
+Active slice context: `Slice 86` in progress (explicit user-requested prompt/docs hardening)
+
+## Objective + Scope Lock
+- Objective: codify deterministic fail-closed skill prompting and response I/O behavior for X-Claw OpenClaw interactions.
+- Scope lock:
+  - `skills/xclaw-agent/SKILL.md`
+  - `skills/xclaw-agent/references/commands.md`
+  - `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - handoff artifact updates (`spec.md`, `tasks.md`, `acceptance.md`)
+- Out of scope: API/runtime/schema/migration code paths.
+
+## Behavior Checks
+- [x] Skill docs define explicit fail-closed statuses (`SKILL_SELECTION_AMBIGUOUS`, `NOT_VISIBLE`, `NOT_DEFINED`, `BLOCKED_<CATEGORY>`).
+- [x] Skill docs define required response I/O sections (`Objective`, `Constraints Applied`, `Actions Taken`, `Evidence`, `Result`, `Next Step`).
+- [x] Canonical source-of-truth includes matching locked prompt/response contract and runtime boundary guard.
+- [x] Primary failure-code precedence is explicitly locked and single-code-only.
+- [x] `BLOCKED_<CATEGORY>` uses fixed enum (`POLICY|PERMISSION|RUNTIME|DEPENDENCY|NETWORK|AUTH|DATA`).
+- [x] `NOT_VISIBLE` usage is constrained to unavailable in-session source text/context.
+- [x] Required machine envelope fields are locked (`status`, `code`, `summary`, `actions`, `evidence`).
+
+## Required Validation Gates
+- [x] `npm run db:parity` -> PASS (`ok: true`)
+- [x] `npm run seed:reset` -> PASS (`ok: true`)
+- [x] `npm run seed:load` -> PASS (`ok: true`)
+- [x] `npm run seed:verify` -> PASS (`ok: true`)
+- [x] `npm run build` -> PASS (Next.js production build succeeded)
+- [x] `pm2 restart all` -> PASS (`xclaw-web` online)
+
+---
+
 # Hotfix Acceptance Evidence: Capability-Gated Telegram Patch + Management-Link Fallback
 
 Date (UTC): 2026-02-18
