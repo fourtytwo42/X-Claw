@@ -101,6 +101,7 @@ Common optional:
 - For `approval_pending`:
   - transfer (`xfr_...`): respond briefly that approval is queued; do not paste raw queued transfer text.
   - trade/policy: respond with concise pending status and next step.
+  - policy (`ppr_...`): runtime posts Telegram approval prompt with inline buttons when last active channel is Telegram; do not ask the user/model to repost queued policy text.
 - Non-Telegram channels (web/Discord/Slack):
   - do not mention Telegram callback instructions,
   - route approval to web management,

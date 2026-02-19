@@ -2747,21 +2747,20 @@ Limitations / notes:
 3. Requests are stored server-side and are visible/operable on `/agents/:id` (owner-only) like trade approvals.
 4. Approval surfaces:
    - Web UI: owner can Approve/Deny the request in `/agents/:id`.
-   - Telegram: queued message receives Approve/Deny inline buttons; callback intercept applies decision (strict, no LLM).
+   - Telegram: runtime sends a policy approval prompt with Approve/Deny inline buttons when OpenClaw last active channel is Telegram; callback intercept applies decision (strict, no LLM).
 5. Telegram callback prefix:
    - `xpol|a|<policyApprovalId>|<chainKey>` approve
    - `xpol|r|<policyApprovalId>|<chainKey>` deny
-6. Message auto-attach:
-   - OpenClaw gateway auto-attaches policy approval buttons when a queued message contains:
-     - `Status: approval_pending`
-     - `Approval ID: ppr_...`
+6. Prompt delivery contract:
+   - Primary path: runtime sends the policy approval prompt directly to Telegram with inline Approve/Deny buttons.
+   - Fallback path: gateway auto-attach remains best-effort when a message includes `Approval ID: ppr_...` and `chain` context.
    - Runtime should provide machine-readable policy approval fields (`policyApprovalId`, `status`, `chain`) so chat surfaces can render concise prompts without brittle template replay.
 7. Decision feedback:
    - After Telegram deny, decision feedback must be routed into the agent message pipeline (synthetic inbound message + instructions) so the agent can react to rejection context.
    - Telegram approve for policy requests should not trigger synthetic agent-pipeline notification (non-terminal/no execution event).
    - Reliability requirement: for policy approvals, Telegram callback success must also emit an immediate deterministic confirmation message (`Approved policy approval ...` / `Denied policy approval ...`) so the user gets feedback even if agent pipeline produces no visible reply.
    - Converged callback requirement: when Telegram callback returns idempotent/converged `409` with terminal `currentStatus` (`approved`/`rejected`/`filled`), policy approvals must still emit deterministic confirmation after inline buttons are cleared.
-   - For proposed policy approvals, the agent should send concise pending-approval text; Telegram button attachment is handled by runtime/gateway.
+   - For proposed policy approvals, the agent should send concise pending-approval text; runtime handles Telegram prompt/button delivery.
    - Approval ID provenance rule: the agent must source `policyApprovalId`/`Approval ID` from the current runtime/API response for that request; it must never replay/fabricate a `ppr_...` from older transcript or memory context.
    - User-facing response contract: in normal chat responses, the agent must not expose internal tool-call/CLI command strings (for example `python3 ... xclaw_agent_skill.py ...`) unless the user explicitly asks for the exact command syntax.
    - Wrapper reliability contract: `approval_required` responses with `details.status=approval_pending` or `details.lastStatus=approval_pending` are non-terminal orchestration outcomes and must not be surfaced as command-exec failures to the user.

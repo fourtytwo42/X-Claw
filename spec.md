@@ -1,3 +1,38 @@
+# Hotfix Spec: Policy Approval Telegram Auto-Prompt Parity (Preapprove/Revoke/Global)
+
+## Goal
+Align policy approval flows with trade/transfer behavior so policy requests auto-post Telegram approval prompts with inline buttons when last active channel is Telegram, without requiring model/user queued-message repost.
+
+## Non-goals
+1. No web/API endpoint changes.
+2. No trade/transfer callback semantics changes.
+3. No management UI redesign.
+
+## Locked scope
+1. `apps/agent-runtime/xclaw_agent/cli.py`
+2. `apps/agent-runtime/tests/test_trade_path.py`
+3. `skills/xclaw-agent/scripts/xclaw_agent_skill.py`
+4. `skills/xclaw-agent/scripts/openclaw_gateway_patch.py`
+5. `skills/xclaw-agent/SKILL.md`
+6. `skills/xclaw-agent/references/commands.md`
+7. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+8. `spec.md`
+9. `tasks.md`
+10. `acceptance.md`
+
+## Acceptance checks
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- `python3 -m py_compile skills/xclaw-agent/scripts/openclaw_gateway_patch.py`
+- `python3 skills/xclaw-agent/scripts/openclaw_gateway_patch.py --json`
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `pm2 restart all`
+
+---
+
 # Hotfix Spec: Force-Upgrade Gateway Callback Patch (v15) For Trade-Approve Ack Suppression
 
 ## Goal

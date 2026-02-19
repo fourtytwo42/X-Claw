@@ -1,3 +1,34 @@
+# Hotfix Tasks: Policy Approval Telegram Auto-Prompt Parity (Preapprove/Revoke/Global)
+
+Active slice context: `Slice 86` is in progress; this is an explicit user-requested Telegram approval UX alignment hotfix.
+
+## 1) Scope lock
+- [x] Keep scope to policy preapprove/revoke/global runtime + skill/gateway prompt behavior.
+- [x] Preserve existing trade/transfer behavior.
+
+## 2) Implementation
+- [x] Add runtime helper `_maybe_send_telegram_policy_approval_prompt(...)` with `xpol` callbacks.
+- [x] Wire helper into policy request commands: token add/remove + global enable/disable.
+- [x] Remove dependency on `queuedMessage` repost for policy request success payloads.
+- [x] Normalize pending policy response in skill wrapper to concise approval guidance.
+- [x] Harden gateway fallback auto-attach for policy IDs without strict `Status: approval_pending` dependency.
+- [x] Bump gateway patch marker/schema for rollout upgrade.
+- [x] Sync skill docs and source-of-truth.
+- [x] Update handoff artifacts.
+
+## 3) Validation
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- [x] `python3 -m py_compile skills/xclaw-agent/scripts/openclaw_gateway_patch.py`
+- [x] `python3 skills/xclaw-agent/scripts/openclaw_gateway_patch.py --json`
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+
+---
+
 # Hotfix Tasks: Force-Upgrade Gateway Callback Patch (v15) For Trade-Approve Ack Suppression
 
 Active slice context: `Slice 86` is in progress; this is an explicit user-reported rollout reliability hotfix.

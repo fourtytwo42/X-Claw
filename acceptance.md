@@ -1,3 +1,42 @@
+# Hotfix Acceptance Evidence: Policy Approval Telegram Auto-Prompt Parity (Preapprove/Revoke/Global)
+
+Date (UTC): 2026-02-19
+Active slice context: `Slice 86` in progress (explicit user-requested Telegram approval UX alignment hotfix)
+
+## Objective + Scope Lock
+- Objective: make policy preapprove/revoke/global requests auto-send Telegram approval prompts with inline buttons (when Telegram is active), matching trade/transfer behavior.
+- Scope lock:
+  - `apps/agent-runtime/xclaw_agent/cli.py`
+  - `apps/agent-runtime/tests/test_trade_path.py`
+  - `skills/xclaw-agent/scripts/xclaw_agent_skill.py`
+  - `skills/xclaw-agent/scripts/openclaw_gateway_patch.py`
+  - `skills/xclaw-agent/SKILL.md`
+  - `skills/xclaw-agent/references/commands.md`
+  - `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - handoff artifacts (`spec.md`, `tasks.md`, `acceptance.md`)
+- Out of scope: API/schema/migration and management UI structural changes.
+
+## Behavior Checks
+- [x] Policy request commands attempt runtime-side Telegram prompt send for `approval_pending`.
+- [x] Policy request responses are concise and do not require queuedMessage repost instructions.
+- [x] Policy prompt callback payloads use `xpol|a|...` and `xpol|r|...`.
+- [x] Non-Telegram active channel path skips auto-send and keeps management fallback hint.
+- [x] Prompt send failures do not fail policy request creation.
+- [x] Gateway fallback auto-attach accepts policy prompt text containing `ppr_...` even when strict status line is absent.
+
+## Required Validation Gates
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- [x] `python3 -m py_compile skills/xclaw-agent/scripts/openclaw_gateway_patch.py`
+- [x] `python3 skills/xclaw-agent/scripts/openclaw_gateway_patch.py --json`
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+
+---
+
 # Hotfix Acceptance Evidence: Force-Upgrade Gateway Callback Patch (v15) For Trade-Approve Ack Suppression
 
 Date (UTC): 2026-02-19

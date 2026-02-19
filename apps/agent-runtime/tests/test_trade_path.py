@@ -808,6 +808,68 @@ class TradePathRuntimeTests(unittest.TestCase):
             )
         run_mock.assert_not_called()
 
+    def test_telegram_policy_prompt_includes_details_and_callbacks(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir, mock.patch.object(cli, "APP_DIR", pathlib.Path(tmpdir)), mock.patch.object(
+            cli, "APPROVAL_PROMPTS_FILE", pathlib.Path(tmpdir) / "approval_prompts.json"
+        ), mock.patch.object(
+            cli, "_read_openclaw_last_delivery", return_value={"lastChannel": "telegram", "lastTo": "123", "lastThreadId": None}
+        ), mock.patch.object(
+            cli, "_require_openclaw_bin", return_value="openclaw"
+        ):
+            captured: dict[str, object] = {}
+
+            def fake_run(cmd: list[str], timeout_sec: int, kind: str):
+                captured["cmd"] = cmd
+                return mock.Mock(returncode=0, stdout='{"payload":{"messageId":"777"}}', stderr="")
+
+            with mock.patch.object(cli, "_run_subprocess", side_effect=fake_run):
+                cli._maybe_send_telegram_policy_approval_prompt(
+                    {
+                        "policyApprovalId": "ppr_abc",
+                        "chainKey": "base_sepolia",
+                        "requestType": "token_preapprove_add",
+                        "tokenDisplay": "USDC (0x" + "11" * 20 + ")",
+                    }
+                )
+
+            cmd = captured.get("cmd") or []
+            self.assertIn("--channel", cmd)
+            self.assertIn("telegram", cmd)
+            message_arg = None
+            buttons_arg = None
+            for idx, part in enumerate(cmd):
+                if part == "--message" and idx + 1 < len(cmd):
+                    message_arg = cmd[idx + 1]
+                if part == "--buttons" and idx + 1 < len(cmd):
+                    buttons_arg = cmd[idx + 1]
+            self.assertIsNotNone(message_arg)
+            self.assertIn("Approve policy change", message_arg)
+            self.assertIn("Approval ID: ppr_abc", message_arg)
+            self.assertIn("Status: approval_pending", message_arg)
+            self.assertIsNotNone(buttons_arg)
+            buttons = json.loads(buttons_arg or "[]")
+            row0 = buttons[0]
+            callback_data = [b.get("callback_data") for b in row0 if isinstance(b, dict)]
+            self.assertIn("xpol|a|ppr_abc|base_sepolia", callback_data)
+            self.assertIn("xpol|r|ppr_abc|base_sepolia", callback_data)
+            entry = cli._get_policy_approval_prompt("ppr_abc")
+            self.assertIsInstance(entry, dict)
+            self.assertEqual((entry or {}).get("messageId"), "777")
+            self.assertEqual((entry or {}).get("channel"), "telegram")
+
+    def test_telegram_policy_prompt_skips_when_last_channel_not_telegram(self) -> None:
+        with mock.patch.object(cli, "_read_openclaw_last_delivery", return_value={"lastChannel": "web", "lastTo": "123", "lastThreadId": None}), mock.patch.object(
+            cli, "_run_subprocess"
+        ) as run_mock:
+            cli._maybe_send_telegram_policy_approval_prompt(
+                {
+                    "policyApprovalId": "ppr_abc",
+                    "chainKey": "base_sepolia",
+                    "requestType": "global_approval_enable",
+                }
+            )
+        run_mock.assert_not_called()
+
     def test_delete_telegram_transfer_prompt_uses_saved_message_id(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir, mock.patch.object(cli, "APP_DIR", pathlib.Path(tmpdir)), mock.patch.object(
             cli, "APPROVAL_PROMPTS_FILE", pathlib.Path(tmpdir) / "approval_prompts.json"
@@ -1673,15 +1735,17 @@ class TradePathRuntimeTests(unittest.TestCase):
 
         with mock.patch.object(cli, "_resolve_api_key", return_value="xak1.ag_1.sig.payload"), mock.patch.object(
             cli, "_resolve_agent_id", return_value="ag_1"
-        ), mock.patch.object(cli, "_api_request", side_effect=fake_api_request):
+        ), mock.patch.object(cli, "_api_request", side_effect=fake_api_request), mock.patch.object(
+            cli, "_maybe_send_telegram_policy_approval_prompt"
+        ) as prompt_mock:
             payload = self._run_and_parse_stdout(lambda: cli.cmd_approvals_request_token(args))
 
         self.assertTrue(payload.get("ok"))
-        queued = str(payload.get("queuedMessage") or "")
-        self.assertIn("Approval ID: ppr_1", queued)
-        self.assertIn("Status: approval_pending", queued)
-        self.assertIn("Chain: base_sepolia", queued)
-        self.assertTrue(str(payload.get("agentInstructions") or "").strip() != "")
+        self.assertEqual(payload.get("policyApprovalId"), "ppr_1")
+        self.assertEqual(payload.get("chain"), "base_sepolia")
+        self.assertNotIn("queuedMessage", payload)
+        self.assertEqual(payload.get("promptSent"), True)
+        prompt_mock.assert_called_once()
         self.assertEqual(captured.get("method"), "POST")
         self.assertEqual(captured.get("path"), "/agent/policy-approvals/proposed")
         sent = captured.get("payload") or {}
@@ -1740,14 +1804,16 @@ class TradePathRuntimeTests(unittest.TestCase):
 
         with mock.patch.object(cli, "_resolve_api_key", return_value="xak1.ag_1.sig.payload"), mock.patch.object(
             cli, "_resolve_agent_id", return_value="ag_1"
-        ), mock.patch.object(cli, "_api_request", side_effect=fake_api_request):
+        ), mock.patch.object(cli, "_api_request", side_effect=fake_api_request), mock.patch.object(
+            cli, "_maybe_send_telegram_policy_approval_prompt"
+        ) as prompt_mock:
             payload = self._run_and_parse_stdout(lambda: cli.cmd_approvals_revoke_token(args))
 
         self.assertTrue(payload.get("ok"))
-        queued = str(payload.get("queuedMessage") or "")
-        self.assertIn("Approval ID: ppr_2", queued)
-        self.assertIn("Status: approval_pending", queued)
-        self.assertIn("Chain: base_sepolia", queued)
+        self.assertEqual(payload.get("policyApprovalId"), "ppr_2")
+        self.assertNotIn("queuedMessage", payload)
+        self.assertEqual(payload.get("promptSent"), True)
+        prompt_mock.assert_called_once()
         self.assertEqual(captured.get("method"), "POST")
         self.assertEqual(captured.get("path"), "/agent/policy-approvals/proposed")
         sent = captured.get("payload") or {}
@@ -1775,10 +1841,15 @@ class TradePathRuntimeTests(unittest.TestCase):
 
         with mock.patch.object(cli, "_resolve_api_key", return_value="xak1.ag_1.sig.payload"), mock.patch.object(
             cli, "_resolve_agent_id", return_value="ag_1"
-        ), mock.patch.object(cli, "_api_request", side_effect=fake_api_request):
+        ), mock.patch.object(cli, "_api_request", side_effect=fake_api_request), mock.patch.object(
+            cli, "_maybe_send_telegram_policy_approval_prompt"
+        ) as prompt_mock:
             payload = self._run_and_parse_stdout(lambda: cli.cmd_approvals_request_global(args))
 
         self.assertTrue(payload.get("ok"))
+        self.assertNotIn("queuedMessage", payload)
+        self.assertEqual(payload.get("promptSent"), True)
+        prompt_mock.assert_called_once()
         self.assertEqual(captured.get("method"), "POST")
         self.assertEqual(captured.get("path"), "/agent/policy-approvals/proposed")
         self.assertEqual((captured.get("payload") or {}).get("requestType"), "global_approval_enable")
@@ -1804,14 +1875,43 @@ class TradePathRuntimeTests(unittest.TestCase):
 
         with mock.patch.object(cli, "_resolve_api_key", return_value="xak1.ag_1.sig.payload"), mock.patch.object(
             cli, "_resolve_agent_id", return_value="ag_1"
-        ), mock.patch.object(cli, "_api_request", side_effect=fake_api_request):
+        ), mock.patch.object(cli, "_api_request", side_effect=fake_api_request), mock.patch.object(
+            cli, "_maybe_send_telegram_policy_approval_prompt"
+        ) as prompt_mock:
             payload = self._run_and_parse_stdout(lambda: cli.cmd_approvals_revoke_global(args))
 
         self.assertTrue(payload.get("ok"))
+        self.assertNotIn("queuedMessage", payload)
+        self.assertEqual(payload.get("promptSent"), True)
+        prompt_mock.assert_called_once()
         self.assertEqual(captured.get("method"), "POST")
         self.assertEqual(captured.get("path"), "/agent/policy-approvals/proposed")
         self.assertEqual((captured.get("payload") or {}).get("requestType"), "global_approval_disable")
         self.assertRegex(str(captured.get("idempotency_key") or ""), r"^rt-polrev-global-base_sepolia-[0-9a-f]{16}$")
+
+    def test_policy_request_pending_survives_prompt_send_failure(self) -> None:
+        args = argparse.Namespace(chain="base_sepolia", token="USDC", json=True)
+
+        def fake_api_request(
+            method: str,
+            path: str,
+            payload: dict | None = None,
+            include_idempotency: bool = False,
+            idempotency_key: str | None = None,
+            allow_auth_recovery: bool = True,
+        ):
+            return 200, {"ok": True, "policyApprovalId": "ppr_fail", "status": "approval_pending"}
+
+        with mock.patch.object(cli, "_resolve_api_key", return_value="xak1.ag_1.sig.payload"), mock.patch.object(
+            cli, "_resolve_agent_id", return_value="ag_1"
+        ), mock.patch.object(cli, "_api_request", side_effect=fake_api_request), mock.patch.object(
+            cli, "_maybe_send_telegram_policy_approval_prompt", side_effect=RuntimeError("send failed")
+        ):
+            payload = self._run_and_parse_stdout(lambda: cli.cmd_approvals_request_token(args))
+
+        self.assertTrue(payload.get("ok"))
+        self.assertEqual(payload.get("policyApprovalId"), "ppr_fail")
+        self.assertEqual(payload.get("promptSent"), False)
 
     def test_management_link_normalizes_loopback_host_to_public_domain(self) -> None:
         args = argparse.Namespace(ttl_seconds=600, json=True)

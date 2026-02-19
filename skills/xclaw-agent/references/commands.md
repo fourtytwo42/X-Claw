@@ -169,7 +169,9 @@ Underlying runtime delegation (performed by wrapper):
 
 - Telegram-focused conversation:
   - transfer `approval_pending` (`xfr_...`): do not echo `queuedMessage`; send a short "queued for management approval" acknowledgment.
-  - trade/policy `approval_pending`: send concise pending-approval acknowledgment; runtime/gateway handles Telegram button delivery.
+  - trade `approval_pending`: send concise pending-approval acknowledgment; runtime/gateway handles Telegram button delivery.
+  - policy `approval_pending` (`ppr_...`): send concise pending-approval acknowledgment; runtime sends Telegram prompt with inline buttons when last active channel is Telegram.
+  - do not ask user/model to repost queued policy prompt text for button attachment.
   - fallback override: when `XCLAW_TELEGRAM_APPROVALS_FORCE_MANAGEMENT=1`, route Telegram approvals via management link flow (same as non-Telegram), and do not assume inline buttons are available.
 - Non-Telegram conversation (web chat / Slack / Discord / other):
   - do not include Telegram button directives or callback payloads,

@@ -49,9 +49,10 @@ DECISION_RESULT_ROUTE_MARKER_V1 = "xclaw: telegram trade result routed to agent"
 QUEUED_BUTTONS_MARKER = "xclaw: telegram queued approval buttons"
 QUEUED_BUTTONS_MARKER_V2 = "xclaw: telegram queued approval buttons v2"
 QUEUED_BUTTONS_MARKER_V3 = "xclaw: telegram queued approval buttons v3"
+QUEUED_BUTTONS_MARKER_V4 = "xclaw: telegram queued approval buttons v4"
 LEGACY_DM_SENTINEL = 'Allow in DMs even when inlineButtonsScope is "allowlist", gated by chatId == senderId.'
 # Bump when patch semantics change so we invalidate the cached "already patched" fast-path.
-STATE_SCHEMA_VERSION = 46
+STATE_SCHEMA_VERSION = 47
 STATE_DIR = Path.home() / ".openclaw" / "xclaw"
 STATE_FILE = STATE_DIR / "openclaw_patch_state.json"
 LOCK_FILE = STATE_DIR / "openclaw_patch.lock"
@@ -793,7 +794,7 @@ def _patch_queued_buttons(raw: str) -> tuple[str, bool, str | None]:
         "\n\t// xclaw: telegram queued approval buttons\n"
         "\t// If the agent posts an approval_pending trade summary (queued message), attach inline Approve/Deny buttons.\n"
         "\t// This avoids sending a second Telegram prompt message.\n"
-        "\tif (!replyMarkup && typeof text === \"string\" && /\\bStatus:\\s*approval_pending\\b/i.test(text)) {\n"
+        "\tif (!replyMarkup && typeof text === \"string\" && (/\\bStatus:\\s*approval_pending\\b/i.test(text) || /\\bppr_[a-z0-9]+\\b/i.test(text))) {\n"
         "\t\tconst tradeMatch = text.match(/\\bTrade ID:\\s*(trd_[a-z0-9]+)\\b/i) ?? text.match(/\\bTrade:\\s*(trd_[a-z0-9]+)\\b/i);\n"
         "\t\tconst policyMatch = text.match(/\\bApproval ID:\\s*(ppr_[a-z0-9]+)\\b/i) ?? text.match(/\\bPolicy Approval ID:\\s*(ppr_[a-z0-9]+)\\b/i);\n"
         "\t\tconst transferMatch = text.match(/\\bApproval ID:\\s*(xfr(?:\\\\_|[_-])?[a-z0-9]+)\\b/i) ?? text.match(/\\bTransfer Approval ID:\\s*(xfr(?:\\\\_|[_-])?[a-z0-9]+)\\b/i);\n"
@@ -854,7 +855,7 @@ def _patch_queued_buttons_v2(raw: str) -> tuple[str, bool, str | None]:
     # v3 is our current canonical behavior. If a v3 block exists but doesn't support policy approvals,
     # replace it in-place. This handles upgrades from trade-only v3 -> trade+policy v3.
     anchor_idx = raw.find(anchor)
-    if QUEUED_BUTTONS_MARKER_V3 in raw:
+    if QUEUED_BUTTONS_MARKER_V4 in raw:
         window = raw[anchor_idx : min(len(raw), anchor_idx + 9000)]
         if (
             ("xpol|a|${approvalId}" in window)
@@ -862,15 +863,24 @@ def _patch_queued_buttons_v2(raw: str) -> tuple[str, bool, str | None]:
             and ("queued policy buttons attached" in window)
             and ("missing trade/policy/transfer id" in window)
             and ("xfr(?:\\\\_|[_-])?" in window)
+            and ("__xclawHasPolicyPending" in window)
         ):
             return raw, False, None
-        start = raw.find(f"\n\t// {QUEUED_BUTTONS_MARKER_V3}", anchor_idx)
+        start = raw.find(f"\n\t// {QUEUED_BUTTONS_MARKER_V4}", anchor_idx)
         if start >= 0:
             end = raw.find("\n\n\ttry {", start)
             if end < 0:
                 end = raw.find("\n\ttry {", start)
             if end > start and end < anchor_idx + 12000:
                 # Replace the existing v3 block with the current injection.
+                raw = raw[:start] + raw[end:]
+    elif QUEUED_BUTTONS_MARKER_V3 in raw:
+        start = raw.find(f"\n\t// {QUEUED_BUTTONS_MARKER_V3}", anchor_idx)
+        if start >= 0:
+            end = raw.find("\n\n\ttry {", start)
+            if end < 0:
+                end = raw.find("\n\ttry {", start)
+            if end > start and end < anchor_idx + 12000:
                 raw = raw[:start] + raw[end:]
 
     if QUEUED_BUTTONS_MARKER_V2 in raw:
@@ -884,12 +894,13 @@ def _patch_queued_buttons_v2(raw: str) -> tuple[str, bool, str | None]:
                 raw = raw[:start] + raw[end:]
 
     injection = (
-        "\n\t// xclaw: telegram queued approval buttons v3\n"
+        "\n\t// xclaw: telegram queued approval buttons v4\n"
         "\t// Auto-attach Approve/Deny buttons to queued approval_pending trade summaries sent by the agent runtime.\n"
         "\t// This avoids relying on the model to emit `[[buttons:...]]` directives.\n"
         "\tconst __xclawCheckText = String(opts?.plainText ?? text ?? \"\");\n"
         "\tconst __xclawNormalized = __xclawCheckText.replace(/<[^>]*>/g, \" \").replace(/&nbsp;/g, \" \").replace(/\\s+/g, \" \").trim();\n"
-        "\tconst __xclawHasPending = /\\bStatus:\\s*approval_pending\\b/i.test(__xclawNormalized);\n"
+        "\tconst __xclawHasPolicyPending = /\\bppr_[a-z0-9]+\\b/i.test(__xclawNormalized);\n"
+        "\tconst __xclawHasPending = /\\bStatus:\\s*approval_pending\\b/i.test(__xclawNormalized) || __xclawHasPolicyPending;\n"
         "\tif (__xclawHasPending && !opts?.replyMarkup) {\n"
         "\t\tconst tradeMatch = __xclawNormalized.match(/\\bTrade ID:\\s*(trd_[a-z0-9]+)\\b/i) ?? __xclawNormalized.match(/\\bTrade:\\s*(trd_[a-z0-9]+)\\b/i) ?? __xclawNormalized.match(/\\b(trd_[a-z0-9]+)\\b/i);\n"
         "\t\tconst policyMatch = __xclawNormalized.match(/\\bApproval ID:\\s*(ppr_[a-z0-9]+)\\b/i) ?? __xclawNormalized.match(/\\bPolicy Approval ID:\\s*(ppr_[a-z0-9]+)\\b/i) ?? __xclawNormalized.match(/\\b(ppr_[a-z0-9]+)\\b/i);\n"
@@ -945,7 +956,7 @@ def _patch_queued_buttons_v2(raw: str) -> tuple[str, bool, str | None]:
     out, ok = _inject_after_anchor(raw, anchor, injection)
     if not ok:
         return raw, False, "queued_buttons_v2_injection_failed"
-    if QUEUED_BUTTONS_MARKER_V3 not in out:
+    if QUEUED_BUTTONS_MARKER_V4 not in out:
         return raw, False, "queued_buttons_v2_marker_missing_after_patch"
     return out, True, None
 

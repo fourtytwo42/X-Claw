@@ -2508,6 +2508,10 @@ def _transfer_prompt_key(approval_id: str) -> str:
     return f"xfer:{approval_id}"
 
 
+def _policy_prompt_key(approval_id: str) -> str:
+    return f"xpol:{approval_id}"
+
+
 def _record_transfer_approval_prompt(approval_id: str, prompt: dict[str, Any]) -> None:
     _record_approval_prompt(
         _transfer_prompt_key(approval_id),
@@ -2532,6 +2536,21 @@ def _get_transfer_approval_prompt(approval_id: str) -> dict[str, Any] | None:
     return _get_approval_prompt(_transfer_prompt_key(approval_id))
 
 
+def _record_policy_approval_prompt(approval_id: str, prompt: dict[str, Any]) -> None:
+    _record_approval_prompt(
+        _policy_prompt_key(approval_id),
+        {
+            **prompt,
+            "promptType": "policy",
+            "approvalId": approval_id,
+        },
+    )
+
+
+def _get_policy_approval_prompt(approval_id: str) -> dict[str, Any] | None:
+    return _get_approval_prompt(_policy_prompt_key(approval_id))
+
+
 def _remove_approval_prompt(trade_id: str) -> None:
     state = _load_approval_prompts()
     prompts = state.get("prompts")
@@ -2544,6 +2563,10 @@ def _remove_approval_prompt(trade_id: str) -> None:
 
 def _remove_transfer_approval_prompt(approval_id: str) -> None:
     _remove_approval_prompt(_transfer_prompt_key(approval_id))
+
+
+def _remove_policy_approval_prompt(approval_id: str) -> None:
+    _remove_approval_prompt(_policy_prompt_key(approval_id))
 
 
 def _approval_channels_enabled(policy_payload: dict[str, Any], channel: str) -> bool:
@@ -2830,6 +2853,92 @@ def _maybe_send_telegram_transfer_approval_prompt(flow: dict[str, Any]) -> None:
     if not message_id:
         message_id = "unknown"
     _record_transfer_approval_prompt(
+        approval_id,
+        {
+            "channel": "telegram",
+            "chainKey": chain,
+            "to": chat_id,
+            "threadId": thread_id,
+            "messageId": message_id,
+            "createdAt": utc_now(),
+        },
+    )
+
+
+def _maybe_send_telegram_policy_approval_prompt(flow: dict[str, Any]) -> None:
+    approval_id = str(flow.get("policyApprovalId") or "").strip()
+    chain = str(flow.get("chainKey") or "").strip()
+    if not approval_id or not chain:
+        return
+    existing = _get_policy_approval_prompt(approval_id)
+    if existing and str(existing.get("channel") or "") == "telegram":
+        return
+
+    delivery = _read_openclaw_last_delivery()
+    if not delivery or str(delivery.get("lastChannel") or "").lower() != "telegram":
+        return
+
+    chat_id = str(delivery.get("lastTo") or "").strip()
+    if not chat_id:
+        return
+
+    thread_raw = delivery.get("lastThreadId")
+    thread_id: str | None = None
+    if isinstance(thread_raw, int):
+        thread_id = str(thread_raw)
+    elif isinstance(thread_raw, str) and thread_raw.strip():
+        thread_id = thread_raw.strip()
+
+    callback_approve = f"xpol|a|{approval_id}|{chain}"
+    callback_deny = f"xpol|r|{approval_id}|{chain}"
+    if len(callback_approve.encode("utf-8")) > 64 or len(callback_deny.encode("utf-8")) > 64:
+        return
+
+    request_type = str(flow.get("requestType") or "").strip().lower()
+    token_display = str(flow.get("tokenDisplay") or "").strip()
+    request_label = "Policy update"
+    if request_type == "token_preapprove_add":
+        request_label = "Preapprove token for trading"
+    elif request_type == "token_preapprove_remove":
+        request_label = "Revoke preapproved token"
+    elif request_type == "global_approval_enable":
+        request_label = "Enable Approve all (global trading)"
+    elif request_type == "global_approval_disable":
+        request_label = "Disable Approve all (global trading)"
+
+    lines = [
+        "Approve policy change",
+        f"Request: {request_label}",
+    ]
+    if token_display:
+        lines.append(f"Token: {token_display}")
+    lines.extend(
+        [
+            f"Chain: {chain}",
+            f"Approval ID: {approval_id}",
+            "Status: approval_pending",
+            "",
+            "Tap Approve to apply (or Deny to reject).",
+        ]
+    )
+    text = "\n".join(lines)
+    buttons = json.dumps(
+        [[{"text": "Approve", "callback_data": callback_approve}, {"text": "Deny", "callback_data": callback_deny}]],
+        separators=(",", ":"),
+    )
+    openclaw = _require_openclaw_bin()
+    cmd = [openclaw, "message", "send", "--channel", "telegram", "--target", chat_id, "--message", text, "--buttons", buttons, "--json"]
+    if thread_id:
+        cmd.extend(["--thread-id", thread_id])
+    proc = _run_subprocess(cmd, timeout_sec=30, kind="openclaw_send")
+    if proc.returncode != 0:
+        stderr = (proc.stderr or "").strip()
+        stdout = (proc.stdout or "").strip()
+        raise WalletStoreError(stderr or stdout or "openclaw message send failed.")
+    message_id = _extract_openclaw_message_id(proc.stdout or "")
+    if not message_id:
+        message_id = "unknown"
+    _record_policy_approval_prompt(
         approval_id,
         {
             "channel": "telegram",
@@ -3468,27 +3577,34 @@ def cmd_approvals_request_token(args: argparse.Namespace) -> int:
         status = str(body.get("status", "approval_pending"))
         token_addr = _normalize_address(token_address)
         token_display = f"{token_symbol} ({token_addr})" if token_symbol else token_addr
-        queued_message = (
-            "Approval required (policy)\n\n"
-            "Request: Preapprove token for trading\n"
-            f"Token: {token_display}\n"
-            f"Chain: {args.chain}\n"
-            f"Approval ID: {policy_approval_id}\n"
-            f"Status: {status}\n\n"
-            "Tap Approve or Deny.\n"
-        )
+        prompt_sent = False
+        if status == "approval_pending":
+            try:
+                _maybe_send_telegram_policy_approval_prompt(
+                    {
+                        "policyApprovalId": policy_approval_id,
+                        "chainKey": args.chain,
+                        "status": status,
+                        "requestType": "token_preapprove_add",
+                        "tokenDisplay": token_display,
+                    }
+                )
+                prompt_sent = True
+            except Exception:
+                prompt_sent = False
         return ok(
-            "Policy approval requested (pending). Post queuedMessage to the owner verbatim so Telegram buttons can attach.",
+            "Policy approval requested (pending).",
             chain=args.chain,
             policyApprovalId=policy_approval_id,
             status=status,
             requestType="token_preapprove_add",
             tokenAddress=token_addr,
-            queuedMessage=queued_message,
-            agentInstructions=(
-                "Send queuedMessage verbatim to the owner in the active chat. "
-                "Do not reformat the 'Approval ID:' and 'Status:' lines; Telegram button auto-attach depends on them. "
-                "Use only the Approval ID returned in this command result; never reuse a historical Approval ID from memory/chat."
+            tokenDisplay=token_display,
+            promptSent=prompt_sent,
+            actionHint=(
+                "Approve or deny in Telegram/management to apply this policy change."
+                if prompt_sent
+                else "Approve or deny in management (or active Telegram session) to apply this policy change."
             ),
         )
     except Exception as exc:
@@ -3524,25 +3640,31 @@ def cmd_approvals_request_global(args: argparse.Namespace) -> int:
             )
         policy_approval_id = str(body.get("policyApprovalId", ""))
         status = str(body.get("status", "approval_pending"))
-        queued_message = (
-            "Approval required (policy)\n\n"
-            "Request: Enable Approve all (global trading)\n"
-            f"Chain: {args.chain}\n"
-            f"Approval ID: {policy_approval_id}\n"
-            f"Status: {status}\n\n"
-            "Tap Approve or Deny.\n"
-        )
+        prompt_sent = False
+        if status == "approval_pending":
+            try:
+                _maybe_send_telegram_policy_approval_prompt(
+                    {
+                        "policyApprovalId": policy_approval_id,
+                        "chainKey": args.chain,
+                        "status": status,
+                        "requestType": "global_approval_enable",
+                    }
+                )
+                prompt_sent = True
+            except Exception:
+                prompt_sent = False
         return ok(
-            "Policy approval requested (pending). Post queuedMessage to the owner verbatim so Telegram buttons can attach.",
+            "Policy approval requested (pending).",
             chain=args.chain,
             policyApprovalId=policy_approval_id,
             status=status,
             requestType="global_approval_enable",
-            queuedMessage=queued_message,
-            agentInstructions=(
-                "Send queuedMessage verbatim to the owner in the active chat. "
-                "Do not reformat the 'Approval ID:' and 'Status:' lines; Telegram button auto-attach depends on them. "
-                "Use only the Approval ID returned in this command result; never reuse a historical Approval ID from memory/chat."
+            promptSent=prompt_sent,
+            actionHint=(
+                "Approve or deny in Telegram/management to apply this policy change."
+                if prompt_sent
+                else "Approve or deny in management (or active Telegram session) to apply this policy change."
             ),
         )
     except Exception as exc:
@@ -3591,27 +3713,34 @@ def cmd_approvals_revoke_token(args: argparse.Namespace) -> int:
         status = str(body.get("status", "approval_pending"))
         token_addr = _normalize_address(token_address)
         token_display = f"{token_symbol} ({token_addr})" if token_symbol else token_addr
-        queued_message = (
-            "Approval required (policy)\n\n"
-            "Request: Revoke preapproved token\n"
-            f"Token: {token_display}\n"
-            f"Chain: {args.chain}\n"
-            f"Approval ID: {policy_approval_id}\n"
-            f"Status: {status}\n\n"
-            "Tap Approve or Deny.\n"
-        )
+        prompt_sent = False
+        if status == "approval_pending":
+            try:
+                _maybe_send_telegram_policy_approval_prompt(
+                    {
+                        "policyApprovalId": policy_approval_id,
+                        "chainKey": args.chain,
+                        "status": status,
+                        "requestType": "token_preapprove_remove",
+                        "tokenDisplay": token_display,
+                    }
+                )
+                prompt_sent = True
+            except Exception:
+                prompt_sent = False
         return ok(
-            "Policy revoke requested (pending). Post queuedMessage to the owner verbatim so Telegram buttons can attach.",
+            "Policy revoke requested (pending).",
             chain=args.chain,
             policyApprovalId=policy_approval_id,
             status=status,
             requestType="token_preapprove_remove",
             tokenAddress=token_addr,
-            queuedMessage=queued_message,
-            agentInstructions=(
-                "Send queuedMessage verbatim to the owner in the active chat. "
-                "Do not reformat the 'Approval ID:' and 'Status:' lines; Telegram button auto-attach depends on them. "
-                "Use only the Approval ID returned in this command result; never reuse a historical Approval ID from memory/chat."
+            tokenDisplay=token_display,
+            promptSent=prompt_sent,
+            actionHint=(
+                "Approve or deny in Telegram/management to apply this policy change."
+                if prompt_sent
+                else "Approve or deny in management (or active Telegram session) to apply this policy change."
             ),
         )
     except Exception as exc:
@@ -3647,25 +3776,31 @@ def cmd_approvals_revoke_global(args: argparse.Namespace) -> int:
             )
         policy_approval_id = str(body.get("policyApprovalId", ""))
         status = str(body.get("status", "approval_pending"))
-        queued_message = (
-            "Approval required (policy)\n\n"
-            "Request: Disable Approve all (global trading)\n"
-            f"Chain: {args.chain}\n"
-            f"Approval ID: {policy_approval_id}\n"
-            f"Status: {status}\n\n"
-            "Tap Approve or Deny.\n"
-        )
+        prompt_sent = False
+        if status == "approval_pending":
+            try:
+                _maybe_send_telegram_policy_approval_prompt(
+                    {
+                        "policyApprovalId": policy_approval_id,
+                        "chainKey": args.chain,
+                        "status": status,
+                        "requestType": "global_approval_disable",
+                    }
+                )
+                prompt_sent = True
+            except Exception:
+                prompt_sent = False
         return ok(
-            "Policy revoke requested (pending). Post queuedMessage to the owner verbatim so Telegram buttons can attach.",
+            "Policy revoke requested (pending).",
             chain=args.chain,
             policyApprovalId=policy_approval_id,
             status=status,
             requestType="global_approval_disable",
-            queuedMessage=queued_message,
-            agentInstructions=(
-                "Send queuedMessage verbatim to the owner in the active chat. "
-                "Do not reformat the 'Approval ID:' and 'Status:' lines; Telegram button auto-attach depends on them. "
-                "Use only the Approval ID returned in this command result; never reuse a historical Approval ID from memory/chat."
+            promptSent=prompt_sent,
+            actionHint=(
+                "Approve or deny in Telegram/management to apply this policy change."
+                if prompt_sent
+                else "Approve or deny in management (or active Telegram session) to apply this policy change."
             ),
         )
     except Exception as exc:

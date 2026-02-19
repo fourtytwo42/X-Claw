@@ -229,6 +229,28 @@ def _normalize_non_terminal_approval(runtime_json: dict) -> Optional[dict]:
     return normalized
 
 
+def _normalize_pending_policy_request(runtime_json: dict) -> Optional[dict]:
+    if runtime_json.get("ok") is not True:
+        return None
+    code = str(runtime_json.get("code") or "").strip().lower()
+    if code not in {"ok", "approval_pending"}:
+        return None
+    status = str(runtime_json.get("status") or "").strip().lower()
+    approval_id = str(runtime_json.get("policyApprovalId") or "").strip().lower()
+    if status != "approval_pending" or not approval_id.startswith("ppr_"):
+        return None
+
+    normalized = dict(runtime_json)
+    normalized.pop("queuedMessage", None)
+    normalized["message"] = "Policy change queued for approval."
+    prompt_sent = bool(runtime_json.get("promptSent"))
+    if prompt_sent:
+        normalized["actionHint"] = "Approve or deny in Telegram/management to apply this policy change."
+    else:
+        normalized["actionHint"] = "Approve or deny in management (or active Telegram session) to apply this policy change."
+    return normalized
+
+
 def _normalize_known_nonfatal_error(runtime_json: dict, command_args: Iterable[str]) -> Optional[dict]:
     code = str(runtime_json.get("code") or "").strip().lower()
     message = str(runtime_json.get("message") or "")
@@ -467,6 +489,10 @@ def _run_agent(args: Iterable[str]) -> int:
         out = proc.stdout.strip()
         runtime_json = _extract_json_payload(out)
         if runtime_json is not None:
+            normalized_policy_pending = _normalize_pending_policy_request(runtime_json)
+            if normalized_policy_pending is not None:
+                _print_json(normalized_policy_pending)
+                return 0
             normalized_non_terminal = _normalize_non_terminal_approval(runtime_json)
             if normalized_non_terminal is not None:
                 _print_json(normalized_non_terminal)
