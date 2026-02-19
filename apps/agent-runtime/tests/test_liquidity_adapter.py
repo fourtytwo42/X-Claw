@@ -2,6 +2,7 @@ import pathlib
 import sys
 import unittest
 from unittest import mock
+import types
 
 RUNTIME_ROOT = pathlib.Path("apps/agent-runtime").resolve()
 if str(RUNTIME_ROOT) not in sys.path:
@@ -37,6 +38,31 @@ class LiquidityAdapterTests(unittest.TestCase):
         with mock.patch("builtins.__import__", side_effect=ModuleNotFoundError("no module named hedera")):
             with self.assertRaises(HederaSdkUnavailable):
                 adapter.quote_add({"amountA": "1", "amountB": "1", "slippageBps": 100})
+
+    def test_hedera_add_uses_plugin_bridge(self) -> None:
+        adapter = HederaHtsLiquidityAdapter(chain="hedera_testnet", dex="hedera_hts", protocol_family="hedera_hts", position_type="v2")
+        plugin = types.SimpleNamespace(
+            execute_liquidity=mock.Mock(return_value={"txHash": "0xabc", "positionId": "pos_1", "details": {"network": "hedera"}})
+        )
+        with mock.patch.object(adapter, "ensure_sdk"), mock.patch("importlib.import_module", return_value=plugin):
+            result = adapter.add({"amountA": "1", "amountB": "1", "slippageBps": 100})
+        self.assertEqual(result.get("txHash"), "0xabc")
+        self.assertEqual(result.get("positionId"), "pos_1")
+        self.assertEqual(result.get("details"), {"network": "hedera"})
+        self.assertTrue(plugin.execute_liquidity.called)
+
+    def test_hedera_add_plugin_missing_tx_hash_fails(self) -> None:
+        adapter = HederaHtsLiquidityAdapter(chain="hedera_testnet", dex="hedera_hts", protocol_family="hedera_hts", position_type="v2")
+        plugin = types.SimpleNamespace(execute_liquidity=mock.Mock(return_value={"ok": True}))
+        with mock.patch.object(adapter, "ensure_sdk"), mock.patch("importlib.import_module", return_value=plugin):
+            with self.assertRaises(LiquidityAdapterError):
+                adapter.add({"amountA": "1", "amountB": "1", "slippageBps": 100})
+
+    def test_hedera_plugin_bridge_missing_module_fails_closed(self) -> None:
+        adapter = HederaHtsLiquidityAdapter(chain="hedera_testnet", dex="hedera_hts", protocol_family="hedera_hts", position_type="v2")
+        with mock.patch.object(adapter, "ensure_sdk"), mock.patch("importlib.import_module", side_effect=ModuleNotFoundError("no plugin")):
+            with self.assertRaises(HederaSdkUnavailable):
+                adapter.add({"amountA": "1", "amountB": "1", "slippageBps": 100})
 
     def test_resolve_adapter_from_chain_config(self) -> None:
         adapter = build_liquidity_adapter_for_request("base_sepolia", "aerodrome", "v2")

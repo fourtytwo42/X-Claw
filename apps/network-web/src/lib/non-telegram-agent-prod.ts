@@ -230,6 +230,29 @@ export function buildWebTradeDecisionProdMessage(input: {
   ].join('\n');
 }
 
+export function buildWebLiquidityDecisionProdMessage(input: {
+  decision: string;
+  liquidityIntentId: string;
+  chainKey: string;
+  source: string;
+  reasonMessage?: string | null;
+}): string {
+  const decisionWord = String(input.decision || '').trim().toUpperCase();
+  const instruction =
+    decisionWord === 'APPROVE'
+      ? `Immediately run liquidity execute --intent ${input.liquidityIntentId}, then reply to the user with progress.`
+      : 'Reply to the user confirming the liquidity intent was rejected via web management.';
+  return [
+    '[X-CLAW WEB LIQUIDITY DECISION]',
+    `Decision: ${decisionWord}`,
+    `LiquidityIntent: ${input.liquidityIntentId}`,
+    `Chain: ${input.chainKey}`,
+    `Source: ${input.source}`,
+    `Reason: ${String(input.reasonMessage ?? '').trim() || 'n/a'}`,
+    `Instruction: ${instruction}`
+  ].join('\n');
+}
+
 export function buildWebTradeResultProdMessage(input: {
   status: string;
   tradeId: string;

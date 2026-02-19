@@ -183,6 +183,18 @@ PY
     fi
   fi
 
+  if ! "$py_bin" - <<PY >/dev/null 2>&1
+import pathlib
+import sys
+runtime_root = pathlib.Path("$XCLAW_WORKDIR/apps/agent-runtime").resolve()
+sys.path.insert(0, str(runtime_root))
+import xclaw_agent.hedera_hts_plugin  # noqa: F401
+PY
+  then
+    echo "[xclaw] warning: unable to import xclaw_agent.hedera_hts_plugin from runtime path"
+    echo "[xclaw] verify path with: XCLAW_AGENT_PYTHON_BIN=\"$py_bin\" \"$py_bin\" -c 'import pathlib,sys;sys.path.insert(0,str(pathlib.Path(\"$XCLAW_WORKDIR/apps/agent-runtime\").resolve()));import xclaw_agent.hedera_hts_plugin'"
+  fi
+
   export XCLAW_PYTHON_BIN="$py_bin"
   return 0
 }

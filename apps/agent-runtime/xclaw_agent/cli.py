@@ -129,6 +129,14 @@ class WalletPolicyError(Exception):
         self.details = details or {}
 
 
+class LiquidityExecutionError(WalletStoreError):
+    """Liquidity execution failed with deterministic reason code."""
+
+    def __init__(self, reason_code: str, message: str):
+        super().__init__(message)
+        self.reason_code = str(reason_code or "liquidity_execution_failed").strip() or "liquidity_execution_failed"
+
+
 class SubprocessTimeout(WalletStoreError):
     """A subprocess operation timed out (cast call/receipt/send/etc)."""
 
@@ -3829,6 +3837,83 @@ def cmd_approvals_decide_spot(args: argparse.Namespace) -> int:
     )
 
 
+def cmd_approvals_decide_liquidity(args: argparse.Namespace) -> int:
+    chk = require_json_flag(args)
+    if chk is not None:
+        return chk
+    liquidity_intent_id = str(args.intent_id or "").strip()
+    decision = str(args.decision or "").strip().lower()
+    chain = str(args.chain or "").strip()
+    source = str(getattr(args, "source", "") or "").strip().lower() or "runtime"
+    reason_message = str(args.reason_message or "").strip()
+    if not liquidity_intent_id:
+        return fail("invalid_input", "intent_id is required.", "Provide --intent-id liq_... and retry.", exit_code=2)
+    if decision not in {"approve", "reject"}:
+        return fail("invalid_input", "decision must be approve|reject.", "Use --decision approve|reject.", exit_code=2)
+    if not chain:
+        return fail("invalid_input", "chain is required.", "Provide --chain <chainKey> and retry.", {"liquidityIntentId": liquidity_intent_id}, exit_code=2)
+
+    try:
+        intent = _read_liquidity_intent(liquidity_intent_id, chain)
+        status = str(intent.get("status") or "").strip().lower()
+        if status in {"filled", "failed", "rejected", "expired", "verification_timeout"}:
+            return ok(
+                "Liquidity decision converged on terminal state.",
+                subjectType="liquidity",
+                subjectId=liquidity_intent_id,
+                decision=decision,
+                source=source,
+                chain=chain,
+                status=status,
+                converged=True,
+                txHash=intent.get("txHash"),
+            )
+        if decision == "reject":
+            if status == "approval_pending":
+                _post_liquidity_status(
+                    liquidity_intent_id,
+                    "rejected",
+                    {"reasonCode": "approval_rejected", "reasonMessage": reason_message or "Denied by owner."},
+                )
+                status = "rejected"
+            return ok(
+                "Liquidity intent rejected.",
+                subjectType="liquidity",
+                subjectId=liquidity_intent_id,
+                decision=decision,
+                source=source,
+                chain=chain,
+                status=status,
+                executionStatus=status,
+            )
+        if status == "approval_pending":
+            _post_liquidity_status(liquidity_intent_id, "approved")
+            status = "approved"
+        if status != "approved":
+            return fail(
+                "liquidity_not_actionable",
+                f"Liquidity decision is not actionable from status '{status}'.",
+                "Approve only approval_pending intents.",
+                {"liquidityIntentId": liquidity_intent_id, "chain": chain, "status": status},
+                exit_code=1,
+            )
+        execute_code, execute_payload = _run_liquidity_execute_inline(liquidity_intent_id, chain)
+        if isinstance(execute_payload, dict):
+            execute_payload.setdefault("subjectType", "liquidity")
+            execute_payload.setdefault("subjectId", liquidity_intent_id)
+            execute_payload.setdefault("decision", decision)
+            execute_payload.setdefault("source", source)
+        return emit(execute_payload) if isinstance(execute_payload, dict) else execute_code
+    except Exception as exc:
+        return fail(
+            "liquidity_decision_failed",
+            str(exc),
+            "Inspect liquidity decision path and retry.",
+            {"liquidityIntentId": liquidity_intent_id, "chain": chain},
+            exit_code=1,
+        )
+
+
 def cmd_approvals_decide_policy(args: argparse.Namespace) -> int:
     chk = require_json_flag(args)
     if chk is not None:
@@ -4473,6 +4558,423 @@ def _post_trade_status(
         code = str(body.get("code", "api_error"))
         message = str(body.get("message", f"trade status update failed ({status_code})"))
         raise WalletStoreError(f"{code}: {message}")
+
+
+def _post_liquidity_status(
+    liquidity_intent_id: str,
+    to_status: str,
+    extra: dict[str, Any] | None = None,
+) -> None:
+    payload: dict[str, Any] = {"status": to_status}
+    if extra:
+        for key, value in extra.items():
+            if value is None:
+                continue
+            payload[key] = value
+    status_code, body = _api_request(
+        "POST",
+        f"/liquidity/{urllib.parse.quote(liquidity_intent_id)}/status",
+        payload=payload,
+        include_idempotency=True,
+    )
+    if status_code < 200 or status_code >= 300:
+        code = str(body.get("code", "api_error"))
+        message = str(body.get("message", f"liquidity status update failed ({status_code})"))
+        raise WalletStoreError(f"{code}: {message}")
+
+
+def _read_liquidity_intent(liquidity_intent_id: str, chain: str) -> dict[str, Any]:
+    status_code, body = _api_request(
+        "GET",
+        f"/liquidity/pending?chainKey={urllib.parse.quote(chain)}&limit=200",
+    )
+    if status_code < 200 or status_code >= 300:
+        code = str(body.get("code", "api_error"))
+        message = str(body.get("message", f"liquidity pending read failed ({status_code})"))
+        raise WalletStoreError(f"{code}: {message}")
+    items = body.get("items")
+    if not isinstance(items, list):
+        raise WalletStoreError("Liquidity pending response missing items list.")
+    target = str(liquidity_intent_id or "").strip()
+    for row in items:
+        if not isinstance(row, dict):
+            continue
+        if str(row.get("liquidityIntentId") or "").strip() == target:
+            return row
+    raise WalletStoreError(f"Liquidity intent '{target}' was not found in pending scope for chain '{chain}'.")
+
+
+def _read_liquidity_position(chain: str, position_id: str) -> dict[str, Any]:
+    agent_id = _resolve_agent_id_or_fail(chain)
+    status_code, body = _api_request(
+        "GET",
+        f"/liquidity/positions?agentId={urllib.parse.quote(agent_id)}&chainKey={urllib.parse.quote(chain)}",
+    )
+    if status_code < 200 or status_code >= 300:
+        code = str(body.get("code", "api_error"))
+        message = str(body.get("message", f"liquidity positions read failed ({status_code})"))
+        raise WalletStoreError(f"{code}: {message}")
+    items = body.get("items")
+    if not isinstance(items, list):
+        raise WalletStoreError("Liquidity positions response missing items list.")
+    target = str(position_id or "").strip()
+    for row in items:
+        if not isinstance(row, dict):
+            continue
+        if str(row.get("positionId") or "").strip() == target:
+            return row
+    raise WalletStoreError(f"Liquidity position '{target}' was not found for chain '{chain}'.")
+
+
+def _wait_for_tx_receipt_success(chain: str, tx_hash: str) -> dict[str, Any]:
+    cast_bin = _require_cast_bin()
+    rpc_url = _chain_rpc_url(chain)
+    receipt_proc = _run_subprocess(
+        [cast_bin, "receipt", "--json", "--rpc-url", rpc_url, tx_hash],
+        timeout_sec=_cast_receipt_timeout_sec(),
+        kind="cast_receipt",
+    )
+    if receipt_proc.returncode != 0:
+        stderr = (receipt_proc.stderr or "").strip()
+        stdout = (receipt_proc.stdout or "").strip()
+        raise WalletStoreError(stderr or stdout or "cast receipt failed.")
+    receipt_payload = json.loads((receipt_proc.stdout or "{}").strip() or "{}")
+    receipt_status = str(receipt_payload.get("status", "0x0")).lower()
+    if receipt_status not in {"0x1", "1"}:
+        raise WalletStoreError(f"On-chain receipt indicates failure status '{receipt_status}'.")
+    return receipt_payload
+
+
+def _ensure_token_allowance(
+    *,
+    chain: str,
+    token_address: str,
+    owner: str,
+    spender: str,
+    required_units: int,
+    private_key_hex: str,
+) -> str | None:
+    allowance_wei = int(_fetch_token_allowance_wei(chain, token_address, owner, spender))
+    if allowance_wei >= required_units:
+        return None
+    approve_data = _cast_calldata("approve(address,uint256)(bool)", [spender, str(required_units)])
+    tx_hash = _cast_rpc_send_transaction(
+        _chain_rpc_url(chain),
+        {"from": owner, "to": token_address, "data": approve_data},
+        private_key_hex,
+    )
+    _wait_for_tx_receipt_success(chain, tx_hash)
+    return tx_hash
+
+
+def _resolve_factory_from_router(chain: str, router: str) -> str:
+    factory_raw = _cast_call_stdout(chain, router, "factory()(address)")
+    factory = _parse_address_from_cast_output(factory_raw)
+    if factory.lower() == "0x0000000000000000000000000000000000000000":
+        raise WalletStoreError(f"Router factory resolved to zero address for router {router}.")
+    return factory
+
+
+def _resolve_pair_from_factory(chain: str, factory: str, token_a: str, token_b: str) -> str:
+    pair_raw = _cast_call_stdout(chain, factory, "getPair(address,address)(address)", token_a, token_b)
+    pair = _parse_address_from_cast_output(pair_raw)
+    if pair.lower() == "0x0000000000000000000000000000000000000000":
+        raise WalletStoreError("Factory returned zero pair address for token pair.")
+    return pair
+
+
+def _estimate_remove_amount_out_min(
+    *,
+    chain: str,
+    pair: str,
+    token_a: str,
+    token_b: str,
+    liquidity_units: int,
+    slippage_bps: int,
+) -> tuple[int, int]:
+    token0 = _parse_address_from_cast_output(_cast_call_stdout(chain, pair, "token0()(address)")).lower()
+    reserves_out = _cast_call_stdout(chain, pair, "getReserves()(uint112,uint112,uint32)")
+    reserve_values = _parse_uint_tuple_from_cast_output(reserves_out)
+    if len(reserve_values) < 2:
+        raise WalletStoreError("Unable to parse reserves for remove-liquidity estimate.")
+    reserve0 = int(reserve_values[0])
+    reserve1 = int(reserve_values[1])
+    total_supply_raw = _cast_call_stdout(chain, pair, "totalSupply()(uint256)")
+    total_supply = _parse_uint_from_cast_output(total_supply_raw)
+    if total_supply <= 0:
+        raise WalletStoreError("Pair totalSupply is zero; cannot estimate remove outputs.")
+    amount0 = (liquidity_units * reserve0) // total_supply
+    amount1 = (liquidity_units * reserve1) // total_supply
+    min0 = (amount0 * max(0, 10000 - slippage_bps)) // 10000
+    min1 = (amount1 * max(0, 10000 - slippage_bps)) // 10000
+    token_a_is_token0 = token_a.lower() == token0
+    min_a = min0 if token_a_is_token0 else min1
+    min_b = min1 if token_a_is_token0 else min0
+    return max(0, min_a), max(0, min_b)
+
+
+def _preflight_liquidity_v2_add_execution(
+    *,
+    chain: str,
+    token_a: str,
+    token_b: str,
+    amount_a_units: int,
+    amount_b_units: int,
+    min_a_units: int,
+    min_b_units: int,
+    wallet_address: str,
+    router: str,
+    deadline: str,
+) -> dict[str, Any]:
+    if min_a_units <= 0 or min_b_units <= 0:
+        raise LiquidityExecutionError(
+            "liquidity_preflight_min_amount_zero",
+            "Computed minimum output amount is zero. Increase size or reduce slippage.",
+        )
+
+    token_a_balance = int(_fetch_token_balance_wei(chain, wallet_address, token_a))
+    token_b_balance = int(_fetch_token_balance_wei(chain, wallet_address, token_b))
+    if token_a_balance < amount_a_units:
+        raise LiquidityExecutionError(
+            "liquidity_preflight_insufficient_token_balance",
+            "Insufficient tokenA balance for addLiquidity execution.",
+        )
+    if token_b_balance < amount_b_units:
+        raise LiquidityExecutionError(
+            "liquidity_preflight_insufficient_token_balance",
+            "Insufficient tokenB balance for addLiquidity execution.",
+        )
+
+    native_balance = int(_fetch_native_balance_wei(chain, wallet_address))
+    min_native_gas_wei = int(Decimal("0.001") * Decimal(10**18))
+    if native_balance < min_native_gas_wei:
+        raise LiquidityExecutionError(
+            "liquidity_preflight_insufficient_gas_balance",
+            "Native token balance is too low for addLiquidity gas fees.",
+        )
+
+    factory = _resolve_factory_from_router(chain, router)
+    pair = _resolve_pair_from_factory(chain, factory, token_a, token_b)
+    reserves_out = _cast_call_stdout(chain, pair, "getReserves()(uint112,uint112,uint32)")
+    reserve_values = _parse_uint_tuple_from_cast_output(reserves_out)
+    if len(reserve_values) < 2:
+        raise LiquidityExecutionError(
+            "liquidity_preflight_pair_reserve_parse_failed",
+            "Unable to parse pair reserves during addLiquidity preflight.",
+        )
+    reserve0 = int(reserve_values[0])
+    reserve1 = int(reserve_values[1])
+    if reserve0 <= 0 or reserve1 <= 0:
+        raise LiquidityExecutionError(
+            "liquidity_preflight_empty_reserves",
+            "Pair reserves are empty; choose a liquid pair before execution.",
+        )
+
+    try:
+        _cast_call_stdout(
+            chain,
+            router,
+            "addLiquidity(address,address,uint256,uint256,uint256,uint256,address,uint256)(uint256,uint256,uint256)",
+            token_a,
+            token_b,
+            str(amount_a_units),
+            str(amount_b_units),
+            str(min_a_units),
+            str(min_b_units),
+            wallet_address,
+            deadline,
+        )
+    except WalletStoreError as exc:
+        raise LiquidityExecutionError(
+            "liquidity_preflight_router_revert",
+            f"addLiquidity simulation failed before submit: {exc}",
+        ) from exc
+
+    return {
+        "pair": pair.lower(),
+        "factory": factory.lower(),
+        "reserve0": str(reserve0),
+        "reserve1": str(reserve1),
+        "tokenABalance": str(token_a_balance),
+        "tokenBBalance": str(token_b_balance),
+        "nativeBalanceWei": str(native_balance),
+    }
+
+
+def _execute_liquidity_v2_add(intent: dict[str, Any], chain: str) -> dict[str, Any]:
+    dex = str(intent.get("dex") or "").strip().lower()
+    position_type = str(intent.get("positionType") or "v2").strip().lower()
+    adapter = build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type=position_type)
+    token_a = _resolve_token_address(chain, str(intent.get("tokenA") or ""))
+    token_b = _resolve_token_address(chain, str(intent.get("tokenB") or ""))
+    amount_a_h = _parse_positive_amount_text(str(intent.get("amountA") or ""), "amountA")
+    amount_b_h = _parse_positive_amount_text(str(intent.get("amountB") or ""), "amountB")
+    slippage_bps = int(intent.get("slippageBps") or 100)
+    if slippage_bps < 0 or slippage_bps > 5000:
+        raise WalletStoreError("slippageBps must be between 0 and 5000 for liquidity execution.")
+    adapter.quote_add(
+        {
+            "tokenA": token_a,
+            "tokenB": token_b,
+            "amountA": _decimal_text(amount_a_h),
+            "amountB": _decimal_text(amount_b_h),
+            "slippageBps": slippage_bps,
+        }
+    )
+    router = _require_chain_contract_address(chain, "router")
+    token_a_meta = _fetch_erc20_metadata(chain, token_a)
+    token_b_meta = _fetch_erc20_metadata(chain, token_b)
+    token_a_decimals = int(token_a_meta.get("decimals", 18))
+    token_b_decimals = int(token_b_meta.get("decimals", 18))
+    amount_a_units = int(_to_units_uint(_decimal_text(amount_a_h), token_a_decimals))
+    amount_b_units = int(_to_units_uint(_decimal_text(amount_b_h), token_b_decimals))
+    min_a_units = (amount_a_units * max(0, 10000 - slippage_bps)) // 10000
+    min_b_units = (amount_b_units * max(0, 10000 - slippage_bps)) // 10000
+
+    store = load_wallet_store()
+    wallet_address, private_key_hex = _execution_wallet(store, chain)
+    deadline = str(int(datetime.now(timezone.utc).timestamp()) + 120)
+    preflight_details = _preflight_liquidity_v2_add_execution(
+        chain=chain,
+        token_a=token_a,
+        token_b=token_b,
+        amount_a_units=amount_a_units,
+        amount_b_units=amount_b_units,
+        min_a_units=min_a_units,
+        min_b_units=min_b_units,
+        wallet_address=wallet_address,
+        router=router,
+        deadline=deadline,
+    )
+    _ensure_token_allowance(
+        chain=chain,
+        token_address=token_a,
+        owner=wallet_address,
+        spender=router,
+        required_units=amount_a_units,
+        private_key_hex=private_key_hex,
+    )
+    _ensure_token_allowance(
+        chain=chain,
+        token_address=token_b,
+        owner=wallet_address,
+        spender=router,
+        required_units=amount_b_units,
+        private_key_hex=private_key_hex,
+    )
+    calldata = _cast_calldata(
+        "addLiquidity(address,address,uint256,uint256,uint256,uint256,address,uint256)(uint256,uint256,uint256)",
+        [
+            token_a,
+            token_b,
+            str(amount_a_units),
+            str(amount_b_units),
+            str(min_a_units),
+            str(min_b_units),
+            wallet_address,
+            deadline,
+        ],
+    )
+    tx_hash = _cast_rpc_send_transaction(
+        _chain_rpc_url(chain),
+        {"from": wallet_address, "to": router, "data": calldata},
+        private_key_hex,
+    )
+    return {
+        "txHash": tx_hash,
+        "positionId": tx_hash,
+        "details": {
+            "adapterFamily": adapter.protocol_family,
+            "dex": adapter.dex,
+            "action": "add",
+            "minAmountA": str(min_a_units),
+            "minAmountB": str(min_b_units),
+            "preflight": preflight_details,
+        },
+    }
+
+
+def _execute_liquidity_v2_remove(intent: dict[str, Any], chain: str) -> dict[str, Any]:
+    dex = str(intent.get("dex") or "").strip().lower()
+    position_type = str(intent.get("positionType") or "v2").strip().lower()
+    adapter = build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type=position_type)
+    position_id = str(intent.get("positionRef") or "").strip()
+    if not position_id:
+        raise WalletStoreError("Remove intent is missing positionRef.")
+    percent_raw = str(intent.get("amountA") or "").strip() or "0"
+    try:
+        percent = int(Decimal(percent_raw).to_integral_value(rounding=ROUND_DOWN))
+    except Exception as exc:
+        raise WalletStoreError("Remove intent amountA is not a valid percent.") from exc
+    if percent < 1 or percent > 100:
+        raise WalletStoreError("Remove intent percent must be between 1 and 100.")
+    slippage_bps = int(intent.get("slippageBps") or 100)
+    if slippage_bps < 0 or slippage_bps > 5000:
+        raise WalletStoreError("slippageBps must be between 0 and 5000 for liquidity execution.")
+
+    snapshot = _read_liquidity_position(chain, position_id)
+    token_a = _resolve_token_address(chain, str(snapshot.get("tokenA") or intent.get("tokenA") or ""))
+    token_b = _resolve_token_address(chain, str(snapshot.get("tokenB") or intent.get("tokenB") or ""))
+    adapter.quote_remove({"positionId": position_id, "percent": percent, "slippageBps": slippage_bps})
+
+    router = _require_chain_contract_address(chain, "router")
+    factory = _resolve_factory_from_router(chain, router)
+    pair = _resolve_pair_from_factory(chain, factory, token_a, token_b)
+
+    store = load_wallet_store()
+    wallet_address, private_key_hex = _execution_wallet(store, chain)
+    lp_balance = int(_fetch_token_balance_wei(chain, wallet_address, pair))
+    liquidity_units = (lp_balance * percent) // 100
+    if liquidity_units <= 0:
+        raise WalletStoreError("Computed LP liquidity amount is zero; increase percent or ensure position has liquidity.")
+    min_a_units, min_b_units = _estimate_remove_amount_out_min(
+        chain=chain,
+        pair=pair,
+        token_a=token_a,
+        token_b=token_b,
+        liquidity_units=liquidity_units,
+        slippage_bps=slippage_bps,
+    )
+    _ensure_token_allowance(
+        chain=chain,
+        token_address=pair,
+        owner=wallet_address,
+        spender=router,
+        required_units=liquidity_units,
+        private_key_hex=private_key_hex,
+    )
+    deadline = str(int(datetime.now(timezone.utc).timestamp()) + 120)
+    calldata = _cast_calldata(
+        "removeLiquidity(address,address,uint256,uint256,uint256,address,uint256)(uint256,uint256)",
+        [
+            token_a,
+            token_b,
+            str(liquidity_units),
+            str(min_a_units),
+            str(min_b_units),
+            wallet_address,
+            deadline,
+        ],
+    )
+    tx_hash = _cast_rpc_send_transaction(
+        _chain_rpc_url(chain),
+        {"from": wallet_address, "to": router, "data": calldata},
+        private_key_hex,
+    )
+    return {
+        "txHash": tx_hash,
+        "positionId": position_id,
+        "details": {
+            "adapterFamily": adapter.protocol_family,
+            "dex": adapter.dex,
+            "action": "remove",
+            "pair": pair.lower(),
+            "percent": percent,
+            "liquidityUnits": str(liquidity_units),
+            "minAmountA": str(min_a_units),
+            "minAmountB": str(min_b_units),
+        },
+    }
 
 
 def _parse_uint_from_cast_output(raw: str) -> int:
@@ -5253,10 +5755,18 @@ def cmd_liquidity_add(args: argparse.Namespace) -> int:
             return fail(
                 "approval_required",
                 "Liquidity add is waiting for management approval.",
-                "Approve from authorized management view, then run liquidity add again or use resume flow.",
+                "Approve from authorized management view; approved intents auto-execute.",
                 {"liquidityIntentId": liquidity_intent_id, "chain": chain, "dex": dex, "status": status},
                 exit_code=1,
             )
+        if status == "approved":
+            code, payload = _run_liquidity_execute_inline(liquidity_intent_id, chain)
+            if isinstance(payload, dict):
+                payload.setdefault("liquidityIntentId", liquidity_intent_id)
+                payload.setdefault("chain", chain)
+                payload.setdefault("dex", adapter.dex)
+                payload.setdefault("adapterFamily", adapter.protocol_family)
+            return emit(payload) if isinstance(payload, dict) else code
         return ok(
             "Liquidity add intent created.",
             chain=chain,
@@ -5355,10 +5865,18 @@ def cmd_liquidity_remove(args: argparse.Namespace) -> int:
             return fail(
                 "approval_required",
                 "Liquidity remove is waiting for management approval.",
-                "Approve from authorized management view, then run liquidity remove again or use resume flow.",
+                "Approve from authorized management view; approved intents auto-execute.",
                 {"liquidityIntentId": liquidity_intent_id, "chain": chain, "dex": dex, "status": status},
                 exit_code=1,
             )
+        if status == "approved":
+            code, payload = _run_liquidity_execute_inline(liquidity_intent_id, chain)
+            if isinstance(payload, dict):
+                payload.setdefault("liquidityIntentId", liquidity_intent_id)
+                payload.setdefault("chain", chain)
+                payload.setdefault("dex", adapter.dex)
+                payload.setdefault("adapterFamily", adapter.protocol_family)
+            return emit(payload) if isinstance(payload, dict) else code
         return ok(
             "Liquidity remove intent created.",
             chain=chain,
@@ -5394,6 +5912,236 @@ def cmd_liquidity_remove(args: argparse.Namespace) -> int:
         return fail("liquidity_remove_failed", str(exc), "Verify API env/auth, chain capability, and inputs.", {"chain": chain, "dex": dex}, exit_code=1)
     except Exception as exc:
         return fail("liquidity_remove_failed", str(exc), "Inspect runtime liquidity remove path and retry.", {"chain": chain, "dex": dex}, exit_code=1)
+
+
+def _run_liquidity_execute_inline(liquidity_intent_id: str, chain: str) -> tuple[int, dict[str, Any]]:
+    nested = argparse.Namespace(intent=liquidity_intent_id, chain=chain, json=True)
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        code = cmd_liquidity_execute(nested)
+    raw = buf.getvalue().strip()
+    payload: dict[str, Any] = {
+        "ok": bool(code == 0),
+        "code": "liquidity_execute_result_unavailable",
+        "message": "Liquidity execute result unavailable.",
+        "liquidityIntentId": liquidity_intent_id,
+        "chain": chain,
+    }
+    if raw:
+        try:
+            parsed = json.loads(raw)
+            if isinstance(parsed, dict):
+                payload = parsed
+        except Exception:
+            payload = {
+                "ok": False,
+                "code": "liquidity_execute_parse_failed",
+                "message": raw[:400],
+                "liquidityIntentId": liquidity_intent_id,
+                "chain": chain,
+            }
+    return code, payload
+
+
+def cmd_liquidity_execute(args: argparse.Namespace) -> int:
+    chk = require_json_flag(args)
+    if chk is not None:
+        return chk
+    liquidity_intent_id = str(args.intent or "").strip()
+    chain = str(args.chain or "").strip()
+    if not liquidity_intent_id:
+        return fail("invalid_input", "intent is required.", "Provide --intent liq_... and retry.", exit_code=2)
+    if not chain:
+        return fail("invalid_input", "chain is required.", "Provide --chain <chainKey> and retry.", {"liquidityIntentId": liquidity_intent_id}, exit_code=2)
+
+    transition_state = "init"
+    last_tx_hash: str | None = None
+    try:
+        intent = _read_liquidity_intent(liquidity_intent_id, chain)
+        status = str(intent.get("status") or "").strip().lower()
+        action = str(intent.get("action") or "").strip().lower()
+        dex = str(intent.get("dex") or "").strip().lower()
+        position_type = str(intent.get("positionType") or "v2").strip().lower()
+        if status != "approved":
+            return fail(
+                "liquidity_not_actionable",
+                f"Liquidity intent is not actionable from status '{status}'.",
+                "Execute only approved liquidity intents in this slice.",
+                {"liquidityIntentId": liquidity_intent_id, "chain": chain, "status": status},
+                exit_code=1,
+            )
+
+        adapter = build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type=position_type)
+        if adapter.protocol_family == "amm_v3":
+            return fail(
+                "unsupported_liquidity_execution_family",
+                "Liquidity execution for v3 positions is not enabled in this slice.",
+                "Use v2 or hedera_hts execution paths.",
+                {"liquidityIntentId": liquidity_intent_id, "chain": chain, "dex": dex, "positionType": position_type},
+                exit_code=2,
+            )
+        if adapter.protocol_family not in {"amm_v2", "hedera_hts"}:
+            return fail(
+                "unsupported_liquidity_execution_family",
+                f"Unsupported liquidity execution family '{adapter.protocol_family}'.",
+                "Use v2 or hedera_hts execution paths.",
+                {"liquidityIntentId": liquidity_intent_id, "chain": chain, "dex": dex, "adapterFamily": adapter.protocol_family},
+                exit_code=2,
+            )
+
+        _post_liquidity_status(liquidity_intent_id, "executing")
+        transition_state = "executing"
+
+        execution: dict[str, Any]
+        if adapter.protocol_family == "hedera_hts":
+            if action == "add":
+                execution = adapter.add(
+                    {
+                        "tokenA": str(intent.get("tokenA") or ""),
+                        "tokenB": str(intent.get("tokenB") or ""),
+                        "amountA": str(intent.get("amountA") or ""),
+                        "amountB": str(intent.get("amountB") or ""),
+                        "slippageBps": int(intent.get("slippageBps") or 100),
+                    }
+                )
+            elif action == "remove":
+                execution = adapter.remove(
+                    {
+                        "positionId": str(intent.get("positionRef") or ""),
+                        "percent": int(Decimal(str(intent.get("amountA") or "100")).to_integral_value(rounding=ROUND_DOWN)),
+                        "slippageBps": int(intent.get("slippageBps") or 100),
+                    }
+                )
+            else:
+                raise WalletStoreError(f"Unsupported liquidity action '{action}'.")
+        else:
+            if action == "add":
+                execution = _execute_liquidity_v2_add(intent, chain)
+            elif action == "remove":
+                execution = _execute_liquidity_v2_remove(intent, chain)
+            else:
+                raise WalletStoreError(f"Unsupported liquidity action '{action}'.")
+
+        tx_hash = str(execution.get("txHash") or "").strip()
+        if not tx_hash:
+            raise WalletStoreError("Liquidity execution did not return txHash.")
+        last_tx_hash = tx_hash
+
+        _post_liquidity_status(
+            liquidity_intent_id,
+            "verifying",
+            {
+                "txHash": tx_hash,
+                "positionId": execution.get("positionId"),
+                "details": execution.get("details") if isinstance(execution.get("details"), dict) else None,
+            },
+        )
+        transition_state = "verifying"
+
+        if adapter.protocol_family == "amm_v2":
+            _wait_for_tx_receipt_success(chain, tx_hash)
+
+        _post_liquidity_status(
+            liquidity_intent_id,
+            "filled",
+            {
+                "txHash": tx_hash,
+                "positionId": execution.get("positionId"),
+                "details": execution.get("details") if isinstance(execution.get("details"), dict) else None,
+            },
+        )
+        return ok(
+            "Liquidity intent executed.",
+            liquidityIntentId=liquidity_intent_id,
+            chain=chain,
+            dex=dex,
+            action=action,
+            positionType=position_type,
+            adapterFamily=adapter.protocol_family,
+            status="filled",
+            txHash=tx_hash,
+            positionId=execution.get("positionId"),
+            details=execution.get("details"),
+        )
+    except HederaSdkUnavailable as exc:
+        if transition_state == "executing":
+            try:
+                _post_liquidity_status(liquidity_intent_id, "failed", {"reasonCode": "missing_dependency", "reasonMessage": str(exc), "txHash": last_tx_hash})
+            except Exception:
+                pass
+        return fail("missing_dependency", str(exc), "Install Hedera SDK/plugin bridge and retry.", {"liquidityIntentId": liquidity_intent_id, "chain": chain}, exit_code=2)
+    except SubprocessTimeout as exc:
+        if transition_state == "verifying":
+            try:
+                _post_liquidity_status(
+                    liquidity_intent_id,
+                    "verification_timeout",
+                    {"reasonCode": "verification_timeout", "reasonMessage": str(exc), "txHash": last_tx_hash},
+                )
+            except Exception:
+                pass
+        return fail(
+            "liquidity_verification_failed",
+            str(exc),
+            "Receipt timed out; inspect explorer and retry if needed.",
+            {"liquidityIntentId": liquidity_intent_id, "chain": chain, "txHash": last_tx_hash},
+            exit_code=1,
+        )
+    except LiquidityExecutionError as exc:
+        reason_code = str(exc.reason_code or "liquidity_execution_failed")
+        if transition_state in {"executing", "verifying"}:
+            try:
+                _post_liquidity_status(
+                    liquidity_intent_id,
+                    "failed",
+                    {"reasonCode": reason_code, "reasonMessage": str(exc), "txHash": last_tx_hash},
+                )
+            except Exception:
+                pass
+        return fail(
+            "liquidity_execution_failed",
+            str(exc),
+            "Verify intent payload, wallet balances, pair liquidity, and chain contracts, then retry.",
+            {"liquidityIntentId": liquidity_intent_id, "chain": chain, "txHash": last_tx_hash, "reasonCode": reason_code},
+            exit_code=1,
+        )
+    except (LiquidityAdapterError, WalletStoreError) as exc:
+        if transition_state in {"executing", "verifying"}:
+            fail_status = "failed" if transition_state == "executing" else "failed"
+            try:
+                _post_liquidity_status(liquidity_intent_id, fail_status, {"reasonCode": "liquidity_execution_failed", "reasonMessage": str(exc), "txHash": last_tx_hash})
+            except Exception:
+                pass
+        return fail(
+            "liquidity_execution_failed",
+            str(exc),
+            "Verify intent payload, wallet configuration, and chain contracts, then retry.",
+            {"liquidityIntentId": liquidity_intent_id, "chain": chain, "txHash": last_tx_hash},
+            exit_code=1,
+        )
+    except Exception as exc:
+        if transition_state in {"executing", "verifying"}:
+            try:
+                _post_liquidity_status(liquidity_intent_id, "failed", {"reasonCode": "liquidity_execution_failed", "reasonMessage": str(exc), "txHash": last_tx_hash})
+            except Exception:
+                pass
+        return fail(
+            "liquidity_execution_failed",
+            str(exc),
+            "Inspect runtime liquidity execution path and retry.",
+            {"liquidityIntentId": liquidity_intent_id, "chain": chain, "txHash": last_tx_hash},
+            exit_code=1,
+        )
+
+
+def cmd_liquidity_resume(args: argparse.Namespace) -> int:
+    chk = require_json_flag(args)
+    if chk is not None:
+        return chk
+    liquidity_intent_id = str(args.intent or "").strip()
+    chain = str(args.chain or "").strip()
+    nested = argparse.Namespace(intent=liquidity_intent_id, chain=chain, json=True)
+    return cmd_liquidity_execute(nested)
 
 
 def cmd_liquidity_positions(args: argparse.Namespace) -> int:
@@ -8759,6 +9507,15 @@ def build_parser() -> argparse.ArgumentParser:
     approvals_decide_spot.add_argument("--json", action="store_true")
     approvals_decide_spot.set_defaults(func=cmd_approvals_decide_spot)
 
+    approvals_decide_liquidity = approvals_sub.add_parser("decide-liquidity")
+    approvals_decide_liquidity.add_argument("--intent-id", required=True)
+    approvals_decide_liquidity.add_argument("--decision", required=True, choices=["approve", "reject"])
+    approvals_decide_liquidity.add_argument("--reason-message")
+    approvals_decide_liquidity.add_argument("--source")
+    approvals_decide_liquidity.add_argument("--chain", required=True)
+    approvals_decide_liquidity.add_argument("--json", action="store_true")
+    approvals_decide_liquidity.set_defaults(func=cmd_approvals_decide_liquidity)
+
     approvals_resume_transfer = approvals_sub.add_parser("resume-transfer")
     approvals_resume_transfer.add_argument("--approval-id", required=True)
     approvals_resume_transfer.add_argument("--chain")
@@ -8892,6 +9649,18 @@ def build_parser() -> argparse.ArgumentParser:
     liquidity_discover_pairs.add_argument("--scan-max", default=50)
     liquidity_discover_pairs.add_argument("--json", action="store_true")
     liquidity_discover_pairs.set_defaults(func=cmd_liquidity_discover_pairs)
+
+    liquidity_execute = liquidity_sub.add_parser("execute")
+    liquidity_execute.add_argument("--intent", required=True)
+    liquidity_execute.add_argument("--chain", required=True)
+    liquidity_execute.add_argument("--json", action="store_true")
+    liquidity_execute.set_defaults(func=cmd_liquidity_execute)
+
+    liquidity_resume = liquidity_sub.add_parser("resume")
+    liquidity_resume.add_argument("--intent", required=True)
+    liquidity_resume.add_argument("--chain", required=True)
+    liquidity_resume.add_argument("--json", action="store_true")
+    liquidity_resume.set_defaults(func=cmd_liquidity_resume)
 
     transfers = sub.add_parser("transfers")
     transfers_sub = transfers.add_subparsers(dest="transfers_cmd")

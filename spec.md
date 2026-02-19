@@ -2317,6 +2317,38 @@ Implement the post-Slice-88 liquidity program through runtime adapter preflight 
 
 ---
 
+# Slice 95 Spec Addendum: Auto-Execute Approved Liquidity Intents (UTC 2026-02-19)
+
+## Goal
+1. Close the liquidity execution-depth gap by auto-submitting approved intents and posting tx-aware lifecycle status transitions.
+2. Keep execution scope locked to `amm_v2 + hedera_hts` for this slice.
+3. Preserve deterministic fail-closed behavior for unavailable HTS plugin/runtime dependencies.
+
+## Non-goals
+1. No new liquidity core API endpoint paths.
+2. No v3 on-chain liquidity execution in this pass.
+
+## Locked scope
+1. `apps/agent-runtime/xclaw_agent/cli.py`
+2. `apps/agent-runtime/xclaw_agent/liquidity_adapter.py`
+3. `apps/agent-runtime/tests/test_liquidity_cli.py`
+4. `apps/agent-runtime/tests/test_liquidity_adapter.py`
+5. `apps/network-web/src/app/api/v1/management/approvals/decision/route.ts`
+6. `packages/shared-schemas/json/management-approval-decision-request.schema.json`
+7. `apps/network-web/src/lib/non-telegram-agent-prod.ts`
+8. `infrastructure/scripts/management-approvals-liquidity-tests.mjs`
+9. `package.json`
+
+## Acceptance checks
+- `xclaw-agent liquidity execute --intent <liq_id> --chain <chain> --json` enforces actionable-state/family guards and status transitions.
+- `xclaw-agent liquidity add/remove ... --json` auto-runs execute path when proposal status is `approved`.
+- `POST /api/v1/management/approvals/decision` supports liquidity decision payload and queues runtime continuation on approve.
+- `python3 -m unittest apps/agent-runtime/tests/test_liquidity_adapter.py -v` passes.
+- `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v` passes.
+- `npm run test:management:liquidity:decision` exists and is runnable (blockers must be explicit if env auth/session cannot bootstrap).
+
+---
+
 # Slice 95 Spec Addendum: Hedera EVM + HTS Evidence Closure (UTC 2026-02-19)
 
 ## Goal
@@ -2349,6 +2381,35 @@ Implement the post-Slice-88 liquidity program through runtime adapter preflight 
 - `XCLAW_AGENT_API_KEY=... XCLAW_AGENT_ID=... apps/agent-runtime/bin/xclaw-agent liquidity add --chain hedera_testnet --dex saucerswap --token-a WHBAR --token-b SAUCE --amount-a 1 --amount-b 1 --slippage-bps 100 --json`
 - `apps/agent-runtime/bin/xclaw-agent liquidity quote-add --chain hedera_testnet --dex hedera_hts --token-a WHBAR --token-b SAUCE --amount-a 1 --amount-b 1 --position-type v2 --slippage-bps 100 --json`
 - `XCLAW_AGENT_API_KEY=... XCLAW_AGENT_ID=... apps/agent-runtime/bin/xclaw-agent liquidity add --chain hedera_testnet --dex hedera_hts --token-a WHBAR --token-b SAUCE --amount-a 1 --amount-b 1 --slippage-bps 100 --json`
+- Required gates (sequential):
+  - `npm run db:parity`
+  - `npm run seed:reset`
+  - `npm run seed:load`
+  - `npm run seed:verify`
+  - `npm run build`
+  - `pm2 restart all`
+
+---
+
+# Slice 95A Spec Addendum: Readiness + Deterministic Preflight (UTC 2026-02-19)
+
+## Goal
+1. Remove non-deterministic environment blockers before tx-hash evidence pass.
+2. Ensure management liquidity route test bootstraps without manual token file maintenance.
+3. Keep HTS plugin bridge importable/callable with fail-closed runtime behavior.
+4. Emit deterministic reason codes for EVM add pre-submit failures.
+
+## Locked scope
+1. `infrastructure/scripts/management-approvals-liquidity-tests.mjs`
+2. `apps/agent-runtime/xclaw_agent/hedera_hts_plugin.py`
+3. `apps/agent-runtime/xclaw_agent/cli.py`
+4. `apps/agent-runtime/tests/test_liquidity_cli.py`
+5. `apps/network-web/src/app/skill-install.sh/route.ts`
+
+## Acceptance checks
+- `python3 -m unittest apps/agent-runtime/tests/test_liquidity_adapter.py -v`
+- `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v`
+- `npm run test:management:liquidity:decision` (pass expected when local API host is reachable)
 - Required gates (sequential):
   - `npm run db:parity`
   - `npm run seed:reset`

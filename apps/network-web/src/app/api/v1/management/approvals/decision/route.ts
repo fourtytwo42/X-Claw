@@ -11,7 +11,11 @@ import { errorResponse, internalErrorResponse, successResponse } from '@/lib/err
 import { parseJsonBody } from '@/lib/http';
 import { makeId } from '@/lib/ids';
 import { requireManagementWriteAuth } from '@/lib/management-auth';
-import { buildWebTradeDecisionProdMessage, dispatchNonTelegramAgentProd } from '@/lib/non-telegram-agent-prod';
+import {
+  buildWebLiquidityDecisionProdMessage,
+  buildWebTradeDecisionProdMessage,
+  dispatchNonTelegramAgentProd
+} from '@/lib/non-telegram-agent-prod';
 import { getRequestId } from '@/lib/request-id';
 import { validatePayload } from '@/lib/validation';
 
@@ -19,11 +23,26 @@ export const runtime = 'nodejs';
 
 type ApprovalDecisionRequest = {
   agentId: string;
-  tradeId: string;
+  subjectType?: 'trade' | 'liquidity';
+  tradeId?: string;
+  liquidityIntentId?: string;
   decision: 'approve' | 'reject';
   reasonCode?: string;
   reasonMessage?: string;
 };
+
+type DecisionSubject = 'trade' | 'liquidity';
+
+function resolveDecisionSubject(body: ApprovalDecisionRequest): DecisionSubject {
+  const raw = String(body.subjectType ?? '').trim().toLowerCase();
+  if (raw === 'liquidity') {
+    return 'liquidity';
+  }
+  if (raw === 'trade') {
+    return 'trade';
+  }
+  return body.liquidityIntentId ? 'liquidity' : 'trade';
+}
 
 function runtimeCanonicalApprovalDecisionsEnabled(): boolean {
   const raw = (process.env.XCLAW_RUNTIME_CANONICAL_APPROVAL_DECISIONS ?? '').trim().toLowerCase();
@@ -157,6 +176,64 @@ function invokeRuntimeDecisionSync(input: {
   };
 }
 
+function invokeRuntimeLiquidityDecisionSync(input: {
+  req: NextRequest;
+  agentId: string;
+  chainKey: string;
+  liquidityIntentId: string;
+  decision: 'approve' | 'reject';
+  reasonMessage?: string | null;
+}): RuntimeDecisionInvokeResult {
+  const runtimeBin = resolveRuntimeBin();
+  const runtimeArgs = [
+    'approvals',
+    'decide-liquidity',
+    '--intent-id',
+    input.liquidityIntentId,
+    '--decision',
+    input.decision,
+    '--chain',
+    input.chainKey,
+    '--source',
+    'web',
+    '--json'
+  ];
+  const reason = String(input.reasonMessage ?? '').trim();
+  if (reason) {
+    runtimeArgs.push('--reason-message', reason);
+  }
+  const child = spawnSync(runtimeBin, runtimeArgs, {
+    encoding: 'utf8',
+    timeout: runtimeDecisionTimeoutMs(),
+    env: runtimeSpawnEnv(input.req, input.agentId, input.chainKey)
+  });
+  const stdout = String(child.stdout ?? '');
+  const stderr = String(child.stderr ?? '');
+  let payload: Record<string, unknown> | undefined;
+  const lines = stdout
+    .split(/\r?\n/)
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0);
+  if (lines.length > 0) {
+    try {
+      const parsed = JSON.parse(lines[lines.length - 1]);
+      if (parsed && typeof parsed === 'object') {
+        payload = parsed as Record<string, unknown>;
+      }
+    } catch {}
+  }
+  const timedOut = child.error?.name === 'Error' && String(child.error?.message || '').toLowerCase().includes('timed out');
+  return {
+    queued: false,
+    runtimeBin,
+    runtimeArgs,
+    payload,
+    runtimeExitStatus: child.status,
+    timeout: timedOut,
+    stderrSummary: stderr.slice(0, 500),
+  };
+}
+
 function spawnResumeSpotInBackground(input: {
   req: NextRequest;
   agentId: string;
@@ -184,6 +261,39 @@ function spawnResumeSpotInBackground(input: {
       ok: false,
       code: 'resume_queue_failed',
       message: String((error as Error)?.message || 'Failed to queue background resume process.'),
+      runtimeBin,
+      runtimeArgs
+    };
+  }
+}
+
+function spawnLiquidityExecuteInBackground(input: {
+  req: NextRequest;
+  agentId: string;
+  liquidityIntentId: string;
+  chainKey: string;
+}): Record<string, unknown> {
+  const runtimeBin = resolveRuntimeBin();
+  const runtimeArgs = ['liquidity', 'execute', '--intent', input.liquidityIntentId, '--chain', input.chainKey, '--json'];
+  try {
+    const child = spawn(runtimeBin, runtimeArgs, {
+      detached: true,
+      stdio: 'ignore',
+      env: runtimeSpawnEnv(input.req, input.agentId, input.chainKey)
+    });
+    child.unref();
+    return {
+      ok: true,
+      code: 'liquidity_execute_queued_background',
+      message: 'Liquidity execute queued in background runtime process.',
+      runtimeBin,
+      runtimeArgs
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      code: 'liquidity_execute_queue_failed',
+      message: String((error as Error)?.message || 'Failed to queue background liquidity execute process.'),
       runtimeBin,
       runtimeArgs
     };
@@ -234,6 +344,56 @@ function enqueueRuntimeDecision(input: {
       ok: false,
       code: 'runtime_decision_queue_failed',
       message: String((error as Error)?.message || 'Failed to queue runtime decision.'),
+      runtimeBin,
+      runtimeArgs
+    };
+  }
+}
+
+function enqueueRuntimeLiquidityDecision(input: {
+  req: NextRequest;
+  agentId: string;
+  liquidityIntentId: string;
+  chainKey: string;
+  decision: 'approve' | 'reject';
+  reasonMessage?: string | null;
+}): Record<string, unknown> {
+  const runtimeBin = resolveRuntimeBin();
+  const runtimeArgs = [
+    'approvals',
+    'decide-liquidity',
+    '--intent-id',
+    input.liquidityIntentId,
+    '--decision',
+    input.decision,
+    '--chain',
+    input.chainKey,
+    '--source',
+    'web',
+    '--json'
+  ];
+  const reason = String(input.reasonMessage ?? '').trim();
+  if (reason) {
+    runtimeArgs.push('--reason-message', reason);
+  }
+  try {
+    const child = spawn(runtimeBin, runtimeArgs, {
+      detached: true,
+      stdio: 'ignore',
+      env: runtimeSpawnEnv(input.req, input.agentId, input.chainKey)
+    });
+    child.unref();
+    return {
+      ok: true,
+      code: 'runtime_liquidity_decision_queued',
+      runtimeBin,
+      runtimeArgs
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      code: 'runtime_liquidity_decision_queue_failed',
+      message: String((error as Error)?.message || 'Failed to queue runtime liquidity decision.'),
       runtimeBin,
       runtimeArgs
     };
@@ -336,7 +496,7 @@ export async function POST(req: NextRequest) {
         {
           code: 'payload_invalid',
           message: 'Approval decision payload does not match schema.',
-          actionHint: 'Provide agentId, tradeId, and decision.',
+          actionHint: 'Provide agentId, decision, and exactly one of tradeId or liquidityIntentId.',
           details: validated.details
         },
         requestId
@@ -344,12 +504,131 @@ export async function POST(req: NextRequest) {
     }
 
     const body = validated.data;
+    const subjectType = resolveDecisionSubject(body);
+    const tradeId = String(body.tradeId ?? '').trim();
+    const liquidityIntentId = String(body.liquidityIntentId ?? '').trim();
+    if (subjectType === 'trade' && !tradeId) {
+      return errorResponse(
+        400,
+        {
+          code: 'payload_invalid',
+          message: 'tradeId is required for trade approval decisions.',
+          actionHint: 'Provide tradeId and retry.'
+        },
+        requestId
+      );
+    }
+    if (subjectType === 'liquidity' && !liquidityIntentId) {
+      return errorResponse(
+        400,
+        {
+          code: 'payload_invalid',
+          message: 'liquidityIntentId is required for liquidity approval decisions.',
+          actionHint: 'Provide liquidityIntentId and retry.'
+        },
+        requestId
+      );
+    }
     const auth = await requireManagementWriteAuth(req, requestId, body.agentId);
     if (!auth.ok) {
       return auth.response;
     }
 
     if (runtimeCanonicalApprovalDecisionsEnabled()) {
+      if (subjectType === 'liquidity') {
+        const liqRow = await dbQuery<{ status: string; chain_key: string }>(
+          `
+          select status, chain_key
+          from liquidity_intents
+          where liquidity_intent_id = $1 and agent_id = $2
+          limit 1
+          `,
+          [liquidityIntentId, body.agentId]
+        );
+        if ((liqRow.rowCount ?? 0) === 0) {
+          return errorResponse(
+            404,
+            {
+              code: 'payload_invalid',
+              message: 'Liquidity intent was not found for this agent.',
+              actionHint: 'Verify liquidityIntentId and retry.'
+            },
+            requestId
+          );
+        }
+        const chainKey = liqRow.rows[0].chain_key;
+        const invoked = invokeRuntimeLiquidityDecisionSync({
+          req,
+          agentId: body.agentId,
+          liquidityIntentId,
+          chainKey,
+          decision: body.decision,
+          reasonMessage: body.reasonMessage ?? null,
+        });
+        await dbQuery(
+          `
+          insert into management_audit_log (
+            audit_id, agent_id, management_session_id, action_type, action_status,
+            public_redacted_payload, private_payload, user_agent, created_at
+          ) values ($1, $2, $3, 'approval.liquidity.decision.runtime', $4, $5::jsonb, $6::jsonb, $7, now())
+          `,
+          [
+            makeId('aud'),
+            body.agentId,
+            auth.session.sessionId,
+            invoked.runtimeExitStatus === 0 ? 'accepted' : 'failed',
+            JSON.stringify({ subjectType: 'liquidity', liquidityIntentId, decision: body.decision, mode: 'runtime_canonical' }),
+            JSON.stringify({ reasonCode: body.reasonCode ?? null, reasonMessage: body.reasonMessage ?? null, runtime: invoked.payload ?? null }),
+            req.headers.get('user-agent')
+          ]
+        );
+        const runtimeOk = invoked.runtimeExitStatus === 0 && Boolean(invoked.payload?.ok);
+        if (runtimeOk) {
+          return successResponse(
+            {
+              ok: true,
+              decisionAccepted: true,
+              source: 'runtime',
+              subjectType: 'liquidity',
+              liquidityIntentId,
+              chainKey,
+              runtimeDecision: invoked.payload
+            },
+            200,
+            requestId
+          );
+        }
+        const queued = enqueueRuntimeLiquidityDecision({
+          req,
+          agentId: body.agentId,
+          liquidityIntentId,
+          chainKey,
+          decision: body.decision,
+          reasonMessage: body.reasonMessage ?? null,
+        });
+        console.info('[management.approvals.decision] runtime-canonical liquidity queued', {
+          requestId,
+          liquidityIntentId,
+          chainKey,
+          invoked,
+          queued,
+        });
+        return successResponse(
+          {
+            ok: true,
+            decisionAccepted: true,
+            source: 'runtime',
+            subjectType: 'liquidity',
+            liquidityIntentId,
+            chainKey,
+            runtimeDecision: invoked.payload ?? null,
+            runtimeQueued: queued
+          },
+          202,
+          requestId
+        );
+      }
+
       const tradeRow = await dbQuery<{ status: string; chain_key: string }>(
         `
         select status, chain_key
@@ -357,7 +636,7 @@ export async function POST(req: NextRequest) {
         where trade_id = $1 and agent_id = $2
         limit 1
         `,
-        [body.tradeId, body.agentId]
+        [tradeId, body.agentId]
       );
       if ((tradeRow.rowCount ?? 0) === 0) {
         return errorResponse(
@@ -374,7 +653,7 @@ export async function POST(req: NextRequest) {
       const invoked = invokeRuntimeDecisionSync({
         req,
         agentId: body.agentId,
-        tradeId: body.tradeId,
+        tradeId,
         chainKey,
         decision: body.decision,
         reasonMessage: body.reasonMessage ?? null,
@@ -391,7 +670,7 @@ export async function POST(req: NextRequest) {
           body.agentId,
           auth.session.sessionId,
           invoked.runtimeExitStatus === 0 ? 'accepted' : 'failed',
-          JSON.stringify({ tradeId: body.tradeId, decision: body.decision, mode: 'runtime_canonical' }),
+          JSON.stringify({ tradeId, decision: body.decision, mode: 'runtime_canonical' }),
           JSON.stringify({ reasonCode: body.reasonCode ?? null, reasonMessage: body.reasonMessage ?? null, runtime: invoked.payload ?? null }),
           req.headers.get('user-agent')
         ]
@@ -404,7 +683,7 @@ export async function POST(req: NextRequest) {
             ok: true,
             decisionAccepted: true,
             source: 'runtime',
-            tradeId: body.tradeId,
+            tradeId,
             chainKey,
             runtimeDecision: invoked.payload
           },
@@ -415,14 +694,14 @@ export async function POST(req: NextRequest) {
       const queued = enqueueRuntimeDecision({
         req,
         agentId: body.agentId,
-        tradeId: body.tradeId,
+        tradeId,
         chainKey,
         decision: body.decision,
         reasonMessage: body.reasonMessage ?? null,
       });
       console.info('[management.approvals.decision] runtime-canonical queued', {
         requestId,
-        tradeId: body.tradeId,
+        tradeId,
         chainKey,
         invoked,
         queued,
@@ -432,12 +711,164 @@ export async function POST(req: NextRequest) {
           ok: true,
           decisionAccepted: true,
           source: 'runtime',
-          tradeId: body.tradeId,
+          tradeId,
           chainKey,
           runtimeDecision: invoked.payload ?? null,
           runtimeQueued: queued
         },
         202,
+        requestId
+      );
+    }
+
+    if (subjectType === 'liquidity') {
+      const targetStatus = body.decision === 'approve' ? 'approved' : 'rejected';
+      const result = await withTransaction(async (client) => {
+        const liq = await client.query<{ status: string; chain_key: string }>(
+          `
+          select status, chain_key
+          from liquidity_intents
+          where liquidity_intent_id = $1
+            and agent_id = $2
+          limit 1
+          `,
+          [liquidityIntentId, body.agentId]
+        );
+        if (liq.rowCount === 0) {
+          return { ok: false as const, kind: 'missing' as const };
+        }
+        const currentStatus = liq.rows[0].status;
+        if (currentStatus !== 'approval_pending') {
+          return { ok: false as const, kind: 'transition' as const, currentStatus };
+        }
+        await client.query(
+          `
+          update liquidity_intents
+          set
+            status = $1,
+            reason_code = $2,
+            reason_message = $3,
+            updated_at = now()
+          where liquidity_intent_id = $4
+          `,
+          [targetStatus, body.reasonCode ?? null, body.reasonMessage ?? null, liquidityIntentId]
+        );
+        await client.query(
+          `
+          insert into management_audit_log (
+            audit_id, agent_id, management_session_id, action_type, action_status,
+            public_redacted_payload, private_payload, user_agent, created_at
+          ) values ($1, $2, $3, 'approval.liquidity.decision', 'accepted', $4::jsonb, $5::jsonb, $6, now())
+          `,
+          [
+            makeId('aud'),
+            body.agentId,
+            auth.session.sessionId,
+            JSON.stringify({ subjectType: 'liquidity', liquidityIntentId, decision: body.decision }),
+            JSON.stringify({ reasonCode: body.reasonCode ?? null, reasonMessage: body.reasonMessage ?? null }),
+            req.headers.get('user-agent')
+          ]
+        );
+        return { ok: true as const, status: targetStatus, chainKey: liq.rows[0].chain_key };
+      });
+
+      if (!result.ok) {
+        if (result.kind === 'missing') {
+          return errorResponse(
+            404,
+            {
+              code: 'payload_invalid',
+              message: 'Liquidity intent was not found for this agent.',
+              actionHint: 'Verify liquidityIntentId and retry.'
+            },
+            requestId
+          );
+        }
+        return errorResponse(
+          409,
+          {
+            code: 'liquidity_invalid_transition',
+            message: 'Liquidity intent is not in approval_pending state.',
+            actionHint: 'Refresh queue and retry only pending items.',
+            details: { currentStatus: result.currentStatus }
+          },
+          requestId
+        );
+      }
+
+      const queued = {
+        requestId,
+        agentId: body.agentId,
+        liquidityIntentId,
+        chainKey: result.chainKey,
+        decision: body.decision,
+        reasonMessage: body.reasonMessage ?? null
+      };
+      setImmediate(() => {
+        void (async () => {
+          if (queued.decision === 'approve') {
+            const runtimeExecute = spawnLiquidityExecuteInBackground({
+              req,
+              agentId: queued.agentId,
+              liquidityIntentId: queued.liquidityIntentId,
+              chainKey: queued.chainKey
+            });
+            console.info('[management.approvals.decision] liquidity runtime execute dispatch', {
+              requestId: queued.requestId,
+              liquidityIntentId: queued.liquidityIntentId,
+              chainKey: queued.chainKey,
+              runtimeExecute
+            });
+            return;
+          }
+
+          const agentProdDecision = await dispatchNonTelegramAgentProd({
+            allowTelegramLastChannel: true,
+            message: buildWebLiquidityDecisionProdMessage({
+              decision: queued.decision,
+              liquidityIntentId: queued.liquidityIntentId,
+              chainKey: queued.chainKey,
+              source: 'web_management_liquidity_decision',
+              reasonMessage: queued.reasonMessage
+            })
+          });
+          console.info('[management.approvals.decision] liquidity prod decision dispatch', {
+            requestId: queued.requestId,
+            liquidityIntentId: queued.liquidityIntentId,
+            chainKey: queued.chainKey,
+            agentProdDecision
+          });
+        })().catch((error) => {
+          console.error('[management.approvals.decision] liquidity async dispatch failure', {
+            requestId: queued.requestId,
+            liquidityIntentId: queued.liquidityIntentId,
+            error: String((error as Error)?.message || error)
+          });
+        });
+      });
+
+      return successResponse(
+        {
+          ok: true,
+          subjectType: 'liquidity',
+          liquidityIntentId,
+          status: result.status,
+          chainKey: result.chainKey,
+          runtimeResume: {
+            ok: true,
+            code: queued.decision === 'approve' ? 'liquidity_execute_dispatch_async' : 'decision_dispatch_async',
+            message:
+              queued.decision === 'approve'
+                ? 'Decision accepted; liquidity execute dispatch queued asynchronously.'
+                : 'Decision accepted; agent prod dispatch queued asynchronously.'
+          },
+          agentProdDecision: {
+            attempted: false,
+            skipped: true,
+            reason: 'queued_async'
+          }
+        },
+        200,
         requestId
       );
     }
@@ -454,7 +885,7 @@ export async function POST(req: NextRequest) {
           and agent_id = $2
         limit 1
         `,
-        [body.tradeId, body.agentId]
+        [tradeId, body.agentId]
       );
 
       if (trade.rowCount === 0) {
@@ -476,7 +907,7 @@ export async function POST(req: NextRequest) {
           updated_at = now()
         where trade_id = $4
         `,
-        [targetStatus, body.reasonCode ?? null, body.reasonMessage ?? null, body.tradeId]
+        [targetStatus, body.reasonCode ?? null, body.reasonMessage ?? null, tradeId]
       );
 
       await client.query(
@@ -487,7 +918,7 @@ export async function POST(req: NextRequest) {
         [
           makeId('evt'),
           body.agentId,
-          body.tradeId,
+          tradeId,
           eventType,
           JSON.stringify({
             decision: body.decision,
@@ -509,7 +940,7 @@ export async function POST(req: NextRequest) {
           makeId('aud'),
           body.agentId,
           auth.session.sessionId,
-          JSON.stringify({ tradeId: body.tradeId, decision: body.decision }),
+          JSON.stringify({ tradeId, decision: body.decision }),
           JSON.stringify({ reasonCode: body.reasonCode ?? null, reasonMessage: body.reasonMessage ?? null }),
           req.headers.get('user-agent')
         ]
@@ -546,7 +977,7 @@ export async function POST(req: NextRequest) {
     const queued = {
       requestId,
       agentId: body.agentId,
-      tradeId: body.tradeId,
+      tradeId,
       chainKey: result.chainKey,
       decision: body.decision,
       reasonMessage: body.reasonMessage ?? null
@@ -653,7 +1084,7 @@ export async function POST(req: NextRequest) {
     return successResponse(
       {
         ok: true,
-        tradeId: body.tradeId,
+        tradeId,
         status: result.status,
         chainKey: result.chainKey,
         runtimeResume: {

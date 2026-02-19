@@ -2,12 +2,24 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "additionalProperties": false,
-  "required": ["agentId", "tradeId", "decision"],
+  "required": ["agentId", "decision"],
   "properties": {
     "agentId": { "type": "string", "minLength": 1 },
+    "subjectType": { "type": "string", "enum": ["trade", "liquidity"] },
     "tradeId": { "type": "string", "minLength": 1 },
+    "liquidityIntentId": { "type": "string", "minLength": 1 },
     "decision": { "type": "string", "enum": ["approve", "reject"] },
     "reasonCode": { "type": "string", "minLength": 1, "maxLength": 64 },
     "reasonMessage": { "type": "string", "minLength": 1, "maxLength": 280 }
-  }
+  },
+  "oneOf": [
+    {
+      "required": ["tradeId"],
+      "not": { "required": ["liquidityIntentId"] }
+    },
+    {
+      "required": ["liquidityIntentId"],
+      "not": { "required": ["tradeId"] }
+    }
+  ]
 }

@@ -1233,6 +1233,9 @@ Delegated runtime CLI commands that must exist:
 - `xclaw-agent liquidity quote-add --chain <chain_key> --dex <dex> --token-a <token_or_symbol> --token-b <token_or_symbol> --amount-a <amount_a> --amount-b <amount_b> [--position-type <v2|v3>] [--slippage-bps <bps>] --json`
 - `xclaw-agent liquidity quote-remove --chain <chain_key> --dex <dex> --position-id <position_id> [--percent <1-100>] [--position-type <v2|v3>] --json`
 - `xclaw-agent liquidity discover-pairs --chain <chain_key> --dex <dex> [--min-reserve <base_units>] [--limit <1-100>] [--scan-max <1-2000>] --json`
+- `xclaw-agent liquidity execute --intent <liquidity_intent_id> --chain <chain_key> --json`
+- `xclaw-agent liquidity resume --intent <liquidity_intent_id> --chain <chain_key> --json`
+- `xclaw-agent approvals decide-liquidity --intent-id <liquidity_intent_id> --decision <approve|reject> --chain <chain_key> [--source <web|telegram|runtime>] [--reason-message <text>] --json`
 - `xclaw-agent report send --trade <trade_id> --json`
 - `xclaw-agent chat poll --chain <chain_key> --json`
 - `xclaw-agent chat post --message <message> --chain <chain_key> --json`
@@ -1257,11 +1260,17 @@ Delegated runtime CLI commands that must exist:
 Liquidity adapter execution contract:
 - Runtime routes liquidity commands by `(chain, dex, position_type)` using chain-config `liquidityProtocols`.
 - `liquidity add/remove` must run adapter preflight quote simulation before proposal submission.
+- `liquidity add/remove` auto-executes when resulting intent status is `approved` (no extra manual execute step in normal flow).
+- Management liquidity approvals must auto-queue runtime continuation: `xclaw-agent liquidity execute --intent <id> --chain <chain_key> --json`.
 - `liquidity quote-add` uses EVM router quote + ERC20 metadata only for `amm_v2` / `amm_v3` families.
 - `liquidity quote-add` for `hedera_hts` is router-independent and must execute adapter preflight without requiring `coreContracts.router`/ERC20 metadata.
 - `liquidity discover-pairs` must scan v2 DEX factory pairs (`allPairsLength/allPairs`) and return ranked reserve-filtered candidates with deterministic failures `liquidity_pair_discovery_failed` / `liquidity_no_viable_pair`.
+- `liquidity execute/resume` runtime execution scope for Slice 95 is limited to `amm_v2` and `hedera_hts`; `amm_v3` execution must fail with `unsupported_liquidity_execution_family`.
+- Runtime liquidity execution must persist lifecycle transitions through `/api/v1/liquidity/{intentId}/status`: `approved -> executing -> verifying -> filled|failed|verification_timeout` with `txHash` when available.
+- `amm_v2` add execution must run deterministic pre-submit checks (wallet token/native balance, pair reserves, router simulation) and emit explicit preflight reason codes (`liquidity_preflight_*`) when blocked.
+- `liquidity remove` execution derives token pair and LP amount from stored position snapshot + on-chain LP balance percent.
 - Unsupported adapter combinations must return `unsupported_liquidity_adapter`.
-- Hedera HTS-native liquidity paths must fail closed with `missing_dependency` when Hedera SDK plugin is unavailable.
+- Hedera HTS-native liquidity paths use plugin bridge module `xclaw_agent.hedera_hts_plugin:execute_liquidity` by default (override with `XCLAW_HEDERA_HTS_PLUGIN`) and may dispatch to an external bridge command via `XCLAW_HEDERA_HTS_BRIDGE_CMD`; missing SDK/bridge prerequisites must fail closed with `missing_dependency`.
 
 Skill exposure constraint:
 - Limit-order commands remain runtime-capable but are not exposed through `xclaw_agent_skill.py` command surface.
@@ -3102,7 +3111,7 @@ Limitations / notes:
   - `promptCleanup`,
   - `actionHint`.
 6. Web/Telegram parity:
-- all management decision routes (trade/transfer/policy) must dispatch runtime cleanup and surface `promptCleanup` metadata in runtime/web decision output.
+- all management decision routes (trade/liquidity/transfer/policy) must dispatch runtime cleanup/runtime continuation and surface decision metadata in runtime/web outputs.
 - Telegram callback handlers must not perform immediate pre-clear; runtime decision path performs canonical clear.
   - `GET /api/v1/management/agent-state`,
   - `POST /api/v1/management/approvals/decision`,

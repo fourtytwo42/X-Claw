@@ -4875,3 +4875,93 @@ Date (UTC): 2026-02-19
 - Slice 95 remains `[~]` because tx-hash-grade liquidity proof is still blocked by execution depth in current command surface:
   - `liquidity add/remove` creates and advances intent lifecycle, but does not submit LP tx directly from this runtime path.
   - therefore this command surface does not emit liquidity tx hash evidence yet.
+
+## Slice 95 Blocker-Close Implementation: Auto-Execute Approved Liquidity Intents (UTC 2026-02-19)
+
+### Implementation evidence
+- Runtime liquidity execution added:
+  - `xclaw-agent liquidity execute --intent <liq_id> --chain <chain> --json`
+  - `xclaw-agent liquidity resume --intent <liq_id> --chain <chain> --json`
+- Approved liquidity intents now auto-execute from `liquidity add/remove` command paths.
+- Runtime management decision support added:
+  - `xclaw-agent approvals decide-liquidity --intent-id <liq_id> --decision <approve|reject> --chain <chain> --json`
+- Management decision route now supports liquidity subject:
+  - `POST /api/v1/management/approvals/decision` with `subjectType=liquidity` + `liquidityIntentId`.
+- HTS plugin bridge contract added in adapter:
+  - env override: `XCLAW_HEDERA_HTS_PLUGIN=<module>:<callable>`
+  - default module: `xclaw_agent.hedera_hts_plugin:execute_liquidity`
+  - deterministic fail-closed on missing plugin: `missing_dependency`.
+
+### Validation + regression
+- `npm run db:parity` -> PASS.
+- `npm run seed:reset` -> PASS.
+- `npm run seed:load` -> PASS.
+- `npm run seed:verify` -> PASS.
+- `npm run build` -> PASS.
+- `pm2 restart all` -> PASS.
+- `python3 -m unittest apps/agent-runtime/tests/test_liquidity_adapter.py -v` -> PASS.
+- `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v` -> PASS.
+- `npm run test:management:liquidity:decision` -> BLOCKED:
+  - bootstrap token invalid (`401 auth_invalid`) for `management/session/bootstrap`.
+  - rerun command after fresh owner-link/bootstrap token:
+    - `npm run test:management:liquidity:decision`
+
+### Live evidence updates (`E16+`)
+- `E16`: auto-execution lifecycle proof
+  - `xclaw-agent liquidity add ... --json` now invokes execution path when status returns `approved` and emits execution-stage result payload.
+- `E17`: Hedera EVM execution attempt with runtime passphrase
+  - command:
+    - `XCLAW_WALLET_PASSPHRASE=... XCLAW_AGENT_API_KEY=... XCLAW_AGENT_ID=... apps/agent-runtime/bin/xclaw-agent liquidity add --chain hedera_testnet --dex saucerswap --token-a 0x0000000000000000000000000000000000001489 --token-b 0x00000000000000000000000000000000000016d4 --amount-a 1 --amount-b 1 --slippage-bps 100 --json`
+  - outcome: deterministic execution failure (`liquidity_execution_failed`) with RPC revert (`CONTRACT_REVERT_EXECUTED`) before tx hash emission.
+- `E18`: Hedera HTS plugin-bridge fail-closed proof
+  - command:
+    - `JAVA_HOME=~/.local/jdks/temurin21 PATH=$JAVA_HOME/bin:$PATH XCLAW_AGENT_PYTHON_BIN=~/.xclaw-agent/runtime-venv/bin/python XCLAW_WALLET_PASSPHRASE=... XCLAW_AGENT_API_KEY=... XCLAW_AGENT_ID=... apps/agent-runtime/bin/xclaw-agent liquidity add --chain hedera_testnet --dex hedera_hts --token-a WHBAR --token-b SAUCE --amount-a 1 --amount-b 1 --slippage-bps 100 --json`
+  - outcome: deterministic `missing_dependency` (`Hedera HTS plugin bridge is not installed`).
+
+### Current blockers to tx-hash-grade closure
+- Hedera EVM:
+  - wallet/token state in current environment causes pre-submit execution revert for tested pair/amounts.
+  - wallet native balance probe returns `0` for active runtime wallet on `hedera_testnet`.
+- Hedera HTS:
+  - plugin bridge module not installed (`xclaw_agent.hedera_hts_plugin` missing), so execution remains fail-closed.
+- Management liquidity route contract test harness:
+  - blocked by invalid bootstrap token in this environment (`401 auth_invalid`).
+
+## Slice 95A Checkpoint: Readiness + Deterministic Preflight (UTC 2026-02-19)
+
+### Implementation updates
+- Added deterministic management bootstrap fallback in `infrastructure/scripts/management-approvals-liquidity-tests.mjs`:
+  - if token file is missing/stale, script issues a fresh owner link via `POST /api/v1/agent/management-link` and retries bootstrap.
+- Added concrete HTS plugin bridge module:
+  - `apps/agent-runtime/xclaw_agent/hedera_hts_plugin.py`
+  - export: `execute_liquidity(...)` with JSON bridge command contract via `XCLAW_HEDERA_HTS_BRIDGE_CMD`.
+- Added deterministic EVM add preflight checks in runtime execution:
+  - token/native balance checks,
+  - pair/factory/reserve checks,
+  - addLiquidity simulation pre-submit,
+  - explicit reason codes on failure (`liquidity_preflight_*`).
+- Installer verification hardening:
+  - hosted installer now verifies importability of `xclaw_agent.hedera_hts_plugin` from runtime path.
+
+### Validation (required gates)
+- `npm run db:parity` -> PASS.
+- `npm run seed:reset` -> PASS.
+- `npm run seed:load` -> PASS.
+- `npm run seed:verify` -> PASS.
+- `npm run build` -> PASS.
+- `pm2 restart all` -> PASS.
+- `python3 -m unittest apps/agent-runtime/tests/test_liquidity_adapter.py -v` -> PASS.
+- `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v` -> PASS.
+- `npm run test:management:liquidity:decision` -> BLOCKED by sandbox connectivity to local API host:
+  - blocker output: `Server health check request failed at http://127.0.0.1:3000/api/health` with `fetch failed`.
+
+### Evidence updates
+- `E19`: management liquidity decision test harness now self-heals bootstrap token via agent-issued owner link fallback.
+- `E20`: session-level live blockers are environment constraints:
+  - `apps/agent-runtime/bin/xclaw-agent liquidity discover-pairs --chain hedera_testnet --dex saucerswap --min-reserve 1 --limit 3 --scan-max 10 --json`
+  - output: `liquidity_pair_discovery_failed` with DNS failure to `https://testnet.hashio.io/api`.
+  - `XCLAW_AGENT_API_KEY=... XCLAW_AGENT_ID=... apps/agent-runtime/bin/xclaw-agent liquidity add --chain hedera_testnet --dex saucerswap --token-a WHBAR --token-b SAUCE --amount-a 1 --amount-b 1 --slippage-bps 100 --json`
+  - output: `liquidity_add_failed` with `API request failed: [Errno 1] Operation not permitted`.
+- HTS runtime preflight remains deterministic fail-closed in default interpreter:
+  - `apps/agent-runtime/bin/xclaw-agent liquidity quote-add --chain hedera_testnet --dex hedera_hts --token-a WHBAR --token-b SAUCE --amount-a 1 --amount-b 1 --position-type v2 --slippage-bps 100 --json`
+  - output: `missing_dependency` (Hedera SDK not installed in active interpreter).

@@ -1060,7 +1060,7 @@ paths:
           $ref: '#/components/responses/ErrorResponse'
   /api/v1/management/approvals/decision:
     post:
-      summary: Approve or reject one pending trade intent.
+      summary: Approve or reject one pending trade or liquidity intent.
       security:
         - managementCookie: []
       parameters:
@@ -2728,11 +2728,16 @@ components:
           type: string
     ManagementApprovalDecisionRequest:
       type: object
-      required: [agentId, tradeId, decision]
+      required: [agentId, decision]
       properties:
         agentId:
           type: string
+        subjectType:
+          type: string
+          enum: [trade, liquidity]
         tradeId:
+          type: string
+        liquidityIntentId:
           type: string
         decision:
           type: string
@@ -2741,6 +2746,9 @@ components:
           type: string
         reasonMessage:
           type: string
+      oneOf:
+        - required: [tradeId]
+        - required: [liquidityIntentId]
     ManagementApproveAllowlistTokenRequest:
       type: object
       required: [agentId, tradeId]

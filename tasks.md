@@ -2500,3 +2500,63 @@ Active slice context: Slice 90 close-out -> Slice 95 hardening/evidence sequence
 - [x] Run required validation gates sequentially.
 - [x] `pm2 restart all` after successful build.
 - [ ] Commit/push and post updated issue #41 evidence with commit hash.
+
+---
+
+# Slice 95 Tasks Addendum: Auto-Execute Approved Liquidity Intents (UTC 2026-02-19)
+
+## 1) Runtime execution path
+- [x] Add `liquidity execute` command for approved intents.
+- [x] Add `liquidity resume` command as execution alias.
+- [x] Add liquidity status posting helper for `executing|verifying|filled|failed|verification_timeout`.
+- [x] Add `amm_v2` add execution path (`addLiquidity`) with approval checks.
+- [x] Add `amm_v2` remove execution path (`removeLiquidity`) with pair/snapshot/LP-balance derivation.
+- [x] Add deterministic v3 execution rejection (`unsupported_liquidity_execution_family`).
+
+## 2) HTS plugin bridge
+- [x] Add optional HTS plugin bridge loader in adapter (`XCLAW_HEDERA_HTS_PLUGIN`).
+- [x] Enforce deterministic fail-closed `missing_dependency` for missing plugin/sdk.
+- [x] Add adapter tests for plugin success + missing module + invalid plugin response.
+
+## 3) Approval auto-run integration
+- [x] Extend management approval schema for trade/liquidity decision payloads.
+- [x] Extend `POST /api/v1/management/approvals/decision` to support `subjectType=liquidity`.
+- [x] Queue runtime `liquidity execute` automatically on approved liquidity decisions.
+- [x] Add runtime-canonical liquidity decision invocation + queue fallback.
+- [x] Add non-telegram liquidity decision message builder for parity.
+
+## 4) Validation and evidence
+- [x] Required gate sequence completed (`db:parity`, seed reset/load/verify, build, pm2 restart).
+- [x] Runtime unit suites pass (`test_liquidity_adapter.py`, `test_liquidity_cli.py`).
+- [!] Route-level management liquidity decision contract command added and executed, but blocked by invalid management bootstrap token (`401 auth_invalid`) in this environment.
+- [!] Live Hedera EVM/HTS tx-hash closure still blocked by environment prerequisites (`CONTRACT_REVERT_EXECUTED` on EVM add and missing HTS plugin bridge module).
+
+---
+
+# Slice 95A Tasks Addendum: Readiness + Determinism (UTC 2026-02-19)
+
+## 1) Management test bootstrap determinism
+- [x] Add owner-link fallback to auto-issue fresh management bootstrap token when token file is missing/stale.
+- [x] Persist refreshed token to bootstrap token file for repeatability.
+- [!] Route-level management decision command still blocked in this sandbox when local API host is unreachable (`fetch failed` to `127.0.0.1:3000`).
+
+## 2) HTS plugin packaging
+- [x] Add concrete runtime module `xclaw_agent.hedera_hts_plugin` with `execute_liquidity(...)`.
+- [x] Use explicit bridge command contract via `XCLAW_HEDERA_HTS_BRIDGE_CMD`.
+- [x] Keep deterministic fail-closed behavior (`HederaSdkUnavailable`) when SDK/runtime bridge prerequisites are absent.
+
+## 3) EVM execution diagnostics
+- [x] Add deterministic addLiquidity pre-submit checks (wallet token balance, gas balance, pair reserves, simulation call).
+- [x] Emit deterministic preflight reason codes (`liquidity_preflight_*`) through execution failure details.
+- [x] Add regression coverage for deterministic reason-code surfacing.
+
+## 4) Validation
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_liquidity_adapter.py -v`
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v`
+- [!] `npm run test:management:liquidity:decision` (blocked by sandbox-local API reachability)

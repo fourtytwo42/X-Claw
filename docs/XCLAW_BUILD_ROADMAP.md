@@ -3108,6 +3108,7 @@ Note:
 ### 95.1 Pending verification/evidence pass
 - [x] Run required repo gates sequentially for this liquidity program pass.
 - [x] Add runtime pair-discovery utility (`liquidity discover-pairs`) and capture Hedera EVM viable pair evidence.
-- [~] Capture hardhat-local + external testnet acceptance evidence (Hedera EVM pair discovery + quote/add intent and HTS JDK-enabled quote/add are captured; tx-hash-grade completion remains blocked by current liquidity command-surface execution depth without direct on-chain LP submission).
+- [x] Implement runtime auto-execution for approved liquidity intents (`liquidity execute/resume`, v2 + hedera_hts scope) and management decision auto-queue integration.
+- [~] Capture hardhat-local + external testnet acceptance evidence (runtime now auto-executes approved liquidity intents and emits deterministic execution/verification errors; tx-hash-grade Hedera closure remains blocked in this session by sandbox network restrictions for API/RPC plus missing HTS SDK/JDK runtime prerequisites in the active interpreter).
 - [x] Update bounty checklist evidence IDs for Hedera/0G/Kite.
 - [x] Post issue evidence + commit hashes for slices 90-95.

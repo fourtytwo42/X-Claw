@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import importlib
+import os
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from typing import Any
@@ -120,6 +122,88 @@ class HederaHtsLiquidityAdapter(LiquidityAdapter):
     def quote_remove(self, payload: dict[str, Any]) -> dict[str, Any]:
         self.ensure_sdk()
         return super().quote_remove(payload)
+
+    @staticmethod
+    def _resolve_plugin_callable() -> Any:
+        spec = str(os.environ.get("XCLAW_HEDERA_HTS_PLUGIN") or "").strip()
+        if spec:
+            module_name, _, attr_name = spec.partition(":")
+            module_name = module_name.strip()
+            attr_name = attr_name.strip() or "execute_liquidity"
+        else:
+            module_name = "xclaw_agent.hedera_hts_plugin"
+            attr_name = "execute_liquidity"
+        if not module_name:
+            raise HederaSdkUnavailable(
+                "Hedera HTS plugin path is empty. Set XCLAW_HEDERA_HTS_PLUGIN=<module>:<callable>."
+            )
+        try:
+            module = importlib.import_module(module_name)
+        except Exception as exc:
+            raise HederaSdkUnavailable(
+                "Hedera HTS plugin bridge is not installed. "
+                "Set XCLAW_HEDERA_HTS_PLUGIN=<module>:<callable> or install xclaw_agent.hedera_hts_plugin."
+            ) from exc
+        fn = getattr(module, attr_name, None)
+        if not callable(fn):
+            raise HederaSdkUnavailable(
+                f"Hedera HTS plugin callable '{module_name}:{attr_name}' is unavailable."
+            )
+        return fn
+
+    def _execute_with_plugin(self, action: str, payload: dict[str, Any], preflight: dict[str, Any]) -> dict[str, Any]:
+        fn = self._resolve_plugin_callable()
+        base = {
+            "action": action,
+            "chain": self.chain,
+            "dex": self.dex,
+            "positionType": self.position_type,
+            "payload": payload,
+        }
+        try:
+            try:
+                out = fn(
+                    action=action,
+                    chain=self.chain,
+                    dex=self.dex,
+                    position_type=self.position_type,
+                    payload=payload,
+                )
+            except TypeError:
+                out = fn(base)
+        except HederaSdkUnavailable:
+            raise
+        except Exception as exc:
+            raise LiquidityAdapterError(f"HTS plugin execution failed: {exc}") from exc
+        if not isinstance(out, dict):
+            raise LiquidityAdapterError("HTS plugin must return a JSON object.")
+        tx_hash = str(out.get("txHash") or "").strip()
+        if not tx_hash:
+            raise LiquidityAdapterError("HTS plugin response is missing txHash.")
+        response: dict[str, Any] = {
+            "ok": True,
+            "family": self.protocol_family,
+            "positionType": self.position_type,
+            "dex": self.dex,
+            "action": action,
+            "txHash": tx_hash,
+            "preflight": preflight,
+        }
+        if out.get("positionId") is not None:
+            response["positionId"] = out.get("positionId")
+        if isinstance(out.get("details"), dict):
+            response["details"] = out.get("details")
+        return response
+
+    def add(self, payload: dict[str, Any]) -> dict[str, Any]:
+        self.ensure_sdk()
+        quote = self.quote_add(payload)
+        return self._execute_with_plugin("add", payload, quote.get("simulation", {}))
+
+    def remove(self, payload: dict[str, Any]) -> dict[str, Any]:
+        self.ensure_sdk()
+        quote = self.quote_remove(payload)
+        return self._execute_with_plugin("remove", payload, quote.get("simulation", {}))
 
 
 def _require_non_empty(value: Any, field_name: str) -> str:

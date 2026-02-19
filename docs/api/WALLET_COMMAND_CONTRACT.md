@@ -62,6 +62,9 @@ Wrapper delegation target commands:
 - `xclaw-agent liquidity quote-add --chain <chain_key> --dex <dex> --token-a <token_or_symbol> --token-b <token_or_symbol> --amount-a <amount_a> --amount-b <amount_b> [--position-type <v2|v3>] [--slippage-bps <bps>] --json`
 - `xclaw-agent liquidity quote-remove --chain <chain_key> --dex <dex> --position-id <position_id> [--percent <1-100>] [--position-type <v2|v3>] --json`
 - `xclaw-agent liquidity discover-pairs --chain <chain_key> --dex <dex> [--min-reserve <base_units>] [--limit <1-100>] [--scan-max <1-2000>] --json`
+- `xclaw-agent liquidity execute --intent <liquidity_intent_id> --chain <chain_key> --json`
+- `xclaw-agent liquidity resume --intent <liquidity_intent_id> --chain <chain_key> --json`
+- `xclaw-agent approvals decide-liquidity --intent-id <liquidity_intent_id> --decision <approve|reject> --chain <chain_key> [--source <web|telegram|runtime>] [--reason-message <text>] --json`
 - `xclaw-agent default-chain get --json`
 - `xclaw-agent default-chain set --chain <chain_key> --json`
 
@@ -183,7 +186,12 @@ Current behavior in `apps/agent-runtime/xclaw_agent/cli.py`:
    - rollback kill-switch `XCLAW_TX_FEE_MODE=legacy` restores legacy fixed `gasPrice` sender behavior.
 14. Liquidity commands enforce adapter preflight before API proposal submission:
    - unsupported chain/dex/position combinations fail with `unsupported_liquidity_adapter`,
-   - HTS-native Hedera paths fail closed with `missing_dependency` when SDK plugin is unavailable.
+   - HTS-native Hedera paths fail closed with `missing_dependency` when SDK/plugin bridge is unavailable,
+   - HTS plugin bridge defaults to `xclaw_agent.hedera_hts_plugin:execute_liquidity` and may use `XCLAW_HEDERA_HTS_BRIDGE_CMD` for external bridge execution,
+   - `liquidity execute/resume` supports `amm_v2` + `hedera_hts` in Slice 95 and rejects `amm_v3` with `unsupported_liquidity_execution_family`,
+   - non-actionable statuses fail with `liquidity_not_actionable`,
+   - v2 add execution emits deterministic preflight reject reasons (`liquidity_preflight_*`) before submit,
+   - runtime execution/verification failures return deterministic `liquidity_execution_failed` / `liquidity_verification_failed`.
 
 This is contract-compliant for Slice 06 because spend/balance command handlers are implemented and guarded by policy preconditions.
 

@@ -1810,5 +1810,6 @@ DoD:
 - [x] bounty checklist updated with evidence IDs for Hedera/0G/Kite paths.
 - [x] Hedera evidence pass captures both EVM (`saucerswap`) and HTS-native (`hedera_hts`) runtime attempts with deterministic outcomes (`policy_denied|approved|missing_dependency`) and explicit rerun blockers.
 - [x] runtime adds deterministic Hedera EVM pair discovery utility (`liquidity discover-pairs`) with reserve filtering and failure codes (`liquidity_pair_discovery_failed`, `liquidity_no_viable_pair`).
-- [~] tx-hash-grade Hedera liquidity proof remains blocked by runtime execution depth: current `liquidity add/remove` command surface records proposal/approval lifecycle but does not submit on-chain LP tx directly, so no tx hash is emitted in-command.
+- [x] runtime auto-executes approved liquidity intents (`liquidity execute/resume`) with lifecycle transitions and deterministic v3 execution reject (`unsupported_liquidity_execution_family`).
+- [~] tx-hash-grade Hedera liquidity proof remains blocked by environment prerequisites in this session: sandbox network policy prevents API/RPC reachability (`Operation not permitted` / DNS resolution failure), and HTS path still fail-closes when Hedera SDK runtime prerequisites are missing in the active interpreter (`missing_dependency`).
 - [x] final docs sync + issue evidence posts with commit hashes.

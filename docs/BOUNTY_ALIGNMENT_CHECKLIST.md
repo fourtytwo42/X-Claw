@@ -56,7 +56,7 @@ Notes:
 Notes:
 - `E6`: Hedera EVM quote path now executes against configured Saucer router and reaches live RPC revert (`CONTRACT_REVERT_EXECUTED`) instead of config-contract failure.
 - `E7`: Hedera EVM add-intent path succeeds (`status=approved`) after policy snapshot is present; first attempt demonstrates deterministic `policy_denied` guardrail.
-- `E8`: HTS-native runtime path fails closed with deterministic `missing_dependency` (current host lacks JDK/JNI runtime; `hedera-sdk-py` import fails with `Unable to find javac`).
+- `E8`: HTS-native runtime path fails closed with deterministic `missing_dependency` when SDK/plugin prerequisites are unavailable.
 - `E9`: HTS fail-closed unit test proof remains passing (`test_quote_add_fails_closed_when_hedera_sdk_missing`).
 - `E10`: Hedera pair-discovery matrix now returns ranked live pairs for both `saucerswap` and `pangolin` via factory scan (`candidateCount:13` in sampled scan).
 - `E11`: Hosted installer rerun yields Hedera wallet readiness (`hasWallet:true`) in this environment.
@@ -157,7 +157,7 @@ Notes:
 
 Notes:
 - `E1/E2/E3/E4/E5` cover hardhat-local + Base Sepolia contract/preflight/approval evidence.
-- `E6/E7/E8/E9/E10/E11/E12/E13/E14/E15` cover Hedera EVM+HTS execution attempts, pair discovery, and JDK-enabled HTS runtime success; tx-hash-grade completion remains blocked by liquidity command-surface execution depth (intent lifecycle without on-chain LP submission).
+- `E6..E20` cover Hedera EVM+HTS execution attempts, pair discovery, installer/JDK checks, runtime auto-execution implementation, and deterministic blockers; tx-hash-grade completion remains blocked in this environment by network sandbox constraints and HTS runtime prerequisites.
 
 ---
 
@@ -178,3 +178,8 @@ Notes:
 - `E13`: Hedera EVM quote-add succeeds on discovered pair (`TEST/FOOL` pair addresses from scan output).
 - `E14`: Hedera EVM liquidity add intent succeeds on discovered pair (`status=approved`).
 - `E15`: Hedera HTS quote-add/add succeed with JDK-enabled runtime (`XCLAW_AGENT_PYTHON_BIN` + `JAVA_HOME`).
+- `E16`: Runtime `liquidity add/remove` now auto-executes approved intents and posts lifecycle transitions (`approved -> executing -> verifying -> filled|failed|verification_timeout`).
+- `E17`: Hedera EVM auto-execution attempt reaches deterministic execution failure (`CONTRACT_REVERT_EXECUTED`) with wallet passphrase provided; blocker now reflects live token/liquidity conditions, not missing execution path.
+- `E18`: Hedera HTS auto-execution path fail-closed proof (default interpreter missing Hedera SDK/JDK prerequisites).
+- `E19`: Management liquidity decision route test bootstrap is now self-healing (agent-issued owner link fallback); route command remains blocked only when local API health is unreachable in this sandbox.
+- `E20`: Hedera EVM/HTS live probes in this session fail deterministically due sandbox network policy (`Operation not permitted`/DNS failure), not contract drift.
