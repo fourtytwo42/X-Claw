@@ -2715,8 +2715,10 @@ Limitations / notes:
 9. Telegram deny:
    - Deny transitions `approval_pending -> rejected` (reasonCode `approval_rejected`, reasonMessage set).
 10. Decision feedback in chat:
-   - after approve/deny in Telegram, the system posts a deterministic confirmation message directly in the same chat (tradeId/policyId + chain + decision).
-   - Reliability requirement: for both trade (`xappr`) and policy (`xpol`) callbacks, Telegram callback success (including converged terminal `409`) must emit immediate visible feedback (`Approved/Denied ...`).
+   - after deny in Telegram, the system posts a deterministic confirmation message directly in the same chat (tradeId/policyId + chain + decision).
+   - Reliability requirement:
+     - policy (`xpol`) and transfer (`xfer`) callbacks must emit immediate visible confirmation (`Approved/Denied ...`), including converged terminal `409`,
+     - trade approve (`xappr approve`) must not emit an intermediate `Approved trade ...` message; approval is confirmed by the final trade-result message after auto-resume.
    - Single-trigger spot flow requirement (Telegram-focused): for `trade spot` approvals (`xappr approve`), the system must auto-resume execution without requiring a second user message.
    - Final-result requirement: after auto-resume execution, the system must emit a deterministic final result message in the same chat (status + tradeId + chain + tx hash when available).
    - Agent-pipeline notification rule:

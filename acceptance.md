@@ -1,3 +1,35 @@
+# Hotfix Acceptance Evidence: Suppress Telegram Intermediate "Approved trade" Ack For Conversions
+
+Date (UTC): 2026-02-19
+Active slice context: `Slice 86` in progress (explicit user-requested Telegram UX hotfix)
+
+## Objective + Scope Lock
+- Objective: suppress intermediate Telegram `Approved trade ...` callback ack for trade approvals while preserving final result messaging.
+- Scope lock:
+  - `skills/xclaw-agent/scripts/openclaw_gateway_patch.py`
+  - `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - handoff artifacts (`spec.md`, `tasks.md`, `acceptance.md`)
+- Out of scope: API/runtime contract changes beyond callback ack emission behavior.
+
+## Behavior Checks
+- [x] Trade approve callback success path does not send intermediate `Approved trade ...` chat message.
+- [x] Converged callback `409` branch suppresses `Approved trade ...` for `xappr` while preserving policy/transfer confirmations.
+- [x] Fallback ack path suppresses `Approved trade ...` for `xappr` approve.
+- [x] Final trade result messaging remains unchanged.
+- [x] Source-of-truth feedback contract aligned to suppress intermediate trade approve ack.
+
+## Required Validation Gates
+- [x] `python3 -m py_compile skills/xclaw-agent/scripts/openclaw_gateway_patch.py` -> PASS
+- [x] `python3 skills/xclaw-agent/scripts/openclaw_gateway_patch.py --json` -> PASS (`ok:true`, `patched:true`)
+- [x] `npm run db:parity` -> PASS (`ok: true`)
+- [x] `npm run seed:reset` -> PASS (`ok: true`)
+- [x] `npm run seed:load` -> PASS (`ok: true`)
+- [x] `npm run seed:verify` -> PASS (`ok: true`)
+- [x] `npm run build` -> PASS (Next.js production build succeeded)
+- [x] `pm2 restart all` -> PASS (`xclaw-web` online)
+
+---
+
 # Hotfix Acceptance Evidence: X-Claw Skill Prompt Contract Hardening (Fail-Closed Determinism)
 
 Date (UTC): 2026-02-19

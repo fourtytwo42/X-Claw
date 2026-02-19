@@ -1,3 +1,35 @@
+# Hotfix Spec: Suppress Telegram Intermediate "Approved trade" Ack For Conversions
+
+## Goal
+Remove the intermediate Telegram callback acknowledgment message (`Approved trade <tradeId>`) for trade approvals (`xappr approve`) so conversion flow shows:
+1) approval prompt,
+2) final trade result,
+without extra approval-ack noise.
+
+## Non-goals
+1. No change to policy (`xpol`) or transfer (`xfer`) approval confirmation behavior.
+2. No change to trade execution/result message contract.
+3. No API/schema/migration changes.
+
+## Locked scope
+1. `skills/xclaw-agent/scripts/openclaw_gateway_patch.py`
+2. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+3. `spec.md`
+4. `tasks.md`
+5. `acceptance.md`
+
+## Acceptance checks
+- `python3 -m py_compile skills/xclaw-agent/scripts/openclaw_gateway_patch.py`
+- `python3 skills/xclaw-agent/scripts/openclaw_gateway_patch.py --json`
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `pm2 restart all`
+
+---
+
 # Hotfix Spec: X-Claw Skill Prompt Contract Hardening (Fail-Closed Determinism)
 
 ## Goal

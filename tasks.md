@@ -1,3 +1,31 @@
+# Hotfix Tasks: Suppress Telegram Intermediate "Approved trade" Ack For Conversions
+
+Active slice context: `Slice 86` is in progress; this is an explicit user-requested Telegram UX hotfix.
+
+## 1) Scope lock
+- [x] Change only trade-approve callback acknowledgment behavior.
+- [x] Preserve policy/transfer confirmation behavior.
+- [x] Preserve final trade-result message behavior.
+
+## 2) Implementation
+- [x] Update OpenClaw gateway patch injection to suppress approve-ack send for `xappr` approve success path.
+- [x] Update converged `409` callback path to suppress `Approved trade ...` emission for `xappr`.
+- [x] Update fallback ack path to suppress `Approved trade ...` emission for `xappr` approve.
+- [x] Sync source-of-truth decision feedback contract.
+- [x] Update handoff artifacts (`spec.md`, `tasks.md`, `acceptance.md`).
+
+## 3) Validation
+- [x] `python3 -m py_compile skills/xclaw-agent/scripts/openclaw_gateway_patch.py`
+- [x] `python3 skills/xclaw-agent/scripts/openclaw_gateway_patch.py --json`
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+
+---
+
 # Hotfix Tasks: X-Claw Skill Prompt Contract Hardening (Fail-Closed Determinism)
 
 Active slice context: `Slice 86` is in progress; this is an explicit user-requested prompt-contract hotfix.
