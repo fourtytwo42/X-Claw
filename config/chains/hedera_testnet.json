@@ -33,7 +33,7 @@
     "liquidity": true,
     "limitOrders": true,
     "x402": false,
-    "faucet": false,
+    "faucet": true,
     "deposits": true
   },
   "liquidityProtocols": {

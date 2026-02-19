@@ -5039,3 +5039,66 @@ Date (UTC): 2026-02-19
 - Hedera EVM tx-hash evidence: complete (`E22`, `E23`).
 - Hedera HTS tx-hash evidence: complete (`E29`, `E30`).
 - Slice 95 verification bar is met in this session.
+
+## Slice 95D Installer Auto-Bind + Register Sync Closure (UTC 2026-02-19)
+
+### Live installer evidence (`E31+`)
+- `E31` Hedera auto-bind attempt with portable-key invariant:
+  - command: `XCLAW_DEFAULT_CHAIN=base_sepolia XCLAW_INSTALL_AUTO_HEDERA_FAUCET=0 curl -fsSL http://127.0.0.1:3000/skill-install.sh | bash`
+  - outcome: installer executes Hedera bind path and verifies default-chain/Hedera address consistency before registration.
+- `E32` Multi-chain register upsert from installer:
+  - installer register response includes both wallet rows:
+    - `{"chainKey":"base_sepolia","address":"0x582f6f293e0f49855bb752ae29d6b0565c500d87"}`
+    - `{"chainKey":"hedera_testnet","address":"0x582f6f293e0f49855bb752ae29d6b0565c500d87"}`
+  - DB proof command:
+    - `psql "$DATABASE_URL" -Atc "select chain_key,address from agent_wallets where agent_id='ag_a123e3bc428c12675f93' order by chain_key;"`
+  - output:
+    - `base_sepolia|0x582f6f293e0f49855bb752ae29d6b0565c500d87`
+    - `hedera_testnet|0x582f6f293e0f49855bb752ae29d6b0565c500d87`
+- `E33` Optional Hedera faucet warmup contract:
+  - env gate: `XCLAW_INSTALL_AUTO_HEDERA_FAUCET` (default `1`).
+  - non-fatal failure contract observed in script output: deterministic warning code `hedera_faucet_warmup_failed` with action hint propagation.
+
+## Slice 95E/95F/95G Faucet Warmup Reliability (UTC 2026-02-19)
+
+### Implementation updates
+- `POST /api/v1/agent/faucet/request` now emits deterministic Hedera-safe error codes instead of opaque `internal_error` for common failures:
+  - `faucet_config_invalid`
+  - `faucet_fee_too_low_for_chain`
+  - `faucet_native_insufficient`
+  - `faucet_wrapped_insufficient`
+  - `faucet_stable_insufficient`
+  - `faucet_send_preflight_failed`
+  - `faucet_rpc_unavailable`
+- Hedera chain fee policy now uses chain-aware gas floor enforcement (`XCLAW_TESTNET_FAUCET_MIN_GAS_PRICE_WEI[_HEDERA_TESTNET]`, default `900000000000` wei) and rejects under-floor explicit overrides deterministically.
+- Faucet config hardening added:
+  - wrapped/stable token address validation via `isAddress`,
+  - drip amount parsing requires positive integer wei values.
+- Installer warmup diagnostics now print `faucetCode`, `faucetMessage`, `actionHint`, `requestId` (when present), plus exact rerun command and environment diagnostics.
+- Installer register flow now defaults `XCLAW_AGENT_NAME` to `XCLAW_AGENT_ID` when name is unset, preventing `set -u` unbound-variable aborts.
+
+### Validation + regression
+- `npm run db:parity` -> PASS.
+- `npm run seed:reset` -> PASS.
+- `npm run seed:load` -> PASS.
+- `npm run seed:verify` -> PASS.
+- `npm run build` -> PASS.
+- `pm2 restart all` -> PASS.
+- `python3 -m unittest apps/agent-runtime/tests/test_liquidity_adapter.py -v` -> PASS.
+- `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v` -> PASS.
+- `npm run test:management:liquidity:decision` -> PASS.
+- `npm run test:faucet:contract` -> PASS (demo-agent block + non-demo deterministic Hedera failure contract).
+
+### Evidence updates (`E34+`)
+- `E34` Hedera faucet deterministic preflight proof:
+  - command:
+    - `source ~/.xclaw-secrets/wallet-backups/20260219T204540Z-faucet-live/env.sh && XCLAW_E2E_AGENT_ID=$XCLAW_AGENT_ID XCLAW_E2E_AGENT_API_KEY=$XCLAW_AGENT_API_KEY npm run test:faucet:contract`
+  - outcome: non-demo Hedera failure returns `code=faucet_rpc_unavailable` (not `internal_error`) with `requestId`.
+- `E35` Non-demo installer warmup observability proof:
+  - command:
+    - `source ~/.xclaw-secrets/wallet-backups/20260219T204540Z-faucet-live/env.sh && XCLAW_INSTALL_AUTO_HEDERA_FAUCET=1 curl -fsSL https://xclaw.trade/skill-install.sh | bash`
+  - outcome: installer prints deterministic warmup diagnostics (`faucetCode`, `faucetMessage`, `actionHint`) and rerun command without aborting install.
+- `E36` Reinstall no-op bind + register upsert proof:
+  - same installer run completes with existing wallet, registers agent, and preserves chain wallet bindings.
+- `E37` Warmup deterministic failure contract proof:
+  - installer captures warmup blocker as `hedera_faucet_warmup_failed` with structured hint fields instead of opaque failure.

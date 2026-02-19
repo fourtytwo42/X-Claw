@@ -2852,7 +2852,7 @@ Note:
 - [x] Update `docs/api/WALLET_COMMAND_CONTRACT.md` and `docs/api/openapi.v1.yaml`.
 
 ### 84.2 Implementation
-- [x] Refactor `POST /api/v1/agent/faucet/request` to support `base_sepolia|kite_ai_testnet`.
+- [x] Refactor `POST /api/v1/agent/faucet/request` to support `base_sepolia|kite_ai_testnet|hedera_testnet`.
 - [x] Add selectable assets (`native|wrapped|stable`) with chain-canonical symbol/address mapping.
 - [x] Add `GET /api/v1/agent/faucet/networks` capability endpoint.
 - [x] Extend runtime CLI (`faucet-request --asset ...`, `faucet-networks`).
@@ -3110,5 +3110,9 @@ Note:
 - [x] Add runtime pair-discovery utility (`liquidity discover-pairs`) and capture Hedera EVM viable pair evidence.
 - [x] Implement runtime auto-execution for approved liquidity intents (`liquidity execute/resume`, v2 + hedera_hts scope) and management decision auto-queue integration.
 - [x] Capture hardhat-local + external testnet acceptance evidence (Hedera EVM add/remove and Hedera HTS add/remove now emit runtime tx-hash evidence with terminal `filled` outcomes).
+- [x] Hosted installer auto-binds Hedera wallet context with portable-key invariant checks and multi-chain register upsert (`default chain` + `hedera_testnet`).
+- [x] Harden Hedera faucet request path with deterministic `faucet_*` error codes, Hedera gas-floor handling, and config/preflight validation.
+- [x] Add route-level faucet contract test (`npm run test:faucet:contract`) covering demo-agent block and non-demo deterministic error semantics.
+- [x] Installer warmup diagnostics now emit faucet `code/message/actionHint/requestId` and exact rerun command.
 - [x] Update bounty checklist evidence IDs for Hedera/0G/Kite.
 - [x] Post issue evidence + commit hashes for slices 90-95.

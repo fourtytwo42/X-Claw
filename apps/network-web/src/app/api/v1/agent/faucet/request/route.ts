@@ -5,7 +5,7 @@ import { Contract, JsonRpcProvider, Wallet, isAddress } from 'ethers';
 import { requireAgentAuth } from '@/lib/agent-auth';
 import { chainCapabilityEnabled, chainRpcUrl, getChainConfig, supportedChainHint } from '@/lib/chains';
 import { dbQuery } from '@/lib/db';
-import { errorResponse, successResponse } from '@/lib/errors';
+import { errorResponse, successResponse, type ApiErrorCode } from '@/lib/errors';
 import { parseJsonBody } from '@/lib/http';
 import { enforceAgentFaucetDailyRateLimit } from '@/lib/rate-limit';
 import { getRedisClient } from '@/lib/redis';
@@ -32,13 +32,40 @@ const BASE_DRIP_STABLE_WEI = '20000000000000000000000'; // 20000 USDC
 const KITE_DRIP_NATIVE_WEI = '50000000000000000'; // 0.05 KITE
 const KITE_DRIP_WRAPPED_WEI = '50000000000000000'; // 0.05 WKITE
 const KITE_DRIP_STABLE_WEI = '100000000000000000'; // 0.10 USDT
+const HEDERA_DRIP_NATIVE_WEI = '200000000'; // 2.0 HBAR (8 decimals)
+const HEDERA_DRIP_WRAPPED_WEI = '200000000'; // 2.0 WHBAR (8 decimals)
+const HEDERA_DRIP_STABLE_WEI = '5000000'; // 5.0 stable (6 decimals expected)
 
 const GAS_BUFFER_MULTIPLIER_BPS = 12000; // 1.2x
+const HEDERA_MIN_GAS_PRICE_WEI_DEFAULT = '900000000000'; // 900 gwei
 
 const ERC20_ABI = [
   'function balanceOf(address owner) view returns (uint256)',
   'function transfer(address to, uint256 value) returns (bool)'
 ];
+
+type FaucetRouteErrorInput = {
+  status: number;
+  code: ApiErrorCode;
+  message: string;
+  actionHint: string;
+  details?: Record<string, unknown>;
+};
+
+class FaucetRouteError extends Error {
+  status: number;
+  code: ApiErrorCode;
+  actionHint: string;
+  details: Record<string, unknown> | undefined;
+
+  constructor(input: FaucetRouteErrorInput) {
+    super(input.message);
+    this.status = input.status;
+    this.code = input.code;
+    this.actionHint = input.actionHint;
+    this.details = input.details;
+  }
+}
 
 function toEnvSuffix(chainKey: string): string {
   return chainKey.replace(/[^a-zA-Z0-9]/g, '_').toUpperCase();
@@ -51,6 +78,34 @@ function resolveChainScopedEnv(prefix: string, chainKey: string): string {
     return scoped;
   }
   return (process.env[prefix] || '').trim();
+}
+
+function isHederaChain(chainKey: string): boolean {
+  return chainKey.startsWith('hedera_');
+}
+
+function parsePositiveWei(value: string, field: string): bigint {
+  try {
+    const parsed = BigInt(String(value || '').trim());
+    if (parsed <= BigInt(0)) {
+      throw new Error('non_positive');
+    }
+    return parsed;
+  } catch {
+    throw new FaucetRouteError({
+      status: 503,
+      code: 'faucet_config_invalid',
+      message: `Faucet configuration for ${field} is invalid.`,
+      actionHint: `Set ${field} to a positive integer amount in wei units.`,
+      details: { field, value },
+    });
+  }
+}
+
+function resolveHederaMinGasPriceWei(chainKey: string): bigint {
+  const configured =
+    resolveChainScopedEnv('XCLAW_TESTNET_FAUCET_MIN_GAS_PRICE_WEI', chainKey) || HEDERA_MIN_GAS_PRICE_WEI_DEFAULT;
+  return parsePositiveWei(configured, `XCLAW_TESTNET_FAUCET_MIN_GAS_PRICE_WEI_${toEnvSuffix(chainKey)}`);
 }
 
 function parseRequestedAssets(raw: FaucetAssetKey[] | undefined): FaucetAssetKey[] {
@@ -89,10 +144,31 @@ async function rollbackFaucetDailyLimit(agentId: string, chainKey: string): Prom
 }
 
 function buildFeeOverrides(
+  chainKey: string,
   feeData: Awaited<ReturnType<JsonRpcProvider['getFeeData']>>,
   attempt: number
-): { maxFeePerGas: bigint; maxPriorityFeePerGas: bigint } {
+): { gasPrice: bigint } | { maxFeePerGas: bigint; maxPriorityFeePerGas: bigint } {
   const bumpGwei = BigInt(1_000_000_000) * BigInt(attempt);
+  if (isHederaChain(chainKey)) {
+    const configuredGasPrice = resolveChainScopedEnv('XCLAW_TESTNET_FAUCET_GAS_PRICE_WEI', chainKey);
+    const minGasPrice = resolveHederaMinGasPriceWei(chainKey);
+    const proposedBase = configuredGasPrice ? parsePositiveWei(configuredGasPrice, `XCLAW_TESTNET_FAUCET_GAS_PRICE_WEI_${toEnvSuffix(chainKey)}`) : feeData.gasPrice ?? minGasPrice;
+    if (proposedBase < minGasPrice) {
+      throw new FaucetRouteError({
+        status: 503,
+        code: 'faucet_fee_too_low_for_chain',
+        message: `Configured faucet gas price is below Hedera minimum floor for ${chainKey}.`,
+        actionHint: `Set XCLAW_TESTNET_FAUCET_GAS_PRICE_WEI_${toEnvSuffix(chainKey)} >= ${minGasPrice.toString()}.`,
+        details: {
+          chainKey,
+          requiredMinGasPriceWei: minGasPrice.toString(),
+          proposedGasPriceWei: proposedBase.toString(),
+        },
+      });
+    }
+    const gasPrice = (proposedBase < minGasPrice ? minGasPrice : proposedBase) + bumpGwei;
+    return { gasPrice };
+  }
   const basePriority = feeData.maxPriorityFeePerGas ?? BigInt(1_000_000_000);
   const maxPriorityFeePerGas = basePriority + bumpGwei;
   const baseMaxFee = feeData.maxFeePerGas ?? feeData.gasPrice ?? BigInt(2_000_000_000);
@@ -101,17 +177,27 @@ function buildFeeOverrides(
 }
 
 function resolveWrappedToken(chainKey: string): { symbol: string; address: string } | null {
+  const envAddress = resolveChainScopedEnv('XCLAW_TESTNET_FAUCET_WRAPPED_TOKEN_ADDRESS', chainKey);
+  if (envAddress) {
+    const envSymbol = resolveChainScopedEnv('XCLAW_TESTNET_FAUCET_WRAPPED_TOKEN_SYMBOL', chainKey) || 'WRAPPED';
+    return { symbol: envSymbol, address: envAddress };
+  }
   const cfg = getChainConfig(chainKey);
   const tokens = cfg?.canonicalTokens || {};
-  const wrapped = (tokens.WETH || tokens.WKITE || '').trim();
+  const wrapped = (tokens.WETH || tokens.WKITE || tokens.WHBAR || '').trim();
   if (!wrapped) {
     return null;
   }
-  const symbol = (tokens.WETH ? 'WETH' : 'WKITE') as string;
+  const symbol = (tokens.WETH ? 'WETH' : tokens.WKITE ? 'WKITE' : 'WHBAR') as string;
   return { symbol, address: wrapped };
 }
 
 function resolveStableToken(chainKey: string): { symbol: string; address: string } | null {
+  const envAddress = resolveChainScopedEnv('XCLAW_TESTNET_FAUCET_STABLE_TOKEN_ADDRESS', chainKey);
+  if (envAddress) {
+    const envSymbol = resolveChainScopedEnv('XCLAW_TESTNET_FAUCET_STABLE_TOKEN_SYMBOL', chainKey) || 'USDC';
+    return { symbol: envSymbol, address: envAddress };
+  }
   const cfg = getChainConfig(chainKey);
   const tokens = cfg?.canonicalTokens || {};
   const stable = (tokens.USDC || tokens.USDT || '').trim();
@@ -123,11 +209,28 @@ function resolveStableToken(chainKey: string): { symbol: string; address: string
 }
 
 function resolveDripAmounts(chainKey: string): { nativeWei: string; wrappedWei: string; stableWei: string } {
+  const nativeOverride = resolveChainScopedEnv('XCLAW_TESTNET_FAUCET_DRIP_NATIVE_WEI', chainKey);
+  const wrappedOverride = resolveChainScopedEnv('XCLAW_TESTNET_FAUCET_DRIP_WRAPPED_WEI', chainKey);
+  const stableOverride = resolveChainScopedEnv('XCLAW_TESTNET_FAUCET_DRIP_STABLE_WEI', chainKey);
+  if (nativeOverride || wrappedOverride || stableOverride) {
+    return {
+      nativeWei: nativeOverride || BASE_DRIP_NATIVE_WEI,
+      wrappedWei: wrappedOverride || BASE_DRIP_WRAPPED_WEI,
+      stableWei: stableOverride || BASE_DRIP_STABLE_WEI,
+    };
+  }
   if (chainKey === 'kite_ai_testnet') {
     return {
       nativeWei: KITE_DRIP_NATIVE_WEI,
       wrappedWei: KITE_DRIP_WRAPPED_WEI,
       stableWei: KITE_DRIP_STABLE_WEI,
+    };
+  }
+  if (chainKey === 'hedera_testnet') {
+    return {
+      nativeWei: HEDERA_DRIP_NATIVE_WEI,
+      wrappedWei: HEDERA_DRIP_WRAPPED_WEI,
+      stableWei: HEDERA_DRIP_STABLE_WEI,
     };
   }
   return {
@@ -211,7 +314,7 @@ export async function POST(req: NextRequest) {
       return errorResponse(
         503,
         {
-          code: 'internal_error',
+          code: 'faucet_config_invalid',
           message: 'Faucet is not configured.',
           actionHint: `Set XCLAW_TESTNET_FAUCET_PRIVATE_KEY_${toEnvSuffix(chainKey)} (or XCLAW_TESTNET_FAUCET_PRIVATE_KEY).`
         },
@@ -276,7 +379,7 @@ export async function POST(req: NextRequest) {
       return errorResponse(
         503,
         {
-          code: 'internal_error',
+          code: 'faucet_config_invalid',
           message: 'Faucet RPC is not configured.',
           actionHint: `Set XCLAW_TESTNET_FAUCET_RPC_URL_${toEnvSuffix(chainKey)} (or XCLAW_TESTNET_FAUCET_RPC_URL), or configure chain RPC.`
         },
@@ -291,9 +394,9 @@ export async function POST(req: NextRequest) {
       return errorResponse(
         503,
         {
-          code: 'internal_error',
+          code: 'faucet_config_invalid',
           message: 'Wrapped token faucet asset is not configured for this chain.',
-          actionHint: 'Configure canonicalTokens.WETH or canonicalTokens.WKITE for the selected chain.',
+          actionHint: 'Configure canonicalTokens.WETH, canonicalTokens.WKITE, or canonicalTokens.WHBAR for the selected chain.',
           details: { chainKey }
         },
         requestId
@@ -304,10 +407,35 @@ export async function POST(req: NextRequest) {
       return errorResponse(
         503,
         {
-          code: 'internal_error',
+          code: 'faucet_config_invalid',
           message: 'Stable token faucet asset is not configured for this chain.',
           actionHint: 'Configure canonicalTokens.USDC or canonicalTokens.USDT for the selected chain.',
           details: { chainKey }
+        },
+        requestId
+      );
+    }
+
+    if (wrappedToken && !isAddress(wrappedToken.address)) {
+      return errorResponse(
+        503,
+        {
+          code: 'faucet_config_invalid',
+          message: 'Wrapped token address is invalid for faucet configuration.',
+          actionHint: `Set XCLAW_TESTNET_FAUCET_WRAPPED_TOKEN_ADDRESS_${toEnvSuffix(chainKey)} to a valid EVM address.`,
+          details: { chainKey, field: 'wrappedToken.address', value: wrappedToken.address }
+        },
+        requestId
+      );
+    }
+    if (stableToken && !isAddress(stableToken.address)) {
+      return errorResponse(
+        503,
+        {
+          code: 'faucet_config_invalid',
+          message: 'Stable token address is invalid for faucet configuration.',
+          actionHint: `Set XCLAW_TESTNET_FAUCET_STABLE_TOKEN_ADDRESS_${toEnvSuffix(chainKey)} to a valid EVM address.`,
+          details: { chainKey, field: 'stableToken.address', value: stableToken.address }
         },
         requestId
       );
@@ -318,79 +446,115 @@ export async function POST(req: NextRequest) {
 
     const nativeSymbol = getChainConfig(chainKey)?.nativeCurrency?.symbol?.trim() || 'ETH';
     const dripAmounts = resolveDripAmounts(chainKey);
-    const dripNative = BigInt(dripAmounts.nativeWei);
-    const dripWrapped = BigInt(dripAmounts.wrappedWei);
-    const dripStable = BigInt(dripAmounts.stableWei);
+    const dripNative = parsePositiveWei(dripAmounts.nativeWei, `XCLAW_TESTNET_FAUCET_DRIP_NATIVE_WEI_${toEnvSuffix(chainKey)}`);
+    const dripWrapped = parsePositiveWei(dripAmounts.wrappedWei, `XCLAW_TESTNET_FAUCET_DRIP_WRAPPED_WEI_${toEnvSuffix(chainKey)}`);
+    const dripStable = parsePositiveWei(dripAmounts.stableWei, `XCLAW_TESTNET_FAUCET_DRIP_STABLE_WEI_${toEnvSuffix(chainKey)}`);
 
     const wrapped = wrappedToken ? new Contract(wrappedToken.address, ERC20_ABI, signer) : null;
     const stable = stableToken ? new Contract(stableToken.address, ERC20_ABI, signer) : null;
 
-    if (wrapped) {
-      const wrappedBal = (await wrapped.balanceOf(signer.address)) as bigint;
-      if (wrappedBal < dripWrapped) {
-        return errorResponse(
-          503,
-          {
-            code: 'internal_error',
+    try {
+      if (wrapped) {
+        const wrappedBal = (await wrapped.balanceOf(signer.address)) as bigint;
+        if (wrappedBal < dripWrapped) {
+          throw new FaucetRouteError({
+            status: 503,
+            code: 'faucet_wrapped_insufficient',
             message: 'Faucet wrapped-token balance is insufficient.',
             actionHint: `Top up faucet ${wrappedToken?.symbol || 'wrapped'} balance and retry.`,
-            details: { tokenAddress: wrappedToken?.address }
-          },
-          requestId
-        );
+            details: { tokenAddress: wrappedToken?.address, requiredWei: dripWrapped.toString(), balanceWei: wrappedBal.toString() },
+          });
+        }
       }
-    }
-
-    if (stable) {
-      const stableBal = (await stable.balanceOf(signer.address)) as bigint;
-      if (stableBal < dripStable) {
-        return errorResponse(
-          503,
-          {
-            code: 'internal_error',
+      if (stable) {
+        const stableBal = (await stable.balanceOf(signer.address)) as bigint;
+        if (stableBal < dripStable) {
+          throw new FaucetRouteError({
+            status: 503,
+            code: 'faucet_stable_insufficient',
             message: 'Faucet stable-token balance is insufficient.',
             actionHint: `Top up faucet ${stableToken?.symbol || 'stable'} balance and retry.`,
-            details: { tokenAddress: stableToken?.address }
-          },
-          requestId
-        );
+            details: { tokenAddress: stableToken?.address, requiredWei: dripStable.toString(), balanceWei: stableBal.toString() },
+          });
+        }
       }
+    } catch (error) {
+      if (error instanceof FaucetRouteError) {
+        throw error;
+      }
+      throw new FaucetRouteError({
+        status: 503,
+        code: 'faucet_rpc_unavailable',
+        message: 'Faucet token preflight failed while checking token balances.',
+        actionHint: 'Verify RPC health and token contract configuration, then retry.',
+        details: { chainKey },
+      });
     }
 
-    const feeData = await provider.getFeeData();
-    const maxFeePerGas = feeData.maxFeePerGas ?? feeData.gasPrice ?? BigInt(1_000_000_000);
+    let feeData: Awaited<ReturnType<JsonRpcProvider['getFeeData']>>;
+    try {
+      feeData = await provider.getFeeData();
+    } catch {
+      throw new FaucetRouteError({
+        status: 503,
+        code: 'faucet_rpc_unavailable',
+        message: 'Failed to resolve faucet fee data from chain RPC.',
+        actionHint: 'Verify faucet RPC connectivity and retry.',
+        details: { chainKey, rpcUrl },
+      });
+    }
+    const initialFeeOverrides = buildFeeOverrides(chainKey, feeData, 0);
+    const preflightGasPrice = 'gasPrice' in initialFeeOverrides ? initialFeeOverrides.gasPrice : initialFeeOverrides.maxFeePerGas;
 
     const estimates: bigint[] = [];
-    if (wrapped) {
-      estimates.push(await signer.estimateGas(await wrapped.transfer.populateTransaction(trimmedRecipient, dripWrapped)));
-    }
-    if (stable) {
-      estimates.push(await signer.estimateGas(await stable.transfer.populateTransaction(trimmedRecipient, dripStable)));
-    }
-    if (requestedAssets.includes('native')) {
-      estimates.push(await signer.estimateGas({ to: trimmedRecipient, value: dripNative }));
+    try {
+      if (wrapped) {
+        estimates.push(await signer.estimateGas(await wrapped.transfer.populateTransaction(trimmedRecipient, dripWrapped)));
+      }
+      if (stable) {
+        estimates.push(await signer.estimateGas(await stable.transfer.populateTransaction(trimmedRecipient, dripStable)));
+      }
+      if (requestedAssets.includes('native')) {
+        estimates.push(await signer.estimateGas({ to: trimmedRecipient, value: dripNative }));
+      }
+    } catch (error) {
+      throw new FaucetRouteError({
+        status: 503,
+        code: 'faucet_send_preflight_failed',
+        message: error instanceof Error ? error.message : 'Faucet transfer preflight failed.',
+        actionHint: 'Verify faucet token contracts and requested assets, then retry.',
+        details: { chainKey, recipient: trimmedRecipient },
+      });
     }
 
     const gasSum = estimates.reduce((acc, next) => acc + next, BigInt(0));
-    const gasCost = (gasSum * maxFeePerGas * BigInt(GAS_BUFFER_MULTIPLIER_BPS)) / BigInt(10000);
+    const gasCost = (gasSum * preflightGasPrice * BigInt(GAS_BUFFER_MULTIPLIER_BPS)) / BigInt(10000);
     const nativeValue = requestedAssets.includes('native') ? dripNative : BigInt(0);
     const requiredNative = nativeValue + gasCost;
-    const faucetBalance = await provider.getBalance(signer.address);
+    let faucetBalance = BigInt(0);
+    try {
+      faucetBalance = await provider.getBalance(signer.address);
+    } catch {
+      throw new FaucetRouteError({
+        status: 503,
+        code: 'faucet_rpc_unavailable',
+        message: 'Faucet preflight failed while reading native balance.',
+        actionHint: 'Verify RPC health and retry.',
+        details: { chainKey, faucetAddress: signer.address },
+      });
+    }
     if (faucetBalance < requiredNative) {
-      return errorResponse(
-        503,
-        {
-          code: 'internal_error',
-          message: 'Faucet wallet has insufficient native balance to cover drip plus gas.',
-          actionHint: `Top up faucet wallet on ${chainKey}, then retry.`,
-          details: {
-            faucetAddress: signer.address,
-            requiredWei: requiredNative.toString(),
-            balanceWei: faucetBalance.toString()
-          }
+      throw new FaucetRouteError({
+        status: 503,
+        code: 'faucet_native_insufficient',
+        message: 'Faucet wallet has insufficient native balance to cover drip plus gas.',
+        actionHint: `Top up faucet wallet on ${chainKey}, then retry.`,
+        details: {
+          faucetAddress: signer.address,
+          requiredWei: requiredNative.toString(),
+          balanceWei: faucetBalance.toString()
         },
-        requestId
-      );
+      });
     }
 
     const limiter = await enforceAgentFaucetDailyRateLimit(requestId, auth.agentId, chainKey);
@@ -405,7 +569,7 @@ export async function POST(req: NextRequest) {
 
     try {
       for (let attempt = 0; attempt < sendAttempts; attempt += 1) {
-        const fees = buildFeeOverrides(feeData, attempt);
+        const fees = buildFeeOverrides(chainKey, feeData, attempt);
         try {
           let nonceOffset = 0;
           if (wrapped) {
@@ -491,12 +655,24 @@ export async function POST(req: NextRequest) {
       requestId
     );
   } catch (error) {
+    if (error instanceof FaucetRouteError) {
+      return errorResponse(
+        error.status,
+        {
+          code: error.code,
+          message: error.message,
+          actionHint: error.actionHint,
+          details: error.details
+        },
+        requestId
+      );
+    }
     return errorResponse(
       500,
       {
-        code: 'internal_error',
+        code: 'faucet_send_preflight_failed',
         message: error instanceof Error ? error.message : 'Faucet request failed.',
-        actionHint: 'Retry later or check faucet funding/configuration.'
+        actionHint: 'Retry later or check faucet funding/configuration and RPC health.'
       },
       requestId
     );

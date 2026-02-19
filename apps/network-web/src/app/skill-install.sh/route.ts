@@ -43,6 +43,8 @@ export XCLAW_REPO_REF="\${XCLAW_REPO_REF:-main}"
 export XCLAW_REPO_URL="\${XCLAW_REPO_URL:-https://github.com/fourtytwo42/ETHDenver2026}"
 export XCLAW_API_BASE_URL="\${XCLAW_API_BASE_URL:-${origin}/api/v1}"
 export XCLAW_DEFAULT_CHAIN="\${XCLAW_DEFAULT_CHAIN:-base_sepolia}"
+export XCLAW_HEDERA_CHAIN_KEY="\${XCLAW_HEDERA_CHAIN_KEY:-hedera_testnet}"
+export XCLAW_INSTALL_AUTO_HEDERA_FAUCET="\${XCLAW_INSTALL_AUTO_HEDERA_FAUCET:-1}"
 
 tmp_dir="$(mktemp -d)"
 cleanup() { rm -rf "$tmp_dir"; }
@@ -704,6 +706,68 @@ try:
 except Exception:
  print("")'
 )"
+hedera_wallet_address=""
+hedera_bind_status="skipped"
+if [ "$XCLAW_HEDERA_CHAIN_KEY" != "$XCLAW_DEFAULT_CHAIN" ]; then
+  echo "[xclaw] ensuring portable wallet is bound on $XCLAW_HEDERA_CHAIN_KEY"
+  set +e
+  hedera_bind_json="$("$XCLAW_AGENT_BIN" wallet create --chain "$XCLAW_HEDERA_CHAIN_KEY" --json 2>&1)"
+  hedera_bind_rc=$?
+  set -e
+  if [ "$hedera_bind_rc" -ne 0 ]; then
+    bind_code="$(printf "%s" "$hedera_bind_json" | python3 -c 'import json,sys
+try:
+ d=json.load(sys.stdin)
+ print((d.get("code") or "").strip())
+except Exception:
+ print("")')"
+    bind_addr="$(printf "%s" "$hedera_bind_json" | python3 -c 'import json,sys
+try:
+ d=json.load(sys.stdin)
+ details=d.get("details") or {}
+ if isinstance(details,dict):
+   print((details.get("address") or "").strip())
+ else:
+   print("")
+except Exception:
+ print("")')"
+    if [ "$bind_code" = "wallet_exists" ]; then
+      hedera_bind_status="ok_existing"
+      if [ -z "$hedera_wallet_address" ] && [ -n "$bind_addr" ]; then
+        hedera_wallet_address="$bind_addr"
+      fi
+      echo "[xclaw] hedera wallet already bound; continuing"
+    else
+      hedera_bind_status="failed"
+      echo "[xclaw] warning: hedera wallet auto-bind failed"
+      echo "[xclaw] code=hedera_wallet_bind_failed chain=$XCLAW_HEDERA_CHAIN_KEY"
+      printf "%s\n" "$hedera_bind_json"
+    fi
+  else
+    hedera_bind_status="ok"
+  fi
+
+  hedera_addr_json="$("$XCLAW_AGENT_BIN" wallet address --chain "$XCLAW_HEDERA_CHAIN_KEY" --json 2>/dev/null || true)"
+  hedera_wallet_address="$(printf "%s" "$hedera_addr_json" | python3 -c 'import json,sys
+try:
+ d=json.load(sys.stdin)
+ print((d.get("address") or "").strip())
+except Exception:
+ print("")')"
+
+  if [ -n "$wallet_address" ] && [ -n "$hedera_wallet_address" ]; then
+    if [ "$(printf "%s" "$wallet_address" | tr '[:upper:]' '[:lower:]')" != "$(printf "%s" "$hedera_wallet_address" | tr '[:upper:]' '[:lower:]')" ]; then
+      echo "[xclaw] ERROR: portable wallet invariant failed (default-chain and Hedera addresses differ)"
+      echo "[xclaw] code=portable_wallet_invariant_failed defaultChain=$XCLAW_DEFAULT_CHAIN hederaChain=$XCLAW_HEDERA_CHAIN_KEY"
+      echo "[xclaw] defaultAddress=$wallet_address"
+      echo "[xclaw] hederaAddress=$hedera_wallet_address"
+      echo "[xclaw] aborting before registration to avoid split-key onboarding"
+      exit 1
+    fi
+  fi
+else
+  hedera_wallet_address="$wallet_address"
+fi
 
 # If a wallet exists, verify we can decrypt/sign before attempting signed bootstrap or on-chain trades.
 if [ "$wallet_exists" = "1" ]; then
@@ -837,6 +901,9 @@ except Exception:
       if [ -n "$boot_agent_name" ]; then
         export XCLAW_AGENT_NAME="$boot_agent_name"
       fi
+      if [ -z "\${XCLAW_AGENT_NAME:-}" ]; then
+        export XCLAW_AGENT_NAME="$XCLAW_AGENT_ID"
+      fi
       bootstrap_ok=1
       openclaw config set skills.entries.xclaw-agent.apiKey "$XCLAW_AGENT_API_KEY" || true
       openclaw config set skills.entries.xclaw-agent.env.XCLAW_AGENT_API_KEY "$XCLAW_AGENT_API_KEY" || true
@@ -865,19 +932,49 @@ except Exception:
   fi
 fi
 
-if [ "$bootstrap_ok" = "1" ]; then
-  echo "[xclaw] register + heartbeat already completed by bootstrap endpoint"
-elif [ -n "\${XCLAW_AGENT_API_KEY:-}" ] && [ -n "\${XCLAW_AGENT_ID:-}" ] && [ -n "$wallet_address" ]; then
-  echo "[xclaw] registering agent first (required before runtime polling)"
+if [ -n "\${XCLAW_AGENT_ID:-}" ] && [ -z "\${XCLAW_AGENT_NAME:-}" ]; then
+  export XCLAW_AGENT_NAME="$XCLAW_AGENT_ID"
+fi
+
+wallets_json="$(python3 - "$XCLAW_DEFAULT_CHAIN" "$wallet_address" "$XCLAW_HEDERA_CHAIN_KEY" "$hedera_wallet_address" <<'PY'
+import json,sys
+default_chain=sys.argv[1]
+default_addr=sys.argv[2]
+hedera_chain=sys.argv[3]
+hedera_addr=sys.argv[4]
+rows=[]
+seen=set()
+def add(chain_key,address):
+    ck=(chain_key or "").strip()
+    ad=(address or "").strip()
+    if not ck or not ad:
+        return
+    key=(ck.lower(), ad.lower())
+    if key in seen:
+        return
+    seen.add(key)
+    rows.append({"chainKey": ck, "address": ad})
+add(default_chain, default_addr)
+add(hedera_chain, hedera_addr)
+print(json.dumps(rows, separators=(",", ":")))
+PY
+)"
+
+if [ -n "\${XCLAW_AGENT_API_KEY:-}" ] && [ -n "\${XCLAW_AGENT_ID:-}" ] && [ -n "$wallet_address" ]; then
+  if [ "$bootstrap_ok" = "1" ]; then
+    echo "[xclaw] bootstrap completed; syncing wallet chain bindings via register upsert"
+  else
+    echo "[xclaw] registering agent first (required before runtime polling)"
+  fi
   register_key="register-$XCLAW_AGENT_ID-$(date +%s)"
-  heartbeat_key="heartbeat-$XCLAW_AGENT_ID-$(date +%s)"
+  heartbeat_key="heartbeat-$XCLAW_AGENT_ID-$(date +%s)-sync"
   register_payload="$(cat <<JSON
 {
   "schemaVersion": 1,
   "agentId": "$XCLAW_AGENT_ID",
   "agentName": "$XCLAW_AGENT_NAME",
   "runtimePlatform": "$runtime_platform",
-  "wallets": [{"chainKey": "$XCLAW_DEFAULT_CHAIN", "address": "$wallet_address"}]
+  "wallets": $wallets_json
 }
 JSON
 )"
@@ -903,9 +1000,62 @@ JSON
     -H "Authorization: Bearer $XCLAW_AGENT_API_KEY" \
     -H "Idempotency-Key: $heartbeat_key" \
     -d "$heartbeat_payload"
-  echo "[xclaw] register + heartbeat attempted"
+  if [ "$bootstrap_ok" = "1" ]; then
+    echo "[xclaw] register wallet-chain sync + heartbeat attempted"
+  else
+    echo "[xclaw] register + heartbeat attempted"
+  fi
 else
   echo "[xclaw] skipped auto-register. Provide XCLAW_AGENT_API_KEY and XCLAW_AGENT_ID, or ensure /api/v1/agent/bootstrap is enabled."
+fi
+
+if [ -n "\${XCLAW_AGENT_API_KEY:-}" ] && [ -n "\${XCLAW_AGENT_ID:-}" ] && [ "$XCLAW_INSTALL_AUTO_HEDERA_FAUCET" = "1" ]; then
+  echo "[xclaw] optional hedera faucet warmup (chain=$XCLAW_HEDERA_CHAIN_KEY)"
+  set +e
+  hedera_faucet_json="$("$XCLAW_AGENT_BIN" faucet-request --chain "$XCLAW_HEDERA_CHAIN_KEY" --asset native --asset wrapped --asset stable --json 2>&1)"
+  hedera_faucet_rc=$?
+  set -e
+  if [ "$hedera_faucet_rc" -ne 0 ]; then
+    faucet_code="$(printf "%s" "$hedera_faucet_json" | python3 -c 'import json,sys
+try:
+ d=json.load(sys.stdin)
+ print((d.get("code") or "").strip())
+except Exception:
+ print("")')"
+    faucet_message="$(printf "%s" "$hedera_faucet_json" | python3 -c 'import json,sys
+try:
+ d=json.load(sys.stdin)
+ print((d.get("message") or "").strip())
+except Exception:
+ print("")')"
+    faucet_hint="$(printf "%s" "$hedera_faucet_json" | python3 -c 'import json,sys
+try:
+ d=json.load(sys.stdin)
+ print((d.get("actionHint") or "").strip())
+except Exception:
+ print("")')"
+    faucet_request_id="$(printf "%s" "$hedera_faucet_json" | python3 -c 'import json,sys
+try:
+ d=json.load(sys.stdin)
+ print((d.get("requestId") or "").strip())
+except Exception:
+ print("")')"
+    echo "[xclaw] warning: hedera faucet warmup skipped"
+    echo "[xclaw] code=hedera_faucet_warmup_failed chain=$XCLAW_HEDERA_CHAIN_KEY faucetCode=\${faucet_code:-unknown}"
+    if [ -n "$faucet_message" ]; then
+      echo "[xclaw] faucetMessage: $faucet_message"
+    fi
+    if [ -n "$faucet_hint" ]; then
+      echo "[xclaw] actionHint: $faucet_hint"
+    fi
+    if [ -n "$faucet_request_id" ]; then
+      echo "[xclaw] requestId: $faucet_request_id"
+    fi
+    echo "[xclaw] rerun: $XCLAW_AGENT_BIN faucet-request --chain $XCLAW_HEDERA_CHAIN_KEY --asset native --asset wrapped --asset stable --json"
+    echo "[xclaw] diagnostics: ensure XCLAW_AGENT_API_KEY/XCLAW_AGENT_ID are set and faucet envs (RPC/private key/token addresses) are configured for $XCLAW_HEDERA_CHAIN_KEY"
+  else
+    echo "[xclaw] hedera faucet warmup completed"
+  fi
 fi
 
 echo "[xclaw] restarting OpenClaw gateway to apply updated skill/env config"

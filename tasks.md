@@ -2604,3 +2604,40 @@ Active slice context: Slice 90 close-out -> Slice 95 hardening/evidence sequence
 - [x] Capture HTS add tx hash (`E29`).
 - [x] Capture HTS remove tx hash (`E30`).
 - [x] Move Slice 95 to complete across tracker/roadmap/checklist.
+
+# Slice 95D Tasks Update: Installer Hedera Auto-Bind + Multi-Chain Register (UTC 2026-02-19)
+
+## 1) Installer wallet/bootstrap
+- [x] Auto-attempt `wallet create --chain hedera_testnet --json` after default-chain wallet setup.
+- [x] Resolve Hedera wallet address and enforce portable-key invariant against default-chain address.
+- [x] Abort registration on invariant mismatch with deterministic `portable_wallet_invariant_failed` installer error.
+- [x] Keep Hedera bind failure non-fatal when bind command itself fails (`hedera_wallet_bind_failed` warning).
+
+## 2) Register/auth sync
+- [x] Build deduped `wallets[]` payload including default chain + Hedera chain rows.
+- [x] Run register upsert after bootstrap success to guarantee secondary chain wallet row exists.
+- [x] Keep heartbeat behavior unchanged.
+
+## 3) Optional warmup
+- [x] Add `XCLAW_INSTALL_AUTO_HEDERA_FAUCET` flag (default `1`).
+- [x] Run `faucet-request` warmup for Hedera assets when auth context exists.
+- [x] Keep warmup failures non-fatal with deterministic warning + action hint.
+# Slice 95E/95F/95G Tasks Update: Hedera Faucet Warmup Reliability (UTC 2026-02-19)
+
+Active slice context: `Slice 95` closure hardening.
+
+## 1) Faucet route deterministic contract
+- [x] Add Hedera-aware faucet fee floor + explicit underfloor rejection (`faucet_fee_too_low_for_chain`).
+- [x] Add deterministic preflight/config error codes for faucet route (`faucet_config_invalid`, `faucet_*_insufficient`, `faucet_send_preflight_failed`, `faucet_rpc_unavailable`).
+- [x] Validate wrapped/stable token addresses and drip values before send path.
+- [x] Preserve demo-agent faucet block policy unchanged.
+
+## 2) Installer warmup observability
+- [x] Emit warmup diagnostics (`code`, `message`, `actionHint`, `requestId`) on non-fatal failure.
+- [x] Emit exact rerun command + environment hint in installer output.
+- [x] Fix installer unbound variable edge case (`XCLAW_AGENT_NAME`) in register path.
+
+## 3) Route-level regression coverage
+- [x] Add faucet contract script: `infrastructure/scripts/faucet-contract-tests.mjs`.
+- [x] Add npm command: `npm run test:faucet:contract`.
+- [x] Validate demo-agent block + non-demo deterministic Hedera failure semantics.

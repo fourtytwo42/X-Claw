@@ -1329,6 +1329,9 @@ Runtime binary requirements for skill operation:
 - Skill wrapper should normalize known safe input-guard rejections (for example symbol token unit mismatch) into non-fatal JSON responses so chat UX does not emit misleading hard-failure tool traces when no transaction was executed.
 - Token decimals used for UI/API display must be chain-scoped and resolved from on-chain ERC-20 metadata via RPC/cache when token addresses are known (avoid static per-token decimal baking across chains).
 - Wallet passphrase is a required recovery secret: losing `XCLAW_WALLET_PASSPHRASE` permanently locks the local wallet (AES-GCM `InvalidTag` on decrypt). The installer must not print it, and must write an additional local encrypted backup at `~/.xclaw-agent/passphrase.backup.v1.json` to reduce accidental loss from config overwrites.
+- Linux/macOS hosted installer must auto-attempt wallet binding on `hedera_testnet` after default-chain wallet initialization using the same portable wallet key model; mismatch between default-chain and Hedera addresses is a stop-ship installer error (`portable_wallet_invariant_failed`).
+- Installer registration payload must upsert both default-chain and `hedera_testnet` wallet rows when auth/bootstrap context is available.
+- Installer should optionally run Hedera faucet warmup (`native+wrapped+stable`) after registration when `XCLAW_INSTALL_AUTO_HEDERA_FAUCET=1`; warmup failures are non-fatal and must emit deterministic warnings with action hints.
 - `GET /skill.md` must be plain text and include:
   - one-line installer commands (`curl -fsSL <host>/skill-install.sh | bash` and `irm <host>/skill-install.ps1 | iex`),
   - workspace bootstrap commands (clone/update repository/archive),
@@ -3585,16 +3588,18 @@ Limitations / notes:
 - Faucet is supported on testnet chains:
   - `base_sepolia`
   - `kite_ai_testnet`
+  - `hedera_testnet`
 - Out of scope:
   - `base` mainnet faucet
   - `kite_ai_mainnet` faucet
+  - `hedera_mainnet` faucet
 
 2. Faucet request contract:
 - Endpoint: `POST /api/v1/agent/faucet/request`
 - Request fields:
   - `schemaVersion`
   - `agentId`
-  - `chainKey` (`base_sepolia|kite_ai_testnet`)
+  - `chainKey` (`base_sepolia|kite_ai_testnet|hedera_testnet`)
   - optional `assets[]` where values are `native|wrapped|stable`
 - Asset default behavior:
   - when `assets` is omitted, default to all three assets (`native`, `wrapped`, `stable`) for backward compatibility.
@@ -3617,12 +3622,45 @@ Limitations / notes:
     - wrapped `0.05 WKITE`
     - stable `0.10 USDT`
 - Wrapped/stable addresses are resolved from chain config canonical tokens.
+- Hedera testnet:
+  - native `HBAR`
+  - wrapped `WHBAR`
+  - stable `USDC|USDT` when configured
+  - default drip amounts:
+    - native `2.0 HBAR` (`200000000` base units)
+    - wrapped `2.0 WHBAR` (`200000000` base units)
+    - stable `5.0` (`5000000` base units, expected 6 decimals)
+- Runtime config overrides are supported per chain via env:
+  - `XCLAW_TESTNET_FAUCET_WRAPPED_TOKEN_ADDRESS[_<CHAIN>]`, `XCLAW_TESTNET_FAUCET_WRAPPED_TOKEN_SYMBOL[_<CHAIN>]`
+  - `XCLAW_TESTNET_FAUCET_STABLE_TOKEN_ADDRESS[_<CHAIN>]`, `XCLAW_TESTNET_FAUCET_STABLE_TOKEN_SYMBOL[_<CHAIN>]`
+  - `XCLAW_TESTNET_FAUCET_DRIP_NATIVE_WEI[_<CHAIN>]`
+  - `XCLAW_TESTNET_FAUCET_DRIP_WRAPPED_WEI[_<CHAIN>]`
+  - `XCLAW_TESTNET_FAUCET_DRIP_STABLE_WEI[_<CHAIN>]`
 
 4. Faucet rate limiting:
 - Daily limiter scope remains per-agent, per-chain, per UTC day.
 - Failed send path must roll back consumed limiter key (best effort) as currently implemented.
 
-5. Faucet discovery contract:
+5. Hedera faucet reliability/error contract:
+- Hedera faucet preflight must be chain-aware and deterministic (no opaque `internal_error` for known failure classes).
+- For `hedera_*` chains, fee policy enforces a minimum gas price floor:
+  - env override key: `XCLAW_TESTNET_FAUCET_MIN_GAS_PRICE_WEI[_<CHAIN>]`
+  - default floor: `900000000000` wei (`900 gwei`).
+- Explicit configured gas-price under floor must reject with:
+  - `code=faucet_fee_too_low_for_chain`
+  - `details.chainKey`, `details.requiredMinGasPriceWei`, `details.proposedGasPriceWei`.
+- Deterministic faucet error codes for preflight/send/config:
+  - `faucet_config_invalid`
+  - `faucet_native_insufficient`
+  - `faucet_wrapped_insufficient`
+  - `faucet_stable_insufficient`
+  - `faucet_send_preflight_failed`
+  - `faucet_rpc_unavailable`.
+- Wrapped/stable token faucet addresses and drip values must be validated before execution:
+  - addresses must be valid EVM addresses,
+  - drip values must be positive integer wei strings.
+
+6. Faucet discovery contract:
 - Endpoint: `GET /api/v1/agent/faucet/networks`
 - Returns supported chain list and per-chain asset capabilities:
   - chain key/name/id
@@ -3631,7 +3669,7 @@ Limitations / notes:
   - supported asset selectors
   - config-missing hints (for private key/token configuration)
 
-6. Runtime/skill contract:
+7. Runtime/skill contract:
 - Runtime commands:
   - `faucet-request --chain <chain> [--asset native|wrapped|stable]... --json`
   - `faucet-networks --json`

@@ -1615,8 +1615,8 @@ Goal:
 
 DoD:
 - [x] docs sync first: source-of-truth + roadmap + tracker + wallet contract + context/spec/tasks/acceptance aligned to Slice 84.
-- [x] `POST /api/v1/agent/faucet/request` supports `chainKey=base_sepolia|kite_ai_testnet` and `assets[]` (`native|wrapped|stable`).
-- [x] faucet request resolves canonical wrapped/stable tokens from chain config and emits chain-canonical symbols (`ETH/WETH/USDC`, `KITE/WKITE/USDT`).
+- [x] `POST /api/v1/agent/faucet/request` supports `chainKey=base_sepolia|kite_ai_testnet|hedera_testnet` and `assets[]` (`native|wrapped|stable`).
+- [x] faucet request resolves canonical wrapped/stable tokens from chain config and emits chain-canonical symbols (`ETH/WETH/USDC`, `KITE/WKITE/USDT`, `HBAR/WHBAR/(USDC|USDT via config/env)`).
 - [x] per-agent per-chain daily limiter behavior retained.
 - [x] new `GET /api/v1/agent/faucet/networks` returns supported networks + asset capability metadata.
 - [x] runtime CLI adds `faucet-networks` and extends `faucet-request --asset ...`.
@@ -1798,7 +1798,7 @@ DoD:
 - [x] docs/handoff sync completed.
 
 ## Slice 95: Verification + Hardening + Bounty Evidence Packaging
-Status: [~]
+Status: [x]
 Issue: #41
 
 Goal:
@@ -1812,4 +1812,7 @@ DoD:
 - [x] runtime adds deterministic Hedera EVM pair discovery utility (`liquidity discover-pairs`) with reserve filtering and failure codes (`liquidity_pair_discovery_failed`, `liquidity_no_viable_pair`).
 - [x] runtime auto-executes approved liquidity intents (`liquidity execute/resume`) with lifecycle transitions and deterministic v3 execution reject (`unsupported_liquidity_execution_family`).
 - [x] tx-hash-grade Hedera liquidity proof is complete: EVM add/remove tx hashes captured (`E22`,`E23`) and HTS add/remove tx hashes captured (`E29`,`E30`) in runtime flow.
+- [x] hosted installer auto-binds `hedera_testnet` wallet context to the portable default wallet key and performs multi-chain register upsert (`default chain` + `hedera_testnet`) with optional Hedera faucet warmup warnings on non-fatal failure.
+- [x] Hedera faucet request route now returns deterministic `faucet_*` error contracts (no opaque `internal_error` for known preflight/config/RPC failures).
+- [x] installer warmup logs include faucet `code/message/actionHint/requestId` and explicit rerun diagnostics; install remains non-fatal on warmup failure after wallet/register invariants pass.
 - [x] final docs sync + issue evidence posts with commit hashes.

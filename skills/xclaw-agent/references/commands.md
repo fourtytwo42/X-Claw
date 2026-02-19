@@ -115,6 +115,10 @@ Underlying runtime delegation (performed by wrapper):
 - `xclaw-agent wallet token-balance --token <token_address> --chain <chain_key> --json`
 - `xclaw-agent wallet create --chain <chain_key> --json`
 
+Installer/bootstrap note:
+- Hosted installer (`/skill-install.sh`) creates/binds default-chain wallet and auto-attempts `hedera_testnet` bind using the same portable wallet key. Registration upsert includes both chain wallet rows when auth context is present.
+- Installer optional Hedera warmup emits deterministic diagnostics (`faucetCode`, `faucetMessage`, `actionHint`, optional `requestId`) plus exact rerun command when warmup is non-fatal.
+
 ## Output Requirements
 
 - Commands must return JSON on stdout.

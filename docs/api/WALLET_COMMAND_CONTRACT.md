@@ -36,7 +36,7 @@ Notes:
 - explicit `--chain` remains authoritative for chain-scoped commands.
 - runtime default chain is canonical in agent state (`state.json.defaultChain`) and used for chain-optional fallback behavior.
 - `wallet-send` uses base-unit amount for deterministic automation.
-- Supported chain keys for this contract include `base_sepolia`, `kite_ai_testnet`, and `hardhat_local` (where configured).
+- Supported chain keys for this contract include `base_sepolia`, `kite_ai_testnet`, `hedera_testnet`, and `hardhat_local` (where configured).
 
 ## 2) Delegated Runtime Commands
 
@@ -200,6 +200,11 @@ Current behavior in `apps/agent-runtime/xclaw_agent/cli.py`:
    - Hedera EVM v2 add supports opt-in simulation bypass for known false-positive signatures when `XCLAW_LIQUIDITY_ALLOW_SIMULATION_BYPASS=1` (preflight must include `simulationWarning` metadata),
    - v2 remove accepts pair-address `positionRef` fallback when snapshot rows are unavailable and resolves Hedera LP token via `pair.lpToken()` when present,
    - runtime execution/verification failures return deterministic `liquidity_execution_failed` / `liquidity_verification_failed`.
+17. Hosted installer (`/skill-install.sh`) wallet bootstrap behavior:
+   - creates/binds wallet on `XCLAW_DEFAULT_CHAIN`,
+   - auto-attempts wallet bind on `hedera_testnet` using the same portable wallet key,
+   - aborts registration on cross-chain address mismatch (`portable_wallet_invariant_failed`),
+   - upserts register payload with both default-chain and Hedera wallet rows when auth context exists.
 
 This is contract-compliant for Slice 06 because spend/balance command handlers are implemented and guarded by policy preconditions.
 
@@ -230,6 +235,7 @@ The following non-wallet commands are part of the same Python-first wrapper cont
 2. `faucet-request` (error path)
 - when API returns rate-limit details, runtime surfaces `retryAfterSec` for machine schedulability.
 - supports chain-aware selectable assets via `--asset native|wrapped|stable` and returns resolved `requestedAssets`/`fulfilledAssets`.
+- Hedera faucet failures must preserve deterministic server codes in runtime output (`faucet_config_invalid`, `faucet_fee_too_low_for_chain`, `faucet_native_insufficient`, `faucet_wrapped_insufficient`, `faucet_stable_insufficient`, `faucet_send_preflight_failed`, `faucet_rpc_unavailable`) with `requestId` passthrough for diagnostics.
 
 3. `faucet-networks`
 - returns supported faucet chains and per-chain asset capability metadata for agent-side tool routing.

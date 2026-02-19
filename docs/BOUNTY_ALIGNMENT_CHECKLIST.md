@@ -166,7 +166,9 @@ Notes:
 
 Notes:
 - `E1/E2/E3/E4/E5` cover hardhat-local + Base Sepolia contract/preflight/approval evidence.
-- `E6..E20` cover Hedera EVM+HTS execution attempts, pair discovery, installer/JDK checks, runtime auto-execution implementation, and deterministic blockers; tx-hash-grade completion remains blocked in this environment by network sandbox constraints and HTS runtime prerequisites.
+- `E22/E23` capture Hedera EVM add/remove tx-hash runtime proof.
+- `E29/E30` capture Hedera HTS add/remove tx-hash runtime proof.
+- `E34..E37` capture Hedera faucet deterministic failure contract and installer warmup diagnostics for non-demo install flows.
 
 ---
 
@@ -193,3 +195,19 @@ Notes:
 - `E19`: Management liquidity decision route test bootstrap is self-healing (agent-issued owner link fallback) and the suite passes (`14 passed / 0 failed`).
 - `E20`: Local API/DB health recovered in-session (`/api/health` -> `overallStatus=healthy`; Postgres `127.0.0.1:55432` accepting connections).
 - `E21`: Remaining live blocker is wallet signing in this shell (`wallet-sign-challenge` returns deterministic `sign_failed` until correct `XCLAW_WALLET_PASSPHRASE` is provided); HTS default interpreter still fail-closes with `missing_dependency`.
+- `E22`: Hedera EVM runtime `liquidity add` tx hash `0x2c019ea7b35176d6d6c1b141fabdb849625b1b05ae7a1d3112a6673e173c8891` (receipt `status=0x1`).
+- `E23`: Hedera EVM runtime `liquidity remove` tx hash `0x69df2d9b23653b13b8a86cc2e03a6da72b2b2118ed70ed4a3f26f4ef1fd32865` (receipt `status=0x1`).
+- `E24`: Hedera deterministic preflight probe outputs (`liquidity_preflight_token_transfer_blocked_token_a|b`, enriched router-revert details).
+- `E25`: HTS readiness matrix in wallet health output (`java/javac/import/plugin/bridge` checks).
+- `E26`: HTS add deterministic fail-closed sample (`missing_dependency`) before bridge default wiring.
+- `E27`: HTS remove deterministic fail-closed sample (`missing_dependency`) before bridge default wiring.
+- `E28`: HTS readiness pass with default bridge command resolution.
+- `E29`: HTS add tx hash `4fce8accb8103ceadbb20865a9020222189d3606c309b6896c77bc8b97cb928fdbcc012933a5c373fa7f2922bccfd62f`.
+- `E30`: HTS remove tx hash `41428b5b6519e0c710d1aa80b796819a690ed6211ab7cce6052937cc9c89c6508b2c43813ce2ec7d0deb9cdddb9fea88`.
+- `E31`: Installer auto-binds Hedera wallet with portable-key invariant enforcement.
+- `E32`: Installer register upsert writes both default-chain + Hedera wallet rows.
+- `E33`: Installer optional Hedera warmup emits deterministic non-fatal warning contract.
+- `E34`: Hedera faucet contract test proves non-demo deterministic Hedera error code (`faucet_rpc_unavailable`) with requestId.
+- `E35`: Installer warmup output includes `faucetCode`, `faucetMessage`, `actionHint`, and rerun command.
+- `E36`: Reinstall path preserves existing wallet and register upsert behavior.
+- `E37`: Warmup failure remains deterministic and non-fatal (`hedera_faucet_warmup_failed`).

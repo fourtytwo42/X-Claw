@@ -19,6 +19,13 @@ export type ApiErrorCode =
   | 'rpc_unavailable'
   | 'trade_invalid_transition'
   | 'liquidity_invalid_transition'
+  | 'faucet_config_invalid'
+  | 'faucet_fee_too_low_for_chain'
+  | 'faucet_native_insufficient'
+  | 'faucet_wrapped_insufficient'
+  | 'faucet_stable_insufficient'
+  | 'faucet_send_preflight_failed'
+  | 'faucet_rpc_unavailable'
   | 'idempotency_conflict'
   | 'payload_invalid'
   | 'internal_error';

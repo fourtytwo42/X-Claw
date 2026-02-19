@@ -6,7 +6,7 @@
   "properties": {
     "schemaVersion": { "type": "integer", "const": 1 },
     "agentId": { "type": "string", "minLength": 1 },
-    "chainKey": { "type": "string", "enum": ["base_sepolia", "kite_ai_testnet"] },
+    "chainKey": { "type": "string", "enum": ["base_sepolia", "kite_ai_testnet", "hedera_testnet"] },
     "assets": {
       "type": "array",
       "minItems": 1,

@@ -1,4 +1,5 @@
 import type { NextRequest } from 'next/server';
+import { isAddress } from 'ethers';
 
 import { authenticateAgentByToken } from '@/lib/agent-auth';
 import { chainCapabilityEnabled, getChainConfig, listEnabledChains } from '@/lib/chains';
@@ -23,17 +24,36 @@ function resolveChainScopedEnv(prefix: string, chainKey: string): string {
 }
 
 function resolveWrapped(chainKey: string): { symbol: string; address: string } | null {
+  const envAddress = resolveChainScopedEnv('XCLAW_TESTNET_FAUCET_WRAPPED_TOKEN_ADDRESS', chainKey);
+  if (envAddress) {
+    const envSymbol = resolveChainScopedEnv('XCLAW_TESTNET_FAUCET_WRAPPED_TOKEN_SYMBOL', chainKey) || 'WRAPPED';
+    if (!isAddress(envAddress)) {
+      return null;
+    }
+    return { symbol: envSymbol, address: envAddress };
+  }
   const cfg = getChainConfig(chainKey);
   const tokens = cfg?.canonicalTokens || {};
-  const address = (tokens.WETH || tokens.WKITE || '').trim();
+  const address = (tokens.WETH || tokens.WKITE || tokens.WHBAR || '').trim();
   if (!address) {
     return null;
   }
-  const symbol = tokens.WETH ? 'WETH' : 'WKITE';
+  const symbol = tokens.WETH ? 'WETH' : tokens.WKITE ? 'WKITE' : 'WHBAR';
+  if (!isAddress(address)) {
+    return null;
+  }
   return { symbol, address };
 }
 
 function resolveStable(chainKey: string): { symbol: string; address: string } | null {
+  const envAddress = resolveChainScopedEnv('XCLAW_TESTNET_FAUCET_STABLE_TOKEN_ADDRESS', chainKey);
+  if (envAddress) {
+    const envSymbol = resolveChainScopedEnv('XCLAW_TESTNET_FAUCET_STABLE_TOKEN_SYMBOL', chainKey) || 'USDC';
+    if (!isAddress(envAddress)) {
+      return null;
+    }
+    return { symbol: envSymbol, address: envAddress };
+  }
   const cfg = getChainConfig(chainKey);
   const tokens = cfg?.canonicalTokens || {};
   const address = (tokens.USDC || tokens.USDT || '').trim();
@@ -41,6 +61,9 @@ function resolveStable(chainKey: string): { symbol: string; address: string } | 
     return null;
   }
   const symbol = tokens.USDC ? 'USDC' : 'USDT';
+  if (!isAddress(address)) {
+    return null;
+  }
   return { symbol, address };
 }
 

@@ -2466,3 +2466,51 @@ Implement the post-Slice-88 liquidity program through runtime adapter preflight 
 3. Wired installer env defaults to persist `XCLAW_HEDERA_HTS_BRIDGE_CMD` for skill runtime.
 4. Extended `wallet health` HTS readiness details with bridge source/config state.
 5. Captured live HTS add/remove tx-hash evidence (`E29`, `E30`).
+
+# Slice 95D Addendum: Installer Hedera Auto-Bind + Multi-Chain Register (UTC 2026-02-19)
+
+## Goal
+1. Ensure hosted installer automatically binds `hedera_testnet` wallet context using the same portable wallet key as default chain.
+2. Ensure installer registration upserts both default-chain and Hedera wallet rows.
+3. Add optional Hedera faucet warmup after auth/register for immediate test readiness.
+
+## Locked scope
+1. `apps/network-web/src/app/skill-install.sh/route.ts`
+2. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+3. `docs/XCLAW_BUILD_ROADMAP.md`
+4. `docs/XCLAW_SLICE_TRACKER.md`
+5. `docs/api/WALLET_COMMAND_CONTRACT.md`
+6. `skills/xclaw-agent/SKILL.md`
+7. `skills/xclaw-agent/references/commands.md`
+8. `spec.md`
+9. `tasks.md`
+10. `acceptance.md`
+
+## Acceptance checks
+- Hosted installer run binds Hedera wallet (or emits deterministic non-fatal bind warning).
+- Portable-key invariant enforced: default-chain and Hedera addresses must match or installer stops with `portable_wallet_invariant_failed`.
+- Register payload includes deduped wallets for default chain + `hedera_testnet`.
+- Optional warmup gate:
+  - `XCLAW_INSTALL_AUTO_HEDERA_FAUCET=1` runs `faucet-request --chain hedera_testnet --asset native --asset wrapped --asset stable`.
+  - failure is non-fatal and logs deterministic warning + action hint.
+# Slice 95E/95F/95G Addendum: Hedera Faucet Warmup Reliability (UTC 2026-02-19)
+
+## Goals
+1. Remove opaque Hedera faucet `internal_error` outcomes for known preflight/config/RPC failures.
+2. Keep installer warmup non-fatal while surfacing deterministic diagnostics and rerun commands.
+3. Preserve existing endpoint paths and demo-agent faucet block policy.
+
+## Locked contract updates
+1. `POST /api/v1/agent/faucet/request` remains path-stable; error `code` contract expanded for deterministic Hedera handling:
+   - `faucet_config_invalid`
+   - `faucet_fee_too_low_for_chain`
+   - `faucet_native_insufficient`
+   - `faucet_wrapped_insufficient`
+   - `faucet_stable_insufficient`
+   - `faucet_send_preflight_failed`
+   - `faucet_rpc_unavailable`
+2. Hedera gas floor enforced with default minimum `900000000000` wei and env override hooks.
+3. Installer warmup output includes `faucetCode`, `faucetMessage`, `actionHint`, optional `requestId`, and exact rerun command.
+
+## Validation
+- `npm run test:faucet:contract` is the route-level regression command for faucet error contract behavior.
