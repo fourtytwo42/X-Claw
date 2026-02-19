@@ -42,6 +42,7 @@ DECISION_ACK_MARKER_V11 = "xclaw: telegram approval decision ack v11"
 DECISION_ACK_MARKER_V12 = "xclaw: telegram approval decision ack v12"
 DECISION_ACK_MARKER_V13 = "xclaw: telegram approval decision ack v13"
 DECISION_ACK_MARKER_V14 = "xclaw: telegram approval decision ack v14"
+DECISION_ACK_MARKER_V15 = "xclaw: telegram approval decision ack v15"
 DECISION_ROUTE_MARKER_V1 = "xclaw: telegram approval decision routed to agent"
 DECISION_EXEC_MARKER_V1 = "xclaw: telegram trade resume trigger v1"
 DECISION_RESULT_ROUTE_MARKER_V1 = "xclaw: telegram trade result routed to agent"
@@ -50,7 +51,7 @@ QUEUED_BUTTONS_MARKER_V2 = "xclaw: telegram queued approval buttons v2"
 QUEUED_BUTTONS_MARKER_V3 = "xclaw: telegram queued approval buttons v3"
 LEGACY_DM_SENTINEL = 'Allow in DMs even when inlineButtonsScope is "allowlist", gated by chatId == senderId.'
 # Bump when patch semantics change so we invalidate the cached "already patched" fast-path.
-STATE_SCHEMA_VERSION = 45
+STATE_SCHEMA_VERSION = 46
 STATE_DIR = Path.home() / ".openclaw" / "xclaw"
 STATE_FILE = STATE_DIR / "openclaw_patch_state.json"
 LOCK_FILE = STATE_DIR / "openclaw_patch.lock"
@@ -297,6 +298,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         or DECISION_ACK_MARKER_V12 not in raw
         or DECISION_ACK_MARKER_V13 not in raw
         or DECISION_ACK_MARKER_V14 not in raw
+        or DECISION_ACK_MARKER_V15 not in raw
         or DECISION_ROUTE_MARKER_V1 not in raw
         or DECISION_EXEC_MARKER_V1 not in raw
         or DECISION_RESULT_ROUTE_MARKER_V1 not in raw
@@ -324,6 +326,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         or DECISION_ACK_MARKER_V12 not in raw
         or DECISION_ACK_MARKER_V13 not in raw
         or DECISION_ACK_MARKER_V14 not in raw
+        or DECISION_ACK_MARKER_V15 not in raw
         or DECISION_ROUTE_MARKER_V1 not in raw
         or DECISION_EXEC_MARKER_V1 not in raw
         or DECISION_RESULT_ROUTE_MARKER_V1 not in raw
@@ -438,6 +441,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         and DECISION_ACK_MARKER_V12 in raw
         and DECISION_ACK_MARKER_V13 in raw
         and DECISION_ACK_MARKER_V14 in raw
+        and DECISION_ACK_MARKER_V15 in raw
         and DECISION_ROUTE_MARKER_V1 in raw
         and DECISION_EXEC_MARKER_V1 in raw
         and DECISION_RESULT_ROUTE_MARKER_V1 in raw
@@ -600,6 +604,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V12}\n'
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V13}\n'
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V14}\n'
+        f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V15}\n'
         '\t\t\t\t\t\t\t\t// Keep queued text in chat history and only clear inline buttons.\n'
         '\t\t\t\t\t\t\t\ttry { await bot.api.editMessageReplyMarkup(chatId, callbackMessage.message_id, { inline_keyboard: [] }); } catch {}\n'
         '\t\t\t\t\t\t\t\t// Emit deterministic confirmation immediately so users always see a result.\n'

@@ -1,3 +1,30 @@
+# Hotfix Tasks: Force-Upgrade Gateway Callback Patch (v15) For Trade-Approve Ack Suppression
+
+Active slice context: `Slice 86` is in progress; this is an explicit user-reported rollout reliability hotfix.
+
+## 1) Scope lock
+- [x] Force-upgrade patch semantics for already-patched bundles.
+- [x] No functional drift beyond existing `xappr` approve-ack suppression intent.
+
+## 2) Implementation
+- [x] Add `DECISION_ACK_MARKER_V15` marker.
+- [x] Require `v15` marker in upgrade/fast-path gating checks.
+- [x] Include `v15` marker in canonical injected callback block.
+- [x] Bump patch state schema to invalidate cached already-patched state.
+- [x] Update handoff artifacts (`spec.md`, `tasks.md`, `acceptance.md`).
+
+## 3) Validation
+- [x] `python3 -m py_compile skills/xclaw-agent/scripts/openclaw_gateway_patch.py`
+- [x] `python3 skills/xclaw-agent/scripts/openclaw_gateway_patch.py --json`
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+
+---
+
 # Hotfix Tasks: Suppress Telegram Intermediate "Approved trade" Ack For Conversions
 
 Active slice context: `Slice 86` is in progress; this is an explicit user-requested Telegram UX hotfix.

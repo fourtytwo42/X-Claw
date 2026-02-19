@@ -1,3 +1,33 @@
+# Hotfix Acceptance Evidence: Force-Upgrade Gateway Callback Patch (v15) For Trade-Approve Ack Suppression
+
+Date (UTC): 2026-02-19
+Active slice context: `Slice 86` in progress (explicit user-reported rollout reliability hotfix)
+
+## Objective + Scope Lock
+- Objective: force-update already-patched OpenClaw callback bundles so new trade-approve ack suppression behavior is actually applied.
+- Scope lock:
+  - `skills/xclaw-agent/scripts/openclaw_gateway_patch.py`
+  - handoff artifacts (`spec.md`, `tasks.md`, `acceptance.md`)
+- Out of scope: user-facing behavior changes beyond already-locked suppression contract.
+
+## Behavior Checks
+- [x] `v15` marker added and required for upgrade detection.
+- [x] Existing bundles lacking `v15` are treated as outdated and re-injected.
+- [x] patch fast-path cache invalidated via state schema bump.
+- [x] canonical injected block includes `v15` marker.
+
+## Required Validation Gates
+- [x] `python3 -m py_compile skills/xclaw-agent/scripts/openclaw_gateway_patch.py` -> PASS
+- [x] `python3 skills/xclaw-agent/scripts/openclaw_gateway_patch.py --json` -> PASS (`ok:true`, `patched:true`)
+- [x] `npm run db:parity` -> PASS (`ok: true`)
+- [x] `npm run seed:reset` -> PASS (`ok: true`)
+- [x] `npm run seed:load` -> PASS (`ok: true`)
+- [x] `npm run seed:verify` -> PASS (`ok: true`)
+- [x] `npm run build` -> PASS (Next.js production build succeeded)
+- [x] `pm2 restart all` -> PASS (`xclaw-web` online)
+
+---
+
 # Hotfix Acceptance Evidence: Suppress Telegram Intermediate "Approved trade" Ack For Conversions
 
 Date (UTC): 2026-02-19

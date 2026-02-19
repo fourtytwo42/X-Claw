@@ -1,3 +1,31 @@
+# Hotfix Spec: Force-Upgrade Gateway Callback Patch (v15) For Trade-Approve Ack Suppression
+
+## Goal
+Ensure existing OpenClaw installs with older callback patch blocks are upgraded in-place so `xappr approve` no longer emits intermediate `Approved trade ...` Telegram messages.
+
+## Non-goals
+1. No change to final trade result messaging.
+2. No change to policy/transfer confirmation behavior.
+3. No API/schema/migration changes.
+
+## Locked scope
+1. `skills/xclaw-agent/scripts/openclaw_gateway_patch.py`
+2. `spec.md`
+3. `tasks.md`
+4. `acceptance.md`
+
+## Acceptance checks
+- `python3 -m py_compile skills/xclaw-agent/scripts/openclaw_gateway_patch.py`
+- `python3 skills/xclaw-agent/scripts/openclaw_gateway_patch.py --json`
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `pm2 restart all`
+
+---
+
 # Hotfix Spec: Suppress Telegram Intermediate "Approved trade" Ack For Conversions
 
 ## Goal
