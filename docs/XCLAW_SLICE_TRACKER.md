@@ -1878,7 +1878,7 @@ DoD:
 - [x] issue #44 updated with verification evidence + commit hash(es).
 
 ## Slice 99: Installer Multi-Chain Wallet Auto-Bind Hardening
-Status: [~]
+Status: [x]
 Issue: #45
 
 Goal:
@@ -2057,4 +2057,4 @@ DoD:
 - [x] wallet-only/disabled chain promotion backlog documented with gate checklist.
 - [x] required gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
 - [x] runtime tests pass (`test_liquidity_cli.py`, `test_trade_path.py`).
-- [ ] issue #49 evidence post + commit hash(es).
+- [x] issue #49 evidence post + commit hash(es).
