@@ -101,6 +101,8 @@ type ChartPoint = {
 
 const FIXED_CHAIN_COLORS: Record<string, string> = {
   base_sepolia: '#3b82f6',
+  ethereum: '#2563eb',
+  ethereum_sepolia: '#0ea5e9',
   hardhat_local: '#f59e0b',
   kite_ai_testnet: '#22c55e',
 };

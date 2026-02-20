@@ -2831,3 +2831,29 @@ Active slice context: `Slice 96`.
 - [x] Harness now fails fast deterministically when hardhat rpc is unavailable (`hardhat_rpc_unavailable`).
 - [x] Harness now blocks base-sepolia run when hardhat evidence report missing/non-green.
 - [x] Harness now retries transient management `500` responses with bounded backoff+jitter and structured diagnostics.
+
+# Slice 97 Tasks: Ethereum + Ethereum Sepolia Wallet-First Onboarding (UTC 2026-02-20)
+
+Active slice context: `Slice 97`.
+
+## 1) Canonical sync
+- [x] Add Slice 97 tracker entry in `docs/XCLAW_SLICE_TRACKER.md`.
+- [x] Add Slice 97 roadmap section in `docs/XCLAW_BUILD_ROADMAP.md`.
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` with wallet-first chain onboarding contract.
+- [x] Update `docs/api/WALLET_COMMAND_CONTRACT.md` and relevant OpenAPI chain-key examples.
+- [x] Update handoff artifacts (`spec.md`, `tasks.md`, `acceptance.md`).
+
+## 2) Implementation
+- [x] Add `config/chains/ethereum.json` (enabled+visible, wallet-first capabilities, verified RPC/explorer metadata).
+- [x] Add `config/chains/ethereum_sepolia.json` (enabled+visible, wallet-first capabilities, verified RPC/explorer metadata).
+- [x] Update fallback chain registry in `apps/network-web/src/lib/active-chain.ts`.
+- [x] Update status provider probe allowlist in `apps/network-web/src/lib/ops-health.ts`.
+- [x] Update deterministic dashboard chain color map in `apps/network-web/src/app/dashboard/page.tsx`.
+
+## 3) Validation/evidence
+- [x] `apps/agent-runtime/bin/xclaw-agent chains --json` includes both new chains and wallet-first capabilities.
+- [x] Isolated-home wallet create/address/health checks pass for both chains.
+- [x] `/api/v1/public/chains` returns both new chains with expected metadata.
+- [x] `/api/status` provider list includes both new chains.
+- [x] Required repo gates run sequentially.
+- [x] Issue #43 evidence posted with commit hash(es).

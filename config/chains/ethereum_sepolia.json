@@ -1,0 +1,52 @@
+{
+  "chainKey": "ethereum_sepolia",
+  "family": "evm",
+  "enabled": true,
+  "uiVisible": true,
+  "chainId": 11155111,
+  "displayName": "Ethereum Sepolia",
+  "nativeCurrency": {
+    "name": "Ether",
+    "symbol": "ETH",
+    "decimals": 18
+  },
+  "explorerBaseUrl": "https://sepolia.etherscan.io",
+  "rpc": {
+    "primary": "https://ethereum-sepolia-rpc.publicnode.com",
+    "fallback": "https://sepolia.drpc.org"
+  },
+  "coreContracts": {
+    "dex": "uniswap_v2",
+    "deploymentStatus": "external",
+    "factory": "0xF62c03E08ada871A0bEb309762E260a7a6a880E6",
+    "router": "0xeE567Fe1712Faf6149d80dA1E6934E354124CfE3",
+    "notes": "Wallet-first onboarding (Slice 97). Trading capabilities remain disabled until explicit phase-2 enablement. Uniswap V2 factory/router are recorded for future activation."
+  },
+  "canonicalTokens": {
+    "WETH": "0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14",
+    "USDC": "0x1c7d4b196cb0c7b01d743fbc6116a902379c7238"
+  },
+  "capabilities": {
+    "wallet": true,
+    "trade": false,
+    "liquidity": false,
+    "limitOrders": false,
+    "x402": false,
+    "faucet": false,
+    "deposits": false
+  },
+  "updatedAt": "2026-02-20T00:00:00.000Z",
+  "version": 1,
+  "sources": {
+    "chainMetadata": [
+      "https://raw.githubusercontent.com/ethereum-lists/chains/master/_data/chains/eip155-11155111.json"
+    ],
+    "uniswapV2Deployments": [
+      "https://docs.uniswap.org/contracts/v2/reference/smart-contracts/v2-deployments"
+    ],
+    "rpcVerification": [
+      "eth_chainId https://ethereum-sepolia-rpc.publicnode.com -> 0xaa36a7",
+      "eth_chainId https://sepolia.drpc.org -> 0xaa36a7"
+    ]
+  }
+}

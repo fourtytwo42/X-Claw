@@ -2720,3 +2720,46 @@ Ensure `wallet balance --chain hedera_testnet` shows all owned Hedera tokens for
 - preflight block (`hardhatRpc`, `walletDecryptProbe`, `managementSession`),
 - `retryFailures`,
 - `unresolvedPending`.
+
+---
+
+# Slice 97 Spec: Ethereum + Ethereum Sepolia Wallet-First Onboarding (2026-02-20)
+
+## Goal
+Add `ethereum` and `ethereum_sepolia` to the config-driven chain registry so wallet/send/balance flows are available immediately, while trade/liquidity/limit/x402/faucet/deposit remain capability-gated off.
+
+## Non-goals
+1. No new API endpoints.
+2. No trade/liquidity enablement on new chains.
+3. No default-chain change from `base_sepolia`.
+
+## Locked scope
+1. `config/chains/ethereum.json`
+2. `config/chains/ethereum_sepolia.json`
+3. `apps/network-web/src/lib/active-chain.ts`
+4. `apps/network-web/src/lib/ops-health.ts`
+5. `apps/network-web/src/app/dashboard/page.tsx`
+6. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+7. `docs/XCLAW_BUILD_ROADMAP.md`
+8. `docs/XCLAW_SLICE_TRACKER.md`
+9. `docs/api/WALLET_COMMAND_CONTRACT.md`
+10. `docs/api/openapi.v1.yaml`
+11. `spec.md`
+12. `tasks.md`
+13. `acceptance.md`
+
+## Acceptance checks
+- `apps/agent-runtime/bin/xclaw-agent chains --json`
+- isolated-home wallet smoke:
+  - `XCLAW_AGENT_HOME=<tmp> XCLAW_WALLET_PASSPHRASE=<pass> apps/agent-runtime/bin/xclaw-agent wallet create --chain ethereum --json`
+  - `XCLAW_AGENT_HOME=<tmp> XCLAW_WALLET_PASSPHRASE=<pass> apps/agent-runtime/bin/xclaw-agent wallet health --chain ethereum --json`
+  - `XCLAW_AGENT_HOME=<tmp> XCLAW_WALLET_PASSPHRASE=<pass> apps/agent-runtime/bin/xclaw-agent wallet create --chain ethereum_sepolia --json`
+  - `XCLAW_AGENT_HOME=<tmp> XCLAW_WALLET_PASSPHRASE=<pass> apps/agent-runtime/bin/xclaw-agent wallet health --chain ethereum_sepolia --json`
+- `curl -sS http://127.0.0.1:3000/api/v1/public/chains`
+- `curl -sS http://127.0.0.1:3000/api/v1/health`
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `pm2 restart all`

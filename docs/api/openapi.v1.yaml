@@ -2804,7 +2804,7 @@ components:
           type: string
         chainKey:
           type: string
-          description: Chain key (e.g. `base_sepolia` or `kite_ai_testnet`).
+          description: Chain key (e.g. `base_sepolia`, `kite_ai_testnet`, `ethereum`, or `ethereum_sepolia`).
         chainEnabled:
           type: boolean
     ManagementApprovalChannelUpdateRequest:
@@ -2815,7 +2815,7 @@ components:
           type: string
         chainKey:
           type: string
-          description: Chain key (e.g. `base_sepolia` or `kite_ai_testnet`).
+          description: Chain key (e.g. `base_sepolia`, `kite_ai_testnet`, `ethereum`, or `ethereum_sepolia`).
         channel:
           type: string
           enum: [telegram]

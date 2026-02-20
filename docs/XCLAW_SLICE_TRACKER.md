@@ -1681,7 +1681,7 @@ DoD:
 - [x] shell installer capability-gates Telegram gateway patching; permission-denied patch paths auto-degrade to management-link Telegram fallback mode with explicit sudo rerun guidance for inline-button support.
 
 ## Slice 88: Approvals Center Full UX Flush (Batch + Risk)
-Status: [~]
+Status: [x]
 Issue: #35
 
 Goal:
@@ -1838,3 +1838,21 @@ DoD:
 - [x] harness stabilization includes strict hardhat-first gating, wallet decrypt preflight fail-fast, and retry-backed management writes with diagnostics.
 - [x] add unit tests for harness planner/tolerance/runtime parsing, retry/preflight behavior, and runtime Telegram suppression behavior.
 - [x] docs/handoff sync completed in same change (`source-of-truth`, roadmap, tracker, context/spec/tasks/acceptance).
+
+## Slice 97: Ethereum + Ethereum Sepolia Wallet-First Chain Onboarding
+Status: [~]
+Issue: #43
+
+Goal:
+- Add `ethereum` and `ethereum_sepolia` as first-class chain registry entries, visible in selectors and health probes, with wallet-only capabilities enabled.
+
+DoD:
+- [x] docs sync first: source-of-truth + roadmap + tracker + wallet contract + spec/tasks/acceptance aligned to Slice 97 scope.
+- [x] add `config/chains/ethereum.json` with validated chain metadata (chain id, rpc, explorer, canonical tokens, wallet-first capabilities).
+- [x] add `config/chains/ethereum_sepolia.json` with validated chain metadata (chain id, rpc, explorer, canonical tokens, wallet-first capabilities).
+- [x] web chain-selector fallback registry includes `ethereum` + `ethereum_sepolia`.
+- [x] status provider probe allowlist includes `ethereum` + `ethereum_sepolia`.
+- [x] dashboard chain color map includes deterministic entries for `ethereum` + `ethereum_sepolia`.
+- [x] runtime validation evidence captured for `chains --json` and isolated-home wallet create/address/health on both new chains.
+- [x] required repo gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
+- [x] issue #43 updated with verification evidence + commit hash(es).

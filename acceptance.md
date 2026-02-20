@@ -5302,3 +5302,48 @@ Date (UTC): 2026-02-19
     - `preflight.managementSession`,
     - `retryFailures`,
     - `unresolvedPending`.
+
+## Slice 97 Ethereum + Ethereum Sepolia Wallet-First Onboarding (UTC 2026-02-20)
+
+### Implementation evidence
+- Added `config/chains/ethereum.json` and `config/chains/ethereum_sepolia.json` with:
+  - chain IDs `1` and `11155111`,
+  - explorer URLs (`etherscan.io`, `sepolia.etherscan.io`),
+  - RPC primary/fallback endpoints,
+  - wallet-first capability gating (`wallet=true`, others false),
+  - Uniswap V2 router/factory metadata for deferred phase-2 activation.
+- Updated web/runtime support surfaces:
+  - `apps/network-web/src/lib/active-chain.ts` fallback registry includes both chains.
+  - `apps/network-web/src/lib/ops-health.ts` probes include both chains.
+  - `apps/network-web/src/app/dashboard/page.tsx` includes deterministic colors for both chains.
+- Synced canonical docs/contracts:
+  - `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - `docs/XCLAW_BUILD_ROADMAP.md`
+  - `docs/XCLAW_SLICE_TRACKER.md`
+  - `docs/api/WALLET_COMMAND_CONTRACT.md`
+  - `docs/api/openapi.v1.yaml`
+
+### Runtime/API checks
+- `apps/agent-runtime/bin/xclaw-agent chains --json`
+  - `ethereum` capabilities: `wallet=true`, `trade=false`, `liquidity=false`, `limitOrders=false`, `x402=false`, `faucet=false`, `deposits=false`.
+  - `ethereum_sepolia` capabilities: `wallet=true`, `trade=false`, `liquidity=false`, `limitOrders=false`, `x402=false`, `faucet=false`, `deposits=false`.
+- Isolated-home wallet smoke (`XCLAW_AGENT_HOME=$(mktemp -d)/.xclaw-agent`, `XCLAW_WALLET_PASSPHRASE=slice97-passphrase-123`):
+  - `wallet create --chain ethereum --json` -> PASS (`ok:true`, `code:ok`).
+  - `wallet address --chain ethereum --json` -> PASS (`ok:true`, deterministic address returned).
+  - `wallet health --chain ethereum --json` -> PASS (`ok:true`, `integrityChecked:true`).
+  - `wallet create --chain ethereum_sepolia --json` -> PASS (`ok:true`, portable wallet bound).
+  - `wallet address --chain ethereum_sepolia --json` -> PASS (`ok:true`, same portable address returned).
+  - `wallet health --chain ethereum_sepolia --json` -> PASS (`ok:true`, `integrityChecked:true`).
+- `GET /api/v1/public/chains` -> PASS:
+  - `ethereum`: `chainId=1`, `explorerBaseUrl=https://etherscan.io`, wallet-first capabilities.
+  - `ethereum_sepolia`: `chainId=11155111`, `explorerBaseUrl=https://sepolia.etherscan.io`, wallet-first capabilities.
+- `GET /api/status` provider probe -> PASS:
+  - provider rows include `ethereum` (`primary`,`fallback`) and `ethereum_sepolia` (`primary`,`fallback`) with healthy status.
+
+### Required gates
+- `npm run db:parity` -> PASS
+- `npm run seed:reset` -> PASS
+- `npm run seed:load` -> PASS
+- `npm run seed:verify` -> PASS
+- `npm run build` -> PASS
+- `pm2 restart all` -> PASS

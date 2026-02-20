@@ -3171,3 +3171,46 @@ Note:
   - [x] preflight block emitted in JSON report,
   - [x] retry failure diagnostics emitted in JSON report,
   - [x] pending cleanup includes unresolved list for traceability.
+
+## 97) Slice 97: Ethereum + Ethereum Sepolia Wallet-First Onboarding
+
+### 97.1 Canonical/doc sync
+- [x] Add Slice 97 entries to `docs/XCLAW_SLICE_TRACKER.md` and this roadmap section.
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` with wallet-first onboarding contract for `ethereum` + `ethereum_sepolia`.
+- [x] Update `docs/api/WALLET_COMMAND_CONTRACT.md` supported chain list.
+- [x] Update handoff artifacts: `spec.md`, `tasks.md`, `acceptance.md`.
+
+### 97.2 Implementation
+- [x] Add `config/chains/ethereum.json` with:
+  - [x] `chainId=1`, `displayName=Ethereum`, `explorerBaseUrl=https://etherscan.io`.
+  - [x] `rpc.primary=https://ethereum-rpc.publicnode.com`, `rpc.fallback=https://eth.drpc.org`.
+  - [x] `coreContracts` metadata with Uniswap V2 mainnet router/factory references.
+  - [x] `canonicalTokens` (`WETH`, `USDC`) and wallet-first capability gating.
+- [x] Add `config/chains/ethereum_sepolia.json` with:
+  - [x] `chainId=11155111`, `displayName=Ethereum Sepolia`, `explorerBaseUrl=https://sepolia.etherscan.io`.
+  - [x] `rpc.primary=https://ethereum-sepolia-rpc.publicnode.com`, `rpc.fallback=https://sepolia.drpc.org`.
+  - [x] `coreContracts` metadata with Uniswap V2 Sepolia router/factory references.
+  - [x] `canonicalTokens` (`WETH`, `USDC`) and wallet-first capability gating.
+- [x] Update web fallback chain registry in `apps/network-web/src/lib/active-chain.ts`.
+- [x] Update status RPC probe allowlist in `apps/network-web/src/lib/ops-health.ts`.
+- [x] Update deterministic dashboard chain colors in `apps/network-web/src/app/dashboard/page.tsx`.
+- [x] Update chain-key example descriptions in `docs/api/openapi.v1.yaml` where chain-config-backed.
+
+### 97.3 Validation + evidence
+- [x] `apps/agent-runtime/bin/xclaw-agent chains --json` includes `ethereum` + `ethereum_sepolia` with wallet-only capabilities.
+- [x] Isolated-home wallet smoke per chain:
+  - [x] `wallet create --chain ethereum --json`
+  - [x] `wallet address --chain ethereum --json`
+  - [x] `wallet health --chain ethereum --json` (`integrityChecked=true`)
+  - [x] `wallet create --chain ethereum_sepolia --json`
+  - [x] `wallet address --chain ethereum_sepolia --json`
+  - [x] `wallet health --chain ethereum_sepolia --json` (`integrityChecked=true`)
+- [x] `/api/v1/public/chains` includes both new chains with expected `chainId` + explorer + capabilities.
+- [x] `/api/status` provider probe includes both new chains.
+- [ ] Required gates run sequentially:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `pm2 restart all`

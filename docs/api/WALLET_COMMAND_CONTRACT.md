@@ -40,7 +40,7 @@ Notes:
 - explicit `--chain` remains authoritative for chain-scoped commands.
 - runtime default chain is canonical in agent state (`state.json.defaultChain`) and used for chain-optional fallback behavior.
 - `wallet-send` uses base-unit amount for deterministic automation.
-- Supported chain keys for this contract include `base_sepolia`, `kite_ai_testnet`, `hedera_testnet`, and `hardhat_local` (where configured).
+- Supported chain keys for this contract include `base_sepolia`, `kite_ai_testnet`, `hedera_testnet`, `hardhat_local`, `ethereum`, and `ethereum_sepolia` (where configured).
 
 ## 2) Delegated Runtime Commands
 

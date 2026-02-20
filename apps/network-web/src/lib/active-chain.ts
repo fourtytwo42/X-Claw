@@ -21,6 +21,8 @@ const FALLBACK_CHAIN = 'base_sepolia';
 
 const FALLBACK_REGISTRY: ChainDescriptor[] = [
   { chainKey: 'base_sepolia', displayName: 'Base Sepolia', nativeCurrency: { symbol: 'ETH' } },
+  { chainKey: 'ethereum', displayName: 'Ethereum', nativeCurrency: { symbol: 'ETH' } },
+  { chainKey: 'ethereum_sepolia', displayName: 'Ethereum Sepolia', nativeCurrency: { symbol: 'ETH' } },
   { chainKey: 'kite_ai_testnet', displayName: 'Kite AI Testnet', nativeCurrency: { symbol: 'KITE' } },
 ];
 

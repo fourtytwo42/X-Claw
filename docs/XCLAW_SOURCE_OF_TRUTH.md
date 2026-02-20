@@ -970,7 +970,7 @@ This section supersedes any earlier conflicting statements in this file.
 - Sensitive management writes rate limit is 10 req/min per agent/session.
 - `/api/health` and `/api/status` are both available.
 - Compatibility aliases `/api/v1/health` and `/api/v1/status` are available; canonical routes remain unversioned `/api/health` and `/api/status`.
-- `/api/status` is public and exposes provider names + health flags (no raw RPC URLs) for launch-active public chain(s) only (current scope: `base_sepolia`; exclude local dev chains like `hardhat_local`).
+- `/api/status` is public and exposes provider names + health flags (no raw RPC URLs) for configured public chains in the status-provider allowlist (current scope includes `base_sepolia`, `kite_ai_testnet`, `ethereum`, and `ethereum_sepolia`; exclude local dev chains like `hardhat_local`).
 - API versioning uses `/api/v1/...`.
 - Migrations are explicit runbook step only (not auto-run on startup).
 - Seed/demo data must be explicitly tagged and separated from runtime data.
@@ -1525,9 +1525,10 @@ These defaults define baseline UX/layout behavior so frontend implementation is 
 
 ### 26.1 File Model
 1. Chain constants are stored as one file per chain under `config/chains/`.
-2. MVP file set:
+2. Baseline file set includes:
 - `config/chains/hardhat_local.json` (local-first development chain)
 - `config/chains/base_sepolia.json` (external testnet chain)
+- additional enabled chain files may be present (for example `config/chains/ethereum.json`, `config/chains/ethereum_sepolia.json`).
 3. Both `apps/network-web` and `apps/agent-runtime` must read the same file format.
 4. Runtime boot must fail if required fields are missing.
 
@@ -3923,3 +3924,56 @@ Limitations / notes:
 - Hardhat gating is strict: Base Sepolia harness runs are blocked unless a green Hardhat smoke report exists.
 - Wallet decrypt preflight must fail fast with deterministic `wallet_passphrase_mismatch` (instead of late `InvalidTag` in scenarios) and include actionable details (`walletStorePath`, `passphraseSource`, `chain`).
 - Management write retries must use bounded exponential backoff + jitter and include request diagnostics (`requestId`, `status`, `code`, `attempts`, `path`, `payloadHash`) on terminal failure.
+
+## 79) Slice 97 Ethereum + Ethereum Sepolia Wallet-First Onboarding Contract (Locked)
+
+1. Scope boundary:
+- Add `ethereum` and `ethereum_sepolia` as config-driven EVM chains with wallet/send readiness only.
+- Default chain remains `base_sepolia`.
+- No new API endpoints are introduced.
+
+2. Chain constants contract:
+- Add `config/chains/ethereum.json` with:
+  - `chainKey=ethereum`, `family=evm`, `enabled=true`, `uiVisible=true`,
+  - `chainId=1`,
+  - `displayName=Ethereum`,
+  - `nativeCurrency={name:Ether,symbol:ETH,decimals:18}`,
+  - `explorerBaseUrl=https://etherscan.io`,
+  - `rpc.primary=https://ethereum-rpc.publicnode.com`,
+  - `rpc.fallback=https://eth.drpc.org`,
+  - `coreContracts` includes Uniswap V2 router/factory metadata for later trade activation,
+  - `canonicalTokens` includes `WETH` and `USDC`.
+- Add `config/chains/ethereum_sepolia.json` with:
+  - `chainKey=ethereum_sepolia`, `family=evm`, `enabled=true`, `uiVisible=true`,
+  - `chainId=11155111`,
+  - `displayName=Ethereum Sepolia`,
+  - `nativeCurrency={name:Ether,symbol:ETH,decimals:18}`,
+  - `explorerBaseUrl=https://sepolia.etherscan.io`,
+  - `rpc.primary=https://ethereum-sepolia-rpc.publicnode.com`,
+  - `rpc.fallback=https://sepolia.drpc.org`,
+  - `coreContracts` includes Uniswap V2 router/factory metadata for later trade activation,
+  - `canonicalTokens` includes `WETH` and `USDC`.
+
+3. Capability-gating contract (wallet-first):
+- For both new chains:
+  - `capabilities.wallet=true`
+  - `capabilities.trade=false`
+  - `capabilities.liquidity=false`
+  - `capabilities.limitOrders=false`
+  - `capabilities.x402=false`
+  - `capabilities.faucet=false`
+  - `capabilities.deposits=false`
+- Trade/liquidity/limit/x402/faucet/deposit paths must continue fail-closed on these chains until a later slice explicitly enables them.
+
+4. Web/runtime visibility contract:
+- `GET /api/v1/public/chains` must include the new chain rows because `enabled=true`.
+- Chain selector fallback registry must include both chains so UI remains usable when public-chain fetch is unavailable.
+- `/api/v1/health` provider probes include both new chains (primary + fallback RPC checks).
+- Dashboard chain color mapping includes deterministic colors for both new chain keys.
+
+5. Evidence/source contract:
+- Sources for chain metadata, RPC candidates, and explorer:
+  - `https://raw.githubusercontent.com/ethereum-lists/chains/master/_data/chains/eip155-1.json`
+  - `https://raw.githubusercontent.com/ethereum-lists/chains/master/_data/chains/eip155-11155111.json`
+- Source for Uniswap V2 router/factory references:
+  - `https://docs.uniswap.org/contracts/v2/reference/smart-contracts/v2-deployments`
