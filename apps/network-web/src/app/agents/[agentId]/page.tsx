@@ -9,7 +9,7 @@ import { rememberManagedAgent } from '@/components/management-header-controls';
 import { PrimaryNav } from '@/components/primary-nav';
 import { PublicStatusBadge } from '@/components/public-status-badge';
 import { ThemeToggle } from '@/components/theme-toggle';
-import { nativeSymbolForChainKey, useActiveChainKey } from '@/lib/active-chain';
+import { nativeDecimalsForChainKey, nativeSymbolForChainKey, useActiveChainKey } from '@/lib/active-chain';
 import { getAgentAvatarPalette, getAgentInitial } from '@/lib/agent-avatar-color';
 import {
   buildHoldings,
@@ -386,13 +386,17 @@ function policyApprovalLabel(item: { request_type: string; token_address: string
   return humanizeKeyLabel(item.request_type);
 }
 
-function normalizeTokenSelectionSymbol(value: string | null | undefined): string {
+function normalizeTokenSelectionSymbol(value: string | null | undefined, nativeSymbol = 'ETH'): string {
   const raw = String(value ?? '').trim();
   if (!raw) {
     return '';
   }
   const upper = raw.toUpperCase();
-  if (upper === 'NATIVE' || upper === 'ETH' || upper.endsWith(' ETH')) {
+  const nativeUpper = nativeSymbol.trim().toUpperCase() || 'ETH';
+  if (upper === 'NATIVE' || upper === nativeUpper || upper.endsWith(` ${nativeUpper}`)) {
+    return nativeUpper;
+  }
+  if (upper === 'ETH' || upper.endsWith(' ETH')) {
     return 'ETH';
   }
   return upper;
@@ -497,6 +501,7 @@ export default function AgentPublicProfilePage() {
   const bootstrapToken = searchParams.get('token')?.trim() ?? '';
   const [activeChainKey, , activeChainLabel] = useActiveChainKey();
   const activeNativeSymbol = useMemo(() => nativeSymbolForChainKey(activeChainKey), [activeChainKey]);
+  const activeNativeDecimals = useMemo(() => nativeDecimalsForChainKey(activeChainKey), [activeChainKey]);
   const avatarPalette = useMemo(() => getAgentAvatarPalette(agentId), [agentId]);
 
   const [bootstrapState, setBootstrapState] = useState<BootstrapState>({ phase: 'ready' });
@@ -1122,12 +1127,12 @@ export default function AgentPublicProfilePage() {
         const symbol = holding.token.trim().toUpperCase();
         return symbol === activeNativeSymbol.toUpperCase() || symbol === 'NATIVE';
       }) ?? null;
-    const nativeBalance = nativeHolding ? formatUnitsTruncated(nativeHolding.amountRaw, nativeHolding.decimals, 6) : '0';
+    const nativeBalance = nativeHolding ? formatUnitsTruncated(nativeHolding.amountRaw, activeNativeDecimals, 6) : '0';
     const opts: Array<{ label: string; value: string }> = [{ label: `${activeChainLabel} ${activeNativeSymbol} (${nativeBalance})`, value: 'NATIVE' }];
     const seen = new Set<string>(['NATIVE']);
     for (const holding of holdings) {
-      const symbol = holding.token.trim().toUpperCase();
-      if (!symbol || symbol === 'ETH' || symbol === 'NATIVE') {
+      const symbol = normalizeTokenSelectionSymbol(holding.token, activeNativeSymbol);
+      if (!symbol || symbol === activeNativeSymbol.toUpperCase() || symbol === 'NATIVE') {
         continue;
       }
       if (!seen.has(symbol)) {
@@ -1136,7 +1141,7 @@ export default function AgentPublicProfilePage() {
       }
     }
     return opts;
-  }, [holdings, activeChainLabel, activeNativeSymbol]);
+  }, [holdings, activeChainLabel, activeNativeDecimals, activeNativeSymbol]);
 
   const withdrawSelectedHolding = useMemo(() => {
     if (withdrawAsset === 'NATIVE') {
@@ -1152,8 +1157,14 @@ export default function AgentPublicProfilePage() {
     if (!withdrawSelectedHolding) {
       return '';
     }
-    return formatUnitsTruncated(withdrawSelectedHolding.amountRaw, withdrawSelectedHolding.decimals, 18);
-  }, [withdrawSelectedHolding]);
+    return formatUnitsTruncated(
+      withdrawSelectedHolding.amountRaw,
+      normalizeTokenSelectionSymbol(withdrawSelectedHolding.token, activeNativeSymbol) === activeNativeSymbol.toUpperCase()
+        ? activeNativeDecimals
+        : withdrawSelectedHolding.decimals,
+      18
+    );
+  }, [activeNativeDecimals, activeNativeSymbol, withdrawSelectedHolding]);
 
   useEffect(() => {
     if (!preferredWithdrawDestination) {
@@ -1163,9 +1174,10 @@ export default function AgentPublicProfilePage() {
   }, [preferredWithdrawDestination]);
   const tokenDecimalsBySymbol = useMemo(() => {
     const map = new Map<string, number>();
+    map.set(activeNativeSymbol.toUpperCase(), activeNativeDecimals);
     if (management.phase === 'ready') {
       for (const token of management.data.chainTokens ?? []) {
-        const symbol = normalizeTokenSelectionSymbol(token.symbol);
+        const symbol = normalizeTokenSelectionSymbol(token.symbol, activeNativeSymbol);
         if (!symbol) {
           continue;
         }
@@ -1176,13 +1188,13 @@ export default function AgentPublicProfilePage() {
       }
     }
     for (const holding of holdings) {
-      const symbol = normalizeTokenSelectionSymbol(holding.token);
+      const symbol = normalizeTokenSelectionSymbol(holding.token, activeNativeSymbol);
       if (symbol && !map.has(symbol)) {
         map.set(symbol, holding.decimals);
       }
     }
     return map;
-  }, [holdings, management]);
+  }, [activeNativeDecimals, activeNativeSymbol, holdings, management]);
 
   const explorerTxBaseUrl = useMemo(() => {
     const base = activeDepositChain?.explorerBaseUrl ?? null;
@@ -1204,7 +1216,7 @@ export default function AgentPublicProfilePage() {
 
   const formatHumanAmount = useCallback(
     (amount: string | null | undefined, tokenLabel: string, decimalsHint?: number) => {
-      const normalized = normalizeTokenSelectionSymbol(tokenLabel);
+      const normalized = normalizeTokenSelectionSymbol(tokenLabel, activeNativeSymbol);
       if (!amount) {
         return `— ${tokenLabel}`;
       }
@@ -1241,17 +1253,17 @@ export default function AgentPublicProfilePage() {
       }
       return `${formatDecimalText(amount)} ${tokenLabel}`;
     },
-    []
+    [activeNativeSymbol]
   );
 
   const formatX402AtomicAmount = useCallback(
     (amountAtomic: string | null | undefined, assetKind: 'native' | 'erc20', assetSymbol: string | null | undefined) => {
-      const symbol = assetKind === 'native' ? activeNativeSymbol : normalizeTokenSelectionSymbol(assetSymbol) || 'TOKEN';
+      const symbol = assetKind === 'native' ? activeNativeSymbol : normalizeTokenSelectionSymbol(assetSymbol, activeNativeSymbol) || 'TOKEN';
       const tokenLabel = assetKind === 'native' ? `${activeChainLabel} ${activeNativeSymbol}` : symbol;
-      const decimals = assetKind === 'native' ? 18 : tokenDecimalsBySymbol.get(symbol);
+      const decimals = assetKind === 'native' ? activeNativeDecimals : tokenDecimalsBySymbol.get(symbol);
       return formatHumanAmount(amountAtomic, tokenLabel, decimals);
     },
-    [activeChainLabel, activeNativeSymbol, formatHumanAmount, tokenDecimalsBySymbol]
+    [activeChainLabel, activeNativeDecimals, activeNativeSymbol, formatHumanAmount, tokenDecimalsBySymbol]
   );
 
   const transferApprovedState = useCallback((status: string) => {
@@ -1271,8 +1283,8 @@ export default function AgentPublicProfilePage() {
     for (const trade of trades ?? []) {
       const tokenIn = resolveTokenLabel(trade.token_in, chainTokenSymbolByAddress);
       const tokenOut = resolveTokenLabel(trade.token_out, chainTokenSymbolByAddress);
-      const normalizedIn = normalizeTokenSelectionSymbol(tokenIn);
-      const normalizedOut = normalizeTokenSelectionSymbol(tokenOut);
+      const normalizedIn = normalizeTokenSelectionSymbol(tokenIn, activeNativeSymbol);
+      const normalizedOut = normalizeTokenSelectionSymbol(tokenOut, activeNativeSymbol);
       const tradedAmount = formatHumanAmount(trade.amount_in, tokenIn);
       const gainedAmount = formatHumanAmount(trade.amount_out, tokenOut);
       const reason = trade.reason ?? trade.reason_code ?? trade.reason_message;
@@ -1293,8 +1305,8 @@ export default function AgentPublicProfilePage() {
       if (event.event_type.startsWith('trade_')) {
         continue;
       }
-      const tokenIn = normalizeTokenSelectionSymbol(event.token_in_symbol);
-      const tokenOut = normalizeTokenSelectionSymbol(event.token_out_symbol);
+      const tokenIn = normalizeTokenSelectionSymbol(event.token_in_symbol, activeNativeSymbol);
+      const tokenOut = normalizeTokenSelectionSymbol(event.token_out_symbol, activeNativeSymbol);
       const pair = event.pair_display ?? `${event.token_in_symbol ?? 'token'} / ${event.token_out_symbol ?? 'token'}`;
       items.push({
         id: `evt-${event.event_id}`,
@@ -1310,7 +1322,7 @@ export default function AgentPublicProfilePage() {
     }
 
     for (const deposit of activeDepositChain?.recentDeposits ?? []) {
-      const depositSymbol = normalizeTokenSelectionSymbol(deposit.token);
+      const depositSymbol = normalizeTokenSelectionSymbol(deposit.token, activeNativeSymbol);
       const depositDecimals = tokenDecimalsBySymbol.get(depositSymbol) ?? undefined;
       const depositAmount = formatHumanAmount(deposit.amount, deposit.token, depositDecimals);
       const confirmationsText = activeDepositChain?.minConfirmations
@@ -1331,7 +1343,10 @@ export default function AgentPublicProfilePage() {
 
     if (management.phase === 'ready') {
       for (const payment of x402Payments?.history ?? []) {
-        const symbol = normalizeTokenSelectionSymbol(payment.asset_symbol || (payment.asset_kind === 'native' ? activeNativeSymbol : 'TOKEN'));
+        const symbol = normalizeTokenSelectionSymbol(
+          payment.asset_symbol || (payment.asset_kind === 'native' ? activeNativeSymbol : 'TOKEN'),
+          activeNativeSymbol
+        );
         const directionLabel = payment.direction === 'inbound' ? 'Received' : 'Sent';
         const amountLabel = formatX402AtomicAmount(payment.amount_atomic, payment.asset_kind, payment.asset_symbol);
         items.push({
@@ -1349,9 +1364,9 @@ export default function AgentPublicProfilePage() {
       }
       for (const item of management.data.transferApprovalsHistory ?? []) {
         const transferTokenLabel = item.transfer_type === 'native' ? `${activeChainLabel} ${activeNativeSymbol}` : item.token_symbol ?? 'Token';
-        const transferSymbol = item.transfer_type === 'native' ? activeNativeSymbol : normalizeTokenSelectionSymbol(item.token_symbol);
+        const transferSymbol = item.transfer_type === 'native' ? activeNativeSymbol : normalizeTokenSelectionSymbol(item.token_symbol, activeNativeSymbol);
         const transferDecimals =
-          item.transfer_type === 'native' ? 18 : (tokenDecimalsBySymbol.get(normalizeTokenSelectionSymbol(item.token_symbol)) ?? 18);
+          item.transfer_type === 'native' ? activeNativeDecimals : (tokenDecimalsBySymbol.get(normalizeTokenSelectionSymbol(item.token_symbol, activeNativeSymbol)) ?? 18);
         const transferAmount = formatHumanAmount(item.amount_wei, transferTokenLabel, transferDecimals);
         const x402AmountLabel = formatX402AtomicAmount(
           item.x402_amount_atomic ?? item.amount_wei,
@@ -1376,9 +1391,9 @@ export default function AgentPublicProfilePage() {
       }
       for (const item of management.data.transferApprovalsQueue ?? []) {
         const transferTokenLabel = item.transfer_type === 'native' ? `${activeChainLabel} ${activeNativeSymbol}` : item.token_symbol ?? 'Token';
-        const transferSymbol = item.transfer_type === 'native' ? activeNativeSymbol : normalizeTokenSelectionSymbol(item.token_symbol);
+        const transferSymbol = item.transfer_type === 'native' ? activeNativeSymbol : normalizeTokenSelectionSymbol(item.token_symbol, activeNativeSymbol);
         const transferDecimals =
-          item.transfer_type === 'native' ? 18 : (tokenDecimalsBySymbol.get(normalizeTokenSelectionSymbol(item.token_symbol)) ?? 18);
+          item.transfer_type === 'native' ? activeNativeDecimals : (tokenDecimalsBySymbol.get(normalizeTokenSelectionSymbol(item.token_symbol, activeNativeSymbol)) ?? 18);
         const transferAmount = formatHumanAmount(item.amount_wei, transferTokenLabel, transferDecimals);
         const x402AmountLabel = formatX402AtomicAmount(
           item.x402_amount_atomic ?? item.amount_wei,
@@ -1402,7 +1417,9 @@ export default function AgentPublicProfilePage() {
         });
       }
       for (const item of management.data.policyApprovalsHistory ?? []) {
-        const policySymbol = item.token_address ? normalizeTokenSelectionSymbol(chainTokenSymbolByAddress.get(item.token_address.toLowerCase()) ?? '') : '';
+        const policySymbol = item.token_address
+          ? normalizeTokenSelectionSymbol(chainTokenSymbolByAddress.get(item.token_address.toLowerCase()) ?? '', activeNativeSymbol)
+          : '';
         items.push({
           id: `polh-${item.request_id}`,
           at: item.decided_at ?? item.created_at,
@@ -1416,7 +1433,9 @@ export default function AgentPublicProfilePage() {
         });
       }
       for (const item of management.data.policyApprovalsQueue ?? []) {
-        const policySymbol = item.token_address ? normalizeTokenSelectionSymbol(chainTokenSymbolByAddress.get(item.token_address.toLowerCase()) ?? '') : '';
+        const policySymbol = item.token_address
+          ? normalizeTokenSelectionSymbol(chainTokenSymbolByAddress.get(item.token_address.toLowerCase()) ?? '', activeNativeSymbol)
+          : '';
         items.push({
           id: `polq-${item.request_id}`,
           at: item.created_at,
@@ -1432,8 +1451,8 @@ export default function AgentPublicProfilePage() {
       for (const item of management.data.approvalsQueue) {
         const tokenInLabel = resolveTokenLabel(item.token_in, chainTokenSymbolByAddress);
         const tokenOutLabel = resolveTokenLabel(item.token_out, chainTokenSymbolByAddress);
-        const tokenIn = normalizeTokenSelectionSymbol(tokenInLabel);
-        const tokenOut = normalizeTokenSelectionSymbol(tokenOutLabel);
+        const tokenIn = normalizeTokenSelectionSymbol(tokenInLabel, activeNativeSymbol);
+        const tokenOut = normalizeTokenSelectionSymbol(tokenOutLabel, activeNativeSymbol);
         items.push({
           id: `trdapp-${item.trade_id}`,
           at: item.created_at,
@@ -1456,6 +1475,8 @@ export default function AgentPublicProfilePage() {
     return items;
   }, [
     activeChainLabel,
+    activeNativeDecimals,
+    activeNativeSymbol,
     activeDepositChain?.minConfirmations,
     activeDepositChain?.recentDeposits,
     activity,
@@ -1530,15 +1551,15 @@ export default function AgentPublicProfilePage() {
     }): string => {
       const transferTokenLabel = item.transfer_type === 'native' ? `${activeChainLabel} ${activeNativeSymbol}` : item.token_symbol ?? 'Token';
       const transferDecimals =
-        item.transfer_type === 'native' ? 18 : (tokenDecimalsBySymbol.get(normalizeTokenSelectionSymbol(item.token_symbol)) ?? 18);
+        item.transfer_type === 'native' ? activeNativeDecimals : (tokenDecimalsBySymbol.get(normalizeTokenSelectionSymbol(item.token_symbol, activeNativeSymbol)) ?? 18);
       return formatHumanAmount(item.amount_wei, transferTokenLabel, transferDecimals);
     };
     const pendingTradeIds = new Set((management.data.approvalsQueue ?? []).map((item) => item.trade_id));
     for (const item of management.data.approvalsQueue) {
       const tokenInLabel = resolveTokenLabel(item.token_in, chainTokenSymbolByAddress);
       const tokenOutLabel = resolveTokenLabel(item.token_out, chainTokenSymbolByAddress);
-      const tokenIn = normalizeTokenSelectionSymbol(tokenInLabel);
-      const tokenOut = normalizeTokenSelectionSymbol(tokenOutLabel);
+      const tokenIn = normalizeTokenSelectionSymbol(tokenInLabel, activeNativeSymbol);
+      const tokenOut = normalizeTokenSelectionSymbol(tokenOutLabel, activeNativeSymbol);
       rows.push({
         id: `trade-${item.trade_id}`,
         at: item.created_at,
@@ -1556,8 +1577,8 @@ export default function AgentPublicProfilePage() {
       }
       const tokenInLabel = resolveTokenLabel(item.token_in, chainTokenSymbolByAddress);
       const tokenOutLabel = resolveTokenLabel(item.token_out, chainTokenSymbolByAddress);
-      const tokenIn = normalizeTokenSelectionSymbol(tokenInLabel);
-      const tokenOut = normalizeTokenSelectionSymbol(tokenOutLabel);
+      const tokenIn = normalizeTokenSelectionSymbol(tokenInLabel, activeNativeSymbol);
+      const tokenOut = normalizeTokenSelectionSymbol(tokenOutLabel, activeNativeSymbol);
       const normalized = String(item.status ?? '').trim().toLowerCase();
       const status =
         normalized === 'rejected' || normalized === 'deny' || normalized === 'denied' || normalized === 'expired'
@@ -1577,7 +1598,9 @@ export default function AgentPublicProfilePage() {
       });
     }
     for (const item of management.data.policyApprovalsQueue ?? []) {
-      const policySymbol = item.token_address ? normalizeTokenSelectionSymbol(chainTokenSymbolByAddress.get(item.token_address.toLowerCase()) ?? '') : '';
+      const policySymbol = item.token_address
+        ? normalizeTokenSelectionSymbol(chainTokenSymbolByAddress.get(item.token_address.toLowerCase()) ?? '', activeNativeSymbol)
+        : '';
       rows.push({
         id: `policy-pending-${item.request_id}`,
         at: item.created_at,
@@ -1590,7 +1613,9 @@ export default function AgentPublicProfilePage() {
       });
     }
     for (const item of management.data.policyApprovalsHistory ?? []) {
-      const policySymbol = item.token_address ? normalizeTokenSelectionSymbol(chainTokenSymbolByAddress.get(item.token_address.toLowerCase()) ?? '') : '';
+      const policySymbol = item.token_address
+        ? normalizeTokenSelectionSymbol(chainTokenSymbolByAddress.get(item.token_address.toLowerCase()) ?? '', activeNativeSymbol)
+        : '';
       rows.push({
         id: `policy-history-${item.request_id}`,
         at: item.decided_at ?? item.created_at,
@@ -1603,7 +1628,7 @@ export default function AgentPublicProfilePage() {
       });
     }
     for (const item of management.data.transferApprovalsQueue ?? []) {
-      const transferSymbol = item.transfer_type === 'native' ? activeNativeSymbol : normalizeTokenSelectionSymbol(item.token_symbol);
+      const transferSymbol = item.transfer_type === 'native' ? activeNativeSymbol : normalizeTokenSelectionSymbol(item.token_symbol, activeNativeSymbol);
       const x402AmountLabel = formatX402AtomicAmount(
         item.x402_amount_atomic ?? item.amount_wei,
         item.transfer_type === 'native' ? 'native' : 'erc20',
@@ -1630,7 +1655,7 @@ export default function AgentPublicProfilePage() {
       if ((item.status === 'pending' || item.status === 'approval_pending') && pendingTransferQueueIds.has(item.approval_id)) {
         continue;
       }
-      const transferSymbol = item.transfer_type === 'native' ? activeNativeSymbol : normalizeTokenSelectionSymbol(item.token_symbol);
+      const transferSymbol = item.transfer_type === 'native' ? activeNativeSymbol : normalizeTokenSelectionSymbol(item.token_symbol, activeNativeSymbol);
       const x402AmountLabel = formatX402AtomicAmount(
         item.x402_amount_atomic ?? item.amount_wei,
         item.transfer_type === 'native' ? 'native' : 'erc20',
@@ -1655,7 +1680,7 @@ export default function AgentPublicProfilePage() {
     }
     rows.sort((a, b) => Number(new Date(b.at).getTime()) - Number(new Date(a.at).getTime()));
     return rows;
-  }, [activeChainLabel, activeNativeSymbol, chainTokenSymbolByAddress, formatHumanAmount, formatX402AtomicAmount, management, tokenDecimalsBySymbol]);
+  }, [activeChainLabel, activeNativeDecimals, activeNativeSymbol, chainTokenSymbolByAddress, formatHumanAmount, formatX402AtomicAmount, management, tokenDecimalsBySymbol]);
 
   const filteredApprovalHistory = useMemo(() => {
     const tokenFiltered =
@@ -1716,16 +1741,17 @@ export default function AgentPublicProfilePage() {
   const selectedTokenSummary =
     selectedWalletTokens.length === 0 ? 'All tokens' : `${selectedWalletTokens.join(', ')} selected`;
   const displayWalletTokenLabel = (token: string): string => {
-    const normalized = normalizeTokenSelectionSymbol(token);
+    const normalized = normalizeTokenSelectionSymbol(token, activeNativeSymbol);
     const upperNative = activeNativeSymbol.toUpperCase();
-    if (normalized === 'ETH' || normalized === upperNative || normalized.endsWith(` ${upperNative}`)) {
+    if (normalized === upperNative) {
       return `${activeChainLabel} ${activeNativeSymbol}`;
     }
     return token;
   };
   const formatWalletHoldingAmount = (holding: { token: string; amountRaw: string; decimals: number }): string => {
-    const normalized = normalizeTokenSelectionSymbol(holding.token);
-    const base = formatUnitsTruncated(holding.amountRaw, holding.decimals, 6);
+    const normalized = normalizeTokenSelectionSymbol(holding.token, activeNativeSymbol);
+    const decimals = normalized === activeNativeSymbol.toUpperCase() ? activeNativeDecimals : holding.decimals;
+    const base = formatUnitsTruncated(holding.amountRaw, decimals, 6);
     if (normalized === 'USDC') {
       const numeric = Number(base);
       if (Number.isFinite(numeric)) {
@@ -2078,9 +2104,9 @@ export default function AgentPublicProfilePage() {
             {visibleWalletHoldings.map((holding) => (
               <div
                 key={holding.token}
-                className={`${styles.listRow} ${styles.walletTokenRow} ${selectedWalletTokenSet.has(normalizeTokenSelectionSymbol(holding.token)) ? styles.selectedWalletRow : ''}`}
+                className={`${styles.listRow} ${styles.walletTokenRow} ${selectedWalletTokenSet.has(normalizeTokenSelectionSymbol(holding.token, activeNativeSymbol)) ? styles.selectedWalletRow : ''}`}
                 onClick={(event) => {
-                  const symbol = normalizeTokenSelectionSymbol(holding.token);
+                  const symbol = normalizeTokenSelectionSymbol(holding.token, activeNativeSymbol);
                   if (!symbol) {
                     return;
                   }

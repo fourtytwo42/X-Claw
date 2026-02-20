@@ -8,7 +8,7 @@ export type DashboardChainKey = 'all' | ChainKey;
 type ChainDescriptor = {
   chainKey: string;
   displayName: string;
-  nativeCurrency?: { symbol?: string };
+  nativeCurrency?: { symbol?: string; decimals?: number };
 };
 
 const STORAGE_KEY = 'xclaw_chain_key';
@@ -20,18 +20,18 @@ const REGISTRY_EVENT_NAME = 'xclaw:chain_registry_changed';
 const FALLBACK_CHAIN = 'base_sepolia';
 
 const FALLBACK_REGISTRY: ChainDescriptor[] = [
-  { chainKey: 'base_mainnet', displayName: 'Base Mainnet', nativeCurrency: { symbol: 'ETH' } },
-  { chainKey: 'base_sepolia', displayName: 'Base Sepolia', nativeCurrency: { symbol: 'ETH' } },
-  { chainKey: 'hedera_mainnet', displayName: 'Hedera Mainnet', nativeCurrency: { symbol: 'HBAR' } },
-  { chainKey: 'hedera_testnet', displayName: 'Hedera Testnet', nativeCurrency: { symbol: 'HBAR' } },
-  { chainKey: 'ethereum', displayName: 'Ethereum', nativeCurrency: { symbol: 'ETH' } },
-  { chainKey: 'ethereum_sepolia', displayName: 'Ethereum Sepolia', nativeCurrency: { symbol: 'ETH' } },
-  { chainKey: 'kite_ai_mainnet', displayName: 'KiteAI Mainnet', nativeCurrency: { symbol: 'KITE' } },
-  { chainKey: 'kite_ai_testnet', displayName: 'KiteAI Testnet', nativeCurrency: { symbol: 'KITE' } },
-  { chainKey: 'adi_mainnet', displayName: 'ADI Mainnet', nativeCurrency: { symbol: 'ADI' } },
-  { chainKey: 'adi_testnet', displayName: 'ADI Network AB Testnet', nativeCurrency: { symbol: 'ADI' } },
-  { chainKey: 'og_mainnet', displayName: '0G Mainnet', nativeCurrency: { symbol: '0G' } },
-  { chainKey: 'og_testnet', displayName: '0G Galileo Testnet', nativeCurrency: { symbol: '0G' } },
+  { chainKey: 'base_mainnet', displayName: 'Base Mainnet', nativeCurrency: { symbol: 'ETH', decimals: 18 } },
+  { chainKey: 'base_sepolia', displayName: 'Base Sepolia', nativeCurrency: { symbol: 'ETH', decimals: 18 } },
+  { chainKey: 'hedera_mainnet', displayName: 'Hedera Mainnet', nativeCurrency: { symbol: 'HBAR', decimals: 8 } },
+  { chainKey: 'hedera_testnet', displayName: 'Hedera Testnet', nativeCurrency: { symbol: 'HBAR', decimals: 8 } },
+  { chainKey: 'ethereum', displayName: 'Ethereum', nativeCurrency: { symbol: 'ETH', decimals: 18 } },
+  { chainKey: 'ethereum_sepolia', displayName: 'Ethereum Sepolia', nativeCurrency: { symbol: 'ETH', decimals: 18 } },
+  { chainKey: 'kite_ai_mainnet', displayName: 'KiteAI Mainnet', nativeCurrency: { symbol: 'KITE', decimals: 18 } },
+  { chainKey: 'kite_ai_testnet', displayName: 'KiteAI Testnet', nativeCurrency: { symbol: 'KITE', decimals: 18 } },
+  { chainKey: 'adi_mainnet', displayName: 'ADI Mainnet', nativeCurrency: { symbol: 'ADI', decimals: 18 } },
+  { chainKey: 'adi_testnet', displayName: 'ADI Network AB Testnet', nativeCurrency: { symbol: 'ADI', decimals: 18 } },
+  { chainKey: 'og_mainnet', displayName: '0G Mainnet', nativeCurrency: { symbol: '0G', decimals: 18 } },
+  { chainKey: 'og_testnet', displayName: '0G Galileo Testnet', nativeCurrency: { symbol: '0G', decimals: 18 } },
 ];
 
 function loadRegistryFromStorage(): ChainDescriptor[] {
@@ -43,7 +43,9 @@ function loadRegistryFromStorage(): ChainDescriptor[] {
     if (!raw) {
       return FALLBACK_REGISTRY;
     }
-    const parsed = JSON.parse(raw) as { chains?: Array<{ chainKey?: unknown; displayName?: unknown; nativeCurrency?: { symbol?: unknown } }> };
+    const parsed = JSON.parse(raw) as {
+      chains?: Array<{ chainKey?: unknown; displayName?: unknown; nativeCurrency?: { symbol?: unknown; decimals?: unknown } }>;
+    };
     const rows = Array.isArray(parsed?.chains) ? parsed.chains : [];
     const normalized = rows
       .map((row) => {
@@ -54,7 +56,10 @@ function loadRegistryFromStorage(): ChainDescriptor[] {
         const displayName = String(row?.displayName ?? chainKey).trim() || chainKey;
         const symbolRaw = row?.nativeCurrency?.symbol;
         const nativeSymbol = typeof symbolRaw === 'string' && symbolRaw.trim() ? symbolRaw.trim() : 'ETH';
-        return { chainKey, displayName, nativeCurrency: { symbol: nativeSymbol } };
+        const decimalsRaw = row?.nativeCurrency?.decimals;
+        const nativeDecimals =
+          typeof decimalsRaw === 'number' && Number.isFinite(decimalsRaw) && decimalsRaw >= 0 ? Math.floor(decimalsRaw) : 18;
+        return { chainKey, displayName, nativeCurrency: { symbol: nativeSymbol, decimals: nativeDecimals } };
       })
       .filter(Boolean) as ChainDescriptor[];
     return normalized.length > 0 ? normalized : FALLBACK_REGISTRY;
@@ -78,6 +83,16 @@ export function nativeSymbolForChainKey(chainKey: ChainKey): string {
     return found.nativeCurrency.symbol.trim().toUpperCase();
   }
   return 'ETH';
+}
+
+export function nativeDecimalsForChainKey(chainKey: ChainKey): number {
+  const registry = loadRegistryFromStorage();
+  const found = registry.find((row) => row.chainKey === chainKey);
+  const decimals = found?.nativeCurrency?.decimals;
+  if (typeof decimals === 'number' && Number.isFinite(decimals) && decimals >= 0) {
+    return Math.floor(decimals);
+  }
+  return 18;
 }
 
 function isChainKey(value: unknown): value is ChainKey {
@@ -105,7 +120,7 @@ async function fetchAndStoreRegistry(): Promise<void> {
       return;
     }
     const payload = (await res.json()) as {
-      chains?: Array<{ chainKey?: string; displayName?: string; nativeCurrency?: { symbol?: string } }>;
+      chains?: Array<{ chainKey?: string; displayName?: string; nativeCurrency?: { symbol?: string; decimals?: number } }>;
     };
     const chains = Array.isArray(payload?.chains) ? payload.chains : [];
     if (chains.length === 0) {
