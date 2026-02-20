@@ -1971,4 +1971,4 @@ DoD:
   - `avalanche_mainnet`, `op_mainnet`, `arbitrum_mainnet`, `zksync_mainnet`, `monad_mainnet`.
 - [x] openapi + schema artifacts updated for LP proxy routes and liquidity status provenance fields.
 - [x] required gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
-- [ ] issue #45 updated with verification evidence + commit hash(es).
+- [x] issue #45 updated with verification evidence + commit hash(es).

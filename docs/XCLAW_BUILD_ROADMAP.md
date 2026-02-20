@@ -3395,4 +3395,4 @@ Note:
   - [x] `npm run seed:verify`
   - [x] `npm run build`
   - [x] `pm2 restart all`
-- [ ] Issue #45 evidence post + commit hash(es).
+- [x] Issue #45 evidence post + commit hash(es).
