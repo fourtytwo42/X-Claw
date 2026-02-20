@@ -1858,7 +1858,7 @@ DoD:
 - [x] issue #43 updated with verification evidence + commit hash(es).
 
 ## Slice 98: Chain Metadata Normalization + Truthful Capability Gating
-Status: [~]
+Status: [x]
 Issue: #44
 
 Goal:
@@ -1875,4 +1875,4 @@ DoD:
 - [x] status provider probing is chain-config-driven for all enabled+visible chains with configured RPC URLs.
 - [x] runtime/web validation evidence captured (`chains`, public chains, status providers) reflecting normalized metadata.
 - [x] required repo gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
-- [ ] issue #44 updated with verification evidence + commit hash(es).
+- [x] issue #44 updated with verification evidence + commit hash(es).

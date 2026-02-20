@@ -2883,4 +2883,4 @@ Active slice context: `Slice 98`.
 - [x] `/api/v1/public/chains` reflects normalized names and chain visibility.
 - [x] `/api/status` provider list reflects enabled+visible chains with RPCs.
 - [x] Required repo gates run sequentially.
-- [ ] Issue #44 evidence posted with commit hash(es).
+- [x] Issue #44 evidence posted with commit hash(es).
