@@ -54,6 +54,14 @@ function isHederaChain(chainKey: string): boolean {
   return chainKey.startsWith('hedera_');
 }
 
+function nativeAtomicDecimalsForBalance(chainKey: string, token: string): number | null {
+  const normalizedToken = String(token ?? '').trim().toUpperCase();
+  if (chainKey.startsWith('hedera_') && (normalizedToken === 'NATIVE' || normalizedToken === 'HBAR')) {
+    return 18;
+  }
+  return null;
+}
+
 function chainEnvSuffix(chainKey: string): string {
   return chainKey.replace(/[^a-zA-Z0-9]/g, '_').toUpperCase();
 }
@@ -420,6 +428,11 @@ export async function GET(req: NextRequest) {
       const decimalsByToken = new Map<string, number>();
       await Promise.all(
         Array.from(new Set(balances.rows.map((row) => String(row.token).trim()).filter((token) => token.length > 0))).map(async (token) => {
+          const forcedNativeAtomic = nativeAtomicDecimalsForBalance(wallet.chain_key, token);
+          if (forcedNativeAtomic !== null) {
+            decimalsByToken.set(token, forcedNativeAtomic);
+            return;
+          }
           const resolved = await resolveTokenDecimals(wallet.chain_key, token).catch(() => 18);
           decimalsByToken.set(token, resolved);
         })

@@ -1,4 +1,4 @@
-import { chainNativeSymbol, getChainConfig, chainRpcUrl } from '@/lib/chains';
+import { chainNativeAtomicDecimals, chainNativeSymbol, getChainConfig, chainRpcUrl } from '@/lib/chains';
 import { dbQuery } from '@/lib/db';
 
 type ResolveSource = 'config' | 'rpc' | 'cache' | 'fallback';
@@ -210,7 +210,7 @@ export async function resolveTokenMetadata(chainKey: string, tokenAddress: strin
 export async function resolveTokenDecimals(chainKey: string, token: string | null | undefined): Promise<number> {
   const raw = String(token ?? '').trim();
   const cfg = getChainConfig(chainKey);
-  const nativeDecimals = cfg?.nativeCurrency?.decimals ?? 18;
+  const nativeDecimals = chainNativeAtomicDecimals(chainKey);
   const nativeSymbol = chainNativeSymbol(chainKey).toUpperCase();
 
   if (!raw) {

@@ -151,3 +151,16 @@ export function chainNativeSymbol(chainKey: string): string {
   }
   return chainKey === 'kite_ai_testnet' ? 'KITE' : 'ETH';
 }
+
+// Native EVM balances/amounts are expressed in wei-like base units.
+// Hedera EVM also reports native value in 18-decimal wei-equivalent units.
+export function chainNativeAtomicDecimals(chainKey: string): number {
+  if (chainKey.startsWith('hedera_')) {
+    return 18;
+  }
+  const decimals = getChainConfig(chainKey)?.nativeCurrency?.decimals;
+  if (typeof decimals === 'number' && Number.isFinite(decimals) && decimals > 0) {
+    return Math.floor(decimals);
+  }
+  return 18;
+}

@@ -100,6 +100,9 @@ export function nativeSymbolForChainKey(chainKey: ChainKey): string {
 }
 
 export function nativeDecimalsForChainKey(chainKey: ChainKey): number {
+  if (chainKey.startsWith('hedera_')) {
+    return 18;
+  }
   const registry = loadRegistryFromStorage();
   const found = registry.find((row) => row.chainKey === chainKey);
   const symbol = found?.nativeCurrency?.symbol ?? '';

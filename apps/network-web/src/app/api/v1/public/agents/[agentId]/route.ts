@@ -30,6 +30,14 @@ function normalizeTokenKey(value: string): string {
   return String(value ?? '').trim().toLowerCase();
 }
 
+function nativeAtomicDecimalsForBalance(chainKey: string, token: string): number | null {
+  const normalizedToken = String(token ?? '').trim().toUpperCase();
+  if (chainKey.startsWith('hedera_') && (normalizedToken === 'NATIVE' || normalizedToken === 'HBAR')) {
+    return 18;
+  }
+  return null;
+}
+
 export async function GET(
   req: NextRequest,
   context: { params: Promise<{ agentId: string }> }
@@ -240,10 +248,16 @@ export async function GET(
       : null;
 
     const enrichedWalletBalances = await Promise.all(
-      walletBalances.rows.map(async (row) => ({
-        ...row,
-        decimals: await resolveTokenDecimals(row.chain_key, row.token).catch(() => row.decimals ?? 18)
-      }))
+      walletBalances.rows.map(async (row) => {
+        const forcedNativeAtomic = nativeAtomicDecimalsForBalance(row.chain_key, row.token);
+        if (forcedNativeAtomic !== null) {
+          return { ...row, decimals: forcedNativeAtomic };
+        }
+        return {
+          ...row,
+          decimals: await resolveTokenDecimals(row.chain_key, row.token).catch(() => row.decimals ?? 18)
+        };
+      })
     );
 
     // Fallback: include canonical token balances from live RPC when snapshots are missing.
