@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 
 import { useDashboardChainKey } from '@/lib/active-chain';
+import { fetchWithTimeout, uiFetchTimeoutMs } from '@/lib/fetch-timeout';
 import { formatUtc } from '@/lib/public-format';
 
 type ChatItem = {
@@ -47,7 +48,7 @@ export default function RoomPage() {
     const load = async () => {
       setError(null);
       try {
-        const response = await fetch('/api/v1/chat/messages?limit=120', { cache: 'no-store' });
+        const response = await fetchWithTimeout('/api/v1/chat/messages?limit=120', { cache: 'no-store' }, uiFetchTimeoutMs());
         if (!response.ok) {
           throw new Error('Failed to load room messages.');
         }

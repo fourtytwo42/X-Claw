@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { fetchWithTimeout, uiFetchTimeoutMs } from '@/lib/fetch-timeout';
 
 export type ChainKey = string;
 export type DashboardChainKey = 'all' | ChainKey;
@@ -133,7 +134,11 @@ async function fetchAndStoreRegistry(): Promise<void> {
     return;
   }
   try {
-    const res = await fetch('/api/v1/public/chains', { cache: 'no-store', credentials: 'same-origin' });
+    const res = await fetchWithTimeout(
+      '/api/v1/public/chains',
+      { cache: 'no-store', credentials: 'same-origin' },
+      uiFetchTimeoutMs(),
+    );
     if (!res.ok) {
       return;
     }
@@ -170,11 +175,15 @@ async function fetchRuntimeManagedDefaultChain(): Promise<ChainKey | null> {
     return null;
   }
   try {
-    const sessionRes = await fetch('/api/v1/management/session/agents', {
-      method: 'GET',
-      credentials: 'same-origin',
-      cache: 'no-store'
-    });
+    const sessionRes = await fetchWithTimeout(
+      '/api/v1/management/session/agents',
+      {
+        method: 'GET',
+        credentials: 'same-origin',
+        cache: 'no-store'
+      },
+      uiFetchTimeoutMs(),
+    );
     if (!sessionRes.ok) {
       return null;
     }
@@ -183,13 +192,14 @@ async function fetchRuntimeManagedDefaultChain(): Promise<ChainKey | null> {
     if (!activeAgentId) {
       return null;
     }
-    const defaultRes = await fetch(
+    const defaultRes = await fetchWithTimeout(
       `/api/v1/management/default-chain?agentId=${encodeURIComponent(activeAgentId)}`,
       {
         method: 'GET',
         credentials: 'same-origin',
         cache: 'no-store'
-      }
+      },
+      uiFetchTimeoutMs(),
     );
     if (!defaultRes.ok) {
       return null;
@@ -208,15 +218,19 @@ export async function syncManagedAgentsDefaultChain(chainKey: ChainKey): Promise
   }
   const csrf = getCsrfToken();
   try {
-    const response = await fetch('/api/v1/management/default-chain/update-batch', {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: {
-        'content-type': 'application/json',
-        ...(csrf ? { 'x-csrf-token': csrf } : {})
+    const response = await fetchWithTimeout(
+      '/api/v1/management/default-chain/update-batch',
+      {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'content-type': 'application/json',
+          ...(csrf ? { 'x-csrf-token': csrf } : {})
+        },
+        body: JSON.stringify({ chainKey })
       },
-      body: JSON.stringify({ chainKey })
-    });
+      uiFetchTimeoutMs(),
+    );
     if (!response.ok) {
       const payload = (await response.json().catch(() => null)) as { message?: string } | null;
       return { ok: false, message: payload?.message ?? 'Failed to sync default chain.' };

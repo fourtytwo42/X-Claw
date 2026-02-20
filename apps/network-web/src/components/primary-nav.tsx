@@ -10,6 +10,7 @@ import { MobileMoreSheet } from '@/components/mobile-more-sheet';
 import { SidebarIcon } from '@/components/sidebar-icons';
 import { getStoredChainKey } from '@/lib/active-chain';
 import { getAgentAvatarPalette, getAgentInitial } from '@/lib/agent-avatar-color';
+import { fetchWithTimeout, uiFetchTimeoutMs } from '@/lib/fetch-timeout';
 
 import styles from './primary-nav.module.css';
 
@@ -88,7 +89,7 @@ export function PrimaryNav({ className, desktopExtra, mobileMoreContent }: Prima
         setBookmarkedAgentIds(localIds);
         setUsingServerTracked(false);
 
-        void fetch('/api/v1/management/session/agents', { credentials: 'same-origin', cache: 'no-store' })
+        void fetchWithTimeout('/api/v1/management/session/agents', { credentials: 'same-origin', cache: 'no-store' }, uiFetchTimeoutMs())
           .then(async (response) => {
             if (!response.ok) {
               return null;
@@ -102,9 +103,10 @@ export function PrimaryNav({ className, desktopExtra, mobileMoreContent }: Prima
               return;
             }
             setActiveManagedAgentId(activeAgentId);
-            const trackedResponse = await fetch(
+            const trackedResponse = await fetchWithTimeout(
               `/api/v1/management/tracked-agents?agentId=${encodeURIComponent(activeAgentId)}&chainKey=${encodeURIComponent(getStoredChainKey())}`,
-              { credentials: 'same-origin', cache: 'no-store' }
+              { credentials: 'same-origin', cache: 'no-store' },
+              uiFetchTimeoutMs(),
             );
             if (!trackedResponse.ok) {
               return;
@@ -170,7 +172,11 @@ export function PrimaryNav({ className, desktopExtra, mobileMoreContent }: Prima
       await Promise.all(
         bookmarkedAgentIds.map(async (agentId) => {
           try {
-            const response = await fetch(`/api/v1/public/agents/${encodeURIComponent(agentId)}`, { cache: 'no-store' });
+            const response = await fetchWithTimeout(
+              `/api/v1/public/agents/${encodeURIComponent(agentId)}`,
+              { cache: 'no-store' },
+              uiFetchTimeoutMs(),
+            );
             if (!response.ok) {
               names[agentId] = 'Saved Agent';
               return;
@@ -211,7 +217,7 @@ export function PrimaryNav({ className, desktopExtra, mobileMoreContent }: Prima
 
     if (usingServerTracked && activeManagedAgentId) {
       const csrf = getCsrfToken();
-      void fetch('/api/v1/management/tracked-agents', {
+      void fetchWithTimeout('/api/v1/management/tracked-agents', {
         method: 'DELETE',
         credentials: 'same-origin',
         headers: {
@@ -219,7 +225,7 @@ export function PrimaryNav({ className, desktopExtra, mobileMoreContent }: Prima
           ...(csrf ? { 'x-csrf-token': csrf } : {})
         },
         body: JSON.stringify({ agentId: activeManagedAgentId, trackedAgentId: agentId })
-      }).then(() => {
+      }, uiFetchTimeoutMs()).then(() => {
         setBookmarkedAgentIds((current) => current.filter((id) => id !== agentId));
         setBookmarkedAgentNames((current) => {
           const copy = { ...current };

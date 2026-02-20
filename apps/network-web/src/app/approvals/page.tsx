@@ -7,6 +7,7 @@ import { ChainHeaderControl } from '@/components/chain-header-control';
 import { PrimaryNav } from '@/components/primary-nav';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { useDashboardChainKey } from '@/lib/active-chain';
+import { fetchWithTimeout, uiFetchTimeoutMs } from '@/lib/fetch-timeout';
 import { formatNumber, formatUtc } from '@/lib/public-format';
 
 import styles from './page.module.css';
@@ -96,12 +97,12 @@ async function managementPost(path: string, payload: Record<string, unknown>) {
     headers['x-csrf-token'] = csrf;
   }
 
-  const response = await fetch(path, {
+  const response = await fetchWithTimeout(path, {
     method: 'POST',
     credentials: 'same-origin',
     headers,
     body: JSON.stringify(payload)
-  });
+  }, uiFetchTimeoutMs());
 
   const json = (await response.json().catch(() => null)) as { message?: string; code?: string; actionHint?: string } | null;
   if (!response.ok) {
@@ -160,7 +161,11 @@ export default function ApprovalsCenterPage() {
     async function loadOwnerContext() {
       setOwnerContext({ phase: 'loading' });
       try {
-        const response = await fetch('/api/v1/management/session/agents', { credentials: 'same-origin', cache: 'no-store' });
+        const response = await fetchWithTimeout(
+          '/api/v1/management/session/agents',
+          { credentials: 'same-origin', cache: 'no-store' },
+          uiFetchTimeoutMs(),
+        );
         if (!response.ok) {
           if (!cancelled) {
             setOwnerContext({ phase: 'none' });
@@ -201,9 +206,10 @@ export default function ApprovalsCenterPage() {
       setLoadingState(true);
       setError(null);
       try {
-        const response = await fetch(
+        const response = await fetchWithTimeout(
           `/api/v1/management/approvals/inbox?chainKey=${encodeURIComponent(effectiveChain)}&status=all&types=trade,policy,transfer&limit=400`,
-          { cache: 'no-store', credentials: 'same-origin' }
+          { cache: 'no-store', credentials: 'same-origin' },
+          uiFetchTimeoutMs(),
         );
 
         if (!response.ok) {
@@ -270,9 +276,10 @@ export default function ApprovalsCenterPage() {
   }, [rows, state]);
 
   async function reloadInbox() {
-    const response = await fetch(
+    const response = await fetchWithTimeout(
       `/api/v1/management/approvals/inbox?chainKey=${encodeURIComponent(effectiveChain)}&status=all&types=trade,policy,transfer&limit=400`,
-      { cache: 'no-store', credentials: 'same-origin' }
+      { cache: 'no-store', credentials: 'same-origin' },
+      uiFetchTimeoutMs(),
     );
     if (!response.ok) {
       return;

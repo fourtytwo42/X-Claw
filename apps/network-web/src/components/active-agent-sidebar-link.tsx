@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 import { getAgentAvatarPalette, getAgentInitial } from '@/lib/agent-avatar-color';
+import { fetchWithTimeout, uiFetchTimeoutMs } from '@/lib/fetch-timeout';
 
 type SessionAgentsPayload = {
   managedAgents?: string[];
@@ -24,6 +25,63 @@ type ActiveAgentSidebarLinkProps = {
   labelClassName?: string;
 };
 
+const MANAGED_AGENT_IDS_KEY = 'xclaw_managed_agent_ids';
+const MANAGED_AGENT_NAMES_KEY = 'xclaw_managed_agent_names';
+
+function parseStoredManagedAgentIds(): string[] {
+  if (typeof window === 'undefined') {
+    return [];
+  }
+  try {
+    const raw = window.localStorage.getItem(MANAGED_AGENT_IDS_KEY);
+    if (!raw) {
+      return [];
+    }
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed.map((item) => String(item ?? '').trim()).filter((item) => item.length > 0);
+  } catch {
+    return [];
+  }
+}
+
+function parseStoredManagedAgentNames(): Record<string, string> {
+  if (typeof window === 'undefined') {
+    return {};
+  }
+  try {
+    const raw = window.localStorage.getItem(MANAGED_AGENT_NAMES_KEY);
+    if (!raw) {
+      return {};
+    }
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return {};
+    }
+    const out: Record<string, string> = {};
+    for (const [agentId, name] of Object.entries(parsed)) {
+      const normalizedId = String(agentId ?? '').trim();
+      const normalizedName = String(name ?? '').trim();
+      if (!normalizedId || !normalizedName) {
+        continue;
+      }
+      out[normalizedId] = normalizedName;
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+function persistManagedAgentNames(next: Record<string, string>): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  window.localStorage.setItem(MANAGED_AGENT_NAMES_KEY, JSON.stringify(next));
+}
+
 export function ActiveAgentSidebarLink({ itemClassName, activeClassName, showLabel = false, labelClassName }: ActiveAgentSidebarLinkProps) {
   const pathname = usePathname();
   const [managedAgentIds, setManagedAgentIds] = useState<string[]>([]);
@@ -33,8 +91,21 @@ export function ActiveAgentSidebarLink({ itemClassName, activeClassName, showLab
     let cancelled = false;
 
     async function load() {
+      const storedIds = parseStoredManagedAgentIds();
+      const storedNames = parseStoredManagedAgentNames();
+      if (storedIds.length > 0) {
+        setManagedAgentIds(storedIds);
+      }
+      if (Object.keys(storedNames).length > 0) {
+        setAgentNames(storedNames);
+      }
+
       try {
-        const response = await fetch('/api/v1/management/session/agents', { credentials: 'same-origin', cache: 'no-store' });
+        const response = await fetchWithTimeout(
+          '/api/v1/management/session/agents',
+          { credentials: 'same-origin', cache: 'no-store' },
+          uiFetchTimeoutMs(3000),
+        );
         if (!response.ok) {
           return;
         }
@@ -51,24 +122,42 @@ export function ActiveAgentSidebarLink({ itemClassName, activeClassName, showLab
         }
         setManagedAgentIds(ids);
 
-        const names: Record<string, string> = {};
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem(MANAGED_AGENT_IDS_KEY, JSON.stringify(ids));
+        }
+
+        const names: Record<string, string> = { ...storedNames };
         await Promise.all(
           ids.map(async (id) => {
             try {
-              const profileResponse = await fetch(`/api/v1/public/agents/${encodeURIComponent(id)}`, { cache: 'no-store' });
+              const profileResponse = await fetchWithTimeout(
+                `/api/v1/public/agents/${encodeURIComponent(id)}`,
+                { cache: 'no-store' },
+                uiFetchTimeoutMs(3000),
+              );
               if (!profileResponse.ok) {
-                names[id] = id;
                 return;
               }
               const profile = (await profileResponse.json()) as PublicAgentPayload;
-              names[id] = (profile.agent?.agent_name ?? '').trim() || id;
+              const resolvedName = (profile.agent?.agent_name ?? '').trim();
+              if (resolvedName) {
+                names[id] = resolvedName;
+              }
             } catch {
-              names[id] = id;
+              // keep best-effort cached value
             }
           })
         );
         if (!cancelled) {
-          setAgentNames(names);
+          const filtered: Record<string, string> = {};
+          for (const id of ids) {
+            const name = String(names[id] ?? '').trim();
+            if (name) {
+              filtered[id] = name;
+            }
+          }
+          setAgentNames(filtered);
+          persistManagedAgentNames(filtered);
         }
       } catch {
         // no-op
@@ -89,11 +178,11 @@ export function ActiveAgentSidebarLink({ itemClassName, activeClassName, showLab
   return (
     <>
       {managedAgentIds.map((agentId, index) => {
-        const agentName = agentNames[agentId] ?? agentId;
-        const title = agentName || agentId;
+        const resolvedName = String(agentNames[agentId] ?? '').trim();
+        const title = resolvedName || agentId;
         const isActive = pathname === `/agents/${agentId}`;
         const className = isActive && activeClassName ? `${itemClassName} ${activeClassName}` : itemClassName;
-        const initial = getAgentInitial(agentName, agentId);
+        const initial = resolvedName ? getAgentInitial(resolvedName, agentId) : '?';
         const avatarPalette = getAgentAvatarPalette(agentId, index * 137);
         return (
           <Link key={`managed-${agentId}`} href={`/agents/${encodeURIComponent(agentId)}`} className={className} aria-label={title} title={title}>

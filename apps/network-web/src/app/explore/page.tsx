@@ -9,6 +9,7 @@ import { PrimaryNav } from '@/components/primary-nav';
 import { PublicStatusBadge } from '@/components/public-status-badge';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { useDashboardChainKey } from '@/lib/active-chain';
+import { fetchWithTimeout, uiFetchTimeoutMs } from '@/lib/fetch-timeout';
 import { getAgentAvatarPalette, getAgentInitial } from '@/lib/agent-avatar-color';
 import {
   badgeLabel,
@@ -150,12 +151,12 @@ async function postJson(path: string, payload: Record<string, unknown>) {
   if (csrf) {
     headers['x-csrf-token'] = csrf;
   }
-  const response = await fetch(path, {
+  const response = await fetchWithTimeout(path, {
     method: 'POST',
     credentials: 'same-origin',
     headers,
     body: JSON.stringify(payload)
-  });
+  }, uiFetchTimeoutMs());
   const json = (await response.json().catch(() => null)) as { message?: string; code?: string } | null;
   if (!response.ok) {
     const error = new Error(json?.message ?? 'Request failed.') as Error & { code?: string };
@@ -173,12 +174,12 @@ async function putJson(path: string, payload: Record<string, unknown>) {
   if (csrf) {
     headers['x-csrf-token'] = csrf;
   }
-  const response = await fetch(path, {
+  const response = await fetchWithTimeout(path, {
     method: 'PUT',
     credentials: 'same-origin',
     headers,
     body: JSON.stringify(payload)
-  });
+  }, uiFetchTimeoutMs());
   const json = (await response.json().catch(() => null)) as { message?: string; code?: string } | null;
   if (!response.ok) {
     const error = new Error(json?.message ?? 'Request failed.') as Error & { code?: string };
@@ -299,7 +300,11 @@ export default function ExplorePage() {
     let cancelled = false;
     async function loadOwnerContext() {
       try {
-        const response = await fetch('/api/v1/management/session/agents', { credentials: 'same-origin', cache: 'no-store' });
+        const response = await fetchWithTimeout(
+          '/api/v1/management/session/agents',
+          { credentials: 'same-origin', cache: 'no-store' },
+          uiFetchTimeoutMs(),
+        );
         if (!response.ok) {
           if (!cancelled) {
             setOwnerContext({ phase: 'none' });
@@ -334,9 +339,10 @@ export default function ExplorePage() {
     let cancelled = false;
     async function loadTracked() {
       try {
-        const response = await fetch(
+        const response = await fetchWithTimeout(
           `/api/v1/management/tracked-agents?agentId=${encodeURIComponent(activeAgentId)}&chainKey=${encodeURIComponent(chainKey)}`,
-          { cache: 'no-store', credentials: 'same-origin' }
+          { cache: 'no-store', credentials: 'same-origin' },
+          uiFetchTimeoutMs(),
         );
         if (!response.ok) {
           return;
@@ -385,7 +391,7 @@ export default function ExplorePage() {
       }
 
       try {
-        const response = await fetch(`/api/v1/public/agents?${params.toString()}`, { cache: 'no-store' });
+        const response = await fetchWithTimeout(`/api/v1/public/agents?${params.toString()}`, { cache: 'no-store' }, uiFetchTimeoutMs());
         if (!response.ok) {
           throw new Error('Failed to load explore agents.');
         }
@@ -467,7 +473,7 @@ export default function ExplorePage() {
     try {
       const tracked = trackedAgentIds.includes(agentId);
       if (tracked) {
-        await fetch('/api/v1/management/tracked-agents', {
+        await fetchWithTimeout('/api/v1/management/tracked-agents', {
           method: 'DELETE',
           credentials: 'same-origin',
           headers: {
@@ -475,7 +481,7 @@ export default function ExplorePage() {
             ...(getCsrfToken() ? { 'x-csrf-token': getCsrfToken() as string } : {})
           },
           body: JSON.stringify({ agentId: ownerContext.activeAgentId, trackedAgentId: agentId })
-        }).then(async (response) => {
+        }, uiFetchTimeoutMs()).then(async (response) => {
           if (!response.ok) {
             const payload = (await response.json().catch(() => null)) as { message?: string } | null;
             throw new Error(payload?.message ?? 'Failed to remove tracked agent.');

@@ -7,6 +7,7 @@ import { ChainHeaderControl } from '@/components/chain-header-control';
 import { rememberManagedAgent } from '@/components/management-header-controls';
 import { PrimaryNav } from '@/components/primary-nav';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { fetchWithTimeout, uiFetchTimeoutMs } from '@/lib/fetch-timeout';
 
 import styles from './page.module.css';
 
@@ -204,12 +205,12 @@ async function postJson(path: string, payload: Record<string, unknown>) {
     headers['x-csrf-token'] = csrf;
   }
 
-  const response = await fetch(path, {
+  const response = await fetchWithTimeout(path, {
     method: 'POST',
     credentials: 'same-origin',
     headers,
     body: JSON.stringify(payload)
-  });
+  }, uiFetchTimeoutMs());
 
   const json = (await response.json().catch(() => null)) as { message?: string; actionHint?: string; code?: string } | null;
   if (!response.ok) {
@@ -233,12 +234,12 @@ async function deleteJson(path: string, payload: Record<string, unknown>) {
     headers['x-csrf-token'] = csrf;
   }
 
-  const response = await fetch(path, {
+  const response = await fetchWithTimeout(path, {
     method: 'DELETE',
     credentials: 'same-origin',
     headers,
     body: JSON.stringify(payload)
-  });
+  }, uiFetchTimeoutMs());
 
   const json = (await response.json().catch(() => null)) as { message?: string; actionHint?: string; code?: string } | null;
   if (!response.ok) {
@@ -334,7 +335,11 @@ export default function SettingsPage() {
     async function loadOwnerContext() {
       try {
         setError(null);
-        const response = await fetch('/api/v1/management/session/agents', { credentials: 'same-origin', cache: 'no-store' });
+        const response = await fetchWithTimeout(
+          '/api/v1/management/session/agents',
+          { credentials: 'same-origin', cache: 'no-store' },
+          uiFetchTimeoutMs(),
+        );
         if (!response.ok) {
           if (!cancelled) {
             setOwnerContext({ phase: 'none' });
@@ -385,7 +390,11 @@ export default function SettingsPage() {
       await Promise.all(
         managedAgents.map(async (agentId) => {
           try {
-            const response = await fetch(`/api/v1/public/agents/${encodeURIComponent(agentId)}`, { cache: 'no-store' });
+            const response = await fetchWithTimeout(
+              `/api/v1/public/agents/${encodeURIComponent(agentId)}`,
+              { cache: 'no-store' },
+              uiFetchTimeoutMs(),
+            );
             if (!response.ok) {
               names[agentId] = 'Unnamed Agent';
               return;

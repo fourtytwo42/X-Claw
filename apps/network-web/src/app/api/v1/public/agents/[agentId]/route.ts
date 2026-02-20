@@ -4,6 +4,7 @@ import { chainRpcUrl, getChainConfig } from '@/lib/chains';
 import { ensureAgentWalletMappings } from '@/lib/agent-wallet-mappings';
 import { dbQuery } from '@/lib/db';
 import { errorResponse, internalErrorResponse, successResponse } from '@/lib/errors';
+import { fetchWithTimeout, upstreamFetchTimeoutMs } from '@/lib/fetch-timeout';
 import { enforcePublicReadRateLimit } from '@/lib/rate-limit';
 import { getRequestId } from '@/lib/request-id';
 import { resolveTokenDecimals } from '@/lib/token-metadata';
@@ -11,11 +12,15 @@ import { resolveTokenDecimals } from '@/lib/token-metadata';
 export const runtime = 'nodejs';
 
 async function rpcRequest(rpcUrl: string, method: string, params: unknown[]): Promise<unknown> {
-  const res = await fetch(rpcUrl, {
+  const res = await fetchWithTimeout(
+    rpcUrl,
+    {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params })
-  });
+    },
+    upstreamFetchTimeoutMs(),
+  );
   if (!res.ok) {
     throw new Error(`RPC ${method} failed with HTTP ${res.status}`);
   }

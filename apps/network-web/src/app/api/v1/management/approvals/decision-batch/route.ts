@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server';
 
 import { errorResponse, internalErrorResponse, successResponse } from '@/lib/errors';
+import { fetchWithTimeout, upstreamFetchTimeoutMs } from '@/lib/fetch-timeout';
 import { parseJsonBody } from '@/lib/http';
 import { getRequestId } from '@/lib/request-id';
 import { validatePayload } from '@/lib/validation';
@@ -19,15 +20,19 @@ type BatchDecisionRequest = {
 export const runtime = 'nodejs';
 
 async function postWithSession(req: NextRequest, path: string, body: Record<string, unknown>): Promise<{ ok: boolean; status: number; payload: unknown }> {
-  const response = await fetch(new URL(path, req.nextUrl.origin), {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      cookie: req.headers.get('cookie') ?? '',
-      'x-csrf-token': req.headers.get('x-csrf-token') ?? ''
+  const response = await fetchWithTimeout(
+    new URL(path, req.nextUrl.origin),
+    {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        cookie: req.headers.get('cookie') ?? '',
+        'x-csrf-token': req.headers.get('x-csrf-token') ?? ''
+      },
+      body: JSON.stringify(body)
     },
-    body: JSON.stringify(body)
-  });
+    upstreamFetchTimeoutMs(),
+  );
   const payload = await response.json().catch(() => null);
   return { ok: response.ok, status: response.status, payload };
 }

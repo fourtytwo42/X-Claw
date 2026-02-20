@@ -6,6 +6,7 @@ import { ChainHeaderControl } from '@/components/chain-header-control';
 import { PrimaryNav } from '@/components/primary-nav';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { useDashboardChainKey } from '@/lib/active-chain';
+import { fetchWithTimeout, uiFetchTimeoutMs } from '@/lib/fetch-timeout';
 import { formatUtc } from '@/lib/public-format';
 
 import styles from './page.module.css';
@@ -73,7 +74,7 @@ export default function StatusPage() {
     async function load() {
       try {
         setError(null);
-        const res = await fetch('/api/status', { cache: 'no-store' });
+        const res = await fetchWithTimeout('/api/status', { cache: 'no-store' }, uiFetchTimeoutMs());
         if (!res.ok) {
           throw new Error('Status request failed.');
         }

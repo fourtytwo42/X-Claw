@@ -11,6 +11,7 @@ import { PublicStatusBadge } from '@/components/public-status-badge';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { nativeDecimalsForChainKey, nativeSymbolForChainKey, useActiveChainKey } from '@/lib/active-chain';
 import { getAgentAvatarPalette, getAgentInitial } from '@/lib/agent-avatar-color';
+import { fetchWithTimeout, uiFetchTimeoutMs } from '@/lib/fetch-timeout';
 import {
   buildHoldings,
   formatActivityTitle,
@@ -224,12 +225,16 @@ async function managementPost(path: string, payload: Record<string, unknown>) {
     headers['x-csrf-token'] = csrf;
   }
 
-  const response = await fetch(path, {
-    method: 'POST',
-    credentials: 'same-origin',
-    headers,
-    body: JSON.stringify(payload)
-  });
+  const response = await fetchWithTimeout(
+    path,
+    {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers,
+      body: JSON.stringify(payload)
+    },
+    uiFetchTimeoutMs(),
+  );
 
   const json = (await response.json().catch(() => null)) as { message?: string; code?: string; actionHint?: string } | null;
   if (!response.ok) {
@@ -253,12 +258,16 @@ async function managementGet(path: string) {
     headers['x-csrf-token'] = csrf;
   }
 
-  const response = await fetch(path, {
-    method: 'GET',
-    credentials: 'same-origin',
-    headers,
-    cache: 'no-store'
-  });
+  const response = await fetchWithTimeout(
+    path,
+    {
+      method: 'GET',
+      credentials: 'same-origin',
+      headers,
+      cache: 'no-store'
+    },
+    uiFetchTimeoutMs(),
+  );
   const json = (await response.json().catch(() => null)) as { message?: string } | null;
   if (!response.ok) {
     throw new Error(json?.message ?? 'Management request failed.');
@@ -273,12 +282,16 @@ async function managementDelete(path: string, payload: Record<string, unknown>) 
     headers['x-csrf-token'] = csrf;
   }
 
-  const response = await fetch(path, {
-    method: 'DELETE',
-    credentials: 'same-origin',
-    headers,
-    body: JSON.stringify(payload)
-  });
+  const response = await fetchWithTimeout(
+    path,
+    {
+      method: 'DELETE',
+      credentials: 'same-origin',
+      headers,
+      body: JSON.stringify(payload)
+    },
+    uiFetchTimeoutMs(),
+  );
   const json = (await response.json().catch(() => null)) as { message?: string; code?: string; actionHint?: string } | null;
   if (!response.ok) {
     const error = new Error(json?.message ?? 'Management request failed.') as Error & { code?: string; actionHint?: string };
@@ -297,14 +310,18 @@ async function bootstrapSession(
   agentId: string,
   token: string
 ): Promise<{ ok: true } | { ok: false; message: string; code?: string; actionHint?: string }> {
-  const response = await fetch('/api/v1/management/session/bootstrap', {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json'
+  const response = await fetchWithTimeout(
+    '/api/v1/management/session/bootstrap',
+    {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json'
+      },
+      credentials: 'same-origin',
+      body: JSON.stringify({ agentId, token })
     },
-    credentials: 'same-origin',
-    body: JSON.stringify({ agentId, token })
-  });
+    uiFetchTimeoutMs(),
+  );
 
   if (!response.ok) {
     let message = 'Bootstrap failed. Verify token and retry.';
@@ -331,12 +348,16 @@ async function bootstrapSession(
 }
 
 async function selectManagementSession(agentId: string, token: string): Promise<boolean> {
-  const response = await fetch('/api/v1/management/session/select', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    credentials: 'same-origin',
-    body: JSON.stringify({ agentId, token })
-  });
+  const response = await fetchWithTimeout(
+    '/api/v1/management/session/select',
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ agentId, token })
+    },
+    uiFetchTimeoutMs(),
+  );
   return response.ok;
 }
 
@@ -564,10 +585,14 @@ export default function AgentPublicProfilePage() {
     setViewerTrackingContext({ mode: 'local' });
 
     try {
-      const sessionResponse = await fetch('/api/v1/management/session/agents', {
-        credentials: 'same-origin',
-        cache: 'no-store'
-      });
+      const sessionResponse = await fetchWithTimeout(
+        '/api/v1/management/session/agents',
+        {
+          credentials: 'same-origin',
+          cache: 'no-store'
+        },
+        uiFetchTimeoutMs(),
+      );
       if (!sessionResponse.ok) {
         return;
       }
@@ -576,12 +601,13 @@ export default function AgentPublicProfilePage() {
       if (!activeManagedAgentId) {
         return;
       }
-      const trackedResponse = await fetch(
+      const trackedResponse = await fetchWithTimeout(
         `/api/v1/management/tracked-agents?agentId=${encodeURIComponent(activeManagedAgentId)}&chainKey=${encodeURIComponent(activeChainKey)}`,
         {
           credentials: 'same-origin',
           cache: 'no-store'
-        }
+        },
+        uiFetchTimeoutMs(),
       );
       if (!trackedResponse.ok) {
         return;
@@ -682,11 +708,23 @@ export default function AgentPublicProfilePage() {
 
   const loadPublicData = useCallback(async () => {
     const [profileRes, tradesRes, activityRes] = await Promise.all([
-      fetch(`/api/v1/public/agents/${agentId}?chainKey=${encodeURIComponent(activeChainKey)}`, { cache: 'no-store' }),
-      fetch(`/api/v1/public/agents/${agentId}/trades?limit=30&chainKey=${encodeURIComponent(activeChainKey)}`, { cache: 'no-store' }),
-      fetch(`/api/v1/public/activity?limit=30&agentId=${encodeURIComponent(agentId)}&chainKey=${encodeURIComponent(activeChainKey)}`, {
-        cache: 'no-store'
-      })
+      fetchWithTimeout(
+        `/api/v1/public/agents/${agentId}?chainKey=${encodeURIComponent(activeChainKey)}`,
+        { cache: 'no-store' },
+        uiFetchTimeoutMs(),
+      ),
+      fetchWithTimeout(
+        `/api/v1/public/agents/${agentId}/trades?limit=30&chainKey=${encodeURIComponent(activeChainKey)}`,
+        { cache: 'no-store' },
+        uiFetchTimeoutMs(),
+      ),
+      fetchWithTimeout(
+        `/api/v1/public/activity?limit=30&agentId=${encodeURIComponent(agentId)}&chainKey=${encodeURIComponent(activeChainKey)}`,
+        {
+          cache: 'no-store'
+        },
+        uiFetchTimeoutMs(),
+      )
     ]);
 
     if (!profileRes.ok || !tradesRes.ok || !activityRes.ok) {
@@ -704,12 +742,13 @@ export default function AgentPublicProfilePage() {
 
   const loadManagementData = useCallback(async () => {
     async function fetchManagementState() {
-      return fetch(
+      return fetchWithTimeout(
         `/api/v1/management/agent-state?agentId=${encodeURIComponent(agentId)}&chainKey=${encodeURIComponent(activeChainKey)}`,
         {
           cache: 'no-store',
           credentials: 'same-origin'
-        }
+        },
+        uiFetchTimeoutMs(),
       );
     }
 
@@ -763,10 +802,14 @@ export default function AgentPublicProfilePage() {
 
       let sessionAgentId = '';
       try {
-        const sessionRes = await fetch('/api/v1/management/session/agents', {
-          credentials: 'same-origin',
-          cache: 'no-store'
-        });
+        const sessionRes = await fetchWithTimeout(
+          '/api/v1/management/session/agents',
+          {
+            credentials: 'same-origin',
+            cache: 'no-store'
+          },
+          uiFetchTimeoutMs(),
+        );
         if (sessionRes.ok) {
           const sessionPayload = (await sessionRes.json()) as { activeAgentId?: string };
           sessionAgentId = String(sessionPayload.activeAgentId ?? '').trim();

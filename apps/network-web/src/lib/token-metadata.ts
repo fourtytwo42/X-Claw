@@ -1,5 +1,6 @@
 import { chainNativeAtomicDecimals, chainNativeSymbol, getChainConfig, chainRpcUrl } from '@/lib/chains';
 import { dbQuery } from '@/lib/db';
+import { fetchWithTimeout, upstreamFetchTimeoutMs } from '@/lib/fetch-timeout';
 
 type ResolveSource = 'config' | 'rpc' | 'cache' | 'fallback';
 type ResolveStatus = 'ok' | 'rpc_error' | 'non_erc20' | 'invalid';
@@ -23,7 +24,9 @@ function fallbackSymbol(address: string): string {
 }
 
 async function rpcCall(rpcUrl: string, to: string, data: string): Promise<string | null> {
-  const res = await fetch(rpcUrl, {
+  const res = await fetchWithTimeout(
+    rpcUrl,
+    {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
@@ -32,7 +35,9 @@ async function rpcCall(rpcUrl: string, to: string, data: string): Promise<string
       method: 'eth_call',
       params: [{ to, data }, 'latest'],
     }),
-  });
+    },
+    upstreamFetchTimeoutMs(),
+  );
   if (!res.ok) {
     return null;
   }

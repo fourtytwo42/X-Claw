@@ -4,6 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
+import { fetchWithTimeout, uiFetchTimeoutMs } from '@/lib/fetch-timeout';
 import { formatUtc } from '@/lib/public-format';
 
 import styles from './page.module.css';
@@ -57,8 +58,12 @@ export default function LandingPage() {
     async function loadLandingData() {
       try {
         const [activityRes, agentsRes] = await Promise.all([
-          fetch('/api/v1/public/activity?limit=240', { cache: 'no-store' }),
-          fetch('/api/v1/public/agents?page=1&pageSize=100&includeMetrics=true&includeDeactivated=false&chain=all', { cache: 'no-store' })
+          fetchWithTimeout('/api/v1/public/activity?limit=240', { cache: 'no-store' }, uiFetchTimeoutMs()),
+          fetchWithTimeout(
+            '/api/v1/public/agents?page=1&pageSize=100&includeMetrics=true&includeDeactivated=false&chain=all',
+            { cache: 'no-store' },
+            uiFetchTimeoutMs(),
+          )
         ]);
 
         if (!activityRes.ok || !agentsRes.ok) {

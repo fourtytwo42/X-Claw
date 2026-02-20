@@ -1,6 +1,7 @@
 import { getChainConfig } from '@/lib/chains';
 import { UniswapProxyError } from '@/lib/uniswap-proxy';
 import { getEnv } from '@/lib/env';
+import { fetchWithTimeout, upstreamFetchTimeoutMs } from '@/lib/fetch-timeout';
 
 export { UniswapProxyError } from '@/lib/uniswap-proxy';
 
@@ -106,15 +107,19 @@ async function uniswapRequest(path: string, payload: Record<string, unknown>): P
   const apiKey = ensureUniswapConfigured();
   let response: Response;
   try {
-    response = await fetch(`${UNISWAP_BASE_URL}${path}`, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-api-key': apiKey,
+    response = await fetchWithTimeout(
+      `${UNISWAP_BASE_URL}${path}`,
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-api-key': apiKey,
+        },
+        body: JSON.stringify(payload),
+        cache: 'no-store',
       },
-      body: JSON.stringify(payload),
-      cache: 'no-store',
-    });
+      upstreamFetchTimeoutMs(),
+    );
   } catch (error) {
     throw new UniswapProxyError('uniswap_upstream_unavailable', 'Uniswap upstream request failed.', 502, {
       cause: String(error ?? 'unknown_error'),

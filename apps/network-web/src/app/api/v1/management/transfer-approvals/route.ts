@@ -3,6 +3,7 @@ import type { NextRequest } from 'next/server';
 import { chainRpcUrl } from '@/lib/chains';
 import { dbQuery } from '@/lib/db';
 import { errorResponse, internalErrorResponse, successResponse } from '@/lib/errors';
+import { fetchWithTimeout, upstreamFetchTimeoutMs } from '@/lib/fetch-timeout';
 import { requireManagementSession, sessionHasAgentAccess } from '@/lib/management-auth';
 import { getRequestId } from '@/lib/request-id';
 import { kickStaleTransferRecovery } from '@/lib/transfer-recovery';
@@ -19,11 +20,15 @@ function hexToBigInt(raw: string): bigint {
 }
 
 async function rpcRequest(rpcUrl: string, method: string, params: unknown[]): Promise<unknown> {
-  const res = await fetch(rpcUrl, {
+  const res = await fetchWithTimeout(
+    rpcUrl,
+    {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params })
-  });
+    },
+    upstreamFetchTimeoutMs(),
+  );
   if (!res.ok) {
     throw new Error(`RPC ${method} failed with HTTP ${res.status}`);
   }

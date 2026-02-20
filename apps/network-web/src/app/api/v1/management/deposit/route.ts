@@ -3,6 +3,7 @@ import type { NextRequest } from 'next/server';
 import { chainRpcUrl, getChainConfig } from '@/lib/chains';
 import { dbQuery, withTransaction } from '@/lib/db';
 import { errorResponse, internalErrorResponse, successResponse } from '@/lib/errors';
+import { fetchWithTimeout, upstreamFetchTimeoutMs } from '@/lib/fetch-timeout';
 import { ensureAgentWalletMappings } from '@/lib/agent-wallet-mappings';
 import { makeId } from '@/lib/ids';
 import { requireCsrfToken, requireManagementSession, sessionHasAgentAccess } from '@/lib/management-auth';
@@ -89,14 +90,18 @@ async function hederaDiscoverWalletTokens(chainKey: string, walletAddress: strin
 
   while (nextUrl && !visited.has(nextUrl) && visited.size < 20) {
     visited.add(nextUrl);
-    const res = await fetch(nextUrl, {
-      method: 'GET',
-      headers: {
-        accept: 'application/json',
-        'user-agent': 'xclaw-web/1.0 (+https://xclaw.trade)',
+    const res = await fetchWithTimeout(
+      nextUrl,
+      {
+        method: 'GET',
+        headers: {
+          accept: 'application/json',
+          'user-agent': 'xclaw-web/1.0 (+https://xclaw.trade)',
+        },
+        cache: 'no-store',
       },
-      cache: 'no-store',
-    });
+      upstreamFetchTimeoutMs(),
+    );
     if (!res.ok) {
       throw new Error(`Hedera mirror tokens request failed with HTTP ${res.status}`);
     }
@@ -119,14 +124,18 @@ async function hederaDiscoverWalletTokens(chainKey: string, walletAddress: strin
       if (balanceUnits <= BigInt(0)) {
         continue;
       }
-      const metaRes = await fetch(`${base}/tokens/${tokenId}`, {
-        method: 'GET',
-        headers: {
-          accept: 'application/json',
-          'user-agent': 'xclaw-web/1.0 (+https://xclaw.trade)',
+      const metaRes = await fetchWithTimeout(
+        `${base}/tokens/${tokenId}`,
+        {
+          method: 'GET',
+          headers: {
+            accept: 'application/json',
+            'user-agent': 'xclaw-web/1.0 (+https://xclaw.trade)',
+          },
+          cache: 'no-store',
         },
-        cache: 'no-store',
-      });
+        upstreamFetchTimeoutMs(),
+      );
       if (!metaRes.ok) {
         continue;
       }
@@ -155,11 +164,15 @@ async function hederaDiscoverWalletTokens(chainKey: string, walletAddress: strin
 }
 
 async function rpcRequest(rpcUrl: string, method: string, params: unknown[]): Promise<unknown> {
-  const res = await fetch(rpcUrl, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params })
-  });
+  const res = await fetchWithTimeout(
+    rpcUrl,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params })
+    },
+    upstreamFetchTimeoutMs(),
+  );
 
   if (!res.ok) {
     throw new Error(`RPC ${method} failed with HTTP ${res.status}`);

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
+import { fetchWithTimeout, uiFetchTimeoutMs } from '@/lib/fetch-timeout';
 
 const MANAGED_AGENT_IDS_KEY = 'xclaw_managed_agent_ids';
 
@@ -62,7 +63,7 @@ export function ManagementHeaderControls() {
       }
     }
 
-    void fetch('/api/v1/management/session/agents', { credentials: 'same-origin', cache: 'no-store' })
+    void fetchWithTimeout('/api/v1/management/session/agents', { credentials: 'same-origin', cache: 'no-store' }, uiFetchTimeoutMs())
       .then(async (response) => {
         if (!response.ok) {
           return null;
@@ -98,7 +99,11 @@ export function ManagementHeaderControls() {
       await Promise.all(
         agentIds.map(async (agentId) => {
           try {
-            const response = await fetch(`/api/v1/public/agents/${encodeURIComponent(agentId)}`, { cache: 'no-store' });
+            const response = await fetchWithTimeout(
+              `/api/v1/public/agents/${encodeURIComponent(agentId)}`,
+              { cache: 'no-store' },
+              uiFetchTimeoutMs(),
+            );
             if (!response.ok) {
               names[agentId] = 'Unnamed Agent';
               return;
@@ -134,10 +139,14 @@ export function ManagementHeaderControls() {
   const onLogout = async () => {
     setBusy(true);
     try {
-      await fetch('/api/v1/management/logout', {
-        method: 'POST',
-        credentials: 'same-origin'
-      });
+      await fetchWithTimeout(
+        '/api/v1/management/logout',
+        {
+          method: 'POST',
+          credentials: 'same-origin'
+        },
+        uiFetchTimeoutMs(),
+      );
     } finally {
       clearManagedAgents();
       setAgentIds([]);
