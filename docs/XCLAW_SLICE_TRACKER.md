@@ -2215,10 +2215,11 @@ Status: [~]
 Issue: #60
 
 Goal:
-- Extend wallet-approval harness execution from `hardhat_local -> base_sepolia` to `hardhat_local -> base_sepolia -> ethereum_sepolia`, with deterministic capability-aware assertions.
+- Extend wallet-approval harness execution from `hardhat_local -> base_sepolia` to `hardhat_local -> base_sepolia -> ethereum_sepolia -> hedera_testnet`, with deterministic capability-aware assertions.
 
 DoD:
 - [x] add matrix runner `apps/agent-runtime/scripts/wallet_approval_chain_matrix.py` with strict sequential stop-on-failure behavior.
+- [x] matrix runner supports resume execution via `--start-chain` so one chain can be rerun without replaying prior legs.
 - [x] harness supports optional wallet identity assertion (`--expected-wallet-address`).
 - [x] harness includes Ethereum Sepolia ETH bootstrap path (`ETH -> WETH -> USDC`) and deterministic `scenario_funding_missing` fail-fast.
 - [x] harness transfer and x402 scenarios are split so `ethereum_sepolia` asserts deterministic x402 unsupported behavior (`unsupported_chain_capability`).

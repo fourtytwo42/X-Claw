@@ -4543,12 +4543,14 @@ Supersession note:
 - Extend harness validation sequence to strict chain order:
   - `hardhat_local` smoke,
   - `base_sepolia` full,
-  - `ethereum_sepolia` full.
+  - `ethereum_sepolia` full,
+  - `hedera_testnet` full.
 - Preserve Python-first runtime invocation model.
 
 2. Harness sequence contract:
 - Add matrix entrypoint:
   - `python3 apps/agent-runtime/scripts/wallet_approval_chain_matrix.py --agent-id <id> --bootstrap-token-file <path> --harvy-address <0x...> --json-report <path>`
+  - Resume-only execution is supported with `--start-chain <hardhat_local|base_sepolia|ethereum_sepolia|hedera_testnet>`.
 - Runner must stop on first failing chain and emit consolidated JSON summary.
 - Non-hardhat chains remain hardhat-gated through green `--hardhat-evidence-report`.
 

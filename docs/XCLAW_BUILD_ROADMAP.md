@@ -3730,8 +3730,9 @@ Note:
   - [x] transfer scenario split from x402 scenario.
   - [x] deterministic x402 unsupported assertion path on `ethereum_sepolia`.
 - [x] Add matrix orchestrator `apps/agent-runtime/scripts/wallet_approval_chain_matrix.py`:
-  - [x] run order: hardhat smoke -> base full -> ethereum sepolia full,
+  - [x] run order: hardhat smoke -> base full -> ethereum sepolia full -> hedera testnet full,
   - [x] stop-on-first-failure,
+  - [x] resume support via `--start-chain`,
   - [x] consolidated JSON report output.
 
 ### 117.3 Tests
@@ -3739,7 +3740,7 @@ Note:
 - [x] `python3 -m unittest apps/agent-runtime/tests/test_wallet_approval_chain_matrix.py -v`
 
 ### 117.4 Validation + evidence
-- [ ] `python3 apps/agent-runtime/scripts/wallet_approval_chain_matrix.py ...` (hardhat/base/ethereum sepolia)
+- [ ] `python3 apps/agent-runtime/scripts/wallet_approval_chain_matrix.py ...` (hardhat/base/ethereum sepolia/hedera testnet)
 - [ ] Required gates run sequentially:
   - [ ] `npm run db:parity`
   - [ ] `npm run seed:reset`
