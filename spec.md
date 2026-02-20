@@ -3351,3 +3351,13 @@ Ensure runtime never reports queued transfer approvals that are invisible in web
 1. Transfer mirror write route (`/api/v1/agent/transfer-approvals/mirror`) must emit deterministic `transfer_mirror_unavailable` with HTTP 503 when mirror schema/storage is unavailable.
 2. Management read route (`/api/v1/management/agent-state`) must return deterministic `transfer_mirror_unavailable` with HTTP 503 for transfer-mirror schema/storage unavailability; no silent empty queue/history fallback.
 3. Skill wrapper must preserve mirror-sync failures as non-success (`approval_sync_failed`), never normalize them into `approval_pending`.
+
+## Hotfix E extension (UI management-session rendering verification)
+1. `/agents/:id` approvals rows expose deterministic selectors for automation:
+   - transfer rows: `data-testid="approval-row-transfer-<approval_id>"`.
+2. A deterministic browser smoke verifier (`npm run verify:ui:agent-approvals`) must:
+   - write a pending transfer approval via mirror route,
+   - bootstrap a real management session from `/agents/:id?token=...`,
+   - assert token query stripping and pending transfer row rendering in the Approvals panel.
+3. Verification artifacts on failure must include screenshot and DOM snapshot under `/tmp/xclaw-ui-verify-*`.
+4. Hotfix E is not complete until this browser verification passes after build + PM2 restart.

@@ -27,6 +27,7 @@
     "db:parity": "node infrastructure/scripts/check-migration-parity.mjs",
     "db:migrate": "node infrastructure/scripts/db-migrate.mjs",
     "e2e:full": "bash infrastructure/scripts/e2e-full-pass.sh",
+    "verify:ui:agent-approvals": "node infrastructure/scripts/verify-agents-approval-row-ui.mjs",
     "ops:verify-static-assets": "bash infrastructure/scripts/ops/verify-static-assets.sh"
   },
   "dependencies": {
@@ -38,6 +39,8 @@
     "redis": "4.7.1"
   },
   "devDependencies": {
+    "@nomicfoundation/hardhat-ethers": "3.0.8",
+    "@playwright/test": "1.51.1",
     "@types/node": "^20",
     "@types/pg": "8.15.0",
     "@types/react": "^19",
@@ -46,7 +49,6 @@
     "eslint-config-next": "16.1.6",
     "ethers": "6.13.2",
     "hardhat": "2.22.10",
-    "@nomicfoundation/hardhat-ethers": "3.0.8",
     "ts-node": "10.9.2",
     "typescript": "^5"
   }

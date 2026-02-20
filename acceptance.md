@@ -6026,6 +6026,10 @@ Active slice context: `Slice 117` in progress (issue `#60`).
   - `apps/network-web/src/lib/transfer-mirror-schema.ts`
   - `apps/network-web/src/app/api/v1/agent/transfer-approvals/mirror/route.ts`
   - `apps/network-web/src/app/api/v1/management/agent-state/route.ts`
+  - `apps/network-web/src/app/agents/[agentId]/page.tsx`
+  - `infrastructure/scripts/verify-agents-approval-row-ui.mjs`
+  - `infrastructure/scripts/e2e-full-pass.sh`
+  - `package.json`
   - `skills/xclaw-agent/scripts/xclaw_agent_skill.py`
   - `apps/agent-runtime/tests/test_x402_skill_wrapper.py`
   - canonical docs/handoff artifacts.
@@ -6037,6 +6041,8 @@ Active slice context: `Slice 117` in progress (issue `#60`).
 - [x] `POST /api/v1/agent/transfer-approvals/mirror` returns deterministic `transfer_mirror_unavailable` (503) on schema/storage drift instead of opaque `internal_error`.
 - [x] `GET /api/v1/management/agent-state` returns deterministic `transfer_mirror_unavailable` (503) on transfer-mirror schema/storage drift instead of silently empty transfer approvals.
 - [x] Skill wrapper preserves `approval_sync_failed` as non-success (no `approval_pending` normalization).
+- [x] `/agents/:id` transfer approval rows expose deterministic selector `data-testid=\"approval-row-transfer-<approval_id>\"`.
+- [x] Browser smoke verifier confirms mirrored pending transfer approval renders in `/agents/:id` under management session auth.
 
 ## Targeted Runtime/API Verification
 - [x] Direct mirror write accepted:
@@ -6058,3 +6064,13 @@ Active slice context: `Slice 117` in progress (issue `#60`).
 - [x] `npm run seed:verify`
 - [x] `npm run build`
 - [x] `pm2 restart all`
+- [x] `npm run verify:ui:agent-approvals`
+
+## Browser UI Verifier Evidence
+- [x] Command executed:
+  - `XCLAW_UI_VERIFY_BASE_URL=http://127.0.0.1:3000 XCLAW_UI_VERIFY_AGENT_ID=ag_slice7 XCLAW_UI_VERIFY_CHAIN_KEY=base_sepolia XCLAW_UI_VERIFY_AGENT_API_KEY=<agent_key> XCLAW_UI_VERIFY_BOOTSTRAP_TOKEN_FILE=~/.xclaw-secrets/management/ag_slice7-bootstrap-token.json npm run verify:ui:agent-approvals`
+- [x] Current outcome:
+  - verifier returned `ok:true` with selector:
+    - `approval-row-transfer-xfr_ui_1771625941671_o1low5v4`
+  - artifact dir:
+    - `/tmp/xclaw-ui-verify-xfr_ui_1771625941671_o1low5v4`

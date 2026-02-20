@@ -3810,6 +3810,9 @@ Note:
 - [x] Regression test added for token-send approval sync failure path.
 - [x] `POST /api/v1/agent/transfer-approvals/mirror` classifies schema/storage drift as deterministic `transfer_mirror_unavailable` (503) with structured error logging.
 - [x] `GET /api/v1/management/agent-state` surfaces transfer-mirror schema/storage drift as deterministic `transfer_mirror_unavailable` (503) instead of silent empty transfer approvals.
+- [x] `/agents/:id` transfer approval rows now expose deterministic selector `data-testid="approval-row-transfer-<approval_id>"`.
+- [x] Added executable browser verifier: `npm run verify:ui:agent-approvals`.
+- [x] Verifier writes pending transfer mirror row, bootstraps management session from owner link token, and asserts `/agents/:id` pending approval row rendering.
 - [x] Canonical docs + handoff artifacts synchronized.
 - [ ] Required gates run sequentially:
   - [ ] `npm run db:parity`
@@ -3818,4 +3821,5 @@ Note:
   - [ ] `npm run seed:verify`
   - [ ] `npm run build`
   - [ ] `pm2 restart all`
+- [x] `npm run verify:ui:agent-approvals`
 - [ ] Issue #60 evidence post + commit hash(es).

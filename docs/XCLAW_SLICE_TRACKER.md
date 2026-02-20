@@ -2288,6 +2288,9 @@ DoD:
 - [x] `wallet-send` and `wallet-send-token` return deterministic `approval_sync_failed` when mirror delivery cannot be confirmed.
 - [x] regression coverage added for mirror-sync failure path.
 - [x] server mirror/write + management/read routes return deterministic `transfer_mirror_unavailable` on transfer-mirror schema/storage unavailability (no silent empty approvals fallback).
+- [x] `/agents/:id` approvals transfer rows include deterministic selector `data-testid="approval-row-transfer-<approval_id>"` for automation.
+- [x] executable browser smoke verifier validates management-session-gated approval row rendering on `/agents/:id`.
 - [x] canonical docs/handoff artifacts synchronized.
 - [ ] required gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
+- [x] browser verification gate rerun (`npm run verify:ui:agent-approvals`) after build + PM2 restart.
 - [ ] issue #60 updated with verification evidence + commit hash(es).

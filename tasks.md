@@ -3542,6 +3542,10 @@ Active slice context: `Slice 117` in progress.
 ## 3) Tests
 - [x] Add regression test for approval sync failure path in `test_trade_path.py`.
 - [x] Add skill-wrapper regression that `approval_sync_failed` remains non-success/non-normalized.
+- [x] Add deterministic `/agents/:id` transfer approval row selector (`data-testid="approval-row-transfer-<approval_id>"`).
+- [x] Add browser smoke verifier `infrastructure/scripts/verify-agents-approval-row-ui.mjs` for management-session-gated approval rendering.
+- [x] Add npm command entrypoint `verify:ui:agent-approvals`.
+- [x] Add optional `e2e-full` hook to run UI verifier and report WARN/FAIL deterministically.
 
 ## 4) Validation
 - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
@@ -3552,3 +3556,4 @@ Active slice context: `Slice 117` in progress.
 - [x] `npm run seed:verify`
 - [x] `npm run build`
 - [x] `pm2 restart all`
+- [x] `npm run verify:ui:agent-approvals`

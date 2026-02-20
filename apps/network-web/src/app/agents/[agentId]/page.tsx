@@ -218,6 +218,10 @@ function forgetManagedAgentToken(agentId: string) {
   window.localStorage.setItem(MANAGED_AGENT_TOKENS_KEY, JSON.stringify(current));
 }
 
+function testIdSafePart(value: string): string {
+  return String(value).trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '-');
+}
+
 async function managementPost(path: string, payload: Record<string, unknown>) {
   const csrf = getCsrfToken();
   const headers: Record<string, string> = { 'content-type': 'application/json' };
@@ -2441,8 +2445,14 @@ export default function AgentPublicProfilePage() {
               </div>
               {!isOwner ? <p className={styles.muted}>View-only mode: only the owner can approve or deny.</p> : null}
               {filteredApprovalHistory.length === 0 ? <p className={styles.muted}>No approvals in this filter.</p> : null}
-              {visibleApprovalHistory.map((row) => (
-                <div key={row.id} className={styles.queueRow}>
+              {visibleApprovalHistory.map((row) => {
+                const transferApprovalId =
+                  row.type === 'transfer' && row.raw && typeof row.raw.approval_id === 'string' ? testIdSafePart(row.raw.approval_id) : null;
+                const rowTestId = transferApprovalId
+                  ? `approval-row-transfer-${transferApprovalId}`
+                  : `approval-row-${testIdSafePart(row.type)}-${testIdSafePart(row.id)}`;
+                return (
+                <div key={row.id} className={styles.queueRow} data-testid={rowTestId}>
                   <div>
                     <div className={styles.listTitle}>{row.title}</div>
                     <div className={styles.muted}>{row.subtitle}</div>
@@ -2601,7 +2611,7 @@ export default function AgentPublicProfilePage() {
                     ) : null}
                   </div>
                 </div>
-              ))}
+              )})}
               {filteredApprovalHistory.length > 3 ? (
                 <div className={styles.paginationRow}>
                   <button type="button" onClick={() => setApprovalHistoryExpanded((current) => !current)}>

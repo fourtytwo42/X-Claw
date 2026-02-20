@@ -4621,3 +4621,8 @@ Supersession note (Slice 117 Hotfix D):
 - Runtime must not return queued transfer approval responses when web management cannot read the mirrored approval row.
 - Server mirror write path (`POST /api/v1/agent/transfer-approvals/mirror`) must classify transfer-mirror schema/storage unavailability and return deterministic `transfer_mirror_unavailable` (503), not opaque `internal_error`.
 - Management read path (`GET /api/v1/management/agent-state`) must surface transfer mirror schema/storage unavailability as deterministic `transfer_mirror_unavailable` (503) instead of silently returning empty transfer approvals arrays.
+- `/agents/:id` Approvals rows must expose deterministic automation selectors:
+  - transfer row selector: `data-testid="approval-row-transfer-<approval_id>"`.
+- Canonical Hotfix E acceptance requires executable browser verification (not manual-only):
+  - `npm run verify:ui:agent-approvals` must create a mirrored pending transfer approval, bootstrap management session via `/agents/:id?token=...`, and assert pending row rendering under `/agents/:id`.
+- Browser verifier failure evidence must include artifact paths for screenshot + HTML snapshot under `/tmp/xclaw-ui-verify-*`.

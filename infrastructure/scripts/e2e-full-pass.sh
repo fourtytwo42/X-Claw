@@ -14,6 +14,7 @@ PASS_PHRASE="${XCLAW_E2E_WALLET_PASSPHRASE:-passphrase-123}"
 ENABLE_DEPOSITS="${XCLAW_E2E_ENABLE_DEPOSITS:-1}"
 ENABLE_LIMIT_ORDERS="${XCLAW_E2E_ENABLE_LIMIT_ORDERS:-1}"
 SIMULATE_API_OUTAGE="${XCLAW_E2E_SIMULATE_API_OUTAGE:-0}"
+VERIFY_AGENT_APPROVALS_UI="${XCLAW_E2E_VERIFY_AGENT_APPROVALS_UI:-1}"
 WORK_DIR="${XCLAW_E2E_WORK_DIR:-/tmp/xclaw-e2e-full}"
 AGENT_HOME="${WORK_DIR}/agent-home"
 COOKIE_JAR="${WORK_DIR}/cookies.txt"
@@ -241,6 +242,23 @@ main() {
     record "PASS" "user:management-bootstrap" "$(cat "${WORK_DIR}/bootstrap.json")"
   else
     record "FAIL" "user:management-bootstrap" "status=${code} body=$(cat "${WORK_DIR}/bootstrap.json" 2>/dev/null)"
+  fi
+
+  if [ "${VERIFY_AGENT_APPROVALS_UI}" = "1" ]; then
+    if [ -z "${XCLAW_E2E_AGENT_API_KEY:-}" ]; then
+      record "WARN" "user:verify-ui-agent-approvals" "skipped: set XCLAW_E2E_AGENT_API_KEY to run browser approval-row verification."
+    else
+      if XCLAW_UI_VERIFY_BASE_URL="$BASE_URL" \
+        XCLAW_UI_VERIFY_AGENT_ID="$AGENT_ID" \
+        XCLAW_UI_VERIFY_CHAIN_KEY="$DEFAULT_CHAIN" \
+        XCLAW_UI_VERIFY_AGENT_API_KEY="$AGENT_API_KEY" \
+        XCLAW_UI_VERIFY_BOOTSTRAP_TOKEN_FILE="$TOKEN_FILE" \
+        npm run verify:ui:agent-approvals >"${WORK_DIR}/verify_ui_agent_approvals.json" 2>&1; then
+        record "PASS" "user:verify-ui-agent-approvals" "$(cat "${WORK_DIR}/verify_ui_agent_approvals.json")"
+      else
+        record "FAIL" "user:verify-ui-agent-approvals" "$(cat "${WORK_DIR}/verify_ui_agent_approvals.json" 2>/dev/null)"
+      fi
+    fi
   fi
 
   local csrf
