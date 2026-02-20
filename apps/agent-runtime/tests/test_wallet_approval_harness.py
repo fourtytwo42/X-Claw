@@ -154,6 +154,32 @@ class WalletApprovalHarnessUnitTests(unittest.TestCase):
         self.assertEqual(ctx.exception.code, "wallet_passphrase_mismatch")
         self.assertFalse(bool(runner.preflight["walletDecryptProbe"]["ok"]))
 
+    def test_post_permissions_update_splits_transfer_policy_calls(self) -> None:
+        runner = harness.WalletApprovalHarness(self._args())
+        calls: list[tuple[str, str]] = []
+
+        def fake_post(path: str, payload: dict[str, object], *, label: str) -> dict[str, object]:
+            calls.append((path, label))
+            if path.endswith("/transfer-policy/update"):
+                return {"ok": True, "transferPolicy": {"transferApprovalMode": "per_transfer"}}
+            return {"ok": True, "updatedTradePolicy": True}
+
+        with mock.patch.object(runner, "_management_post_with_retry", side_effect=fake_post):
+            out = runner._post_permissions_update(
+                {
+                    "agentId": "ag_test",
+                    "chainKey": "hardhat_local",
+                    "tradeApprovalMode": "per_trade",
+                    "allowedTokens": [],
+                    "transferApprovalMode": "per_transfer",
+                    "nativeTransferPreapproved": False,
+                    "allowedTransferTokens": [],
+                }
+            )
+        self.assertTrue(out.get("ok"))
+        self.assertIn(("/management/transfer-policy/update", "transfer_policy_update"), calls)
+        self.assertIn(("/management/permissions/update", "permissions_update"), calls)
+
 
 if __name__ == "__main__":
     unittest.main()

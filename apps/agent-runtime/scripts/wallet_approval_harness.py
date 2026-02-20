@@ -437,7 +437,49 @@ class WalletApprovalHarness:
         raise HarnessError(f"{label} failed unexpectedly.", code="management_api_retry_exhausted", category="transient_api_failure")
 
     def _post_permissions_update(self, payload: dict[str, Any]) -> dict[str, Any]:
-        return self._management_post_with_retry("/management/permissions/update", payload, label="permissions_update")
+        transfer_keys = {"transferApprovalMode", "nativeTransferPreapproved", "allowedTransferTokens"}
+        trade_outbound_keys = {
+            "tradeApprovalMode",
+            "allowedTokens",
+            "outboundTransfersEnabled",
+            "outboundMode",
+            "outboundWhitelistAddresses",
+        }
+        result: dict[str, Any] = {"ok": True}
+
+        has_transfer = any(key in payload for key in transfer_keys)
+        if has_transfer:
+            transfer_payload = {
+                "agentId": payload.get("agentId"),
+                "chainKey": payload.get("chainKey"),
+                "transferApprovalMode": payload.get("transferApprovalMode", "per_transfer"),
+                "nativeTransferPreapproved": bool(payload.get("nativeTransferPreapproved", False)),
+                "allowedTransferTokens": payload.get("allowedTransferTokens", []),
+            }
+            transfer_result = self._management_post_with_retry(
+                "/management/transfer-policy/update",
+                transfer_payload,
+                label="transfer_policy_update",
+            )
+            result["transferPolicy"] = transfer_result.get("transferPolicy")
+
+        has_trade_or_outbound = any(key in payload for key in trade_outbound_keys)
+        if has_trade_or_outbound:
+            permissions_payload = {
+                "agentId": payload.get("agentId"),
+                "chainKey": payload.get("chainKey"),
+            }
+            for key in trade_outbound_keys:
+                if key in payload:
+                    permissions_payload[key] = payload[key]
+            permissions_result = self._management_post_with_retry(
+                "/management/permissions/update",
+                permissions_payload,
+                label="permissions_update",
+            )
+            result.update(permissions_result)
+
+        return result
 
     def _restore_permissions(self) -> None:
         state = self.initial_state
