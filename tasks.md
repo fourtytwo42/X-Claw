@@ -3641,3 +3641,23 @@ Active slice context: `Slice 117` in progress.
 - [x] `npm run build`
 - [x] `pm2 restart all`
 - [x] `npm run verify:ui:agent-approvals`
+
+---
+
+# Hotfix Tasks: Slice 117 Hotfix H Runtime Signing Preflight False-Negative Guard
+
+Active slice context: `Slice 117` in progress.
+
+## 1) Implementation
+- [x] Prevent heartbeat null-clobber on runtime readiness map when readiness fields are omitted.
+- [x] Add normalized chain-key fallback matching for transfer approve readiness preflight.
+- [x] Add defensive latest-positive readiness fallback when chain-specific readiness record is missing.
+
+## 2) Validation
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+- [x] `npm run verify:ui:agent-approvals`

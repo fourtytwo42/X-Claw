@@ -72,6 +72,10 @@ export async function POST(req: NextRequest) {
     }
 
     const statusResult = await withTransaction(async (client) => {
+      const hasReadinessUpdate =
+        typeof body.walletSigningReady === 'boolean' ||
+        body.walletSigningReasonCode !== undefined ||
+        body.walletSigningCheckedAt !== undefined;
       const readinessChain = {
         walletSigningReady: typeof body.walletSigningReady === 'boolean' ? body.walletSigningReady : null,
         walletSigningReasonCode: String(body.walletSigningReasonCode ?? '').trim() || null,
@@ -82,17 +86,20 @@ export async function POST(req: NextRequest) {
         `
         update agents
         set public_status = $1,
-            openclaw_metadata = jsonb_set(
-              coalesce(openclaw_metadata, '{}'::jsonb),
-              array['runtimeReadiness', 'chains', $2::text],
-              $3::jsonb,
-              true
-            ),
+            openclaw_metadata = case
+              when $3::boolean then jsonb_set(
+                coalesce(openclaw_metadata, '{}'::jsonb),
+                array['runtimeReadiness', 'chains', $2::text],
+                $4::jsonb,
+                true
+              )
+              else coalesce(openclaw_metadata, '{}'::jsonb)
+            end,
             updated_at = now()
-        where agent_id = $4
+        where agent_id = $5
         returning agent_id
         `,
-        [body.publicStatus, policyChainKey, JSON.stringify(readinessChain), body.agentId]
+        [body.publicStatus, policyChainKey, hasReadinessUpdate, JSON.stringify(readinessChain), body.agentId]
       );
 
       if (updated.rowCount === 0) {

@@ -4673,3 +4673,12 @@ Supersession note (Slice 117 Hotfix D):
   - `xclaw.runloop.apiBase=...`
   - `xclaw.runloop.agentId=...`
   - `xclaw.runloop.walletSigningReady=true|false`
+
+### Slice 117 Hotfix H Addendum: Runtime Signing Preflight False-Negative Guard
+- Management transfer approve preflight (`POST /api/v1/management/transfer-approvals/decision`) must tolerate chain-key representation drift for runtime readiness lookup:
+  - exact key match,
+  - normalized underscore/hyphen variant match,
+  - case-insensitive equivalent chain key match.
+- Defensive fallback: when chain-specific readiness record is missing, preflight may use most-recent `walletSigningReady=true` readiness snapshot from runtime readiness map to prevent false-negative blocks in single-chain runtime contexts.
+- Heartbeat updates must not clobber runtime readiness state with null fields:
+  - if heartbeat payload omits readiness fields, existing readiness map remains unchanged.

@@ -3866,5 +3866,19 @@ Note:
   - [x] `npm run seed:verify`
   - [x] `npm run build`
   - [x] `pm2 restart all`
+- [x] `npm run verify:ui:agent-approvals`
+- [ ] Issue #60 evidence post + commit hash(es).
+
+### 117.11 Hotfix H: Runtime Signing Preflight False-Negative Guard
+- [x] `POST /api/v1/agent/heartbeat` no longer overwrites runtime readiness with null when readiness fields are omitted.
+- [x] transfer decision preflight readiness lookup supports chain-key normalization (underscore/hyphen/case variants).
+- [x] transfer decision preflight uses defensive latest-positive readiness fallback when chain-specific record is missing.
+- [x] Required gates run sequentially:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `pm2 restart all`
   - [x] `npm run verify:ui:agent-approvals`
 - [ ] Issue #60 evidence post + commit hash(es).

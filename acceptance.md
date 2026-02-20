@@ -6191,3 +6191,35 @@ Active slice context: `Slice 117` in progress (issue `#60`).
 - [x] Browser verifier final pass:
   - selector: `approval-row-transfer-xfr_ui_1771630667281_ay3fcv92`
   - artifact dir: `/tmp/xclaw-ui-verify-xfr_ui_1771630667281_ay3fcv92`
+
+---
+
+# Hotfix Acceptance Evidence: Slice 117 Hotfix H Runtime Signing Preflight False-Negative Guard
+
+Date (UTC): 2026-02-20
+Active slice context: `Slice 117` in progress (issue `#60`).
+
+## Objective + Scope Lock
+- Objective: stop false `runtime_signing_unavailable` blocks when runtime signing is healthy.
+- Scope lock:
+  - `apps/network-web/src/app/api/v1/agent/heartbeat/route.ts`
+  - `apps/network-web/src/app/api/v1/management/transfer-approvals/decision/route.ts`
+  - canonical docs/handoff artifacts.
+
+## Behavior Checks
+- [x] heartbeat updates no longer null-clobber existing runtime readiness when readiness fields are absent.
+- [x] transfer decision readiness lookup supports normalized chain-key fallback (`-` vs `_`, case-insensitive).
+- [x] transfer decision readiness lookup uses latest-positive readiness fallback when chain-specific record is missing.
+
+## Required Validation Gates
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+- [x] `npm run verify:ui:agent-approvals`
+
+## Browser Verifier Evidence
+- [x] selector: `approval-row-transfer-xfr_ui_1771631356653_njxfnktm`
+- [x] artifact dir: `/tmp/xclaw-ui-verify-xfr_ui_1771631356653_njxfnktm`

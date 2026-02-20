@@ -2324,6 +2324,19 @@ DoD:
 - [x] installer final pass enforces install-origin canonical API base and bootstrap-issued agent credentials.
 - [x] installer emits deterministic run-loop summary lines for apiBase/agentId/walletSigningReady.
 - [x] required gates pass: runtime tests, `db:parity`, seed gates, `build`, `pm2 restart all`, UI verifier.
+
+## Slice 117 Hotfix H: Runtime Signing Preflight False-Negative Guard
+Status: [ ]
+Issue: #60
+
+Goal:
+- Eliminate spurious `runtime_signing_unavailable` blocks when runtime signing is healthy but readiness lookup is missed/clobbered.
+
+DoD:
+- [x] heartbeat route preserves existing readiness state when readiness fields are omitted (no null clobber).
+- [x] management transfer preflight supports normalized chain-key matching for readiness lookup.
+- [x] management preflight includes defensive fallback to most-recent positive readiness snapshot when chain key record is absent.
+- [x] required gates pass: `db:parity`, seed gates, `build`, `pm2 restart all`, UI verifier.
 - [x] canonical docs/handoff artifacts synchronized.
 - [ ] required gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
 - [x] browser verification gate rerun (`npm run verify:ui:agent-approvals`) after build + PM2 restart.

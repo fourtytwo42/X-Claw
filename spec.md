@@ -3408,3 +3408,8 @@ Ensure runtime never reports queued transfer approvals that are invisible in web
    - `xclaw.runloop.apiBase`,
    - `xclaw.runloop.agentId`,
    - `xclaw.runloop.walletSigningReady`.
+
+## Hotfix H extension (runtime signing preflight false-negative guard)
+1. Heartbeat route must preserve prior readiness when readiness fields are omitted.
+2. Transfer approve preflight readiness lookup must support normalized chain key matches (`-` vs `_`, case-insensitive).
+3. If chain-specific readiness record is absent, preflight may use latest positive readiness snapshot as defensive fallback to avoid false-negative operator blocks in single-chain runtime operation.

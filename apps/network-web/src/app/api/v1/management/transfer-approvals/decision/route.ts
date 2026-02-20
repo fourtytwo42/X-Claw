@@ -28,6 +28,10 @@ type RuntimeSigningReadiness = {
   walletSigningCheckedAt: string | null;
 };
 
+function normalizeChainKey(value: string): string {
+  return String(value || '').trim().toLowerCase().replace(/-/g, '_');
+}
+
 function resolveRuntimeSigningReadiness(metadata: unknown, chainKey: string): RuntimeSigningReadiness {
   if (!metadata || typeof metadata !== 'object') {
     return {
@@ -43,9 +47,54 @@ function resolveRuntimeSigningReadiness(metadata: unknown, chainKey: string): Ru
   const chains = runtimeReadiness?.chains && typeof runtimeReadiness.chains === 'object'
     ? (runtimeReadiness.chains as Record<string, unknown>)
     : null;
-  const chain = chains?.[chainKey] && typeof chains[chainKey] === 'object'
-    ? (chains[chainKey] as Record<string, unknown>)
-    : null;
+  const chainCandidates = [chainKey, normalizeChainKey(chainKey)];
+  let chain: Record<string, unknown> | null = null;
+  for (const candidate of chainCandidates) {
+    if (!candidate || !chains) {
+      continue;
+    }
+    const direct = chains[candidate];
+    if (direct && typeof direct === 'object') {
+      chain = direct as Record<string, unknown>;
+      break;
+    }
+  }
+  if (!chain && chains) {
+    const wanted = normalizeChainKey(chainKey);
+    for (const [key, value] of Object.entries(chains)) {
+      if (normalizeChainKey(key) !== wanted) {
+        continue;
+      }
+      if (value && typeof value === 'object') {
+        chain = value as Record<string, unknown>;
+        break;
+      }
+    }
+  }
+  // Fallback for defensive reliability: when chain-specific key is missing,
+  // use the most recent walletSigningReady=true snapshot across chain map.
+  if (!chain && chains) {
+    let best: { checkedAt: string; value: Record<string, unknown> } | null = null;
+    for (const value of Object.values(chains)) {
+      if (!value || typeof value !== 'object') {
+        continue;
+      }
+      const record = value as Record<string, unknown>;
+      if (!Boolean(record.walletSigningReady)) {
+        continue;
+      }
+      const checkedAt = String(record.walletSigningCheckedAt ?? '').trim() || String(record.updatedAt ?? '').trim();
+      if (!checkedAt) {
+        continue;
+      }
+      if (!best || checkedAt > best.checkedAt) {
+        best = { checkedAt, value: record };
+      }
+    }
+    if (best) {
+      chain = best.value;
+    }
+  }
   if (!chain) {
     return {
       walletSigningReady: false,
