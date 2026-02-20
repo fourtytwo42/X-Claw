@@ -706,68 +706,6 @@ try:
 except Exception:
  print("")'
 )"
-hedera_wallet_address=""
-hedera_bind_status="skipped"
-if [ "$XCLAW_HEDERA_CHAIN_KEY" != "$XCLAW_DEFAULT_CHAIN" ]; then
-  echo "[xclaw] ensuring portable wallet is bound on $XCLAW_HEDERA_CHAIN_KEY"
-  set +e
-  hedera_bind_json="$("$XCLAW_AGENT_BIN" wallet create --chain "$XCLAW_HEDERA_CHAIN_KEY" --json 2>&1)"
-  hedera_bind_rc=$?
-  set -e
-  if [ "$hedera_bind_rc" -ne 0 ]; then
-    bind_code="$(printf "%s" "$hedera_bind_json" | python3 -c 'import json,sys
-try:
- d=json.load(sys.stdin)
- print((d.get("code") or "").strip())
-except Exception:
- print("")')"
-    bind_addr="$(printf "%s" "$hedera_bind_json" | python3 -c 'import json,sys
-try:
- d=json.load(sys.stdin)
- details=d.get("details") or {}
- if isinstance(details,dict):
-   print((details.get("address") or "").strip())
- else:
-   print("")
-except Exception:
- print("")')"
-    if [ "$bind_code" = "wallet_exists" ]; then
-      hedera_bind_status="ok_existing"
-      if [ -z "$hedera_wallet_address" ] && [ -n "$bind_addr" ]; then
-        hedera_wallet_address="$bind_addr"
-      fi
-      echo "[xclaw] hedera wallet already bound; continuing"
-    else
-      hedera_bind_status="failed"
-      echo "[xclaw] warning: hedera wallet auto-bind failed"
-      echo "[xclaw] code=hedera_wallet_bind_failed chain=$XCLAW_HEDERA_CHAIN_KEY"
-      printf "%s\n" "$hedera_bind_json"
-    fi
-  else
-    hedera_bind_status="ok"
-  fi
-
-  hedera_addr_json="$("$XCLAW_AGENT_BIN" wallet address --chain "$XCLAW_HEDERA_CHAIN_KEY" --json 2>/dev/null || true)"
-  hedera_wallet_address="$(printf "%s" "$hedera_addr_json" | python3 -c 'import json,sys
-try:
- d=json.load(sys.stdin)
- print((d.get("address") or "").strip())
-except Exception:
- print("")')"
-
-  if [ -n "$wallet_address" ] && [ -n "$hedera_wallet_address" ]; then
-    if [ "$(printf "%s" "$wallet_address" | tr '[:upper:]' '[:lower:]')" != "$(printf "%s" "$hedera_wallet_address" | tr '[:upper:]' '[:lower:]')" ]; then
-      echo "[xclaw] ERROR: portable wallet invariant failed (default-chain and Hedera addresses differ)"
-      echo "[xclaw] code=portable_wallet_invariant_failed defaultChain=$XCLAW_DEFAULT_CHAIN hederaChain=$XCLAW_HEDERA_CHAIN_KEY"
-      echo "[xclaw] defaultAddress=$wallet_address"
-      echo "[xclaw] hederaAddress=$hedera_wallet_address"
-      echo "[xclaw] aborting before registration to avoid split-key onboarding"
-      exit 1
-    fi
-  fi
-else
-  hedera_wallet_address="$wallet_address"
-fi
 
 # If a wallet exists, verify we can decrypt/sign before attempting signed bootstrap or on-chain trades.
 if [ "$wallet_exists" = "1" ]; then
@@ -803,6 +741,127 @@ if [ "$wallet_exists" = "1" ]; then
       exit 1
     fi
   fi
+fi
+
+discover_wallet_chains() {
+  "$XCLAW_AGENT_BIN" chains --json 2>/dev/null | python3 - <<'PY'
+import json
+import sys
+
+try:
+    payload = json.load(sys.stdin)
+except Exception:
+    payload = {}
+
+items = payload.get("chains")
+if not isinstance(items, list):
+    print("")
+    raise SystemExit(0)
+
+out = []
+seen = set()
+for row in items:
+    if not isinstance(row, dict):
+        continue
+    key = str(row.get("chainKey") or "").strip()
+    if not key:
+        continue
+    if key.lower() in seen:
+        continue
+    caps = row.get("capabilities")
+    if isinstance(caps, dict):
+        wallet_cap = caps.get("wallet")
+        if isinstance(wallet_cap, bool) and not wallet_cap:
+            continue
+    out.append(key)
+    seen.add(key.lower())
+
+print(" ".join(out))
+PY
+}
+
+runtime_wallet_chains="$(discover_wallet_chains || true)"
+if [ -z "$runtime_wallet_chains" ]; then
+  runtime_wallet_chains="$XCLAW_DEFAULT_CHAIN"
+fi
+case " $runtime_wallet_chains " in
+  *" $XCLAW_DEFAULT_CHAIN "*) ;;
+  *) runtime_wallet_chains="$XCLAW_DEFAULT_CHAIN $runtime_wallet_chains" ;;
+esac
+
+wallet_binding_failed=0
+for chain_key in $runtime_wallet_chains; do
+  [ -n "$chain_key" ] || continue
+  echo "[xclaw] ensuring portable wallet is bound on $chain_key"
+  set +e
+  bind_json="$("$XCLAW_AGENT_BIN" wallet create --chain "$chain_key" --json 2>&1)"
+  bind_rc=$?
+  set -e
+  if [ "$bind_rc" -ne 0 ]; then
+    bind_code="$(printf "%s" "$bind_json" | python3 -c 'import json,sys
+try:
+ d=json.load(sys.stdin)
+ print((d.get("code") or "").strip())
+except Exception:
+ print("")')"
+    if [ "$bind_code" = "wallet_exists" ]; then
+      echo "[xclaw] wallet already bound for $chain_key"
+      continue
+    fi
+    wallet_binding_failed=1
+    echo "[xclaw] warning: wallet auto-bind failed for chain=$chain_key"
+    printf "%s\n" "$bind_json"
+    continue
+  fi
+done
+
+wallet_rows_json="$(python3 - "$XCLAW_AGENT_BIN" "$wallet_address" "$runtime_wallet_chains" <<'PY'
+import json
+import subprocess
+import sys
+
+agent_bin = str(sys.argv[1] or "").strip() or "xclaw-agent"
+default_addr = str(sys.argv[2] or "").strip()
+chains_raw = str(sys.argv[3] or "").strip()
+chains = [item for item in chains_raw.split() if item]
+
+rows = []
+seen = set()
+
+def add(chain_key: str, address: str) -> None:
+    ck = (chain_key or "").strip()
+    ad = (address or "").strip()
+    if not ck or not ad:
+        return
+    key = (ck.lower(), ad.lower())
+    if key in seen:
+        return
+    seen.add(key)
+    rows.append({"chainKey": ck, "address": ad})
+
+for chain_key in chains:
+    addr = ""
+    try:
+        proc = subprocess.run(
+            [agent_bin, "wallet", "address", "--chain", chain_key, "--json"],
+            check=False,
+            text=True,
+            capture_output=True,
+        )
+        payload = json.loads((proc.stdout or "").strip() or "{}")
+        addr = str(payload.get("address") or "").strip()
+    except Exception:
+        addr = ""
+    if not addr and chain_key == chains[0]:
+        addr = default_addr
+    add(chain_key, addr)
+
+print(json.dumps(rows, separators=(",", ":")))
+PY
+)"
+
+if [ "$wallet_binding_failed" = "1" ]; then
+  echo "[xclaw] warning: one or more wallet chain bindings failed; installer will continue with available bindings"
 fi
 
 bootstrap_ok=0
@@ -936,29 +995,7 @@ if [ -n "\${XCLAW_AGENT_ID:-}" ] && [ -z "\${XCLAW_AGENT_NAME:-}" ]; then
   export XCLAW_AGENT_NAME="$XCLAW_AGENT_ID"
 fi
 
-wallets_json="$(python3 - "$XCLAW_DEFAULT_CHAIN" "$wallet_address" "$XCLAW_HEDERA_CHAIN_KEY" "$hedera_wallet_address" <<'PY'
-import json,sys
-default_chain=sys.argv[1]
-default_addr=sys.argv[2]
-hedera_chain=sys.argv[3]
-hedera_addr=sys.argv[4]
-rows=[]
-seen=set()
-def add(chain_key,address):
-    ck=(chain_key or "").strip()
-    ad=(address or "").strip()
-    if not ck or not ad:
-        return
-    key=(ck.lower(), ad.lower())
-    if key in seen:
-        return
-    seen.add(key)
-    rows.append({"chainKey": ck, "address": ad})
-add(default_chain, default_addr)
-add(hedera_chain, hedera_addr)
-print(json.dumps(rows, separators=(",", ":")))
-PY
-)"
+wallets_json="$wallet_rows_json"
 
 if [ -n "\${XCLAW_AGENT_API_KEY:-}" ] && [ -n "\${XCLAW_AGENT_ID:-}" ] && [ -n "$wallet_address" ]; then
   if [ "$bootstrap_ok" = "1" ]; then

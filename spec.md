@@ -2814,3 +2814,37 @@ Normalize enabled+visible chain metadata so every supported chain has authoritat
 - `npm run seed:verify`
 - `npm run build`
 - `pm2 restart all`
+
+---
+
+# Slice 99 Spec: Installer Multi-Chain Wallet Auto-Bind Hardening (2026-02-20)
+
+## Goal
+Ensure hosted installers bind portable wallet entries across all enabled wallet-capable chains so runtime is ready on newly added chains immediately after install.
+
+## Non-goals
+1. No chain capability changes.
+2. No bootstrap/auth endpoint contract changes.
+3. No faucet scope expansion.
+
+## Locked scope
+1. `apps/network-web/src/app/skill-install.sh/route.ts`
+2. `apps/network-web/src/app/skill-install.ps1/route.ts`
+3. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+4. `docs/XCLAW_BUILD_ROADMAP.md`
+5. `docs/XCLAW_SLICE_TRACKER.md`
+6. `docs/api/WALLET_COMMAND_CONTRACT.md`
+7. `spec.md`
+8. `tasks.md`
+9. `acceptance.md`
+
+## Acceptance checks
+- installer script logic uses `xclaw-agent chains --json` to select `capabilities.wallet=true` chains.
+- installer auto-attempts `wallet create --chain <chain> --json` per discovered chain.
+- register payload contains deduplicated `wallets[]` rows for all resolved chain addresses.
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `pm2 restart all`

@@ -215,9 +215,9 @@ Current behavior in `apps/agent-runtime/xclaw_agent/cli.py`:
    - runtime execution/verification failures return deterministic `liquidity_execution_failed` / `liquidity_verification_failed`.
 18. Hosted installer (`/skill-install.sh`) wallet bootstrap behavior:
    - creates/binds wallet on `XCLAW_DEFAULT_CHAIN`,
-   - auto-attempts wallet bind on `hedera_testnet` using the same portable wallet key,
-   - aborts registration on cross-chain address mismatch (`portable_wallet_invariant_failed`),
-   - upserts register payload with both default-chain and Hedera wallet rows when auth context exists.
+   - auto-attempts wallet bind for every enabled chain with `capabilities.wallet=true` using the same portable wallet key,
+   - continues on per-chain bind failures with deterministic warning output and registers available wallet bindings,
+   - upserts register payload with deduplicated wallet rows for all successfully bound wallet-capable chains when auth context exists.
 
 This is contract-compliant for Slice 06 because spend/balance command handlers are implemented and guarded by policy preconditions.
 

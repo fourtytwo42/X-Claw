@@ -1345,8 +1345,8 @@ Runtime binary requirements for skill operation:
 - Skill wrapper should normalize known safe input-guard rejections (for example symbol token unit mismatch) into non-fatal JSON responses so chat UX does not emit misleading hard-failure tool traces when no transaction was executed.
 - Token decimals used for UI/API display must be chain-scoped and resolved from on-chain ERC-20 metadata via RPC/cache when token addresses are known (avoid static per-token decimal baking across chains).
 - Wallet passphrase is a required recovery secret: losing `XCLAW_WALLET_PASSPHRASE` permanently locks the local wallet (AES-GCM `InvalidTag` on decrypt). The installer must not print it, and must write an additional local encrypted backup at `~/.xclaw-agent/passphrase.backup.v1.json` to reduce accidental loss from config overwrites.
-- Linux/macOS hosted installer must auto-attempt wallet binding on `hedera_testnet` after default-chain wallet initialization using the same portable wallet key model; mismatch between default-chain and Hedera addresses is a stop-ship installer error (`portable_wallet_invariant_failed`).
-- Installer registration payload must upsert both default-chain and `hedera_testnet` wallet rows when auth/bootstrap context is available.
+- Hosted installers (`/skill-install.sh`, `/skill-install.ps1`) must auto-attempt wallet binding for every enabled chain with `capabilities.wallet=true` after default-chain wallet initialization, using the same portable wallet key model.
+- Installer registration payload must upsert deduplicated wallet rows for all successfully bound wallet-capable chains when auth/bootstrap context is available.
 - Installer should optionally run Hedera faucet warmup (`native+wrapped+stable`) after registration when `XCLAW_INSTALL_AUTO_HEDERA_FAUCET=1`; warmup failures are non-fatal and must emit deterministic warnings with action hints.
 - `GET /skill.md` must be plain text and include:
   - one-line installer commands (`curl -fsSL <host>/skill-install.sh | bash` and `irm <host>/skill-install.ps1 | iex`),

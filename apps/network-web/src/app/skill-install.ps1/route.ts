@@ -554,6 +554,73 @@ try {
       }
     }
 
+    $runtimeWalletChains = @()
+    try {
+      $chainsPayload = & $xclawAgentBin chains --json | ConvertFrom-Json
+      if ($chainsPayload -and $chainsPayload.chains) {
+        foreach ($row in $chainsPayload.chains) {
+          $chainKey = if ($null -eq $row.chainKey) { "" } else { [string]$row.chainKey }
+          if (-not $chainKey) { continue }
+          $walletCap = $true
+          if ($row.capabilities -and $null -ne $row.capabilities.wallet) {
+            $walletCap = [bool]$row.capabilities.wallet
+          }
+          if (-not $walletCap) { continue }
+          if (-not ($runtimeWalletChains -contains $chainKey)) {
+            $runtimeWalletChains += $chainKey
+          }
+        }
+      }
+    } catch {
+      $runtimeWalletChains = @()
+    }
+    if (-not ($runtimeWalletChains -contains $env:XCLAW_DEFAULT_CHAIN)) {
+      $runtimeWalletChains = @($env:XCLAW_DEFAULT_CHAIN) + $runtimeWalletChains
+    }
+    if ($runtimeWalletChains.Count -eq 0) {
+      $runtimeWalletChains = @($env:XCLAW_DEFAULT_CHAIN)
+    }
+
+    $walletRows = @()
+    $walletBindingFailed = $false
+    foreach ($chainKey in $runtimeWalletChains) {
+      if (-not $chainKey) { continue }
+      Write-Host "[xclaw] ensuring portable wallet is bound on $chainKey"
+      $bindOutput = ""
+      try {
+        $bindOutput = & $xclawAgentBin wallet create --chain $chainKey --json 2>&1
+        if ($LASTEXITCODE -ne 0) { throw "wallet_create_failed" }
+      } catch {
+        $bindCode = (Get-JsonStringProperty -JsonText "$bindOutput" -PropertyName "code").Trim()
+        if ($bindCode -eq "wallet_exists") {
+          Write-Host "[xclaw] wallet already bound for $chainKey"
+        } else {
+          $walletBindingFailed = $true
+          Write-Host "[xclaw] warning: wallet auto-bind failed for chain=$chainKey"
+          if ($bindOutput) { Write-Output $bindOutput }
+        }
+      }
+
+      $addrJson = ""
+      $addr = ""
+      try {
+        $addrJson = & $xclawAgentBin wallet address --chain $chainKey --json 2>$null
+        $addr = (Get-JsonStringProperty -JsonText "$addrJson" -PropertyName "address").Trim()
+      } catch {
+        $addr = ""
+      }
+      if (-not $addr -and $chainKey -eq $env:XCLAW_DEFAULT_CHAIN) {
+        $addr = $walletAddress
+      }
+      if ($addr) {
+        $walletRows += @{ chainKey = $chainKey; address = $addr }
+      }
+    }
+
+    if ($walletBindingFailed) {
+      Write-Host "[xclaw] warning: one or more wallet chain bindings failed; installer will continue with available bindings"
+    }
+
     $bootstrapOk = $false
     if (-not $env:XCLAW_AGENT_API_KEY -and $walletAddress) {
       Write-Host "[xclaw] no API key provided; requesting auto-bootstrap credentials from server"
@@ -641,7 +708,7 @@ try {
         agentId = $env:XCLAW_AGENT_ID
         agentName = $env:XCLAW_AGENT_NAME
         runtimePlatform = $runtimePlatform
-        wallets = @(@{ chainKey = $env:XCLAW_DEFAULT_CHAIN; address = $walletAddress })
+        wallets = if ($walletRows.Count -gt 0) { $walletRows } else { @(@{ chainKey = $env:XCLAW_DEFAULT_CHAIN; address = $walletAddress }) }
       } | ConvertTo-Json -Depth 8 -Compress
 
       $heartbeatPayload = @{

@@ -1876,3 +1876,17 @@ DoD:
 - [x] runtime/web validation evidence captured (`chains`, public chains, status providers) reflecting normalized metadata.
 - [x] required repo gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
 - [x] issue #44 updated with verification evidence + commit hash(es).
+
+## Slice 99: Installer Multi-Chain Wallet Auto-Bind Hardening
+Status: [~]
+Issue: #45
+
+Goal:
+- Ensure hosted installers bind wallet context across all enabled wallet-capable chains so runtime commands are immediately usable after install.
+
+DoD:
+- [x] `/skill-install.sh` discovers runtime chains via `xclaw-agent chains --json` and auto-attempts `wallet create --chain <chain>` for each wallet-capable chain.
+- [x] `/skill-install.ps1` mirrors the same wallet-capable chain auto-bind behavior.
+- [x] installer register payload upserts deduplicated wallet rows for all successfully bound wallet-capable chains.
+- [x] installer keeps bind failures non-fatal per chain and logs deterministic warning output.
+- [x] canonical docs sync (`source-of-truth`, roadmap, tracker, wallet contract, spec/tasks/acceptance).

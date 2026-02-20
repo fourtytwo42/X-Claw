@@ -3247,3 +3247,28 @@ Note:
   - [x] `npm run seed:verify`
   - [x] `npm run build`
   - [x] `pm2 restart all`
+
+## 99) Slice 99: Installer Multi-Chain Wallet Auto-Bind Hardening
+
+### 99.1 Canonical/doc sync
+- [x] Add Slice 99 entries to `docs/XCLAW_SLICE_TRACKER.md` and this roadmap section.
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` installer wallet bootstrap contract to wallet-capable chain auto-bind.
+- [x] Update `docs/api/WALLET_COMMAND_CONTRACT.md` hosted installer wallet behavior.
+- [x] Update handoff artifacts: `spec.md`, `tasks.md`, `acceptance.md`.
+
+### 99.2 Implementation
+- [x] `apps/network-web/src/app/skill-install.sh/route.ts`:
+  - [x] discover wallet-capable chains from `xclaw-agent chains --json`,
+  - [x] auto-bind portable wallet per discovered chain,
+  - [x] build deduplicated register `wallets[]` from successful chain-address resolutions.
+- [x] `apps/network-web/src/app/skill-install.ps1/route.ts` mirrors the same chain discovery + auto-bind + register wallet payload behavior.
+
+### 99.3 Validation + evidence
+- [x] installer scripts generate and include wallet-capable chain bindings for register payloads.
+- [ ] Required gates run sequentially:
+  - [ ] `npm run db:parity`
+  - [ ] `npm run seed:reset`
+  - [ ] `npm run seed:load`
+  - [ ] `npm run seed:verify`
+  - [ ] `npm run build`
+  - [ ] `pm2 restart all`

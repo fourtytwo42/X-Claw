@@ -2884,3 +2884,18 @@ Active slice context: `Slice 98`.
 - [x] `/api/status` provider list reflects enabled+visible chains with RPCs.
 - [x] Required repo gates run sequentially.
 - [x] Issue #44 evidence posted with commit hash(es).
+
+# Slice 99 Tasks: Installer Multi-Chain Wallet Auto-Bind Hardening (UTC 2026-02-20)
+
+## 1) Installer wallet auto-bind
+- [x] Update `/skill-install.sh` to discover wallet-capable chains via `xclaw-agent chains --json`.
+- [x] Auto-attempt wallet bind for each discovered chain using `wallet create --chain <chain> --json`.
+- [x] Keep per-chain bind failures warning-level/non-fatal.
+
+## 2) Register payload sync
+- [x] Build deduplicated `wallets[]` rows from resolved wallet addresses across bound chains.
+- [x] Use multi-chain `wallets[]` payload for installer register upsert.
+
+## 3) Cross-platform parity + docs
+- [x] Mirror wallet auto-bind + register payload behavior in `/skill-install.ps1`.
+- [x] Sync canonical docs (`source-of-truth`, tracker, roadmap, wallet contract, spec/tasks/acceptance).

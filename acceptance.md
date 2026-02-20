@@ -5388,3 +5388,22 @@ Date (UTC): 2026-02-19
 - `npm run seed:verify` -> PASS
 - `npm run build` -> PASS
 - `pm2 restart all` -> PASS
+
+## Slice 99 Installer Multi-Chain Wallet Auto-Bind Hardening (UTC 2026-02-20)
+
+### Implementation evidence
+- `apps/network-web/src/app/skill-install.sh/route.ts`
+  - wallet-capable chain discovery added via runtime `chains --json`.
+  - installer now loops chain binds with `wallet create --chain <chain> --json`.
+  - register payload wallet rows are built from resolved per-chain addresses.
+- `apps/network-web/src/app/skill-install.ps1/route.ts`
+  - mirrored wallet-capable chain discovery + bind loop.
+  - register payload now uses discovered deduplicated wallet rows.
+
+### Validation
+- `npm run db:parity` -> PASS
+- `npm run seed:reset` -> PASS
+- `npm run seed:load` -> PASS
+- `npm run seed:verify` -> PASS
+- `npm run build` -> PASS
+- `pm2 restart all` -> PASS
