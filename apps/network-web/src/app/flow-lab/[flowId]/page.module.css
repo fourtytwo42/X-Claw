@@ -1,0 +1,324 @@
+.page {
+  width: min(1320px, 100%);
+  margin: 0 auto;
+  padding: 1.2rem 0.35rem 2.4rem;
+  display: grid;
+  gap: 0.8rem;
+}
+
+.hero {
+  border: 1px solid color-mix(in srgb, var(--line) 78%, var(--accent));
+  border-radius: 22px;
+  padding: clamp(1rem, 2vw, 1.65rem);
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--bg-elev) 90%, #081326), color-mix(in srgb, var(--bg-elev-2) 92%, #0a1a34)),
+    radial-gradient(circle at 6% 8%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 30%);
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.kicker {
+  margin: 0 0 0.35rem;
+  font-size: 0.78rem;
+  font-family: var(--font-mono);
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--accent) 82%, var(--text));
+}
+
+.hero h1 {
+  margin: 0;
+  font-size: clamp(1.35rem, 3vw, 2.3rem);
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+
+.hero p {
+  margin: 0.48rem 0 0;
+  color: var(--text-muted);
+  max-width: 85ch;
+  line-height: 1.48;
+}
+
+.heroRight {
+  display: grid;
+  gap: 0.45rem;
+  justify-items: end;
+}
+
+.badge {
+  border-radius: 999px;
+  padding: 0.24rem 0.56rem;
+  font-size: 0.7rem;
+  font-family: var(--font-mono);
+  border: 1px solid transparent;
+}
+
+.shipped {
+  color: color-mix(in srgb, var(--ok) 90%, var(--text));
+  border-color: color-mix(in srgb, var(--ok) 60%, var(--line));
+  background: color-mix(in srgb, var(--ok) 14%, var(--bg-elev));
+}
+
+.inProgress {
+  color: color-mix(in srgb, var(--warn) 92%, var(--text));
+  border-color: color-mix(in srgb, var(--warn) 62%, var(--line));
+  background: color-mix(in srgb, var(--warn) 16%, var(--bg-elev));
+}
+
+.backLink {
+  color: color-mix(in srgb, var(--accent) 88%, var(--text));
+  font-size: 0.78rem;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.chartCard {
+  border: 1px solid color-mix(in srgb, var(--line) 78%, var(--accent));
+  border-radius: 20px;
+  background:
+    linear-gradient(160deg, color-mix(in srgb, var(--bg-elev) 92%, #09152b), color-mix(in srgb, var(--bg-elev-2) 94%, #0a1731)),
+    repeating-linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--line) 24%, transparent) 0,
+      color-mix(in srgb, var(--line) 24%, transparent) 1px,
+      transparent 1px,
+      transparent 60px
+    );
+  padding: 0.72rem;
+}
+
+.chartArea {
+  position: relative;
+  border: 1px solid color-mix(in srgb, var(--line) 70%, var(--accent));
+  border-radius: 15px;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--bg-elev-2) 88%, #0b1935), color-mix(in srgb, var(--bg-elev) 94%, #060f20));
+  overflow: hidden;
+}
+
+.edgesLayer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.edgePath {
+  fill: none;
+  stroke: color-mix(in srgb, var(--accent) 78%, var(--line));
+  stroke-width: 0.5;
+  stroke-dasharray: 2.2 1.6;
+  animation: flow 2.1s linear infinite;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.edgeOk {
+  stroke: color-mix(in srgb, var(--ok) 75%, var(--line));
+}
+
+.edgeWarn {
+  stroke: color-mix(in srgb, var(--warn) 80%, var(--line));
+}
+
+.edgeArrow {
+  fill: color-mix(in srgb, var(--accent) 90%, var(--line));
+}
+
+.edgeLabel {
+  fill: var(--text-muted);
+  font-size: 1.95px;
+  font-family: var(--font-mono);
+  paint-order: stroke;
+  stroke: color-mix(in srgb, var(--bg-elev) 95%, black);
+  stroke-width: 0.35px;
+}
+
+.node {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: min(190px, 20vw);
+  min-height: 84px;
+  border: 1px solid color-mix(in srgb, var(--line-strong) 76%, var(--line));
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--bg-glass) 94%, transparent);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
+  padding: 0.48rem 0.52rem;
+  display: grid;
+  gap: 0.26rem;
+  z-index: 2;
+}
+
+.nodeStep {
+  font-family: var(--font-mono);
+  font-size: 0.67rem;
+  letter-spacing: 0.09em;
+  color: color-mix(in srgb, var(--accent) 86%, var(--text));
+}
+
+.node h2 {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.3;
+  font-weight: 600;
+}
+
+.nodeOk {
+  border-color: color-mix(in srgb, var(--ok) 56%, var(--line));
+  background: color-mix(in srgb, var(--ok) 11%, var(--bg-glass));
+}
+
+.nodeWarn {
+  border-color: color-mix(in srgb, var(--warn) 58%, var(--line));
+  background: color-mix(in srgb, var(--warn) 12%, var(--bg-glass));
+}
+
+.textSection {
+  display: grid;
+  gap: 0.66rem;
+}
+
+.infoCard {
+  border: 1px solid color-mix(in srgb, var(--line) 85%, #101f3d);
+  border-radius: 14px;
+  padding: 0.78rem;
+  background: linear-gradient(170deg, color-mix(in srgb, var(--bg-elev-2) 93%, #111f3d), color-mix(in srgb, var(--bg-elev) 95%, #09192f));
+}
+
+.infoCard h3 {
+  margin: 0 0 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: color-mix(in srgb, var(--accent) 80%, var(--text));
+}
+
+.infoCard ul {
+  margin: 0;
+  padding-left: 1rem;
+  color: var(--text-muted);
+  display: grid;
+  gap: 0.44rem;
+}
+
+.infoCard p {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.47;
+}
+
+.signalRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.42rem;
+}
+
+.signalChip {
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--line-strong) 65%, var(--line));
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg-elev));
+  color: var(--text);
+  font-size: 0.73rem;
+  padding: 0.29rem 0.52rem;
+}
+
+.pager {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.7rem;
+  border: 1px solid color-mix(in srgb, var(--line) 80%, var(--accent));
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--bg-glass) 92%, transparent);
+  padding: 0.6rem 0.72rem;
+}
+
+.pager a {
+  color: color-mix(in srgb, var(--accent) 90%, var(--text));
+  font-size: 0.78rem;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+.dim {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+}
+
+@keyframes flow {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: -8;
+  }
+}
+
+@media (max-width: 1100px) {
+  .node {
+    width: min(170px, 24vw);
+  }
+}
+
+@media (max-width: 920px) {
+  .hero {
+    flex-direction: column;
+  }
+
+  .heroRight {
+    justify-items: start;
+  }
+
+  .chartArea {
+    min-height: 640px;
+  }
+
+  .node {
+    width: 160px;
+  }
+}
+
+@media (max-width: 760px) {
+  .page {
+    padding: 0.95rem 0.15rem 2rem;
+  }
+
+  .chartArea {
+    min-height: 700px;
+  }
+
+  .edgesLayer {
+    display: none;
+  }
+
+  .node {
+    width: min(240px, 84vw);
+    position: static;
+    transform: none;
+    margin: 0.5rem auto;
+  }
+
+  .chartArea {
+    display: grid;
+    align-content: start;
+    padding: 0.35rem 0;
+  }
+
+  .pager {
+    flex-direction: column;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .edgePath {
+    animation: none;
+  }
+}

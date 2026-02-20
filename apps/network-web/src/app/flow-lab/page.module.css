@@ -1,0 +1,108 @@
+.page {
+  width: min(1200px, 100%);
+  margin: 0 auto;
+  padding: 1.2rem 0.35rem 2.5rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.hero {
+  border: 1px solid color-mix(in srgb, var(--line) 76%, var(--accent));
+  border-radius: 22px;
+  padding: clamp(1rem, 2vw, 1.8rem);
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--bg-elev) 90%, #081326), color-mix(in srgb, var(--bg-elev-2) 92%, #0a1a34)),
+    radial-gradient(circle at 6% 8%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 30%);
+  box-shadow: 0 20px 46px rgba(1, 8, 18, 0.3);
+}
+
+.kicker {
+  margin: 0 0 0.4rem;
+  font-size: 0.78rem;
+  font-family: var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--accent) 82%, var(--text));
+}
+
+.hero h1 {
+  margin: 0;
+  font-size: clamp(1.5rem, 4vw, 2.6rem);
+  letter-spacing: -0.03em;
+}
+
+.hero p {
+  margin: 0.55rem 0 0;
+  color: var(--text-muted);
+  max-width: 78ch;
+  line-height: 1.5;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 0.7rem;
+}
+
+.card {
+  border: 1px solid color-mix(in srgb, var(--line) 80%, var(--accent));
+  border-radius: 16px;
+  padding: 0.82rem;
+  display: grid;
+  gap: 0.62rem;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--bg-elev-2) 92%, #101f3f), color-mix(in srgb, var(--bg-elev) 93%, #081527));
+  transition: transform 150ms ease, border-color 150ms ease;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--accent) 64%, var(--line));
+}
+
+.cardTop {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+
+.cardTop h2 {
+  margin: 0;
+  font-size: 0.98rem;
+  line-height: 1.3;
+}
+
+.card p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.badge {
+  border-radius: 999px;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.68rem;
+  font-family: var(--font-mono);
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.shipped {
+  color: color-mix(in srgb, var(--ok) 90%, var(--text));
+  border-color: color-mix(in srgb, var(--ok) 60%, var(--line));
+  background: color-mix(in srgb, var(--ok) 14%, var(--bg-elev));
+}
+
+.inProgress {
+  color: color-mix(in srgb, var(--warn) 90%, var(--text));
+  border-color: color-mix(in srgb, var(--warn) 60%, var(--line));
+  background: color-mix(in srgb, var(--warn) 16%, var(--bg-elev));
+}
+
+.cta {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: color-mix(in srgb, var(--accent) 88%, var(--text));
+}
