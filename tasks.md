@@ -3079,7 +3079,7 @@ Active slice context: `Slice 98`.
 - [x] `npm run seed:verify`.
 - [x] `npm run build`.
 - [x] `pm2 restart all`.
-- [ ] Issue evidence post with commit hash(es).
+- [x] Issue evidence post with commit hash(es).
 
 # Slice 104 Tasks: LP Migrate/Claim-Rewards Promotion (UTC 2026-02-20)
 

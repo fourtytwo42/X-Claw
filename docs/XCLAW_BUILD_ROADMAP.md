@@ -3358,7 +3358,7 @@ Note:
   - [x] `npm run seed:verify`
   - [x] `npm run build`
   - [x] `pm2 restart all`
-- [ ] Issue #47 evidence post + commit hash(es).
+- [x] Issue #47 evidence post + commit hash(es).
 
 ## 102) Slice 102: Uniswap LP Core Integration (Proxy-First + Fallback)
 

@@ -1824,7 +1824,7 @@ DoD:
 - [x] final docs sync + issue evidence posts with commit hashes.
 
 ## Slice 96: Base Sepolia Wallet/Approval E2E Harness (Telegram-Suppressed)
-Status: [~]
+Status: [x]
 Issue: #42
 
 Goal:
@@ -2021,4 +2021,4 @@ DoD:
 - [x] `ethereum_sepolia` remains enabled for both operations.
 - [x] Runtime/proxy behavior unchanged: fail closed deterministically when no execution provider path exists.
 - [x] Required gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
-- [ ] Issue #47 evidence post + commit hash(es).
+- [x] Issue #47 evidence post + commit hash(es).
