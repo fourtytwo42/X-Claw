@@ -1084,6 +1084,7 @@ export default function AgentPublicProfilePage() {
       ),
     [policyAllowedTokens]
   );
+  const hasAutoApprovalsEnabled = policyApprovalMode === 'auto' || policyAllowedTokenSet.size > 0;
 
   function buildPolicyUpdatePayload(next: { approvalMode?: 'per_trade' | 'auto'; allowedTokens?: string[] }) {
     return {
@@ -2105,6 +2106,7 @@ export default function AgentPublicProfilePage() {
                 <button
                   type="button"
                   className={styles.dangerButton}
+                  disabled={!hasAutoApprovalsEnabled}
                   onClick={() => {
                     if (!window.confirm('Turn off all auto-approvals for this agent?')) {
                       return;
@@ -2115,7 +2117,7 @@ export default function AgentPublicProfilePage() {
                     );
                   }}
                 >
-                  Turn Off Auto-Approvals
+                  {hasAutoApprovalsEnabled ? 'Turn Off Auto-Approvals' : 'Auto-Approvals Already Off'}
                 </button>
                 <div className={styles.withdrawInline}>
                   {withdrawDestinationPreview ? <span className={styles.withdrawPreviewLabel}>{withdrawDestinationPreview}</span> : null}

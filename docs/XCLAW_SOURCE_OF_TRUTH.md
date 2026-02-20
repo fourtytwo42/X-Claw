@@ -2725,6 +2725,10 @@ Supersession note:
    - owner-only approval policy controls live in the wallet card (not the rail):
      - Global Approval toggle (`Approve all`),
      - per-token preapproval controls inline on token rows.
+   - owner-only emergency control `Turn Off Auto-Approvals` must be state-aware:
+     - visible to owner in management mode,
+     - enabled only when global approval is `auto` or token allowlist has at least one entry,
+     - when no auto approvals are active, label must indicate already-off state and must not imply toggled-on status.
 4. Chain access management:
    - management session cookie + CSRF is sufficient for enable/disable (Slice 36 removed step-up).
 5. Canonical endpoints:
