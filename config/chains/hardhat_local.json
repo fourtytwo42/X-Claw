@@ -71,5 +71,13 @@
       "quoter": true,
       "escrow": true
     }
+  },
+  "liquidityOperations": {
+    "claimFees": {
+      "legacyEnabled": false
+    },
+    "claimRewards": {
+      "legacyEnabled": false
+    }
   }
 }

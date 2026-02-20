@@ -5629,3 +5629,28 @@ Date (UTC): 2026-02-19
 - `npm run seed:verify` -> PASS
 - `npm run build` -> PASS
 - `pm2 restart all` -> PASS
+
+## Slice 105 Cross-Chain Liquidity Claims (UTC 2026-02-20)
+
+### Implementation evidence
+- Runtime claim orchestration updates:
+  - `apps/agent-runtime/xclaw_agent/cli.py`
+- Adapter claim capability updates:
+  - `apps/agent-runtime/xclaw_agent/liquidity_adapter.py`
+- Hedera guarded claim action dispatch:
+  - `apps/agent-runtime/xclaw_agent/hedera_hts_plugin.py`
+  - `apps/agent-runtime/xclaw_agent/bridges/hedera_hts_bridge.py`
+- Chain config claim gates added:
+  - `config/chains/*.json` (`liquidityOperations.claimFees.legacyEnabled`, `liquidityOperations.claimRewards.legacyEnabled`)
+- Runtime claim regression coverage updated:
+  - `apps/agent-runtime/tests/test_liquidity_cli.py`
+
+### Validation status
+- `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v` -> PASS.
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS.
+- `npm run db:parity` -> PASS
+- `npm run seed:reset` -> PASS
+- `npm run seed:load` -> PASS
+- `npm run seed:verify` -> PASS
+- `npm run build` -> PASS
+- `pm2 restart all` -> PASS

@@ -48,9 +48,12 @@ def execute_liquidity(
     payload: dict[str, Any],
 ) -> dict[str, Any]:
     _require_hedera_sdk()
+    normalized_action = str(action or "").strip().lower()
+    if normalized_action not in {"add", "remove", "claim_fees", "claim_rewards"}:
+        raise HederaSdkUnavailable(f"Hedera HTS plugin action '{action}' is unsupported.")
     command = _bridge_command()
     bridge_input = {
-        "action": str(action or "").strip().lower(),
+        "action": normalized_action,
         "chain": str(chain or "").strip(),
         "dex": str(dex or "").strip().lower(),
         "positionType": str(position_type or "").strip().lower(),

@@ -3033,3 +3033,19 @@ Promote `migrate` and `claim_rewards` operation enablement from `ethereum_sepoli
 - `zksync_mainnet`
 - `unichain_mainnet`
 - `monad_mainnet`
+
+## Slice 105: Cross-Chain Liquidity Claims (Fees + Rewards)
+
+### Goal
+Unify claim behavior across all chains by enforcing deterministic claim contracts: execute via available providers or return stable fail-closed codes.
+
+### Non-goals
+1. Enabling disabled chains.
+2. Synthetic claim success for unsupported protocols.
+3. Full rewards integration for every non-Uniswap DEX in one slice.
+
+### Constraints
+1. Uniswap chains remain `uniswap_api` primary with fallback only when configured and implemented.
+2. Legacy claim availability requires both config gate and adapter support.
+3. AMM v2 fee claim remains unsupported unless future protocol-specific implementation is added.
+4. Non-Uniswap rewards remain not configured by default.

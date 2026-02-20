@@ -55,6 +55,7 @@ from xclaw_agent.liquidity_adapter import (
     build_liquidity_adapter_for_request,
     HederaSdkUnavailable,
     LiquidityAdapterError,
+    UnsupportedLiquidityOperation,
     UnsupportedLiquidityAdapter,
 )
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
@@ -6675,30 +6676,58 @@ def cmd_liquidity_claim_fees(args: argparse.Namespace) -> int:
         if not position_id:
             return fail("invalid_input", "position-id is required.", "Provide --position-id and retry.", {"chain": chain}, exit_code=2)
         provider_requested, fallback_provider = _liquidity_provider_settings(chain)
-        if provider_requested != "uniswap_api":
-            return fail(
-                "no_execution_provider_available",
-                "Liquidity fee claim currently requires uniswap_api provider on this chain.",
-                "Enable Uniswap LP provider for this chain or use supported legacy commands.",
-                {"chain": chain, "providerRequested": provider_requested, "fallback": fallback_provider},
-                exit_code=2,
-            )
-
-        store = load_wallet_store()
-        wallet_address, private_key_hex = _execution_wallet(store, chain)
+        fallback_used = False
+        fallback_reason: dict[str, str] | None = None
+        provider_used = "legacy_router"
+        uniswap_operation: str | None = None
         request_payload = {
             "tokenId": position_id,
             "collectAsWeth": bool(args.collect_as_weth),
             "token0CollectAmount": "0",
             "token1CollectAmount": "0",
         }
-        claim_result = _uniswap_lp_call_via_proxy(chain, wallet_address, "/agent/liquidity/uniswap/claim-fees", request_payload)
-        claim_hashes = _execute_uniswap_lp_transactions(
-            chain, wallet_address, private_key_hex, list(claim_result.get("transactions") or []), "uniswap lp claim"
-        )
-        if not claim_hashes:
-            raise WalletStoreError("uniswap_payload_invalid: claim produced no executable transactions.")
-        tx_hash = claim_hashes[-1]
+
+        if provider_requested == "uniswap_api":
+            store = load_wallet_store()
+            wallet_address, private_key_hex = _execution_wallet(store, chain)
+            try:
+                claim_result = _uniswap_lp_call_via_proxy(chain, wallet_address, "/agent/liquidity/uniswap/claim-fees", request_payload)
+                claim_hashes = _execute_uniswap_lp_transactions(
+                    chain, wallet_address, private_key_hex, list(claim_result.get("transactions") or []), "uniswap lp claim"
+                )
+                if not claim_hashes:
+                    raise WalletStoreError("uniswap_payload_invalid: claim produced no executable transactions.")
+                provider_used = "uniswap_api"
+                uniswap_operation = "claim"
+            except Exception as exc:
+                if _legacy_liquidity_operation_available(chain, dex, "v2", "claim_fees"):
+                    fallback_used = True
+                    fallback_reason = _fallback_reason("uniswap_claim_fees_failed", str(exc))
+                    legacy_result = _execute_legacy_liquidity_operation(
+                        chain=chain,
+                        dex=dex,
+                        position_type="v2",
+                        operation="claim_fees",
+                        payload={"positionId": position_id},
+                    )
+                    claim_hashes = [str(legacy_result.get("txHash") or "")]
+                    provider_used = "legacy_router"
+                else:
+                    raise WalletStoreError(f"no_execution_provider_available: {exc}") from exc
+        else:
+            legacy_result = _execute_legacy_liquidity_operation(
+                chain=chain,
+                dex=dex,
+                position_type="v2",
+                operation="claim_fees",
+                payload={"positionId": position_id},
+            )
+            claim_hashes = [str(legacy_result.get("txHash") or "")]
+            provider_used = "legacy_router"
+
+        tx_hash = str(claim_hashes[-1] or "").strip()
+        if not tx_hash:
+            raise WalletStoreError("liquidity_claim_fees_failed: claim execution returned empty txHash.")
         return ok(
             "Liquidity fees claimed.",
             chain=chain,
@@ -6707,14 +6736,18 @@ def cmd_liquidity_claim_fees(args: argparse.Namespace) -> int:
             txHash=tx_hash,
             operationTxHashes=claim_hashes,
             providerRequested=provider_requested,
-            providerUsed="uniswap_api",
-            fallbackUsed=False,
-            fallbackReason=None,
-            uniswapLpOperation="claim",
+            providerUsed=provider_used,
+            fallbackUsed=fallback_used,
+            fallbackReason=fallback_reason,
+            uniswapLpOperation=uniswap_operation,
         )
     except ChainRegistryError as exc:
         return fail("unsupported_chain_capability", str(exc), chain_supported_hint(), {"chain": chain, "requiredCapability": "liquidity"}, exit_code=2)
     except WalletStoreError as exc:
+        err = str(exc)
+        for code in {"claim_fees_not_supported_for_protocol", "no_execution_provider_available"}:
+            if err.startswith(f"{code}:"):
+                return fail(code, err.split(":", 1)[1].strip(), "Verify chain claim-fees support and retry.", {"chain": chain, "dex": dex, "positionId": position_id}, exit_code=1)
         return fail("liquidity_claim_fees_failed", str(exc), "Verify Uniswap LP configuration and retry.", {"chain": chain, "dex": dex, "positionId": position_id}, exit_code=1)
     except Exception as exc:
         return fail("liquidity_claim_fees_failed", str(exc), "Inspect runtime liquidity fee-claim path and retry.", {"chain": chain, "dex": dex, "positionId": position_id}, exit_code=1)
@@ -6836,28 +6869,9 @@ def cmd_liquidity_claim_rewards(args: argparse.Namespace) -> int:
         assert_chain_capability(chain, "liquidity")
         if not position_id:
             return fail("invalid_input", "position-id is required.", "Provide --position-id and retry.", {"chain": chain}, exit_code=2)
-        if not _uniswap_lp_operation_enabled(chain, "claim_rewards"):
-            return fail(
-                "uniswap_claim_rewards_not_supported_on_chain",
-                f"Uniswap LP claim-rewards is not enabled on chain '{chain}'.",
-                "Use ethereum_sepolia or wait for staged rollout on this chain.",
-                {"chain": chain},
-                exit_code=2,
-            )
         provider_requested, _ = _liquidity_provider_settings(chain)
         fallback_used = False
         fallback_reason: dict[str, str] | None = None
-        if provider_requested != "uniswap_api":
-            return fail(
-                "no_execution_provider_available",
-                "Liquidity claim-rewards currently requires uniswap_api provider on this chain.",
-                "Enable Uniswap LP claim-rewards for this chain.",
-                {"chain": chain, "providerRequested": provider_requested},
-                exit_code=2,
-            )
-
-        store = load_wallet_store()
-        wallet_address, private_key_hex = _execution_wallet(store, chain)
         request_payload: dict[str, Any] = {"positionId": position_id}
         reward_token = str(args.reward_token or "").strip()
         if reward_token:
@@ -6868,38 +6882,65 @@ def cmd_liquidity_claim_rewards(args: argparse.Namespace) -> int:
             if not isinstance(extra, dict):
                 raise WalletStoreError("request-json must decode to an object.")
             request_payload.update(extra)
-        if "tokens" not in request_payload:
-            return fail(
-                "invalid_input",
-                "claim-rewards requires --reward-token or --request-json with tokens.",
-                "Provide a reward token symbol/address or full request payload.",
-                {"chain": chain, "positionId": position_id},
-                exit_code=2,
-            )
 
-        try:
-            claim_result = _uniswap_lp_call_via_proxy(chain, wallet_address, "/agent/liquidity/uniswap/claim-rewards", request_payload)
-            claim_hashes = _execute_uniswap_lp_transactions(
-                chain, wallet_address, private_key_hex, list(claim_result.get("transactions") or []), "uniswap lp claim rewards"
+        uniswap_operation: str | None = None
+        if provider_requested == "uniswap_api":
+            if not _uniswap_lp_operation_enabled(chain, "claim_rewards"):
+                return fail(
+                    "uniswap_claim_rewards_not_supported_on_chain",
+                    f"Uniswap LP claim-rewards is not enabled on chain '{chain}'.",
+                    "Use a chain where claim-rewards is enabled or rely on configured legacy path.",
+                    {"chain": chain},
+                    exit_code=2,
+                )
+            if "tokens" not in request_payload:
+                return fail(
+                    "invalid_input",
+                    "claim-rewards requires --reward-token or --request-json with tokens.",
+                    "Provide a reward token symbol/address or full request payload.",
+                    {"chain": chain, "positionId": position_id},
+                    exit_code=2,
+                )
+            store = load_wallet_store()
+            wallet_address, private_key_hex = _execution_wallet(store, chain)
+            try:
+                claim_result = _uniswap_lp_call_via_proxy(chain, wallet_address, "/agent/liquidity/uniswap/claim-rewards", request_payload)
+                claim_hashes = _execute_uniswap_lp_transactions(
+                    chain, wallet_address, private_key_hex, list(claim_result.get("transactions") or []), "uniswap lp claim rewards"
+                )
+                if not claim_hashes:
+                    raise WalletStoreError("uniswap_payload_invalid: claim-rewards produced no executable transactions.")
+                provider_used = "uniswap_api"
+                uniswap_operation = "claim_rewards"
+            except Exception as exc:
+                if _legacy_liquidity_operation_available(chain, dex, "v2", "claim_rewards"):
+                    fallback_used = True
+                    fallback_reason = _fallback_reason("uniswap_claim_rewards_failed", str(exc))
+                    legacy_result = _execute_legacy_liquidity_operation(
+                        chain=chain,
+                        dex=dex,
+                        position_type="v2",
+                        operation="claim_rewards",
+                        payload=request_payload,
+                    )
+                    claim_hashes = [str(legacy_result.get("txHash") or "")]
+                    provider_used = "legacy_router"
+                else:
+                    raise WalletStoreError(f"no_execution_provider_available: {exc}") from exc
+        else:
+            legacy_result = _execute_legacy_liquidity_operation(
+                chain=chain,
+                dex=dex,
+                position_type="v2",
+                operation="claim_rewards",
+                payload=request_payload,
             )
-            if not claim_hashes:
-                raise WalletStoreError("uniswap_payload_invalid: claim-rewards produced no executable transactions.")
-            provider_used = "uniswap_api"
-        except Exception as exc:
-            if _legacy_liquidity_operation_available(chain, dex, "v2", "claim_rewards"):
-                fallback_used = True
-                fallback_reason = _fallback_reason("uniswap_claim_rewards_failed", str(exc))
-            else:
-                raise WalletStoreError(f"no_execution_provider_available: {exc}") from exc
-            return fail(
-                "no_execution_provider_available",
-                "Liquidity claim-rewards failed on uniswap_api and no fallback provider is available.",
-                "Retry later or use a chain with claim-rewards fallback support.",
-                {"chain": chain, "fallbackReason": fallback_reason},
-                exit_code=1,
-            )
+            claim_hashes = [str(legacy_result.get("txHash") or "")]
+            provider_used = "legacy_router"
 
-        tx_hash = claim_hashes[-1]
+        tx_hash = str(claim_hashes[-1] or "").strip()
+        if not tx_hash:
+            raise WalletStoreError("liquidity_claim_rewards_failed: claim execution returned empty txHash.")
         return ok(
             "Liquidity rewards claimed.",
             chain=chain,
@@ -6911,11 +6952,15 @@ def cmd_liquidity_claim_rewards(args: argparse.Namespace) -> int:
             providerUsed=provider_used,
             fallbackUsed=fallback_used,
             fallbackReason=fallback_reason,
-            uniswapLpOperation="claim_rewards",
+            uniswapLpOperation=uniswap_operation,
         )
     except ChainRegistryError as exc:
         return fail("unsupported_chain_capability", str(exc), chain_supported_hint(), {"chain": chain, "requiredCapability": "liquidity"}, exit_code=2)
     except WalletStoreError as exc:
+        err = str(exc)
+        for code in {"claim_rewards_not_configured", "claim_rewards_not_supported_for_protocol", "no_execution_provider_available"}:
+            if err.startswith(f"{code}:"):
+                return fail(code, err.split(":", 1)[1].strip(), "Verify chain claim-rewards support and retry.", {"chain": chain, "dex": dex, "positionId": position_id}, exit_code=1)
         return fail("liquidity_claim_rewards_failed", str(exc), "Verify Uniswap LP claim-rewards configuration and retry.", {"chain": chain, "dex": dex, "positionId": position_id}, exit_code=1)
     except Exception as exc:
         return fail("liquidity_claim_rewards_failed", str(exc), "Inspect runtime liquidity claim-rewards path and retry.", {"chain": chain, "dex": dex, "positionId": position_id}, exit_code=1)
@@ -7340,8 +7385,80 @@ def _legacy_liquidity_provider_available(chain: str, dex: str, position_type: st
 def _legacy_liquidity_operation_available(chain: str, dex: str, position_type: str, operation: str) -> bool:
     op = str(operation or "").strip().lower()
     if op in {"add", "remove", "increase", "claim", "claim_fees"}:
+        if op == "claim_fees" and not _chain_liquidity_legacy_operation_enabled(chain, "claim_fees"):
+            return False
+        if op == "claim_fees":
+            try:
+                adapter = build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type=position_type)
+                return bool(adapter.supports_operation("claim_fees"))
+            except Exception:
+                return False
         return _legacy_liquidity_provider_available(chain, dex, position_type)
+    if op in {"claim_rewards", "claim-rewards"}:
+        if not _chain_liquidity_legacy_operation_enabled(chain, "claim_rewards"):
+            return False
+        try:
+            adapter = build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type=position_type)
+            return bool(adapter.supports_operation("claim_rewards"))
+        except Exception:
+            return False
     return False
+
+
+def _chain_liquidity_legacy_operation_enabled(chain: str, operation: str) -> bool:
+    cfg = _load_chain_config(chain)
+    payload = cfg.get("liquidityOperations")
+    if not isinstance(payload, dict):
+        return False
+    op = str(operation or "").strip().lower()
+    if op in {"claim_fees", "claim-fees"}:
+        key = "claimFees"
+    elif op in {"claim_rewards", "claim-rewards"}:
+        key = "claimRewards"
+    else:
+        return False
+    entry = payload.get(key)
+    if not isinstance(entry, dict):
+        return False
+    return bool(entry.get("legacyEnabled"))
+
+
+def _execute_legacy_liquidity_operation(
+    chain: str,
+    dex: str,
+    position_type: str,
+    operation: str,
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    op = str(operation or "").strip().lower()
+    adapter = build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type=position_type)
+    if op in {"claim_fees", "claim-fees"}:
+        if not _chain_liquidity_legacy_operation_enabled(chain, "claim_fees"):
+            raise WalletStoreError("claim_fees_not_supported_for_protocol: legacy claim-fees is not enabled for this chain.")
+        if not adapter.supports_operation("claim_fees"):
+            raise WalletStoreError("claim_fees_not_supported_for_protocol: legacy adapter does not support fee claiming.")
+        try:
+            out = adapter.claim_fees(dict(payload or {}))
+        except UnsupportedLiquidityOperation as exc:
+            raise WalletStoreError(f"claim_fees_not_supported_for_protocol: {exc}") from exc
+    elif op in {"claim_rewards", "claim-rewards"}:
+        if not _chain_liquidity_legacy_operation_enabled(chain, "claim_rewards"):
+            raise WalletStoreError("claim_rewards_not_configured: legacy claim-rewards is not configured for this chain.")
+        if not adapter.supports_operation("claim_rewards"):
+            raise WalletStoreError("claim_rewards_not_supported_for_protocol: legacy adapter does not support rewards claiming.")
+        try:
+            out = adapter.claim_rewards(dict(payload or {}))
+        except UnsupportedLiquidityOperation as exc:
+            raise WalletStoreError(f"claim_rewards_not_supported_for_protocol: {exc}") from exc
+    else:
+        raise WalletStoreError(f"no_execution_provider_available: unsupported legacy liquidity operation '{operation}'.")
+
+    if not isinstance(out, dict):
+        raise WalletStoreError("liquidity_claim_failed: legacy claim operation returned non-object payload.")
+    tx_hash = str(out.get("txHash") or "").strip()
+    if not tx_hash:
+        raise WalletStoreError("liquidity_claim_failed: legacy claim operation returned empty txHash.")
+    return out
 
 
 def _uniswap_lp_operation_enabled(chain: str, operation: str) -> bool:

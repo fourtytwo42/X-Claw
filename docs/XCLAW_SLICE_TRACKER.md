@@ -2022,3 +2022,21 @@ DoD:
 - [x] Runtime/proxy behavior unchanged: fail closed deterministically when no execution provider path exists.
 - [x] Required gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
 - [x] Issue #47 evidence post + commit hash(es).
+
+## Slice 105: Cross-Chain Liquidity Claims (Fees + Rewards)
+Status: [~]
+Issue: #48
+
+Goal:
+- Implement deterministic cross-chain claim behavior for `liquidity claim-fees` and `liquidity claim-rewards` with Uniswap-first fallback semantics where available.
+
+DoD:
+- [x] Runtime claim commands use provider orchestration and deterministic fail-closed behavior.
+- [x] Legacy claim operation support checks use config gate + adapter capability.
+- [x] Adapter layer exposes `claim_fees` and `claim_rewards` fail-closed defaults.
+- [x] Hedera plugin/bridge includes guarded claim action dispatch with fail-closed defaults.
+- [x] Chain configs include `liquidityOperations.claimFees.legacyEnabled` and `liquidityOperations.claimRewards.legacyEnabled`.
+- [x] claim command outputs include provider provenance fields consistently.
+- [x] Required gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
+- [x] Runtime tests pass (`test_liquidity_cli.py`, `test_trade_path.py`).
+- [ ] Issue #48 evidence post + commit hash(es).

@@ -21,6 +21,10 @@ class HederaSdkUnavailable(LiquidityAdapterError):
     pass
 
 
+class UnsupportedLiquidityOperation(LiquidityAdapterError):
+    pass
+
+
 @dataclass(frozen=True)
 class LiquidityAdapter:
     chain: str
@@ -83,6 +87,16 @@ class LiquidityAdapter:
             "action": "remove",
             "preflight": quote.get("simulation", {}),
         }
+
+    def claim_fees(self, payload: dict[str, Any]) -> dict[str, Any]:
+        raise UnsupportedLiquidityOperation("claim_fees_not_supported_for_protocol")
+
+    def claim_rewards(self, payload: dict[str, Any]) -> dict[str, Any]:
+        raise UnsupportedLiquidityOperation("claim_rewards_not_supported_for_protocol")
+
+    def supports_operation(self, operation: str) -> bool:
+        op = str(operation or "").strip().lower()
+        return op in {"add", "remove", "quote_add", "quote_remove", "position_fetch"}
 
     def position_fetch(self, payload: dict[str, Any]) -> dict[str, Any]:
         position_id = str(payload.get("positionId") or "").strip()
@@ -204,6 +218,24 @@ class HederaHtsLiquidityAdapter(LiquidityAdapter):
         self.ensure_sdk()
         quote = self.quote_remove(payload)
         return self._execute_with_plugin("remove", payload, quote.get("simulation", {}))
+
+    def claim_fees(self, payload: dict[str, Any]) -> dict[str, Any]:
+        self.ensure_sdk()
+        request = dict(payload or {})
+        _require_non_empty(request.get("positionId"), "positionId")
+        return self._execute_with_plugin("claim_fees", request, {})
+
+    def claim_rewards(self, payload: dict[str, Any]) -> dict[str, Any]:
+        self.ensure_sdk()
+        request = dict(payload or {})
+        _require_non_empty(request.get("positionId"), "positionId")
+        return self._execute_with_plugin("claim_rewards", request, {})
+
+    def supports_operation(self, operation: str) -> bool:
+        op = str(operation or "").strip().lower()
+        if op in {"claim_fees", "claim_rewards"}:
+            return True
+        return super().supports_operation(op)
 
 
 def _require_non_empty(value: Any, field_name: str) -> str:

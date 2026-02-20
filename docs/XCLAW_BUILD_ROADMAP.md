@@ -3466,3 +3466,30 @@ Note:
   - [x] `npm run build`
   - [x] `pm2 restart all`
 - [ ] Issue #47 evidence post + commit hash(es).
+
+## 105) Slice 105: Cross-Chain Liquidity Claims (Fees + Rewards)
+
+### 105.1 Canonical/doc sync
+- [x] Add Slice 105 entries to `docs/XCLAW_SLICE_TRACKER.md` and this roadmap section.
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` with cross-chain claim contract.
+- [x] Update handoff artifacts: `docs/CONTEXT_PACK.md`, `spec.md`, `tasks.md`, `acceptance.md`.
+
+### 105.2 Runtime + adapter implementation
+- [x] `cmd_liquidity_claim_fees` supports provider orchestration + fallback.
+- [x] `cmd_liquidity_claim_rewards` supports provider orchestration + fallback.
+- [x] `liquidity_adapter.py` adds `claim_fees` / `claim_rewards` interface methods.
+- [x] Hedera plugin/bridge adds guarded claim action dispatch (fail-closed default).
+- [x] Config gates added in `config/chains/*.json` under `liquidityOperations.*.legacyEnabled`.
+
+### 105.3 Validation + evidence
+- [x] Runtime tests:
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- [x] Required gates run sequentially:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `pm2 restart all`
+- [ ] Issue #48 evidence post + commit hash(es).

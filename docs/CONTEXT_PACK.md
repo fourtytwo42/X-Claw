@@ -1451,3 +1451,27 @@ Promote already-implemented Uniswap LP `migrate` and `claim_rewards` operations 
   - `spec.md`
   - `tasks.md`
   - `acceptance.md`
+
+## Slice 105 Context Pack (2026-02-20): Cross-Chain Liquidity Claims
+
+### Objective
+Implement deterministic cross-chain `liquidity claim-fees` and `liquidity claim-rewards` behavior with Uniswap-first execution and legacy fallback only when explicitly configured and implemented.
+
+### Constraints
+- Agent runtime wallet remains signing/execution source of truth.
+- Uniswap key remains server-only.
+- No synthetic success paths for unsupported claims.
+- Disabled/no-liquidity chains remain fail-closed.
+
+### Primary touchpoints
+- Runtime orchestration:
+  - `apps/agent-runtime/xclaw_agent/cli.py`
+- Adapter capability layer:
+  - `apps/agent-runtime/xclaw_agent/liquidity_adapter.py`
+- Hedera bridge/plugin guarded claim dispatch:
+  - `apps/agent-runtime/xclaw_agent/hedera_hts_plugin.py`
+  - `apps/agent-runtime/xclaw_agent/bridges/hedera_hts_bridge.py`
+- Chain config gates:
+  - `config/chains/*.json`
+- Regression coverage:
+  - `apps/agent-runtime/tests/test_liquidity_cli.py`

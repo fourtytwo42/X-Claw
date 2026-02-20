@@ -43,5 +43,13 @@
     "verifiedAt": "2026-02-20T00:00:00.000Z",
     "verifiedViaRpc": true,
     "verifiedChainIdHex": "0x1869f"
+  },
+  "liquidityOperations": {
+    "claimFees": {
+      "legacyEnabled": false
+    },
+    "claimRewards": {
+      "legacyEnabled": false
+    }
   }
 }

@@ -4218,3 +4218,41 @@ Limitations / notes:
   - `ethereum_sepolia`, `ethereum`, `base_mainnet`, `arbitrum_mainnet`, `op_mainnet`,
     `polygon_mainnet`, `avalanche_mainnet`, `bnb_mainnet`, `zksync_mainnet`,
     `unichain_mainnet`, `monad_mainnet`.
+
+## 85) Slice 105 Cross-Chain Liquidity Claims Contract (Locked)
+
+1. Scope:
+- Normalize `liquidity claim-fees` and `liquidity claim-rewards` behavior across all configured chains.
+- Keep agent runtime wallet as execution source of truth.
+
+2. Provider orchestration lock:
+- On chains with `liquidityProviders.primary=uniswap_api`, runtime attempts Uniswap first.
+- Runtime may fallback to legacy claim path only when both are true:
+  - chain `liquidityOperations.<op>.legacyEnabled=true`, and
+  - resolved adapter reports operation support.
+- If primary/fallback are unavailable, fail closed with deterministic `no_execution_provider_available`.
+
+3. Legacy claim contract:
+- New chain config keys:
+  - `liquidityOperations.claimFees.legacyEnabled`
+  - `liquidityOperations.claimRewards.legacyEnabled`
+- Defaults are `false` unless chain-specific claim implementation is verified.
+
+4. Deterministic error contract additions:
+- `claim_fees_not_supported_for_protocol`
+- `claim_rewards_not_configured`
+- `claim_rewards_not_supported_for_protocol`
+- `no_execution_provider_available` (existing)
+
+5. Behavior locks:
+- AMM v2-style fee claim remains deterministic unsupported (no synthetic alias to remove).
+- Non-Uniswap rewards claim remains fail-closed until chain-specific rewards path is configured.
+- Disabled/no-liquidity chains remain fail-closed; no fake enablement.
+
+6. Provenance lock:
+- `liquidity claim-fees` and `liquidity claim-rewards` must always surface:
+  - `providerRequested`
+  - `providerUsed`
+  - `fallbackUsed`
+  - `fallbackReason`
+  - `uniswapLpOperation` (set when Uniswap path executes)

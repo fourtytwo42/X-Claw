@@ -57,5 +57,13 @@
   "liquidityProviders": {
     "primary": "uniswap_api",
     "fallback": "legacy_router"
+  },
+  "liquidityOperations": {
+    "claimFees": {
+      "legacyEnabled": false
+    },
+    "claimRewards": {
+      "legacyEnabled": false
+    }
   }
 }

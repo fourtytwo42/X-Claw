@@ -137,8 +137,10 @@ def _transfer_tinybar_amount(action: str) -> int:
 
 def _execute_hts_action(request: dict[str, Any]) -> dict[str, Any]:
     action = str(request.get("action") or "").strip().lower()
-    if action not in {"add", "remove"}:
+    if action not in {"add", "remove", "claim_fees", "claim_rewards"}:
         raise BridgeError("unsupported_action")
+    if action in {"claim_fees", "claim_rewards"}:
+        raise BridgeError(f"{action}_not_configured")
     chain = str(request.get("chain") or "").strip()
     if not chain:
         raise BridgeError("missing_chain")

@@ -12,7 +12,7 @@ if str(RUNTIME_ROOT) not in sys.path:
     sys.path.insert(0, str(RUNTIME_ROOT))
 
 from xclaw_agent import cli  # noqa: E402
-from xclaw_agent.liquidity_adapter import HederaSdkUnavailable  # noqa: E402
+from xclaw_agent.liquidity_adapter import HederaSdkUnavailable, LiquidityAdapter, HederaHtsLiquidityAdapter  # noqa: E402
 
 
 class LiquidityCliTests(unittest.TestCase):
@@ -819,6 +819,111 @@ class LiquidityCliTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(payload.get("providerUsed"), "uniswap_api")
         self.assertEqual(payload.get("uniswapLpOperation"), "claim_rewards")
+
+    def test_liquidity_claim_fees_falls_back_to_legacy_when_uniswap_fails(self) -> None:
+        args = argparse.Namespace(
+            chain="ethereum_sepolia",
+            dex="uniswap_v3",
+            position_id="123",
+            collect_as_weth=False,
+            json=True,
+        )
+        with mock.patch.object(cli, "assert_chain_capability"), mock.patch.object(
+            cli, "_liquidity_provider_settings", return_value=("uniswap_api", "legacy_router")
+        ), mock.patch.object(
+            cli, "load_wallet_store", return_value={}
+        ), mock.patch.object(
+            cli, "_execution_wallet", return_value=("0x" + "11" * 20, "0x" + "22" * 32)
+        ), mock.patch.object(
+            cli, "_uniswap_lp_call_via_proxy", side_effect=RuntimeError("upstream down")
+        ), mock.patch.object(
+            cli, "_legacy_liquidity_operation_available", return_value=True
+        ), mock.patch.object(
+            cli, "_execute_legacy_liquidity_operation", return_value={"txHash": "0x" + "aa" * 32}
+        ):
+            code, payload = self._run(lambda: cli.cmd_liquidity_claim_fees(args))
+        self.assertEqual(code, 0)
+        self.assertEqual(payload.get("providerUsed"), "legacy_router")
+        self.assertEqual(payload.get("fallbackUsed"), True)
+
+    def test_liquidity_claim_fees_non_uniswap_unsupported(self) -> None:
+        args = argparse.Namespace(
+            chain="base_sepolia",
+            dex="aerodrome",
+            position_id="123",
+            collect_as_weth=False,
+            json=True,
+        )
+        with mock.patch.object(cli, "assert_chain_capability"), mock.patch.object(
+            cli, "_liquidity_provider_settings", return_value=("legacy_router", "legacy_router")
+        ), mock.patch.object(
+            cli,
+            "_execute_legacy_liquidity_operation",
+            side_effect=cli.WalletStoreError("claim_fees_not_supported_for_protocol: legacy claim-fees is not enabled for this chain."),
+        ):
+            code, payload = self._run(lambda: cli.cmd_liquidity_claim_fees(args))
+        self.assertEqual(code, 1)
+        self.assertEqual(payload.get("code"), "claim_fees_not_supported_for_protocol")
+
+    def test_liquidity_claim_rewards_falls_back_to_legacy_when_uniswap_fails(self) -> None:
+        args = argparse.Namespace(
+            chain="ethereum_sepolia",
+            dex="uniswap_v3",
+            position_id="123",
+            reward_token="USDC",
+            request_json="",
+            json=True,
+        )
+        with mock.patch.object(cli, "assert_chain_capability"), mock.patch.object(
+            cli, "_uniswap_lp_operation_enabled", return_value=True
+        ), mock.patch.object(
+            cli, "_liquidity_provider_settings", return_value=("uniswap_api", "legacy_router")
+        ), mock.patch.object(
+            cli, "load_wallet_store", return_value={}
+        ), mock.patch.object(
+            cli, "_execution_wallet", return_value=("0x" + "11" * 20, "0x" + "22" * 32)
+        ), mock.patch.object(
+            cli, "_resolve_token_address", return_value="0x" + "44" * 20
+        ), mock.patch.object(
+            cli, "_uniswap_lp_call_via_proxy", side_effect=RuntimeError("upstream down")
+        ), mock.patch.object(
+            cli, "_legacy_liquidity_operation_available", return_value=True
+        ), mock.patch.object(
+            cli, "_execute_legacy_liquidity_operation", return_value={"txHash": "0x" + "bb" * 32}
+        ):
+            code, payload = self._run(lambda: cli.cmd_liquidity_claim_rewards(args))
+        self.assertEqual(code, 0)
+        self.assertEqual(payload.get("providerUsed"), "legacy_router")
+        self.assertEqual(payload.get("fallbackUsed"), True)
+
+    def test_liquidity_claim_rewards_non_uniswap_not_configured(self) -> None:
+        args = argparse.Namespace(
+            chain="hedera_testnet",
+            dex="hedera_hts",
+            position_id="123",
+            reward_token="",
+            request_json="",
+            json=True,
+        )
+        with mock.patch.object(cli, "assert_chain_capability"), mock.patch.object(
+            cli, "_liquidity_provider_settings", return_value=("legacy_router", "legacy_router")
+        ), mock.patch.object(
+            cli,
+            "_execute_legacy_liquidity_operation",
+            side_effect=cli.WalletStoreError("claim_rewards_not_configured: legacy claim-rewards is not configured for this chain."),
+        ):
+            code, payload = self._run(lambda: cli.cmd_liquidity_claim_rewards(args))
+        self.assertEqual(code, 1)
+        self.assertEqual(payload.get("code"), "claim_rewards_not_configured")
+
+    def test_liquidity_adapter_claim_methods_are_fail_closed(self) -> None:
+        adapter = LiquidityAdapter(chain="base_sepolia", dex="aerodrome", protocol_family="amm_v2", position_type="v2")
+        with self.assertRaisesRegex(Exception, "claim_fees_not_supported_for_protocol"):
+            adapter.claim_fees({"positionId": "1"})
+        with self.assertRaisesRegex(Exception, "claim_rewards_not_supported_for_protocol"):
+            adapter.claim_rewards({"positionId": "1"})
+        hts = HederaHtsLiquidityAdapter(chain="hedera_testnet", dex="hedera_hts", protocol_family="hedera_hts", position_type="v2")
+        self.assertTrue(hts.supports_operation("claim_fees"))
 
 
 if __name__ == "__main__":

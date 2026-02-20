@@ -100,5 +100,13 @@
   },
   "marketData": {
     "dexscreenerChainId": "base"
+  },
+  "liquidityOperations": {
+    "claimFees": {
+      "legacyEnabled": false
+    },
+    "claimRewards": {
+      "legacyEnabled": false
+    }
   }
 }

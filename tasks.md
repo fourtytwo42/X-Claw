@@ -3113,3 +3113,31 @@ Active slice context: `Slice 98`.
 - [x] `npm run build`.
 - [x] `pm2 restart all`.
 - [ ] Issue evidence post with commit hash(es).
+
+# Slice 105 Tasks: Cross-Chain Liquidity Claims (UTC 2026-02-20)
+
+## 1) Canonical/doc sync
+- [x] Add Slice 105 tracker entry in `docs/XCLAW_SLICE_TRACKER.md`.
+- [x] Add Slice 105 roadmap section in `docs/XCLAW_BUILD_ROADMAP.md`.
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` with cross-chain claim contract.
+- [x] Update handoff artifacts (`docs/CONTEXT_PACK.md`, `spec.md`, `tasks.md`, `acceptance.md`).
+
+## 2) Runtime and adapter implementation
+- [x] Refactor `cmd_liquidity_claim_fees` for provider orchestration + fallback.
+- [x] Refactor `cmd_liquidity_claim_rewards` for provider orchestration + fallback.
+- [x] Add adapter claim operation methods (`claim_fees`, `claim_rewards`) with fail-closed defaults.
+- [x] Add guarded claim action dispatch in Hedera plugin/bridge.
+- [x] Add per-chain config gates:
+  - [x] `liquidityOperations.claimFees.legacyEnabled`
+  - [x] `liquidityOperations.claimRewards.legacyEnabled`
+
+## 3) Validation/evidence
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v`.
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`.
+- [x] `npm run db:parity`.
+- [x] `npm run seed:reset`.
+- [x] `npm run seed:load`.
+- [x] `npm run seed:verify`.
+- [x] `npm run build`.
+- [x] `pm2 restart all`.
+- [ ] Issue evidence post with commit hash(es).

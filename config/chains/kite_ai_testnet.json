@@ -76,5 +76,13 @@
       "dexRouter": true,
       "router": true
     }
+  },
+  "liquidityOperations": {
+    "claimFees": {
+      "legacyEnabled": false
+    },
+    "claimRewards": {
+      "legacyEnabled": false
+    }
   }
 }
