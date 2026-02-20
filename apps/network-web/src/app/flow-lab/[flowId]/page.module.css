@@ -3,7 +3,7 @@
   margin: 0 auto;
   padding: 1.2rem 0.35rem 2.4rem;
   display: grid;
-  gap: 0.8rem;
+  gap: 0.82rem;
 }
 
 .hero {
@@ -30,7 +30,7 @@
 
 .hero h1 {
   margin: 0;
-  font-size: clamp(1.35rem, 3vw, 2.3rem);
+  font-size: clamp(1.35rem, 3vw, 2.25rem);
   line-height: 1.1;
   letter-spacing: -0.03em;
 }
@@ -92,38 +92,32 @@
 }
 
 .chartArea {
-  position: relative;
   border: 1px solid color-mix(in srgb, var(--line) 70%, var(--accent));
   border-radius: 15px;
   background: linear-gradient(160deg, color-mix(in srgb, var(--bg-elev-2) 88%, #0b1935), color-mix(in srgb, var(--bg-elev) 94%, #060f20));
-  overflow: hidden;
+  overflow: auto;
 }
 
-.edgesLayer {
-  position: absolute;
-  inset: 0;
+.graphSvg {
+  display: block;
   width: 100%;
-  height: 100%;
-  z-index: 3;
-  pointer-events: none;
+  height: auto;
 }
 
 .edgePath {
   fill: none;
-  stroke: color-mix(in srgb, var(--accent) 78%, var(--line));
-  stroke-width: 0.5;
-  stroke-dasharray: 2.2 1.6;
-  animation: flow 2.1s linear infinite;
+  stroke: color-mix(in srgb, var(--accent) 84%, var(--line));
+  stroke-width: 2.1;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 
 .edgeOk {
-  stroke: color-mix(in srgb, var(--ok) 75%, var(--line));
+  stroke: color-mix(in srgb, var(--ok) 80%, var(--line));
 }
 
 .edgeWarn {
-  stroke: color-mix(in srgb, var(--warn) 80%, var(--line));
+  stroke: color-mix(in srgb, var(--warn) 82%, var(--line));
 }
 
 .edgeArrow {
@@ -132,50 +126,42 @@
 
 .edgeLabel {
   fill: var(--text-muted);
-  font-size: 1.95px;
+  font-size: 14px;
   font-family: var(--font-mono);
   paint-order: stroke;
-  stroke: color-mix(in srgb, var(--bg-elev) 95%, black);
-  stroke-width: 0.35px;
+  stroke: color-mix(in srgb, var(--bg-elev) 96%, black);
+  stroke-width: 4px;
+  stroke-linejoin: round;
 }
 
-.node {
-  position: absolute;
-  transform: translate(-50%, -50%);
-  width: min(190px, 20vw);
-  min-height: 84px;
-  border: 1px solid color-mix(in srgb, var(--line-strong) 76%, var(--line));
-  border-radius: 13px;
-  background: color-mix(in srgb, var(--bg-glass) 94%, transparent);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
-  padding: 0.48rem 0.52rem;
-  display: grid;
-  gap: 0.26rem;
-  z-index: 2;
+.nodeRect {
+  fill: color-mix(in srgb, var(--bg-glass) 96%, transparent);
+  stroke: color-mix(in srgb, var(--line-strong) 78%, var(--line));
+  stroke-width: 1.4;
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.24));
+}
+
+.nodeOkRect {
+  fill: color-mix(in srgb, var(--ok) 11%, var(--bg-glass));
+  stroke: color-mix(in srgb, var(--ok) 60%, var(--line));
+}
+
+.nodeWarnRect {
+  fill: color-mix(in srgb, var(--warn) 11%, var(--bg-glass));
+  stroke: color-mix(in srgb, var(--warn) 62%, var(--line));
 }
 
 .nodeStep {
+  fill: color-mix(in srgb, var(--accent) 88%, var(--text));
+  font-size: 11px;
   font-family: var(--font-mono);
-  font-size: 0.67rem;
-  letter-spacing: 0.09em;
-  color: color-mix(in srgb, var(--accent) 86%, var(--text));
+  letter-spacing: 0.1em;
 }
 
-.node h2 {
-  margin: 0;
-  font-size: 0.8rem;
-  line-height: 1.3;
+.nodeTitle {
+  fill: var(--text);
+  font-size: 15px;
   font-weight: 600;
-}
-
-.nodeOk {
-  border-color: color-mix(in srgb, var(--ok) 56%, var(--line));
-  background: color-mix(in srgb, var(--ok) 11%, var(--bg-glass));
-}
-
-.nodeWarn {
-  border-color: color-mix(in srgb, var(--warn) 58%, var(--line));
-  background: color-mix(in srgb, var(--warn) 12%, var(--bg-glass));
 }
 
 .textSection {
@@ -253,21 +239,6 @@
   text-transform: uppercase;
 }
 
-@keyframes flow {
-  from {
-    stroke-dashoffset: 0;
-  }
-  to {
-    stroke-dashoffset: -8;
-  }
-}
-
-@media (max-width: 1100px) {
-  .node {
-    width: min(170px, 24vw);
-  }
-}
-
 @media (max-width: 920px) {
   .hero {
     flex-direction: column;
@@ -277,12 +248,8 @@
     justify-items: start;
   }
 
-  .chartArea {
-    min-height: 640px;
-  }
-
-  .node {
-    width: 160px;
+  .graphSvg {
+    min-width: 1100px;
   }
 }
 
@@ -291,34 +258,11 @@
     padding: 0.95rem 0.15rem 2rem;
   }
 
-  .chartArea {
-    min-height: 700px;
-  }
-
-  .edgesLayer {
-    display: none;
-  }
-
-  .node {
-    width: min(240px, 84vw);
-    position: static;
-    transform: none;
-    margin: 0.5rem auto;
-  }
-
-  .chartArea {
-    display: grid;
-    align-content: start;
-    padding: 0.35rem 0;
-  }
-
   .pager {
     flex-direction: column;
   }
-}
 
-@media (prefers-reduced-motion: reduce) {
-  .edgePath {
-    animation: none;
+  .nodeTitle {
+    font-size: 14px;
   }
 }

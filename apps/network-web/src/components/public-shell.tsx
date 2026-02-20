@@ -2,10 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 
-import { ChainHeaderControl } from '@/components/chain-header-control';
-import { ManagementHeaderControls } from '@/components/management-header-controls';
 import { PrimaryNav } from '@/components/primary-nav';
-import { ThemeToggle } from '@/components/theme-toggle';
 
 export function PublicShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -28,22 +25,7 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="primary-shell">
-      <PrimaryNav
-        desktopExtra={
-          <>
-            <ChainHeaderControl />
-            <ManagementHeaderControls />
-            <ThemeToggle />
-          </>
-        }
-        mobileMoreContent={
-          <>
-            <ChainHeaderControl />
-            <ManagementHeaderControls />
-            <ThemeToggle />
-          </>
-        }
-      />
+      <PrimaryNav />
       <main className="primary-shell-content">{children}</main>
     </div>
   );
