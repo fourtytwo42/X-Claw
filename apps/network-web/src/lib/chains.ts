@@ -43,6 +43,8 @@ export type ChainConfig = {
   uniswapApi?: {
     enabled?: boolean;
     liquidityEnabled?: boolean;
+    migrateEnabled?: boolean;
+    claimRewardsEnabled?: boolean;
   };
   marketData?: {
     dexscreenerChainId?: string;

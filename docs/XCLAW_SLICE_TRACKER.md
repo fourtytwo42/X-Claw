@@ -1972,3 +1972,28 @@ DoD:
 - [x] openapi + schema artifacts updated for LP proxy routes and liquidity status provenance fields.
 - [x] required gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
 - [x] issue #45 updated with verification evidence + commit hash(es).
+
+## Slice 103: Uniswap LP Completion (Migrate + Claim Rewards)
+Status: [~]
+Issue: #46
+
+Goal:
+- Complete remaining Uniswap LP operations (`migrate`, `claim_rewards`) using proxy-first runtime execution with deterministic fallback semantics.
+
+DoD:
+- [x] add server-side Uniswap LP proxy routes:
+  - `POST /api/v1/agent/liquidity/uniswap/migrate`
+  - `POST /api/v1/agent/liquidity/uniswap/claim-rewards`
+- [x] add request schemas:
+  - `uniswap-lp-migrate-request.schema.json`
+  - `uniswap-lp-claim-rewards-request.schema.json`
+- [x] runtime command additions:
+  - `liquidity migrate`
+  - `liquidity claim-rewards`
+- [x] runtime outputs include provenance fields for new operations.
+- [x] liquidity status schema supports `uniswapLpOperation` values `migrate` and `claim_rewards`.
+- [x] stage-gated rollout config:
+  - `ethereum_sepolia` has `uniswapApi.migrateEnabled=true` and `claimRewardsEnabled=true`
+  - mainnet targets set `migrateEnabled=false` and `claimRewardsEnabled=false` pending promotion.
+- [x] required gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
+- [ ] issue #46 updated with verification evidence + commit hash(es).

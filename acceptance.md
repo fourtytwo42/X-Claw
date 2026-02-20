@@ -5348,6 +5348,44 @@ Date (UTC): 2026-02-19
 - `npm run build` -> PASS
 - `pm2 restart all` -> PASS
 
+## Slice 103 Uniswap LP Completion (UTC 2026-02-20)
+
+### Implementation evidence
+- Proxy/helper extensions:
+  - `apps/network-web/src/lib/uniswap-lp-proxy.ts`
+    - added `migrateLpUniswap(...)`
+    - added `claimLpRewardsUniswap(...)`
+    - added operation-level gate helper `isUniswapLpOperationEnabled(...)`
+- New agent-auth routes:
+  - `apps/network-web/src/app/api/v1/agent/liquidity/uniswap/migrate/route.ts`
+  - `apps/network-web/src/app/api/v1/agent/liquidity/uniswap/claim-rewards/route.ts`
+- New schemas:
+  - `packages/shared-schemas/json/uniswap-lp-migrate-request.schema.json`
+  - `packages/shared-schemas/json/uniswap-lp-claim-rewards-request.schema.json`
+- Runtime commands:
+  - `apps/agent-runtime/xclaw_agent/cli.py`
+    - `cmd_liquidity_migrate`
+    - `cmd_liquidity_claim_rewards`
+    - parser entries for `liquidity migrate` and `liquidity claim-rewards`
+    - operation-level chain gates via `uniswapApi.{migrateEnabled,claimRewardsEnabled}`
+- Status/contracts:
+  - `packages/shared-schemas/json/liquidity-status.schema.json` extends `uniswapLpOperation` enum with `migrate`, `claim_rewards`
+  - `apps/network-web/src/app/api/v1/liquidity/[intentId]/status/route.ts` typed union updated
+  - `docs/api/openapi.v1.yaml` adds both new routes and schema components
+- Stage rollout flags:
+  - `config/chains/ethereum_sepolia.json`: `migrateEnabled=true`, `claimRewardsEnabled=true`
+  - mainnet targets set `migrateEnabled=false`, `claimRewardsEnabled=false` (stage-gated)
+
+### Validation status
+- `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v` -> PASS.
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS.
+- `npm run db:parity` -> PASS
+- `npm run seed:reset` -> PASS
+- `npm run seed:load` -> PASS
+- `npm run seed:verify` -> PASS
+- `npm run build` -> PASS
+- `pm2 restart all` -> PASS
+
 ## Slice 102 Uniswap LP Core Integration (UTC 2026-02-20)
 
 ### Implementation evidence

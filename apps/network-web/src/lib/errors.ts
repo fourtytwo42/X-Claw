@@ -26,6 +26,8 @@ export type ApiErrorCode =
   | 'uniswap_upstream_unavailable'
   | 'uniswap_upstream_error'
   | 'uniswap_payload_invalid'
+  | 'uniswap_migrate_not_supported_on_chain'
+  | 'uniswap_claim_rewards_not_supported_on_chain'
   | 'faucet_config_invalid'
   | 'faucet_fee_too_low_for_chain'
   | 'faucet_native_insufficient'

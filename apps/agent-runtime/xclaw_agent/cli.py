@@ -6720,6 +6720,207 @@ def cmd_liquidity_claim_fees(args: argparse.Namespace) -> int:
         return fail("liquidity_claim_fees_failed", str(exc), "Inspect runtime liquidity fee-claim path and retry.", {"chain": chain, "dex": dex, "positionId": position_id}, exit_code=1)
 
 
+def cmd_liquidity_migrate(args: argparse.Namespace) -> int:
+    chk = require_json_flag(args)
+    if chk is not None:
+        return chk
+    chain = str(args.chain or "").strip()
+    dex = str(args.dex or "").strip().lower()
+    position_id = str(args.position_id or "").strip()
+    from_protocol = str(args.from_protocol or "").strip().upper()
+    to_protocol = str(args.to_protocol or "").strip().upper()
+    try:
+        assert_chain_capability(chain, "liquidity")
+        if not position_id:
+            return fail("invalid_input", "position-id is required.", "Provide --position-id and retry.", {"chain": chain}, exit_code=2)
+        if from_protocol not in {"V2", "V3", "V4"} or to_protocol not in {"V2", "V3", "V4"}:
+            return fail(
+                "invalid_input",
+                "from-protocol and to-protocol must be one of V2|V3|V4.",
+                "Provide valid protocol versions and retry.",
+                {"fromProtocol": from_protocol, "toProtocol": to_protocol},
+                exit_code=2,
+            )
+        slippage_bps = int(args.slippage_bps)
+        if slippage_bps < 0 or slippage_bps > 5000:
+            return fail("invalid_input", "slippage-bps must be between 0 and 5000.", "Use integer bps in range.", {"slippageBps": args.slippage_bps}, exit_code=2)
+        if not _uniswap_lp_operation_enabled(chain, "migrate"):
+            return fail(
+                "uniswap_migrate_not_supported_on_chain",
+                f"Uniswap LP migrate is not enabled on chain '{chain}'.",
+                "Use ethereum_sepolia or wait for staged rollout on this chain.",
+                {"chain": chain},
+                exit_code=2,
+            )
+        provider_requested, _ = _liquidity_provider_settings(chain)
+        fallback_used = False
+        fallback_reason: dict[str, str] | None = None
+        if provider_requested != "uniswap_api":
+            return fail(
+                "no_execution_provider_available",
+                "Liquidity migrate currently requires uniswap_api provider on this chain.",
+                "Enable Uniswap LP migrate for this chain.",
+                {"chain": chain, "providerRequested": provider_requested},
+                exit_code=2,
+            )
+
+        store = load_wallet_store()
+        wallet_address, private_key_hex = _execution_wallet(store, chain)
+        request_payload: dict[str, Any] = {
+            "tokenId": position_id,
+            "inputProtocol": from_protocol,
+            "outputProtocol": to_protocol,
+            "slippageTolerance": slippage_bps,
+        }
+        request_json = str(args.request_json or "").strip()
+        if request_json:
+            extra = json.loads(request_json)
+            if not isinstance(extra, dict):
+                raise WalletStoreError("request-json must decode to an object.")
+            request_payload.update(extra)
+
+        try:
+            migrate_result = _uniswap_lp_call_via_proxy(chain, wallet_address, "/agent/liquidity/uniswap/migrate", request_payload)
+            migrate_hashes = _execute_uniswap_lp_transactions(
+                chain, wallet_address, private_key_hex, list(migrate_result.get("transactions") or []), "uniswap lp migrate"
+            )
+            if not migrate_hashes:
+                raise WalletStoreError("uniswap_payload_invalid: migrate produced no executable transactions.")
+            provider_used = "uniswap_api"
+        except Exception as exc:
+            if _legacy_liquidity_operation_available(chain, dex, "v2", "migrate"):
+                fallback_used = True
+                fallback_reason = _fallback_reason("uniswap_migrate_failed", str(exc))
+            else:
+                raise WalletStoreError(f"no_execution_provider_available: {exc}") from exc
+            return fail(
+                "no_execution_provider_available",
+                "Liquidity migrate failed on uniswap_api and no fallback provider is available.",
+                "Retry later or use a chain with migrate fallback support.",
+                {"chain": chain, "fallbackReason": fallback_reason},
+                exit_code=1,
+            )
+
+        tx_hash = migrate_hashes[-1]
+        return ok(
+            "Liquidity position migrated.",
+            chain=chain,
+            dex=dex,
+            positionId=position_id,
+            txHash=tx_hash,
+            operationTxHashes=migrate_hashes,
+            providerRequested=provider_requested,
+            providerUsed=provider_used,
+            fallbackUsed=fallback_used,
+            fallbackReason=fallback_reason,
+            uniswapLpOperation="migrate",
+            fromProtocol=from_protocol,
+            toProtocol=to_protocol,
+        )
+    except ChainRegistryError as exc:
+        return fail("unsupported_chain_capability", str(exc), chain_supported_hint(), {"chain": chain, "requiredCapability": "liquidity"}, exit_code=2)
+    except WalletStoreError as exc:
+        return fail("liquidity_migrate_failed", str(exc), "Verify Uniswap LP migrate configuration and retry.", {"chain": chain, "dex": dex, "positionId": position_id}, exit_code=1)
+    except Exception as exc:
+        return fail("liquidity_migrate_failed", str(exc), "Inspect runtime liquidity migrate path and retry.", {"chain": chain, "dex": dex, "positionId": position_id}, exit_code=1)
+
+
+def cmd_liquidity_claim_rewards(args: argparse.Namespace) -> int:
+    chk = require_json_flag(args)
+    if chk is not None:
+        return chk
+    chain = str(args.chain or "").strip()
+    dex = str(args.dex or "").strip().lower()
+    position_id = str(args.position_id or "").strip()
+    try:
+        assert_chain_capability(chain, "liquidity")
+        if not position_id:
+            return fail("invalid_input", "position-id is required.", "Provide --position-id and retry.", {"chain": chain}, exit_code=2)
+        if not _uniswap_lp_operation_enabled(chain, "claim_rewards"):
+            return fail(
+                "uniswap_claim_rewards_not_supported_on_chain",
+                f"Uniswap LP claim-rewards is not enabled on chain '{chain}'.",
+                "Use ethereum_sepolia or wait for staged rollout on this chain.",
+                {"chain": chain},
+                exit_code=2,
+            )
+        provider_requested, _ = _liquidity_provider_settings(chain)
+        fallback_used = False
+        fallback_reason: dict[str, str] | None = None
+        if provider_requested != "uniswap_api":
+            return fail(
+                "no_execution_provider_available",
+                "Liquidity claim-rewards currently requires uniswap_api provider on this chain.",
+                "Enable Uniswap LP claim-rewards for this chain.",
+                {"chain": chain, "providerRequested": provider_requested},
+                exit_code=2,
+            )
+
+        store = load_wallet_store()
+        wallet_address, private_key_hex = _execution_wallet(store, chain)
+        request_payload: dict[str, Any] = {"positionId": position_id}
+        reward_token = str(args.reward_token or "").strip()
+        if reward_token:
+            request_payload["tokens"] = [_resolve_token_address(chain, reward_token)]
+        request_json = str(args.request_json or "").strip()
+        if request_json:
+            extra = json.loads(request_json)
+            if not isinstance(extra, dict):
+                raise WalletStoreError("request-json must decode to an object.")
+            request_payload.update(extra)
+        if "tokens" not in request_payload:
+            return fail(
+                "invalid_input",
+                "claim-rewards requires --reward-token or --request-json with tokens.",
+                "Provide a reward token symbol/address or full request payload.",
+                {"chain": chain, "positionId": position_id},
+                exit_code=2,
+            )
+
+        try:
+            claim_result = _uniswap_lp_call_via_proxy(chain, wallet_address, "/agent/liquidity/uniswap/claim-rewards", request_payload)
+            claim_hashes = _execute_uniswap_lp_transactions(
+                chain, wallet_address, private_key_hex, list(claim_result.get("transactions") or []), "uniswap lp claim rewards"
+            )
+            if not claim_hashes:
+                raise WalletStoreError("uniswap_payload_invalid: claim-rewards produced no executable transactions.")
+            provider_used = "uniswap_api"
+        except Exception as exc:
+            if _legacy_liquidity_operation_available(chain, dex, "v2", "claim_rewards"):
+                fallback_used = True
+                fallback_reason = _fallback_reason("uniswap_claim_rewards_failed", str(exc))
+            else:
+                raise WalletStoreError(f"no_execution_provider_available: {exc}") from exc
+            return fail(
+                "no_execution_provider_available",
+                "Liquidity claim-rewards failed on uniswap_api and no fallback provider is available.",
+                "Retry later or use a chain with claim-rewards fallback support.",
+                {"chain": chain, "fallbackReason": fallback_reason},
+                exit_code=1,
+            )
+
+        tx_hash = claim_hashes[-1]
+        return ok(
+            "Liquidity rewards claimed.",
+            chain=chain,
+            dex=dex,
+            positionId=position_id,
+            txHash=tx_hash,
+            operationTxHashes=claim_hashes,
+            providerRequested=provider_requested,
+            providerUsed=provider_used,
+            fallbackUsed=fallback_used,
+            fallbackReason=fallback_reason,
+            uniswapLpOperation="claim_rewards",
+        )
+    except ChainRegistryError as exc:
+        return fail("unsupported_chain_capability", str(exc), chain_supported_hint(), {"chain": chain, "requiredCapability": "liquidity"}, exit_code=2)
+    except WalletStoreError as exc:
+        return fail("liquidity_claim_rewards_failed", str(exc), "Verify Uniswap LP claim-rewards configuration and retry.", {"chain": chain, "dex": dex, "positionId": position_id}, exit_code=1)
+    except Exception as exc:
+        return fail("liquidity_claim_rewards_failed", str(exc), "Inspect runtime liquidity claim-rewards path and retry.", {"chain": chain, "dex": dex, "positionId": position_id}, exit_code=1)
+
+
 def _run_liquidity_execute_inline(liquidity_intent_id: str, chain: str) -> tuple[int, dict[str, Any]]:
     nested = argparse.Namespace(intent=liquidity_intent_id, chain=chain, json=True)
     buf = io.StringIO()
@@ -7134,6 +7335,26 @@ def _legacy_liquidity_provider_available(chain: str, dex: str, position_type: st
     except Exception:
         return False
     return adapter.protocol_family in {"amm_v2", "hedera_hts"}
+
+
+def _legacy_liquidity_operation_available(chain: str, dex: str, position_type: str, operation: str) -> bool:
+    op = str(operation or "").strip().lower()
+    if op in {"add", "remove", "increase", "claim", "claim_fees"}:
+        return _legacy_liquidity_provider_available(chain, dex, position_type)
+    return False
+
+
+def _uniswap_lp_operation_enabled(chain: str, operation: str) -> bool:
+    cfg = _load_chain_config(chain)
+    uniswap_cfg = cfg.get("uniswapApi")
+    if not isinstance(uniswap_cfg, dict):
+        return False
+    op = str(operation or "").strip().lower()
+    if op == "migrate":
+        return bool(uniswap_cfg.get("migrateEnabled"))
+    if op in {"claim_rewards", "claim-rewards"}:
+        return bool(uniswap_cfg.get("claimRewardsEnabled"))
+    return bool(uniswap_cfg.get("liquidityEnabled"))
 
 
 def _uniswap_quote_via_proxy(
@@ -11697,6 +11918,26 @@ def build_parser() -> argparse.ArgumentParser:
     liquidity_claim_fees.add_argument("--collect-as-weth", action="store_true")
     liquidity_claim_fees.add_argument("--json", action="store_true")
     liquidity_claim_fees.set_defaults(func=cmd_liquidity_claim_fees)
+
+    liquidity_migrate = liquidity_sub.add_parser("migrate")
+    liquidity_migrate.add_argument("--chain", required=True)
+    liquidity_migrate.add_argument("--dex", required=True)
+    liquidity_migrate.add_argument("--position-id", required=True)
+    liquidity_migrate.add_argument("--from-protocol", required=True)
+    liquidity_migrate.add_argument("--to-protocol", required=True)
+    liquidity_migrate.add_argument("--slippage-bps", default=100)
+    liquidity_migrate.add_argument("--request-json")
+    liquidity_migrate.add_argument("--json", action="store_true")
+    liquidity_migrate.set_defaults(func=cmd_liquidity_migrate)
+
+    liquidity_claim_rewards = liquidity_sub.add_parser("claim-rewards")
+    liquidity_claim_rewards.add_argument("--chain", required=True)
+    liquidity_claim_rewards.add_argument("--dex", required=True)
+    liquidity_claim_rewards.add_argument("--position-id", required=True)
+    liquidity_claim_rewards.add_argument("--reward-token")
+    liquidity_claim_rewards.add_argument("--request-json")
+    liquidity_claim_rewards.add_argument("--json", action="store_true")
+    liquidity_claim_rewards.set_defaults(func=cmd_liquidity_claim_rewards)
 
     liquidity_positions = liquidity_sub.add_parser("positions")
     liquidity_positions.add_argument("--chain", required=True)

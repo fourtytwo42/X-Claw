@@ -744,6 +744,82 @@ class LiquidityCliTests(unittest.TestCase):
         self.assertEqual(checks.get("bridgeCommandSource"), "default")
         self.assertEqual(checks.get("bridgeCommandConfigured"), True)
 
+    def test_liquidity_migrate_success_uniswap(self) -> None:
+        args = argparse.Namespace(
+            chain="ethereum_sepolia",
+            dex="uniswap_v3",
+            position_id="123",
+            from_protocol="V3",
+            to_protocol="V4",
+            slippage_bps=100,
+            request_json="",
+            json=True,
+        )
+        with mock.patch.object(cli, "assert_chain_capability"), mock.patch.object(
+            cli, "_uniswap_lp_operation_enabled", return_value=True
+        ), mock.patch.object(
+            cli, "_liquidity_provider_settings", return_value=("uniswap_api", "legacy_router")
+        ), mock.patch.object(
+            cli, "load_wallet_store", return_value={}
+        ), mock.patch.object(
+            cli, "_execution_wallet", return_value=("0x" + "11" * 20, "0x" + "22" * 32)
+        ), mock.patch.object(
+            cli, "_uniswap_lp_call_via_proxy", return_value={"transactions": [{"to": "0x" + "33" * 20, "data": "0xdead", "value": "0"}]}
+        ), mock.patch.object(
+            cli, "_execute_uniswap_lp_transactions", return_value=["0x" + "ab" * 32]
+        ):
+            code, payload = self._run(lambda: cli.cmd_liquidity_migrate(args))
+        self.assertEqual(code, 0)
+        self.assertEqual(payload.get("providerUsed"), "uniswap_api")
+        self.assertEqual(payload.get("uniswapLpOperation"), "migrate")
+
+    def test_liquidity_migrate_not_enabled_on_chain(self) -> None:
+        args = argparse.Namespace(
+            chain="base_mainnet",
+            dex="uniswap_v3",
+            position_id="123",
+            from_protocol="V3",
+            to_protocol="V4",
+            slippage_bps=100,
+            request_json="",
+            json=True,
+        )
+        with mock.patch.object(cli, "assert_chain_capability"), mock.patch.object(
+            cli, "_uniswap_lp_operation_enabled", return_value=False
+        ):
+            code, payload = self._run(lambda: cli.cmd_liquidity_migrate(args))
+        self.assertEqual(code, 2)
+        self.assertEqual(payload.get("code"), "uniswap_migrate_not_supported_on_chain")
+
+    def test_liquidity_claim_rewards_success_uniswap(self) -> None:
+        args = argparse.Namespace(
+            chain="ethereum_sepolia",
+            dex="uniswap_v3",
+            position_id="123",
+            reward_token="USDC",
+            request_json="",
+            json=True,
+        )
+        with mock.patch.object(cli, "assert_chain_capability"), mock.patch.object(
+            cli, "_uniswap_lp_operation_enabled", return_value=True
+        ), mock.patch.object(
+            cli, "_liquidity_provider_settings", return_value=("uniswap_api", "legacy_router")
+        ), mock.patch.object(
+            cli, "load_wallet_store", return_value={}
+        ), mock.patch.object(
+            cli, "_execution_wallet", return_value=("0x" + "11" * 20, "0x" + "22" * 32)
+        ), mock.patch.object(
+            cli, "_resolve_token_address", return_value="0x" + "44" * 20
+        ), mock.patch.object(
+            cli, "_uniswap_lp_call_via_proxy", return_value={"transactions": [{"to": "0x" + "33" * 20, "data": "0xdead", "value": "0"}]}
+        ), mock.patch.object(
+            cli, "_execute_uniswap_lp_transactions", return_value=["0x" + "ab" * 32]
+        ):
+            code, payload = self._run(lambda: cli.cmd_liquidity_claim_rewards(args))
+        self.assertEqual(code, 0)
+        self.assertEqual(payload.get("providerUsed"), "uniswap_api")
+        self.assertEqual(payload.get("uniswapLpOperation"), "claim_rewards")
+
 
 if __name__ == "__main__":
     unittest.main()

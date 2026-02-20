@@ -22,7 +22,7 @@ type LiquidityStatusBody = {
   providerUsed?: 'uniswap_api' | 'legacy_router';
   fallbackUsed?: boolean;
   fallbackReason?: { code: string; message: string };
-  uniswapLpOperation?: 'approve' | 'create' | 'increase' | 'decrease' | 'claim';
+  uniswapLpOperation?: 'approve' | 'create' | 'increase' | 'decrease' | 'claim' | 'migrate' | 'claim_rewards';
   details?: Record<string, unknown>;
 };
 

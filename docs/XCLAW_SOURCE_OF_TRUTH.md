@@ -4139,3 +4139,51 @@ Limitations / notes:
   - `ethereum`, `ethereum_sepolia`, `unichain_mainnet`, `bnb_mainnet`, `polygon_mainnet`,
   - `base_mainnet`, `avalanche_mainnet`, `op_mainnet`, `arbitrum_mainnet`,
   - `zksync_mainnet`, `monad_mainnet`.
+
+## 83) Slice 103 Uniswap LP Completion Contract (Locked)
+
+1. Scope completion:
+- Add remaining Uniswap LP operations:
+  - `migrate`
+  - `claim_rewards`
+- Maintain existing proxy-first + fallback architecture from Slice 102.
+
+2. API proxy contract (agent-auth):
+- `POST /api/v1/agent/liquidity/uniswap/migrate`
+- `POST /api/v1/agent/liquidity/uniswap/claim-rewards`
+- Requests stay in canonical shape:
+  - `agentId`, `chainKey`, `walletAddress`, `request`.
+
+3. Runtime command contract:
+- Add:
+  - `liquidity migrate --chain <chain> --dex <dex> --position-id <id> --from-protocol <V2|V3|V4> --to-protocol <V2|V3|V4> [--slippage-bps] [--request-json <json>] --json`
+  - `liquidity claim-rewards --chain <chain> --dex <dex> --position-id <id> [--reward-token <symbol|address>] [--request-json <json>] --json`
+- Runtime continues to sign/send with agent wallet keys.
+
+4. Operation-level chain gating:
+- New config flags under `uniswapApi`:
+  - `migrateEnabled`
+  - `claimRewardsEnabled`
+- Stage-1 enablement is `ethereum_sepolia` only (`true/true`).
+- Mainnet targets remain disabled for these two operations until explicit promotion.
+
+5. Fallback contract:
+- Runtime attempts `uniswap_api` first when operation flag is enabled.
+- Fallback to legacy is only allowed when a valid legacy implementation exists for the operation.
+- If no valid fallback is available, fail closed with deterministic `no_execution_provider_available`.
+
+6. Deterministic errors:
+- `uniswap_migrate_not_supported_on_chain`
+- `uniswap_claim_rewards_not_supported_on_chain`
+- `uniswap_payload_invalid`
+- `uniswap_upstream_error`
+- `no_execution_provider_available`
+
+7. Provenance/status contract:
+- Runtime outputs for migrate/rewards include:
+  - `providerRequested`
+  - `providerUsed`
+  - `fallbackUsed`
+  - `fallbackReason`
+  - `uniswapLpOperation` (`migrate|claim_rewards`)
+- Liquidity status schema enum supports these new operation values for persisted details payloads.

@@ -39,7 +39,9 @@
   },
   "uniswapApi": {
     "enabled": true,
-    "liquidityEnabled": true
+    "liquidityEnabled": true,
+    "migrateEnabled": false,
+    "claimRewardsEnabled": false
   },
   "marketData": {
     "dexscreenerChainId": "zksync"

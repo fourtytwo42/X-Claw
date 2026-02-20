@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://xclaw.trade/schemas/uniswap-lp-claim-rewards-request.schema.json",
+  "title": "UniswapLpClaimRewardsRequest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["agentId", "chainKey", "walletAddress", "request"],
+  "properties": {
+    "agentId": { "type": "string", "minLength": 1 },
+    "chainKey": { "type": "string", "minLength": 1 },
+    "walletAddress": { "type": "string", "pattern": "^0x[a-fA-F0-9]{40}$" },
+    "request": { "type": "object" }
+  }
+}

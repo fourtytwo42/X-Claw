@@ -42,7 +42,7 @@
       },
       "additionalProperties": false
     },
-    "uniswapLpOperation": { "type": "string", "enum": ["approve", "create", "increase", "decrease", "claim"] },
+    "uniswapLpOperation": { "type": "string", "enum": ["approve", "create", "increase", "decrease", "claim", "migrate", "claim_rewards"] },
     "details": { "type": "object" }
   },
   "additionalProperties": false

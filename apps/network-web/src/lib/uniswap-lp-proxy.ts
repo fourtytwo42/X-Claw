@@ -27,7 +27,7 @@ type UniswapLpTx = {
 };
 
 type UniswapLpResult = {
-  operation: 'approve' | 'create' | 'increase' | 'decrease' | 'claim';
+  operation: 'approve' | 'create' | 'increase' | 'decrease' | 'claim' | 'migrate' | 'claim_rewards';
   transactions: UniswapLpTx[];
   raw: Record<string, unknown>;
 };
@@ -195,6 +195,20 @@ export function isUniswapLpEligibleChain(chainKey: string): boolean {
   return swapEnabled && lpEnabled;
 }
 
+export function isUniswapLpOperationEnabled(chainKey: string, operation: 'migrate' | 'claim_rewards'): boolean {
+  const cfg = getChainConfig(chainKey);
+  if (!cfg || cfg.enabled === false) {
+    return false;
+  }
+  if (!isUniswapLpEligibleChain(chainKey)) {
+    return false;
+  }
+  if (operation === 'migrate') {
+    return cfg.uniswapApi?.migrateEnabled === true;
+  }
+  return cfg.uniswapApi?.claimRewardsEnabled === true;
+}
+
 export async function approveLpUniswap(input: UniswapLpInput): Promise<UniswapLpResult> {
   const raw = await uniswapRequest('/lp/approve', withWalletAndChain(input));
   return collectTransactions(
@@ -232,4 +246,14 @@ export async function decreaseLpUniswap(input: UniswapLpInput): Promise<UniswapL
 export async function claimLpFeesUniswap(input: UniswapLpInput): Promise<UniswapLpResult> {
   const raw = await uniswapRequest('/lp/claim', withWalletAndChain(input));
   return collectTransactions(raw, ['claim'], 'claim', false);
+}
+
+export async function migrateLpUniswap(input: UniswapLpInput): Promise<UniswapLpResult> {
+  const raw = await uniswapRequest('/lp/migrate', withWalletAndChain(input));
+  return collectTransactions(raw, ['migrate', 'create', 'decrease'], 'migrate', false);
+}
+
+export async function claimLpRewardsUniswap(input: UniswapLpInput): Promise<UniswapLpResult> {
+  const raw = await uniswapRequest('/lp/claim-rewards', withWalletAndChain(input));
+  return collectTransactions(raw, ['claimRewards', 'claim'], 'claim_rewards', false);
 }

@@ -1396,3 +1396,28 @@ Extend Uniswap proxy-first execution to LP core operations (`approve/create/incr
 - Agent-auth LP routes: `apps/network-web/src/app/api/v1/agent/liquidity/uniswap/*/route.ts`
 - Contracts: `docs/api/openapi.v1.yaml`, `packages/shared-schemas/json/liquidity-status.schema.json`, `packages/shared-schemas/json/uniswap-lp-*.schema.json`
 - Chain config rollout: `config/chains/{ethereum,ethereum_sepolia,unichain_mainnet,bnb_mainnet,polygon_mainnet,base_mainnet,avalanche_mainnet,op_mainnet,arbitrum_mainnet,zksync_mainnet,monad_mainnet}.json`
+
+## Slice 103 Context Pack (2026-02-20): Uniswap LP Completion (Migrate + Claim Rewards)
+
+### Objective
+Complete Uniswap LP integration by adding `migrate` and `claim_rewards` with the same proxy-first/runtime-wallet execution model.
+
+### Constraints
+- Server-only Uniswap key custody.
+- Runtime wallet signs and broadcasts all transactions.
+- Stage-gated rollout: operation-level enablement starts at `ethereum_sepolia` only.
+- Fallback is allowed only when operation-specific legacy support exists.
+
+### Primary touchpoints
+- LP proxy client + new routes:
+  - `apps/network-web/src/lib/uniswap-lp-proxy.ts`
+  - `apps/network-web/src/app/api/v1/agent/liquidity/uniswap/{migrate,claim-rewards}/route.ts`
+- Runtime CLI:
+  - `apps/agent-runtime/xclaw_agent/cli.py` (`liquidity migrate`, `liquidity claim-rewards`)
+- Contracts:
+  - `docs/api/openapi.v1.yaml`
+  - `packages/shared-schemas/json/uniswap-lp-migrate-request.schema.json`
+  - `packages/shared-schemas/json/uniswap-lp-claim-rewards-request.schema.json`
+  - `packages/shared-schemas/json/liquidity-status.schema.json`
+- Stage flags:
+  - `config/chains/*.json` `uniswapApi.{migrateEnabled,claimRewardsEnabled}`

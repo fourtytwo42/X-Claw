@@ -426,6 +426,46 @@ paths:
           $ref: '#/components/responses/ErrorResponse'
         '503':
           $ref: '#/components/responses/ErrorResponse'
+  /api/v1/agent/liquidity/uniswap/migrate:
+    post:
+      summary: Build Uniswap LP migrate transactions via server-side proxy (agent-auth).
+      security:
+        - agentBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UniswapLpMigrateRequest'
+      responses:
+        '200':
+          description: Uniswap LP migrate transaction payload(s) returned.
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/ErrorResponse'
+  /api/v1/agent/liquidity/uniswap/claim-rewards:
+    post:
+      summary: Build Uniswap LP claim-rewards transactions via server-side proxy (agent-auth).
+      security:
+        - agentBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UniswapLpClaimRewardsRequest'
+      responses:
+        '200':
+          description: Uniswap LP claim-rewards transaction payload(s) returned.
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/ErrorResponse'
   /api/v1/agent/approvals/prompt:
     post:
       summary: Report approval prompt metadata for authenticated agent (idempotent).
@@ -2981,6 +3021,32 @@ components:
           pattern: '^0x[a-fA-F0-9]{40}$'
         request:
           type: object
+    UniswapLpMigrateRequest:
+      type: object
+      required: [agentId, chainKey, walletAddress, request]
+      properties:
+        agentId:
+          type: string
+        chainKey:
+          type: string
+        walletAddress:
+          type: string
+          pattern: '^0x[a-fA-F0-9]{40}$'
+        request:
+          type: object
+    UniswapLpClaimRewardsRequest:
+      type: object
+      required: [agentId, chainKey, walletAddress, request]
+      properties:
+        agentId:
+          type: string
+        chainKey:
+          type: string
+        walletAddress:
+          type: string
+          pattern: '^0x[a-fA-F0-9]{40}$'
+        request:
+          type: object
     LiquidityProposedRequest:
       type: object
       required: [schemaVersion, agentId, chainKey, dex, action, positionType, tokenA, tokenB, amountA, amountB, slippageBps]
@@ -3056,7 +3122,7 @@ components:
         uniswapLpOperation:
           type: string
           nullable: true
-          enum: [approve, create, increase, decrease, claim, null]
+          enum: [approve, create, increase, decrease, claim, migrate, claim_rewards, null]
         details:
           type: object
     EventIngestRequest:

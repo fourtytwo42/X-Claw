@@ -2959,6 +2959,23 @@ Implement Uniswap LP core operations through server-side proxy routes with runti
 3. LP provider precedence is `uniswap_api` then `legacy_router`.
 4. On Uniswap LP error and unavailable fallback, fail closed with deterministic code.
 
+## Slice 103: Uniswap LP Completion (Migrate + Claim Rewards)
+
+### Goal
+Implement remaining Uniswap LP operations (`migrate`, `claim_rewards`) using server proxy + runtime wallet execution, with operation-level staged chain enablement.
+
+### Non-goals
+1. Full LP web UX redesign.
+2. Non-repo chain onboarding.
+3. Forcing legacy support where no operation-specific fallback exists.
+
+### Constraints
+1. Operation-level chain flags:
+- `uniswapApi.migrateEnabled`
+- `uniswapApi.claimRewardsEnabled`
+2. Stage 1 enables these only on `ethereum_sepolia`.
+3. Runtime must emit provenance fields and deterministic fail-closed errors when no provider path is available.
+
 ## Locked scope
 1. `apps/network-web/src/app/api/v1/public/dashboard/trending-tokens/route.ts`
 2. `apps/network-web/src/app/dashboard/page.tsx`
