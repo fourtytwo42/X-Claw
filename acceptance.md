@@ -5347,3 +5347,44 @@ Date (UTC): 2026-02-19
 - `npm run seed:verify` -> PASS
 - `npm run build` -> PASS
 - `pm2 restart all` -> PASS
+
+## Slice 98 Chain Metadata Normalization + Truthful Capability Gating (UTC 2026-02-20)
+
+### Implementation evidence
+- Chain metadata normalization:
+  - `config/chains/adi_mainnet.json` and `config/chains/adi_testnet.json` now include chain IDs, RPC endpoints, explorer URLs, and source/verification blocks.
+  - `config/chains/og_mainnet.json` and `config/chains/og_testnet.json` now include chain IDs, RPC endpoints, explorer URLs, and source/verification blocks.
+  - `config/chains/kite_ai_mainnet.json` chain ID corrected to `2366` (live RPC-confirmed), naming normalized to `KiteAI Mainnet`.
+- Testnet naming normalization:
+  - `KiteAI Testnet`, `ADI Network AB Testnet`, `0G Galileo Testnet`.
+- Capability truth normalization:
+  - non-integrated chains (`base_mainnet`, `kite_ai_mainnet`, `adi_*`, `og_*`) now wallet-first only.
+  - unresolved `canton_mainnet` / `canton_testnet` disabled+hidden.
+- Runtime/web support surfaces updated:
+  - `apps/network-web/src/lib/ops-health.ts` now probes providers dynamically for enabled+visible chains with configured RPC URLs.
+  - `apps/network-web/src/lib/active-chain.ts` fallback registry expanded and normalized.
+  - `apps/network-web/src/app/dashboard/page.tsx` deterministic color map expanded for normalized chain set.
+
+### Runtime/API checks
+- `apps/agent-runtime/bin/xclaw-agent chains --json` -> PASS:
+  - `adi_mainnet`, `adi_testnet`, `og_mainnet`, `og_testnet`, `kite_ai_mainnet`, `kite_ai_testnet` present with normalized display names.
+  - `canton_mainnet` and `canton_testnet` absent from enabled chain list (disabled/hidden by contract).
+  - wallet-first capability gating confirmed for non-integrated chains (`trade/liquidity/limitOrders/x402/faucet/deposits=false`).
+- `GET /api/v1/public/chains` -> PASS:
+  - `adi_mainnet` (`chainId=36900`, explorer `https://explorer.adifoundation.ai`),
+  - `adi_testnet` (`chainId=99999`, explorer `https://exp.testnet.adifoundation.ai`),
+  - `og_mainnet` (`chainId=16661`, explorer `https://chainscan.0g.ai`),
+  - `og_testnet` (`chainId=16602`, explorer `https://chainscan-galileo.0g.ai`),
+  - `kite_ai_mainnet` (`chainId=2366`),
+  - `kite_ai_testnet` (`chainId=2368`, display `KiteAI Testnet`).
+- `GET /api/status` -> PASS:
+  - provider rows include all enabled+visible RPC-configured chains (`adi_*`, `base_*`, `ethereum*`, `hedera*`, `kite_ai*`, `og_*`).
+  - provider rows exclude disabled/hidden Canton chains.
+
+### Required gates
+- `npm run db:parity` -> PASS
+- `npm run seed:reset` -> PASS
+- `npm run seed:load` -> PASS
+- `npm run seed:verify` -> PASS
+- `npm run build` -> PASS
+- `pm2 restart all` -> PASS

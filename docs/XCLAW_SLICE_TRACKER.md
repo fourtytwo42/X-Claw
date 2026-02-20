@@ -1856,3 +1856,23 @@ DoD:
 - [x] runtime validation evidence captured for `chains --json` and isolated-home wallet create/address/health on both new chains.
 - [x] required repo gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
 - [x] issue #43 updated with verification evidence + commit hash(es).
+
+## Slice 98: Chain Metadata Normalization + Truthful Capability Gating
+Status: [~]
+Issue: #44
+
+Goal:
+- Ensure every enabled+visible chain has authoritative metadata (chainId/rpc/explorer/name) and truthful runtime capabilities; hide unresolved placeholders.
+
+DoD:
+- [x] docs sync first: source-of-truth + roadmap + tracker + wallet contract + spec/tasks/acceptance aligned to Slice 98 scope.
+- [x] ADI mainnet/testnet chain metadata populated (`chainId`, `rpc`, `explorer`, sources, live RPC verification evidence).
+- [x] 0G mainnet/testnet chain metadata populated (`chainId`, `rpc`, `explorer`, sources, live RPC verification evidence).
+- [x] Kite mainnet chain id corrected to live network (`2366`) and naming normalized.
+- [x] Testnet display names normalized to canonical labels (`KiteAI Testnet`, `ADI Network AB Testnet`, `0G Galileo Testnet`, etc.).
+- [x] non-integrated networks are wallet-first capability-gated (trade/liquidity/limit/x402/faucet/deposits disabled).
+- [x] unresolved Canton placeholder chains are disabled+hidden pending authoritative metadata.
+- [x] status provider probing is chain-config-driven for all enabled+visible chains with configured RPC URLs.
+- [x] runtime/web validation evidence captured (`chains`, public chains, status providers) reflecting normalized metadata.
+- [x] required repo gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
+- [ ] issue #44 updated with verification evidence + commit hash(es).

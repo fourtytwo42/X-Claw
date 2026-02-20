@@ -100,11 +100,19 @@ type ChartPoint = {
 };
 
 const FIXED_CHAIN_COLORS: Record<string, string> = {
+  adi_mainnet: '#059669',
+  adi_testnet: '#34d399',
   base_sepolia: '#3b82f6',
+  base_mainnet: '#1d4ed8',
   ethereum: '#2563eb',
   ethereum_sepolia: '#0ea5e9',
+  hedera_mainnet: '#111827',
+  hedera_testnet: '#4b5563',
   hardhat_local: '#f59e0b',
+  kite_ai_mainnet: '#f97316',
   kite_ai_testnet: '#22c55e',
+  og_mainnet: '#7c3aed',
+  og_testnet: '#a78bfa',
 };
 const FALLBACK_CHAIN_COLORS = ['#38bdf8', '#fb7185', '#34d399', '#fbbf24', '#a78bfa', '#f97316'];
 

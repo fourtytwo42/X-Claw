@@ -4,7 +4,7 @@
   "enabled": true,
   "uiVisible": true,
   "chainId": 8453,
-  "displayName": "Base",
+  "displayName": "Base Mainnet",
   "nativeCurrency": {
     "name": "Ether",
     "symbol": "ETH",
@@ -12,27 +12,37 @@
   },
   "explorerBaseUrl": "https://basescan.org",
   "rpc": {
-    "primary": "https://mainnet.base.org"
+    "primary": "https://mainnet.base.org",
+    "fallback": "https://base-rpc.publicnode.com"
   },
   "coreContracts": {
-    "dex": "uniswap_v3",
-    "deploymentStatus": "external",
-    "notes": "Wave-1 target. Enable after deployed contract/address verification."
+    "dex": "adapter_pending",
+    "deploymentStatus": "pending_verification",
+    "notes": "Wallet-first chain profile. Trade/liquidity activation remains blocked until router/factory/token metadata is verified."
   },
   "canonicalTokens": {},
   "capabilities": {
     "wallet": true,
-    "trade": true,
-    "liquidity": true,
-    "limitOrders": true,
+    "trade": false,
+    "liquidity": false,
+    "limitOrders": false,
     "x402": false,
     "faucet": false,
-    "deposits": true
+    "deposits": false
   },
-  "liquidityProtocols": {
-    "uniswap_v3": { "family": "amm_v3", "enabled": true },
-    "aerodrome": { "family": "amm_v2", "enabled": true }
+  "updatedAt": "2026-02-20T00:00:00.000Z",
+  "version": 1,
+  "sources": {
+    "networkInfo": [
+      "https://docs.base.org/chain/network-information"
+    ],
+    "rpcVerification": [
+      "eth_chainId https://mainnet.base.org -> 0x2105"
+    ]
   },
-  "updatedAt": "2026-02-19T00:00:00.000Z",
-  "version": 1
+  "verification": {
+    "verifiedAt": "2026-02-20T00:00:00.000Z",
+    "verifiedViaRpc": true,
+    "verifiedChainIdHex": "0x2105"
+  }
 }

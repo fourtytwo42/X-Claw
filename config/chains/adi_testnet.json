@@ -3,28 +3,45 @@
   "family": "evm",
   "enabled": true,
   "uiVisible": true,
-  "displayName": "ADI Testnet",
+  "chainId": 99999,
+  "displayName": "ADI Network AB Testnet",
   "nativeCurrency": {
     "name": "ADI",
     "symbol": "ADI",
     "decimals": 18
   },
-  "rpc": {},
+  "explorerBaseUrl": "https://exp.testnet.adifoundation.ai",
+  "rpc": {
+    "primary": "https://rpc.ab.testnet.adifoundation.ai"
+  },
   "coreContracts": {
     "dex": "adapter_pending",
     "deploymentStatus": "pending_verification",
-    "notes": "Post Wave-1 chain pack."
+    "notes": "Wallet-first chain profile. Trade/liquidity activation remains blocked until DEX router/factory and canonical token metadata are verified."
   },
   "canonicalTokens": {},
   "capabilities": {
     "wallet": true,
-    "trade": true,
-    "liquidity": true,
-    "limitOrders": true,
+    "trade": false,
+    "liquidity": false,
+    "limitOrders": false,
     "x402": false,
     "faucet": false,
-    "deposits": true
+    "deposits": false
   },
-  "updatedAt": "2026-02-19T00:00:00.000Z",
-  "version": 1
+  "updatedAt": "2026-02-20T00:00:00.000Z",
+  "version": 1,
+  "sources": {
+    "networkInfo": [
+      "https://adi-docs.readthedocs.io/en/latest/getting_started/network.html"
+    ],
+    "rpcVerification": [
+      "eth_chainId https://rpc.ab.testnet.adifoundation.ai -> 0x1869f"
+    ]
+  },
+  "verification": {
+    "verifiedAt": "2026-02-20T00:00:00.000Z",
+    "verifiedViaRpc": true,
+    "verifiedChainIdHex": "0x1869f"
+  }
 }

@@ -3,28 +3,46 @@
   "family": "evm",
   "enabled": true,
   "uiVisible": true,
-  "displayName": "ADI",
+  "chainId": 36900,
+  "displayName": "ADI Mainnet",
   "nativeCurrency": {
     "name": "ADI",
     "symbol": "ADI",
     "decimals": 18
   },
-  "rpc": {},
+  "explorerBaseUrl": "https://explorer.adifoundation.ai",
+  "rpc": {
+    "primary": "https://rpc.adifoundation.ai"
+  },
   "coreContracts": {
     "dex": "adapter_pending",
     "deploymentStatus": "pending_verification",
-    "notes": "Post Wave-1 chain pack."
+    "notes": "Wallet-first chain profile. Trade/liquidity activation remains blocked until DEX router/factory and canonical token metadata are verified."
   },
   "canonicalTokens": {},
   "capabilities": {
     "wallet": true,
-    "trade": true,
-    "liquidity": true,
-    "limitOrders": true,
+    "trade": false,
+    "liquidity": false,
+    "limitOrders": false,
     "x402": false,
     "faucet": false,
-    "deposits": true
+    "deposits": false
   },
-  "updatedAt": "2026-02-19T00:00:00.000Z",
-  "version": 1
+  "updatedAt": "2026-02-20T00:00:00.000Z",
+  "version": 1,
+  "sources": {
+    "networkInfo": [
+      "https://adi-docs.readthedocs.io/en/latest/getting_started/network.html",
+      "https://raw.githubusercontent.com/ethereum-lists/chains/master/_data/chains/eip155-36900.json"
+    ],
+    "rpcVerification": [
+      "eth_chainId https://rpc.adifoundation.ai -> 0x9024"
+    ]
+  },
+  "verification": {
+    "verifiedAt": "2026-02-20T00:00:00.000Z",
+    "verifiedViaRpc": true,
+    "verifiedChainIdHex": "0x9024"
+  }
 }

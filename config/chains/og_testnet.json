@@ -3,28 +3,45 @@
   "family": "evm",
   "enabled": true,
   "uiVisible": true,
-  "displayName": "0G Testnet",
+  "chainId": 16602,
+  "displayName": "0G Galileo Testnet",
   "nativeCurrency": {
     "name": "0G",
     "symbol": "0G",
     "decimals": 18
   },
-  "rpc": {},
+  "explorerBaseUrl": "https://chainscan-galileo.0g.ai",
+  "rpc": {
+    "primary": "https://evmrpc-testnet.0g.ai"
+  },
   "coreContracts": {
     "dex": "adapter_pending",
     "deploymentStatus": "pending_verification",
-    "notes": "Post Wave-1 chain pack."
+    "notes": "Wallet-first chain profile. Trade/liquidity activation remains blocked until DEX router/factory and canonical token metadata are verified."
   },
   "canonicalTokens": {},
   "capabilities": {
     "wallet": true,
-    "trade": true,
-    "liquidity": true,
-    "limitOrders": true,
+    "trade": false,
+    "liquidity": false,
+    "limitOrders": false,
     "x402": false,
     "faucet": false,
-    "deposits": true
+    "deposits": false
   },
-  "updatedAt": "2026-02-19T00:00:00.000Z",
-  "version": 1
+  "updatedAt": "2026-02-20T00:00:00.000Z",
+  "version": 1,
+  "sources": {
+    "chainMetadata": [
+      "https://raw.githubusercontent.com/ethereum-lists/chains/master/_data/chains/eip155-16602.json"
+    ],
+    "rpcVerification": [
+      "eth_chainId https://evmrpc-testnet.0g.ai -> 0x40da"
+    ]
+  },
+  "verification": {
+    "verifiedAt": "2026-02-20T00:00:00.000Z",
+    "verifiedViaRpc": true,
+    "verifiedChainIdHex": "0x40da"
+  }
 }

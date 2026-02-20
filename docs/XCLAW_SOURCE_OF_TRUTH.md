@@ -970,7 +970,7 @@ This section supersedes any earlier conflicting statements in this file.
 - Sensitive management writes rate limit is 10 req/min per agent/session.
 - `/api/health` and `/api/status` are both available.
 - Compatibility aliases `/api/v1/health` and `/api/v1/status` are available; canonical routes remain unversioned `/api/health` and `/api/status`.
-- `/api/status` is public and exposes provider names + health flags (no raw RPC URLs) for configured public chains in the status-provider allowlist (current scope includes `base_sepolia`, `kite_ai_testnet`, `ethereum`, and `ethereum_sepolia`; exclude local dev chains like `hardhat_local`).
+- `/api/status` is public and exposes provider names + health flags (no raw RPC URLs) for enabled+visible chains that define at least one RPC URL (`rpc.primary` or `rpc.fallback`). Local dev chains with `uiVisible=false` (for example `hardhat_local`) are excluded.
 - API versioning uses `/api/v1/...`.
 - Migrations are explicit runbook step only (not auto-run on startup).
 - Seed/demo data must be explicitly tagged and separated from runtime data.
@@ -3977,3 +3977,56 @@ Limitations / notes:
   - `https://raw.githubusercontent.com/ethereum-lists/chains/master/_data/chains/eip155-11155111.json`
 - Source for Uniswap V2 router/factory references:
   - `https://docs.uniswap.org/contracts/v2/reference/smart-contracts/v2-deployments`
+
+## 80) Slice 98 Chain Metadata Normalization + Truthful Capability Gating Contract (Locked)
+
+1. Scope boundary:
+- Normalize all enabled+visible chain entries so UI/runtime only advertise capabilities that are actually integrated.
+- Add authoritative chain metadata for previously placeholder chains where reliable RPC/explorer/chainId sources are available.
+- Disable unresolved placeholder chains that do not yet have authoritative EVM metadata.
+
+2. Naming contract:
+- Testnet display names must use canonical branded names (not generic placeholders) where source evidence exists.
+- Canonical examples in this slice:
+  - `Ethereum Sepolia`
+  - `Base Sepolia`
+  - `KiteAI Testnet`
+  - `Hedera Testnet`
+  - `ADI Network AB Testnet`
+  - `0G Galileo Testnet`
+
+3. Capability truth contract:
+- Chains with missing verified router/factory/canonical-token metadata must be wallet-first:
+  - `wallet=true`
+  - `trade=false`
+  - `liquidity=false`
+  - `limitOrders=false`
+  - `x402=false`
+  - `faucet=false`
+  - `deposits=false`
+- Chains may only advertise `trade/liquidity/limitOrders/deposits` after metadata and runtime path verification are complete.
+
+4. Chain metadata normalization delivered in this slice:
+- ADI mainnet/testnet:
+  - chain IDs and RPC/explorer fields populated from ADI docs + runtime RPC verification.
+- 0G mainnet/testnet:
+  - chain IDs and RPC/explorer fields populated from chain metadata sources + runtime RPC verification.
+- Kite mainnet:
+  - chain id corrected to live network chain id (`2366`).
+- Canton mainnet/testnet:
+  - disabled/hidden until authoritative EVM metadata exists.
+
+5. Status provider contract:
+- `/api/status` provider probing is dynamic and chain-config-driven:
+  - include enabled+visible chains with at least one configured RPC URL,
+  - exclude hidden/disabled chains.
+
+6. Evidence/source contract:
+- ADI network info:
+  - `https://adi-docs.readthedocs.io/en/latest/getting_started/network.html`
+- Chain metadata references:
+  - `https://raw.githubusercontent.com/ethereum-lists/chains/master/_data/chains/eip155-36900.json`
+  - `https://raw.githubusercontent.com/ethereum-lists/chains/master/_data/chains/eip155-16661.json`
+  - `https://raw.githubusercontent.com/ethereum-lists/chains/master/_data/chains/eip155-16602.json`
+  - `https://raw.githubusercontent.com/ethereum-lists/chains/master/_data/chains/eip155-2366.json`
+- Live RPC chain-id verification evidence is required in config `sources.rpcVerification` for each normalized chain.

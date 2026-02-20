@@ -3214,3 +3214,36 @@ Note:
   - [x] `npm run seed:verify`
   - [x] `npm run build`
   - [x] `pm2 restart all`
+
+## 98) Slice 98: Chain Metadata Normalization + Truthful Capability Gating
+
+### 98.1 Canonical/doc sync
+- [x] Add Slice 98 entries to `docs/XCLAW_SLICE_TRACKER.md` and this roadmap section.
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` with metadata-normalization + naming + capability-truth contract.
+- [x] Update `docs/api/WALLET_COMMAND_CONTRACT.md` chain-support wording to config-driven model.
+- [x] Update handoff artifacts: `spec.md`, `tasks.md`, `acceptance.md`.
+
+### 98.2 Implementation
+- [x] Populate ADI chain metadata:
+  - [x] `adi_mainnet` chain id/rpc/explorer from authoritative sources + live rpc chainId verification.
+  - [x] `adi_testnet` chain id/rpc/explorer from authoritative sources + live rpc chainId verification.
+- [x] Populate 0G chain metadata:
+  - [x] `og_mainnet` chain id/rpc/explorer + live rpc chainId verification.
+  - [x] `og_testnet` chain id/rpc/explorer + live rpc chainId verification.
+- [x] Correct `kite_ai_mainnet` chain id to `2366` and normalize display naming (`KiteAI Mainnet`).
+- [x] Normalize testnet names (`KiteAI Testnet`, `ADI Network AB Testnet`, `0G Galileo Testnet`).
+- [x] Set wallet-first capability gating for non-integrated chains (`base_mainnet`, `kite_ai_mainnet`, `adi_*`, `og_*`).
+- [x] Disable/hide unresolved Canton placeholders (`canton_mainnet`, `canton_testnet`).
+- [x] Update status provider probing in `apps/network-web/src/lib/ops-health.ts` to dynamic chain-config selection (enabled+visible+has-rpc).
+
+### 98.3 Validation + evidence
+- [x] `apps/agent-runtime/bin/xclaw-agent chains --json` reflects normalized chain metadata/capabilities.
+- [x] `/api/v1/public/chains` reflects canonical names and visible-chain set.
+- [x] `/api/status` providers include all enabled+visible chains with RPCs.
+- [ ] Required gates run sequentially:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `pm2 restart all`

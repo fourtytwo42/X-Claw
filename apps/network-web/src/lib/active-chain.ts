@@ -20,10 +20,18 @@ const REGISTRY_EVENT_NAME = 'xclaw:chain_registry_changed';
 const FALLBACK_CHAIN = 'base_sepolia';
 
 const FALLBACK_REGISTRY: ChainDescriptor[] = [
+  { chainKey: 'base_mainnet', displayName: 'Base Mainnet', nativeCurrency: { symbol: 'ETH' } },
   { chainKey: 'base_sepolia', displayName: 'Base Sepolia', nativeCurrency: { symbol: 'ETH' } },
+  { chainKey: 'hedera_mainnet', displayName: 'Hedera Mainnet', nativeCurrency: { symbol: 'HBAR' } },
+  { chainKey: 'hedera_testnet', displayName: 'Hedera Testnet', nativeCurrency: { symbol: 'HBAR' } },
   { chainKey: 'ethereum', displayName: 'Ethereum', nativeCurrency: { symbol: 'ETH' } },
   { chainKey: 'ethereum_sepolia', displayName: 'Ethereum Sepolia', nativeCurrency: { symbol: 'ETH' } },
-  { chainKey: 'kite_ai_testnet', displayName: 'Kite AI Testnet', nativeCurrency: { symbol: 'KITE' } },
+  { chainKey: 'kite_ai_mainnet', displayName: 'KiteAI Mainnet', nativeCurrency: { symbol: 'KITE' } },
+  { chainKey: 'kite_ai_testnet', displayName: 'KiteAI Testnet', nativeCurrency: { symbol: 'KITE' } },
+  { chainKey: 'adi_mainnet', displayName: 'ADI Mainnet', nativeCurrency: { symbol: 'ADI' } },
+  { chainKey: 'adi_testnet', displayName: 'ADI Network AB Testnet', nativeCurrency: { symbol: 'ADI' } },
+  { chainKey: 'og_mainnet', displayName: '0G Mainnet', nativeCurrency: { symbol: '0G' } },
+  { chainKey: 'og_testnet', displayName: '0G Galileo Testnet', nativeCurrency: { symbol: '0G' } },
 ];
 
 function loadRegistryFromStorage(): ChainDescriptor[] {

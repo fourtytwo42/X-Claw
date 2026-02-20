@@ -2763,3 +2763,54 @@ Add `ethereum` and `ethereum_sepolia` to the config-driven chain registry so wal
 - `npm run seed:verify`
 - `npm run build`
 - `pm2 restart all`
+
+---
+
+# Slice 98 Spec: Chain Metadata Normalization + Truthful Capability Gating (2026-02-20)
+
+## Goal
+Normalize enabled+visible chain metadata so every supported chain has authoritative naming/chain-id/rpc/explorer data and truthful capability flags. Remove unresolved placeholders from user-facing support surface.
+
+## Non-goals
+1. No new API endpoints.
+2. No forced trade enablement for chains lacking verified DEX/token metadata.
+3. No speculative chain metadata insertion without source evidence.
+
+## Locked scope
+1. `config/chains/adi_mainnet.json`
+2. `config/chains/adi_testnet.json`
+3. `config/chains/og_mainnet.json`
+4. `config/chains/og_testnet.json`
+5. `config/chains/base_mainnet.json`
+6. `config/chains/kite_ai_mainnet.json`
+7. `config/chains/kite_ai_testnet.json`
+8. `config/chains/canton_mainnet.json`
+9. `config/chains/canton_testnet.json`
+10. `apps/network-web/src/lib/ops-health.ts`
+11. `apps/network-web/src/lib/active-chain.ts`
+12. `apps/network-web/src/app/dashboard/page.tsx`
+13. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+14. `docs/XCLAW_BUILD_ROADMAP.md`
+15. `docs/XCLAW_SLICE_TRACKER.md`
+16. `docs/api/WALLET_COMMAND_CONTRACT.md`
+17. `spec.md`
+18. `tasks.md`
+19. `acceptance.md`
+
+## Acceptance checks
+- `apps/agent-runtime/bin/xclaw-agent chains --json`
+- `curl -sS http://127.0.0.1:3000/api/v1/public/chains`
+- `curl -sS http://127.0.0.1:3000/api/status`
+- RPC chain-id probes:
+  - `https://rpc.gokite.ai` -> `0x93e`
+  - `https://rpc-testnet.gokite.ai` -> `0x940`
+  - `https://evmrpc.0g.ai` -> `0x4115`
+  - `https://evmrpc-testnet.0g.ai` -> `0x40da`
+  - `https://rpc.adifoundation.ai` -> `0x9024`
+  - `https://rpc.ab.testnet.adifoundation.ai` -> `0x1869f`
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `pm2 restart all`

@@ -4,7 +4,7 @@
   "enabled": true,
   "uiVisible": true,
   "chainId": 2368,
-  "displayName": "Kite AI Testnet",
+  "displayName": "KiteAI Testnet",
   "nativeCurrency": {
     "name": "KITE",
     "symbol": "KITE",
@@ -24,7 +24,7 @@
     "quoter": null,
     "escrow": null,
     "escrowAbiVersion": null,
-    "notes": "Slice 83: Kite AI Testnet routing through verified UniswapV2Router02 compatible router."
+    "notes": "Slice 83: KiteAI Testnet routing through verified UniswapV2Router02-compatible router."
   },
   "canonicalTokens": {
     "WKITE": "0x3bC8f037691Ce1d28c0bB224BD33563b49F99dE8",
@@ -49,7 +49,7 @@
       "enabled": false
     }
   },
-  "updatedAt": "2026-02-17T23:10:00.000Z",
+  "updatedAt": "2026-02-20T00:00:00.000Z",
   "version": 1,
   "sources": {
     "rpcEndpoints": [
@@ -66,7 +66,7 @@
     ]
   },
   "verification": {
-    "verifiedAt": "2026-02-17T23:10:00.000Z",
+    "verifiedAt": "2026-02-20T00:00:00.000Z",
     "verifiedViaRpc": true,
     "verifiedChainIdHex": "0x940",
     "verifiedContractCodePresent": {

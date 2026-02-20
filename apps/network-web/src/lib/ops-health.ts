@@ -44,6 +44,8 @@ export type StatusSnapshot = {
 
 type ChainConfig = {
   chainKey: string;
+  enabled?: boolean;
+  uiVisible?: boolean;
   rpc?: {
     primary?: string | null;
     fallback?: string | null;
@@ -51,13 +53,6 @@ type ChainConfig = {
 };
 
 const HEARTBEAT_MISS_THRESHOLD_SECONDS = 180;
-const STATUS_PROVIDER_CHAIN_KEYS = new Set([
-  'base_sepolia',
-  'kite_ai_testnet',
-  'ethereum',
-  'ethereum_sepolia',
-]);
-
 function nowIso(): string {
   return new Date().toISOString();
 }
@@ -206,7 +201,15 @@ async function pingRpcProvider(chainKey: string, provider: 'primary' | 'fallback
 }
 
 async function checkProviders(): Promise<ProviderHealth[]> {
-  const configs = readChainConfigs().filter((cfg) => STATUS_PROVIDER_CHAIN_KEYS.has(cfg.chainKey));
+  const configs = readChainConfigs().filter((cfg) => {
+    if (!cfg.chainKey || cfg.enabled === false) {
+      return false;
+    }
+    if (cfg.uiVisible === false) {
+      return false;
+    }
+    return Boolean(cfg.rpc?.primary || cfg.rpc?.fallback);
+  });
   const probes: Array<Promise<ProviderHealth>> = [];
 
   for (const cfg of configs) {

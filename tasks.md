@@ -2857,3 +2857,30 @@ Active slice context: `Slice 97`.
 - [x] `/api/status` provider list includes both new chains.
 - [x] Required repo gates run sequentially.
 - [x] Issue #43 evidence posted with commit hash(es).
+
+# Slice 98 Tasks: Chain Metadata Normalization + Truthful Capability Gating (UTC 2026-02-20)
+
+Active slice context: `Slice 98`.
+
+## 1) Canonical sync
+- [x] Add Slice 98 tracker entry in `docs/XCLAW_SLICE_TRACKER.md`.
+- [x] Add Slice 98 roadmap section in `docs/XCLAW_BUILD_ROADMAP.md`.
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` with naming/capability/metadata normalization contract.
+- [x] Update `docs/api/WALLET_COMMAND_CONTRACT.md` with config-driven chain support wording.
+- [x] Update handoff artifacts (`spec.md`, `tasks.md`, `acceptance.md`).
+
+## 2) Implementation
+- [x] Fill ADI mainnet/testnet chainId/rpc/explorer from source-backed metadata and live RPC verification.
+- [x] Fill 0G mainnet/testnet chainId/rpc/explorer from source-backed metadata and live RPC verification.
+- [x] Correct Kite mainnet chain id and normalize Kite naming (`KiteAI Mainnet`, `KiteAI Testnet`).
+- [x] Normalize testnet names to canonical branding (`ADI Network AB Testnet`, `0G Galileo Testnet`).
+- [x] Set wallet-first capabilities for non-integrated chains (disable trade/liquidity/limit/x402/faucet/deposits).
+- [x] Disable/hide unresolved Canton placeholders pending authoritative metadata.
+- [x] Update status provider probing to dynamic enabled+visible+has-rpc selection.
+
+## 3) Validation/evidence
+- [x] `apps/agent-runtime/bin/xclaw-agent chains --json` reflects normalized metadata/capabilities.
+- [x] `/api/v1/public/chains` reflects normalized names and chain visibility.
+- [x] `/api/status` provider list reflects enabled+visible chains with RPCs.
+- [x] Required repo gates run sequentially.
+- [ ] Issue #44 evidence posted with commit hash(es).

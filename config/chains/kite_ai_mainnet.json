@@ -3,8 +3,8 @@
   "family": "evm",
   "enabled": true,
   "uiVisible": true,
-  "chainId": 2369,
-  "displayName": "Kite AI",
+  "chainId": 2366,
+  "displayName": "KiteAI Mainnet",
   "nativeCurrency": {
     "name": "KITE",
     "symbol": "KITE",
@@ -15,22 +15,34 @@
     "primary": "https://rpc.gokite.ai"
   },
   "coreContracts": {
-    "dex": "tesseract_univ2",
-    "deploymentStatus": "external"
+    "dex": "adapter_pending",
+    "deploymentStatus": "pending_verification",
+    "notes": "Wallet-first chain profile. Trade/liquidity activation remains blocked until mainnet router/factory/token metadata is verified."
   },
   "canonicalTokens": {},
   "capabilities": {
     "wallet": true,
-    "trade": true,
-    "liquidity": true,
-    "limitOrders": true,
-    "x402": true,
+    "trade": false,
+    "liquidity": false,
+    "limitOrders": false,
+    "x402": false,
     "faucet": false,
-    "deposits": true
+    "deposits": false
   },
-  "liquidityProtocols": {
-    "tesseract_univ2": { "family": "amm_v2", "enabled": true }
+  "updatedAt": "2026-02-20T00:00:00.000Z",
+  "version": 1,
+  "sources": {
+    "networkInfo": [
+      "https://docs.gokite.ai/kite-chain/1-getting-started/network-information",
+      "https://raw.githubusercontent.com/ethereum-lists/chains/master/_data/chains/eip155-2366.json"
+    ],
+    "rpcVerification": [
+      "eth_chainId https://rpc.gokite.ai -> 0x93e"
+    ]
   },
-  "updatedAt": "2026-02-19T00:00:00.000Z",
-  "version": 1
+  "verification": {
+    "verifiedAt": "2026-02-20T00:00:00.000Z",
+    "verifiedViaRpc": true,
+    "verifiedChainIdHex": "0x93e"
+  }
 }
