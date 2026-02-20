@@ -5905,9 +5905,38 @@ Active slice context: `Slice 117` in progress.
 - [x] Deposit poll path writes are tagged as comparator rows (`legacy_server_poller`) for dual-run visibility.
 
 ## Required Validation Gates
-- [ ] `npm run db:parity`
-- [ ] `npm run seed:reset`
-- [ ] `npm run seed:load`
-- [ ] `npm run seed:verify`
-- [ ] `npm run build`
-- [ ] `pm2 restart all`
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+
+## Hotfix B Closeout Evidence (UTC)
+- `2026-02-20T19:02:50Z` `node infrastructure/scripts/agent-confirmation-dualrun-evidence.mjs`
+  - PASS: `"ok": true`, `"passed": 12`, `"failed": 0`
+  - PASS checks include:
+    - `parity.migration_columns_and_constraints_present`
+    - `parity.deposit_poller_comparator_tagging_present`
+    - `crosstalk.trade_status_terminal_server_fanout_removed`
+    - `crosstalk.transfer_mirror_terminal_server_fanout_removed`
+    - `crosstalk.transfer_decision_terminal_server_fanout_removed`
+    - `negative.contract_wrong_agent_trade_update_rejected`
+    - `negative.contract_missing_txhash_rejected`
+    - `negative.contract_transfer_mirror_provenance_schema_validation`
+- `2026-02-20T19:02:55Z` `npm run db:parity`
+  - PASS: `"ok": true`
+  - Proof: migration list includes `0026_slice117_agent_watcher_provenance.sql`
+- `2026-02-20T19:02:57Z` `npm run seed:reset`
+  - PASS: `"ok": true`
+- `2026-02-20T19:02:58Z` `npm run seed:load`
+  - PASS: `"ok": true`
+  - Proof: `"seedMode": true`, `"totals":{"agents":6,"trades":11}`
+- `2026-02-20T19:03:00Z` `npm run seed:verify`
+  - PASS: `"ok": true`
+- `2026-02-20T19:03:10Z` `npm run build`
+  - PASS: `Compiled successfully`
+- `2026-02-20T19:03:13Z` `pm2 restart all`
+  - PASS: `[PM2] [xclaw-web](0) ✓` and process status `online`
+- `2026-02-20T19:03:22Z` `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+  - PASS: `Ran 119 tests` and `OK`

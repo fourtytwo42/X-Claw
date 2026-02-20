@@ -3430,9 +3430,9 @@ Active slice context: `Slice 117` in progress.
 - [x] Update handoff artifacts (`spec.md`, `tasks.md`, `acceptance.md`).
 
 ## 8) Validation
-- [ ] `npm run db:parity`
-- [ ] `npm run seed:reset`
-- [ ] `npm run seed:load`
-- [ ] `npm run seed:verify`
-- [ ] `npm run build`
-- [ ] `pm2 restart all`
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`

@@ -3760,4 +3760,4 @@ Note:
   - [x] `POST /api/v1/agent/transfer-approvals/mirror`
   - [x] terminal branch in `POST /api/v1/management/transfer-approvals/decision`
 - [x] Keep server deposit poller in dual-run comparator mode (`legacy_server_poller` tagging), while exposing watcher-authority metadata in management deposit response.
-- [ ] Add dedicated dual-run parity + cross-talk regression script evidence.
+- [x] Add dedicated dual-run parity + cross-talk regression script evidence.

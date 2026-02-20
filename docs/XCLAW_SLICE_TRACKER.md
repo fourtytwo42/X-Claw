@@ -2240,4 +2240,4 @@ DoD:
 - [x] server persists watcher provenance metadata for trade + transfer mirrors.
 - [x] terminal server synthetic fanout removed from trade/transfer status ingest paths.
 - [x] server deposit poll path marked/tagged as `legacy_server_poller` comparator during dual-run.
-- [ ] dual-run parity + cross-talk regression evidence captured.
+- [x] dual-run parity + cross-talk regression evidence captured.
