@@ -3860,3 +3860,48 @@ Limitations / notes:
   - `[X-CLAW WEB TRANSFER DECISION]`,
   - `[X-CLAW WEB TRANSFER RESULT]`.
 - Each synthetic envelope must include an explicit `Instruction:` line so the agent deterministically knows whether to send a user-facing confirmation.
+
+## 78) Slice 96 Wallet/Approval E2E Harness Contract (Locked)
+
+1. Scope boundary:
+- Harness executes real Base Sepolia runtime + management flows for wallet/approval behavior.
+- Harness is Python-first and must not require Node/npm command surfaces for agent-runtime invocation.
+- Harness uses management APIs as canonical approval decision driver for this slice.
+
+2. Runtime Telegram suppression contract:
+- Runtime env flag: `XCLAW_TEST_HARNESS_DISABLE_TELEGRAM`.
+- When enabled, runtime must skip Telegram prompt/decision message sends in trade/transfer/policy approval UX paths.
+- Suppression must be non-fatal and must not block canonical approval/execution state transitions.
+- Prompt cleanup paths should return deterministic non-fatal suppression semantics when this guard is active.
+
+3. Harness command contract:
+- Entrypoint:
+  - `python3 apps/agent-runtime/scripts/wallet_approval_harness.py --chain base_sepolia --agent-id <id> --bootstrap-token-file <path> --mode full --json-report <path>`
+- Config surface:
+  - `--scenario-set <smoke|full>` (default `full`)
+  - `--approve-driver <management_api>` (fixed for Slice 96)
+  - `--balance-tolerance-bps` (default `40`)
+  - `--balance-tolerance-floor-native` (default `0.0005`)
+  - `--balance-tolerance-floor-stable` (default `5`)
+
+4. Scenario coverage contract (full set):
+- trade approval pending -> approve -> resume -> terminal verification,
+- trade reject path (no execution),
+- pending dedupe reuse + post-terminal new trade id,
+- global approval mode toggle (`auto` vs `per_trade`),
+- per-token allowlist path (`approve-allowlist-token`) and revert,
+- transfer approvals (native + erc20 approve/deny),
+- outbound whitelist override behavior,
+- x402 hosted receive + outbound send loopback with management decision path,
+- liquidity add/remove approval lifecycle path,
+- pause -> `agent_paused` spend block -> resume recovery.
+
+5. Cleanup and balance convergence contract:
+- Harness must restore trade/transfer/outbound permission posture to pre-run snapshot.
+- Harness should attempt reverse-path rebalance actions after scenario execution.
+- Harness final balance check is tolerance-based (not exact equality) using bps + floor windows.
+
+6. Evidence/verification contract:
+- Required gates remain mandatory and sequential (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
+- Hardhat-local evidence must be captured before Base Sepolia evidence.
+- Harness report must include machine-readable per-scenario pass/fail outputs with failure details.

@@ -1275,3 +1275,27 @@ Issue mapping: `#32`
 - `apps/network-web/src/app/api/v1/liquidity/**/route.ts`
 - `apps/network-web/src/app/api/v1/management/agent-state/route.ts`
 - `apps/network-web/src/app/agents/[agentId]/page.tsx`
+
+# Slice 96 Context Addendum: Base Sepolia Wallet/Approval E2E Harness (UTC 2026-02-20)
+
+## Objective
+- Implement a deterministic Python-first end-to-end harness for wallet/approval behavior across trade, transfer, liquidity, x402, and pause/resume on Base Sepolia.
+- Add runtime Telegram suppression for harness runs.
+
+## Constraints
+- Canonical authority: `docs/XCLAW_SOURCE_OF_TRUTH.md`.
+- Approval driver for this harness slice is management API only.
+- No Node/npm requirement for invoking runtime harness command flow.
+- Hardhat-local evidence precedes external testnet evidence.
+
+## Expected touched artifacts
+- `apps/agent-runtime/xclaw_agent/cli.py`
+- `apps/agent-runtime/scripts/wallet_approval_harness.py`
+- `apps/agent-runtime/tests/test_trade_path.py`
+- `apps/agent-runtime/tests/test_wallet_approval_harness.py`
+- canonical docs/handoff files for Slice 96 sync.
+
+## Verification targets
+- runtime Telegram suppression guard behavior covered in unit tests.
+- harness unit tests for scenario parsing/tolerance/report flow.
+- required repo gates executed sequentially.

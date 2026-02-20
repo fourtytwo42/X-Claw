@@ -3122,3 +3122,35 @@ Note:
 - [x] Add ops scripts to audit/fix agent wallet mappings that match faucet signer addresses (`ops:faucet:audit-mappings`, `ops:faucet:fix-mapping`).
 - [x] Update bounty checklist evidence IDs for Hedera/0G/Kite.
 - [x] Post issue evidence + commit hashes for slices 90-95.
+
+## 96) Slice 96: Base Sepolia Wallet/Approval E2E Harness (Telegram-Suppressed)
+
+### 96.1 Canonical/doc sync
+- [x] Add Slice 96 goal/DoD + issue mapping to `docs/XCLAW_SLICE_TRACKER.md`.
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` with Telegram-suppressed harness contract and runtime env flag.
+- [x] Update handoff artifacts (`docs/CONTEXT_PACK.md`, `spec.md`, `tasks.md`, `acceptance.md`).
+
+### 96.2 Runtime + harness implementation
+- [x] Add runtime guard `XCLAW_TEST_HARNESS_DISABLE_TELEGRAM` to skip Telegram approval prompt/decision dispatch safely.
+- [x] Add harness script `apps/agent-runtime/scripts/wallet_approval_harness.py` with:
+  - [x] management session bootstrap (cookie + csrf),
+  - [x] scenario matrix execution,
+  - [x] management decision driver (`approve-driver=management_api`),
+  - [x] baseline policy restore,
+  - [x] tolerance-based balance convergence assertions,
+  - [x] json report emission.
+- [x] Add unit tests:
+  - [x] `apps/agent-runtime/tests/test_wallet_approval_harness.py`
+  - [x] `apps/agent-runtime/tests/test_trade_path.py` Telegram suppression coverage.
+
+### 96.3 Validation + evidence
+- [~] Hardhat-local subset evidence attempted before Base Sepolia; blocked by unavailable local hardhat RPC in this session.
+- [~] Base Sepolia harness full run captured with `XCLAW_TEST_HARNESS_DISABLE_TELEGRAM=1` (report generated, scenarios currently failing under reproducible runtime/server errors).
+- [ ] Required repo gates run sequentially:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `pm2 restart all`
+- [ ] Issue #42 updated with verification evidence + commit hash(es).

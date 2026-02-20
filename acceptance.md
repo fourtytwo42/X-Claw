@@ -5248,3 +5248,53 @@ Date (UTC): 2026-02-19
 - `python3 -m unittest apps/agent-runtime/tests/test_wallet_core.py -v`
 - `python3 -m unittest apps/agent-runtime/tests/test_x402_skill_wrapper.py -v`
 - `npm run test:tokens:mirror:contract`
+
+## Slice 96 Wallet/Approval E2E Harness (UTC 2026-02-20)
+
+### Implementation evidence
+- Added runtime Telegram suppression guard in `apps/agent-runtime/xclaw_agent/cli.py` (`XCLAW_TEST_HARNESS_DISABLE_TELEGRAM`).
+- Added harness entrypoint: `apps/agent-runtime/scripts/wallet_approval_harness.py`.
+- Added harness tests: `apps/agent-runtime/tests/test_wallet_approval_harness.py`.
+- Added Telegram suppression unit coverage in `apps/agent-runtime/tests/test_trade_path.py`.
+
+### Harness invocation contract
+- `python3 apps/agent-runtime/scripts/wallet_approval_harness.py --chain base_sepolia --agent-id <agent_id> --bootstrap-token-file <token_file> --mode full --scenario-set full --approve-driver management_api --balance-tolerance-bps 40 --balance-tolerance-floor-native 0.0005 --balance-tolerance-floor-stable 5 --json-report <path>`
+
+### Pending validation checklist
+- [ ] hardhat-local subset evidence captured.
+- [ ] base-sepolia full harness evidence captured with Telegram suppression enabled.
+- [ ] required repo gates completed sequentially.
+
+## Slice 96 Execution Evidence Update (UTC 2026-02-20)
+
+### Unit/runtime checks
+- `python3 -m unittest apps/agent-runtime/tests/test_wallet_approval_harness.py -v`
+  - result: PASS (4/4)
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+  - result: FAIL (2 baseline pre-existing failures outside Slice 96 scope)
+  - failures:
+    - `test_wallet_import_command_is_not_available`
+    - `test_wallet_remove_command_is_not_available`
+  - new Telegram suppression tests pass.
+
+### Required gates (sequential)
+- `npm run db:parity` -> PASS
+- `npm run seed:reset` -> PASS
+- `npm run seed:load` -> PASS
+- `npm run seed:verify` -> PASS
+- `npm run build` -> PASS
+- `pm2 restart all` -> PASS
+
+### Harness runs
+- Hardhat-local smoke attempt:
+  - command: `python3 apps/agent-runtime/scripts/wallet_approval_harness.py --base-url https://xclaw.trade --chain hardhat_local --agent-id ag_slice7 --bootstrap-token-file /tmp/ag_slice7-bootstrap-token-fresh.json --scenario-set smoke --approve-driver management_api --agent-api-key slice7_token_abc12345 --json-report /tmp/xclaw-slice96-hardhat-smoke.json`
+  - status: blocked/fail
+  - blocker: hardhat RPC unavailable (`127.0.0.1:8545` connection refused) in this session.
+
+- Base Sepolia full run:
+  - command: `python3 apps/agent-runtime/scripts/wallet_approval_harness.py --base-url https://xclaw.trade --chain base_sepolia --agent-id ag_slice7 --bootstrap-token-file /tmp/ag_slice7-bootstrap-token-fresh.json --scenario-set full --approve-driver management_api --agent-api-key slice7_token_abc12345 --wallet-passphrase passphrase-123 --json-report /tmp/xclaw-slice96-base-full.json`
+  - status: executed, non-zero result (`ok=false`)
+  - reproducible failures:
+    - `trade_*` scenarios fail with runtime `InvalidTag` in `trade_spot` path for this wallet context.
+    - permissions-update setup/restore failed with `500 internal_error` (requestIds observed: `req_fcc5dbe66cf70974`, `req_09220c0e580847ca`).
+  - report artifact: `/tmp/xclaw-slice96-base-full.json`.

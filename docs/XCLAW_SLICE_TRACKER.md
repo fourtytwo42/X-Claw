@@ -1822,3 +1822,19 @@ DoD:
 - [x] Hedera wallet balance visibility includes mirror-node discovered token holdings for the requested chain, so non-canonical owned tokens are surfaced in runtime `tokens[]`.
 - [x] Runtime/skill now support user-added token tracking by address (`wallet-track-token`, `wallet-untrack-token`, `wallet-tracked-tokens`), and tracked tokens are included in non-zero holdings + `wallet-send-token` symbol resolution (deterministic `token_symbol_ambiguous` on collisions).
 - [x] final docs sync + issue evidence posts with commit hashes.
+
+## Slice 96: Base Sepolia Wallet/Approval E2E Harness (Telegram-Suppressed)
+Status: [~]
+Issue: #42
+
+Goal:
+- Deliver a deterministic Python-first harness that executes real Base Sepolia wallet/approval flows (trade, transfer, liquidity, x402, pause/resume) with Telegram dispatch suppressed for test runs.
+
+DoD:
+- [~] runtime env gate `XCLAW_TEST_HARNESS_DISABLE_TELEGRAM` suppresses Telegram prompt/decision sends without affecting approval/execution state transitions.
+- [~] add harness entrypoint `apps/agent-runtime/scripts/wallet_approval_harness.py` with management-API approval driver.
+- [~] harness supports `--scenario-set smoke|full` and default `full`.
+- [~] harness validates tolerance-based end-balance convergence using configurable bps/floor args.
+- [~] harness covers trade pending approve/reject, dedupe, global/per-token policy transitions, transfer approvals, x402 loopback, liquidity approvals, and pause/resume block/recover behavior.
+- [~] add unit tests for harness planner/tolerance/runtime parsing and runtime Telegram suppression behavior.
+- [~] docs/handoff sync completed in same change (`source-of-truth`, roadmap, tracker, context/spec/tasks/acceptance).

@@ -942,6 +942,47 @@ class TradePathRuntimeTests(unittest.TestCase):
             )
         run_mock.assert_not_called()
 
+    def test_telegram_prompt_skips_when_harness_suppression_enabled(self) -> None:
+        with mock.patch.dict(os.environ, {"XCLAW_TEST_HARNESS_DISABLE_TELEGRAM": "1"}, clear=False), mock.patch.object(
+            cli, "_run_subprocess"
+        ) as run_mock:
+            cli._maybe_send_telegram_approval_prompt(
+                "trd_abc",
+                "base_sepolia",
+                {"amountInHuman": "5", "tokenInSymbol": "WETH", "tokenOutSymbol": "USDC"},
+            )
+        run_mock.assert_not_called()
+
+    def test_telegram_transfer_prompt_skips_when_harness_suppression_enabled(self) -> None:
+        with mock.patch.dict(os.environ, {"XCLAW_TEST_HARNESS_DISABLE_TELEGRAM": "1"}, clear=False), mock.patch.object(
+            cli, "_run_subprocess"
+        ) as run_mock:
+            cli._maybe_send_telegram_transfer_approval_prompt(
+                {
+                    "approvalId": "xfr_abc",
+                    "chainKey": "base_sepolia",
+                    "transferType": "token",
+                    "tokenSymbol": "WETH",
+                    "tokenDecimals": 18,
+                    "amountWei": "1000000000000000",
+                    "toAddress": "0x9099d24d55c105818b4e9ee117d87bc11063cf10",
+                }
+            )
+        run_mock.assert_not_called()
+
+    def test_telegram_policy_prompt_skips_when_harness_suppression_enabled(self) -> None:
+        with mock.patch.dict(os.environ, {"XCLAW_TEST_HARNESS_DISABLE_TELEGRAM": "1"}, clear=False), mock.patch.object(
+            cli, "_run_subprocess"
+        ) as run_mock:
+            cli._maybe_send_telegram_policy_approval_prompt(
+                {
+                    "policyApprovalId": "ppr_abc",
+                    "chainKey": "base_sepolia",
+                    "requestType": "global_approval_enable",
+                }
+            )
+        run_mock.assert_not_called()
+
     def test_extract_openclaw_message_id_accepts_nested_snake_case(self) -> None:
         stdout = json.dumps(
             {
@@ -1052,6 +1093,19 @@ class TradePathRuntimeTests(unittest.TestCase):
         self.assertIn("• Chain: `base_sepolia`", message)
         self.assertNotIn("0xC97e903056f679ea1Db80893008A92578aDfE609", message)
         self.assertNotIn("0x39A0C0D1b3dDcE1B49fAa5c6e1D300C14012F4E2", message)
+
+    def test_telegram_decision_message_skips_when_harness_suppression_enabled(self) -> None:
+        with mock.patch.dict(os.environ, {"XCLAW_TEST_HARNESS_DISABLE_TELEGRAM": "1"}, clear=False), mock.patch.object(
+            cli, "_run_subprocess"
+        ) as run_mock:
+            cli._maybe_send_telegram_decision_message(
+                trade_id="trd_1",
+                chain="base_sepolia",
+                decision="approved",
+                summary={"amountInHuman": "1", "tokenInSymbol": "WETH", "tokenOutSymbol": "USDC"},
+                trade={"amountIn": "1", "tokenIn": "WETH", "tokenOut": "USDC"},
+            )
+        run_mock.assert_not_called()
 
     def test_trade_spot_does_not_reuse_after_approval(self) -> None:
         # De-dupe only applies while approval is pending; once approved, a repeated identical request
@@ -2174,6 +2228,21 @@ class TradePathRuntimeTests(unittest.TestCase):
         self.assertEqual(result.get("code"), "buttons_cleared")
         remove_prompt.assert_called_once_with("trd_1")
         run_subprocess.assert_not_called()
+
+    def test_clear_telegram_approval_buttons_suppressed_in_harness_mode(self) -> None:
+        with mock.patch.dict(os.environ, {"XCLAW_TEST_HARNESS_DISABLE_TELEGRAM": "1"}, clear=False), mock.patch.object(
+            cli, "_get_approval_prompt", return_value={"channel": "telegram", "to": "telegram:123456", "messageId": "777"}
+        ), mock.patch.object(
+            cli, "_remove_approval_prompt"
+        ) as remove_prompt, mock.patch(
+            "urllib.request.urlopen"
+        ) as urlopen_mock:
+            result = cli._clear_telegram_approval_buttons("trade", "trd_1")
+        self.assertTrue(bool(result.get("ok")))
+        self.assertEqual(str(result.get("code")), "telegram_dispatch_suppressed")
+        self.assertEqual(str((result.get("promptCleanup") or {}).get("code")), "telegram_dispatch_suppressed")
+        remove_prompt.assert_called_once_with("trd_1")
+        urlopen_mock.assert_not_called()
 
     def test_approvals_decide_spot_invalid_decision_at_rejected(self) -> None:
         args = argparse.Namespace(

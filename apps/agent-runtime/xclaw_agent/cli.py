@@ -289,6 +289,13 @@ def _trade_approval_inline_wait_sec() -> int:
     return _env_positive_int("XCLAW_TRADE_APPROVAL_INLINE_WAIT_SEC", 2)
 
 
+def _telegram_dispatch_suppressed_for_harness() -> bool:
+    raw = (os.environ.get("XCLAW_TEST_HARNESS_DISABLE_TELEGRAM") or "").strip().lower()
+    if not raw:
+        return False
+    return raw not in {"0", "false", "off", "no", "disabled"}
+
+
 def _run_subprocess(cmd: list[str], *, timeout_sec: int, kind: str) -> subprocess.CompletedProcess[str]:
     try:
         return subprocess.run(cmd, text=True, capture_output=True, timeout=timeout_sec)
@@ -3088,6 +3095,8 @@ def _post_approval_prompt_metadata(trade_id: str, chain: str, to_addr: str, thre
         raise WalletStoreError(f"{code}: {message}")
 
 def _maybe_send_telegram_approval_prompt(trade_id: str, chain: str, summary: dict[str, Any] | None = None) -> None:
+    if _telegram_dispatch_suppressed_for_harness():
+        return
     # Avoid duplicate sends.
     existing = _get_approval_prompt(trade_id)
     if existing and str(existing.get("channel") or "") == "telegram":
@@ -3165,6 +3174,8 @@ def _maybe_send_telegram_approval_prompt(trade_id: str, chain: str, summary: dic
 
 
 def _maybe_send_telegram_transfer_approval_prompt(flow: dict[str, Any]) -> None:
+    if _telegram_dispatch_suppressed_for_harness():
+        return
     approval_id = str(flow.get("approvalId") or "").strip()
     chain = str(flow.get("chainKey") or "").strip()
     if not approval_id or not chain:
@@ -3250,6 +3261,8 @@ def _maybe_send_telegram_transfer_approval_prompt(flow: dict[str, Any]) -> None:
 
 
 def _maybe_send_telegram_policy_approval_prompt(flow: dict[str, Any]) -> None:
+    if _telegram_dispatch_suppressed_for_harness():
+        return
     approval_id = str(flow.get("policyApprovalId") or "").strip()
     chain = str(flow.get("chainKey") or "").strip()
     if not approval_id or not chain:
@@ -3347,6 +3360,8 @@ def _maybe_send_telegram_decision_message(
     Best-effort acknowledgement into the active Telegram chat when an approval is decided.
     This is advisory UX only and must never gate execution.
     """
+    if _telegram_dispatch_suppressed_for_harness():
+        return
     # Prefer the exact prompt destination when available; session-store "last delivery" can drift.
     chat_id = ""
     thread_id: str | None = None
@@ -3480,6 +3495,22 @@ def _approval_prompt_store_ops(subject_type: str) -> tuple[Any, Any]:
 
 
 def _clear_telegram_approval_buttons(subject_type: str, subject_id: str) -> dict[str, Any]:
+    if _telegram_dispatch_suppressed_for_harness():
+        get_prompt, remove_prompt = _approval_prompt_store_ops(subject_type)
+        entry = get_prompt(subject_id)
+        if entry:
+            remove_prompt(subject_id)
+        return {
+            "ok": True,
+            "code": "telegram_dispatch_suppressed",
+            "subjectType": subject_type,
+            "subjectId": subject_id,
+            "promptCleanup": {
+                "ok": True,
+                "code": "telegram_dispatch_suppressed",
+                "channel": "telegram",
+            },
+        }
     get_prompt, remove_prompt = _approval_prompt_store_ops(subject_type)
     entry = get_prompt(subject_id)
     if not entry:
