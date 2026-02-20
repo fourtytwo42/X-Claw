@@ -1948,7 +1948,7 @@ DoD:
 
 ## Slice 102: Uniswap LP Core Integration (Proxy-First + Fallback)
 Status: [~]
-Issue: #48
+Issue: #45
 
 Goal:
 - Extend Uniswap proxy-first execution from swaps into LP core operations (approve/create/increase/decrease/claim-fees) on repo-supported Uniswap chains, while preserving deterministic fallback behavior.
@@ -1971,4 +1971,4 @@ DoD:
   - `avalanche_mainnet`, `op_mainnet`, `arbitrum_mainnet`, `zksync_mainnet`, `monad_mainnet`.
 - [x] openapi + schema artifacts updated for LP proxy routes and liquidity status provenance fields.
 - [x] required gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
-- [ ] issue #48 updated with verification evidence + commit hash(es).
+- [ ] issue #45 updated with verification evidence + commit hash(es).
