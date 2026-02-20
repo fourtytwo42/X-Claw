@@ -4087,3 +4087,55 @@ Limitations / notes:
   - `npm run seed:verify`
   - `npm run build`
   - `pm2 restart all`
+
+## 82) Slice 102 Uniswap LP Core Execution Contract (Locked)
+
+1. Security boundary:
+- Uniswap API key remains server-only (`XCLAW_UNISWAP_API_KEY`).
+- Agent runtime/skill/web clients must never store or transmit the Uniswap API key.
+- Runtime can only access Uniswap LP operations through authenticated X-Claw proxy routes.
+
+2. LP proxy API surface (agent-auth):
+- `POST /api/v1/agent/liquidity/uniswap/approve`
+- `POST /api/v1/agent/liquidity/uniswap/create`
+- `POST /api/v1/agent/liquidity/uniswap/increase`
+- `POST /api/v1/agent/liquidity/uniswap/decrease`
+- `POST /api/v1/agent/liquidity/uniswap/claim-fees`
+- Proxy routes must validate payload shape, enforce eligible chain scope, and fail closed on malformed upstream responses.
+
+3. Runtime LP provider orchestration:
+- Provider resolution is chain-config-driven:
+  - `liquidityProviders.primary` (`uniswap_api|legacy_router`)
+  - `liquidityProviders.fallback` (`legacy_router|none`)
+- Supported-chain behavior:
+  - attempt `uniswap_api` first when configured,
+  - on any Uniswap LP proxy failure, fallback to legacy liquidity execution path when available.
+- Unsupported/no-fallback behavior:
+  - fail closed with deterministic `no_execution_provider_available`.
+
+4. LP operation scope in this slice:
+- In scope:
+  - `approve`, `create`, `increase`, `decrease`, `claim-fees`.
+- Out of scope:
+  - `migrate`, `claim_rewards`.
+
+5. Runtime command contract:
+- Existing:
+  - `liquidity add`, `liquidity remove`, `liquidity execute`.
+- Added:
+  - `liquidity increase --chain <chain> --dex <dex> --position-id <id> --token-a <token> --token-b <token> --amount-a <amt> --amount-b <amt> [--slippage-bps] --json`
+  - `liquidity claim-fees --chain <chain> --dex <dex> --position-id <id> [--collect-as-weth] --json`
+
+6. LP provenance contract (mandatory):
+- Runtime LP responses and persisted liquidity intent details must include:
+  - `providerRequested`
+  - `providerUsed`
+  - `fallbackUsed`
+  - `fallbackReason` (`code`, `message`) when fallback triggered
+  - `uniswapLpOperation` (`approve|create|increase|decrease|claim`)
+
+7. Chain scope for this slice:
+- Uniswap LP eligible chain scope in-repo:
+  - `ethereum`, `ethereum_sepolia`, `unichain_mainnet`, `bnb_mainnet`, `polygon_mainnet`,
+  - `base_mainnet`, `avalanche_mainnet`, `op_mainnet`, `arbitrum_mainnet`,
+  - `zksync_mainnet`, `monad_mainnet`.

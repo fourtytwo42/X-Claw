@@ -27,7 +27,7 @@
   "capabilities": {
     "wallet": true,
     "trade": true,
-    "liquidity": false,
+    "liquidity": true,
     "limitOrders": false,
     "x402": false,
     "faucet": false,
@@ -38,7 +38,8 @@
     "fallback": "legacy_router"
   },
   "uniswapApi": {
-    "enabled": true
+    "enabled": true,
+    "liquidityEnabled": true
   },
   "updatedAt": "2026-02-20T10:00:00.000Z",
   "version": 1,
@@ -57,5 +58,9 @@
   },
   "marketData": {
     "dexscreenerChainId": "base"
+  },
+  "liquidityProviders": {
+    "primary": "uniswap_api",
+    "fallback": "legacy_router"
   }
 }

@@ -1373,3 +1373,26 @@ Implement Uniswap API integration as server-side proxy execution for runtime tra
 - API routes: `/api/v1/agent/trade/uniswap/quote`, `/api/v1/agent/trade/uniswap/build`
 - Chain config rollout: requested Uniswap-supported chain set in `config/chains/`
 - Contracts/docs: `openapi.v1.yaml`, shared schemas, source-of-truth, tracker, roadmap, handoff artifacts.
+
+## Slice 102 Context Pack (2026-02-20): Uniswap LP Core (Proxy-First + Fallback)
+
+### Objective
+Extend Uniswap proxy-first execution to LP core operations (`approve/create/increase/decrease/claim-fees`) on repo-supported Uniswap chains while retaining legacy liquidity fallback when available.
+
+### Constraints
+- Uniswap API key remains server-only (`XCLAW_UNISWAP_API_KEY`).
+- Runtime/skill wallet remains execution/signing source of truth.
+- Fallback on any Uniswap LP proxy error; fail closed if neither provider can execute.
+- Scope excludes `migrate` and `claim_rewards`.
+
+### Decision locks
+- LP provider precedence: `uniswap_api` -> `legacy_router`.
+- LP provenance metadata must be present in runtime outputs and liquidity status details.
+- Chain rollout limited to repo-supported Uniswap LP chain set.
+
+### Primary touchpoints
+- Runtime orchestration + new commands: `apps/agent-runtime/xclaw_agent/cli.py`
+- Server LP proxy client: `apps/network-web/src/lib/uniswap-lp-proxy.ts`
+- Agent-auth LP routes: `apps/network-web/src/app/api/v1/agent/liquidity/uniswap/*/route.ts`
+- Contracts: `docs/api/openapi.v1.yaml`, `packages/shared-schemas/json/liquidity-status.schema.json`, `packages/shared-schemas/json/uniswap-lp-*.schema.json`
+- Chain config rollout: `config/chains/{ethereum,ethereum_sepolia,unichain_mainnet,bnb_mainnet,polygon_mainnet,base_mainnet,avalanche_mainnet,op_mainnet,arbitrum_mainnet,zksync_mainnet,monad_mainnet}.json`

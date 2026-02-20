@@ -26,7 +26,7 @@
   "capabilities": {
     "wallet": true,
     "trade": true,
-    "liquidity": false,
+    "liquidity": true,
     "limitOrders": false,
     "x402": false,
     "faucet": false,
@@ -37,7 +37,8 @@
     "fallback": "legacy_router"
   },
   "uniswapApi": {
-    "enabled": true
+    "enabled": true,
+    "liquidityEnabled": true
   },
   "marketData": {
     "dexscreenerChainId": "unichain"
@@ -48,5 +49,9 @@
     "chainMetadata": [
       "https://raw.githubusercontent.com/ethereum-lists/chains/master/_data/chains/eip155-130.json"
     ]
+  },
+  "liquidityProviders": {
+    "primary": "uniswap_api",
+    "fallback": "legacy_router"
   }
 }

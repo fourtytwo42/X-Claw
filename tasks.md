@@ -2992,3 +2992,52 @@ Active slice context: `Slice 98`.
 - [x] `npm run build`.
 - [x] `pm2 restart all`.
 - [ ] Issue evidence post with commit hash(es).
+
+# Slice 102 Tasks: Uniswap LP Core Integration (UTC 2026-02-20)
+
+## 1) Canonical/doc sync
+- [x] Add Slice 102 tracker entry in `docs/XCLAW_SLICE_TRACKER.md`.
+- [x] Add Slice 102 roadmap section in `docs/XCLAW_BUILD_ROADMAP.md`.
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` with LP proxy-first + fallback behavior.
+- [x] Update OpenAPI with LP proxy routes and liquidity provenance fields.
+- [x] Update handoff artifacts (`docs/CONTEXT_PACK.md`, `spec.md`, `tasks.md`, `acceptance.md`).
+
+## 2) Backend/runtime implementation
+- [x] Add Uniswap LP proxy helper `apps/network-web/src/lib/uniswap-lp-proxy.ts`.
+- [x] Add LP proxy routes:
+  - [x] `/api/v1/agent/liquidity/uniswap/approve`
+  - [x] `/api/v1/agent/liquidity/uniswap/create`
+  - [x] `/api/v1/agent/liquidity/uniswap/increase`
+  - [x] `/api/v1/agent/liquidity/uniswap/decrease`
+  - [x] `/api/v1/agent/liquidity/uniswap/claim-fees`
+- [x] Add runtime LP provider selector and fallback orchestration in `cmd_liquidity_add/remove/execute`.
+- [x] Add runtime commands:
+  - [x] `liquidity increase`
+  - [x] `liquidity claim-fees`
+- [x] Persist LP provider provenance in liquidity status details.
+- [x] Extend liquidity status schema contract with LP provenance fields.
+
+## 3) Chain rollout
+- [x] Enable LP provider config (`liquidityProviders`, `uniswapApi.liquidityEnabled`) and liquidity capability on:
+  - [x] `ethereum`
+  - [x] `ethereum_sepolia`
+  - [x] `unichain_mainnet`
+  - [x] `bnb_mainnet`
+  - [x] `polygon_mainnet`
+  - [x] `base_mainnet`
+  - [x] `avalanche_mainnet`
+  - [x] `op_mainnet`
+  - [x] `arbitrum_mainnet`
+  - [x] `zksync_mainnet`
+  - [x] `monad_mainnet`
+
+## 4) Validation/evidence
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v`.
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`.
+- [x] `npm run db:parity`.
+- [x] `npm run seed:reset`.
+- [x] `npm run seed:load`.
+- [x] `npm run seed:verify`.
+- [x] `npm run build`.
+- [x] `pm2 restart all`.
+- [ ] Issue evidence post with commit hash(es).

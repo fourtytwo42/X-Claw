@@ -5348,6 +5348,60 @@ Date (UTC): 2026-02-19
 - `npm run build` -> PASS
 - `pm2 restart all` -> PASS
 
+## Slice 102 Uniswap LP Core Integration (UTC 2026-02-20)
+
+### Implementation evidence
+- Added LP proxy helper:
+  - `apps/network-web/src/lib/uniswap-lp-proxy.ts`
+- Added agent-auth LP routes:
+  - `apps/network-web/src/app/api/v1/agent/liquidity/uniswap/approve/route.ts`
+  - `apps/network-web/src/app/api/v1/agent/liquidity/uniswap/create/route.ts`
+  - `apps/network-web/src/app/api/v1/agent/liquidity/uniswap/increase/route.ts`
+  - `apps/network-web/src/app/api/v1/agent/liquidity/uniswap/decrease/route.ts`
+  - `apps/network-web/src/app/api/v1/agent/liquidity/uniswap/claim-fees/route.ts`
+- Runtime LP orchestration + command surface:
+  - `apps/agent-runtime/xclaw_agent/cli.py`
+  - adds `liquidityProviders` selector, Uniswap-first LP path, legacy fallback path, and provenance output/details.
+  - adds commands:
+    - `xclaw-agent liquidity increase ... --json`
+    - `xclaw-agent liquidity claim-fees ... --json`
+- LP status provenance contract updates:
+  - `packages/shared-schemas/json/liquidity-status.schema.json`
+  - `apps/network-web/src/app/api/v1/liquidity/[intentId]/status/route.ts`
+- Chain rollout updates:
+  - `config/chains/ethereum.json`
+  - `config/chains/ethereum_sepolia.json`
+  - `config/chains/unichain_mainnet.json`
+  - `config/chains/bnb_mainnet.json`
+  - `config/chains/polygon_mainnet.json`
+  - `config/chains/base_mainnet.json`
+  - `config/chains/avalanche_mainnet.json`
+  - `config/chains/op_mainnet.json`
+  - `config/chains/arbitrum_mainnet.json`
+  - `config/chains/zksync_mainnet.json`
+  - `config/chains/monad_mainnet.json`
+- Canonical artifacts synced:
+  - `docs/api/openapi.v1.yaml`
+  - `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - `docs/XCLAW_SLICE_TRACKER.md`
+  - `docs/XCLAW_BUILD_ROADMAP.md`
+  - `docs/CONTEXT_PACK.md`
+  - `spec.md`
+  - `tasks.md`
+  - `acceptance.md`
+
+### Runtime tests
+- `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v` -> PASS.
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS.
+
+### Required gates
+- `npm run db:parity` -> PASS
+- `npm run seed:reset` -> PASS
+- `npm run seed:load` -> PASS
+- `npm run seed:verify` -> PASS
+- `npm run build` -> PASS
+- `pm2 restart all` -> PASS
+
 ## Slice 98 Chain Metadata Normalization + Truthful Capability Gating (UTC 2026-02-20)
 
 ### Implementation evidence

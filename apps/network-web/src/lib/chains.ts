@@ -36,8 +36,13 @@ export type ChainConfig = {
     primary?: 'uniswap_api' | 'legacy_router' | string;
     fallback?: 'legacy_router' | 'none' | string;
   };
+  liquidityProviders?: {
+    primary?: 'uniswap_api' | 'legacy_router' | string;
+    fallback?: 'legacy_router' | 'none' | string;
+  };
   uniswapApi?: {
     enabled?: boolean;
+    liquidityEnabled?: boolean;
   };
   marketData?: {
     dexscreenerChainId?: string;

@@ -18,6 +18,11 @@ type LiquidityStatusBody = {
   txHash?: string;
   positionId?: string;
   amountOut?: string | number;
+  providerRequested?: 'uniswap_api' | 'legacy_router';
+  providerUsed?: 'uniswap_api' | 'legacy_router';
+  fallbackUsed?: boolean;
+  fallbackReason?: { code: string; message: string };
+  uniswapLpOperation?: 'approve' | 'create' | 'increase' | 'decrease' | 'claim';
   details?: Record<string, unknown>;
 };
 
@@ -124,6 +129,23 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ intentId: 
         return { kind: 'transition_invalid' as const, currentStatus: current.status, requestedStatus: nextStatus };
       }
 
+      const detailsPatch: Record<string, unknown> = { ...(body.details ?? {}) };
+      if (body.providerRequested) {
+        detailsPatch.providerRequested = body.providerRequested;
+      }
+      if (body.providerUsed) {
+        detailsPatch.providerUsed = body.providerUsed;
+      }
+      if (body.fallbackUsed !== undefined) {
+        detailsPatch.fallbackUsed = body.fallbackUsed;
+      }
+      if (body.fallbackReason) {
+        detailsPatch.fallbackReason = body.fallbackReason;
+      }
+      if (body.uniswapLpOperation) {
+        detailsPatch.uniswapLpOperation = body.uniswapLpOperation;
+      }
+
       await client.query(
         `
         update liquidity_intents
@@ -146,7 +168,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ intentId: 
           body.txHash ?? null,
           body.amountOut !== undefined ? String(body.amountOut) : null,
           body.positionId ?? null,
-          JSON.stringify(body.details ?? {}),
+          JSON.stringify(detailsPatch),
         ]
       );
 

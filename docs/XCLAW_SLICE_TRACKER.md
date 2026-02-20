@@ -1945,3 +1945,30 @@ DoD:
 - [x] table/card rendering includes only columns with available data; section is hidden when selected chain has no mapped/unavailable data.
 - [x] required repo gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
 - [ ] issue #47 updated with verification evidence + commit hash(es).
+
+## Slice 102: Uniswap LP Core Integration (Proxy-First + Fallback)
+Status: [~]
+Issue: #48
+
+Goal:
+- Extend Uniswap proxy-first execution from swaps into LP core operations (approve/create/increase/decrease/claim-fees) on repo-supported Uniswap chains, while preserving deterministic fallback behavior.
+
+DoD:
+- [x] add server-side Uniswap LP proxy client and agent-auth routes:
+  - `POST /api/v1/agent/liquidity/uniswap/approve`
+  - `POST /api/v1/agent/liquidity/uniswap/create`
+  - `POST /api/v1/agent/liquidity/uniswap/increase`
+  - `POST /api/v1/agent/liquidity/uniswap/decrease`
+  - `POST /api/v1/agent/liquidity/uniswap/claim-fees`
+- [x] runtime LP provider selector added (`liquidityProviders.primary/fallback`) with Uniswap-first behavior.
+- [x] `liquidity add/remove/execute` support Uniswap-first execution and fallback to legacy when available.
+- [x] runtime adds LP commands:
+  - `liquidity increase`
+  - `liquidity claim-fees`
+- [x] LP provenance fields are surfaced in runtime outputs and persisted in liquidity intent `details`.
+- [x] chain rollout applied for repo-supported Uniswap chains:
+  - `ethereum`, `ethereum_sepolia`, `unichain_mainnet`, `bnb_mainnet`, `polygon_mainnet`, `base_mainnet`,
+  - `avalanche_mainnet`, `op_mainnet`, `arbitrum_mainnet`, `zksync_mainnet`, `monad_mainnet`.
+- [x] openapi + schema artifacts updated for LP proxy routes and liquidity status provenance fields.
+- [x] required gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
+- [ ] issue #48 updated with verification evidence + commit hash(es).

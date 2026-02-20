@@ -3359,3 +3359,40 @@ Note:
   - [x] `npm run build`
   - [x] `pm2 restart all`
 - [ ] Issue #47 evidence post + commit hash(es).
+
+## 102) Slice 102: Uniswap LP Core Integration (Proxy-First + Fallback)
+
+### 102.1 Canonical/doc sync
+- [x] Add Slice 102 entries to `docs/XCLAW_SLICE_TRACKER.md` and this roadmap section.
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` with Uniswap LP proxy + fallback contract.
+- [x] Update `docs/api/openapi.v1.yaml` with Uniswap LP proxy routes and liquidity status provenance fields.
+- [x] Update handoff artifacts: `docs/CONTEXT_PACK.md`, `spec.md`, `tasks.md`, `acceptance.md`.
+
+### 102.2 Implementation
+- [x] Add server-side LP proxy helper: `apps/network-web/src/lib/uniswap-lp-proxy.ts`.
+- [x] Add agent-auth LP proxy routes:
+  - [x] `/api/v1/agent/liquidity/uniswap/approve`
+  - [x] `/api/v1/agent/liquidity/uniswap/create`
+  - [x] `/api/v1/agent/liquidity/uniswap/increase`
+  - [x] `/api/v1/agent/liquidity/uniswap/decrease`
+  - [x] `/api/v1/agent/liquidity/uniswap/claim-fees`
+- [x] Runtime LP provider selector + fallback orchestration in `apps/agent-runtime/xclaw_agent/cli.py`.
+- [x] Runtime commands added:
+  - [x] `liquidity increase`
+  - [x] `liquidity claim-fees`
+- [x] LP provenance fields surfaced in runtime output and persisted in liquidity status details.
+- [x] Chain config rollout for target Uniswap LP scope:
+  - [x] `ethereum`, `ethereum_sepolia`, `unichain_mainnet`, `bnb_mainnet`, `polygon_mainnet`,
+  - [x] `base_mainnet`, `avalanche_mainnet`, `op_mainnet`, `arbitrum_mainnet`,
+  - [x] `zksync_mainnet`, `monad_mainnet`.
+
+### 102.3 Validation + evidence
+- [x] Runtime unit tests pass for LP provider path/fallback coverage.
+- [x] Required gates run sequentially:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `pm2 restart all`
+- [ ] Issue #48 evidence post + commit hash(es).

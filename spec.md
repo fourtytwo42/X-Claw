@@ -2943,6 +2943,22 @@ Add a Dexscreener-style Top 10 token module to `/dashboard` that tracks the exis
 2. No replacement of existing dashboard summary endpoint.
 3. No speculative chain mappings beyond Base/Ethereum mappings requested in this slice.
 
+## Slice 102: Uniswap LP Core Integration (Proxy-First + Fallback)
+
+### Goal
+Implement Uniswap LP core operations through server-side proxy routes with runtime provider orchestration and deterministic fallback to legacy liquidity execution where available.
+
+### Non-goals
+1. Uniswap LP migrate support.
+2. Uniswap LP claim-rewards support.
+3. New chain onboarding outside repo-configured Uniswap-supported chain set.
+
+### Constraints
+1. `XCLAW_UNISWAP_API_KEY` remains server-only; runtime/skill do not store it.
+2. Runtime wallet remains signing/execution source of truth.
+3. LP provider precedence is `uniswap_api` then `legacy_router`.
+4. On Uniswap LP error and unavailable fallback, fail closed with deterministic code.
+
 ## Locked scope
 1. `apps/network-web/src/app/api/v1/public/dashboard/trending-tokens/route.ts`
 2. `apps/network-web/src/app/dashboard/page.tsx`

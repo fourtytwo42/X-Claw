@@ -6350,8 +6350,6 @@ def cmd_liquidity_add(args: argparse.Namespace) -> int:
     try:
         assert_chain_capability(chain, "liquidity")
         position_type = str(args.position_type or "v2").strip().lower()
-        adapter = build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type=position_type)
-        agent_id = _resolve_agent_id_or_fail(chain)
         token_a = _resolve_token_address(chain, args.token_a)
         token_b = _resolve_token_address(chain, args.token_b)
         if token_a.lower() == token_b.lower():
@@ -6361,21 +6359,33 @@ def cmd_liquidity_add(args: argparse.Namespace) -> int:
         slippage_bps = int(args.slippage_bps)
         if slippage_bps < 0 or slippage_bps > 5000:
             return fail("invalid_input", "slippage-bps must be between 0 and 5000.", "Use integer bps in range.", {"slippageBps": args.slippage_bps}, exit_code=2)
-        preflight = adapter.quote_add(
-            {
-                "tokenA": token_a,
-                "tokenB": token_b,
-                "amountA": _decimal_text(amount_a_h),
-                "amountB": _decimal_text(amount_b_h),
-                "slippageBps": slippage_bps,
-            }
-        )
-        is_hts_native = adapter.protocol_family == "hedera_hts"
+
+        provider_requested, _ = _liquidity_provider_settings(chain)
+        adapter = None
+        adapter_preflight: dict[str, Any] = {}
+        adapter_family = "uniswap_api" if provider_requested == "uniswap_api" else None
+        adapter_dex = dex
+        if provider_requested != "uniswap_api":
+            adapter = build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type=position_type)
+            adapter_preflight = adapter.quote_add(
+                {
+                    "tokenA": token_a,
+                    "tokenB": token_b,
+                    "amountA": _decimal_text(amount_a_h),
+                    "amountB": _decimal_text(amount_b_h),
+                    "slippageBps": slippage_bps,
+                }
+            )
+            adapter_family = adapter.protocol_family
+            adapter_dex = adapter.dex
+        agent_id = _resolve_agent_id_or_fail(chain)
+        preflight = adapter_preflight
+        is_hts_native = bool(adapter is not None and adapter.protocol_family == "hedera_hts")
         payload = {
             "schemaVersion": 1,
             "agentId": agent_id,
             "chainKey": chain,
-            "dex": adapter.dex,
+            "dex": adapter_dex,
             "action": "add",
             "positionType": position_type,
             "tokenA": token_a,
@@ -6385,9 +6395,10 @@ def cmd_liquidity_add(args: argparse.Namespace) -> int:
             "slippageBps": slippage_bps,
             "details": {
                 "v3Range": None if is_hts_native else (str(args.v3_range or "").strip() or None),
-                "adapterFamily": adapter.protocol_family,
+                "adapterFamily": adapter_family,
                 "htsNative": is_hts_native,
-                "preflight": preflight.get("simulation", {}),
+                "preflight": preflight.get("simulation", {}) if isinstance(preflight, dict) else {},
+                "providerRequested": provider_requested,
                 "source": "runtime_liquidity_add",
             },
         }
@@ -6415,18 +6426,19 @@ def cmd_liquidity_add(args: argparse.Namespace) -> int:
             if isinstance(payload, dict):
                 payload.setdefault("liquidityIntentId", liquidity_intent_id)
                 payload.setdefault("chain", chain)
-                payload.setdefault("dex", adapter.dex)
-                payload.setdefault("adapterFamily", adapter.protocol_family)
+                payload.setdefault("dex", adapter_dex)
+                payload.setdefault("adapterFamily", adapter_family)
             return emit(payload) if isinstance(payload, dict) else code
         return ok(
             "Liquidity add intent created.",
             chain=chain,
-            dex=adapter.dex,
+            dex=adapter_dex,
             liquidityIntentId=liquidity_intent_id,
             status=status or "approved",
             approvalMode=status != "approval_pending",
-            adapterFamily=adapter.protocol_family,
-            preflight=preflight.get("simulation", {}),
+            adapterFamily=adapter_family,
+            preflight=preflight.get("simulation", {}) if isinstance(preflight, dict) else {},
+            providerRequested=provider_requested,
         )
     except ChainRegistryError as exc:
         return fail("unsupported_chain_capability", str(exc), chain_supported_hint(), {"chain": chain, "requiredCapability": "liquidity"}, exit_code=2)
@@ -6463,7 +6475,15 @@ def cmd_liquidity_remove(args: argparse.Namespace) -> int:
     try:
         assert_chain_capability(chain, "liquidity")
         position_type = str(args.position_type or "v2").strip().lower()
-        adapter = build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type=position_type)
+        provider_requested, _ = _liquidity_provider_settings(chain)
+        adapter = None
+        adapter_preflight: dict[str, Any] = {}
+        adapter_family = "uniswap_api" if provider_requested == "uniswap_api" else None
+        adapter_dex = dex
+        if provider_requested != "uniswap_api":
+            adapter = build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type=position_type)
+            adapter_dex = adapter.dex
+            adapter_family = adapter.protocol_family
         agent_id = _resolve_agent_id_or_fail(chain)
         position_id = str(args.position_id or "").strip()
         if not position_id:
@@ -6474,18 +6494,20 @@ def cmd_liquidity_remove(args: argparse.Namespace) -> int:
         slippage_bps = int(args.slippage_bps)
         if slippage_bps < 0 or slippage_bps > 5000:
             return fail("invalid_input", "slippage-bps must be between 0 and 5000.", "Use integer bps in range.", {"slippageBps": args.slippage_bps}, exit_code=2)
-        preflight = adapter.quote_remove(
-            {
-                "positionId": position_id,
-                "percent": percent,
-                "slippageBps": slippage_bps,
-            }
-        )
+        if adapter is not None:
+            adapter_preflight = adapter.quote_remove(
+                {
+                    "positionId": position_id,
+                    "percent": percent,
+                    "slippageBps": slippage_bps,
+                }
+            )
+        preflight = adapter_preflight
         payload = {
             "schemaVersion": 1,
             "agentId": agent_id,
             "chainKey": chain,
-            "dex": adapter.dex,
+            "dex": adapter_dex,
             "action": "remove",
             "positionType": position_type,
             "tokenA": str(args.token_a or "POSITION").strip(),
@@ -6496,8 +6518,9 @@ def cmd_liquidity_remove(args: argparse.Namespace) -> int:
             "slippageBps": slippage_bps,
             "details": {
                 "percent": percent,
-                "adapterFamily": adapter.protocol_family,
-                "preflight": preflight.get("simulation", {}),
+                "adapterFamily": adapter_family,
+                "preflight": preflight.get("simulation", {}) if isinstance(preflight, dict) else {},
+                "providerRequested": provider_requested,
                 "source": "runtime_liquidity_remove",
             },
         }
@@ -6525,19 +6548,20 @@ def cmd_liquidity_remove(args: argparse.Namespace) -> int:
             if isinstance(payload, dict):
                 payload.setdefault("liquidityIntentId", liquidity_intent_id)
                 payload.setdefault("chain", chain)
-                payload.setdefault("dex", adapter.dex)
-                payload.setdefault("adapterFamily", adapter.protocol_family)
+                payload.setdefault("dex", adapter_dex)
+                payload.setdefault("adapterFamily", adapter_family)
             return emit(payload) if isinstance(payload, dict) else code
         return ok(
             "Liquidity remove intent created.",
             chain=chain,
-            dex=adapter.dex,
+            dex=adapter_dex,
             liquidityIntentId=liquidity_intent_id,
             status=status or "approved",
             positionId=position_id,
             percent=percent,
-            adapterFamily=adapter.protocol_family,
-            preflight=preflight.get("simulation", {}),
+            adapterFamily=adapter_family,
+            preflight=preflight.get("simulation", {}) if isinstance(preflight, dict) else {},
+            providerRequested=provider_requested,
         )
     except ChainRegistryError as exc:
         return fail("unsupported_chain_capability", str(exc), chain_supported_hint(), {"chain": chain, "requiredCapability": "liquidity"}, exit_code=2)
@@ -6563,6 +6587,137 @@ def cmd_liquidity_remove(args: argparse.Namespace) -> int:
         return fail("liquidity_remove_failed", str(exc), "Verify API env/auth, chain capability, and inputs.", {"chain": chain, "dex": dex}, exit_code=1)
     except Exception as exc:
         return fail("liquidity_remove_failed", str(exc), "Inspect runtime liquidity remove path and retry.", {"chain": chain, "dex": dex}, exit_code=1)
+
+
+def cmd_liquidity_increase(args: argparse.Namespace) -> int:
+    chk = require_json_flag(args)
+    if chk is not None:
+        return chk
+    chain = str(args.chain or "").strip()
+    dex = str(args.dex or "").strip().lower()
+    position_id = str(args.position_id or "").strip()
+    try:
+        assert_chain_capability(chain, "liquidity")
+        if not position_id:
+            return fail("invalid_input", "position-id is required.", "Provide --position-id and retry.", {"chain": chain}, exit_code=2)
+        slippage_bps = int(args.slippage_bps)
+        if slippage_bps < 0 or slippage_bps > 5000:
+            return fail("invalid_input", "slippage-bps must be between 0 and 5000.", "Use integer bps in range.", {"slippageBps": args.slippage_bps}, exit_code=2)
+
+        provider_requested, fallback_provider = _liquidity_provider_settings(chain)
+        if provider_requested != "uniswap_api":
+            return fail(
+                "no_execution_provider_available",
+                "Liquidity increase currently requires uniswap_api provider on this chain.",
+                "Enable Uniswap LP provider for this chain or use add/remove paths.",
+                {"chain": chain, "providerRequested": provider_requested, "fallback": fallback_provider},
+                exit_code=2,
+            )
+
+        store = load_wallet_store()
+        wallet_address, private_key_hex = _execution_wallet(store, chain)
+        token_a = _resolve_token_address(chain, str(args.token_a or ""))
+        token_b = _resolve_token_address(chain, str(args.token_b or ""))
+        token_a_meta = _fetch_erc20_metadata(chain, token_a)
+        token_b_meta = _fetch_erc20_metadata(chain, token_b)
+        amount_a_units = str(_to_units_uint(str(args.amount_a), int(token_a_meta.get("decimals", 18))))
+        amount_b_units = str(_to_units_uint(str(args.amount_b), int(token_b_meta.get("decimals", 18))))
+        request_payload = {
+            "tokenId": position_id,
+            "token0": token_a,
+            "token1": token_b,
+            "token0Increase": amount_a_units,
+            "token1Increase": amount_b_units,
+            "slippageTolerance": slippage_bps,
+        }
+        approve_result = _uniswap_lp_call_via_proxy(chain, wallet_address, "/agent/liquidity/uniswap/approve", request_payload)
+        approve_hashes = _execute_uniswap_lp_transactions(
+            chain, wallet_address, private_key_hex, list(approve_result.get("transactions") or []), "uniswap lp approve"
+        )
+        increase_result = _uniswap_lp_call_via_proxy(chain, wallet_address, "/agent/liquidity/uniswap/increase", request_payload)
+        increase_hashes = _execute_uniswap_lp_transactions(
+            chain, wallet_address, private_key_hex, list(increase_result.get("transactions") or []), "uniswap lp increase"
+        )
+        if not increase_hashes:
+            raise WalletStoreError("uniswap_payload_invalid: increase produced no executable transactions.")
+        tx_hash = increase_hashes[-1]
+        return ok(
+            "Liquidity position increased.",
+            chain=chain,
+            dex=dex,
+            positionId=position_id,
+            txHash=tx_hash,
+            approveTxHashes=approve_hashes,
+            operationTxHashes=increase_hashes,
+            providerRequested=provider_requested,
+            providerUsed="uniswap_api",
+            fallbackUsed=False,
+            fallbackReason=None,
+            uniswapLpOperation="increase",
+        )
+    except ChainRegistryError as exc:
+        return fail("unsupported_chain_capability", str(exc), chain_supported_hint(), {"chain": chain, "requiredCapability": "liquidity"}, exit_code=2)
+    except WalletStoreError as exc:
+        return fail("liquidity_increase_failed", str(exc), "Verify Uniswap LP configuration and retry.", {"chain": chain, "dex": dex, "positionId": position_id}, exit_code=1)
+    except Exception as exc:
+        return fail("liquidity_increase_failed", str(exc), "Inspect runtime liquidity increase path and retry.", {"chain": chain, "dex": dex, "positionId": position_id}, exit_code=1)
+
+
+def cmd_liquidity_claim_fees(args: argparse.Namespace) -> int:
+    chk = require_json_flag(args)
+    if chk is not None:
+        return chk
+    chain = str(args.chain or "").strip()
+    dex = str(args.dex or "").strip().lower()
+    position_id = str(args.position_id or "").strip()
+    try:
+        assert_chain_capability(chain, "liquidity")
+        if not position_id:
+            return fail("invalid_input", "position-id is required.", "Provide --position-id and retry.", {"chain": chain}, exit_code=2)
+        provider_requested, fallback_provider = _liquidity_provider_settings(chain)
+        if provider_requested != "uniswap_api":
+            return fail(
+                "no_execution_provider_available",
+                "Liquidity fee claim currently requires uniswap_api provider on this chain.",
+                "Enable Uniswap LP provider for this chain or use supported legacy commands.",
+                {"chain": chain, "providerRequested": provider_requested, "fallback": fallback_provider},
+                exit_code=2,
+            )
+
+        store = load_wallet_store()
+        wallet_address, private_key_hex = _execution_wallet(store, chain)
+        request_payload = {
+            "tokenId": position_id,
+            "collectAsWeth": bool(args.collect_as_weth),
+            "token0CollectAmount": "0",
+            "token1CollectAmount": "0",
+        }
+        claim_result = _uniswap_lp_call_via_proxy(chain, wallet_address, "/agent/liquidity/uniswap/claim-fees", request_payload)
+        claim_hashes = _execute_uniswap_lp_transactions(
+            chain, wallet_address, private_key_hex, list(claim_result.get("transactions") or []), "uniswap lp claim"
+        )
+        if not claim_hashes:
+            raise WalletStoreError("uniswap_payload_invalid: claim produced no executable transactions.")
+        tx_hash = claim_hashes[-1]
+        return ok(
+            "Liquidity fees claimed.",
+            chain=chain,
+            dex=dex,
+            positionId=position_id,
+            txHash=tx_hash,
+            operationTxHashes=claim_hashes,
+            providerRequested=provider_requested,
+            providerUsed="uniswap_api",
+            fallbackUsed=False,
+            fallbackReason=None,
+            uniswapLpOperation="claim",
+        )
+    except ChainRegistryError as exc:
+        return fail("unsupported_chain_capability", str(exc), chain_supported_hint(), {"chain": chain, "requiredCapability": "liquidity"}, exit_code=2)
+    except WalletStoreError as exc:
+        return fail("liquidity_claim_fees_failed", str(exc), "Verify Uniswap LP configuration and retry.", {"chain": chain, "dex": dex, "positionId": position_id}, exit_code=1)
+    except Exception as exc:
+        return fail("liquidity_claim_fees_failed", str(exc), "Inspect runtime liquidity fee-claim path and retry.", {"chain": chain, "dex": dex, "positionId": position_id}, exit_code=1)
 
 
 def _run_liquidity_execute_inline(liquidity_intent_id: str, chain: str) -> tuple[int, dict[str, Any]]:
@@ -6607,6 +6762,11 @@ def cmd_liquidity_execute(args: argparse.Namespace) -> int:
 
     transition_state = "init"
     last_tx_hash: str | None = None
+    provider_requested = _liquidity_provider_settings(chain)[0]
+    provider_used = "legacy_router"
+    fallback_used = False
+    fallback_reason: dict[str, str] | None = None
+    uniswap_lp_operation: str | None = None
     try:
         intent = _read_liquidity_intent(liquidity_intent_id, chain)
         status = str(intent.get("status") or "").strip().lower()
@@ -6622,61 +6782,102 @@ def cmd_liquidity_execute(args: argparse.Namespace) -> int:
                 exit_code=1,
             )
 
-        adapter = build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type=position_type)
-        if adapter.protocol_family == "amm_v3":
-            return fail(
-                "unsupported_liquidity_execution_family",
-                "Liquidity execution for v3 positions is not enabled in this slice.",
-                "Use v2 or hedera_hts execution paths.",
-                {"liquidityIntentId": liquidity_intent_id, "chain": chain, "dex": dex, "positionType": position_type},
-                exit_code=2,
-            )
-        if adapter.protocol_family not in {"amm_v2", "hedera_hts"}:
-            return fail(
-                "unsupported_liquidity_execution_family",
-                f"Unsupported liquidity execution family '{adapter.protocol_family}'.",
-                "Use v2 or hedera_hts execution paths.",
-                {"liquidityIntentId": liquidity_intent_id, "chain": chain, "dex": dex, "adapterFamily": adapter.protocol_family},
-                exit_code=2,
-            )
+        execution: dict[str, Any]
+        adapter_family = "unknown"
+
+        def _execute_legacy() -> tuple[dict[str, Any], str]:
+            adapter = build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type=position_type)
+            if adapter.protocol_family == "amm_v3":
+                raise WalletStoreError("unsupported_liquidity_execution_family: Liquidity execution for v3 positions is not enabled in legacy path.")
+            if adapter.protocol_family not in {"amm_v2", "hedera_hts"}:
+                raise WalletStoreError(f"unsupported_liquidity_execution_family: Unsupported liquidity execution family '{adapter.protocol_family}'.")
+            if adapter.protocol_family == "hedera_hts":
+                if action == "add":
+                    return (
+                        adapter.add(
+                            {
+                                "tokenA": str(intent.get("tokenA") or ""),
+                                "tokenB": str(intent.get("tokenB") or ""),
+                                "amountA": str(intent.get("amountA") or ""),
+                                "amountB": str(intent.get("amountB") or ""),
+                                "slippageBps": int(intent.get("slippageBps") or 100),
+                            }
+                        ),
+                        adapter.protocol_family,
+                    )
+                if action == "remove":
+                    return (
+                        adapter.remove(
+                            {
+                                "positionId": str(intent.get("positionRef") or ""),
+                                "percent": int(Decimal(str(intent.get("amountA") or "100")).to_integral_value(rounding=ROUND_DOWN)),
+                                "slippageBps": int(intent.get("slippageBps") or 100),
+                            }
+                        ),
+                        adapter.protocol_family,
+                    )
+                raise WalletStoreError(f"Unsupported liquidity action '{action}'.")
+            if action == "add":
+                return _execute_liquidity_v2_add(intent, chain), adapter.protocol_family
+            if action == "remove":
+                return _execute_liquidity_v2_remove(intent, chain), adapter.protocol_family
+            raise WalletStoreError(f"Unsupported liquidity action '{action}'.")
+
+        if provider_requested != "uniswap_api":
+            direct_adapter = build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type=position_type)
+            if direct_adapter.protocol_family == "amm_v3":
+                return fail(
+                    "unsupported_liquidity_execution_family",
+                    "Liquidity execution for v3 positions is not enabled in this slice.",
+                    "Use v2 or hedera_hts execution paths.",
+                    {"liquidityIntentId": liquidity_intent_id, "chain": chain, "dex": dex, "positionType": position_type},
+                    exit_code=2,
+                )
+            if direct_adapter.protocol_family not in {"amm_v2", "hedera_hts"}:
+                return fail(
+                    "unsupported_liquidity_execution_family",
+                    f"Unsupported liquidity execution family '{direct_adapter.protocol_family}'.",
+                    "Use v2 or hedera_hts execution paths.",
+                    {"liquidityIntentId": liquidity_intent_id, "chain": chain, "dex": dex, "adapterFamily": direct_adapter.protocol_family},
+                    exit_code=2,
+                )
 
         _post_liquidity_status(liquidity_intent_id, "executing")
         transition_state = "executing"
 
-        execution: dict[str, Any]
-        if adapter.protocol_family == "hedera_hts":
-            if action == "add":
-                execution = adapter.add(
-                    {
-                        "tokenA": str(intent.get("tokenA") or ""),
-                        "tokenB": str(intent.get("tokenB") or ""),
-                        "amountA": str(intent.get("amountA") or ""),
-                        "amountB": str(intent.get("amountB") or ""),
-                        "slippageBps": int(intent.get("slippageBps") or 100),
-                    }
-                )
-            elif action == "remove":
-                execution = adapter.remove(
-                    {
-                        "positionId": str(intent.get("positionRef") or ""),
-                        "percent": int(Decimal(str(intent.get("amountA") or "100")).to_integral_value(rounding=ROUND_DOWN)),
-                        "slippageBps": int(intent.get("slippageBps") or 100),
-                    }
-                )
-            else:
-                raise WalletStoreError(f"Unsupported liquidity action '{action}'.")
+        if provider_requested == "uniswap_api":
+            try:
+                store = load_wallet_store()
+                wallet_address, private_key_hex = _execution_wallet(store, chain)
+                execution = _execute_uniswap_liquidity_intent(intent, chain, wallet_address, private_key_hex)
+                adapter_family = "uniswap_api"
+                provider_used = "uniswap_api"
+                uniswap_lp_operation = str(execution.get("uniswapLpOperation") or "").strip().lower() or None
+            except Exception as exc:
+                if _legacy_liquidity_provider_available(chain, dex, position_type):
+                    fallback_used = True
+                    fallback_reason = _fallback_reason("uniswap_lp_failed", str(exc))
+                    execution, adapter_family = _execute_legacy()
+                    provider_used = "legacy_router"
+                else:
+                    raise WalletStoreError(f"no_execution_provider_available: {exc}") from exc
         else:
-            if action == "add":
-                execution = _execute_liquidity_v2_add(intent, chain)
-            elif action == "remove":
-                execution = _execute_liquidity_v2_remove(intent, chain)
-            else:
-                raise WalletStoreError(f"Unsupported liquidity action '{action}'.")
+            execution, adapter_family = _execute_legacy()
+            provider_used = "legacy_router"
 
         tx_hash = str(execution.get("txHash") or "").strip()
         if not tx_hash:
             raise WalletStoreError("Liquidity execution did not return txHash.")
         last_tx_hash = tx_hash
+        provider_meta = _build_liquidity_provider_meta(
+            provider_requested=provider_requested,
+            provider_used=provider_used,
+            fallback_used=fallback_used,
+            fallback_reason=fallback_reason,
+            uniswap_lp_operation=uniswap_lp_operation,
+        )
+        status_details = execution.get("details") if isinstance(execution.get("details"), dict) else {}
+        status_details = {**status_details, **provider_meta}
 
         _post_liquidity_status(
             liquidity_intent_id,
@@ -6684,12 +6885,12 @@ def cmd_liquidity_execute(args: argparse.Namespace) -> int:
             {
                 "txHash": tx_hash,
                 "positionId": execution.get("positionId"),
-                "details": execution.get("details") if isinstance(execution.get("details"), dict) else None,
+                "details": status_details,
             },
         )
         transition_state = "verifying"
 
-        if adapter.protocol_family == "amm_v2":
+        if adapter_family == "amm_v2":
             _wait_for_tx_receipt_success(chain, tx_hash)
 
         _post_liquidity_status(
@@ -6698,7 +6899,7 @@ def cmd_liquidity_execute(args: argparse.Namespace) -> int:
             {
                 "txHash": tx_hash,
                 "positionId": execution.get("positionId"),
-                "details": execution.get("details") if isinstance(execution.get("details"), dict) else None,
+                "details": status_details,
             },
         )
         return ok(
@@ -6708,11 +6909,16 @@ def cmd_liquidity_execute(args: argparse.Namespace) -> int:
             dex=dex,
             action=action,
             positionType=position_type,
-            adapterFamily=adapter.protocol_family,
+            adapterFamily=adapter_family,
             status="filled",
             txHash=tx_hash,
             positionId=execution.get("positionId"),
             details=execution.get("details"),
+            providerRequested=provider_requested,
+            providerUsed=provider_used,
+            fallbackUsed=fallback_used,
+            fallbackReason=fallback_reason,
+            uniswapLpOperation=uniswap_lp_operation,
         )
     except HederaSdkUnavailable as exc:
         if transition_state == "executing":
@@ -6863,6 +7069,20 @@ def _trade_provider_settings(chain: str) -> tuple[str, str]:
     return "legacy_router", "legacy_router"
 
 
+def _liquidity_provider_settings(chain: str) -> tuple[str, str]:
+    cfg = _load_chain_config(chain)
+    providers = cfg.get("liquidityProviders")
+    if isinstance(providers, dict):
+        primary = str(providers.get("primary") or "").strip().lower()
+        fallback = str(providers.get("fallback") or "").strip().lower()
+        if primary in {"uniswap_api", "legacy_router"}:
+            return primary, fallback or "legacy_router"
+    uniswap_cfg = cfg.get("uniswapApi")
+    if isinstance(uniswap_cfg, dict) and bool(uniswap_cfg.get("liquidityEnabled")):
+        return "uniswap_api", "legacy_router"
+    return "legacy_router", "legacy_router"
+
+
 def _legacy_router_available(chain: str) -> bool:
     try:
         _require_chain_contract_address(chain, "router")
@@ -6890,6 +7110,30 @@ def _build_provider_meta(
         "fallbackReason": fallback_reason if fallback_used and isinstance(fallback_reason, dict) else None,
         "uniswapRouteType": (str(uniswap_route_type or "").strip().upper() or None),
     }
+
+
+def _build_liquidity_provider_meta(
+    provider_requested: str,
+    provider_used: str,
+    fallback_used: bool,
+    fallback_reason: dict[str, str] | None,
+    uniswap_lp_operation: str | None,
+) -> dict[str, Any]:
+    return {
+        "providerRequested": provider_requested,
+        "providerUsed": provider_used,
+        "fallbackUsed": bool(fallback_used),
+        "fallbackReason": fallback_reason if fallback_used and isinstance(fallback_reason, dict) else None,
+        "uniswapLpOperation": (str(uniswap_lp_operation or "").strip().lower() or None),
+    }
+
+
+def _legacy_liquidity_provider_available(chain: str, dex: str, position_type: str) -> bool:
+    try:
+        adapter = build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type=position_type)
+    except Exception:
+        return False
+    return adapter.protocol_family in {"amm_v2", "hedera_hts"}
 
 
 def _uniswap_quote_via_proxy(
@@ -6965,6 +7209,182 @@ def _normalize_uniswap_tx_payload(tx_payload: dict[str, Any], label: str) -> dic
     if not re.fullmatch(r"[0-9]+", value):
         raise WalletStoreError(f"uniswap_payload_invalid: {label}.value must be an unsigned integer string.")
     return {"to": to_addr, "data": data, "value": value}
+
+
+def _uniswap_lp_call_via_proxy(
+    chain: str,
+    wallet_address: str,
+    endpoint: str,
+    request_payload: dict[str, Any],
+) -> dict[str, Any]:
+    agent_id = _resolve_agent_id_or_fail(chain)
+    payload = {
+        "agentId": agent_id,
+        "chainKey": chain,
+        "walletAddress": wallet_address,
+        "request": request_payload,
+    }
+    status_code, body = _api_request("POST", endpoint, payload=payload)
+    if status_code < 200 or status_code >= 300:
+        code = str(body.get("code", "uniswap_lp_failed"))
+        message = str(body.get("message", f"Uniswap LP endpoint failed ({status_code})"))
+        raise WalletStoreError(f"{code}: {message}")
+    transactions = body.get("transactions")
+    if not isinstance(transactions, list):
+        raise WalletStoreError("uniswap_payload_invalid: LP response missing transactions list.")
+    normalized: list[dict[str, str]] = []
+    for idx, tx in enumerate(transactions):
+        if not isinstance(tx, dict):
+            raise WalletStoreError("uniswap_payload_invalid: LP transaction entry must be object.")
+        normalized.append(_normalize_uniswap_tx_payload(tx, f"transactions[{idx}]"))
+    return {
+        "operation": str(body.get("operation") or "").strip().lower() or None,
+        "transactions": normalized,
+        "raw": body.get("raw") if isinstance(body.get("raw"), dict) else None,
+    }
+
+
+def _execute_uniswap_lp_transactions(
+    chain: str,
+    wallet_address: str,
+    private_key_hex: str,
+    transactions: list[dict[str, str]],
+    label: str,
+) -> list[str]:
+    if not transactions:
+        return []
+    rpc_url = _chain_rpc_url(chain)
+    cast_bin = _require_cast_bin()
+    tx_hashes: list[str] = []
+    for tx in transactions:
+        tx_hash = _cast_rpc_send_transaction(
+            rpc_url,
+            {"from": wallet_address, "to": tx["to"], "data": tx["data"], "value": tx["value"]},
+            private_key_hex,
+        )
+        receipt_proc = _run_subprocess(
+            [cast_bin, "receipt", "--json", "--rpc-url", rpc_url, tx_hash],
+            timeout_sec=_cast_receipt_timeout_sec(),
+            kind="cast_receipt",
+        )
+        if receipt_proc.returncode != 0:
+            stderr = (receipt_proc.stderr or "").strip()
+            stdout = (receipt_proc.stdout or "").strip()
+            raise WalletStoreError(stderr or stdout or f"cast receipt failed for {label} tx.")
+        receipt_payload = json.loads((receipt_proc.stdout or "{}").strip() or "{}")
+        status = str(receipt_payload.get("status", "0x0")).lower()
+        if status not in {"0x1", "1"}:
+            raise WalletStoreError(f"{label} receipt indicates failure status '{status}'.")
+        tx_hashes.append(tx_hash)
+    return tx_hashes
+
+
+def _build_uniswap_lp_create_request(intent: dict[str, Any], chain: str, wallet_address: str) -> dict[str, Any]:
+    token_a = _resolve_token_address(chain, str(intent.get("tokenA") or ""))
+    token_b = _resolve_token_address(chain, str(intent.get("tokenB") or ""))
+    token_a_meta = _fetch_erc20_metadata(chain, token_a)
+    token_b_meta = _fetch_erc20_metadata(chain, token_b)
+    token_a_decimals = int(token_a_meta.get("decimals", 18))
+    token_b_decimals = int(token_b_meta.get("decimals", 18))
+    amount_a_h = _parse_positive_amount_text(str(intent.get("amountA") or ""), "amountA")
+    amount_b_h = _parse_positive_amount_text(str(intent.get("amountB") or ""), "amountB")
+    amount_a_units = str(_to_units_uint(_decimal_text(amount_a_h), token_a_decimals))
+    amount_b_units = str(_to_units_uint(_decimal_text(amount_b_h), token_b_decimals))
+    slippage_bps = int(intent.get("slippageBps") or 100)
+    details = intent.get("details")
+    protocols: list[str] = []
+    if isinstance(details, dict):
+        raw_protocols = details.get("uniswapProtocols")
+        if isinstance(raw_protocols, list):
+            for item in raw_protocols:
+                val = str(item or "").strip().upper()
+                if val in {"V2", "V3", "V4"}:
+                    protocols.append(val)
+    if not protocols:
+        position_type = str(intent.get("positionType") or "v2").strip().lower()
+        protocols = ["V3"] if position_type == "v3" else ["V2"]
+    return {
+        "token0": token_a,
+        "token1": token_b,
+        "token0Amount": amount_a_units,
+        "token1Amount": amount_b_units,
+        "recipient": wallet_address,
+        "slippageTolerance": slippage_bps,
+        "protocols": protocols,
+    }
+
+
+def _build_uniswap_lp_decrease_request(intent: dict[str, Any]) -> dict[str, Any]:
+    details = intent.get("details")
+    if isinstance(details, dict):
+        direct = details.get("uniswapDecreaseRequest")
+        if isinstance(direct, dict):
+            return dict(direct)
+    token_id = str(intent.get("positionRef") or intent.get("positionId") or "").strip()
+    if not token_id:
+        raise WalletStoreError("uniswap_payload_invalid: decrease requires a position token id.")
+    percent = int(Decimal(str(intent.get("amountA") or "100")).to_integral_value(rounding=ROUND_DOWN))
+    if percent < 1 or percent > 100:
+        raise WalletStoreError("uniswap_payload_invalid: remove percent must be between 1 and 100.")
+    return {
+        "tokenId": token_id,
+        "liquidityPercentage": str(percent),
+        "collectFees": True,
+        "collectOptions": {"token0CollectAmount": "0", "token1CollectAmount": "0"},
+    }
+
+
+def _execute_uniswap_liquidity_intent(intent: dict[str, Any], chain: str, wallet_address: str, private_key_hex: str) -> dict[str, Any]:
+    action = str(intent.get("action") or "").strip().lower()
+    if action == "add":
+        request_payload = _build_uniswap_lp_create_request(intent, chain, wallet_address)
+        approve_result = _uniswap_lp_call_via_proxy(chain, wallet_address, "/agent/liquidity/uniswap/approve", request_payload)
+        approve_hashes = _execute_uniswap_lp_transactions(
+            chain, wallet_address, private_key_hex, list(approve_result.get("transactions") or []), "uniswap lp approve"
+        )
+        create_result = _uniswap_lp_call_via_proxy(chain, wallet_address, "/agent/liquidity/uniswap/create", request_payload)
+        create_hashes = _execute_uniswap_lp_transactions(
+            chain, wallet_address, private_key_hex, list(create_result.get("transactions") or []), "uniswap lp create"
+        )
+        if not create_hashes:
+            raise WalletStoreError("uniswap_payload_invalid: create produced no executable transactions.")
+        tx_hash = create_hashes[-1]
+        return {
+            "txHash": tx_hash,
+            "positionId": str(intent.get("positionRef") or tx_hash),
+            "details": {
+                "operation": "create",
+                "approveTxHashes": approve_hashes,
+                "operationTxHashes": create_hashes,
+                "request": request_payload,
+            },
+            "uniswapLpOperation": "create",
+        }
+    if action == "remove":
+        request_payload = _build_uniswap_lp_decrease_request(intent)
+        approve_result = _uniswap_lp_call_via_proxy(chain, wallet_address, "/agent/liquidity/uniswap/approve", request_payload)
+        approve_hashes = _execute_uniswap_lp_transactions(
+            chain, wallet_address, private_key_hex, list(approve_result.get("transactions") or []), "uniswap lp approve"
+        )
+        decrease_result = _uniswap_lp_call_via_proxy(chain, wallet_address, "/agent/liquidity/uniswap/decrease", request_payload)
+        decrease_hashes = _execute_uniswap_lp_transactions(
+            chain, wallet_address, private_key_hex, list(decrease_result.get("transactions") or []), "uniswap lp decrease"
+        )
+        if not decrease_hashes:
+            raise WalletStoreError("uniswap_payload_invalid: decrease produced no executable transactions.")
+        tx_hash = decrease_hashes[-1]
+        return {
+            "txHash": tx_hash,
+            "positionId": str(intent.get("positionRef") or request_payload.get("tokenId") or ""),
+            "details": {
+                "operation": "decrease",
+                "approveTxHashes": approve_hashes,
+                "operationTxHashes": decrease_hashes,
+                "request": request_payload,
+            },
+            "uniswapLpOperation": "decrease",
+        }
+    raise WalletStoreError(f"Unsupported liquidity action '{action}'.")
 
 
 def _execute_uniswap_swap_via_proxy(
@@ -11257,6 +11677,26 @@ def build_parser() -> argparse.ArgumentParser:
     liquidity_remove.add_argument("--token-b")
     liquidity_remove.add_argument("--json", action="store_true")
     liquidity_remove.set_defaults(func=cmd_liquidity_remove)
+
+    liquidity_increase = liquidity_sub.add_parser("increase")
+    liquidity_increase.add_argument("--chain", required=True)
+    liquidity_increase.add_argument("--dex", required=True)
+    liquidity_increase.add_argument("--position-id", required=True)
+    liquidity_increase.add_argument("--token-a", required=True)
+    liquidity_increase.add_argument("--token-b", required=True)
+    liquidity_increase.add_argument("--amount-a", required=True)
+    liquidity_increase.add_argument("--amount-b", required=True)
+    liquidity_increase.add_argument("--slippage-bps", default=100)
+    liquidity_increase.add_argument("--json", action="store_true")
+    liquidity_increase.set_defaults(func=cmd_liquidity_increase)
+
+    liquidity_claim_fees = liquidity_sub.add_parser("claim-fees")
+    liquidity_claim_fees.add_argument("--chain", required=True)
+    liquidity_claim_fees.add_argument("--dex", required=True)
+    liquidity_claim_fees.add_argument("--position-id", required=True)
+    liquidity_claim_fees.add_argument("--collect-as-weth", action="store_true")
+    liquidity_claim_fees.add_argument("--json", action="store_true")
+    liquidity_claim_fees.set_defaults(func=cmd_liquidity_claim_fees)
 
     liquidity_positions = liquidity_sub.add_parser("positions")
     liquidity_positions.add_argument("--chain", required=True)

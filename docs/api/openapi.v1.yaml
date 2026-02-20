@@ -326,6 +326,106 @@ paths:
           $ref: '#/components/responses/ErrorResponse'
         '503':
           $ref: '#/components/responses/ErrorResponse'
+  /api/v1/agent/liquidity/uniswap/approve:
+    post:
+      summary: Build Uniswap LP approval transactions via server-side proxy (agent-auth).
+      security:
+        - agentBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UniswapLpApproveRequest'
+      responses:
+        '200':
+          description: Uniswap LP approval transaction payload(s) returned.
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/ErrorResponse'
+  /api/v1/agent/liquidity/uniswap/create:
+    post:
+      summary: Build Uniswap LP create-position transactions via server-side proxy (agent-auth).
+      security:
+        - agentBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UniswapLpCreateRequest'
+      responses:
+        '200':
+          description: Uniswap LP create transaction payload(s) returned.
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/ErrorResponse'
+  /api/v1/agent/liquidity/uniswap/increase:
+    post:
+      summary: Build Uniswap LP increase-position transactions via server-side proxy (agent-auth).
+      security:
+        - agentBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UniswapLpIncreaseRequest'
+      responses:
+        '200':
+          description: Uniswap LP increase transaction payload(s) returned.
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/ErrorResponse'
+  /api/v1/agent/liquidity/uniswap/decrease:
+    post:
+      summary: Build Uniswap LP decrease-position transactions via server-side proxy (agent-auth).
+      security:
+        - agentBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UniswapLpDecreaseRequest'
+      responses:
+        '200':
+          description: Uniswap LP decrease transaction payload(s) returned.
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/ErrorResponse'
+  /api/v1/agent/liquidity/uniswap/claim-fees:
+    post:
+      summary: Build Uniswap LP claim-fees transactions via server-side proxy (agent-auth).
+      security:
+        - agentBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UniswapLpClaimFeesRequest'
+      responses:
+        '200':
+          description: Uniswap LP claim-fees transaction payload(s) returned.
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/ErrorResponse'
   /api/v1/agent/approvals/prompt:
     post:
       summary: Report approval prompt metadata for authenticated agent (idempotent).
@@ -2816,6 +2916,71 @@ components:
           pattern: '^0x[a-fA-F0-9]{40}$'
         quote:
           type: object
+    UniswapLpApproveRequest:
+      type: object
+      required: [agentId, chainKey, walletAddress, request]
+      properties:
+        agentId:
+          type: string
+        chainKey:
+          type: string
+        walletAddress:
+          type: string
+          pattern: '^0x[a-fA-F0-9]{40}$'
+        request:
+          type: object
+    UniswapLpCreateRequest:
+      type: object
+      required: [agentId, chainKey, walletAddress, request]
+      properties:
+        agentId:
+          type: string
+        chainKey:
+          type: string
+        walletAddress:
+          type: string
+          pattern: '^0x[a-fA-F0-9]{40}$'
+        request:
+          type: object
+    UniswapLpIncreaseRequest:
+      type: object
+      required: [agentId, chainKey, walletAddress, request]
+      properties:
+        agentId:
+          type: string
+        chainKey:
+          type: string
+        walletAddress:
+          type: string
+          pattern: '^0x[a-fA-F0-9]{40}$'
+        request:
+          type: object
+    UniswapLpDecreaseRequest:
+      type: object
+      required: [agentId, chainKey, walletAddress, request]
+      properties:
+        agentId:
+          type: string
+        chainKey:
+          type: string
+        walletAddress:
+          type: string
+          pattern: '^0x[a-fA-F0-9]{40}$'
+        request:
+          type: object
+    UniswapLpClaimFeesRequest:
+      type: object
+      required: [agentId, chainKey, walletAddress, request]
+      properties:
+        agentId:
+          type: string
+        chainKey:
+          type: string
+        walletAddress:
+          type: string
+          pattern: '^0x[a-fA-F0-9]{40}$'
+        request:
+          type: object
     LiquidityProposedRequest:
       type: object
       required: [schemaVersion, agentId, chainKey, dex, action, positionType, tokenA, tokenB, amountA, amountB, slippageBps]
@@ -2869,6 +3034,29 @@ components:
         positionId:
           type: string
           nullable: true
+        providerRequested:
+          type: string
+          nullable: true
+          enum: [uniswap_api, legacy_router, null]
+        providerUsed:
+          type: string
+          nullable: true
+          enum: [uniswap_api, legacy_router, null]
+        fallbackUsed:
+          type: boolean
+          nullable: true
+        fallbackReason:
+          type: object
+          nullable: true
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+        uniswapLpOperation:
+          type: string
+          nullable: true
+          enum: [approve, create, increase, decrease, claim, null]
         details:
           type: object
     EventIngestRequest:

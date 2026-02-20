@@ -2734,6 +2734,43 @@ class TradePathRuntimeTests(unittest.TestCase):
         self.assertEqual(payload.get("providerUsed"), "legacy_router")
         self.assertEqual(payload.get("fallbackUsed"), True)
 
+    def test_liquidity_provider_settings_prefers_chain_config(self) -> None:
+        with mock.patch.object(
+            cli,
+            "_load_chain_config",
+            return_value={
+                "liquidityProviders": {"primary": "uniswap_api", "fallback": "legacy_router"},
+                "uniswapApi": {"enabled": True, "liquidityEnabled": True},
+            },
+        ):
+            primary, fallback = cli._liquidity_provider_settings("ethereum_sepolia")
+        self.assertEqual(primary, "uniswap_api")
+        self.assertEqual(fallback, "legacy_router")
+
+    def test_liquidity_provider_settings_uniswap_flag_defaults_to_uniswap(self) -> None:
+        with mock.patch.object(
+            cli,
+            "_load_chain_config",
+            return_value={"uniswapApi": {"enabled": True, "liquidityEnabled": True}},
+        ):
+            primary, fallback = cli._liquidity_provider_settings("ethereum_sepolia")
+        self.assertEqual(primary, "uniswap_api")
+        self.assertEqual(fallback, "legacy_router")
+
+    def test_liquidity_provider_meta_contains_expected_fields(self) -> None:
+        meta = cli._build_liquidity_provider_meta(
+            provider_requested="uniswap_api",
+            provider_used="legacy_router",
+            fallback_used=True,
+            fallback_reason={"code": "uniswap_lp_failed", "message": "boom"},
+            uniswap_lp_operation="decrease",
+        )
+        self.assertEqual(meta.get("providerRequested"), "uniswap_api")
+        self.assertEqual(meta.get("providerUsed"), "legacy_router")
+        self.assertTrue(meta.get("fallbackUsed"))
+        self.assertEqual(meta.get("fallbackReason"), {"code": "uniswap_lp_failed", "message": "boom"})
+        self.assertEqual(meta.get("uniswapLpOperation"), "decrease")
+
 
 if __name__ == "__main__":
     unittest.main()
