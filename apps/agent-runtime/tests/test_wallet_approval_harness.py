@@ -138,6 +138,21 @@ class WalletApprovalHarnessUnitTests(unittest.TestCase):
         self.assertEqual(ctx.exception.code, "management_api_retry_exhausted")
         self.assertGreaterEqual(len((ctx.exception.details or {}).get("attempts", [])), 2)
 
+    def test_management_post_with_retry_accepts_not_actionable_conflict(self) -> None:
+        runner = harness.WalletApprovalHarness(self._args())
+        with mock.patch.object(
+            runner,
+            "_http",
+            return_value=(409, {"ok": False, "code": "not_actionable", "requestId": "req_1"}),
+        ):
+            out = runner._management_post_with_retry(
+                "/management/transfer-approvals/decision",
+                {"agentId": "ag_test"},
+                label="transfer_decision",
+                accepted_conflict_codes={"not_actionable"},
+            )
+        self.assertTrue(bool(out.get("acceptedConflict")))
+
     def test_wallet_decrypt_probe_fails_fast_with_mismatch_code(self) -> None:
         runner = harness.WalletApprovalHarness(self._args())
         with mock.patch.object(
