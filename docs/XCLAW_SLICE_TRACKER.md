@@ -2290,6 +2290,7 @@ DoD:
 - [x] server mirror/write + management/read routes return deterministic `transfer_mirror_unavailable` on transfer-mirror schema/storage unavailability (no silent empty approvals fallback).
 - [x] `/agents/:id` approvals transfer rows include deterministic selector `data-testid="approval-row-transfer-<approval_id>"` for automation.
 - [x] executable browser smoke verifier validates management-session-gated approval row rendering on `/agents/:id`.
+- [x] transfer decision endpoint is non-blocking for UI operations: approve returns async-queued response quickly and deny applies immediate mirror rejection.
 - [x] canonical docs/handoff artifacts synchronized.
 - [ ] required gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
 - [x] browser verification gate rerun (`npm run verify:ui:agent-approvals`) after build + PM2 restart.

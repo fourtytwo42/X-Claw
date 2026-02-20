@@ -1378,7 +1378,9 @@ paths:
               $ref: '#/components/schemas/ManagementTransferApprovalDecisionRequest'
       responses:
         '200':
-          description: Transfer decision accepted and runtime apply attempted.
+          description: Transfer deny accepted and applied immediately.
+        '202':
+          description: Transfer approve accepted and queued for asynchronous runtime execution.
         '400':
           $ref: '#/components/responses/ErrorResponse'
         '401':
@@ -1386,6 +1388,8 @@ paths:
         '404':
           $ref: '#/components/responses/ErrorResponse'
         '409':
+          $ref: '#/components/responses/ErrorResponse'
+        '503':
           $ref: '#/components/responses/ErrorResponse'
   /api/v1/management/x402/payments:
     get:

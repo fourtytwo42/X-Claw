@@ -3546,6 +3546,8 @@ Active slice context: `Slice 117` in progress.
 - [x] Add browser smoke verifier `infrastructure/scripts/verify-agents-approval-row-ui.mjs` for management-session-gated approval rendering.
 - [x] Add npm command entrypoint `verify:ui:agent-approvals`.
 - [x] Add optional `e2e-full` hook to run UI verifier and report WARN/FAIL deterministically.
+- [x] Convert management transfer approval decision route to non-blocking runtime queue behavior (approve async `202`, deny immediate mirror apply `200`).
+- [x] Update transfer decision UI success copy to “decision submitted” (not immediate execution success wording).
 
 ## 4) Validation
 - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`

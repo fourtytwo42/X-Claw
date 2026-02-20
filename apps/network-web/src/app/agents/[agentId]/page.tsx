@@ -2582,7 +2582,7 @@ export default function AgentPublicProfilePage() {
                                   decision: 'approve',
                                   chainKey: row.raw.chain_key
                                 }).then(() => Promise.resolve()),
-                              'Transfer approved.'
+                              'Transfer decision submitted.'
                             )
                           }
                         >
@@ -2601,7 +2601,7 @@ export default function AgentPublicProfilePage() {
                                   chainKey: row.raw.chain_key,
                                   reasonMessage: (approvalRejectReasons[row.raw.approval_id] ?? '').trim() || 'Rejected by owner.'
                                 }).then(() => Promise.resolve()),
-                              'Transfer denied.'
+                              'Transfer denial submitted.'
                             )
                           }
                         >

@@ -6043,6 +6043,9 @@ Active slice context: `Slice 117` in progress (issue `#60`).
 - [x] Skill wrapper preserves `approval_sync_failed` as non-success (no `approval_pending` normalization).
 - [x] `/agents/:id` transfer approval rows expose deterministic selector `data-testid=\"approval-row-transfer-<approval_id>\"`.
 - [x] Browser smoke verifier confirms mirrored pending transfer approval renders in `/agents/:id` under management session auth.
+- [x] `POST /api/v1/management/transfer-approvals/decision` is non-blocking for UI:
+  - approve returns quickly with async queue (`202`),
+  - deny applies immediate mirror rejection (`200`).
 
 ## Targeted Runtime/API Verification
 - [x] Direct mirror write accepted:
@@ -6074,3 +6077,13 @@ Active slice context: `Slice 117` in progress (issue `#60`).
     - `approval-row-transfer-xfr_ui_1771625941671_o1low5v4`
   - artifact dir:
     - `/tmp/xclaw-ui-verify-xfr_ui_1771625941671_o1low5v4`
+
+## Transfer Decision Non-Blocking Evidence
+- [x] Fresh pending mirror approval created and approved via management decision route.
+- [x] Timed decision request returned quickly:
+  - command used `/usr/bin/time ... POST /api/v1/management/transfer-approvals/decision`
+  - result: `status=202`, `elapsed=0:00.03`
+- [x] Response payload included async queue metadata:
+  - `appliedVia=runtime_async_queue`
+  - `runtimeQueued.code=runtime_transfer_decision_queued`
+  - `promptCleanup.code=runtime_cleanup_queued`

@@ -3361,3 +3361,14 @@ Ensure runtime never reports queued transfer approvals that are invisible in web
    - assert token query stripping and pending transfer row rendering in the Approvals panel.
 3. Verification artifacts on failure must include screenshot and DOM snapshot under `/tmp/xclaw-ui-verify-*`.
 4. Hotfix E is not complete until this browser verification passes after build + PM2 restart.
+
+## Hotfix E extension (non-blocking transfer decision UX)
+1. `POST /api/v1/management/transfer-approvals/decision` must not block UI on runtime send execution.
+2. Approve flow:
+   - queue runtime transfer decision in background,
+   - return quickly with `202` + queue metadata,
+   - update mirror to `approved` decision state while runtime continues to `executing|filled|failed`.
+3. Deny flow:
+   - apply mirror rejection immediately,
+   - return quickly with `200`,
+   - queue runtime prompt cleanup asynchronously.

@@ -4626,3 +4626,7 @@ Supersession note (Slice 117 Hotfix D):
 - Canonical Hotfix E acceptance requires executable browser verification (not manual-only):
   - `npm run verify:ui:agent-approvals` must create a mirrored pending transfer approval, bootstrap management session via `/agents/:id?token=...`, and assert pending row rendering under `/agents/:id`.
 - Browser verifier failure evidence must include artifact paths for screenshot + HTML snapshot under `/tmp/xclaw-ui-verify-*`.
+- Management transfer decision endpoint (`POST /api/v1/management/transfer-approvals/decision`) must be non-blocking for operator UX:
+  - approve path queues runtime execution asynchronously and returns quickly (`202`) with queue metadata,
+  - deny path applies mirror rejection immediately and returns quickly (`200`),
+  - UI must not imply immediate on-chain success when approve is queued.

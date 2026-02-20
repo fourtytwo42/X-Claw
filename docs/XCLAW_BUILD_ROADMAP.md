@@ -3813,6 +3813,9 @@ Note:
 - [x] `/agents/:id` transfer approval rows now expose deterministic selector `data-testid="approval-row-transfer-<approval_id>"`.
 - [x] Added executable browser verifier: `npm run verify:ui:agent-approvals`.
 - [x] Verifier writes pending transfer mirror row, bootstraps management session from owner link token, and asserts `/agents/:id` pending approval row rendering.
+- [x] `POST /api/v1/management/transfer-approvals/decision` moved to non-blocking operator semantics:
+  - [x] approve returns async-queued response quickly (`202`) instead of waiting for runtime transfer execution.
+  - [x] deny applies mirror rejection immediately (`200`) with async prompt cleanup.
 - [x] Canonical docs + handoff artifacts synchronized.
 - [ ] Required gates run sequentially:
   - [ ] `npm run db:parity`
