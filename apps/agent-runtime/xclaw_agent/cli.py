@@ -295,6 +295,11 @@ def _trade_approval_inline_wait_sec() -> int:
     return _env_positive_int("XCLAW_TRADE_APPROVAL_INLINE_WAIT_SEC", 2)
 
 
+def _trade_approval_prompt_resend_cooldown_sec() -> int:
+    # Reused approval_pending trades should be able to re-prompt after a short cooldown.
+    return _env_positive_int("XCLAW_TRADE_APPROVAL_PROMPT_RESEND_COOLDOWN_SEC", 120)
+
+
 def _telegram_dispatch_suppressed_for_harness() -> bool:
     raw = (os.environ.get("XCLAW_TEST_HARNESS_DISABLE_TELEGRAM") or "").strip().lower()
     if not raw:
@@ -3126,10 +3131,14 @@ def _post_approval_prompt_metadata(trade_id: str, chain: str, to_addr: str, thre
 def _maybe_send_telegram_approval_prompt(trade_id: str, chain: str, summary: dict[str, Any] | None = None) -> None:
     if _telegram_dispatch_suppressed_for_harness():
         return
-    # Avoid duplicate sends.
+    # Avoid duplicate sends within a short cooldown window.
     existing = _get_approval_prompt(trade_id)
     if existing and str(existing.get("channel") or "") == "telegram":
-        return
+        updated_at = _parse_iso_utc(str(existing.get("updatedAt") or existing.get("createdAt") or ""))
+        if updated_at is not None:
+            age_sec = (datetime.now(timezone.utc) - updated_at).total_seconds()
+            if age_sec < float(_trade_approval_prompt_resend_cooldown_sec()):
+                return
 
     delivery = _read_openclaw_last_delivery()
     if not delivery or str(delivery.get("lastChannel") or "").lower() != "telegram":

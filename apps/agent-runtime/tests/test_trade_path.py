@@ -6,6 +6,7 @@ import tempfile
 import unittest
 from unittest import mock
 from decimal import Decimal
+from datetime import datetime, timedelta, timezone
 
 from contextlib import ExitStack, redirect_stdout
 
@@ -964,6 +965,48 @@ class TradePathRuntimeTests(unittest.TestCase):
             callback_data = [b.get("callback_data") for b in row0 if isinstance(b, dict)]
             self.assertIn("xappr|a|trd_abc|base_sepolia", callback_data)
             self.assertIn("xappr|r|trd_abc|base_sepolia", callback_data)
+
+    def test_telegram_prompt_resends_when_existing_prompt_is_stale(self) -> None:
+        stale = (datetime.now(timezone.utc) - timedelta(minutes=5)).isoformat()
+        with tempfile.TemporaryDirectory() as tmpdir, mock.patch.object(cli, "APP_DIR", pathlib.Path(tmpdir)), mock.patch.object(
+            cli, "APPROVAL_PROMPTS_FILE", pathlib.Path(tmpdir) / "approval_prompts.json"
+        ), mock.patch.object(
+            cli, "_get_approval_prompt", return_value={"channel": "telegram", "updatedAt": stale}
+        ), mock.patch.object(
+            cli, "_trade_approval_prompt_resend_cooldown_sec", return_value=60
+        ), mock.patch.object(
+            cli, "_read_openclaw_last_delivery", return_value={"lastChannel": "telegram", "lastTo": "123", "lastThreadId": None}
+        ), mock.patch.object(
+            cli, "_require_openclaw_bin", return_value="openclaw"
+        ):
+            with mock.patch.object(cli, "_run_subprocess", return_value=mock.Mock(returncode=0, stdout='{"payload":{"messageId":"777"}}', stderr="")) as run_mock:
+                cli._maybe_send_telegram_approval_prompt(
+                    "trd_abc",
+                    "base_sepolia",
+                    {"amountInHuman": "5", "tokenInSymbol": "WETH", "tokenOutSymbol": "USDC"},
+                )
+            self.assertEqual(run_mock.call_count, 1)
+
+    def test_telegram_prompt_skips_when_existing_prompt_within_cooldown(self) -> None:
+        fresh = datetime.now(timezone.utc).isoformat()
+        with tempfile.TemporaryDirectory() as tmpdir, mock.patch.object(cli, "APP_DIR", pathlib.Path(tmpdir)), mock.patch.object(
+            cli, "APPROVAL_PROMPTS_FILE", pathlib.Path(tmpdir) / "approval_prompts.json"
+        ), mock.patch.object(
+            cli, "_get_approval_prompt", return_value={"channel": "telegram", "updatedAt": fresh}
+        ), mock.patch.object(
+            cli, "_trade_approval_prompt_resend_cooldown_sec", return_value=120
+        ), mock.patch.object(
+            cli, "_read_openclaw_last_delivery", return_value={"lastChannel": "telegram", "lastTo": "123", "lastThreadId": None}
+        ), mock.patch.object(
+            cli, "_require_openclaw_bin", return_value="openclaw"
+        ):
+            with mock.patch.object(cli, "_run_subprocess") as run_mock:
+                cli._maybe_send_telegram_approval_prompt(
+                    "trd_abc",
+                    "base_sepolia",
+                    {"amountInHuman": "5", "tokenInSymbol": "WETH", "tokenOutSymbol": "USDC"},
+                )
+            self.assertEqual(run_mock.call_count, 0)
 
     def test_telegram_transfer_prompt_includes_details_and_callbacks(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir, mock.patch.object(cli, "APP_DIR", pathlib.Path(tmpdir)), mock.patch.object(
