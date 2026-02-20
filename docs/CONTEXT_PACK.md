@@ -1421,3 +1421,33 @@ Complete Uniswap LP integration by adding `migrate` and `claim_rewards` with the
   - `packages/shared-schemas/json/liquidity-status.schema.json`
 - Stage flags:
   - `config/chains/*.json` `uniswapApi.{migrateEnabled,claimRewardsEnabled}`
+
+## Slice 104 Context Pack (2026-02-20): LP Migrate/Claim-Rewards Promotion
+
+### Objective
+Promote already-implemented Uniswap LP `migrate` and `claim_rewards` operations from Sepolia-only staging to all repo target chains without changing runtime architecture.
+
+### Constraints
+- Agent runtime wallet remains execution/signing source of truth.
+- Uniswap API key remains server-only.
+- No synthetic fallback for unsupported operations; fail closed deterministically.
+
+### Primary touchpoints
+- Chain promotion configs:
+  - `config/chains/ethereum.json`
+  - `config/chains/base_mainnet.json`
+  - `config/chains/arbitrum_mainnet.json`
+  - `config/chains/op_mainnet.json`
+  - `config/chains/polygon_mainnet.json`
+  - `config/chains/avalanche_mainnet.json`
+  - `config/chains/bnb_mainnet.json`
+  - `config/chains/zksync_mainnet.json`
+  - `config/chains/unichain_mainnet.json`
+  - `config/chains/monad_mainnet.json`
+- Canonical sync:
+  - `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - `docs/XCLAW_SLICE_TRACKER.md`
+  - `docs/XCLAW_BUILD_ROADMAP.md`
+  - `spec.md`
+  - `tasks.md`
+  - `acceptance.md`

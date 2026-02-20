@@ -5601,3 +5601,30 @@ Date (UTC): 2026-02-19
 - `npm run seed:verify` -> PASS
 - `npm run build` -> PASS
 - `pm2 restart all` -> PASS
+
+## Slice 104 LP Operation Promotion (UTC 2026-02-20)
+
+### Implementation evidence
+- Promotion config flags enabled on:
+  - `config/chains/ethereum.json`
+  - `config/chains/base_mainnet.json`
+  - `config/chains/arbitrum_mainnet.json`
+  - `config/chains/op_mainnet.json`
+  - `config/chains/polygon_mainnet.json`
+  - `config/chains/avalanche_mainnet.json`
+  - `config/chains/bnb_mainnet.json`
+  - `config/chains/zksync_mainnet.json`
+  - `config/chains/unichain_mainnet.json`
+  - `config/chains/monad_mainnet.json`
+- `ethereum_sepolia` remains enabled for both operations.
+- Runtime/proxy execution architecture unchanged; operation-level fail-closed behavior retained.
+
+### Validation status
+- `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v` -> PASS.
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS.
+- `npm run db:parity` -> PASS
+- `npm run seed:reset` -> PASS
+- `npm run seed:load` -> PASS
+- `npm run seed:verify` -> PASS
+- `npm run build` -> PASS
+- `pm2 restart all` -> PASS

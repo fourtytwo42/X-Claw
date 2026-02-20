@@ -41,8 +41,8 @@
   "uniswapApi": {
     "enabled": true,
     "liquidityEnabled": true,
-    "migrateEnabled": false,
-    "claimRewardsEnabled": false
+    "migrateEnabled": true,
+    "claimRewardsEnabled": true
   },
   "marketData": {
     "dexscreenerChainId": "bsc"

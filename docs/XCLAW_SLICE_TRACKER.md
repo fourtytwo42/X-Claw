@@ -1997,3 +1997,28 @@ DoD:
   - mainnet targets set `migrateEnabled=false` and `claimRewardsEnabled=false` pending promotion.
 - [x] required gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
 - [x] issue #46 updated with verification evidence + commit hash(es).
+
+## Slice 104: Promote LP Migrate/Claim-Rewards to Target Mainnets
+Status: [~]
+Issue: #47
+
+Goal:
+- Promote Uniswap LP `migrate` and `claim_rewards` from Sepolia-only staging to all repo target chains with agent-first execution and deterministic fail-closed behavior.
+
+DoD:
+- [x] Canonical docs/handoff synced for Slice 104 rollout contract.
+- [x] Promotion flags set true on:
+  - [x] `ethereum`
+  - [x] `base_mainnet`
+  - [x] `arbitrum_mainnet`
+  - [x] `op_mainnet`
+  - [x] `polygon_mainnet`
+  - [x] `avalanche_mainnet`
+  - [x] `bnb_mainnet`
+  - [x] `zksync_mainnet`
+  - [x] `unichain_mainnet`
+  - [x] `monad_mainnet`
+- [x] `ethereum_sepolia` remains enabled for both operations.
+- [x] Runtime/proxy behavior unchanged: fail closed deterministically when no execution provider path exists.
+- [x] Required gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
+- [ ] Issue #47 evidence post + commit hash(es).

@@ -40,8 +40,8 @@
   "uniswapApi": {
     "enabled": true,
     "liquidityEnabled": true,
-    "migrateEnabled": false,
-    "claimRewardsEnabled": false
+    "migrateEnabled": true,
+    "claimRewardsEnabled": true
   },
   "updatedAt": "2026-02-20T10:00:00.000Z",
   "version": 1,

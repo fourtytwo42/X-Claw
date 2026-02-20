@@ -3007,3 +3007,29 @@ Implement remaining Uniswap LP operations (`migrate`, `claim_rewards`) using ser
 - `npm run seed:verify`
 - `npm run build`
 - `pm2 restart all`
+
+## Slice 104: Promote LP Migrate/Claim-Rewards to Target Mainnets
+
+### Goal
+Promote `migrate` and `claim_rewards` operation enablement from `ethereum_sepolia` to all repo target chains while preserving agent-first execution and deterministic fail-closed semantics.
+
+### Non-goals
+1. New LP web action workflows.
+2. Telegram/NL parser expansion.
+3. New fallback mechanism beyond current deterministic provider resolution.
+
+### Constraints
+1. `XCLAW_UNISWAP_API_KEY` remains server-only.
+2. Agent runtime wallet remains signing/execution source of truth.
+3. No synthetic fallback for unsupported operations; fail closed deterministically.
+4. Promotion targets:
+- `ethereum`
+- `base_mainnet`
+- `arbitrum_mainnet`
+- `op_mainnet`
+- `polygon_mainnet`
+- `avalanche_mainnet`
+- `bnb_mainnet`
+- `zksync_mainnet`
+- `unichain_mainnet`
+- `monad_mainnet`

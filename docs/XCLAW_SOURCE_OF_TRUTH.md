@@ -4187,3 +4187,34 @@ Limitations / notes:
   - `fallbackReason`
   - `uniswapLpOperation` (`migrate|claim_rewards`)
 - Liquidity status schema enum supports these new operation values for persisted details payloads.
+
+## 84) Slice 104 LP Operation Promotion Contract (Locked)
+
+1. Scope:
+- Promote already-implemented Uniswap LP operations `migrate` and `claim_rewards` from Sepolia to the full repo target chain set.
+- Keep agent wallet runtime as execution/signing source of truth.
+
+2. Promotion chain set:
+- `ethereum`, `base_mainnet`, `arbitrum_mainnet`, `op_mainnet`, `polygon_mainnet`,
+  `avalanche_mainnet`, `bnb_mainnet`, `zksync_mainnet`, `unichain_mainnet`, `monad_mainnet`.
+
+3. Runtime behavior lock:
+- `uniswap_api` operation path remains primary where operation flags are enabled.
+- No synthetic fallback for unsupported operations; fail closed deterministically when no valid path exists.
+
+4. Deterministic failure contract:
+- Preserve operation-level fail-closed semantics for unavailable providers using stable runtime codes, including `no_execution_provider_available`.
+
+5. Provenance lock:
+- Runtime outputs and persisted liquidity details continue surfacing:
+  - `providerRequested`
+  - `providerUsed`
+  - `fallbackUsed`
+  - `fallbackReason`
+  - `uniswapLpOperation` (`migrate|claim_rewards`)
+
+6. Final rollout truth for Slice 104:
+- `uniswapApi.migrateEnabled=true` and `uniswapApi.claimRewardsEnabled=true` on:
+  - `ethereum_sepolia`, `ethereum`, `base_mainnet`, `arbitrum_mainnet`, `op_mainnet`,
+    `polygon_mainnet`, `avalanche_mainnet`, `bnb_mainnet`, `zksync_mainnet`,
+    `unichain_mainnet`, `monad_mainnet`.

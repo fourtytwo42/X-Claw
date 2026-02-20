@@ -3432,3 +3432,37 @@ Note:
   - [x] `npm run build`
   - [x] `pm2 restart all`
 - [ ] Issue #46 evidence post + commit hash(es).
+
+## 104) Slice 104: LP Operation Promotion (Migrate + Claim Rewards)
+
+### 104.1 Canonical/doc sync
+- [x] Add Slice 104 entries to `docs/XCLAW_SLICE_TRACKER.md` and this roadmap section.
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` with final promoted chain-state truth.
+- [x] Update handoff artifacts: `docs/CONTEXT_PACK.md`, `spec.md`, `tasks.md`, `acceptance.md`.
+
+### 104.2 Chain promotion rollout
+- [x] Promote to enabled (`uniswapApi.migrateEnabled=true`, `uniswapApi.claimRewardsEnabled=true`):
+  - [x] `ethereum`
+  - [x] `base_mainnet`
+  - [x] `arbitrum_mainnet`
+  - [x] `op_mainnet`
+  - [x] `polygon_mainnet`
+  - [x] `avalanche_mainnet`
+  - [x] `bnb_mainnet`
+  - [x] `zksync_mainnet`
+  - [x] `unichain_mainnet`
+  - [x] `monad_mainnet`
+- [x] Keep `ethereum_sepolia` enabled.
+
+### 104.3 Validation + evidence
+- [x] Runtime regression tests:
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- [x] Required gates run sequentially:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `pm2 restart all`
+- [ ] Issue #47 evidence post + commit hash(es).
