@@ -19,6 +19,7 @@
     "test:liquidity:contract": "node infrastructure/scripts/liquidity-contract-tests.mjs",
     "test:management:liquidity:decision": "node infrastructure/scripts/management-approvals-liquidity-tests.mjs",
     "test:faucet:contract": "node infrastructure/scripts/faucet-contract-tests.mjs",
+    "test:tokens:mirror:contract": "node infrastructure/scripts/tokens-mirror-contract-tests.mjs",
     "ops:faucet:reset-rate-limit": "node infrastructure/scripts/faucet-rate-limit-reset.mjs",
     "ops:faucet:audit-mappings": "node infrastructure/scripts/faucet-audit-wallet-mappings.mjs",
     "ops:faucet:fix-mapping": "node infrastructure/scripts/faucet-fix-wallet-mapping.mjs",

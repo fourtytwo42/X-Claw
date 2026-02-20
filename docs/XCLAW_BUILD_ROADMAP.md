@@ -3115,6 +3115,7 @@ Note:
 - [x] Enable official Hedera wrap path (`wallet wrap-native`) and helper-based faucet auto-wrap fallback (`faucet_wrapped_autowrap_failed` deterministic contract).
 - [x] Rebalance Hedera faucet default drips to operational test values (5 HBAR / 5 WHBAR / 10 USDC) in route defaults + chain-scoped env overrides.
 - [x] Hedera runtime `wallet balance` merges mirror-node discovered token holdings so non-canonical owned tokens (for example USDC) appear in `tokens[]`.
+- [x] Add user-token tracking contract (`wallet track-token|untrack-token|tracked-tokens`) with dedicated server mirror (`/api/v1/agent/tokens/mirror`) and deposit sync inclusion for tracked-token web holdings.
 - [x] Add route-level faucet contract test (`npm run test:faucet:contract`) covering demo-agent block and non-demo deterministic error semantics.
 - [x] Installer warmup diagnostics now emit faucet `code/message/actionHint/requestId` and exact rerun command.
 - [x] Faucet self-recipient sends are hard-blocked (`faucet_recipient_not_eligible`) and success payload includes `recipientAddress` + `faucetAddress`.

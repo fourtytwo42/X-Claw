@@ -138,6 +138,15 @@ class LiquidityExecutionError(WalletStoreError):
         self.details = details or {}
 
 
+class TokenResolutionError(WalletStoreError):
+    """Token resolution failed with deterministic code/details."""
+
+    def __init__(self, code: str, message: str, details: dict[str, Any] | None = None):
+        super().__init__(message)
+        self.code = str(code or "invalid_input").strip() or "invalid_input"
+        self.details = details or {}
+
+
 class SubprocessTimeout(WalletStoreError):
     """A subprocess operation timed out (cast call/receipt/send/etc)."""
 
@@ -373,6 +382,238 @@ def _set_runtime_default_chain(chain: str) -> None:
     save_state(state)
 
 
+def _tracked_token_limit() -> int:
+    return _env_positive_int("XCLAW_TRACKED_TOKEN_LIMIT", 200)
+
+
+def _tracked_tokens_state(state: dict[str, Any], create: bool = True) -> dict[str, Any]:
+    bucket = state.get("trackedTokens")
+    if isinstance(bucket, dict):
+        return bucket
+    if not create:
+        return {}
+    bucket = {}
+    state["trackedTokens"] = bucket
+    return bucket
+
+
+def _normalize_tracked_token_addresses(values: list[Any]) -> list[str]:
+    out: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        token = str(value or "").strip().lower()
+        if not is_hex_address(token):
+            continue
+        if token in seen:
+            continue
+        seen.add(token)
+        out.append(token)
+    return out
+
+
+def _tracked_tokens_chain_entry(state: dict[str, Any], chain: str, create: bool = True) -> dict[str, Any]:
+    tracked = _tracked_tokens_state(state, create=create)
+    row = tracked.get(chain)
+    if isinstance(row, dict):
+        return row
+    if not create:
+        return {}
+    row = {"addresses": [], "metadata": {}}
+    tracked[chain] = row
+    return row
+
+
+def _get_tracked_token_addresses(chain: str) -> list[str]:
+    state = load_state()
+    row = _tracked_tokens_chain_entry(state, chain, create=False)
+    addresses = row.get("addresses")
+    if not isinstance(addresses, list):
+        return []
+    return _normalize_tracked_token_addresses(addresses)
+
+
+def _set_tracked_token_addresses(chain: str, addresses: list[str]) -> None:
+    state = load_state()
+    row = _tracked_tokens_chain_entry(state, chain, create=True)
+    row["addresses"] = _normalize_tracked_token_addresses(addresses)
+    meta = row.get("metadata")
+    if not isinstance(meta, dict):
+        meta = {}
+    normalized = {addr.lower() for addr in row["addresses"]}
+    row["metadata"] = {k: v for k, v in meta.items() if isinstance(k, str) and k.lower() in normalized}
+    save_state(state)
+
+
+def _tracked_token_metadata_map(chain: str) -> dict[str, dict[str, Any]]:
+    state = load_state()
+    row = _tracked_tokens_chain_entry(state, chain, create=False)
+    meta = row.get("metadata")
+    if not isinstance(meta, dict):
+        return {}
+    out: dict[str, dict[str, Any]] = {}
+    for token, value in meta.items():
+        if not isinstance(token, str) or not is_hex_address(token):
+            continue
+        if isinstance(value, dict):
+            out[token.lower()] = value
+    return out
+
+
+def _set_tracked_token_metadata(chain: str, token: str, metadata: dict[str, Any]) -> None:
+    normalized = str(token or "").strip().lower()
+    if not is_hex_address(normalized):
+        return
+    state = load_state()
+    row = _tracked_tokens_chain_entry(state, chain, create=True)
+    meta = row.get("metadata")
+    if not isinstance(meta, dict):
+        meta = {}
+        row["metadata"] = meta
+    meta[normalized] = metadata
+    save_state(state)
+
+
+def _upsert_tracked_token_local(
+    chain: str,
+    token: str,
+    *,
+    symbol: str | None,
+    name: str | None,
+    decimals: int | None,
+) -> dict[str, Any]:
+    normalized = str(token or "").strip().lower()
+    if not is_hex_address(normalized):
+        raise TokenResolutionError(
+            "invalid_token_address",
+            "Invalid token address format.",
+            {"chain": chain, "token": token},
+        )
+    addresses = _get_tracked_token_addresses(chain)
+    existed = normalized in addresses
+    if not existed and len(addresses) >= _tracked_token_limit():
+        raise TokenResolutionError(
+            "tracked_token_limit_reached",
+            "Tracked token limit reached for this chain.",
+            {"chain": chain, "limit": _tracked_token_limit()},
+        )
+    if not existed:
+        addresses.append(normalized)
+        _set_tracked_token_addresses(chain, addresses)
+    metadata = {
+        "token": normalized,
+        "symbol": str(symbol or "").strip() or None,
+        "name": str(name or "").strip() or None,
+        "decimals": int(decimals) if isinstance(decimals, int) else (int(decimals) if decimals is not None else None),
+        "updatedAt": utc_now(),
+    }
+    _set_tracked_token_metadata(chain, normalized, metadata)
+    metadata["created"] = not existed
+    return metadata
+
+
+def _remove_tracked_token_local(chain: str, token: str) -> bool:
+    normalized = str(token or "").strip().lower()
+    if not is_hex_address(normalized):
+        raise TokenResolutionError(
+            "invalid_token_address",
+            "Invalid token address format.",
+            {"chain": chain, "token": token},
+        )
+    addresses = _get_tracked_token_addresses(chain)
+    if normalized not in addresses:
+        return False
+    remaining = [addr for addr in addresses if addr != normalized]
+    _set_tracked_token_addresses(chain, remaining)
+    return True
+
+
+def _tracked_tokens_for_chain(chain: str) -> list[dict[str, Any]]:
+    addresses = _get_tracked_token_addresses(chain)
+    metadata = _tracked_token_metadata_map(chain)
+    out: list[dict[str, Any]] = []
+    for token in addresses:
+        row = metadata.get(token, {})
+        symbol = str(row.get("symbol") or "").strip() or None
+        name = str(row.get("name") or "").strip() or None
+        decimals_raw = row.get("decimals")
+        decimals: int | None
+        if isinstance(decimals_raw, int):
+            decimals = decimals_raw
+        elif isinstance(decimals_raw, str) and re.fullmatch(r"[0-9]+", decimals_raw):
+            decimals = int(decimals_raw)
+        else:
+            decimals = None
+        out.append({"token": token, "symbol": symbol, "name": name, "decimals": decimals})
+    return out
+
+
+def _mirror_tracked_tokens(chain: str) -> bool:
+    try:
+        api_key = _resolve_api_key()
+        agent_id = _resolve_agent_id(api_key)
+        if not agent_id:
+            return False
+        payload = {
+            "agentId": agent_id,
+            "chainKey": chain,
+            "tokens": _tracked_tokens_for_chain(chain),
+        }
+        status_code, _body = _api_request(
+            "POST",
+            "/agent/tokens/mirror",
+            payload=payload,
+            include_idempotency=True,
+            idempotency_key=f"rt-agent-token-mirror-{chain}-{secrets.token_hex(8)}",
+        )
+        return 200 <= status_code < 300
+    except Exception:
+        return False
+
+
+def _sync_tracked_tokens_from_remote(chain: str) -> bool:
+    try:
+        status_code, body = _api_request("GET", f"/agent/tokens?chainKey={urllib.parse.quote(chain)}")
+        if status_code < 200 or status_code >= 300:
+            return False
+        items = body.get("items")
+        if not isinstance(items, list):
+            return False
+        current = _tracked_tokens_for_chain(chain)
+        merged: dict[str, dict[str, Any]] = {}
+        for row in current:
+            token = str(row.get("token") or "").strip().lower()
+            if is_hex_address(token):
+                merged[token] = row
+        for row in items:
+            if not isinstance(row, dict):
+                continue
+            token = str(row.get("tokenAddress") or row.get("token") or "").strip().lower()
+            if not is_hex_address(token):
+                continue
+            merged[token] = {
+                "token": token,
+                "symbol": str(row.get("symbol") or "").strip() or None,
+                "name": str(row.get("name") or "").strip() or None,
+                "decimals": row.get("decimals"),
+            }
+        _set_tracked_token_addresses(chain, list(merged.keys()))
+        for token, row in merged.items():
+            _set_tracked_token_metadata(
+                chain,
+                token,
+                {
+                    "token": token,
+                    "symbol": row.get("symbol"),
+                    "name": row.get("name"),
+                    "decimals": row.get("decimals"),
+                    "updatedAt": utc_now(),
+                },
+            )
+        return True
+    except Exception:
+        return False
+
+
 def _default_wallet_store() -> dict[str, Any]:
     return {
         "version": WALLET_STORE_VERSION,
@@ -428,6 +669,7 @@ def remove_wallet_entry(chain: str) -> bool:
         existed = True
 
     try:
+        _sync_tracked_tokens_from_remote(chain)
         store = load_wallet_store()
     except (WalletStoreError, WalletSecurityError):
         return existed
@@ -5630,7 +5872,23 @@ def _resolve_token_address(chain: str, token_or_symbol: str) -> str:
     value = token_map.get(symbol)
     if value and is_hex_address(value):
         return value
-    raise WalletStoreError("token must be a 0x address or a canonical token symbol for the active chain.")
+    tracked = _tracked_tokens_for_chain(chain)
+    matches: list[str] = []
+    for row in tracked:
+        tracked_symbol = str(row.get("symbol") or "").strip().upper()
+        token = str(row.get("token") or "").strip().lower()
+        if tracked_symbol == symbol and is_hex_address(token):
+            matches.append(token)
+    deduped = sorted(set(matches))
+    if len(deduped) == 1:
+        return deduped[0]
+    if len(deduped) > 1:
+        raise TokenResolutionError(
+            "token_symbol_ambiguous",
+            "Tracked token symbol matches multiple token addresses.",
+            {"chain": chain, "tokenSymbol": symbol, "choices": deduped},
+        )
+    raise WalletStoreError("token must be a 0x address, canonical token symbol, or uniquely tracked token symbol for the active chain.")
 
 
 def _token_symbol_for_display(chain: str, token_or_symbol: str) -> str:
@@ -5645,6 +5903,12 @@ def _token_symbol_for_display(chain: str, token_or_symbol: str) -> str:
     for symbol, address in token_map.items():
         if str(address or "").strip().lower() == normalized:
             return str(symbol or "").strip() or value
+    tracked = _tracked_tokens_for_chain(chain)
+    for row in tracked:
+        token = str(row.get("token") or "").strip().lower()
+        symbol = str(row.get("symbol") or "").strip()
+        if token and token == normalized and symbol:
+            return symbol
     return value
 
 
@@ -8491,15 +8755,40 @@ def _fetch_wallet_holdings(chain: str) -> dict[str, Any]:
             )
         except Exception as exc:
             token_errors.append({"symbol": symbol, "token": token_address, "message": str(exc)})
+    known_tokens = {str(item.get("token") or "").lower() for item in token_balances if isinstance(item, dict)}
+    for row in _tracked_tokens_for_chain(chain):
+        token_address = str(row.get("token") or "").strip().lower()
+        if not is_hex_address(token_address) or token_address in known_tokens:
+            continue
+        try:
+            balance_wei = _fetch_token_balance_wei(chain, address, token_address)
+            balance_int = int(balance_wei)
+            if balance_int <= 0:
+                continue
+            meta = _fetch_erc20_metadata(chain, token_address)
+            decimals = int(meta.get("decimals", row.get("decimals") or 18))
+            symbol = str(meta.get("symbol") or row.get("symbol") or token_address)
+            token_balances.append(
+                {
+                    "symbol": symbol,
+                    "token": token_address,
+                    "balanceWei": balance_wei,
+                    "balance": _format_units(balance_int, decimals),
+                    "balancePretty": _format_units_pretty(balance_int, decimals),
+                    "decimals": decimals,
+                }
+            )
+            known_tokens.add(token_address)
+        except Exception as exc:
+            token_errors.append({"source": "tracked", "token": token_address, "message": str(exc)})
     if _is_hedera_chain(chain):
         try:
             discovered, discover_errors = _discover_hedera_wallet_tokens(chain, address)
-            known = {str(item.get("token") or "").lower() for item in token_balances if isinstance(item, dict)}
             for item in discovered:
                 token_addr = str(item.get("token") or "").lower()
-                if token_addr and token_addr not in known:
+                if token_addr and token_addr not in known_tokens:
                     token_balances.append(item)
-                    known.add(token_addr)
+                    known_tokens.add(token_addr)
             token_errors.extend(discover_errors)
         except Exception as exc:
             token_errors.append({"source": "hedera_mirror", "message": str(exc)})
@@ -9602,6 +9891,117 @@ def cmd_wallet_send(args: argparse.Namespace) -> int:
         return fail("send_failed", str(exc), "Inspect runtime send configuration and retry.", {"chain": chain}, exit_code=1)
 
 
+def cmd_wallet_track_token(args: argparse.Namespace) -> int:
+    chk = require_json_flag(args)
+    if chk is not None:
+        return chk
+    chain = str(args.chain or "").strip()
+    token = str(args.token or "").strip().lower()
+    if not is_hex_address(token):
+        return fail(
+            "invalid_token_address",
+            "Invalid token address format.",
+            "Use 0x-prefixed 20-byte token address.",
+            {"chain": chain, "token": token},
+            exit_code=2,
+        )
+    try:
+        _sync_tracked_tokens_from_remote(chain)
+        symbol: str | None = None
+        name: str | None = None
+        decimals: int | None = None
+        try:
+            meta = _fetch_erc20_metadata(chain, token)
+            symbol = str(meta.get("symbol") or "").strip() or None
+            name = str(meta.get("name") or "").strip() or None
+            decimals = int(meta.get("decimals", 18))
+        except Exception:
+            pass
+        row = _upsert_tracked_token_local(chain, token, symbol=symbol, name=name, decimals=decimals)
+        mirror_synced = _mirror_tracked_tokens(chain)
+        return ok(
+            "Tracked token registered.",
+            chain=chain,
+            token=row.get("token"),
+            symbol=row.get("symbol"),
+            name=row.get("name"),
+            decimals=row.get("decimals"),
+            created=bool(row.get("created")),
+            trackedCount=len(_get_tracked_token_addresses(chain)),
+            mirrorSynced=mirror_synced,
+        )
+    except TokenResolutionError as exc:
+        return fail(exc.code, str(exc), "Fix token input and retry.", exc.details, exit_code=2)
+    except WalletStoreError as exc:
+        msg = str(exc)
+        if "Missing dependency: cast" in msg:
+            return fail(
+                "missing_dependency",
+                msg,
+                "Install Foundry and ensure `cast` is on PATH.",
+                {"dependency": "cast"},
+                exit_code=1,
+            )
+        return fail("track_token_failed", msg, "Verify wallet and chain configuration, then retry.", {"chain": chain}, exit_code=1)
+    except Exception as exc:
+        return fail("track_token_failed", str(exc), "Inspect token tracking configuration and retry.", {"chain": chain}, exit_code=1)
+
+
+def cmd_wallet_untrack_token(args: argparse.Namespace) -> int:
+    chk = require_json_flag(args)
+    if chk is not None:
+        return chk
+    chain = str(args.chain or "").strip()
+    token = str(args.token or "").strip().lower()
+    if not is_hex_address(token):
+        return fail(
+            "invalid_token_address",
+            "Invalid token address format.",
+            "Use 0x-prefixed 20-byte token address.",
+            {"chain": chain, "token": token},
+            exit_code=2,
+        )
+    try:
+        _sync_tracked_tokens_from_remote(chain)
+        removed = _remove_tracked_token_local(chain, token)
+        if not removed:
+            return fail(
+                "token_not_tracked",
+                "Token is not currently tracked for this chain.",
+                "Track the token first or verify the token address and chain.",
+                {"chain": chain, "token": token},
+                exit_code=1,
+            )
+        mirror_synced = _mirror_tracked_tokens(chain)
+        return ok(
+            "Tracked token removed.",
+            chain=chain,
+            token=token,
+            trackedCount=len(_get_tracked_token_addresses(chain)),
+            mirrorSynced=mirror_synced,
+        )
+    except TokenResolutionError as exc:
+        return fail(exc.code, str(exc), "Fix token input and retry.", exc.details, exit_code=2)
+    except Exception as exc:
+        return fail("untrack_token_failed", str(exc), "Inspect token tracking configuration and retry.", {"chain": chain}, exit_code=1)
+
+
+def cmd_wallet_tracked_tokens(args: argparse.Namespace) -> int:
+    chk = require_json_flag(args)
+    if chk is not None:
+        return chk
+    chain = str(args.chain or "").strip()
+    synced = _sync_tracked_tokens_from_remote(chain)
+    items = _tracked_tokens_for_chain(chain)
+    return ok(
+        "Tracked tokens fetched.",
+        chain=chain,
+        count=len(items),
+        items=items,
+        remoteSync=bool(synced),
+    )
+
+
 def cmd_wallet_send_token(args: argparse.Namespace) -> int:
     chk = require_json_flag(args)
     if chk is not None:
@@ -9719,6 +10119,8 @@ def cmd_wallet_send_token(args: argparse.Namespace) -> int:
         return emit(_execute_pending_transfer_flow(flow))
     except WalletPolicyError as exc:
         return fail(exc.code, str(exc), exc.action_hint, exc.details, exit_code=1)
+    except TokenResolutionError as exc:
+        return fail(exc.code, str(exc), "Use a token address or a unique tracked symbol.", exc.details, exit_code=2)
     except WalletPassphraseError as exc:
         return fail("non_interactive", str(exc), "Set XCLAW_WALLET_PASSPHRASE or run with TTY attached.", {"chain": chain}, exit_code=2)
     except WalletSecurityError as exc:
@@ -10643,6 +11045,23 @@ def build_parser() -> argparse.ArgumentParser:
     w_tbal.add_argument("--chain", required=True)
     w_tbal.add_argument("--json", action="store_true")
     w_tbal.set_defaults(func=cmd_wallet_token_balance)
+
+    w_track_token = wallet_sub.add_parser("track-token")
+    w_track_token.add_argument("--token", required=True)
+    w_track_token.add_argument("--chain", required=True)
+    w_track_token.add_argument("--json", action="store_true")
+    w_track_token.set_defaults(func=cmd_wallet_track_token)
+
+    w_untrack_token = wallet_sub.add_parser("untrack-token")
+    w_untrack_token.add_argument("--token", required=True)
+    w_untrack_token.add_argument("--chain", required=True)
+    w_untrack_token.add_argument("--json", action="store_true")
+    w_untrack_token.set_defaults(func=cmd_wallet_untrack_token)
+
+    w_tracked_tokens = wallet_sub.add_parser("tracked-tokens")
+    w_tracked_tokens.add_argument("--chain", required=True)
+    w_tracked_tokens.add_argument("--json", action="store_true")
+    w_tracked_tokens.set_defaults(func=cmd_wallet_tracked_tokens)
 
     w_wrap = wallet_sub.add_parser("wrap-native")
     w_wrap.add_argument("--amount", required=True)

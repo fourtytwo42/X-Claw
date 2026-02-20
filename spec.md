@@ -2643,3 +2643,28 @@ Ensure `wallet balance --chain hedera_testnet` shows all owned Hedera tokens for
 - Runtime `wallet balance --chain hedera_testnet --json` excludes zero-balance token rows.
 - Management deposit sync merges Hedera mirror non-zero token balances into wallet snapshots, enabling USDC visibility in web holdings.
 - Agent page wallet holdings hide zero-balance tokens for the active chain.
+
+# Slice 95N Spec Addendum: User-Added Token Tracking (UTC 2026-02-20)
+
+## Goals
+1. Let users register ERC-20 token addresses per chain so runtime can track balances and resolve send-token symbols.
+2. Mirror tracked token metadata/addresses to server using a dedicated model (no transfer-policy coupling).
+3. Make web holdings sync include tracked tokens while keeping zero-balance filtering.
+
+## Locked scope
+1. `apps/agent-runtime/xclaw_agent/cli.py`
+2. `skills/xclaw-agent/scripts/xclaw_agent_skill.py`
+3. `apps/network-web/src/app/api/v1/agent/tokens/mirror/route.ts`
+4. `apps/network-web/src/app/api/v1/agent/tokens/route.ts`
+5. `apps/network-web/src/app/api/v1/management/deposit/route.ts`
+6. `apps/network-web/src/app/api/v1/management/agent-state/route.ts`
+7. `infrastructure/migrations/0024_slice95n_agent_tracked_tokens.sql`
+8. `packages/shared-schemas/json/agent-tracked-tokens-*.schema.json`
+9. `docs/api/openapi.v1.yaml`
+10. Canonical docs (`XCLAW_SOURCE_OF_TRUTH`, `WALLET_COMMAND_CONTRACT`, tracker/roadmap, acceptance/tasks).
+
+## Acceptance checks
+- `wallet track-token --token 0x... --chain ... --json` persists tracked token locally and mirrors best-effort to server.
+- `wallet send-token` resolves unique tracked symbols and fails deterministically with `token_symbol_ambiguous` on collisions.
+- `wallet balance` includes tracked-token balances when non-zero.
+- `/api/v1/management/deposit` sync includes tracked token addresses for wallet snapshot updates.

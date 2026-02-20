@@ -2739,3 +2739,38 @@ Active slice context: `Slice 95` closure hardening.
 - [x] `pm2 restart all`
 - [!] `python3 -m unittest apps/agent-runtime/tests/test_wallet_core.py -v` (3 existing env-sensitive failures unrelated to holdings changes in this shell context).
 - [!] `curl -sS http://127.0.0.1:3000/api/v1/management/deposit?agentId=<agent>&chainKey=hedera_testnet` authenticated live verification pending valid management session cookie in this shell.
+
+# Slice 95N Tasks Update: User-Added Token Tracking (UTC 2026-02-20)
+
+## 1) Runtime + skill contract
+- [x] Add runtime commands: `wallet track-token`, `wallet untrack-token`, `wallet tracked-tokens`.
+- [x] Persist tracked token addresses/metadata in runtime state (`state.json`) per chain.
+- [x] Extend `wallet-send-token` resolution to support unique tracked symbols with deterministic ambiguity failure.
+- [x] Extend `wallet-balance` holdings merge to include non-zero tracked tokens.
+- [x] Add skill wrapper commands: `wallet-track-token`, `wallet-untrack-token`, `wallet-tracked-tokens`.
+
+## 2) Server mirror + web visibility
+- [x] Add migration `0024_slice95n_agent_tracked_tokens.sql`.
+- [x] Add agent-auth routes:
+  - [x] `POST /api/v1/agent/tokens/mirror`
+  - [x] `GET /api/v1/agent/tokens`
+- [x] Add tracked-token schemas for mirror request and response.
+- [x] Extend management deposit sync to include tracked token addresses in wallet snapshot updates.
+- [x] Extend management agent-state payload with `trackedTokens[]` metadata.
+
+## 3) Contract/docs/tests
+- [x] Update OpenAPI for new token mirror/read routes.
+- [x] Update wallet/skill/source-of-truth contracts for tracked-token command surface and behavior.
+- [x] Add runtime unit tests for tracked-token resolution/state and skill-wrapper command delegation.
+- [x] Add route-level contract script: `npm run test:tokens:mirror:contract`.
+
+## 4) Validation gates
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+- [!] `python3 -m unittest apps/agent-runtime/tests/test_wallet_core.py -v` (2 existing env-sensitive CLI tests fail in this shell context: `test_wallet_send_success_updates_spend_ledger`, `test_wallet_sign_challenge_cast_missing_rejected`; new Slice 95N tests pass).
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_x402_skill_wrapper.py -v`
+- [x] `npm run test:tokens:mirror:contract`

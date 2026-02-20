@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.xclaw.trade/agent-tracked-tokens-response.schema.json",
+  "title": "AgentTrackedTokensResponse",
+  "type": "object",
+  "required": ["ok", "agentId", "chainKey", "items"],
+  "additionalProperties": false,
+  "properties": {
+    "ok": { "type": "boolean", "const": true },
+    "agentId": { "type": "string", "minLength": 1 },
+    "chainKey": { "type": "string", "minLength": 1 },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["trackedTokenId", "tokenAddress", "source", "updatedAt"],
+        "additionalProperties": false,
+        "properties": {
+          "trackedTokenId": { "type": "string", "minLength": 1 },
+          "tokenAddress": { "type": "string", "pattern": "^0x[a-fA-F0-9]{40}$" },
+          "symbol": { "type": ["string", "null"] },
+          "name": { "type": ["string", "null"] },
+          "decimals": { "type": ["integer", "null"], "minimum": 0, "maximum": 255 },
+          "source": { "type": "string", "minLength": 1 },
+          "updatedAt": { "type": "string", "format": "date-time" },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      }
+    }
+  }
+}

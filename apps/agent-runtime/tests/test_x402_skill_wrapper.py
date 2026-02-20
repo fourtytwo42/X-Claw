@@ -218,6 +218,37 @@ class X402SkillWrapperTests(unittest.TestCase):
         self.assertEqual(code, 0)
         run_mock.assert_called_once_with(["wallet", "wrap-native", "--amount", "1", "--chain", "hedera_testnet", "--json"])
 
+    def test_wallet_track_token_delegates_to_runtime(self) -> None:
+        with mock.patch.dict("os.environ", {"XCLAW_DEFAULT_CHAIN": "hedera_testnet"}, clear=False):
+            with mock.patch.object(skill, "_run_agent", return_value=0) as run_mock:
+                code = skill.main(["xclaw_agent_skill.py", "wallet-track-token", "0x0000000000000000000000000000000000001549"])
+        self.assertEqual(code, 0)
+        run_mock.assert_called_once_with(
+            ["wallet", "track-token", "--token", "0x0000000000000000000000000000000000001549", "--chain", "hedera_testnet", "--json"]
+        )
+
+    def test_wallet_untrack_token_delegates_to_runtime(self) -> None:
+        with mock.patch.dict("os.environ", {"XCLAW_DEFAULT_CHAIN": "hedera_testnet"}, clear=False):
+            with mock.patch.object(skill, "_run_agent", return_value=0) as run_mock:
+                code = skill.main(["xclaw_agent_skill.py", "wallet-untrack-token", "0x0000000000000000000000000000000000001549"])
+        self.assertEqual(code, 0)
+        run_mock.assert_called_once_with(
+            ["wallet", "untrack-token", "--token", "0x0000000000000000000000000000000000001549", "--chain", "hedera_testnet", "--json"]
+        )
+
+    def test_wallet_tracked_tokens_delegates_to_runtime(self) -> None:
+        with mock.patch.dict("os.environ", {"XCLAW_DEFAULT_CHAIN": "hedera_testnet"}, clear=False):
+            with mock.patch.object(skill, "_run_agent", return_value=0) as run_mock:
+                code = skill.main(["xclaw_agent_skill.py", "wallet-tracked-tokens"])
+        self.assertEqual(code, 0)
+        run_mock.assert_called_once_with(["wallet", "tracked-tokens", "--chain", "hedera_testnet", "--json"])
+
+    def test_wallet_track_token_requires_address(self) -> None:
+        with mock.patch.dict("os.environ", self._ENV, clear=False):
+            code, payload = self._capture(["xclaw_agent_skill.py", "wallet-track-token"])
+        self.assertEqual(code, 2)
+        self.assertEqual(payload.get("code"), "usage")
+
     def test_faucet_request_native_only_uses_all_asset_default(self) -> None:
         env = {
             "XCLAW_API_BASE_URL": "https://xclaw.trade/api/v1",

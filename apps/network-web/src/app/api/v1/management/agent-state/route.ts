@@ -109,6 +109,18 @@ function isMissingTrackedSchema(error: unknown): boolean {
   );
 }
 
+function isMissingTrackedTokensSchema(error: unknown): boolean {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+  const code = 'code' in error ? String((error as { code?: unknown }).code ?? '') : '';
+  if (code === '42P01' || code === '42703') {
+    return true;
+  }
+  const message = 'message' in error ? String((error as { message?: unknown }).message ?? '') : '';
+  return message.includes('agent_tracked_tokens');
+}
+
 export async function GET(req: NextRequest) {
   const requestId = getRequestId(req);
 
@@ -206,7 +218,8 @@ export async function GET(req: NextRequest) {
       transferPolicyMirror,
       liquidityPositions,
       trackedAgents,
-      trackedRecentTrades
+      trackedRecentTrades,
+      trackedTokens
     ] = await Promise.all([
       dbQuery<{
         agent_id: string;
@@ -718,6 +731,39 @@ export async function GET(req: NextRequest) {
           return { rowCount: 0, rows: [] };
         }
         throw error;
+      }),
+      dbQuery<{
+        tracked_token_id: string;
+        token_address: string;
+        symbol: string | null;
+        name: string | null;
+        decimals: number | null;
+        source: string;
+        created_at: string;
+        updated_at: string;
+      }>(
+        `
+        select
+          tracked_token_id,
+          token_address,
+          symbol,
+          name,
+          decimals,
+          source,
+          created_at::text,
+          updated_at::text
+        from agent_tracked_tokens
+        where agent_id = $1
+          and chain_key = $2
+        order by updated_at desc
+        limit 200
+        `,
+        [agentId, chainKey]
+      ).catch((error) => {
+        if (isMissingTrackedTokensSchema(error)) {
+          return { rowCount: 0, rows: [] };
+        }
+        throw error;
       })
     ]);
 
@@ -884,6 +930,16 @@ export async function GET(req: NextRequest) {
           txHash: row.tx_hash,
           executedAt: row.executed_at,
           createdAt: row.created_at
+        })),
+        trackedTokens: trackedTokens.rows.map((row) => ({
+          trackedTokenId: row.tracked_token_id,
+          tokenAddress: row.token_address,
+          symbol: row.symbol,
+          name: row.name,
+          decimals: row.decimals,
+          source: row.source,
+          createdAt: row.created_at,
+          updatedAt: row.updated_at
         })),
         managementSession: {
           sessionId: auth.session.sessionId,

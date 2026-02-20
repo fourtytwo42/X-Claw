@@ -1820,4 +1820,5 @@ DoD:
 - [x] Ops tooling includes faucet wallet-mapping audit/fix scripts (`ops:faucet:audit-mappings`, `ops:faucet:fix-mapping`) to detect/remediate agent-chain mappings that point to faucet signer addresses.
 - [x] installer warmup logs include faucet `code/message/actionHint/requestId` and explicit rerun diagnostics; install remains non-fatal on warmup failure after wallet/register invariants pass.
 - [x] Hedera wallet balance visibility includes mirror-node discovered token holdings for the requested chain, so non-canonical owned tokens are surfaced in runtime `tokens[]`.
+- [x] Runtime/skill now support user-added token tracking by address (`wallet-track-token`, `wallet-untrack-token`, `wallet-tracked-tokens`), and tracked tokens are included in non-zero holdings + `wallet-send-token` symbol resolution (deterministic `token_symbol_ambiguous` on collisions).
 - [x] final docs sync + issue evidence posts with commit hashes.

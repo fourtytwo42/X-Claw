@@ -1196,6 +1196,9 @@ The skill wrapper commands below are required (JSON output contract):
 - `python3 scripts/xclaw_agent_skill.py wallet-balance`
 - `python3 scripts/xclaw_agent_skill.py wallet-token-balance <token_address>`
 - `python3 scripts/xclaw_agent_skill.py wallet-send-token <token_or_symbol> <to> <amount_wei>`
+- `python3 scripts/xclaw_agent_skill.py wallet-track-token <token_address>`
+- `python3 scripts/xclaw_agent_skill.py wallet-untrack-token <token_address>`
+- `python3 scripts/xclaw_agent_skill.py wallet-tracked-tokens`
 - `python3 scripts/xclaw_agent_skill.py default-chain-get`
 - `python3 scripts/xclaw_agent_skill.py default-chain-set <chain_key>`
 - `python3 scripts/xclaw_agent_skill.py request-x402-payment`
@@ -1217,6 +1220,7 @@ Additional locked reliability requirements for skill/runtime usage:
 - `wallet-health` ok responses should include actionable guidance (`nextAction` and `actionHint`).
 - `wallet-balance` should return combined holdings in one payload: native fields plus token balances (`tokens[]`) and non-fatal token fetch failures (`tokenErrors[]`).
 - `tokens[]` should include only owned/non-zero token holdings for the requested chain (zero-balance token rows should not be rendered in runtime or web holdings views).
+- tracked token behavior: users can register EVM token addresses per chain (`wallet-track-token`), and those tracked token addresses participate in runtime holdings fetch and `wallet-send-token` symbol/address resolution.
 - Hedera chain behavior: `wallet-balance` must merge mirror-node discovered token holdings (non-zero balances for the wallet account) into `tokens[]` so owned tokens are visible even when not present in chain canonical token map.
 - `faucet-request` rate-limit failures should surface machine-readable retry timing when available (`retryAfterSec` from server details).
 - `trade-spot` gas output should include both exact numeric ETH (`totalGasCostEthExact`) and display-friendly pretty form (`totalGasCostEthPretty`), while keeping backward-compatible `totalGasCostEth`.
@@ -1251,6 +1255,9 @@ Delegated runtime CLI commands that must exist:
 - `xclaw-agent wallet send-token --token <token_or_symbol> --to <address> --amount-wei <amount_wei> --chain <chain_key> --json`
 - `xclaw-agent wallet balance --chain <chain_key> --json`
 - `xclaw-agent wallet token-balance --token <token_address> --chain <chain_key> --json`
+- `xclaw-agent wallet track-token --token <token_address> --chain <chain_key> --json`
+- `xclaw-agent wallet untrack-token --token <token_address> --chain <chain_key> --json`
+- `xclaw-agent wallet tracked-tokens --chain <chain_key> --json`
 - `xclaw-agent default-chain get --json`
 - `xclaw-agent default-chain set --chain <chain_key> --json`
 - `xclaw-agent x402 receive-request --network <network> --facilitator <facilitator> --amount-atomic <amount_atomic> [--asset-kind <native|erc20>] [--asset-symbol <symbol>] [--asset-address <0x...>] [--resource-description <text>] --json`
@@ -2951,7 +2958,7 @@ Limitations / notes:
    - `transferApprovalMode`: `auto | per_transfer`,
    - `allowedTransferTokens`: token-address list for ERC-20 auto-approval when mode is `per_transfer`,
    - `nativeTransferPreapproved`: boolean for native sends when mode is `per_transfer`.
-   - `wallet-send-token` accepts canonical token symbol or token address; runtime resolves to canonical token address before policy evaluation/execution.
+   - `wallet-send-token` accepts canonical token symbol, tracked token symbol (when unique), or token address; runtime resolves deterministically before policy evaluation/execution.
 5. Single-trigger behavior:
    - one user transfer intent must be sufficient,
    - if approval is required, queued message includes:

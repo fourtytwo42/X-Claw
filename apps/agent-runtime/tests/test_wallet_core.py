@@ -46,6 +46,7 @@ class WalletCoreUnitTests(unittest.TestCase):
         with (
             mock.patch.object(cli, "_require_api_base_url", return_value="https://xclaw.trade/api/v1"),
             mock.patch.object(cli, "_resolve_api_key", return_value="old-key"),
+            mock.patch.object(cli, "_resolve_runtime_default_chain", return_value=("base_sepolia", "state")),
             mock.patch.object(cli, "_recover_api_key_with_wallet_signature", return_value="new-key") as recover_mock,
             mock.patch.object(
                 cli,
@@ -159,6 +160,78 @@ class WalletCoreUnitTests(unittest.TestCase):
         symbols = {str(t.get("symbol")) for t in holdings.get("tokens", []) if isinstance(t, dict)}
         self.assertIn("WHBAR", symbols)
         self.assertIn("USDC", symbols)
+
+    def test_resolve_token_address_uses_unique_tracked_symbol(self) -> None:
+        with mock.patch.object(
+            cli,
+            "_tracked_tokens_for_chain",
+            return_value=[{"token": "0x" + "11" * 20, "symbol": "USDCX"}],
+        ), mock.patch.object(cli, "_canonical_token_map", return_value={}):
+            resolved = cli._resolve_token_address("hedera_testnet", "USDCX")
+        self.assertEqual(resolved, "0x" + "11" * 20)
+
+    def test_resolve_token_address_rejects_ambiguous_tracked_symbol(self) -> None:
+        with mock.patch.object(
+            cli,
+            "_tracked_tokens_for_chain",
+            return_value=[
+                {"token": "0x" + "11" * 20, "symbol": "USDCX"},
+                {"token": "0x" + "22" * 20, "symbol": "USDCX"},
+            ],
+        ), mock.patch.object(cli, "_canonical_token_map", return_value={}):
+            with self.assertRaises(cli.TokenResolutionError) as ctx:
+                cli._resolve_token_address("hedera_testnet", "USDCX")
+        self.assertEqual(ctx.exception.code, "token_symbol_ambiguous")
+
+    def test_cmd_wallet_track_token_persists_local_state(self) -> None:
+        args = argparse.Namespace(chain="hedera_testnet", token="0x" + "11" * 20, json=True)
+        state: dict = {}
+
+        def _load() -> dict:
+            return json.loads(json.dumps(state))
+
+        def _save(new_state: dict) -> None:
+            state.clear()
+            state.update(json.loads(json.dumps(new_state)))
+
+        with (
+            mock.patch.object(cli, "load_state", side_effect=_load),
+            mock.patch.object(cli, "save_state", side_effect=_save),
+            mock.patch.object(cli, "_sync_tracked_tokens_from_remote", return_value=False),
+            mock.patch.object(cli, "_fetch_erc20_metadata", return_value={"symbol": "USDCX", "name": "USD Coin X", "decimals": 6}),
+            mock.patch.object(cli, "_mirror_tracked_tokens", return_value=True),
+        ):
+            code = cli.cmd_wallet_track_token(args)
+        self.assertEqual(code, 0)
+        tracked = (((state.get("trackedTokens") or {}).get("hedera_testnet") or {}).get("addresses") or [])
+        self.assertIn("0x" + "11" * 20, tracked)
+
+    def test_cmd_wallet_untrack_token_reports_not_tracked(self) -> None:
+        args = argparse.Namespace(chain="hedera_testnet", token="0x" + "11" * 20, json=True)
+        with (
+            mock.patch.object(cli, "_sync_tracked_tokens_from_remote", return_value=False),
+            mock.patch.object(cli, "load_state", return_value={}),
+            mock.patch.object(cli, "save_state"),
+        ):
+            code = cli.cmd_wallet_untrack_token(args)
+        self.assertEqual(code, 1)
+
+    def test_fetch_wallet_holdings_includes_nonzero_tracked_token(self) -> None:
+        wallet = {"address": "0x" + "11" * 20, "crypto": {"enc": "aes-256-gcm", "kdf": "argon2id", "kdfParams": {}, "saltB64": "AA==", "nonceB64": "AA==", "ciphertextB64": "AA=="}}
+        with (
+            mock.patch.object(cli, "load_wallet_store", return_value={"chains": {"base_sepolia": "w1"}, "wallets": {"w1": wallet}}),
+            mock.patch.object(cli, "_chain_wallet", return_value=("w1", wallet)),
+            mock.patch.object(cli, "_validate_wallet_entry_shape"),
+            mock.patch.object(cli, "_fetch_native_balance_wei", return_value=str(2 * 10**18)),
+            mock.patch.object(cli, "_canonical_token_map", return_value={}),
+            mock.patch.object(cli, "_tracked_tokens_for_chain", return_value=[{"token": "0x" + "33" * 20, "symbol": "USDCX", "decimals": 6}]),
+            mock.patch.object(cli, "_fetch_token_balance_wei", return_value=str(130000)),
+            mock.patch.object(cli, "_fetch_erc20_metadata", return_value={"symbol": "USDCX", "decimals": 6}),
+            mock.patch.object(cli, "_is_hedera_chain", return_value=False),
+        ):
+            holdings = cli._fetch_wallet_holdings("base_sepolia")
+        symbols = {str(t.get("symbol")) for t in holdings.get("tokens", []) if isinstance(t, dict)}
+        self.assertIn("USDCX", symbols)
 
 
 class WalletCoreCliTests(unittest.TestCase):

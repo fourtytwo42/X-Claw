@@ -19,19 +19,22 @@ Required wallet commands:
 7. `wallet-balance`
 8. `wallet-token-balance <token_address>`
 9. `wallet-send-token <token_or_symbol> <to> <amount_wei>`
-10. `wallet-remove`
-11. `transfer-policy-get`
-12. `transfer-policy-set`
-13. `transfer-resume`
-14. `transfer-decide`
-15. `liquidity-add`
-16. `liquidity-remove`
-17. `liquidity-positions`
-18. `liquidity-quote-add`
-19. `liquidity-quote-remove`
-20. `default-chain-get`
-21. `default-chain-set <chain_key>`
-22. `wallet-wrap-native <amount>`
+10. `wallet-track-token <token_address>`
+11. `wallet-untrack-token <token_address>`
+12. `wallet-tracked-tokens`
+13. `wallet-remove`
+14. `transfer-policy-get`
+15. `transfer-policy-set`
+16. `transfer-resume`
+17. `transfer-decide`
+18. `liquidity-add`
+19. `liquidity-remove`
+20. `liquidity-positions`
+21. `liquidity-quote-add`
+22. `liquidity-quote-remove`
+23. `default-chain-get`
+24. `default-chain-set <chain_key>`
+25. `wallet-wrap-native <amount>`
 
 Notes:
 - explicit `--chain` remains authoritative for chain-scoped commands.
@@ -52,6 +55,9 @@ Wrapper delegation target commands:
 - `xclaw-agent wallet send-token --token <token_or_symbol> --to <address> --amount-wei <amount_wei> --chain <chain_key> --json`
 - `xclaw-agent wallet balance --chain <chain_key> --json`
 - `xclaw-agent wallet token-balance --token <token_address> --chain <chain_key> --json`
+- `xclaw-agent wallet track-token --token <token_address> --chain <chain_key> --json`
+- `xclaw-agent wallet untrack-token --token <token_address> --chain <chain_key> --json`
+- `xclaw-agent wallet tracked-tokens --chain <chain_key> --json`
 - `xclaw-agent wallet wrap-native --amount <amount> --chain <chain_key> --json`
 - `xclaw-agent wallet remove --chain <chain_key> --json`
 - `xclaw-agent transfers policy-get --chain <chain_key> --json`
@@ -112,18 +118,20 @@ Errors MUST be machine-parseable and human-readable:
 
 1. `wallet-send` validates recipient address format before delegation.
 2. `wallet-send` validates amount is non-negative integer string.
-3. `wallet-send-token` accepts canonical token symbol (for example `USDC`) or `0x` token address and resolves to canonical token address before execution.
-4. `wallet-token-balance` validates token address format before delegation.
-5. `wallet-sign-challenge` rejects empty message.
+3. `wallet-send-token` accepts canonical token symbol, tracked token symbol (when unique), or `0x` token address before execution.
+4. `wallet-track-token` and `wallet-untrack-token` require `0x` 20-byte token addresses.
+5. `wallet-send-token` returns deterministic `token_symbol_ambiguous` when a tracked symbol maps to multiple token addresses.
+6. `wallet-token-balance` validates token address format before delegation.
+7. `wallet-sign-challenge` rejects empty message.
 6. `wallet-create` and `wallet-import` support non-interactive automation when required env vars are provided:
 - `wallet-create`: requires `XCLAW_WALLET_PASSPHRASE`
 - `wallet-import`: requires both `XCLAW_WALLET_IMPORT_PRIVATE_KEY` and `XCLAW_WALLET_PASSPHRASE`
   Without these env vars, non-interactive calls fail with `non_interactive`.
-7. `wallet-send` fails closed when spend policy file is missing, invalid, or unsafe (`~/.xclaw-agent/policy.json`).
-8. `wallet-send` enforces policy preconditions:
+8. `wallet-send` fails closed when spend policy file is missing, invalid, or unsafe (`~/.xclaw-agent/policy.json`).
+9. `wallet-send` enforces policy preconditions:
 - local policy: `paused`, `chains.<chain>.chain_enabled`, approval gate, `max_daily_native_wei`
 - owner policy: `chainEnabled == true` (from `GET /api/v1/agent/transfers/policy?chainKey=...`).
-9. `wallet-wrap-native` requires a Hedera chain and a positive amount; it fails deterministically with `invalid_amount`, `wrapped_native_helper_missing`, or `wrap_native_failed` when runtime preconditions are not met.
+10. `wallet-wrap-native` requires a Hedera chain and a positive amount; it fails deterministically with `invalid_amount`, `wrapped_native_helper_missing`, or `wrap_native_failed` when runtime preconditions are not met.
 
 ## 6) Canonical Challenge Format (`wallet-sign-challenge`)
 
@@ -176,7 +184,7 @@ Current behavior in `apps/agent-runtime/xclaw_agent/cli.py`:
    - `chain_disabled` remains hard block.
 8. `wallet-balance` returns combined holdings for wallet address and chain RPC:
    - native balance fields (`balanceWei`, `balanceEth`, `symbol`, `decimals`),
-   - token holdings in `tokens[]` include only non-zero balances (canonical + discovered),
+   - token holdings in `tokens[]` include only non-zero balances (canonical + tracked + discovered),
    - Hedera chains additionally include discovered token holdings from mirror-node account token relationships (non-zero balances) merged into `tokens[]`,
    - token query/discovery failures in `tokenErrors[]` without failing native balance fetch.
 9. `wallet-token-balance` is implemented via cast-backed ERC-20 `balanceOf(address)` query.

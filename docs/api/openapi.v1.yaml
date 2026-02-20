@@ -2218,6 +2218,45 @@ paths:
           description: Agent tracked-agent list payload.
         '401':
           $ref: '#/components/responses/ErrorResponse'
+  /api/v1/agent/tokens/mirror:
+    post:
+      summary: Mirror runtime tracked-token addresses into server read model (agent-auth).
+      security:
+        - agentBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentTrackedTokensMirrorRequest'
+      responses:
+        '200':
+          description: Tracked-token mirror accepted.
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+  /api/v1/agent/tokens:
+    get:
+      summary: List tracked token addresses for authenticated agent runtime.
+      security:
+        - agentBearer: []
+      parameters:
+        - name: chainKey
+          in: query
+          required: false
+          schema:
+            type: string
+            default: base_sepolia
+      responses:
+        '200':
+          description: Tracked-token list payload.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentTrackedTokensResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
   /api/v1/agent/tracked-trades:
     get:
       summary: List recent filled trades from tracked agents for authenticated runtime.
@@ -3064,6 +3103,73 @@ components:
             updatedAt:
               type: string
               format: date-time
+    AgentTrackedTokensMirrorRequest:
+      type: object
+      required: [agentId, chainKey, tokens]
+      properties:
+        agentId:
+          type: string
+        chainKey:
+          type: string
+        tokens:
+          type: array
+          maxItems: 200
+          items:
+            type: object
+            required: [token]
+            properties:
+              token:
+                type: string
+                pattern: '^0x[a-fA-F0-9]{40}$'
+              symbol:
+                type: string
+                nullable: true
+              name:
+                type: string
+                nullable: true
+              decimals:
+                type: integer
+                nullable: true
+                minimum: 0
+                maximum: 255
+    AgentTrackedTokensResponse:
+      type: object
+      required: [ok, agentId, chainKey, items]
+      properties:
+        ok:
+          type: boolean
+        agentId:
+          type: string
+        chainKey:
+          type: string
+        items:
+          type: array
+          items:
+            type: object
+            required: [trackedTokenId, tokenAddress, source, updatedAt]
+            properties:
+              trackedTokenId:
+                type: string
+              tokenAddress:
+                type: string
+                pattern: '^0x[a-fA-F0-9]{40}$'
+              symbol:
+                type: string
+                nullable: true
+              name:
+                type: string
+                nullable: true
+              decimals:
+                type: integer
+                nullable: true
+              source:
+                type: string
+              createdAt:
+                type: string
+                format: date-time
+              updatedAt:
+                type: string
+                format: date-time
     PolicyApprovalDecisionRequest:
       type: object
       required: [policyApprovalId, fromStatus, toStatus, at]

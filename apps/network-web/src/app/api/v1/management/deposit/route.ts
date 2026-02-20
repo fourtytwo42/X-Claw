@@ -193,10 +193,38 @@ async function syncChainDeposits(agentId: string, chainKey: string, walletAddres
     });
 
     const canonicalTokens = cfg.canonicalTokens ?? {};
+    const trackedTokens = await dbQuery<{ token_address: string }>(
+      `
+      select token_address
+      from agent_tracked_tokens
+      where agent_id = $1
+        and chain_key = $2
+      `,
+      [agentId, chainKey]
+    ).catch(() => ({ rows: [] as Array<{ token_address: string }>, rowCount: 0 }));
     const fromBlock = latestBlock > BigInt(3000) ? latestBlock - BigInt(3000) : BigInt(0);
     const discoveredTokenDecimals = new Map<string, number>();
-
+    const tokenTargets = new Map<string, string>();
+    const knownAddresses = new Set<string>();
     for (const [symbol, tokenAddress] of Object.entries(canonicalTokens)) {
+      const address = String(tokenAddress || '').trim().toLowerCase();
+      if (/^0x[a-f0-9]{40}$/.test(address)) {
+        tokenTargets.set(symbol, address);
+        knownAddresses.add(address);
+      }
+    }
+    for (const row of trackedTokens.rows) {
+      const address = String(row.token_address || '').trim().toLowerCase();
+      if (!/^0x[a-f0-9]{40}$/.test(address)) {
+        continue;
+      }
+      if (!knownAddresses.has(address)) {
+        tokenTargets.set(address, address);
+        knownAddresses.add(address);
+      }
+    }
+
+    for (const [snapshotToken, tokenAddress] of tokenTargets.entries()) {
       const balanceResult = (await rpcRequest(rpcUrl, 'eth_call', [
         {
           to: tokenAddress,
@@ -215,7 +243,7 @@ async function syncChainDeposits(agentId: string, chainKey: string, walletAddres
           on conflict (agent_id, chain_key, token)
           do update set balance = excluded.balance, block_number = excluded.block_number, observed_at = now()
           `,
-          [makeId('wbs'), agentId, chainKey, symbol, tokenBalance, Number(latestBlock)]
+          [makeId('wbs'), agentId, chainKey, snapshotToken, tokenBalance, Number(latestBlock)]
         );
       });
 
@@ -255,7 +283,7 @@ async function syncChainDeposits(agentId: string, chainKey: string, walletAddres
             on conflict (chain_key, tx_hash, log_index, token)
             do nothing
             `,
-            [makeId('dep'), agentId, chainKey, symbol, amount, entry.transactionHash, logIndex, blockNumber]
+            [makeId('dep'), agentId, chainKey, snapshotToken, amount, entry.transactionHash, logIndex, blockNumber]
           );
         });
       }

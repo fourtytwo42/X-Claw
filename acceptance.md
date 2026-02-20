@@ -5214,3 +5214,37 @@ Date (UTC): 2026-02-19
 - `E50` Hedera discovered token visibility in management holdings:
   - command: `GET /api/v1/management/deposit?agentId=<agent>&chainKey=hedera_testnet` (authenticated session)
   - outcome: pending live authenticated verification; implementation now syncs mirror-discovered non-zero Hedera token balances into `wallet_balance_snapshots`.
+
+## Slice 95N User-Added Token Tracking (UTC 2026-02-20)
+
+### Implementation summary
+- Added runtime tracked-token commands (`wallet track-token|untrack-token|tracked-tokens`) with local persistence and best-effort server mirror.
+- Added dedicated tracked-token mirror/read API endpoints and migration-backed table.
+- Extended web deposit sync and management agent-state payload to include tracked token data.
+
+### Evidence IDs (`E51+`)
+- `E51` Runtime tracked-token behavior coverage:
+  - command: `python3 -m unittest apps/agent-runtime/tests/test_wallet_core.py -v`
+  - outcome: Slice 95N tests pass (`track-token` persistence, tracked-symbol resolution, ambiguity fail); suite has 2 pre-existing env-sensitive failures unrelated to tracked-token path:
+    - `test_wallet_send_success_updates_spend_ledger`
+    - `test_wallet_sign_challenge_cast_missing_rejected`
+- `E52` Skill wrapper delegation coverage:
+  - command: `python3 -m unittest apps/agent-runtime/tests/test_x402_skill_wrapper.py -v`
+  - outcome: PASS; includes `wallet-track-token`, `wallet-untrack-token`, `wallet-tracked-tokens`.
+- `E53` Token mirror route contract:
+  - command: `npm run test:tokens:mirror:contract`
+  - outcome: PASS (`5 passed / 0 failed`) with deterministic invalid-address payload rejection and successful mirror/get roundtrip.
+- `E54` Validation gate run:
+  - commands:
+    - `npm run db:parity` -> PASS
+    - `npm run seed:reset` -> PASS
+    - `npm run seed:load` -> PASS
+    - `npm run seed:verify` -> PASS
+    - `npm run build` -> PASS
+    - `pm2 restart all` -> PASS
+    - `npm run db:migrate` -> PASS (applies `0024_slice95n_agent_tracked_tokens.sql` before route contract run)
+
+### Commands
+- `python3 -m unittest apps/agent-runtime/tests/test_wallet_core.py -v`
+- `python3 -m unittest apps/agent-runtime/tests/test_x402_skill_wrapper.py -v`
+- `npm run test:tokens:mirror:contract`

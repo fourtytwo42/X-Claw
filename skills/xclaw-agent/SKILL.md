@@ -127,6 +127,9 @@ Common optional:
 - `wallet-create`
 - `wallet-wrap-native <amount>`
 - `wallet-balance`
+- `wallet-track-token <token_address>`
+- `wallet-untrack-token <token_address>`
+- `wallet-tracked-tokens`
 - `trade-spot <token_in> <token_out> <amount_in> <slippage_bps>`
 - `liquidity-add <dex> <token_a> <token_b> <amount_a> <amount_b> <slippage_bps> [v2|v3] [v3_range]`
 - `liquidity-remove <dex> <position_id> [percent] [slippage_bps] [v2|v3]`
@@ -151,7 +154,8 @@ Additional capabilities:
 
 ## Operational Notes
 
-- `wallet-balance` returns native + canonical token balances in one payload.
+- `wallet-balance` returns native plus non-zero token balances from canonical, tracked, and Hedera mirror-discovered holdings.
+- `wallet-track-token` registers non-canonical ERC-20 addresses for tracking; tracked symbols can be used with `wallet-send-token` when unique.
 - Transfer/trade policy is owner-controlled and may force approval.
 - Runtime default chain is agent-canonical (`state.json.defaultChain`); explicit `--chain` remains authoritative.
 - Runtime-canonical decision mode flag: `XCLAW_RUNTIME_CANONICAL_APPROVAL_DECISIONS=1`

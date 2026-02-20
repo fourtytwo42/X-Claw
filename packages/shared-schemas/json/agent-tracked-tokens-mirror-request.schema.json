@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["agentId", "chainKey", "tokens"],
+  "properties": {
+    "agentId": { "type": "string", "minLength": 1 },
+    "chainKey": { "type": "string", "minLength": 1 },
+    "tokens": {
+      "type": "array",
+      "maxItems": 200,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["token"],
+        "properties": {
+          "token": { "type": "string", "pattern": "^0x[a-fA-F0-9]{40}$" },
+          "symbol": { "type": ["string", "null"], "maxLength": 64 },
+          "name": { "type": ["string", "null"], "maxLength": 128 },
+          "decimals": { "type": ["integer", "null"], "minimum": 0, "maximum": 255 }
+        }
+      }
+    }
+  }
+}

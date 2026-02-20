@@ -54,10 +54,13 @@ This reference defines the expected command surface for the Python-first skill w
 - `wallet-send-token <token_or_symbol> <to> <amount_wei>`
 - `wallet-balance`
 - `wallet-token-balance <token_address>`
+- `wallet-track-token <token_address>`
+- `wallet-untrack-token <token_address>`
+- `wallet-tracked-tokens`
 - `wallet-wrap-native <amount>`
 - `wallet-create`
 
-`wallet-balance` returns native chain balance plus canonical token balances (`tokens[]`) in one response payload.
+`wallet-balance` returns native chain balance plus token balances (`tokens[]`) from canonical tokens, tracked tokens, and Hedera mirror discovery.
 
 Underlying runtime delegation (performed by wrapper):
 
@@ -116,6 +119,9 @@ Underlying runtime delegation (performed by wrapper):
 - `xclaw-agent wallet send-token --token <token_or_symbol> --to <address> --amount-wei <amount_wei> --chain <chain_key> --json`
 - `xclaw-agent wallet balance --chain <chain_key> --json`
 - `xclaw-agent wallet token-balance --token <token_address> --chain <chain_key> --json`
+- `xclaw-agent wallet track-token --token <token_address> --chain <chain_key> --json`
+- `xclaw-agent wallet untrack-token --token <token_address> --chain <chain_key> --json`
+- `xclaw-agent wallet tracked-tokens --chain <chain_key> --json`
 - `xclaw-agent wallet wrap-native --amount <amount> --chain <chain_key> --json`
 - `xclaw-agent wallet create --chain <chain_key> --json`
 
