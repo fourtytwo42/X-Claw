@@ -1202,6 +1202,7 @@ The skill wrapper commands below are required (JSON output contract):
 - `python3 scripts/xclaw_agent_skill.py dexscreener-search <query> [limit]`
 - `python3 scripts/xclaw_agent_skill.py dexscreener-top <query> [limit]`
 - `python3 scripts/xclaw_agent_skill.py dexscreener-token-pairs <chain_id> <token_address> [limit]`
+- `python3 scripts/xclaw_agent_skill.py token-research <query> [limit]`
 - `python3 scripts/xclaw_agent_skill.py default-chain-get`
 - `python3 scripts/xclaw_agent_skill.py default-chain-set <chain_key>`
 - `python3 scripts/xclaw_agent_skill.py request-x402-payment`
@@ -1226,6 +1227,7 @@ Additional locked reliability requirements for skill/runtime usage:
 - tracked token behavior: users can register EVM token addresses per chain (`wallet-track-token`), and those tracked token addresses participate in runtime holdings fetch and `wallet-send-token` symbol/address resolution.
 - Dexscreener research commands in the skill wrapper must query Dexscreener REST directly from agent runtime and must not depend on Node/server proxy paths.
 - `dexscreener-top` output contract is normalized: `priceUsd` as decimal string with 8 fractional digits; USD aggregates (`liquidityUsd`, `volumeH24Usd`, `marketCapUsd`, `fdvUsd`) as decimal strings with 2 fractional digits.
+- `token-research` is the preferred one-shot research command for small models and must return top-by-liquidity shortlist plus primary-token drilldown pairs in a single response.
 - Hedera chain behavior: `wallet-balance` must merge mirror-node discovered token holdings (non-zero balances for the wallet account) into `tokens[]` so owned tokens are visible even when not present in chain canonical token map.
 - `faucet-request` rate-limit failures should surface machine-readable retry timing when available (`retryAfterSec` from server details).
 - `trade-spot` gas output should include both exact numeric ETH (`totalGasCostEthExact`) and display-friendly pretty form (`totalGasCostEthPretty`), while keeping backward-compatible `totalGasCostEth`.

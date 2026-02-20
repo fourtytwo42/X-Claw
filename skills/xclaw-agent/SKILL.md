@@ -143,6 +143,10 @@ Common optional:
 - `chains`
 - `owner-link`
 - `faucet-request [chain] [native|wrapped|stable|hbar|whbar|usdc|usdt]`
+- `dexscreener-search <query> [limit]`
+- `dexscreener-top <query> [limit]`
+- `dexscreener-token-pairs <chain_id> <token_address> [limit]`
+- `token-research <query> [limit]`
 
 Additional capabilities:
 - approvals: `approval-check`, `cleanup-spot`, `clear-prompt`, `trade-resume`, `trade-decide`, `transfer-resume`, `transfer-decide`, `policy-decide`
@@ -156,6 +160,9 @@ Additional capabilities:
 
 - `wallet-balance` returns native plus non-zero token balances from canonical, tracked, and Hedera mirror-discovered holdings.
 - `wallet-track-token` registers non-canonical ERC-20 addresses for tracking; tracked symbols can be used with `wallet-send-token` when unique.
+- Dexscreener research commands query Dexscreener REST directly from the skill wrapper (`api.dexscreener.com`) and do not route through X-Claw server APIs.
+- `dexscreener-top` sorts by liquidity descending and emits normalized decimal strings (`priceUsd` 8dp, USD metrics 2dp).
+- `token-research` is the preferred one-shot flow for small models: top-by-liquidity shortlist plus primary-token drilldown pairs in one response.
 - Transfer/trade policy is owner-controlled and may force approval.
 - Runtime default chain is agent-canonical (`state.json.defaultChain`); explicit `--chain` remains authoritative.
 - Runtime-canonical decision mode flag: `XCLAW_RUNTIME_CANONICAL_APPROVAL_DECISIONS=1`

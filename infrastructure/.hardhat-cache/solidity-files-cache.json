@@ -146,8 +146,8 @@
       ]
     },
     "/home/hendo420/ETHDenver2026/infrastructure/contracts/MockRouter.sol": {
-      "lastModificationDate": 1770997958958,
-      "contentHash": "0dbd94f94dc968baf7687ee4fa282b04",
+      "lastModificationDate": 1771084258626,
+      "contentHash": "6d6db05b3ff0ad04483f1e1810710a58",
       "sourceName": "infrastructure/contracts/MockRouter.sol",
       "solcConfig": {
         "version": "0.8.24",
@@ -180,6 +180,44 @@
       "artifacts": [
         "IERC20Like",
         "MockRouter"
+      ]
+    },
+    "/home/hendo420/ETHDenver2026/infrastructure/contracts/XClawFeeRouterV2.sol": {
+      "lastModificationDate": 1771084258626,
+      "contentHash": "2108a72030f5cb7265db2345840138e0",
+      "sourceName": "infrastructure/contracts/XClawFeeRouterV2.sol",
+      "solcConfig": {
+        "version": "0.8.24",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "evmVersion": "paris",
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.8.24"
+      ],
+      "artifacts": [
+        "IERC20Like",
+        "IV2RouterLike",
+        "XClawFeeRouterV2"
       ]
     }
   }

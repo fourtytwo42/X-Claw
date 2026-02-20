@@ -249,6 +249,179 @@ class X402SkillWrapperTests(unittest.TestCase):
         self.assertEqual(code, 2)
         self.assertEqual(payload.get("code"), "usage")
 
+    def test_dexscreener_search_returns_trimmed_pairs(self) -> None:
+        payload = {
+            "schemaVersion": "1.0.0",
+            "pairs": [
+                {
+                    "chainId": "base",
+                    "dexId": "aerodrome",
+                    "pairAddress": "0xpair1",
+                    "url": "https://dexscreener.com/base/0xpair1",
+                    "baseToken": {"address": "0xbase1", "symbol": "SOL", "name": "Solana"},
+                    "quoteToken": {"address": "0xquote1", "symbol": "USDC", "name": "USD Coin"},
+                    "priceUsd": "100",
+                    "liquidity": {"usd": 12345},
+                    "volume": {"h24": 5000},
+                    "txns": {"h24": {"buys": 12, "sells": 8}},
+                },
+                {
+                    "chainId": "base",
+                    "dexId": "uniswap",
+                    "pairAddress": "0xpair2",
+                    "url": "https://dexscreener.com/base/0xpair2",
+                    "baseToken": {"address": "0xbase2", "symbol": "ETH", "name": "Ether"},
+                    "quoteToken": {"address": "0xquote2", "symbol": "USDC", "name": "USD Coin"},
+                    "priceUsd": "2500",
+                    "liquidity": {"usd": 9999},
+                    "volume": {"h24": 3333},
+                    "txns": {"h24": {"buys": 20, "sells": 10}},
+                },
+            ],
+        }
+        with mock.patch.object(skill, "_fetch_dexscreener_json", return_value=(payload, None, 0)) as fetch_mock:
+            code, result = self._capture(["xclaw_agent_skill.py", "dexscreener-search", "SOL/USDC", "1"])
+        self.assertEqual(code, 0)
+        self.assertEqual(result.get("code"), "ok")
+        self.assertEqual(result.get("source"), "dexscreener")
+        self.assertEqual(result.get("pairCount"), 1)
+        self.assertEqual(len(result.get("pairs") or []), 1)
+        self.assertEqual((result.get("pairs") or [{}])[0].get("dexId"), "aerodrome")
+        called_url = fetch_mock.call_args.args[0]
+        self.assertIn("latest/dex/search", called_url)
+        self.assertIn("q=SOL%2FUSDC", called_url)
+
+    def test_dexscreener_search_requires_query(self) -> None:
+        code, payload = self._capture(["xclaw_agent_skill.py", "dexscreener-search", ""])
+        self.assertEqual(code, 2)
+        self.assertEqual(payload.get("code"), "invalid_input")
+
+    def test_dexscreener_top_sorts_by_liquidity_and_formats_numbers(self) -> None:
+        payload = {
+            "schemaVersion": "1.0.0",
+            "pairs": [
+                {
+                    "chainId": "base",
+                    "dexId": "lowliq",
+                    "pairAddress": "0xpair-low",
+                    "url": "https://dexscreener.com/base/0xpair-low",
+                    "baseToken": {"address": "0xbase1", "symbol": "AAA", "name": "AAA"},
+                    "quoteToken": {"address": "0xquote1", "symbol": "USDC", "name": "USD Coin"},
+                    "priceUsd": "1.123456789",
+                    "liquidity": {"usd": 999.1},
+                    "volume": {"h24": 2222.987},
+                },
+                {
+                    "chainId": "base",
+                    "dexId": "highliq",
+                    "pairAddress": "0xpair-high",
+                    "url": "https://dexscreener.com/base/0xpair-high",
+                    "baseToken": {"address": "0xbase2", "symbol": "BBB", "name": "BBB"},
+                    "quoteToken": {"address": "0xquote2", "symbol": "USDC", "name": "USD Coin"},
+                    "priceUsd": "2.987654321",
+                    "liquidity": {"usd": 12345.6789},
+                    "volume": {"h24": 4000.333},
+                },
+            ],
+        }
+        with mock.patch.object(skill, "_fetch_dexscreener_json", return_value=(payload, None, 0)):
+            code, result = self._capture(["xclaw_agent_skill.py", "dexscreener-top", "base usdc", "2"])
+        self.assertEqual(code, 0)
+        self.assertEqual(result.get("endpoint"), "top")
+        self.assertEqual(result.get("sortBy"), "liquidityUsd_desc")
+        pairs = result.get("pairs") or []
+        self.assertEqual(len(pairs), 2)
+        self.assertEqual(pairs[0].get("dexId"), "highliq")
+        self.assertEqual(pairs[0].get("liquidityUsd"), "12345.68")
+        self.assertEqual(pairs[0].get("priceUsd"), "2.98765432")
+        self.assertEqual(pairs[1].get("dexId"), "lowliq")
+        self.assertEqual(pairs[1].get("liquidityUsd"), "999.10")
+
+    def test_dexscreener_top_requires_query(self) -> None:
+        code, payload = self._capture(["xclaw_agent_skill.py", "dexscreener-top", ""])
+        self.assertEqual(code, 2)
+        self.assertEqual(payload.get("code"), "invalid_input")
+
+    def test_token_research_runs_search_and_drilldown(self) -> None:
+        search_payload = {
+            "pairs": [
+                {
+                    "chainId": "base",
+                    "dexId": "aerodrome",
+                    "pairAddress": "0xpair1",
+                    "url": "https://dexscreener.com/base/0xpair1",
+                    "baseToken": {"address": "0xbase1", "symbol": "AAA", "name": "Token AAA"},
+                    "quoteToken": {"address": "0xquote1", "symbol": "USDC", "name": "USD Coin"},
+                    "priceUsd": "1.5",
+                    "liquidity": {"usd": 2000.01},
+                    "volume": {"h24": 101.2},
+                }
+            ]
+        }
+        drill_payload = [
+            {
+                "chainId": "base",
+                "dexId": "uniswap",
+                "pairAddress": "0xpair2",
+                "url": "https://dexscreener.com/base/0xpair2",
+                "baseToken": {"address": "0xbase1", "symbol": "AAA", "name": "Token AAA"},
+                "quoteToken": {"address": "0xquote2", "symbol": "WETH", "name": "Wrapped Ether"},
+                "priceUsd": "1.6",
+                "liquidity": {"usd": 1800.0},
+                "volume": {"h24": 55.0},
+            }
+        ]
+        with mock.patch.object(
+            skill,
+            "_fetch_dexscreener_json",
+            side_effect=[(search_payload, None, 0), (drill_payload, None, 0)],
+        ) as fetch_mock:
+            code, payload = self._capture(["xclaw_agent_skill.py", "token-research", "AAA", "3"])
+        self.assertEqual(code, 0)
+        self.assertEqual(payload.get("endpoint"), "token-research")
+        self.assertEqual((payload.get("primaryToken") or {}).get("symbol"), "AAA")
+        self.assertEqual(len(payload.get("topPairs") or []), 1)
+        self.assertEqual(len(payload.get("drilldownPairs") or []), 1)
+        self.assertEqual(fetch_mock.call_count, 2)
+
+    def test_token_research_requires_query(self) -> None:
+        code, payload = self._capture(["xclaw_agent_skill.py", "token-research", ""])
+        self.assertEqual(code, 2)
+        self.assertEqual(payload.get("code"), "invalid_input")
+
+    def test_token_research_handles_no_results(self) -> None:
+        with mock.patch.object(skill, "_fetch_dexscreener_json", return_value=({"pairs": []}, None, 0)):
+            code, payload = self._capture(["xclaw_agent_skill.py", "token-research", "nonexistent"])
+        self.assertEqual(code, 1)
+        self.assertEqual(payload.get("code"), "dexscreener_no_results")
+
+    def test_dexscreener_token_pairs_rejects_bad_chain_id(self) -> None:
+        code, payload = self._capture(["xclaw_agent_skill.py", "dexscreener-token-pairs", "base/mainnet", "0xabc"])
+        self.assertEqual(code, 2)
+        self.assertEqual(payload.get("code"), "invalid_input")
+
+    def test_dexscreener_token_pairs_accepts_list_response(self) -> None:
+        pairs = [
+            {
+                "chainId": "base",
+                "dexId": "aerodrome",
+                "pairAddress": "0xpair1",
+                "url": "https://dexscreener.com/base/0xpair1",
+                "baseToken": {"address": "0x4200000000000000000000000000000000000006", "symbol": "WETH", "name": "Wrapped Ether"},
+                "quoteToken": {"address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", "symbol": "USDC", "name": "USD Coin"},
+            }
+        ]
+        with mock.patch.object(skill, "_fetch_dexscreener_json", return_value=(pairs, None, 0)) as fetch_mock:
+            code, payload = self._capture(
+                ["xclaw_agent_skill.py", "dexscreener-token-pairs", "base", "0x4200000000000000000000000000000000000006", "5"]
+            )
+        self.assertEqual(code, 0)
+        self.assertEqual(payload.get("code"), "ok")
+        self.assertEqual(payload.get("endpoint"), "token-pairs")
+        self.assertEqual(payload.get("pairCount"), 1)
+        called_url = fetch_mock.call_args.args[0]
+        self.assertIn("/token-pairs/v1/base/0x4200000000000000000000000000000000000006", called_url)
+
     def test_faucet_request_native_only_uses_all_asset_default(self) -> None:
         env = {
             "XCLAW_API_BASE_URL": "https://xclaw.trade/api/v1",

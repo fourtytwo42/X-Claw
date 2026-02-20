@@ -37,6 +37,10 @@ This reference defines the expected command surface for the Python-first skill w
 - `faucet-request`
 - `faucet-networks`
 - `chains`
+- `dexscreener-search <query> [limit]`
+- `dexscreener-top <query> [limit]`
+- `dexscreener-token-pairs <chain_id> <token_address> [limit]`
+- `token-research <query> [limit]`
 - `default-chain-get`
 - `default-chain-set <chain_key>`
 - `request-x402-payment`
@@ -61,6 +65,9 @@ This reference defines the expected command surface for the Python-first skill w
 - `wallet-create`
 
 `wallet-balance` returns native chain balance plus token balances (`tokens[]`) from canonical tokens, tracked tokens, and Hedera mirror discovery.
+`dexscreener-search` and `dexscreener-token-pairs` fetch market research data directly from Dexscreener REST (`api.dexscreener.com`) from skill runtime, not via xclaw-agent server routes.
+`dexscreener-top` is a skill-side ranking helper: liquidity-desc order with normalized decimal-string output (`priceUsd` 8dp; USD metrics 2dp).
+`token-research` orchestrates search + ranking + primary token drilldown and returns one compact research payload for chat-first model usage.
 
 Underlying runtime delegation (performed by wrapper):
 

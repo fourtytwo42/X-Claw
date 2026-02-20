@@ -15,6 +15,10 @@ import signal
 import shutil
 import subprocess
 import sys
+import urllib.error
+import urllib.parse
+import urllib.request
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
 from typing import Iterable, List, Optional
 
@@ -594,6 +598,175 @@ def _is_uint_string(value: str) -> bool:
     return bool(re.fullmatch(r"[0-9]+", value))
 
 
+def _parse_limit(raw: str, default: int = 10, minimum: int = 1, maximum: int = 20) -> Optional[int]:
+    value = (raw or "").strip()
+    if not value:
+        return default
+    if not _is_uint_string(value):
+        return None
+    parsed = int(value)
+    if parsed < minimum or parsed > maximum:
+        return None
+    return parsed
+
+
+def _parse_timeout(raw: str, default: int = 12, minimum: int = 1, maximum: int = 60) -> Optional[int]:
+    value = (raw or "").strip()
+    if not value:
+        return default
+    if not _is_uint_string(value):
+        return None
+    parsed = int(value)
+    if parsed < minimum or parsed > maximum:
+        return None
+    return parsed
+
+
+def _normalize_dexscreener_pair(row: dict) -> dict:
+    base = row.get("baseToken") if isinstance(row.get("baseToken"), dict) else {}
+    quote = row.get("quoteToken") if isinstance(row.get("quoteToken"), dict) else {}
+    liquidity = row.get("liquidity") if isinstance(row.get("liquidity"), dict) else {}
+    volume = row.get("volume") if isinstance(row.get("volume"), dict) else {}
+    txns = row.get("txns") if isinstance(row.get("txns"), dict) else {}
+    return {
+        "chainId": row.get("chainId"),
+        "dexId": row.get("dexId"),
+        "pairAddress": row.get("pairAddress"),
+        "url": row.get("url"),
+        "labels": row.get("labels") if isinstance(row.get("labels"), list) else [],
+        "baseToken": {
+            "symbol": base.get("symbol"),
+            "name": base.get("name"),
+            "address": base.get("address"),
+        },
+        "quoteToken": {
+            "symbol": quote.get("symbol"),
+            "name": quote.get("name"),
+            "address": quote.get("address"),
+        },
+        "priceUsd": row.get("priceUsd"),
+        "priceNative": row.get("priceNative"),
+        "liquidityUsd": liquidity.get("usd"),
+        "fdv": row.get("fdv"),
+        "marketCap": row.get("marketCap"),
+        "volumeH24": volume.get("h24"),
+        "txnsH24": txns.get("h24"),
+    }
+
+
+def _decimal_or_none(value: object) -> Optional[Decimal]:
+    if value is None:
+        return None
+    try:
+        return Decimal(str(value))
+    except (InvalidOperation, ValueError):
+        return None
+
+
+def _format_decimal(value: object, places: int) -> Optional[str]:
+    dec = _decimal_or_none(value)
+    if dec is None:
+        return None
+    quant = Decimal(1).scaleb(-places)
+    return str(dec.quantize(quant, rounding=ROUND_HALF_UP))
+
+
+def _build_dexscreener_top_rows(pairs: list[dict], limit: int) -> list[dict]:
+    ranked = sorted(
+        pairs,
+        key=lambda row: _decimal_or_none(row.get("liquidityUsd")) or Decimal(0),
+        reverse=True,
+    )
+    top: list[dict] = []
+    for idx, row in enumerate(ranked[:limit], start=1):
+        txns_h24 = row.get("txnsH24") if isinstance(row.get("txnsH24"), dict) else {}
+        top.append(
+            {
+                "rank": idx,
+                "chainId": row.get("chainId"),
+                "dexId": row.get("dexId"),
+                "pairAddress": row.get("pairAddress"),
+                "pairUrl": row.get("url"),
+                "pairSymbol": f"{((row.get('baseToken') or {}).get('symbol') or '?')}/{((row.get('quoteToken') or {}).get('symbol') or '?')}",
+                "priceUsd": _format_decimal(row.get("priceUsd"), 8),
+                "liquidityUsd": _format_decimal(row.get("liquidityUsd"), 2),
+                "volumeH24Usd": _format_decimal(row.get("volumeH24"), 2),
+                "marketCapUsd": _format_decimal(row.get("marketCap"), 2),
+                "fdvUsd": _format_decimal(row.get("fdv"), 2),
+                "txnsH24": {
+                    "buys": txns_h24.get("buys"),
+                    "sells": txns_h24.get("sells"),
+                },
+                "baseToken": row.get("baseToken"),
+                "quoteToken": row.get("quoteToken"),
+            }
+        )
+    return top
+
+
+def _fetch_dexscreener_json(url: str, timeout_sec: int) -> tuple[Optional[object], Optional[dict], int]:
+    req = urllib.request.Request(
+        url,
+        headers={
+            "Accept": "application/json",
+            "User-Agent": "xclaw-agent-skill/1.0",
+        },
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout_sec) as response:
+            status = int(getattr(response, "status", 200))
+            raw = response.read(2_000_000).decode("utf-8", errors="replace")
+    except urllib.error.HTTPError as exc:
+        status = int(getattr(exc, "code", 500))
+        if status == 429:
+            return None, {
+                "code": "dexscreener_rate_limited",
+                "message": "Dexscreener rate limit reached.",
+                "actionHint": "Retry shortly with lower polling frequency.",
+                "details": {"status": status},
+            }, 1
+        return None, {
+            "code": "dexscreener_http_error",
+            "message": f"Dexscreener request failed with HTTP {status}.",
+            "actionHint": "Retry later or adjust the query input.",
+            "details": {"status": status},
+        }, 1
+    except urllib.error.URLError as exc:
+        reason = str(getattr(exc, "reason", "") or str(exc))
+        return None, {
+            "code": "dexscreener_unreachable",
+            "message": "Dexscreener request failed to connect.",
+            "actionHint": "Check outbound network access and retry.",
+            "details": {"reason": reason[:300]},
+        }, 1
+    except TimeoutError:
+        return None, {
+            "code": "dexscreener_timeout",
+            "message": "Dexscreener request timed out.",
+            "actionHint": "Retry or increase XCLAW_DEXSCREENER_TIMEOUT_SEC.",
+            "details": {"timeoutSec": timeout_sec},
+        }, 1
+    except Exception as exc:
+        return None, {
+            "code": "dexscreener_request_failed",
+            "message": "Dexscreener request failed.",
+            "actionHint": "Retry and inspect local runtime networking.",
+            "details": {"error": str(exc)[:300]},
+        }, 1
+
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError:
+        return None, {
+            "code": "dexscreener_parse_failed",
+            "message": "Dexscreener returned non-JSON payload.",
+            "actionHint": "Retry and inspect endpoint response format.",
+            "details": {"status": status},
+        }, 1
+    return payload, None, 0
+
+
 def _sha256_file(path: Path) -> str:
     try:
         digest = hashlib.sha256()
@@ -653,7 +826,7 @@ def main(argv: List[str]) -> int:
         return _err(
             "usage",
             "Missing command.",
-            "Use one of: version, status, dashboard, intents-poll, approval-check, trade-exec, trade-spot, trade-resume, liquidity-add, liquidity-remove, liquidity-positions, liquidity-quote-add, liquidity-quote-remove, transfer-resume, transfer-decide, transfer-policy-get, transfer-policy-set, report-send, chat-poll, chat-post, tracked-list, tracked-trades, username-set, agent-register, auth-recover, owner-link, faucet-request, faucet-networks, chains, default-chain-get, default-chain-set, x402-pay, x402-pay-resume, x402-pay-decide, x402-policy-get, x402-policy-set, x402-networks, request-x402-payment, wallet-health, wallet-address, wallet-sign-challenge, wallet-send, wallet-send-token, wallet-balance, wallet-token-balance, wallet-track-token, wallet-untrack-token, wallet-tracked-tokens, wallet-wrap-native, wallet-create",
+            "Use one of: version, status, dashboard, intents-poll, approval-check, trade-exec, trade-spot, trade-resume, liquidity-add, liquidity-remove, liquidity-positions, liquidity-quote-add, liquidity-quote-remove, transfer-resume, transfer-decide, transfer-policy-get, transfer-policy-set, report-send, chat-poll, chat-post, tracked-list, tracked-trades, username-set, agent-register, auth-recover, owner-link, faucet-request, faucet-networks, chains, dexscreener-search, dexscreener-top, dexscreener-token-pairs, token-research, default-chain-get, default-chain-set, x402-pay, x402-pay-resume, x402-pay-decide, x402-policy-get, x402-policy-set, x402-networks, request-x402-payment, wallet-health, wallet-address, wallet-sign-challenge, wallet-send, wallet-send-token, wallet-balance, wallet-token-balance, wallet-track-token, wallet-untrack-token, wallet-tracked-tokens, wallet-wrap-native, wallet-create",
             exit_code=2,
         )
 
@@ -719,12 +892,15 @@ def main(argv: List[str]) -> int:
         "x402-networks",
         "request-x402-payment",
     }
+    dexscreener_commands = {"dexscreener-search", "dexscreener-top", "dexscreener-token-pairs", "token-research"}
 
     if cmd in api_commands:
         env_required = _require_api_context()
     elif cmd in wallet_commands:
         env_required = _require_env("XCLAW_DEFAULT_CHAIN")
     elif cmd in x402_commands:
+        env_required = None
+    elif cmd in dexscreener_commands:
         env_required = None
     elif cmd in default_chain_commands:
         env_required = None
@@ -1108,6 +1284,261 @@ def main(argv: List[str]) -> int:
         args.append("--json")
         return _run_agent(args)
 
+    if cmd == "dexscreener-search":
+        if len(argv) < 3:
+            return _err(
+                "usage",
+                "dexscreener-search requires <query> [limit].",
+                "usage: dexscreener-search <query> [limit 1-20]",
+                exit_code=2,
+            )
+        query = argv[2].strip()
+        if not query:
+            return _err("invalid_input", "query must not be empty.", "usage: dexscreener-search <query> [limit 1-20]", exit_code=2)
+        limit = _parse_limit(argv[3] if len(argv) >= 4 else "", default=10, minimum=1, maximum=20)
+        if limit is None:
+            return _err("invalid_input", "limit must be an integer between 1 and 20.", "usage: dexscreener-search <query> [limit 1-20]", exit_code=2)
+        timeout_sec = _parse_timeout(os.environ.get("XCLAW_DEXSCREENER_TIMEOUT_SEC", ""), default=12, minimum=1, maximum=60)
+        if timeout_sec is None:
+            return _err(
+                "invalid_env",
+                "XCLAW_DEXSCREENER_TIMEOUT_SEC must be an integer between 1 and 60.",
+                "Unset XCLAW_DEXSCREENER_TIMEOUT_SEC or set it to a valid integer value.",
+                exit_code=2,
+            )
+        encoded_query = urllib.parse.quote_plus(query)
+        url = f"https://api.dexscreener.com/latest/dex/search?q={encoded_query}"
+        payload, fetch_error, fetch_code = _fetch_dexscreener_json(url, timeout_sec=timeout_sec)
+        if fetch_error is not None:
+            return _err(fetch_error["code"], fetch_error["message"], fetch_error.get("actionHint"), fetch_error.get("details"), exit_code=fetch_code)
+        rows = payload.get("pairs") if isinstance(payload, dict) else None
+        if not isinstance(rows, list):
+            return _err("dexscreener_schema_invalid", "Dexscreener response did not contain pairs[].", "Retry with a different query.", exit_code=1)
+        pairs = [_normalize_dexscreener_pair(row) for row in rows if isinstance(row, dict)][:limit]
+        _print_json(
+            {
+                "ok": True,
+                "code": "ok",
+                "message": "Dexscreener search results fetched.",
+                "source": "dexscreener",
+                "endpoint": "search",
+                "query": query,
+                "pairCount": len(pairs),
+                "pairs": pairs,
+            }
+        )
+        return 0
+
+    if cmd == "dexscreener-top":
+        if len(argv) < 3:
+            return _err(
+                "usage",
+                "dexscreener-top requires <query> [limit].",
+                "usage: dexscreener-top <query> [limit 1-20]",
+                exit_code=2,
+            )
+        query = argv[2].strip()
+        if not query:
+            return _err("invalid_input", "query must not be empty.", "usage: dexscreener-top <query> [limit 1-20]", exit_code=2)
+        limit = _parse_limit(argv[3] if len(argv) >= 4 else "", default=10, minimum=1, maximum=20)
+        if limit is None:
+            return _err("invalid_input", "limit must be an integer between 1 and 20.", "usage: dexscreener-top <query> [limit 1-20]", exit_code=2)
+        timeout_sec = _parse_timeout(os.environ.get("XCLAW_DEXSCREENER_TIMEOUT_SEC", ""), default=12, minimum=1, maximum=60)
+        if timeout_sec is None:
+            return _err(
+                "invalid_env",
+                "XCLAW_DEXSCREENER_TIMEOUT_SEC must be an integer between 1 and 60.",
+                "Unset XCLAW_DEXSCREENER_TIMEOUT_SEC or set it to a valid integer value.",
+                exit_code=2,
+            )
+        encoded_query = urllib.parse.quote_plus(query)
+        url = f"https://api.dexscreener.com/latest/dex/search?q={encoded_query}"
+        payload, fetch_error, fetch_code = _fetch_dexscreener_json(url, timeout_sec=timeout_sec)
+        if fetch_error is not None:
+            return _err(fetch_error["code"], fetch_error["message"], fetch_error.get("actionHint"), fetch_error.get("details"), exit_code=fetch_code)
+        rows = payload.get("pairs") if isinstance(payload, dict) else None
+        if not isinstance(rows, list):
+            return _err("dexscreener_schema_invalid", "Dexscreener response did not contain pairs[].", "Retry with a different query.", exit_code=1)
+        pairs = [_normalize_dexscreener_pair(row) for row in rows if isinstance(row, dict)]
+        top = _build_dexscreener_top_rows(pairs, limit=limit)
+        _print_json(
+            {
+                "ok": True,
+                "code": "ok",
+                "message": "Dexscreener top pairs fetched.",
+                "source": "dexscreener",
+                "endpoint": "top",
+                "query": query,
+                "sortBy": "liquidityUsd_desc",
+                "pairCount": len(top),
+                "pairs": top,
+            }
+        )
+        return 0
+
+    if cmd == "dexscreener-token-pairs":
+        if len(argv) < 4:
+            return _err(
+                "usage",
+                "dexscreener-token-pairs requires <chain_id> <token_address> [limit].",
+                "usage: dexscreener-token-pairs <chain_id> <token_address> [limit 1-20]",
+                exit_code=2,
+            )
+        chain_id = argv[2].strip()
+        token_address = argv[3].strip()
+        if not re.fullmatch(r"[a-z0-9_-]{2,64}", chain_id):
+            return _err(
+                "invalid_input",
+                "chain_id format is invalid.",
+                "Use a Dexscreener chain id such as base, ethereum, or solana.",
+                {"chainId": chain_id},
+                exit_code=2,
+            )
+        if not re.fullmatch(r"[A-Za-z0-9._-]{2,128}", token_address):
+            return _err(
+                "invalid_input",
+                "token_address format is invalid.",
+                "Use a token address format accepted by Dexscreener for the target chain.",
+                {"tokenAddress": token_address},
+                exit_code=2,
+            )
+        limit = _parse_limit(argv[4] if len(argv) >= 5 else "", default=10, minimum=1, maximum=20)
+        if limit is None:
+            return _err(
+                "invalid_input",
+                "limit must be an integer between 1 and 20.",
+                "usage: dexscreener-token-pairs <chain_id> <token_address> [limit 1-20]",
+                exit_code=2,
+            )
+        timeout_sec = _parse_timeout(os.environ.get("XCLAW_DEXSCREENER_TIMEOUT_SEC", ""), default=12, minimum=1, maximum=60)
+        if timeout_sec is None:
+            return _err(
+                "invalid_env",
+                "XCLAW_DEXSCREENER_TIMEOUT_SEC must be an integer between 1 and 60.",
+                "Unset XCLAW_DEXSCREENER_TIMEOUT_SEC or set it to a valid integer value.",
+                exit_code=2,
+            )
+        encoded_chain = urllib.parse.quote(chain_id, safe="")
+        encoded_token = urllib.parse.quote(token_address, safe="")
+        url = f"https://api.dexscreener.com/token-pairs/v1/{encoded_chain}/{encoded_token}"
+        payload, fetch_error, fetch_code = _fetch_dexscreener_json(url, timeout_sec=timeout_sec)
+        if fetch_error is not None:
+            return _err(fetch_error["code"], fetch_error["message"], fetch_error.get("actionHint"), fetch_error.get("details"), exit_code=fetch_code)
+        rows = payload if isinstance(payload, list) else None
+        if rows is None and isinstance(payload, dict):
+            candidate = payload.get("pairs")
+            if isinstance(candidate, list):
+                rows = candidate
+        if not isinstance(rows, list):
+            return _err("dexscreener_schema_invalid", "Dexscreener response did not contain a pair list.", "Retry with a valid chain/token combination.", exit_code=1)
+        pairs = [_normalize_dexscreener_pair(row) for row in rows if isinstance(row, dict)][:limit]
+        _print_json(
+            {
+                "ok": True,
+                "code": "ok",
+                "message": "Dexscreener token pairs fetched.",
+                "source": "dexscreener",
+                "endpoint": "token-pairs",
+                "chainId": chain_id,
+                "tokenAddress": token_address,
+                "pairCount": len(pairs),
+                "pairs": pairs,
+            }
+        )
+        return 0
+
+    if cmd == "token-research":
+        if len(argv) < 3:
+            return _err(
+                "usage",
+                "token-research requires <query> [limit].",
+                "usage: token-research <query> [limit 1-20]",
+                exit_code=2,
+            )
+        query = argv[2].strip()
+        if not query:
+            return _err("invalid_input", "query must not be empty.", "usage: token-research <query> [limit 1-20]", exit_code=2)
+        limit = _parse_limit(argv[3] if len(argv) >= 4 else "", default=5, minimum=1, maximum=20)
+        if limit is None:
+            return _err("invalid_input", "limit must be an integer between 1 and 20.", "usage: token-research <query> [limit 1-20]", exit_code=2)
+        timeout_sec = _parse_timeout(os.environ.get("XCLAW_DEXSCREENER_TIMEOUT_SEC", ""), default=12, minimum=1, maximum=60)
+        if timeout_sec is None:
+            return _err(
+                "invalid_env",
+                "XCLAW_DEXSCREENER_TIMEOUT_SEC must be an integer between 1 and 60.",
+                "Unset XCLAW_DEXSCREENER_TIMEOUT_SEC or set it to a valid integer value.",
+                exit_code=2,
+            )
+
+        encoded_query = urllib.parse.quote_plus(query)
+        search_url = f"https://api.dexscreener.com/latest/dex/search?q={encoded_query}"
+        search_payload, search_error, search_code = _fetch_dexscreener_json(search_url, timeout_sec=timeout_sec)
+        if search_error is not None:
+            return _err(search_error["code"], search_error["message"], search_error.get("actionHint"), search_error.get("details"), exit_code=search_code)
+        rows = search_payload.get("pairs") if isinstance(search_payload, dict) else None
+        if not isinstance(rows, list):
+            return _err("dexscreener_schema_invalid", "Dexscreener response did not contain pairs[].", "Retry with a different query.", exit_code=1)
+        normalized_rows = [_normalize_dexscreener_pair(row) for row in rows if isinstance(row, dict)]
+        top = _build_dexscreener_top_rows(normalized_rows, limit=limit)
+        if not top:
+            return _err(
+                "dexscreener_no_results",
+                "No Dexscreener pairs matched the query.",
+                "Try a more specific ticker, token name, or chain-prefixed query.",
+                {"query": query},
+                exit_code=1,
+            )
+
+        primary = top[0]
+        primary_chain = str(primary.get("chainId") or "").strip().lower()
+        primary_token_address = str((primary.get("baseToken") or {}).get("address") or "").strip()
+        drilldown = []
+        drilldown_error = None
+        if re.fullmatch(r"[a-z0-9_-]{2,64}", primary_chain) and primary_token_address:
+            token_url = (
+                "https://api.dexscreener.com/token-pairs/v1/"
+                f"{urllib.parse.quote(primary_chain, safe='')}/"
+                f"{urllib.parse.quote(primary_token_address, safe='')}"
+            )
+            token_payload, token_error, _token_code = _fetch_dexscreener_json(token_url, timeout_sec=timeout_sec)
+            if token_error is None:
+                token_rows = token_payload if isinstance(token_payload, list) else None
+                if token_rows is None and isinstance(token_payload, dict):
+                    candidate = token_payload.get("pairs")
+                    if isinstance(candidate, list):
+                        token_rows = candidate
+                if isinstance(token_rows, list):
+                    drill_norm = [_normalize_dexscreener_pair(row) for row in token_rows if isinstance(row, dict)]
+                    drilldown = _build_dexscreener_top_rows(drill_norm, limit=limit)
+            else:
+                drilldown_error = {
+                    "code": token_error.get("code"),
+                    "message": token_error.get("message"),
+                }
+
+        _print_json(
+            {
+                "ok": True,
+                "code": "ok",
+                "message": "Token research completed.",
+                "source": "dexscreener",
+                "endpoint": "token-research",
+                "query": query,
+                "sortBy": "liquidityUsd_desc",
+                "topPairs": top,
+                "primaryToken": {
+                    "chainId": primary_chain,
+                    "address": primary_token_address,
+                    "symbol": (primary.get("baseToken") or {}).get("symbol"),
+                    "name": (primary.get("baseToken") or {}).get("name"),
+                },
+                "drilldownPairs": drilldown,
+                "drilldownError": drilldown_error,
+                "actionHint": "Use dexscreener-token-pairs <chain_id> <token_address> [limit] for alternate chain or quote-token drilldown.",
+            }
+        )
+        return 0
+
     if cmd == "default-chain-get":
         return _run_agent(["default-chain", "get", "--json"])
 
@@ -1309,7 +1740,7 @@ def main(argv: List[str]) -> int:
     return _err(
         "unknown_command",
         f"Unknown command: {cmd}",
-        "Use one of: version, status, dashboard, intents-poll, approval-check, trade-exec, trade-spot, trade-resume, liquidity-add, liquidity-remove, liquidity-positions, liquidity-quote-add, liquidity-quote-remove, transfer-resume, transfer-decide, transfer-policy-get, transfer-policy-set, report-send, chat-poll, chat-post, tracked-list, tracked-trades, username-set, agent-register, auth-recover, owner-link, faucet-request, faucet-networks, chains, x402-pay, x402-pay-resume, x402-pay-decide, x402-policy-get, x402-policy-set, x402-networks, request-x402-payment, wallet-health, wallet-address, wallet-sign-challenge, wallet-send, wallet-send-token, wallet-balance, wallet-token-balance, wallet-track-token, wallet-untrack-token, wallet-tracked-tokens, wallet-wrap-native, wallet-create",
+        "Use one of: version, status, dashboard, intents-poll, approval-check, trade-exec, trade-spot, trade-resume, liquidity-add, liquidity-remove, liquidity-positions, liquidity-quote-add, liquidity-quote-remove, transfer-resume, transfer-decide, transfer-policy-get, transfer-policy-set, report-send, chat-poll, chat-post, tracked-list, tracked-trades, username-set, agent-register, auth-recover, owner-link, faucet-request, faucet-networks, chains, dexscreener-search, dexscreener-top, dexscreener-token-pairs, token-research, x402-pay, x402-pay-resume, x402-pay-decide, x402-policy-get, x402-policy-set, x402-networks, request-x402-payment, wallet-health, wallet-address, wallet-sign-challenge, wallet-send, wallet-send-token, wallet-balance, wallet-token-balance, wallet-track-token, wallet-untrack-token, wallet-tracked-tokens, wallet-wrap-native, wallet-create",
         exit_code=2,
     )
 
