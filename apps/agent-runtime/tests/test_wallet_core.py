@@ -6,9 +6,11 @@ import stat
 import subprocess
 import shutil
 import sys
+import site
 import tempfile
 import unittest
 import textwrap
+from typing import Any
 from unittest import mock
 from datetime import datetime, timedelta, timezone
 
@@ -235,10 +237,22 @@ class WalletCoreUnitTests(unittest.TestCase):
 
 
 class WalletCoreCliTests(unittest.TestCase):
+    def _base_test_env(self, home: str) -> dict[str, str]:
+        # Hermetic subprocess env: keep only essentials and test-owned runtime paths.
+        user_site = site.getusersitepackages()
+        py_path = str(user_site) if isinstance(user_site, str) and user_site else ""
+        return {
+            "HOME": str(home),
+            "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
+            "LANG": "C.UTF-8",
+            "LC_ALL": "C.UTF-8",
+            "PYTHONPATH": py_path,
+            "XCLAW_AGENT_HOME": str(pathlib.Path(home) / ".xclaw-agent"),
+        }
+
     def _run(self, *args: str, home: str, extra_env: dict[str, str] | None = None) -> tuple[int, dict]:
         cmd = ["apps/agent-runtime/bin/xclaw-agent", *args]
-        env = os.environ.copy()
-        env["XCLAW_AGENT_HOME"] = str(pathlib.Path(home) / ".xclaw-agent")
+        env = self._base_test_env(home)
         if extra_env:
             env.update(extra_env)
         proc = subprocess.run(cmd, capture_output=True, text=True, env=env)
@@ -376,6 +390,61 @@ class WalletCoreCliTests(unittest.TestCase):
             os.chmod(wallet_dir, stat.S_IRWXU)
             os.chmod(state_path, stat.S_IRUSR | stat.S_IWUSR)
 
+    def _seed_transfer_policy_cache(self, home: str, *, chain: str, destination: str) -> None:
+        wallet_dir = pathlib.Path(home) / ".xclaw-agent"
+        wallet_dir.mkdir(parents=True, exist_ok=True)
+        state_path = wallet_dir / "state.json"
+        state: dict[str, Any] = {}
+        if state_path.exists():
+            try:
+                state = json.loads(state_path.read_text(encoding="utf-8") or "{}")
+            except Exception:
+                state = {}
+        cache = state.setdefault("transferPolicyCache", {})
+        cache[chain] = {
+            "cachedAt": datetime.now(timezone.utc).isoformat(),
+            "policy": {
+                "chainEnabled": True,
+                "outboundTransfersEnabled": True,
+                "outboundMode": "whitelist",
+                "outboundWhitelistAddresses": [destination.lower()],
+                "updatedAt": datetime.now(timezone.utc).isoformat(),
+            },
+        }
+        state_path.write_text(json.dumps(state), encoding="utf-8")
+        if os.name != "nt":
+            os.chmod(wallet_dir, stat.S_IRWXU)
+            os.chmod(state_path, stat.S_IRUSR | stat.S_IWUSR)
+
+    def _seed_transfer_approval_policy(
+        self,
+        home: str,
+        *,
+        chain: str,
+        mode: str = "auto",
+        native_preapproved: bool = True,
+        allowed_tokens: list[str] | None = None,
+    ) -> None:
+        wallet_dir = pathlib.Path(home) / ".xclaw-agent"
+        wallet_dir.mkdir(parents=True, exist_ok=True)
+        policy_path = wallet_dir / "transfer-policy.json"
+        payload = {
+            "schemaVersion": 1,
+            "chains": {
+                chain: {
+                    "chainKey": chain,
+                    "transferApprovalMode": mode,
+                    "nativeTransferPreapproved": bool(native_preapproved),
+                    "allowedTransferTokens": list(allowed_tokens or []),
+                    "updatedAt": datetime.now(timezone.utc).isoformat(),
+                }
+            },
+        }
+        policy_path.write_text(json.dumps(payload), encoding="utf-8")
+        if os.name != "nt":
+            os.chmod(wallet_dir, stat.S_IRWXU)
+            os.chmod(policy_path, stat.S_IRUSR | stat.S_IWUSR)
+
     def _install_fake_cast(self, home: str) -> str:
         if os.name == "nt":
             self.skipTest("fake cast script helper is POSIX-only")
@@ -390,6 +459,10 @@ class WalletCoreCliTests(unittest.TestCase):
                 cmd="${1:-}"
                 if [ "$cmd" = "send" ]; then
                   echo '{"transactionHash":"0xabababababababababababababababababababababababababababababababab"}'
+                  exit 0
+                fi
+                if [ "$cmd" = "receipt" ]; then
+                  echo '{"status":"0x1"}'
                   exit 0
                 fi
                 if [ "$cmd" = "balance" ]; then
@@ -407,6 +480,22 @@ class WalletCoreCliTests(unittest.TestCase):
             encoding="utf-8",
         )
         os.chmod(cast_path, stat.S_IRWXU)
+        return str(bin_dir)
+
+    def _install_bash_only_bin(self, home: str) -> str:
+        if os.name == "nt":
+            self.skipTest("bash-only helper is POSIX-only")
+        bin_dir = pathlib.Path(home) / "bash-only-bin"
+        bin_dir.mkdir(parents=True, exist_ok=True)
+        bash_path = bin_dir / "bash"
+        python_path = bin_dir / "python3"
+        dirname_path = bin_dir / "dirname"
+        target_python = shutil.which("python3")
+        if not target_python:
+            self.skipTest("python3 is required for launcher helper")
+        os.symlink("/bin/bash", bash_path)
+        os.symlink(target_python, python_path)
+        os.symlink("/usr/bin/dirname", dirname_path)
         return str(bin_dir)
 
     def _canonical_message(self, chain: str = "base_sepolia", timestamp: datetime | None = None) -> str:
@@ -592,6 +681,7 @@ class WalletCoreCliTests(unittest.TestCase):
     def test_wallet_sign_challenge_cast_missing_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_home:
             self._seed_wallet(tmp_home)
+            bash_only = self._install_bash_only_bin(tmp_home)
             code, payload = self._run(
                 "wallet",
                 "sign-challenge",
@@ -601,7 +691,7 @@ class WalletCoreCliTests(unittest.TestCase):
                 "base_sepolia",
                 "--json",
                 home=tmp_home,
-                extra_env={"XCLAW_WALLET_PASSPHRASE": "passphrase-123", "PATH": "/usr/bin:/bin"},
+                extra_env={"XCLAW_WALLET_PASSPHRASE": "passphrase-123", "PATH": bash_only},
             )
             self.assertEqual(code, 1)
             self.assertEqual(payload["code"], "missing_dependency")
@@ -710,6 +800,12 @@ class WalletCoreCliTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_home:
             self._seed_wallet(tmp_home)
             self._seed_policy(tmp_home, max_daily_native_wei="50")
+            self._seed_transfer_policy_cache(
+                tmp_home,
+                chain="base_sepolia",
+                destination="0x0000000000000000000000000000000000000001",
+            )
+            self._seed_transfer_approval_policy(tmp_home, chain="base_sepolia", mode="auto", native_preapproved=True)
             fake_bin = self._install_fake_cast(tmp_home)
             code, payload = self._run(
                 "wallet",
