@@ -68,10 +68,17 @@
   },
   "liquidityOperations": {
     "claimFees": {
-      "legacyEnabled": false
+      "legacyEnabled": false,
+      "adapter": "none"
     },
     "claimRewards": {
-      "legacyEnabled": false
+      "legacyEnabled": false,
+      "adapter": "none",
+      "rewardContracts": []
     }
+  },
+  "tradeOperations": {
+    "legacyEnabled": true,
+    "adapter": "legacy_router"
   }
 }

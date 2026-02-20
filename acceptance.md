@@ -5655,3 +5655,33 @@ Date (UTC): 2026-02-19
 - `npm run seed:verify` -> PASS
 - `npm run build` -> PASS
 - `pm2 restart all` -> PASS
+
+## Slice 106 Full Cross-Chain Functional Parity + Adapter Fallbacks (UTC 2026-02-20)
+
+### Implementation evidence
+- Runtime operation-aware fallback helpers + claim command integration:
+  - `apps/agent-runtime/xclaw_agent/cli.py`
+- Adapter reward capability metadata:
+  - `apps/agent-runtime/xclaw_agent/liquidity_adapter.py`
+- Chain config model extension:
+  - `config/chains/*.json` (`tradeOperations.*`, `liquidityOperations.*.adapter`, `liquidityOperations.claimRewards.rewardContracts`)
+- Canonical docs/handoff updates:
+  - `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - `docs/XCLAW_SLICE_TRACKER.md`
+  - `docs/XCLAW_BUILD_ROADMAP.md`
+  - `docs/CONTEXT_PACK.md`
+  - `spec.md`
+  - `tasks.md`
+
+### Wallet-only/disabled onboarding backlog (documented)
+- `adi_mainnet`, `adi_testnet`, `og_mainnet`, `og_testnet`, `kite_ai_mainnet`, `canton_mainnet`, `canton_testnet`
+
+### Validation status
+- `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v` -> PASS.
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS.
+- `npm run db:parity` -> PASS
+- `npm run seed:reset` -> PASS
+- `npm run seed:load` -> PASS
+- `npm run seed:verify` -> PASS
+- `npm run build` -> PASS
+- `pm2 restart all` -> PASS

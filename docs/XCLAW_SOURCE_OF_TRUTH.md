@@ -4256,3 +4256,44 @@ Limitations / notes:
   - `fallbackUsed`
   - `fallbackReason`
   - `uniswapLpOperation` (set when Uniswap path executes)
+
+## 86) Slice 106 Full Cross-Chain Functional Parity + Adapter Fallbacks (Locked)
+
+1. Scope:
+- Active chains must expose deterministic contracts for:
+  - wallet send,
+  - trade/convert,
+  - liquidity add/remove,
+  - claim-fees,
+  - claim-rewards.
+
+2. Fallback architecture lock:
+- Uniswap-capable chains keep `uniswap_api` as primary.
+- Legacy fallback is adapter-backed only; fallback execution requires both:
+  - config gate enabled,
+  - adapter capability support for operation.
+- No synthetic success stubs.
+
+3. Chain config extensions (canonical):
+- `tradeOperations`:
+  - `legacyEnabled` (boolean)
+  - `adapter` (string)
+- `liquidityOperations.claimFees`:
+  - `legacyEnabled` (boolean)
+  - `adapter` (string)
+- `liquidityOperations.claimRewards`:
+  - `legacyEnabled` (boolean)
+  - `adapter` (string)
+  - `rewardContracts` (array|object)
+
+4. Claim-rewards policy:
+- If `claimRewards.legacyEnabled=true` but reward contracts are absent for adapters that require them, runtime returns deterministic `claim_rewards_not_configured`.
+- Adapters may declare `reward_contract_required=false` (e.g., plugin-managed flows).
+
+5. Uniswap claim fallback contract:
+- On Uniswap claim failure, runtime attempts legacy claim path only when operation is configured + supported.
+- Otherwise deterministic `no_execution_provider_available`.
+
+6. Backlog contract for wallet-only/disabled chains:
+- `adi_mainnet`, `adi_testnet`, `og_mainnet`, `og_testnet`, `kite_ai_mainnet`, `canton_mainnet`, `canton_testnet` remain fail-closed in this slice.
+- Promotion requires chain-specific adapter onboarding and per-operation acceptance evidence.

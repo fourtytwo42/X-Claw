@@ -55,10 +55,17 @@
   "version": 1,
   "liquidityOperations": {
     "claimFees": {
-      "legacyEnabled": false
+      "legacyEnabled": false,
+      "adapter": "hedera_hts"
     },
     "claimRewards": {
-      "legacyEnabled": false
+      "legacyEnabled": false,
+      "adapter": "hedera_hts",
+      "rewardContracts": []
     }
+  },
+  "tradeOperations": {
+    "legacyEnabled": true,
+    "adapter": "saucerswap"
   }
 }

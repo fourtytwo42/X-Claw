@@ -1475,3 +1475,22 @@ Implement deterministic cross-chain `liquidity claim-fees` and `liquidity claim-
   - `config/chains/*.json`
 - Regression coverage:
   - `apps/agent-runtime/tests/test_liquidity_cli.py`
+
+## Slice 106 Context Pack (2026-02-20): Full Cross-Chain Functional Parity + Adapter Fallbacks
+
+### Objective
+Unify cross-chain execution/fallback contracts so active chains expose deterministic behavior for send/trade/liquidity/claims, with Uniswap-primary chains falling back to adapter paths only when configured and supported.
+
+### Constraints
+- No synthetic success paths.
+- Uniswap remains primary on configured chains.
+- Claim-rewards fallback requires configured reward contracts when adapter requires them.
+- Wallet-only/disabled chains remain fail-closed this slice.
+
+### Primary touchpoints
+- Runtime orchestration:
+  - `apps/agent-runtime/xclaw_agent/cli.py`
+- Adapter capability metadata:
+  - `apps/agent-runtime/xclaw_agent/liquidity_adapter.py`
+- Chain config model:
+  - `config/chains/*.json`

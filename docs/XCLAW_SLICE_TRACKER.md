@@ -2040,3 +2040,21 @@ DoD:
 - [x] Required gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
 - [x] Runtime tests pass (`test_liquidity_cli.py`, `test_trade_path.py`).
 - [x] Issue #48 evidence post + commit hash(es).
+
+## Slice 106: Full Cross-Chain Functional Parity + Adapter Fallbacks
+Status: [~]
+Issue: #49
+
+Goal:
+- Expand operation-level fallback contracts so active chains have deterministic full-function behavior and Uniswap chains can fallback to adapter-backed paths where configured.
+
+DoD:
+- [x] chain config model extended with `tradeOperations` and enriched `liquidityOperations` operation descriptors.
+- [x] runtime provider helper model includes operation-aware provider resolution + fallback executor helper.
+- [x] claim-fees and claim-rewards use unified fallback helper semantics.
+- [x] claim fallback gating checks operation config + adapter capability + reward contract requirements.
+- [x] adapter layer includes explicit reward-claim capability metadata.
+- [x] wallet-only/disabled chain promotion backlog documented with gate checklist.
+- [x] required gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
+- [x] runtime tests pass (`test_liquidity_cli.py`, `test_trade_path.py`).
+- [ ] issue #49 evidence post + commit hash(es).

@@ -3141,3 +3141,44 @@ Active slice context: `Slice 98`.
 - [x] `npm run build`.
 - [x] `pm2 restart all`.
 - [ ] Issue evidence post with commit hash(es).
+
+# Slice 106 Tasks: Full Cross-Chain Functional Parity + Adapter Fallbacks (UTC 2026-02-20)
+
+## 1) Canonical/doc sync
+- [x] Add Slice 106 tracker entry in `docs/XCLAW_SLICE_TRACKER.md`.
+- [x] Add Slice 106 roadmap section in `docs/XCLAW_BUILD_ROADMAP.md`.
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` with parity/fallback contract.
+- [x] Update handoff artifacts (`docs/CONTEXT_PACK.md`, `spec.md`, `tasks.md`, `acceptance.md`).
+
+## 2) Runtime/config implementation
+- [x] Add operation-aware provider helper `_resolve_operation_provider(...)`.
+- [x] Add shared fallback helper `_execute_with_fallback(...)`.
+- [x] Apply fallback helper to claim command paths.
+- [x] Extend `liquidity_adapter.py` capability metadata for reward-claim requirements.
+- [x] Extend all chain configs with:
+  - [x] `tradeOperations.legacyEnabled`
+  - [x] `tradeOperations.adapter`
+  - [x] `liquidityOperations.claimFees.adapter`
+  - [x] `liquidityOperations.claimRewards.adapter`
+  - [x] `liquidityOperations.claimRewards.rewardContracts`
+
+## 3) Backlog/promotions
+- [x] Add wallet-only/disabled onboarding backlog for:
+  - [x] `adi_mainnet`
+  - [x] `adi_testnet`
+  - [x] `og_mainnet`
+  - [x] `og_testnet`
+  - [x] `kite_ai_mainnet`
+  - [x] `canton_mainnet`
+  - [x] `canton_testnet`
+
+## 4) Validation/evidence
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v`.
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`.
+- [x] `npm run db:parity`.
+- [x] `npm run seed:reset`.
+- [x] `npm run seed:load`.
+- [x] `npm run seed:verify`.
+- [x] `npm run build`.
+- [x] `pm2 restart all`.
+- [ ] Issue evidence post with commit hash(es).

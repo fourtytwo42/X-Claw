@@ -3049,3 +3049,19 @@ Unify claim behavior across all chains by enforcing deterministic claim contract
 2. Legacy claim availability requires both config gate and adapter support.
 3. AMM v2 fee claim remains unsupported unless future protocol-specific implementation is added.
 4. Non-Uniswap rewards remain not configured by default.
+
+## Slice 106: Full Cross-Chain Functional Parity + Adapter Fallbacks
+
+### Goal
+Establish operation-level parity contracts across active chains and make Uniswap chains adapter-fallback capable where configuration + capability support exists.
+
+### Non-goals
+1. Enabling currently disabled Canton chains.
+2. Enabling rewards fallback without configured reward contracts.
+3. Placeholder success for unsupported operations.
+
+### Constraints
+1. Uniswap remains primary on Uniswap-enabled chains.
+2. Legacy fallback for claims requires config gate + adapter support.
+3. Reward claim fallback requires configured reward contracts when adapter requires them.
+4. Wallet-only/disabled chains remain fail-closed with explicit onboarding backlog.

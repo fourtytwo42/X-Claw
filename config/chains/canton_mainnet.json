@@ -29,10 +29,17 @@
   "version": 1,
   "liquidityOperations": {
     "claimFees": {
-      "legacyEnabled": false
+      "legacyEnabled": false,
+      "adapter": "none"
     },
     "claimRewards": {
-      "legacyEnabled": false
+      "legacyEnabled": false,
+      "adapter": "none",
+      "rewardContracts": []
     }
+  },
+  "tradeOperations": {
+    "legacyEnabled": false,
+    "adapter": "none"
   }
 }

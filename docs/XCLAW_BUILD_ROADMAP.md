@@ -3493,3 +3493,35 @@ Note:
   - [x] `npm run build`
   - [x] `pm2 restart all`
 - [x] Issue #48 evidence post + commit hash(es).
+
+## 106) Slice 106: Full Cross-Chain Functional Parity + Adapter Fallbacks
+
+### 106.1 Canonical/doc sync
+- [x] Add Slice 106 entries to `docs/XCLAW_SLICE_TRACKER.md` and this roadmap section.
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` with parity/fallback contract.
+- [x] Update handoff artifacts: `docs/CONTEXT_PACK.md`, `spec.md`, `tasks.md`, `acceptance.md`.
+
+### 106.2 Runtime/config implementation
+- [x] Add operation-aware provider helper `_resolve_operation_provider(...)`.
+- [x] Add shared fallback executor `_execute_with_fallback(...)`.
+- [x] Apply helper semantics to liquidity claim commands.
+- [x] Extend config gates:
+  - [x] `tradeOperations.legacyEnabled`
+  - [x] `tradeOperations.adapter`
+  - [x] `liquidityOperations.claimFees.adapter`
+  - [x] `liquidityOperations.claimRewards.adapter`
+  - [x] `liquidityOperations.claimRewards.rewardContracts`
+- [x] Extend adapter capability metadata (`supports_reward_claim`, `reward_contract_required`).
+
+### 106.3 Validation + evidence
+- [x] Runtime tests:
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- [x] Required gates run sequentially:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `pm2 restart all`
+- [ ] Issue #49 evidence post + commit hash(es).

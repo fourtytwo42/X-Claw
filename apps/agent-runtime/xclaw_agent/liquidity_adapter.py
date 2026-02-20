@@ -98,6 +98,12 @@ class LiquidityAdapter:
         op = str(operation or "").strip().lower()
         return op in {"add", "remove", "quote_add", "quote_remove", "position_fetch"}
 
+    def supports_reward_claim(self) -> bool:
+        return self.supports_operation("claim_rewards")
+
+    def reward_contract_required(self) -> bool:
+        return True
+
     def position_fetch(self, payload: dict[str, Any]) -> dict[str, Any]:
         position_id = str(payload.get("positionId") or "").strip()
         if not position_id:
@@ -236,6 +242,12 @@ class HederaHtsLiquidityAdapter(LiquidityAdapter):
         if op in {"claim_fees", "claim_rewards"}:
             return True
         return super().supports_operation(op)
+
+    def supports_reward_claim(self) -> bool:
+        return True
+
+    def reward_contract_required(self) -> bool:
+        return False
 
 
 def _require_non_empty(value: Any, field_name: str) -> str:
