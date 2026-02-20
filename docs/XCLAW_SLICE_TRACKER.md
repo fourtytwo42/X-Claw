@@ -2132,3 +2132,19 @@ DoD:
 - [x] canonical docs/handoff sync completed for 108-111.
 - [x] required gates run sequentially.
 - [ ] issue #54 evidence post + commit hash(es).
+
+## Slice 107 Hotfix A: Base ERC-8021 Builder Code Attribution
+Status: [~]
+Issue: #50
+
+Goal:
+- Enforce ERC-8021 builder code attribution for Base transaction send paths with deterministic env-based config and runtime output metadata.
+
+DoD:
+- [x] Base-chain gating implemented for `base_mainnet` and `base_sepolia`.
+- [x] Fail-closed behavior implemented for missing builder code on Base non-empty calldata (`builder_code_missing`).
+- [x] Safe-mode skip implemented for empty calldata and no double-append on already-tagged calldata.
+- [x] Runtime tx outputs include builder attribution metadata fields.
+- [x] required gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
+- [x] runtime tests pass (`test_trade_path.py`, `test_wallet_core.py` where applicable).
+- [ ] issue #50 evidence post + commit hash(es).

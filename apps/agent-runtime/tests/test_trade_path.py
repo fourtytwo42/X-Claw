@@ -27,6 +27,7 @@ class TradePathRuntimeTests(unittest.TestCase):
             cli.os.environ, {"OPENCLAW_STATE_DIR": self._openclaw_state_tmp.name}, clear=False
         )
         self._openclaw_state_patcher.start()
+        cli._TX_BUILDER_ATTRIBUTION_BY_HASH.clear()
 
     def tearDown(self) -> None:
         self._openclaw_state_patcher.stop()
@@ -218,6 +219,159 @@ class TradePathRuntimeTests(unittest.TestCase):
         self.assertIn("--priority-gas-price", send_cmd)
         self.assertIn("77", send_cmd)
         self.assertNotIn("--gas-price", send_cmd)
+
+    def test_builder_code_suffix_applies_for_base_non_empty_calldata(self) -> None:
+        tx_obj = {
+            "from": "0x1111111111111111111111111111111111111111",
+            "to": "0x2222222222222222222222222222222222222222",
+            "data": "0xdeadbeef",
+        }
+        commands: list[list[str]] = []
+        tx_hash = "0x" + "ab" * 32
+
+        def fake_run(cmd: list[str], text: bool = True, capture_output: bool = True, **kwargs):  # type: ignore[override]
+            commands.append(cmd)
+            if cmd[1] == "send":
+                return mock.Mock(returncode=0, stdout='{"transactionHash":"' + tx_hash + '"}', stderr="")
+            raise AssertionError(f"Unexpected command {cmd}")
+
+        with mock.patch.dict(cli.os.environ, {"XCLAW_BUILDER_CODE_BASE": "bc_test", "XCLAW_TX_FEE_MODE": "legacy"}, clear=False), mock.patch.object(
+            cli, "_require_cast_bin", return_value="cast"
+        ), mock.patch.object(
+            cli.subprocess, "run", side_effect=fake_run
+        ), mock.patch.object(
+            cli, "_estimate_tx_fees", return_value={"mode": "legacy", "gasPrice": 1}
+        ):
+            out_hash = cli._cast_rpc_send_transaction("https://rpc.example", tx_obj, "0x" + "11" * 32, chain="base_mainnet")
+
+        self.assertEqual(out_hash, tx_hash)
+        send_cmd = [entry for entry in commands if len(entry) > 1 and entry[1] == "send"][0]
+        calldata = next((part for part in send_cmd if isinstance(part, str) and part.startswith("0xdeadbeef")), "")
+        self.assertTrue(calldata.endswith(cli._erc8021_magic_hex()))
+        meta = cli._builder_output_from_hashes("base_mainnet", [tx_hash])
+        self.assertTrue(meta.get("builderCodeApplied"))
+        self.assertEqual(meta.get("builderCodeSource"), "XCLAW_BUILDER_CODE_BASE")
+        self.assertEqual(meta.get("builderCodeStandard"), "erc8021")
+
+    def test_builder_code_suffix_skips_empty_calldata_safe_mode(self) -> None:
+        tx_obj = {
+            "from": "0x1111111111111111111111111111111111111111",
+            "to": "0x2222222222222222222222222222222222222222",
+            "data": "0x",
+        }
+        commands: list[list[str]] = []
+        tx_hash = "0x" + "cd" * 32
+
+        def fake_run(cmd: list[str], text: bool = True, capture_output: bool = True, **kwargs):  # type: ignore[override]
+            commands.append(cmd)
+            if cmd[1] == "send":
+                return mock.Mock(returncode=0, stdout='{"transactionHash":"' + tx_hash + '"}', stderr="")
+            raise AssertionError(f"Unexpected command {cmd}")
+
+        with mock.patch.dict(cli.os.environ, {"XCLAW_BUILDER_CODE_BASE": "bc_test", "XCLAW_TX_FEE_MODE": "legacy"}, clear=False), mock.patch.object(
+            cli, "_require_cast_bin", return_value="cast"
+        ), mock.patch.object(
+            cli.subprocess, "run", side_effect=fake_run
+        ), mock.patch.object(
+            cli, "_estimate_tx_fees", return_value={"mode": "legacy", "gasPrice": 1}
+        ):
+            out_hash = cli._cast_rpc_send_transaction("https://rpc.example", tx_obj, "0x" + "11" * 32, chain="base_mainnet")
+
+        self.assertEqual(out_hash, tx_hash)
+        send_cmd = [entry for entry in commands if len(entry) > 1 and entry[1] == "send"][0]
+        self.assertFalse(any(isinstance(part, str) and part.startswith("0x") and part.endswith(cli._erc8021_magic_hex()) for part in send_cmd))
+        meta = cli._builder_output_from_hashes("base_mainnet", [tx_hash])
+        self.assertEqual(meta.get("builderCodeSkippedReason"), "empty_calldata_safe_mode")
+        self.assertFalse(meta.get("builderCodeApplied"))
+
+    def test_builder_code_suffix_missing_env_fails_closed(self) -> None:
+        tx_obj = {
+            "from": "0x1111111111111111111111111111111111111111",
+            "to": "0x2222222222222222222222222222222222222222",
+            "data": "0xdeadbeef",
+        }
+        with mock.patch.dict(cli.os.environ, {}, clear=True), mock.patch.object(cli, "_require_cast_bin", return_value="cast"):
+            with self.assertRaises(cli.WalletStoreError) as ctx:
+                cli._cast_rpc_send_transaction("https://rpc.example", tx_obj, "0x" + "11" * 32, chain="base_mainnet")
+        self.assertIn("builder_code_missing", str(ctx.exception))
+
+    def test_builder_code_suffix_skips_non_base_chain(self) -> None:
+        tx_obj = {
+            "from": "0x1111111111111111111111111111111111111111",
+            "to": "0x2222222222222222222222222222222222222222",
+            "data": "0xdeadbeef",
+        }
+        commands: list[list[str]] = []
+        tx_hash = "0x" + "ef" * 32
+
+        def fake_run(cmd: list[str], text: bool = True, capture_output: bool = True, **kwargs):  # type: ignore[override]
+            commands.append(cmd)
+            if cmd[1] == "send":
+                return mock.Mock(returncode=0, stdout='{"transactionHash":"' + tx_hash + '"}', stderr="")
+            raise AssertionError(f"Unexpected command {cmd}")
+
+        with mock.patch.dict(cli.os.environ, {"XCLAW_TX_FEE_MODE": "legacy"}, clear=False), mock.patch.object(
+            cli, "_require_cast_bin", return_value="cast"
+        ), mock.patch.object(
+            cli.subprocess, "run", side_effect=fake_run
+        ), mock.patch.object(
+            cli, "_estimate_tx_fees", return_value={"mode": "legacy", "gasPrice": 1}
+        ):
+            out_hash = cli._cast_rpc_send_transaction("https://rpc.example", tx_obj, "0x" + "11" * 32, chain="ethereum_sepolia")
+
+        self.assertEqual(out_hash, tx_hash)
+        send_cmd = [entry for entry in commands if len(entry) > 1 and entry[1] == "send"][0]
+        self.assertIn("0xdeadbeef", send_cmd)
+        self.assertFalse(any(isinstance(part, str) and part.endswith(cli._erc8021_magic_hex()) for part in send_cmd))
+        meta = cli._builder_output_from_hashes("ethereum_sepolia", [tx_hash])
+        self.assertFalse(meta.get("builderCodeChainEligible"))
+
+    def test_builder_code_suffix_already_tagged_not_double_appended(self) -> None:
+        suffix = cli._encode_erc8021_suffix(["bc_test"])
+        tagged_data = "0xdeadbeef" + suffix[2:]
+        tx_obj = {
+            "from": "0x1111111111111111111111111111111111111111",
+            "to": "0x2222222222222222222222222222222222222222",
+            "data": tagged_data,
+        }
+        commands: list[list[str]] = []
+        tx_hash = "0x" + "12" * 32
+
+        def fake_run(cmd: list[str], text: bool = True, capture_output: bool = True, **kwargs):  # type: ignore[override]
+            commands.append(cmd)
+            if cmd[1] == "send":
+                return mock.Mock(returncode=0, stdout='{"transactionHash":"' + tx_hash + '"}', stderr="")
+            raise AssertionError(f"Unexpected command {cmd}")
+
+        with mock.patch.dict(cli.os.environ, {"XCLAW_BUILDER_CODE_BASE": "bc_test", "XCLAW_TX_FEE_MODE": "legacy"}, clear=False), mock.patch.object(
+            cli, "_require_cast_bin", return_value="cast"
+        ), mock.patch.object(
+            cli.subprocess, "run", side_effect=fake_run
+        ), mock.patch.object(
+            cli, "_estimate_tx_fees", return_value={"mode": "legacy", "gasPrice": 1}
+        ):
+            out_hash = cli._cast_rpc_send_transaction("https://rpc.example", tx_obj, "0x" + "11" * 32, chain="base_mainnet")
+
+        self.assertEqual(out_hash, tx_hash)
+        send_cmd = [entry for entry in commands if len(entry) > 1 and entry[1] == "send"][0]
+        calldata = next((part for part in send_cmd if isinstance(part, str) and part.startswith("0xdeadbeef")), "")
+        self.assertEqual(calldata, tagged_data)
+        meta = cli._builder_output_from_hashes("base_mainnet", [tx_hash])
+        self.assertEqual(meta.get("builderCodeSkippedReason"), "already_tagged")
+
+    def test_builder_code_env_precedence_scoped_then_base_default(self) -> None:
+        with mock.patch.dict(
+            cli.os.environ,
+            {
+                "XCLAW_BUILDER_CODE_BASE": "bc_base",
+                "XCLAW_BUILDER_CODE_BASE_MAINNET": "bc_mainnet",
+            },
+            clear=False,
+        ):
+            value_mainnet, source_mainnet = cli._resolve_builder_code_for_chain("base_mainnet")
+            value_sepolia, source_sepolia = cli._resolve_builder_code_for_chain("base_sepolia")
+        self.assertEqual((value_mainnet, source_mainnet), ("bc_mainnet", "XCLAW_BUILDER_CODE_BASE_MAINNET"))
+        self.assertEqual((value_sepolia, source_sepolia), ("bc_base", "XCLAW_BUILDER_CODE_BASE"))
 
     def test_wait_for_trade_approval_telegram_returns_quick_pending(self) -> None:
         with mock.patch.object(cli, "_maybe_send_telegram_approval_prompt"), mock.patch.object(
@@ -1425,6 +1579,46 @@ class TradePathRuntimeTests(unittest.TestCase):
         self.assertNotIn(leaked_key, serialized)
         self.assertIn("<REDACTED>", serialized)
 
+    def test_wallet_send_success_exposes_builder_metadata_fields(self) -> None:
+        args = argparse.Namespace(
+            to="0x" + "22" * 20,
+            amount_wei="100",
+            chain="base_sepolia",
+            json=True,
+        )
+        with mock.patch.object(cli, "_enforce_spend_preconditions"), mock.patch.object(
+            cli,
+            "_evaluate_outbound_transfer_policy",
+            return_value={"allowed": True, "policyBlockedAtCreate": False, "policyBlockReasonCode": None, "policyBlockReasonMessage": None},
+        ), mock.patch.object(
+            cli,
+            "_transfer_requires_approval",
+            return_value=(False, {"transferApprovalMode": "auto", "nativeTransferPreapproved": True, "allowedTransferTokens": []}),
+        ), mock.patch.object(
+            cli, "_mirror_transfer_approval"
+        ), mock.patch.object(
+            cli,
+            "_execute_pending_transfer_flow",
+            return_value={
+                "ok": True,
+                "code": "ok",
+                "message": "Transfer executed.",
+                "txHash": "0x" + "ab" * 32,
+                "builderCodeChainEligible": True,
+                "builderCodeApplied": False,
+                "builderCodeSkippedReason": "empty_calldata_safe_mode",
+                "builderCodeSource": None,
+                "builderCodeStandard": "erc8021",
+            },
+        ):
+            payload = self._run_and_parse_stdout(lambda: cli.cmd_wallet_send(args))
+        self.assertTrue(payload.get("ok"))
+        self.assertIn("builderCodeChainEligible", payload)
+        self.assertIn("builderCodeApplied", payload)
+        self.assertIn("builderCodeSkippedReason", payload)
+        self.assertIn("builderCodeSource", payload)
+        self.assertIn("builderCodeStandard", payload)
+
     def test_approvals_decide_transfer_approve_executes(self) -> None:
         approval_id = "xfr_test_1"
         cli._record_pending_transfer_flow(
@@ -2408,6 +2602,52 @@ class TradePathRuntimeTests(unittest.TestCase):
         self.assertEqual(code, 0)
         report_mock.assert_not_called()
 
+    def test_trade_execute_success_includes_builder_metadata_fields(self) -> None:
+        args = argparse.Namespace(intent="trd_real_builder", chain="base_sepolia", json=True)
+        trade_payload = {
+            "tradeId": "trd_real_builder",
+            "chainKey": "base_sepolia",
+            "status": "approved",
+            "mode": "real",
+            "retry": {"eligible": False},
+            "tokenIn": "0x1111111111111111111111111111111111111111",
+            "tokenOut": "0x2222222222222222222222222222222222222222",
+            "amountIn": "1",
+            "slippageBps": 50,
+        }
+        with mock.patch.object(cli, "_read_trade_details", return_value=trade_payload), mock.patch.object(
+            cli, "_enforce_spend_preconditions", return_value=({}, "2026-02-14", 0, 1000000000)
+        ), mock.patch.object(
+            cli, "_replay_trade_usage_outbox", return_value=(0, 0)
+        ), mock.patch.object(
+            cli, "_enforce_trade_caps", return_value=({}, "2026-02-14", cli.Decimal("0"), 0, {"maxDailyUsd": "1000", "maxDailyTradeCount": 10})
+        ), mock.patch.object(
+            cli, "_record_trade_cap_ledger"
+        ), mock.patch.object(
+            cli, "_post_trade_usage"
+        ), mock.patch.object(
+            cli, "_execution_wallet", return_value=("0x1111111111111111111111111111111111111111", "11" * 32)
+        ), mock.patch.object(
+            cli, "_require_chain_contract_address", return_value="0x3333333333333333333333333333333333333333"
+        ), mock.patch.object(
+            cli, "_cast_calldata", return_value="0xdeadbeef"
+        ), mock.patch.object(
+            cli, "_cast_rpc_send_transaction", return_value="0x" + "ab" * 32
+        ), mock.patch.object(
+            cli.subprocess, "run", return_value=mock.Mock(returncode=0, stdout='{"status":"0x1"}', stderr="")
+        ), mock.patch.object(
+            cli, "_post_trade_status"
+        ), mock.patch.object(
+            cli, "_record_spend"
+        ):
+            payload = self._run_and_parse_stdout(lambda: cli.cmd_trade_execute(args))
+        self.assertTrue(payload.get("ok"))
+        self.assertIn("builderCodeChainEligible", payload)
+        self.assertIn("builderCodeApplied", payload)
+        self.assertIn("builderCodeSkippedReason", payload)
+        self.assertIn("builderCodeSource", payload)
+        self.assertIn("builderCodeStandard", payload)
+
     def test_trade_execute_blocks_on_daily_trade_cap(self) -> None:
         args = argparse.Namespace(intent="trd_real_2", chain="base_sepolia", json=True)
         trade_payload = {
@@ -2689,6 +2929,11 @@ class TradePathRuntimeTests(unittest.TestCase):
         self.assertEqual(payload.get("providerUsed"), "uniswap_api")
         self.assertEqual(payload.get("fallbackUsed"), False)
         self.assertEqual(payload.get("uniswapRouteType"), "CLASSIC")
+        self.assertIn("builderCodeChainEligible", payload)
+        self.assertIn("builderCodeApplied", payload)
+        self.assertIn("builderCodeSkippedReason", payload)
+        self.assertIn("builderCodeSource", payload)
+        self.assertIn("builderCodeStandard", payload)
 
     def test_trade_spot_falls_back_to_legacy_when_uniswap_quote_fails(self) -> None:
         args = argparse.Namespace(

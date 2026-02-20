@@ -106,6 +106,9 @@ DEFAULT_TX_RETRY_BUMP_BPS = 1250
 DEFAULT_TX_PRIORITY_FLOOR_GWEI = 1
 LIMIT_ORDER_STORE_VERSION = 1
 AGENT_RECOVERY_ACTION = "agent_key_recovery"
+ERC8021_MAGIC_REPEAT_COUNT = 8
+BASE_BUILDER_CHAINS = {"base_mainnet", "base_sepolia"}
+_TX_BUILDER_ATTRIBUTION_BY_HASH: dict[str, dict[str, Any]] = {}
 
 
 class WalletStoreError(Exception):
@@ -2611,6 +2614,7 @@ def _execute_pending_transfer_flow(flow: dict[str, Any]) -> dict[str, Any]:
                     "data": "0x",
                 },
                 private_key_hex,
+                chain=chain,
             )
             cast_bin = _require_cast_bin()
             receipt_proc = _run_subprocess(
@@ -2629,6 +2633,7 @@ def _execute_pending_transfer_flow(flow: dict[str, Any]) -> dict[str, Any]:
                 rpc_url,
                 {"from": from_address, "to": str(token_address), "data": data},
                 private_key_hex,
+                chain=chain,
             )
             cast_bin = _require_cast_bin()
             receipt_proc = _run_subprocess(
@@ -2653,6 +2658,7 @@ def _execute_pending_transfer_flow(flow: dict[str, Any]) -> dict[str, Any]:
         _record_pending_transfer_flow(approval_id, flow)
         _mirror_transfer_approval(flow)
         _remove_pending_transfer_flow(approval_id)
+        builder_meta = _builder_output_from_hashes(chain, [tx_hash])
         return {
             "ok": True,
             "code": "ok",
@@ -2679,6 +2685,7 @@ def _execute_pending_transfer_flow(flow: dict[str, Any]) -> dict[str, Any]:
             "policyBlockReasonCode": flow.get("policyBlockReasonCode"),
             "policyBlockReasonMessage": flow.get("policyBlockReasonMessage"),
             "executionMode": execution_mode,
+            **builder_meta,
         }
     except Exception as exc:
         message = str(exc) or "Transfer execution failed."
@@ -4978,6 +4985,7 @@ def _ensure_token_allowance(
         _chain_rpc_url(chain),
         {"from": owner, "to": token_address, "data": approve_data},
         private_key_hex,
+        chain=chain,
     )
     _wait_for_tx_receipt_success(chain, tx_hash)
     return tx_hash
@@ -5478,6 +5486,7 @@ def _execute_liquidity_v2_add(intent: dict[str, Any], chain: str) -> dict[str, A
         _chain_rpc_url(chain),
         {"from": wallet_address, "to": router, "data": calldata},
         private_key_hex,
+        chain=chain,
     )
     return {
         "txHash": tx_hash,
@@ -5587,6 +5596,7 @@ def _execute_liquidity_v2_remove(intent: dict[str, Any], chain: str) -> dict[str
         _chain_rpc_url(chain),
         {"from": wallet_address, "to": router, "data": calldata},
         private_key_hex,
+        chain=chain,
     )
     return {
         "txHash": tx_hash,
@@ -6642,6 +6652,7 @@ def cmd_liquidity_increase(args: argparse.Namespace) -> int:
         if not increase_hashes:
             raise WalletStoreError("uniswap_payload_invalid: increase produced no executable transactions.")
         tx_hash = increase_hashes[-1]
+        builder_meta = _builder_output_from_hashes(chain, [*approve_hashes, *increase_hashes])
         return ok(
             "Liquidity position increased.",
             chain=chain,
@@ -6655,6 +6666,7 @@ def cmd_liquidity_increase(args: argparse.Namespace) -> int:
             fallbackUsed=False,
             fallbackReason=None,
             uniswapLpOperation="increase",
+            **builder_meta,
         )
     except ChainRegistryError as exc:
         return fail("unsupported_chain_capability", str(exc), chain_supported_hint(), {"chain": chain, "requiredCapability": "liquidity"}, exit_code=2)
@@ -6742,6 +6754,7 @@ def cmd_liquidity_claim_fees(args: argparse.Namespace) -> int:
         tx_hash = str(claim_hashes[-1] or "").strip()
         if not tx_hash:
             raise WalletStoreError("liquidity_claim_fees_failed: claim execution returned empty txHash.")
+        builder_meta = _builder_output_from_hashes(chain, claim_hashes)
         return ok(
             "Liquidity fees claimed.",
             chain=chain,
@@ -6754,6 +6767,7 @@ def cmd_liquidity_claim_fees(args: argparse.Namespace) -> int:
             fallbackUsed=fallback_used,
             fallbackReason=fallback_reason,
             uniswapLpOperation=uniswap_operation,
+            **builder_meta,
         )
     except ChainRegistryError as exc:
         return fail("unsupported_chain_capability", str(exc), chain_supported_hint(), {"chain": chain, "requiredCapability": "liquidity"}, exit_code=2)
@@ -6849,6 +6863,7 @@ def cmd_liquidity_migrate(args: argparse.Namespace) -> int:
             )
 
         tx_hash = migrate_hashes[-1]
+        builder_meta = _builder_output_from_hashes(chain, migrate_hashes)
         return ok(
             "Liquidity position migrated.",
             chain=chain,
@@ -6863,6 +6878,7 @@ def cmd_liquidity_migrate(args: argparse.Namespace) -> int:
             uniswapLpOperation="migrate",
             fromProtocol=from_protocol,
             toProtocol=to_protocol,
+            **builder_meta,
         )
     except ChainRegistryError as exc:
         return fail("unsupported_chain_capability", str(exc), chain_supported_hint(), {"chain": chain, "requiredCapability": "liquidity"}, exit_code=2)
@@ -6972,6 +6988,7 @@ def cmd_liquidity_claim_rewards(args: argparse.Namespace) -> int:
         tx_hash = str(claim_hashes[-1] or "").strip()
         if not tx_hash:
             raise WalletStoreError("liquidity_claim_rewards_failed: claim execution returned empty txHash.")
+        builder_meta = _builder_output_from_hashes(chain, claim_hashes)
         return ok(
             "Liquidity rewards claimed.",
             chain=chain,
@@ -6984,6 +7001,7 @@ def cmd_liquidity_claim_rewards(args: argparse.Namespace) -> int:
             fallbackUsed=fallback_used,
             fallbackReason=fallback_reason,
             uniswapLpOperation=uniswap_operation,
+            **builder_meta,
         )
     except ChainRegistryError as exc:
         return fail("unsupported_chain_capability", str(exc), chain_supported_hint(), {"chain": chain, "requiredCapability": "liquidity"}, exit_code=2)
@@ -7154,6 +7172,15 @@ def cmd_liquidity_execute(args: argparse.Namespace) -> int:
             uniswap_lp_operation=uniswap_lp_operation,
         )
         status_details = execution.get("details") if isinstance(execution.get("details"), dict) else {}
+        builder_hashes: list[str | None] = [tx_hash]
+        approve_hashes = status_details.get("approveTxHashes")
+        if isinstance(approve_hashes, list):
+            builder_hashes.extend([str(item or "").strip() for item in approve_hashes if str(item or "").strip()])
+        operation_hashes = status_details.get("operationTxHashes")
+        if isinstance(operation_hashes, list):
+            builder_hashes.extend([str(item or "").strip() for item in operation_hashes if str(item or "").strip()])
+        builder_meta = _builder_output_from_hashes(chain, builder_hashes)
+        status_details = {**status_details, **builder_meta}
         status_details = {**status_details, **provider_meta}
 
         _post_liquidity_status(
@@ -7190,12 +7217,13 @@ def cmd_liquidity_execute(args: argparse.Namespace) -> int:
             status="filled",
             txHash=tx_hash,
             positionId=execution.get("positionId"),
-            details=execution.get("details"),
+            details=status_details,
             providerRequested=provider_requested,
             providerUsed=provider_used,
             fallbackUsed=fallback_used,
             fallbackReason=fallback_reason,
             uniswapLpOperation=uniswap_lp_operation,
+            **builder_meta,
         )
     except HederaSdkUnavailable as exc:
         if transition_state == "executing":
@@ -7713,6 +7741,7 @@ def _execute_uniswap_lp_transactions(
             rpc_url,
             {"from": wallet_address, "to": tx["to"], "data": tx["data"], "value": tx["value"]},
             private_key_hex,
+            chain=chain,
         )
         receipt_proc = _run_subprocess(
             [cast_bin, "receipt", "--json", "--rpc-url", rpc_url, tx_hash],
@@ -7809,6 +7838,7 @@ def _execute_uniswap_liquidity_intent(intent: dict[str, Any], chain: str, wallet
                 "approveTxHashes": approve_hashes,
                 "operationTxHashes": create_hashes,
                 "request": request_payload,
+                **_builder_output_from_hashes(chain, [*approve_hashes, *create_hashes]),
             },
             "uniswapLpOperation": "create",
         }
@@ -7833,6 +7863,7 @@ def _execute_uniswap_liquidity_intent(intent: dict[str, Any], chain: str, wallet
                 "approveTxHashes": approve_hashes,
                 "operationTxHashes": decrease_hashes,
                 "request": request_payload,
+                **_builder_output_from_hashes(chain, [*approve_hashes, *decrease_hashes]),
             },
             "uniswapLpOperation": "decrease",
         }
@@ -7863,6 +7894,7 @@ def _execute_uniswap_swap_via_proxy(
             rpc_url,
             {"from": wallet_address, "to": approval_tx["to"], "data": approval_tx["data"], "value": approval_tx["value"]},
             private_key_hex,
+            chain=chain,
         )
         approval_receipt = _run_subprocess(
             [cast_bin, "receipt", "--json", "--rpc-url", rpc_url, approval_tx_hash],
@@ -7883,6 +7915,7 @@ def _execute_uniswap_swap_via_proxy(
         rpc_url,
         {"from": wallet_address, "to": swap_tx["to"], "data": swap_tx["data"], "value": swap_tx["value"]},
         private_key_hex,
+        chain=chain,
     )
     receipt_proc = _run_subprocess(
         [cast_bin, "receipt", "--json", "--rpc-url", rpc_url, swap_tx_hash],
@@ -7902,6 +7935,7 @@ def _execute_uniswap_swap_via_proxy(
         "txHash": swap_tx_hash,
         "amountOutUnits": built.get("amountOutUnits") or quoted.get("amountOutUnits"),
         "routeType": route_type,
+        **_builder_output_from_hashes(chain, [approval_tx_hash, swap_tx_hash]),
     }
 
 
@@ -8178,6 +8212,7 @@ def cmd_trade_spot(args: argparse.Namespace) -> int:
                             "data": approve_data,
                         },
                         private_key_hex,
+                        chain=chain,
                     )
                     last_approve_tx_hash = approve_tx_hash
                     approve_receipt = _run_subprocess(
@@ -8205,6 +8240,7 @@ def cmd_trade_spot(args: argparse.Namespace) -> int:
                         "data": swap_data,
                     },
                     private_key_hex,
+                    chain=chain,
                 )
         else:
             if not router:
@@ -8221,6 +8257,7 @@ def cmd_trade_spot(args: argparse.Namespace) -> int:
                         "data": approve_data,
                     },
                     private_key_hex,
+                    chain=chain,
                 )
                 last_approve_tx_hash = approve_tx_hash
                 approve_receipt = _run_subprocess(
@@ -8248,6 +8285,7 @@ def cmd_trade_spot(args: argparse.Namespace) -> int:
                     "data": swap_data,
                 },
                 private_key_hex,
+                chain=chain,
             )
         last_tx_hash = tx_hash
         provider_meta = _build_provider_meta(provider_requested, provider_used, fallback_used, fallback_reason, uniswap_route_type)
@@ -8319,6 +8357,7 @@ def cmd_trade_spot(args: argparse.Namespace) -> int:
 
         total_gas_cost_eth_exact = _format_units(int(total_cost_wei or 0), 18) if total_cost_wei is not None else None
 
+        builder_meta = _builder_output_from_hashes(chain, [approve_tx_hash, tx_hash])
         return ok(
             "Spot swap executed on-chain via configured router (fee proxy).",
             chain=chain,
@@ -8368,6 +8407,7 @@ def cmd_trade_spot(args: argparse.Namespace) -> int:
             fallbackUsed=fallback_used,
             fallbackReason=fallback_reason,
             uniswapRouteType=uniswap_route_type,
+            **builder_meta,
         )
     except SubprocessTimeout as exc:
         details: dict[str, Any] = {
@@ -8527,6 +8567,151 @@ def _retryable_send_error(stderr: str) -> bool:
         "transaction underpriced",
     )
     return any(fragment in normalized for fragment in retryable_fragments)
+
+
+def _is_base_builder_chain(chain: str) -> bool:
+    return str(chain or "").strip() in BASE_BUILDER_CHAINS
+
+
+def _erc8021_magic_hex() -> str:
+    return "8021" * ERC8021_MAGIC_REPEAT_COUNT
+
+
+def _resolve_builder_code_for_chain(chain: str) -> tuple[str, str]:
+    chain_key = str(chain or "").strip()
+    scoped_env_key = f"XCLAW_BUILDER_CODE_{_chain_env_suffix(chain_key)}"
+    scoped = str(os.environ.get(scoped_env_key) or "").strip()
+    if scoped:
+        return scoped, scoped_env_key
+    default_env_key = "XCLAW_BUILDER_CODE_BASE"
+    default_value = str(os.environ.get(default_env_key) or "").strip()
+    if default_value:
+        return default_value, default_env_key
+    return "", ""
+
+
+def _encode_erc8021_suffix(builder_codes: list[str]) -> str:
+    cleaned: list[str] = []
+    for raw in builder_codes:
+        code = str(raw or "").strip()
+        if not code:
+            raise WalletStoreError("builder_code_invalid: empty builder code.")
+        if "," in code:
+            raise WalletStoreError("builder_code_invalid: builder code must not contain commas.")
+        if not code.isascii():
+            raise WalletStoreError("builder_code_invalid: builder code must be ASCII.")
+        cleaned.append(code)
+    if not cleaned:
+        raise WalletStoreError("builder_code_invalid: at least one builder code is required.")
+    payload_text = ",".join(cleaned)
+    payload_bytes = payload_text.encode("utf-8")
+    payload_len = len(payload_bytes)
+    if payload_len > 255:
+        raise WalletStoreError("builder_code_invalid: encoded builder code payload exceeds 255 bytes.")
+    schema_hex = "00"
+    length_hex = f"{payload_len:02x}"
+    payload_hex = payload_bytes.hex()
+    return f"0x{schema_hex}{length_hex}{payload_hex}{_erc8021_magic_hex()}"
+
+
+def _has_erc8021_suffix(data_hex: str) -> bool:
+    text = str(data_hex or "").strip().lower()
+    if not re.fullmatch(r"0x[a-f0-9]*", text):
+        return False
+    return text.endswith(_erc8021_magic_hex())
+
+
+def _default_builder_attribution(chain: str) -> dict[str, Any]:
+    eligible = _is_base_builder_chain(chain)
+    return {
+        "builderCodeChainEligible": eligible,
+        "builderCodeApplied": False,
+        "builderCodeSkippedReason": "non_base_chain" if not eligible else "not_evaluated",
+        "builderCodeSource": None,
+        "builderCodeValue": None,
+        "builderCodeStandard": "erc8021" if eligible else None,
+    }
+
+
+def _apply_builder_code_suffix_if_needed(chain: str, data_hex: str) -> tuple[str, dict[str, Any]]:
+    chain_key = str(chain or "").strip()
+    text = str(data_hex or "").strip()
+    if text == "":
+        text = "0x"
+    if not re.fullmatch(r"0x[a-fA-F0-9]*", text):
+        raise WalletStoreError("builder_code_invalid: tx data must be hex calldata.")
+    if len(text) % 2 != 0:
+        raise WalletStoreError("builder_code_invalid: tx data must use even-length hex bytes.")
+
+    meta = _default_builder_attribution(chain_key)
+    if not meta["builderCodeChainEligible"]:
+        return text, meta
+    if text == "0x":
+        meta["builderCodeSkippedReason"] = "empty_calldata_safe_mode"
+        return text, meta
+    if _has_erc8021_suffix(text):
+        meta["builderCodeSkippedReason"] = "already_tagged"
+        return text, meta
+
+    builder_code, source_key = _resolve_builder_code_for_chain(chain_key)
+    if not builder_code:
+        raise WalletStoreError(
+            f"builder_code_missing: configure XCLAW_BUILDER_CODE_{_chain_env_suffix(chain_key)} or XCLAW_BUILDER_CODE_BASE."
+        )
+    suffix = _encode_erc8021_suffix([builder_code])
+    tagged = f"0x{text[2:]}{suffix[2:]}"
+    meta.update(
+        {
+            "builderCodeApplied": True,
+            "builderCodeSkippedReason": None,
+            "builderCodeSource": source_key,
+            "builderCodeValue": builder_code,
+            "builderCodeStandard": "erc8021",
+        }
+    )
+    return tagged, meta
+
+
+def _record_tx_builder_attribution(tx_hash: str, metadata: dict[str, Any]) -> None:
+    tx = str(tx_hash or "").strip().lower()
+    if not re.fullmatch(r"0x[a-f0-9]{64}", tx):
+        return
+    _TX_BUILDER_ATTRIBUTION_BY_HASH[tx] = dict(metadata or {})
+
+
+def _tx_builder_attribution(tx_hash: str | None) -> dict[str, Any] | None:
+    tx = str(tx_hash or "").strip().lower()
+    if not tx:
+        return None
+    row = _TX_BUILDER_ATTRIBUTION_BY_HASH.get(tx)
+    return dict(row) if isinstance(row, dict) else None
+
+
+def _builder_output_from_hashes(chain: str, tx_hashes: list[str | None]) -> dict[str, Any]:
+    eligible = _is_base_builder_chain(chain)
+    defaults = {
+        "builderCodeChainEligible": eligible,
+        "builderCodeApplied": False,
+        "builderCodeSkippedReason": "non_base_chain" if not eligible else None,
+        "builderCodeSource": None,
+        "builderCodeStandard": "erc8021" if eligible else None,
+    }
+    if not eligible:
+        return defaults
+    rows = [_tx_builder_attribution(tx_hash) for tx_hash in tx_hashes]
+    rows = [row for row in rows if isinstance(row, dict)]
+    if not rows:
+        return defaults
+    applied = any(bool(row.get("builderCodeApplied")) for row in rows)
+    source = next((row.get("builderCodeSource") for row in rows if row.get("builderCodeSource")), None)
+    skipped = None if applied else next((row.get("builderCodeSkippedReason") for row in rows if row.get("builderCodeSkippedReason")), None)
+    return {
+        "builderCodeChainEligible": True,
+        "builderCodeApplied": applied,
+        "builderCodeSkippedReason": skipped,
+        "builderCodeSource": source,
+        "builderCodeStandard": "erc8021",
+    }
 
 
 def _parse_next_nonce_from_error(stderr: str) -> int | None:
@@ -8743,7 +8928,9 @@ def _cast_nonce(cast_bin: str, rpc_url: str, from_addr: str, block_tag: str) -> 
         return None
 
 
-def _cast_rpc_send_transaction(rpc_url: str, tx_obj: dict[str, Any], private_key_hex: str | None = None) -> str:
+def _cast_rpc_send_transaction(
+    rpc_url: str, tx_obj: dict[str, Any], private_key_hex: str | None = None, chain: str | None = None
+) -> str:
     cast_bin = _require_cast_bin()
     if private_key_hex:
         from_addr = tx_obj.get("from")
@@ -8767,6 +8954,9 @@ def _cast_rpc_send_transaction(rpc_url: str, tx_obj: dict[str, Any], private_key
             raise WalletStoreError("cast send requires tx_obj.to as hex address.")
         if not re.fullmatch(r"0x[a-fA-F0-9]*", data):
             raise WalletStoreError("cast send requires tx_obj.data as hex calldata.")
+        attribution_meta: dict[str, Any] = _default_builder_attribution(str(chain or "").strip())
+        if chain:
+            data, attribution_meta = _apply_builder_code_suffix_if_needed(str(chain), data)
         attempts = _tx_send_max_attempts()
         last_err = "cast send failed."
         nonce_override: int | None = None
@@ -8818,7 +9008,9 @@ def _cast_rpc_send_transaction(rpc_url: str, tx_obj: dict[str, Any], private_key
                 send_cmd.extend(["--value", value_wei])
             proc = _run_subprocess(send_cmd, timeout_sec=_cast_send_timeout_sec(), kind="cast_send")
             if proc.returncode == 0:
-                return _extract_tx_hash(proc.stdout)
+                tx_hash = _extract_tx_hash(proc.stdout)
+                _record_tx_builder_attribution(tx_hash, attribution_meta)
+                return tx_hash
 
             stderr = (proc.stderr or "").strip()
             stdout = (proc.stdout or "").strip()
@@ -8836,8 +9028,17 @@ def _cast_rpc_send_transaction(rpc_url: str, tx_obj: dict[str, Any], private_key
 
         raise WalletStoreError(f"{last_err} (after {attempts} attempts)")
     else:
+        tx_payload = dict(tx_obj or {})
+        attribution_meta = _default_builder_attribution(str(chain or "").strip())
+        if chain:
+            payload_data_raw = tx_payload.get("data")
+            payload_data = str(payload_data_raw).strip() if payload_data_raw is not None else "0x"
+            if payload_data == "":
+                payload_data = "0x"
+            payload_data, attribution_meta = _apply_builder_code_suffix_if_needed(str(chain), payload_data)
+            tx_payload["data"] = payload_data
         proc = _run_subprocess(
-            [cast_bin, "rpc", "--rpc-url", rpc_url, "eth_sendTransaction", json.dumps(tx_obj, separators=(",", ":"))],
+            [cast_bin, "rpc", "--rpc-url", rpc_url, "eth_sendTransaction", json.dumps(tx_payload, separators=(",", ":"))],
             timeout_sec=_cast_send_timeout_sec(),
             kind="cast_send",
         )
@@ -8845,7 +9046,10 @@ def _cast_rpc_send_transaction(rpc_url: str, tx_obj: dict[str, Any], private_key
         stderr = (proc.stderr or "").strip()
         stdout = (proc.stdout or "").strip()
         raise WalletStoreError(stderr or stdout or "cast rpc eth_sendTransaction failed.")
-    return _extract_tx_hash(proc.stdout)
+    tx_hash = _extract_tx_hash(proc.stdout)
+    if chain:
+        _record_tx_builder_attribution(tx_hash, attribution_meta)
+    return tx_hash
 
 
 def cmd_status(args: argparse.Namespace) -> int:
@@ -9071,6 +9275,7 @@ def cmd_trade_execute(args: argparse.Namespace) -> int:
         cap_state, _, current_spend_usd, current_filled_trades, trade_caps = _enforce_trade_caps(args.chain, projected_spend_usd, 1)
         deadline = str(int(datetime.now(timezone.utc).timestamp()) + 120)
         tx_hash: str
+        approve_tx_hash: str | None = None
         if provider_requested == "uniswap_api":
             try:
                 uniswap_exec = _execute_uniswap_swap_via_proxy(
@@ -9083,6 +9288,7 @@ def cmd_trade_execute(args: argparse.Namespace) -> int:
                     500,
                 )
                 provider_used = "uniswap_api"
+                approve_tx_hash = str(uniswap_exec.get("approveTxHash") or "") or None
                 tx_hash = str(uniswap_exec.get("txHash") or "")
                 if not re.fullmatch(r"0x[a-fA-F0-9]{64}", tx_hash):
                     raise WalletStoreError("uniswap_payload_invalid: missing txHash from execution.")
@@ -9103,6 +9309,7 @@ def cmd_trade_execute(args: argparse.Namespace) -> int:
                         "data": approve_data,
                     },
                     private_key_hex,
+                    chain=args.chain,
                 )
                 approve_receipt = _run_subprocess(
                     [cast_bin, "receipt", "--json", "--rpc-url", rpc_url, approve_tx_hash],
@@ -9129,6 +9336,7 @@ def cmd_trade_execute(args: argparse.Namespace) -> int:
                         "data": swap_data,
                     },
                     private_key_hex,
+                    chain=args.chain,
                 )
         else:
             if not router:
@@ -9143,6 +9351,7 @@ def cmd_trade_execute(args: argparse.Namespace) -> int:
                     "data": approve_data,
                 },
                 private_key_hex,
+                chain=args.chain,
             )
             approve_receipt = _run_subprocess(
                 [cast_bin, "receipt", "--json", "--rpc-url", rpc_url, approve_tx_hash],
@@ -9169,6 +9378,7 @@ def cmd_trade_execute(args: argparse.Namespace) -> int:
                     "data": swap_data,
                 },
                 private_key_hex,
+                chain=args.chain,
             )
         provider_meta = _build_provider_meta(provider_requested, provider_used, fallback_used, fallback_reason, uniswap_route_type)
         _post_trade_status(args.intent, previous_status, "executing", {"txHash": tx_hash, **provider_meta})
@@ -9214,6 +9424,7 @@ def cmd_trade_execute(args: argparse.Namespace) -> int:
             "reason": "real_mode_server_tracked",
             "message": "Real-mode trade reports are server-tracked via wallet/RPC and are not sent by runtime."
         }
+        builder_meta = _builder_output_from_hashes(args.chain, [approve_tx_hash, tx_hash])
         return ok(
             "Trade executed in real mode.",
             tradeId=args.intent,
@@ -9234,6 +9445,7 @@ def cmd_trade_execute(args: argparse.Namespace) -> int:
             fallbackReason=fallback_reason,
             uniswapRouteType=uniswap_route_type,
             report=report_result,
+            **builder_meta,
         )
     except WalletPolicyError as exc:
         if transition_state == "executing":
@@ -10388,6 +10600,7 @@ def _execute_limit_order_real(order: dict[str, Any], chain: str) -> str:
             "data": approve_data,
         },
         private_key_hex,
+        chain=chain,
     )
     approve_receipt = _run_subprocess(
         [cast_bin, "receipt", "--json", "--rpc-url", rpc_url, approve_tx_hash],
@@ -10411,6 +10624,7 @@ def _execute_limit_order_real(order: dict[str, Any], chain: str) -> str:
             "data": swap_data,
         },
         private_key_hex,
+        chain=chain,
     )
 
     receipt_proc = _run_subprocess(
@@ -11681,6 +11895,7 @@ def cmd_wallet_wrap_native(args: argparse.Namespace) -> int:
                 "value": amount_in_units,
             },
             private_key_hex,
+            chain=chain,
         )
         receipt_proc = _run_subprocess(
             [cast_bin, "receipt", "--json", "--rpc-url", rpc_url, tx_hash],

@@ -3125,3 +3125,22 @@ Publish final active-chain parity matrix and close evidence trail for slices 108
 ### Constraints
 1. Matrix must include operation-level truth and provider/fallback status per active chain.
 2. Wallet-only/disabled chains remain documented as fail-closed backlog.
+
+## Slice 107 Hotfix A: Base ERC-8021 Builder Code Attribution
+
+### Goal
+Implement ERC-8021 builder code attribution in runtime send paths for Base chains with deterministic env-driven behavior and output metadata.
+
+### Non-goals
+1. Smart contract changes.
+2. Web/server API route contract changes.
+3. Non-Base chain attribution rollout.
+
+### Constraints
+1. Chain scope: `base_mainnet`, `base_sepolia`.
+2. Env-only builder code config:
+- `XCLAW_BUILDER_CODE_BASE`
+- optional per-chain overrides: `XCLAW_BUILDER_CODE_BASE_MAINNET`, `XCLAW_BUILDER_CODE_BASE_SEPOLIA`.
+3. Safe mode: append suffix only for non-empty calldata.
+4. Fail closed when Base non-empty calldata requires suffix but builder code env is missing.
+5. Runtime CLI tx outputs include additive builder attribution metadata fields.

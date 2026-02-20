@@ -4402,3 +4402,39 @@ Supersession note:
 3. Out-of-scope lock remains:
 - Wallet-only/disabled chains continue fail-closed in this stream:
   - `adi_mainnet`, `adi_testnet`, `og_mainnet`, `og_testnet`, `kite_ai_mainnet`, `canton_mainnet`, `canton_testnet`.
+
+## 92) Slice 107 Hotfix: Base ERC-8021 Builder Code Attribution (Locked)
+
+1. Scope lock:
+- Runtime-only transaction construction/output changes in `apps/agent-runtime`.
+- Chain scope is strictly:
+  - `base_mainnet`
+  - `base_sepolia`
+
+2. Builder code config contract:
+- Builder code is env-driven only (no hardcoded code in repo):
+  - `XCLAW_BUILDER_CODE_BASE`
+  - `XCLAW_BUILDER_CODE_BASE_MAINNET` (optional override)
+  - `XCLAW_BUILDER_CODE_BASE_SEPOLIA` (optional override)
+- Precedence:
+  - chain-scoped env first (`XCLAW_BUILDER_CODE_<CHAIN_SUFFIX>`)
+  - then `XCLAW_BUILDER_CODE_BASE`.
+
+3. Runtime tagging behavior:
+- ERC-8021 suffix is appended only for Base-chain transactions with non-empty calldata.
+- Empty calldata (`0x`) is safe-mode skipped (`empty_calldata_safe_mode`).
+- Already-tagged calldata is not double-appended (`already_tagged`).
+- Non-Base chains are no-op for tagging (`non_base_chain`).
+
+4. Fail-closed requirement:
+- Base-chain, non-empty calldata transactions must fail closed when no builder code env is configured:
+  - deterministic error code prefix: `builder_code_missing`.
+
+5. Output metadata contract:
+- Successful tx-executing runtime outputs include additive attribution metadata:
+  - `builderCodeChainEligible`
+  - `builderCodeApplied`
+  - `builderCodeSkippedReason`
+  - `builderCodeSource`
+  - `builderCodeStandard` (`erc8021` when chain-eligible)
+- Applies to wallet send, trade spot/execute, and liquidity execution responses that return tx results.

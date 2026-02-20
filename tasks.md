@@ -3286,3 +3286,31 @@ Active slice context: `Slice 98`.
 ## 2) Validation/evidence
 - [x] Required gates run sequentially.
 - [ ] Issue evidence post with commit hash(es).
+
+# Slice 107 Hotfix A Tasks: Base ERC-8021 Builder Code Attribution (UTC 2026-02-20)
+
+## 1) Canonical/doc sync
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` with locked ERC-8021 Base attribution contract.
+- [x] Add hotfix entry to `docs/XCLAW_SLICE_TRACKER.md` and `docs/XCLAW_BUILD_ROADMAP.md`.
+- [x] Update handoff artifacts (`spec.md`, `tasks.md`, `acceptance.md`).
+
+## 2) Runtime implementation
+- [x] Add Base-gated ERC-8021 helpers in `apps/agent-runtime/xclaw_agent/cli.py`.
+- [x] Update `_cast_rpc_send_transaction(...)` to apply suffix logic and fail-closed behavior when required.
+- [x] Pass `chain` to all runtime send callsites in `cli.py`.
+- [x] Add additive builder metadata fields in wallet/trade/liquidity tx outputs.
+
+## 3) Tests
+- [x] Add sender-path ERC-8021 unit coverage in `apps/agent-runtime/tests/test_trade_path.py`.
+- [x] Add command-output metadata presence checks in `apps/agent-runtime/tests/test_trade_path.py`.
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`.
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_wallet_core.py -v`.
+
+## 4) Required validation sequence
+- [x] `npm run db:parity`.
+- [x] `npm run seed:reset`.
+- [x] `npm run seed:load`.
+- [x] `npm run seed:verify`.
+- [x] `npm run build`.
+- [x] `pm2 restart all`.
+- [ ] Issue evidence post with commit hash(es).

@@ -3626,3 +3626,30 @@ Note:
 ### 111.2 Validation + evidence
 - [x] Required gates run sequentially.
 - [ ] Issue #54 evidence post + commit hash(es).
+
+## 107.A) Slice 107 Hotfix A: Base ERC-8021 Builder Code Attribution
+
+### 107.A.1 Canonical/doc sync
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` with locked ERC-8021 Base attribution behavior.
+- [x] Add tracker/roadmap/handoff entries for this hotfix.
+
+### 107.A.2 Runtime implementation
+- [x] Add ERC-8021 encode/detection/apply helpers in runtime sender path.
+- [x] Gate attribution to `base_mainnet` and `base_sepolia`.
+- [x] Enforce fail-closed missing-builder-code behavior for Base non-empty calldata.
+- [x] Apply safe-mode skip for empty calldata and no double-append for already tagged calldata.
+- [x] Pass `chain` context into `_cast_rpc_send_transaction(...)` callsites.
+- [x] Surface additive builder metadata in wallet/trade/liquidity tx outputs.
+
+### 107.A.3 Validation + evidence
+- [x] Runtime tests:
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_wallet_core.py -v`
+- [x] Required gates run sequentially:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `pm2 restart all`
+- [ ] Issue #50 evidence post + commit hash(es).

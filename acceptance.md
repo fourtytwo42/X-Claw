@@ -5747,3 +5747,40 @@ Date (UTC): 2026-02-19
 - `npm run seed:verify` -> PASS
 - `npm run build` -> PASS
 - `pm2 restart all` -> PASS
+
+## Slice 107 Hotfix A Base ERC-8021 Builder Code Attribution (UTC 2026-02-20)
+
+### Implementation evidence
+- Runtime ERC-8021 sender integration:
+  - `apps/agent-runtime/xclaw_agent/cli.py`
+    - Base chain gating (`base_mainnet`, `base_sepolia`)
+    - env precedence for builder code resolution
+    - fail-closed `builder_code_missing` on Base non-empty calldata without config
+    - safe-mode skip on empty calldata
+    - already-tagged no double append
+    - runtime output metadata aggregation for wallet/trade/liquidity responses
+- Runtime test coverage:
+  - `apps/agent-runtime/tests/test_trade_path.py`
+
+### Validation status
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS (117 tests)
+- `python3 -m unittest apps/agent-runtime/tests/test_wallet_core.py -v` -> PASS (43 tests)
+- `npm run db:parity` -> PASS
+- `npm run seed:reset` -> PASS
+- `npm run seed:load` -> PASS
+- `npm run seed:verify` -> PASS
+- `npm run build` -> PASS
+- `pm2 restart all` -> PASS
+
+### Runtime attribution evidence
+- Unit tests confirm Base-chain suffixing and metadata behavior:
+  - Base non-empty calldata -> suffix appended and `builderCodeApplied=true`.
+  - Base empty calldata -> safe-mode skip with `builderCodeSkippedReason=empty_calldata_safe_mode`.
+  - Missing builder code env -> deterministic fail-closed (`builder_code_missing`).
+- Command payload assertions confirm additive fields in success responses:
+  - `builderCodeChainEligible`
+  - `builderCodeApplied`
+  - `builderCodeSkippedReason`
+  - `builderCodeSource`
+  - `builderCodeStandard`
+- Live Base Sepolia/Mainnet tx hash validation is not included in this session because onchain execution credentials/funded wallets were not used in test runs.
