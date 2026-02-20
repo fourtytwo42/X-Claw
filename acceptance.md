@@ -6143,3 +6143,51 @@ Active slice context: `Slice 117` in progress (issue `#60`).
     - `/tmp/xclaw-ui-verify-xfr_ui_1771628838835_w6khemsv`
   - note:
     - one initial verifier attempt failed due stale bootstrap token; rerun passed after minting fresh owner-link token.
+
+---
+
+# Hotfix Acceptance Evidence: Slice 117 Hotfix G Installer + Run-Loop Wiring Hardening
+
+Date (UTC): 2026-02-20
+Active slice context: `Slice 117` in progress (issue `#60`).
+
+## Objective + Scope Lock
+- Objective: prevent recurring `runtime_signing_unavailable` caused by installer/service/env drift.
+- Scope lock:
+  - `skills/xclaw-agent/scripts/setup_agent_skill.py`
+  - `apps/network-web/src/app/skill-install.sh/route.ts`
+  - `apps/network-web/src/app/skill-install.ps1/route.ts`
+  - `apps/agent-runtime/xclaw_agent/cli.py`
+  - `apps/agent-runtime/tests/test_setup_agent_skill.py`
+  - canonical docs/handoff artifacts.
+
+## Behavior Checks
+- [x] setup script resolves run-loop env from env/config/backup with strict precedence.
+- [x] setup strict mode fails install when run-loop health probe reports signing unavailable.
+- [x] shell installer performs authoritative final strict setup pass after bootstrap/register.
+- [x] PowerShell installer performs authoritative final strict setup pass after bootstrap/register.
+- [x] installer final pass binds run-loop to bootstrap-issued agent credentials and install-origin canonical API base.
+- [x] deterministic installer summary lines emitted for run-loop apiBase/agentId/walletSigningReady.
+
+## Required Validation Gates
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_approvals_run_loop.py -v`
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_setup_agent_skill.py -v`
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+- [x] `npm run verify:ui:agent-approvals`
+
+## Installer Smoke Evidence
+- [x] Local-origin strict setup smoke:
+  - `XCLAW_INSTALL_CANONICAL_API_BASE=http://127.0.0.1:3000/api/v1 ... XCLAW_SETUP_REQUIRE_RUN_LOOP_READY=1 python3 skills/xclaw-agent/scripts/setup_agent_skill.py`
+  - health result: `walletSigningReady=true`, `agentId=ag_slice7`, `apiBaseUrl=http://127.0.0.1:3000/api/v1`.
+- [x] Production-origin strict setup smoke:
+  - `XCLAW_INSTALL_CANONICAL_API_BASE=https://xclaw.trade/api/v1 ... XCLAW_SETUP_REQUIRE_RUN_LOOP_READY=1 python3 skills/xclaw-agent/scripts/setup_agent_skill.py`
+  - health result: `walletSigningReady=true`, `agentId=ag_a123e3bc428c12675f93`, `apiBaseUrl=https://xclaw.trade/api/v1`.
+- [x] Browser verifier final pass:
+  - selector: `approval-row-transfer-xfr_ui_1771630667281_ay3fcv92`
+  - artifact dir: `/tmp/xclaw-ui-verify-xfr_ui_1771630667281_ay3fcv92`

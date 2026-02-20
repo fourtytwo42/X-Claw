@@ -4,19 +4,22 @@
 from __future__ import annotations
 
 import json
+import base64
+import hashlib
 import os
 import shutil
 import stat
 import subprocess
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 APP_DIR = Path.home() / ".xclaw-agent"
 POLICY_FILE = APP_DIR / "policy.json"
 PATCHER = Path(__file__).resolve().parent / "openclaw_gateway_patch.py"
 RUN_LOOP_ENV_FILE = APP_DIR / "approvals-run-loop.env"
 RUN_LOOP_SERVICE = Path.home() / ".config" / "systemd" / "user" / "xclaw-agent-approvals-loop.service"
+PASSPHRASE_BACKUP_FILE = APP_DIR / "passphrase.backup.v1.json"
 
 
 def run(
@@ -229,6 +232,167 @@ def _chmod_if_posix(path: Path, mode: int) -> None:
     os.chmod(path, mode)
 
 
+def _load_openclaw_config() -> dict[str, Any]:
+    cfg = Path.home() / ".openclaw" / "openclaw.json"
+    if not cfg.exists():
+        return {}
+    try:
+        return json.loads(cfg.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _openclaw_skill_entry(config: dict[str, Any]) -> dict[str, Any]:
+    skills = config.get("skills")
+    if not isinstance(skills, dict):
+        return {}
+    entries = skills.get("entries")
+    if not isinstance(entries, dict):
+        return {}
+    entry = entries.get("xclaw-agent")
+    if not isinstance(entry, dict):
+        return {}
+    return entry
+
+
+def _openclaw_skill_env(config: dict[str, Any]) -> dict[str, str]:
+    entry = _openclaw_skill_entry(config)
+    env = entry.get("env")
+    if not isinstance(env, dict):
+        return {}
+    out: dict[str, str] = {}
+    for key, value in env.items():
+        if isinstance(key, str) and isinstance(value, str):
+            out[key] = value.strip()
+    return out
+
+
+def _openclaw_skill_api_key(config: dict[str, Any]) -> str:
+    entry = _openclaw_skill_entry(config)
+    value = entry.get("apiKey")
+    if isinstance(value, str):
+        return value.strip()
+    return ""
+
+
+def _decrypt_passphrase_backup(path: Path) -> str:
+    if not path.exists():
+        return ""
+    try:
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+        from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        nonce_b64 = str(payload.get("nonceB64") or "").strip()
+        ciphertext_b64 = str(payload.get("ciphertextB64") or "").strip()
+        if not nonce_b64 or not ciphertext_b64:
+            return ""
+
+        machine_id = ""
+        for candidate in ("/etc/machine-id", "/var/lib/dbus/machine-id"):
+            probe = Path(candidate)
+            if not probe.exists():
+                continue
+            raw = probe.read_text(encoding="utf-8").strip()
+            if raw:
+                machine_id = raw
+                break
+
+        ikm = hashlib.sha256(("|".join([machine_id, str(os.getuid()), str(Path.home())])).encode("utf-8")).digest()
+        hkdf = HKDF(algorithm=hashes.SHA256(), length=32, salt=b"xclaw-passphrase-backup-v1", info=b"xclaw")
+        key = hkdf.derive(ikm)
+        nonce = base64.b64decode(nonce_b64)
+        ciphertext = base64.b64decode(ciphertext_b64)
+        plaintext = AESGCM(key).decrypt(nonce, ciphertext, b"xclaw-passphrase-backup-v1")
+        return plaintext.decode("utf-8").strip()
+    except Exception:
+        return ""
+
+
+def _resolve_canonical_api_base(config_env: dict[str, str]) -> str:
+    explicit = os.environ.get("XCLAW_API_BASE_URL", "").strip()
+    if explicit:
+        return explicit
+    canonical = os.environ.get("XCLAW_INSTALL_CANONICAL_API_BASE", "").strip()
+    if canonical:
+        return canonical
+    return str(config_env.get("XCLAW_API_BASE_URL") or "").strip()
+
+
+def _resolve_run_loop_env(default_chain: str) -> tuple[dict[str, str], list[str]]:
+    config = _load_openclaw_config()
+    config_env = _openclaw_skill_env(config)
+    cfg_api_key = _openclaw_skill_api_key(config)
+
+    api_base = _resolve_canonical_api_base(config_env)
+    bootstrap_agent_id = os.environ.get("XCLAW_BOOTSTRAP_AGENT_ID", "").strip()
+    bootstrap_agent_api_key = os.environ.get("XCLAW_BOOTSTRAP_AGENT_API_KEY", "").strip()
+    agent_id = os.environ.get("XCLAW_AGENT_ID", "").strip() or bootstrap_agent_id or str(config_env.get("XCLAW_AGENT_ID") or "").strip()
+    api_key = (
+        os.environ.get("XCLAW_AGENT_API_KEY", "").strip()
+        or bootstrap_agent_api_key
+        or str(config_env.get("XCLAW_AGENT_API_KEY") or "").strip()
+        or cfg_api_key
+    )
+    chain = os.environ.get("XCLAW_DEFAULT_CHAIN", "").strip() or str(config_env.get("XCLAW_DEFAULT_CHAIN") or "").strip() or default_chain
+    passphrase = (
+        os.environ.get("XCLAW_WALLET_PASSPHRASE", "").strip()
+        or str(config_env.get("XCLAW_WALLET_PASSPHRASE") or "").strip()
+        or _decrypt_passphrase_backup(PASSPHRASE_BACKUP_FILE)
+    )
+
+    values = {
+        "XCLAW_API_BASE_URL": api_base,
+        "XCLAW_AGENT_ID": agent_id,
+        "XCLAW_AGENT_API_KEY": api_key,
+        "XCLAW_DEFAULT_CHAIN": chain,
+        "XCLAW_WALLET_PASSPHRASE": passphrase,
+        "XCLAW_APPROVALS_RUN_LOOP": "1",
+    }
+    missing = [key for key in ["XCLAW_API_BASE_URL", "XCLAW_AGENT_ID", "XCLAW_AGENT_API_KEY", "XCLAW_DEFAULT_CHAIN", "XCLAW_WALLET_PASSPHRASE"] if not values.get(key, "").strip()]
+    return values, missing
+
+
+def _write_run_loop_env(values: dict[str, str]) -> None:
+    required = ["XCLAW_API_BASE_URL", "XCLAW_AGENT_ID", "XCLAW_AGENT_API_KEY", "XCLAW_DEFAULT_CHAIN", "XCLAW_WALLET_PASSPHRASE"]
+    for key in required:
+        if not str(values.get(key) or "").strip():
+            raise RuntimeError(f"run-loop env write refused: missing {key}.")
+    APP_DIR.mkdir(parents=True, exist_ok=True)
+    _chmod_if_posix(APP_DIR, 0o700)
+    tmp = RUN_LOOP_ENV_FILE.with_suffix(".env.tmp")
+    lines = [f"{key}={str(values.get(key) or '').strip()}" for key in ["XCLAW_API_BASE_URL", "XCLAW_AGENT_ID", "XCLAW_AGENT_API_KEY", "XCLAW_DEFAULT_CHAIN", "XCLAW_WALLET_PASSPHRASE", "XCLAW_APPROVALS_RUN_LOOP"]]
+    tmp.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    _chmod_if_posix(tmp, 0o600)
+    os.replace(tmp, RUN_LOOP_ENV_FILE)
+
+
+def _probe_run_loop_health(default_chain: str, runtime_bin: str, env_values: dict[str, str]) -> dict[str, Any]:
+    env = dict(os.environ)
+    env.update(env_values)
+    proc = run([runtime_bin, "approvals", "run-loop", "--chain", default_chain, "--once", "--json"], check=False, capture=True, env=env)
+    stdout = (proc.stdout or "").strip()
+    parsed: dict[str, Any] = {}
+    if stdout:
+        for line in reversed(stdout.splitlines()):
+            raw = line.strip()
+            if not raw:
+                continue
+            if raw.startswith("{") and raw.endswith("}"):
+                try:
+                    value = json.loads(raw)
+                    if isinstance(value, dict):
+                        parsed = value
+                        break
+                except Exception:
+                    continue
+    if not parsed:
+        parsed = {"ok": False, "code": "health_probe_output_missing", "message": (stdout or (proc.stderr or "").strip() or "health probe output missing")[:300]}
+    parsed["statusCode"] = proc.returncode
+    return parsed
+
+
 def ensure_default_policy_file(default_chain: str) -> None:
     """Create a safe default local policy file when missing.
 
@@ -266,46 +430,24 @@ def ensure_default_policy_file(default_chain: str) -> None:
     _chmod_if_posix(POLICY_FILE, 0o600)
 
 
-def ensure_approvals_run_loop_service(default_chain: str) -> dict[str, object]:
-    """Best-effort systemd user wiring for continuous transfer decision consumption."""
+def ensure_approvals_run_loop_service(default_chain: str, runtime_bin: str, require_healthy: bool) -> dict[str, object]:
+    """Provision and validate systemd user wiring for continuous transfer decision consumption."""
     if os.name == "nt":
-        return {"enabled": False, "reason": "windows_unsupported"}
+        if require_healthy:
+            raise RuntimeError("Run-loop service requires Linux user-systemd; windows setup cannot satisfy strict readiness.")
+        return {"enabled": False, "reason": "windows_unsupported", "envValidated": False}
     if shutil.which("systemctl") is None:
-        return {"enabled": False, "reason": "systemctl_missing"}
-    api_base = os.environ.get("XCLAW_API_BASE_URL", "").strip()
-    agent_id = os.environ.get("XCLAW_AGENT_ID", "").strip()
-    api_key = os.environ.get("XCLAW_AGENT_API_KEY", "").strip()
-    if not api_base or not agent_id or not api_key:
-        return {
-            "enabled": False,
-            "reason": "env_missing",
-            "missing": [
-                name
-                for name, value in [
-                    ("XCLAW_API_BASE_URL", api_base),
-                    ("XCLAW_AGENT_ID", agent_id),
-                    ("XCLAW_AGENT_API_KEY", "set" if api_key else ""),
-                ]
-                if not value
-            ],
-        }
+        if require_healthy:
+            raise RuntimeError("Run-loop service requires systemctl --user; install cannot continue in strict readiness mode.")
+        return {"enabled": False, "reason": "systemctl_missing", "envValidated": False}
 
-    APP_DIR.mkdir(parents=True, exist_ok=True)
-    _chmod_if_posix(APP_DIR, 0o700)
-    RUN_LOOP_ENV_FILE.write_text(
-        "\n".join(
-            [
-                f"XCLAW_API_BASE_URL={api_base}",
-                f"XCLAW_AGENT_ID={agent_id}",
-                f"XCLAW_AGENT_API_KEY={api_key}",
-                f"XCLAW_DEFAULT_CHAIN={default_chain}",
-                "XCLAW_APPROVALS_RUN_LOOP=1",
-                "",
-            ]
-        ),
-        encoding="utf-8",
-    )
-    _chmod_if_posix(RUN_LOOP_ENV_FILE, 0o600)
+    resolved, missing = _resolve_run_loop_env(default_chain)
+    if missing:
+        if require_healthy:
+            raise RuntimeError(f"Run-loop env is missing required values: {', '.join(missing)}")
+        return {"enabled": False, "reason": "env_missing", "missing": missing, "envValidated": False}
+
+    _write_run_loop_env(resolved)
 
     RUN_LOOP_SERVICE.parent.mkdir(parents=True, exist_ok=True)
     unit = "\n".join(
@@ -317,7 +459,7 @@ def ensure_approvals_run_loop_service(default_chain: str) -> dict[str, object]:
             "[Service]",
             "Type=simple",
             f"EnvironmentFile={RUN_LOOP_ENV_FILE}",
-            f"ExecStart={shutil.which('xclaw-agent') or 'xclaw-agent'} approvals run-loop --chain {default_chain} --interval-ms 1500 --json",
+            f"ExecStart={runtime_bin} approvals run-loop --chain {default_chain} --interval-ms 1500 --json",
             "Restart=always",
             "RestartSec=2",
             "",
@@ -331,15 +473,41 @@ def ensure_approvals_run_loop_service(default_chain: str) -> dict[str, object]:
     try:
         run(["systemctl", "--user", "daemon-reload"], check=True)
         run(["systemctl", "--user", "enable", "--now", RUN_LOOP_SERVICE.name], check=True)
-        return {"enabled": True, "service": RUN_LOOP_SERVICE.name, "envFile": str(RUN_LOOP_ENV_FILE)}
+        health = _probe_run_loop_health(default_chain, runtime_bin, resolved)
+        ready = bool(health.get("walletSigningReady"))
+        publish_status = int(health.get("readinessPublishStatus") or 0)
+        healthy = ready and 200 <= publish_status < 300
+        if require_healthy and not healthy:
+            reason = str(health.get("walletSigningReasonCode") or "runtime_signing_unavailable")
+            raise RuntimeError(
+                f"Run-loop readiness probe failed (walletSigningReady={str(ready).lower()}, readinessPublishStatus={publish_status}, reason={reason})."
+            )
+        return {
+            "enabled": True,
+            "service": RUN_LOOP_SERVICE.name,
+            "envFile": str(RUN_LOOP_ENV_FILE),
+            "envValidated": True,
+            "health": {
+                "walletSigningReady": ready,
+                "walletSigningReasonCode": health.get("walletSigningReasonCode"),
+                "readinessPublishStatus": publish_status,
+                "agentId": resolved.get("XCLAW_AGENT_ID"),
+                "apiBaseUrl": resolved.get("XCLAW_API_BASE_URL"),
+                "defaultChain": resolved.get("XCLAW_DEFAULT_CHAIN"),
+                "probeCode": health.get("code"),
+            },
+        }
     except subprocess.CalledProcessError as exc:
         stderr = (exc.stderr or "").strip()
         stdout = (exc.stdout or "").strip()
+        if require_healthy:
+            raise RuntimeError(stderr or stdout or str(exc))
         return {
             "enabled": False,
             "reason": "systemctl_failed",
             "service": RUN_LOOP_SERVICE.name,
             "error": stderr or stdout or str(exc),
+            "envValidated": True,
         }
 
 
@@ -352,9 +520,12 @@ def main() -> int:
         managed_skill = ensure_managed_skill_copy(workspace)
         launcher = ensure_launcher(workspace, openclaw_bin)
         ensure_runtime_bin_env(launcher)
-        default_chain = os.environ.get("XCLAW_DEFAULT_CHAIN", "base_sepolia")
+        config_env = _openclaw_skill_env(_load_openclaw_config())
+        default_chain = os.environ.get("XCLAW_DEFAULT_CHAIN", "").strip() or str(config_env.get("XCLAW_DEFAULT_CHAIN") or "").strip() or "base_sepolia"
         ensure_default_policy_file(default_chain)
-        approvals_loop = ensure_approvals_run_loop_service(default_chain)
+        strict_setup = os.environ.get("XCLAW_SETUP_REQUIRE_RUN_LOOP_READY", "0").strip().lower() in {"1", "true", "yes"}
+        runtime_bin = str(launcher)
+        approvals_loop = ensure_approvals_run_loop_service(default_chain, runtime_bin=runtime_bin, require_healthy=strict_setup)
         gateway_patch: dict[str, object] | None = None
         # Portable Telegram approvals: patch OpenClaw gateway bundle idempotently.
         try:

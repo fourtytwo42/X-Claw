@@ -3390,3 +3390,21 @@ Ensure runtime never reports queued transfer approvals that are invisible in web
 4. Add server terminal transfer prompt cleanup fallback:
    - sweep terminal transfer rows (`filled|failed|rejected`) and dispatch runtime `approvals clear-prompt` best-effort/idempotently,
    - UI remains non-actionable for terminal rows regardless of cleanup status.
+
+## Hotfix G extension (installer + run-loop wiring hardening)
+1. Installer/setup must fail closed on unhealthy run-loop wiring:
+   - final install setup pass requires run-loop health probe success,
+   - install cannot complete if `walletSigningReady` is false.
+2. Run-loop env resolution order is deterministic:
+   - API base: explicit env -> install-canonical API base -> OpenClaw config,
+   - agent id/api key: explicit env -> bootstrap-issued env -> OpenClaw config,
+   - passphrase: explicit env -> OpenClaw config -> encrypted local backup.
+3. Installer canonical API base is derived from installer origin:
+   - local origin -> local API base,
+   - production origin -> production API base.
+4. Installer final pass enforces single-agent host wiring:
+   - bootstrap-issued agent credentials overwrite stale run-loop credentials.
+5. Installer emits deterministic diagnostics:
+   - `xclaw.runloop.apiBase`,
+   - `xclaw.runloop.agentId`,
+   - `xclaw.runloop.walletSigningReady`.

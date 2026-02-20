@@ -3848,3 +3848,23 @@ Note:
   - [x] `pm2 restart all`
   - [x] `npm run verify:ui:agent-approvals`
 - [ ] Issue #60 evidence post + commit hash(es).
+
+### 117.10 Hotfix G: Installer + Run-Loop Wiring Hardening
+- [x] `setup_agent_skill.py` resolves run-loop env from env/config/backup with strict precedence and complete-key validation.
+- [x] strict setup mode probes run-loop health (`approvals run-loop --once --json`) and fails closed when `walletSigningReady` is false.
+- [x] shell installer enforces install-origin canonical API base and runs final strict setup pass after bootstrap/register.
+- [x] PowerShell installer enforces install-origin canonical API base and runs final strict setup pass after bootstrap/register.
+- [x] installer final pass binds bootstrap-issued agent credentials into run-loop wiring (single-agent host policy).
+- [x] installer logs deterministic run-loop summary fields (`apiBase`, `agentId`, `walletSigningReady`).
+- [ ] Required gates run sequentially:
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_approvals_run_loop.py -v`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_setup_agent_skill.py -v`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `pm2 restart all`
+  - [x] `npm run verify:ui:agent-approvals`
+- [ ] Issue #60 evidence post + commit hash(es).

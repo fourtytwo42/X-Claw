@@ -3600,3 +3600,44 @@ Active slice context: `Slice 117` in progress.
 - [x] `npm run build`
 - [x] `pm2 restart all`
 - [x] `npm run verify:ui:agent-approvals`
+
+---
+
+# Hotfix Tasks: Slice 117 Hotfix G Installer + Run-Loop Wiring Hardening
+
+Active slice context: `Slice 117` in progress.
+
+## 1) Scope lock
+- [x] Keep runtime/web separation unchanged.
+- [x] Enforce single-agent host wiring for installer-managed run-loop service.
+
+## 2) Setup script hardening
+- [x] Add deterministic config ingestion for OpenClaw skill env + apiKey.
+- [x] Add passphrase backup decrypt fallback for run-loop env resolution.
+- [x] Enforce strict required-key validation for run-loop env writes.
+- [x] Make run-loop env writes atomic and permission-hardened.
+- [x] Add strict health probe gate (`approvals run-loop --once --json`) and fail closed on unhealthy readiness.
+- [x] Extend setup JSON payload with run-loop health summary (`envValidated`, health fields).
+
+## 3) Installer hardening (shell + PowerShell)
+- [x] Derive canonical API base from installer origin (local/prod).
+- [x] Run final strict setup pass after bootstrap/register.
+- [x] Bind final run-loop wiring to bootstrap-issued credentials.
+- [x] Emit deterministic run-loop summary lines (`apiBase`, `agentId`, `walletSigningReady`).
+- [x] Refuse install completion when final strict setup fails.
+
+## 4) Regression coverage
+- [x] Add setup-script unit tests for config+backup resolution and strict fail-closed behavior.
+- [x] Add run-loop cycle sanity metadata (api host + agent id) to runtime logs.
+
+## 5) Validation
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_approvals_run_loop.py -v`
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_setup_agent_skill.py -v`
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+- [x] `npm run verify:ui:agent-approvals`

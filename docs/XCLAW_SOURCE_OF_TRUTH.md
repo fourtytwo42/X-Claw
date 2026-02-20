@@ -4652,3 +4652,24 @@ Supersession note (Slice 117 Hotfix D):
   - server-side terminal sweeper fallback may trigger runtime `approvals clear-prompt` for terminal transfer approvals (`filled|failed|rejected`),
   - cleanup is best-effort/idempotent; missing prompt metadata is non-fatal,
   - UI must keep terminal transfer approvals non-actionable regardless of cleanup attempt result.
+
+### Slice 117 Hotfix G Addendum: Installer + Run-Loop Wiring Hardening (Fail-Closed)
+- Installer/setup must not report success when run-loop signing readiness is unhealthy.
+- Linux installer contract is fail-closed:
+  - final setup pass must require run-loop provisioning and readiness health (`walletSigningReady=true`),
+  - if service wiring or readiness probe fails, installer exits non-zero.
+- Run-loop env provisioning precedence is canonical and deterministic:
+  - `XCLAW_API_BASE_URL`: explicit env -> install-canonical API base -> OpenClaw config,
+  - `XCLAW_AGENT_ID`: explicit env -> bootstrap-issued env -> OpenClaw config,
+  - `XCLAW_AGENT_API_KEY`: explicit env -> bootstrap-issued env -> OpenClaw config/env/apiKey,
+  - `XCLAW_DEFAULT_CHAIN`: explicit env -> OpenClaw config -> `base_sepolia`,
+  - `XCLAW_WALLET_PASSPHRASE`: explicit env -> OpenClaw config -> encrypted local backup.
+- Installer canonical API base must derive from install origin:
+  - local installer origin (`localhost|127.0.0.1`) -> `http://127.0.0.1:3000/api/v1`,
+  - production installer origin (`https://xclaw.trade`) -> `https://xclaw.trade/api/v1`.
+- Single-agent host policy is authoritative for installer-managed run-loop:
+  - bootstrap-issued agent credentials replace stale run-loop env credentials on final setup pass.
+- Installer must emit deterministic run-loop summary lines:
+  - `xclaw.runloop.apiBase=...`
+  - `xclaw.runloop.agentId=...`
+  - `xclaw.runloop.walletSigningReady=true|false`

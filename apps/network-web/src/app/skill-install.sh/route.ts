@@ -41,7 +41,15 @@ fi
 export XCLAW_WORKDIR="\${XCLAW_WORKDIR:-$HOME/xclaw}"
 export XCLAW_REPO_REF="\${XCLAW_REPO_REF:-main}"
 export XCLAW_REPO_URL="\${XCLAW_REPO_URL:-https://github.com/fourtytwo42/ETHDenver2026}"
-export XCLAW_API_BASE_URL="\${XCLAW_API_BASE_URL:-${origin}/api/v1}"
+export XCLAW_INSTALL_ORIGIN="${origin}"
+if echo "$XCLAW_INSTALL_ORIGIN" | grep -Eq '^https?://(127\\.0\\.0\\.1|localhost)(:[0-9]+)?$'; then
+  export XCLAW_INSTALL_CANONICAL_API_BASE="http://127.0.0.1:3000/api/v1"
+elif echo "$XCLAW_INSTALL_ORIGIN" | grep -Eq '^https?://xclaw\\.trade$'; then
+  export XCLAW_INSTALL_CANONICAL_API_BASE="https://xclaw.trade/api/v1"
+else
+  export XCLAW_INSTALL_CANONICAL_API_BASE="${origin}/api/v1"
+fi
+export XCLAW_API_BASE_URL="\${XCLAW_API_BASE_URL:-$XCLAW_INSTALL_CANONICAL_API_BASE}"
 export XCLAW_DEFAULT_CHAIN="\${XCLAW_DEFAULT_CHAIN:-base_sepolia}"
 export XCLAW_HEDERA_CHAIN_KEY="\${XCLAW_HEDERA_CHAIN_KEY:-hedera_testnet}"
 
@@ -1067,6 +1075,52 @@ JSON
 else
   echo "[xclaw] skipped auto-register. Provide XCLAW_AGENT_API_KEY and XCLAW_AGENT_ID, or ensure /api/v1/agent/bootstrap is enabled."
 fi
+
+echo "[xclaw] running final strict setup pass (run-loop health required)"
+export XCLAW_API_BASE_URL="$XCLAW_INSTALL_CANONICAL_API_BASE"
+if [ -n "\${XCLAW_AGENT_ID:-}" ]; then
+  export XCLAW_BOOTSTRAP_AGENT_ID="$XCLAW_AGENT_ID"
+fi
+if [ -n "\${XCLAW_AGENT_API_KEY:-}" ]; then
+  export XCLAW_BOOTSTRAP_AGENT_API_KEY="$XCLAW_AGENT_API_KEY"
+fi
+set +e
+final_setup_output="$(
+  XCLAW_SETUP_REQUIRE_RUN_LOOP_READY=1 \
+  "$XCLAW_PYTHON_BIN" skills/xclaw-agent/scripts/setup_agent_skill.py 2>&1
+)"
+final_setup_status=$?
+set -e
+if [ -n "$final_setup_output" ]; then
+  printf '%s\n' "$final_setup_output"
+fi
+if [ "$final_setup_status" -ne 0 ]; then
+  echo "[xclaw] final strict setup failed; refusing to complete install with unhealthy run-loop wiring"
+  exit "$final_setup_status"
+fi
+
+runloop_summary="$(printf '%s\n' "$final_setup_output" | "$XCLAW_PYTHON_BIN" - <<'PY'
+import json, sys
+last={}
+for raw in sys.stdin:
+    line=raw.strip()
+    if line.startswith("{") and line.endswith("}"):
+        try:
+            parsed=json.loads(line)
+            if isinstance(parsed, dict):
+                last=parsed
+        except Exception:
+            pass
+ar=last.get("approvalsRunLoop") if isinstance(last, dict) else None
+health=ar.get("health") if isinstance(ar, dict) else {}
+print("apiBase=" + str((health or {}).get("apiBaseUrl") or ""))
+print("agentId=" + str((health or {}).get("agentId") or ""))
+print("walletSigningReady=" + ("true" if bool((health or {}).get("walletSigningReady")) else "false"))
+PY
+)"
+echo "[xclaw] xclaw.runloop.apiBase=$(printf '%s' "$runloop_summary" | awk -F= '/^apiBase=/{print $2}')"
+echo "[xclaw] xclaw.runloop.agentId=$(printf '%s' "$runloop_summary" | awk -F= '/^agentId=/{print $2}')"
+echo "[xclaw] xclaw.runloop.walletSigningReady=$(printf '%s' "$runloop_summary" | awk -F= '/^walletSigningReady=/{print $2}')"
 
 echo "[xclaw] restarting OpenClaw gateway to apply updated skill/env config"
 if openclaw gateway restart >/dev/null 2>&1; then

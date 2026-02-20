@@ -4017,6 +4017,10 @@ def cmd_approvals_run_loop(args: argparse.Namespace) -> int:
     iteration = 0
     backoff_ms = interval_ms
     consecutive_failures = 0
+    api_base = str(os.environ.get("XCLAW_API_BASE_URL") or "").strip()
+    parsed_base = urllib.parse.urlparse(api_base) if api_base else None
+    api_base_host = str(parsed_base.netloc or "").strip() if parsed_base else ""
+    agent_id = str(os.environ.get("XCLAW_AGENT_ID") or "").strip()
     while True:
         iteration += 1
         cycle_started = time.time()
@@ -4042,6 +4046,8 @@ def cmd_approvals_run_loop(args: argparse.Namespace) -> int:
         cycle_log = {
             "event": "approvals_run_loop_cycle",
             "chain": chain,
+            "apiBaseHost": api_base_host or None,
+            "agentId": agent_id or None,
             "iteration": iteration,
             "ok": cycle_ok,
             "syncCode": str(sync_payload.get("code") or ("ok" if cycle_ok else "sync_failed")),

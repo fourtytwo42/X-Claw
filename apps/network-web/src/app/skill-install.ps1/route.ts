@@ -24,7 +24,15 @@ Write-Host "[xclaw] bootstrap start"
 if (-not $env:XCLAW_WORKDIR) { $env:XCLAW_WORKDIR = Join-Path $HOME "xclaw" }
 if (-not $env:XCLAW_REPO_REF) { $env:XCLAW_REPO_REF = "main" }
 if (-not $env:XCLAW_REPO_URL) { $env:XCLAW_REPO_URL = "https://github.com/fourtytwo42/ETHDenver2026" }
-if (-not $env:XCLAW_API_BASE_URL) { $env:XCLAW_API_BASE_URL = "${origin}/api/v1" }
+$env:XCLAW_INSTALL_ORIGIN = "${origin}"
+if ($env:XCLAW_INSTALL_ORIGIN -match '^https?://(127\\.0\\.0\\.1|localhost)(:[0-9]+)?$') {
+  $env:XCLAW_INSTALL_CANONICAL_API_BASE = "http://127.0.0.1:3000/api/v1"
+} elseif ($env:XCLAW_INSTALL_ORIGIN -match '^https?://xclaw\\.trade$') {
+  $env:XCLAW_INSTALL_CANONICAL_API_BASE = "https://xclaw.trade/api/v1"
+} else {
+  $env:XCLAW_INSTALL_CANONICAL_API_BASE = "${origin}/api/v1"
+}
+if (-not $env:XCLAW_API_BASE_URL) { $env:XCLAW_API_BASE_URL = "$($env:XCLAW_INSTALL_CANONICAL_API_BASE)" }
 if (-not $env:XCLAW_DEFAULT_CHAIN) { $env:XCLAW_DEFAULT_CHAIN = "base_sepolia" }
 
 function Resolve-Python {
@@ -745,6 +753,31 @@ try {
     } else {
       Write-Host "[xclaw] skipped auto-register. Provide XCLAW_AGENT_API_KEY and XCLAW_AGENT_ID, or ensure /api/v1/agent/bootstrap is enabled."
     }
+
+    Write-Host "[xclaw] running final strict setup pass (run-loop health required)"
+    $env:XCLAW_API_BASE_URL = "$($env:XCLAW_INSTALL_CANONICAL_API_BASE)"
+    if ($env:XCLAW_AGENT_ID) { $env:XCLAW_BOOTSTRAP_AGENT_ID = "$($env:XCLAW_AGENT_ID)" }
+    if ($env:XCLAW_AGENT_API_KEY) { $env:XCLAW_BOOTSTRAP_AGENT_API_KEY = "$($env:XCLAW_AGENT_API_KEY)" }
+
+    $env:XCLAW_SETUP_REQUIRE_RUN_LOOP_READY = "1"
+    $setupFinalJson = Invoke-Python "skills/xclaw-agent/scripts/setup_agent_skill.py"
+    $setupFinalParsed = $null
+    try {
+      $setupFinalParsed = $setupFinalJson | ConvertFrom-Json
+    } catch {
+      throw "[xclaw] final strict setup returned non-JSON output; cannot verify run-loop health."
+    }
+    $runLoop = $setupFinalParsed.approvalsRunLoop
+    $health = if ($null -ne $runLoop) { $runLoop.health } else { $null }
+    $runLoopEnabled = if ($null -ne $runLoop -and $null -ne $runLoop.enabled) { [bool]$runLoop.enabled } else { $false }
+    $envValidated = if ($null -ne $runLoop -and $null -ne $runLoop.envValidated) { [bool]$runLoop.envValidated } else { $false }
+    $walletSigningReady = if ($null -ne $health -and $null -ne $health.walletSigningReady) { [bool]$health.walletSigningReady } else { $false }
+    if (-not $runLoopEnabled -or -not $envValidated -or -not $walletSigningReady) {
+      throw "[xclaw] final strict setup failed run-loop health validation (enabled/envValidated/walletSigningReady required)."
+    }
+    Write-Host "[xclaw] xclaw.runloop.apiBase=$($health.apiBaseUrl)"
+    Write-Host "[xclaw] xclaw.runloop.agentId=$($health.agentId)"
+    Write-Host "[xclaw] xclaw.runloop.walletSigningReady=$walletSigningReady"
 
     Write-Host "[xclaw] restarting OpenClaw gateway to apply updated skill/env config"
     try {

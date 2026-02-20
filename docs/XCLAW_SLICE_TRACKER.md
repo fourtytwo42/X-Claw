@@ -2308,6 +2308,22 @@ DoD:
 - [x] server terminal sweeper fallback dispatches runtime prompt cleanup for terminal transfer approvals (`filled|failed|rejected`) idempotently.
 - [x] transfer approvals UI remains non-actionable for terminal rows even if cleanup metadata is missing.
 - [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`, runtime tests, browser verifier.
+
+## Slice 117 Hotfix G: Installer + Run-Loop Wiring Hardening
+Status: [ ]
+Issue: #60
+
+Goal:
+- Eliminate recurring `runtime_signing_unavailable` caused by installer/run-loop wiring drift across API base, agent credentials, and passphrase provisioning.
+
+DoD:
+- [x] setup script resolves run-loop env deterministically from env/config/backup with strict precedence.
+- [x] setup script writes complete run-loop env atomically and refuses partial required-key writes.
+- [x] setup script strict mode hard-fails when run-loop health probe is not sign-ready.
+- [x] shell + PowerShell installers perform authoritative final strict setup pass after bootstrap/register.
+- [x] installer final pass enforces install-origin canonical API base and bootstrap-issued agent credentials.
+- [x] installer emits deterministic run-loop summary lines for apiBase/agentId/walletSigningReady.
+- [x] required gates pass: runtime tests, `db:parity`, seed gates, `build`, `pm2 restart all`, UI verifier.
 - [x] canonical docs/handoff artifacts synchronized.
 - [ ] required gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
 - [x] browser verification gate rerun (`npm run verify:ui:agent-approvals`) after build + PM2 restart.

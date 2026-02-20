@@ -172,6 +172,7 @@ Additional capabilities:
 - `report-send` is deprecated for network mode.
 - Wallet create is exposed as `wallet-create`; wallet import/remove remain runtime-only and are not exposed through this skill surface.
 - Transfer decision reliability default: keep `approvals run-loop` active on agent host to consume `/agent/transfer-decisions/inbox`; use `approvals sync` only as manual fallback/debug tool.
+- Installer hardening contract: install/setup must fail closed if run-loop signing readiness is unhealthy; successful install implies `approvals run-loop --once --json` reports `walletSigningReady=true`.
 - Wallet native wrapping is exposed as `wallet-wrap-native <amount>` and delegates to runtime `wallet wrap-native --chain <chain> --amount <amount> --json` using config-driven wrapped-native resolution (helper when configured, canonical wrapped token otherwise).
 - Hosted installer auto-binds `hedera_testnet` wallet context to the same portable wallet key when available; skill commands should assume chain wallet bindings may be pre-created for both default chain and Hedera testnet.
 - Hedera faucet failures are deterministic (`faucet_*` codes) and include `requestId`; treat `faucet_rpc_unavailable` / `faucet_send_preflight_failed` as retryable operational signals, not generic runtime crashes.
