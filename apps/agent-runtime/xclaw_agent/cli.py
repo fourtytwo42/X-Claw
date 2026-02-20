@@ -82,6 +82,7 @@ PENDING_TRADE_INTENTS_FILE = APP_DIR / "pending-trade-intents.json"
 PENDING_SPOT_TRADE_FLOWS_FILE = APP_DIR / "pending-spot-trade-flows.json"
 PENDING_TRANSFER_FLOWS_FILE = APP_DIR / "pending-transfer-flows.json"
 TRANSFER_POLICY_FILE = APP_DIR / "transfer-policy.json"
+WATCHER_STATE_FILE = APP_DIR / "watcher-state.json"
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
 CHAIN_CONFIG_DIR = REPO_ROOT / "config" / "chains"
 
@@ -109,6 +110,7 @@ AGENT_RECOVERY_ACTION = "agent_key_recovery"
 ERC8021_MAGIC_REPEAT_COUNT = 8
 BASE_BUILDER_CHAINS = {"base_mainnet", "base_sepolia"}
 _TX_BUILDER_ATTRIBUTION_BY_HASH: dict[str, dict[str, Any]] = {}
+_WATCHER_RUN_ID_CACHE: str | None = None
 
 
 class WalletStoreError(Exception):
@@ -2361,6 +2363,11 @@ def _mirror_transfer_approval(flow: dict[str, Any]) -> None:
             "policyBlockReasonCode": flow.get("policyBlockReasonCode"),
             "policyBlockReasonMessage": flow.get("policyBlockReasonMessage"),
             "executionMode": flow.get("executionMode"),
+            "observedBy": str(flow.get("observedBy") or "agent_watcher"),
+            "observationSource": str(flow.get("observationSource") or "local_send_result"),
+            "confirmationCount": flow.get("confirmationCount"),
+            "observedAt": flow.get("observedAt") or utc_now(),
+            "watcherRunId": str(flow.get("watcherRunId") or _watcher_run_id()),
             "createdAt": flow.get("createdAt") or utc_now(),
             "updatedAt": flow.get("updatedAt") or utc_now(),
             "decidedAt": flow.get("decidedAt"),
@@ -2566,6 +2573,11 @@ def _execute_pending_transfer_flow(flow: dict[str, Any]) -> dict[str, Any]:
     flow["executionMode"] = execution_mode
     flow["status"] = "executing"
     flow["updatedAt"] = utc_now()
+    flow["observedBy"] = "agent_watcher"
+    flow["observationSource"] = "local_send_result"
+    flow["observedAt"] = flow["updatedAt"]
+    flow["watcherRunId"] = _watcher_run_id()
+    flow["confirmationCount"] = None
     _record_pending_transfer_flow(approval_id, flow)
     _mirror_transfer_approval(flow)
 
@@ -2655,6 +2667,11 @@ def _execute_pending_transfer_flow(flow: dict[str, Any]) -> dict[str, Any]:
         flow["txHash"] = tx_hash
         flow["updatedAt"] = utc_now()
         flow["terminalAt"] = flow["updatedAt"]
+        flow["observedBy"] = "agent_watcher"
+        flow["observationSource"] = "rpc_receipt"
+        flow["observedAt"] = flow["updatedAt"]
+        flow["watcherRunId"] = _watcher_run_id()
+        flow["confirmationCount"] = 1
         _record_pending_transfer_flow(approval_id, flow)
         _mirror_transfer_approval(flow)
         _remove_pending_transfer_flow(approval_id)
@@ -2694,6 +2711,10 @@ def _execute_pending_transfer_flow(flow: dict[str, Any]) -> dict[str, Any]:
         flow["reasonMessage"] = message
         flow["updatedAt"] = utc_now()
         flow["terminalAt"] = flow["updatedAt"]
+        flow["observedBy"] = "agent_watcher"
+        flow["observationSource"] = "rpc_receipt"
+        flow["observedAt"] = flow["updatedAt"]
+        flow["watcherRunId"] = _watcher_run_id()
         _record_pending_transfer_flow(approval_id, flow)
         _mirror_transfer_approval(flow)
         return {
@@ -4877,6 +4898,40 @@ def _parse_decision_at(value: str | None) -> str:
     return dt.astimezone(timezone.utc).isoformat()
 
 
+def _load_watcher_state() -> dict[str, Any]:
+    ensure_app_dir()
+    if not WATCHER_STATE_FILE.exists():
+        return {"watcherRunId": "", "updatedAt": utc_now()}
+    try:
+        payload = json.loads(WATCHER_STATE_FILE.read_text(encoding="utf-8"))
+        if isinstance(payload, dict):
+            return payload
+    except Exception:
+        pass
+    return {"watcherRunId": "", "updatedAt": utc_now()}
+
+
+def _save_watcher_state(state: dict[str, Any]) -> None:
+    ensure_app_dir()
+    WATCHER_STATE_FILE.write_text(json.dumps(state, separators=(",", ":")), encoding="utf-8")
+    os.chmod(WATCHER_STATE_FILE, 0o600)
+
+
+def _watcher_run_id() -> str:
+    global _WATCHER_RUN_ID_CACHE
+    if _WATCHER_RUN_ID_CACHE:
+        return _WATCHER_RUN_ID_CACHE
+    state = _load_watcher_state()
+    run_id = str(state.get("watcherRunId") or "").strip()
+    if not run_id:
+        run_id = f"wrun_{secrets.token_hex(12)}"
+        state["watcherRunId"] = run_id
+        state["updatedAt"] = utc_now()
+        _save_watcher_state(state)
+    _WATCHER_RUN_ID_CACHE = run_id
+    return run_id
+
+
 def _post_trade_status(
     trade_id: str,
     from_status: str,
@@ -4891,6 +4946,10 @@ def _post_trade_status(
         "fromStatus": from_status,
         "toStatus": to_status,
         "at": _parse_decision_at(decision_at),
+        "observedBy": "agent_watcher",
+        "observationSource": "local_send_result",
+        "observedAt": utc_now(),
+        "watcherRunId": _watcher_run_id(),
     }
     if extra:
         payload.update(extra)
@@ -8348,7 +8407,14 @@ def cmd_trade_spot(args: argparse.Namespace) -> int:
             trade_id,
             "verifying",
             "filled",
-            {"txHash": tx_hash, "amountOut": _format_units(int(expected_out_int), token_out_decimals), **provider_meta},
+            {
+                "txHash": tx_hash,
+                "amountOut": _format_units(int(expected_out_int), token_out_decimals),
+                "observationSource": "rpc_receipt",
+                "confirmationCount": 1,
+                "observedAt": utc_now(),
+                **provider_meta,
+            },
         )
         _remove_pending_spot_trade_flow(trade_id)
 
@@ -9440,7 +9506,14 @@ def cmd_trade_execute(args: argparse.Namespace) -> int:
             args.intent,
             "verifying",
             "filled",
-            {"txHash": tx_hash, "amountOut": str(trade.get("amountOut") or "") or None, **provider_meta},
+            {
+                "txHash": tx_hash,
+                "amountOut": str(trade.get("amountOut") or "") or None,
+                "observationSource": "rpc_receipt",
+                "confirmationCount": 1,
+                "observedAt": utc_now(),
+                **provider_meta,
+            },
         )
         report_result = {
             "ok": False,

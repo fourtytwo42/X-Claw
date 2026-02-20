@@ -73,6 +73,17 @@
       }
     },
     "uniswapRouteType": { "type": ["string", "null"] },
+    "observedBy": {
+      "type": ["string", "null"],
+      "enum": ["agent_watcher", "legacy_server_poller", null]
+    },
+    "observationSource": {
+      "type": ["string", "null"],
+      "enum": ["rpc_receipt", "rpc_log", "local_send_result", "reorg_reconciliation", null]
+    },
+    "confirmationCount": { "type": ["integer", "null"], "minimum": 0 },
+    "observedAt": { "type": ["string", "null"], "format": "date-time" },
+    "watcherRunId": { "type": ["string", "null"], "minLength": 1, "maxLength": 128 },
     "at": { "type": "string", "format": "date-time" }
   }
 }

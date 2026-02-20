@@ -47,6 +47,17 @@
     "x402AssetAddress": { "type": ["string", "null"], "pattern": "^0x[a-fA-F0-9]{40}$" },
     "x402AmountAtomic": { "type": ["string", "null"], "pattern": "^[0-9]+(\\.[0-9]+)?$" },
     "x402PaymentId": { "type": ["string", "null"] },
+    "observedBy": {
+      "type": ["string", "null"],
+      "enum": ["agent_watcher", "legacy_server_poller", null]
+    },
+    "observationSource": {
+      "type": ["string", "null"],
+      "enum": ["rpc_receipt", "rpc_log", "local_send_result", "reorg_reconciliation", null]
+    },
+    "confirmationCount": { "type": ["integer", "null"], "minimum": 0 },
+    "observedAt": { "type": ["string", "null"], "format": "date-time" },
+    "watcherRunId": { "type": ["string", "null"], "minLength": 1, "maxLength": 128 },
     "createdAt": { "type": "string", "format": "date-time" },
     "updatedAt": { "type": "string", "format": "date-time" },
     "decidedAt": { "type": ["string", "null"], "format": "date-time" },

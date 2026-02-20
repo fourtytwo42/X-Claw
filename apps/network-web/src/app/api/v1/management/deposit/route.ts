@@ -205,10 +205,17 @@ async function syncChainDeposits(agentId: string, chainKey: string, walletAddres
       await client.query(
         `
         insert into wallet_balance_snapshots (
-          snapshot_id, agent_id, chain_key, token, balance, block_number, observed_at, created_at
-        ) values ($1, $2, $3, $4, $5, $6, now(), now())
+          snapshot_id, agent_id, chain_key, token, balance, block_number, observed_at, created_at,
+          observed_by, observation_source, watcher_run_id
+        ) values ($1, $2, $3, $4, $5, $6, now(), now(), 'legacy_server_poller', 'rpc_log', 'server_poller_dual_run')
         on conflict (agent_id, chain_key, token)
-        do update set balance = excluded.balance, block_number = excluded.block_number, observed_at = now()
+        do update set
+          balance = excluded.balance,
+          block_number = excluded.block_number,
+          observed_at = now(),
+          observed_by = excluded.observed_by,
+          observation_source = excluded.observation_source,
+          watcher_run_id = excluded.watcher_run_id
         `,
         [makeId('wbs'), agentId, chainKey, 'NATIVE', nativeBalance, Number(latestBlock)]
       );
@@ -260,10 +267,17 @@ async function syncChainDeposits(agentId: string, chainKey: string, walletAddres
         await client.query(
           `
           insert into wallet_balance_snapshots (
-            snapshot_id, agent_id, chain_key, token, balance, block_number, observed_at, created_at
-          ) values ($1, $2, $3, $4, $5, $6, now(), now())
+            snapshot_id, agent_id, chain_key, token, balance, block_number, observed_at, created_at,
+            observed_by, observation_source, watcher_run_id
+          ) values ($1, $2, $3, $4, $5, $6, now(), now(), 'legacy_server_poller', 'rpc_log', 'server_poller_dual_run')
           on conflict (agent_id, chain_key, token)
-          do update set balance = excluded.balance, block_number = excluded.block_number, observed_at = now()
+          do update set
+            balance = excluded.balance,
+            block_number = excluded.block_number,
+            observed_at = now(),
+            observed_by = excluded.observed_by,
+            observation_source = excluded.observation_source,
+            watcher_run_id = excluded.watcher_run_id
           `,
           [makeId('wbs'), agentId, chainKey, snapshotToken, tokenBalance, Number(latestBlock)]
         );
@@ -291,9 +305,10 @@ async function syncChainDeposits(agentId: string, chainKey: string, walletAddres
           await client.query(
             `
             insert into deposit_events (
-              deposit_event_id, agent_id, chain_key, token, amount, tx_hash, log_index, block_number, confirmed_at, status, created_at
+              deposit_event_id, agent_id, chain_key, token, amount, tx_hash, log_index, block_number, confirmed_at, status, created_at,
+              observed_by, observation_source, watcher_run_id
             )
-            select $1, $2, $3, $4, $5, $6, $7, $8, now(), 'confirmed', now()
+            select $1, $2, $3, $4, $5, $6, $7, $8, now(), 'confirmed', now(), 'legacy_server_poller', 'rpc_log', 'server_poller_dual_run'
             where not exists (
               select 1
               from trades
@@ -319,10 +334,17 @@ async function syncChainDeposits(agentId: string, chainKey: string, walletAddres
           await client.query(
             `
             insert into wallet_balance_snapshots (
-              snapshot_id, agent_id, chain_key, token, balance, block_number, observed_at, created_at
-            ) values ($1, $2, $3, $4, $5, $6, now(), now())
+              snapshot_id, agent_id, chain_key, token, balance, block_number, observed_at, created_at,
+              observed_by, observation_source, watcher_run_id
+            ) values ($1, $2, $3, $4, $5, $6, now(), now(), 'legacy_server_poller', 'rpc_log', 'server_poller_dual_run')
             on conflict (agent_id, chain_key, token)
-            do update set balance = excluded.balance, block_number = excluded.block_number, observed_at = now()
+            do update set
+              balance = excluded.balance,
+              block_number = excluded.block_number,
+              observed_at = now(),
+              observed_by = excluded.observed_by,
+              observation_source = excluded.observation_source,
+              watcher_run_id = excluded.watcher_run_id
             `,
             [makeId('wbs'), agentId, chainKey, token.symbol, token.balance, Number(latestBlock)]
           );
@@ -403,6 +425,8 @@ export async function GET(req: NextRequest) {
       chainKey: string;
       depositAddress: string;
       minConfirmations: number;
+      watcherAuthority: 'agent_watcher';
+      comparatorMode: 'legacy_server_poller_dual_run';
       lastSyncedAt: string | null;
       syncStatus: 'ok' | 'degraded';
       syncDetail: string | null;
@@ -455,6 +479,8 @@ export async function GET(req: NextRequest) {
         chainKey: wallet.chain_key,
         depositAddress: wallet.address,
         minConfirmations: sync.minConfirmations,
+        watcherAuthority: 'agent_watcher',
+        comparatorMode: 'legacy_server_poller_dual_run',
         lastSyncedAt,
         syncStatus: sync.syncStatus,
         syncDetail: sync.syncDetail,

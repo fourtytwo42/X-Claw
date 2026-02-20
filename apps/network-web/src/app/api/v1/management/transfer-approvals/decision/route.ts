@@ -13,9 +13,7 @@ import { makeId } from '@/lib/ids';
 import { requireManagementWriteAuth } from '@/lib/management-auth';
 import {
   buildWebTransferDecisionProdMessage,
-  buildWebTransferResultProdMessage,
-  dispatchNonTelegramAgentProd,
-  isTransferTerminalStatus
+  dispatchNonTelegramAgentProd
 } from '@/lib/non-telegram-agent-prod';
 import { getRequestId } from '@/lib/request-id';
 import { validatePayload } from '@/lib/validation';
@@ -372,7 +370,6 @@ export async function POST(req: NextRequest) {
     );
 
     let agentProdDecision: Awaited<ReturnType<typeof dispatchNonTelegramAgentProd>> | null = null;
-    let agentProdTerminal: Awaited<ReturnType<typeof dispatchNonTelegramAgentProd>> | null = null;
 
     if (applied) {
       const runtimeCleanup = invokeRuntimePromptCleanupSync({
@@ -407,32 +404,6 @@ export async function POST(req: NextRequest) {
         agentProdDecision
       });
 
-      let terminalStatus = '';
-      if (isTransferTerminalStatus(reconciledStatus ?? '')) {
-        terminalStatus = String(reconciledStatus ?? '').trim().toLowerCase();
-      } else if (body.decision === 'deny' && appliedVia === 'mirror_fallback') {
-        terminalStatus = 'rejected';
-      }
-      if (terminalStatus) {
-        agentProdTerminal = await dispatchNonTelegramAgentProd({
-          allowTelegramLastChannel: true,
-          message: buildWebTransferResultProdMessage({
-            status: terminalStatus,
-            approvalId: body.approvalId,
-            chainKey,
-            txHash: String(runtimePayload?.txHash ?? '').trim() || null,
-            source: 'web_management_transfer_decision',
-            reasonMessage: String(runtimePayload?.reasonMessage ?? '').trim() || (body.reasonMessage ?? null)
-          })
-        });
-        console.info('[management.transfer_approvals.decision] prod terminal dispatch', {
-          requestId,
-          approvalId: body.approvalId,
-          chainKey,
-          terminalStatus,
-          agentProdTerminal
-        });
-      }
     }
 
     console.info('[management.transfer_approvals.decision] runtime decision result', {
@@ -471,7 +442,11 @@ export async function POST(req: NextRequest) {
           runtimePayload,
           promptCleanup,
           agentProdDecision,
-          agentProdTerminal,
+          agentProdTerminal: {
+            attempted: false,
+            skipped: true,
+            reason: 'agent_canonical_terminal_delivery'
+          },
           stderr: (child.stderr || '').slice(0, 1200),
           reasonMessage: body.reasonMessage ?? null
         }),
@@ -511,7 +486,11 @@ export async function POST(req: NextRequest) {
         runtimePayload,
         promptCleanup,
         agentProdDecision,
-        agentProdTerminal
+        agentProdTerminal: {
+          attempted: false,
+          skipped: true,
+          reason: 'agent_canonical_terminal_delivery'
+        }
       },
       200,
       requestId

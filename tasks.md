@@ -3384,3 +3384,55 @@ Active slice context: `Slice 98`.
 - [ ] Run required gates sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
 - [ ] Issue #60 evidence post with commit hash(es).
 - [x] Add harness passphrase recovery from local encrypted backup and opt-out flag (`--disable-passphrase-recovery`).
+
+---
+
+# Slice 117 Hotfix B Tasks: Agent-Canonical Confirmation Pipeline (Dual-Run Start)
+
+Active slice context: `Slice 117` in progress.
+
+## 1) Scope lock
+- [x] Keep scope to terminal confirmation authority/routing boundary and watcher provenance.
+- [x] Avoid speculative new feature surfaces.
+
+## 2) Contracts + schema
+- [x] Extend `trade-status` schema with watcher provenance fields.
+- [x] Extend transfer mirror schema with watcher provenance fields.
+- [x] Update OpenAPI component schemas accordingly.
+
+## 3) Persistence + migration
+- [x] Add migration for watcher provenance/comparator fields on:
+  - [x] `trades`
+  - [x] `agent_transfer_approval_mirror`
+  - [x] `wallet_balance_snapshots`
+  - [x] `deposit_events`
+
+## 4) Runtime emission
+- [x] Add runtime watcher run-id persistence helper (`watcher-state.json`).
+- [x] Add default watcher metadata to `_post_trade_status(...)`.
+- [x] Add watcher metadata to transfer mirror payload writes.
+- [x] Mark receipt-confirmed terminal transitions with `observationSource=rpc_receipt` and `confirmationCount=1`.
+
+## 5) Server ingest hardening + notification cutover
+- [x] Persist provenance metadata in trade status ingest route.
+- [x] Persist provenance metadata in transfer mirror ingest route.
+- [x] Disable terminal synthetic fanout in trade status route.
+- [x] Disable terminal synthetic fanout in transfer mirror route.
+- [x] Disable transfer decision terminal synthetic fanout path.
+
+## 6) Deposit dual-run tagging
+- [x] Tag server deposit poll writes as `legacy_server_poller` comparator rows.
+- [x] Expose dual-run metadata in management deposit response.
+
+## 7) Canonical docs sync
+- [x] Update source-of-truth web bridge + provenance contract sections.
+- [x] Update roadmap and tracker with Slice 117 Hotfix B checklist.
+- [x] Update handoff artifacts (`spec.md`, `tasks.md`, `acceptance.md`).
+
+## 8) Validation
+- [ ] `npm run db:parity`
+- [ ] `npm run seed:reset`
+- [ ] `npm run seed:load`
+- [ ] `npm run seed:verify`
+- [ ] `npm run build`
+- [ ] `pm2 restart all`

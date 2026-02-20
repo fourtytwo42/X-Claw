@@ -41,6 +41,14 @@ function nonTelegramProdEnabled(): boolean {
   return raw !== '0' && raw !== 'false' && raw !== 'off' && raw !== 'no';
 }
 
+function agentCanonicalConfirmationMode(): boolean {
+  const raw = (process.env.XCLAW_AGENT_CANONICAL_CONFIRMATIONS ?? '').trim().toLowerCase();
+  if (!raw) {
+    return true;
+  }
+  return raw !== '0' && raw !== 'false' && raw !== 'off' && raw !== 'no';
+}
+
 function nonTelegramProdTimeoutMs(): number {
   const raw = (process.env.XCLAW_NON_TG_PROD_TIMEOUT_MS ?? '').trim();
   if (!raw || !/^\d+$/.test(raw)) {
@@ -332,6 +340,10 @@ export function buildWebTransferResultProdMessage(input: {
 
 export async function dispatchNonTelegramAgentProd(input: NonTelegramAgentProdInput): Promise<NonTelegramAgentProdDispatchResult> {
   const head = String(input.message ?? '').split('\n')[0] ?? '';
+  if (agentCanonicalConfirmationMode()) {
+    console.info('[non_tg_prod] skipped agent_canonical_mode', { head });
+    return { attempted: false, skipped: true, reason: 'agent_canonical_mode' };
+  }
   if (!nonTelegramProdEnabled()) {
     console.info('[non_tg_prod] skipped disabled', { head });
     return { attempted: false, skipped: true, reason: 'disabled' };

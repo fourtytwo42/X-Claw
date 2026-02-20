@@ -3750,3 +3750,14 @@ Note:
   - [ ] `pm2 restart all`
 - [ ] Issue #60 evidence post + commit hash(es).
 - [x] Harness preflight supports local encrypted passphrase backup recovery (`passphrase.backup.v1.json`) with `--disable-passphrase-recovery` override.
+
+### 117.5 Hotfix B: Agent-Canonical Confirmation Pipeline (Dual-Run Cutover Start)
+- [x] Add watcher provenance fields to trade status + transfer mirror contracts (`observedBy`, `observationSource`, `confirmationCount`, `observedAt`, `watcherRunId`).
+- [x] Add migration columns for watcher provenance and comparator markers on `trades`, `agent_transfer_approval_mirror`, `wallet_balance_snapshots`, `deposit_events`.
+- [x] Runtime emits watcher provenance defaults on trade status updates and transfer mirror writes.
+- [x] Disable server terminal result synthetic fanout for:
+  - [x] `POST /api/v1/trades/{tradeId}/status`
+  - [x] `POST /api/v1/agent/transfer-approvals/mirror`
+  - [x] terminal branch in `POST /api/v1/management/transfer-approvals/decision`
+- [x] Keep server deposit poller in dual-run comparator mode (`legacy_server_poller` tagging), while exposing watcher-authority metadata in management deposit response.
+- [ ] Add dedicated dual-run parity + cross-talk regression script evidence.

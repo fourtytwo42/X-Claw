@@ -3207,3 +3207,44 @@ Extend wallet-approval harness flow to run `hardhat_local -> base_sepolia -> eth
 1. `ethereum_sepolia` bootstrap uses canonical `WETH` and `USDC` only.
 2. Hardhat report must be green before non-hardhat chain runs.
 3. Identity assertion for Harvy is optional via `--expected-wallet-address` and fail-fast when mismatched.
+
+---
+
+# Slice 117 Hotfix B Spec: Agent-Canonical Confirmation Pipeline (Dual-Run Start)
+
+## Goal
+1. Make agent runtime watcher the canonical source for terminal trade/transfer confirmation metadata.
+2. Stop server-origin terminal synthetic dispatch so cross-agent chat routing cannot leak fills/results.
+3. Start dual-run tagging for deposit polling (`legacy_server_poller`) while keeping ingest/read-model continuity.
+
+## Non-goals
+1. Full retirement of legacy deposit poller in this change.
+2. New public endpoint creation.
+3. Telegram callback command grammar changes.
+
+## Locked scope
+1. `apps/agent-runtime/xclaw_agent/cli.py`
+2. `apps/network-web/src/app/api/v1/trades/[tradeId]/status/route.ts`
+3. `apps/network-web/src/app/api/v1/agent/transfer-approvals/mirror/route.ts`
+4. `apps/network-web/src/app/api/v1/management/transfer-approvals/decision/route.ts`
+5. `apps/network-web/src/app/api/v1/management/deposit/route.ts`
+6. `apps/network-web/src/lib/non-telegram-agent-prod.ts`
+7. `packages/shared-schemas/json/trade-status.schema.json`
+8. `packages/shared-schemas/json/agent-transfer-approvals-mirror-request.schema.json`
+9. `infrastructure/migrations/0026_slice117_agent_watcher_provenance.sql`
+10. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+11. `docs/XCLAW_BUILD_ROADMAP.md`
+12. `docs/XCLAW_SLICE_TRACKER.md`
+13. `docs/api/openapi.v1.yaml`
+14. `spec.md`
+15. `tasks.md`
+16. `acceptance.md`
+
+## Acceptance checks
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `pm2 restart all`
+- Runtime regression sweep for trade/transfer status mirror behavior.

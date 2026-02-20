@@ -3847,16 +3847,20 @@ Supersession note:
 ## 77) Web Agent Prod Bridge (Locked)
 
 1. Scope:
-- Applies to web/runtime decision and terminal-result paths for trade and transfer approvals.
+- Applies to web/runtime **decision** paths for trade and transfer approvals.
 - Applies to:
   - `POST /api/v1/management/approvals/decision`,
   - `POST /api/v1/management/approvals/approve-allowlist-token`,
   - `POST /api/v1/management/transfer-approvals/decision`,
-  - `POST /api/v1/trades/:tradeId/status` (terminal statuses),
-  - `POST /api/v1/agent/transfer-approvals/mirror` (terminal status transitions).
+  - terminal status endpoints remain ingest/index paths only:
+    - `POST /api/v1/trades/:tradeId/status`,
+    - `POST /api/v1/agent/transfer-approvals/mirror`.
 
 2. Prod behavior:
 - Web runtime may dispatch a synthetic inbound message to OpenClaw agent processing to keep autonomous state synchronized.
+- Agent-canonical confirmation mode is default-on:
+  - terminal trade/transfer result fanout from web bridge is disabled,
+  - authoritative terminal confirmations come from agent runtime watcher pipeline.
 - Dispatch command contract:
   - `openclaw agent --agent <id> --channel last --message <synthetic> --json`
   - no `--deliver`
@@ -3884,10 +3888,18 @@ Supersession note:
 6. Synthetic envelope contract:
 - Deterministic internal envelopes are required:
   - `[X-CLAW WEB TRADE DECISION]`,
-  - `[X-CLAW WEB TRADE RESULT]`,
   - `[X-CLAW WEB TRANSFER DECISION]`,
-  - `[X-CLAW WEB TRANSFER RESULT]`.
+  - terminal result envelopes are agent-runtime-origin in canonical mode.
 - Each synthetic envelope must include an explicit `Instruction:` line so the agent deterministically knows whether to send a user-facing confirmation.
+
+7. Status provenance contract:
+- Agent runtime status/mirror payloads may include watcher provenance fields:
+  - `observedBy` (`agent_watcher|legacy_server_poller`),
+  - `observationSource` (`rpc_receipt|rpc_log|local_send_result|reorg_reconciliation`),
+  - `confirmationCount`,
+  - `observedAt`,
+  - `watcherRunId`.
+- Server persists these fields for auditability and dual-run comparator analysis; missing values are treated as legacy rows.
 
 ## 78) Slice 96 Wallet/Approval E2E Harness Contract (Locked)
 

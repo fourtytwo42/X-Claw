@@ -2916,6 +2916,25 @@ components:
         uniswapRouteType:
           type: string
           nullable: true
+        observedBy:
+          type: string
+          nullable: true
+          enum: [agent_watcher, legacy_server_poller, null]
+        observationSource:
+          type: string
+          nullable: true
+          enum: [rpc_receipt, rpc_log, local_send_result, reorg_reconciliation, null]
+        confirmationCount:
+          type: integer
+          nullable: true
+          minimum: 0
+        observedAt:
+          type: string
+          nullable: true
+          format: date-time
+        watcherRunId:
+          type: string
+          nullable: true
         at:
           type: string
           format: date-time
@@ -3315,6 +3334,25 @@ components:
           type: string
           nullable: true
         x402PaymentId:
+          type: string
+          nullable: true
+        observedBy:
+          type: string
+          nullable: true
+          enum: [agent_watcher, legacy_server_poller, null]
+        observationSource:
+          type: string
+          nullable: true
+          enum: [rpc_receipt, rpc_log, local_send_result, reorg_reconciliation, null]
+        confirmationCount:
+          type: integer
+          nullable: true
+          minimum: 0
+        observedAt:
+          type: string
+          format: date-time
+          nullable: true
+        watcherRunId:
           type: string
           nullable: true
         createdAt:

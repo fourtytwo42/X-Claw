@@ -5876,3 +5876,38 @@ Date (UTC): 2026-02-19
   - `npm run seed:verify`
   - `npm run build`
   - `pm2 restart all`
+
+---
+
+# Slice 117 Hotfix B Acceptance Evidence: Agent-Canonical Confirmation Pipeline (Dual-Run Start)
+
+Date (UTC): 2026-02-20  
+Active slice context: `Slice 117` in progress.
+
+## Objective + Scope Lock
+- Objective: move terminal confirmation authority to agent runtime watcher metadata and prevent server terminal synthetic result fanout from causing cross-agent routing leakage.
+- Scope lock:
+  - `apps/agent-runtime/xclaw_agent/cli.py`
+  - `apps/network-web/src/app/api/v1/trades/[tradeId]/status/route.ts`
+  - `apps/network-web/src/app/api/v1/agent/transfer-approvals/mirror/route.ts`
+  - `apps/network-web/src/app/api/v1/management/transfer-approvals/decision/route.ts`
+  - `apps/network-web/src/app/api/v1/management/deposit/route.ts`
+  - `apps/network-web/src/lib/non-telegram-agent-prod.ts`
+  - schema/openapi/migration/doc sync artifacts
+
+## Behavior Checks
+- [x] Trade status ingest accepts and persists watcher provenance fields.
+- [x] Transfer mirror ingest accepts and persists watcher provenance fields.
+- [x] Runtime emits watcher provenance defaults (`observedBy=agent_watcher`, `watcherRunId`, `observedAt`) for trade status and transfer mirror writes.
+- [x] Receipt-confirmed terminal transitions emit `observationSource=rpc_receipt`, `confirmationCount=1`.
+- [x] Server terminal synthetic fanout is disabled for trade status and transfer mirror ingress paths.
+- [x] Transfer management decision route no longer sends terminal synthetic fanout.
+- [x] Deposit poll path writes are tagged as comparator rows (`legacy_server_poller`) for dual-run visibility.
+
+## Required Validation Gates
+- [ ] `npm run db:parity`
+- [ ] `npm run seed:reset`
+- [ ] `npm run seed:load`
+- [ ] `npm run seed:verify`
+- [ ] `npm run build`
+- [ ] `pm2 restart all`

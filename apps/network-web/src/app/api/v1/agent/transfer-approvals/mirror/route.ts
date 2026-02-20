@@ -4,7 +4,6 @@ import { authenticateAgentByToken } from '@/lib/agent-auth';
 import { dbQuery } from '@/lib/db';
 import { errorResponse, internalErrorResponse, successResponse } from '@/lib/errors';
 import { parseJsonBody } from '@/lib/http';
-import { buildWebTransferResultProdMessage, dispatchNonTelegramAgentProd, isTransferTerminalStatus } from '@/lib/non-telegram-agent-prod';
 import { getRequestId } from '@/lib/request-id';
 import { validatePayload } from '@/lib/validation';
 
@@ -35,6 +34,11 @@ type AgentTransferApprovalsMirrorRequest = {
   x402AssetAddress?: string | null;
   x402AmountAtomic?: string | null;
   x402PaymentId?: string | null;
+  observedBy?: 'agent_watcher' | 'legacy_server_poller' | null;
+  observationSource?: 'rpc_receipt' | 'rpc_log' | 'local_send_result' | 'reorg_reconciliation' | null;
+  confirmationCount?: number | null;
+  observedAt?: string | null;
+  watcherRunId?: string | null;
   createdAt: string;
   updatedAt: string;
   decidedAt?: string | null;
@@ -108,12 +112,17 @@ export async function POST(req: NextRequest) {
         x402_asset_address,
         x402_amount_atomic,
         x402_payment_id,
+        observed_by,
+        observation_source,
+        confirmation_count,
+        observed_at,
+        watcher_run_id,
         created_at,
         updated_at,
         decided_at,
         terminal_at
       ) values (
-        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10::numeric, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23::numeric, $24, $25::timestamptz, $26::timestamptz, $27::timestamptz, $28::timestamptz
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10::numeric, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23::numeric, $24, $25, $26, $27, $28::timestamptz, $29, $30::timestamptz, $31::timestamptz, $32::timestamptz
       )
       on conflict (approval_id)
       do update set
@@ -138,6 +147,11 @@ export async function POST(req: NextRequest) {
         x402_asset_address = excluded.x402_asset_address,
         x402_amount_atomic = excluded.x402_amount_atomic,
         x402_payment_id = excluded.x402_payment_id,
+        observed_by = excluded.observed_by,
+        observation_source = excluded.observation_source,
+        confirmation_count = excluded.confirmation_count,
+        observed_at = excluded.observed_at,
+        watcher_run_id = excluded.watcher_run_id,
         updated_at = excluded.updated_at,
         decided_at = excluded.decided_at,
         terminal_at = excluded.terminal_at
@@ -167,6 +181,11 @@ export async function POST(req: NextRequest) {
         body.x402AssetAddress ?? null,
         body.x402AmountAtomic ?? null,
         body.x402PaymentId ?? null,
+        body.observedBy ?? null,
+        body.observationSource ?? null,
+        body.confirmationCount ?? null,
+        body.observedAt ?? null,
+        body.watcherRunId ?? null,
         body.createdAt,
         body.updatedAt,
         body.decidedAt ?? null,
@@ -174,23 +193,18 @@ export async function POST(req: NextRequest) {
       ]
     );
 
-    let agentProdTerminal: Awaited<ReturnType<typeof dispatchNonTelegramAgentProd>> | null = null;
-    const nextStatus = String(body.status ?? '').trim().toLowerCase();
-    if (isTransferTerminalStatus(nextStatus) && nextStatus !== priorStatus) {
-      agentProdTerminal = await dispatchNonTelegramAgentProd({
-        message: buildWebTransferResultProdMessage({
-          status: nextStatus,
-          approvalId: body.approvalId,
-          chainKey: body.chainKey,
-          txHash: body.txHash ?? null,
-          source: 'web_transfer_mirror_status',
-          reasonMessage: body.reasonMessage ?? null
-        })
-      });
-    }
-
     return successResponse(
-      { ok: true, approvalId: body.approvalId, status: body.status, agentProdTerminal },
+      {
+        ok: true,
+        approvalId: body.approvalId,
+        status: body.status,
+        priorStatus,
+        agentProdTerminal: {
+          attempted: false,
+          skipped: true,
+          reason: 'agent_canonical_terminal_delivery'
+        }
+      },
       200,
       requestId
     );

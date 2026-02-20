@@ -2227,3 +2227,17 @@ DoD:
 - [ ] runtime matrix evidence captured for hardhat/base/ethereum sepolia.
 - [ ] required gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
 - [ ] issue #60 updated with verification evidence + commit hash(es).
+
+## Slice 117 Hotfix B: Agent-Canonical Confirmation Pipeline (Dual-Run Start)
+Status: [~]
+Issue: #60
+
+Goal:
+- Start dual-run cutover so agent runtime watcher is canonical for terminal trade/transfer confirmations while server remains ingest/index/comparator.
+
+DoD:
+- [x] trade status + transfer mirror payload contracts include watcher provenance metadata.
+- [x] server persists watcher provenance metadata for trade + transfer mirrors.
+- [x] terminal server synthetic fanout removed from trade/transfer status ingest paths.
+- [x] server deposit poll path marked/tagged as `legacy_server_poller` comparator during dual-run.
+- [ ] dual-run parity + cross-talk regression evidence captured.

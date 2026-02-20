@@ -12,7 +12,6 @@ import { eventTypeForTradeStatus, isAllowedTransition } from '@/lib/trade-state'
 import { validatePayload } from '@/lib/validation';
 import { generateCopyIntentsForLeaderFill, syncCopyIntentFromTradeStatus } from '@/lib/copy-lifecycle';
 import { recomputeMetricsForAgents } from '@/lib/metrics';
-import { buildWebTradeResultProdMessage, dispatchNonTelegramAgentProd, isTradeTerminalStatus } from '@/lib/non-telegram-agent-prod';
 
 export const runtime = 'nodejs';
 
@@ -32,6 +31,11 @@ type TradeStatusRequest = {
   fallbackUsed?: boolean | null;
   fallbackReason?: { code: string; message: string } | null;
   uniswapRouteType?: string | null;
+  observedBy?: 'agent_watcher' | 'legacy_server_poller' | null;
+  observationSource?: 'rpc_receipt' | 'rpc_log' | 'local_send_result' | 'reorg_reconciliation' | null;
+  confirmationCount?: number | null;
+  observedAt?: string | null;
+  watcherRunId?: string | null;
   at: string;
 };
 
@@ -167,6 +171,11 @@ export async function POST(
           error_message = coalesce($6, error_message),
           amount_in = coalesce($7, amount_in),
           amount_out = coalesce($8, amount_out),
+          observed_by = coalesce($11, observed_by),
+          observation_source = coalesce($12, observation_source),
+          confirmation_count = coalesce($13, confirmation_count),
+          observed_at = coalesce($14::timestamptz, observed_at),
+          watcher_run_id = coalesce($15, watcher_run_id),
           executed_at = case when $1::trade_status in ('filled', 'failed') then $9::timestamptz else executed_at end,
           updated_at = now()
         where trade_id = $10
@@ -181,7 +190,12 @@ export async function POST(
           body.amountIn ?? null,
           body.amountOut ?? null,
           body.at,
-          pathTradeId
+          pathTradeId,
+          body.observedBy ?? null,
+          body.observationSource ?? null,
+          body.confirmationCount ?? null,
+          body.observedAt ?? null,
+          body.watcherRunId ?? null
         ]
       );
 
@@ -208,7 +222,12 @@ export async function POST(
             providerUsed: body.providerUsed ?? null,
             fallbackUsed: body.fallbackUsed ?? null,
             fallbackReason: body.fallbackReason ?? null,
-            uniswapRouteType: body.uniswapRouteType ?? null
+            uniswapRouteType: body.uniswapRouteType ?? null,
+            observedBy: body.observedBy ?? null,
+            observationSource: body.observationSource ?? null,
+            confirmationCount: body.confirmationCount ?? null,
+            observedAt: body.observedAt ?? null,
+            watcherRunId: body.watcherRunId ?? null
           }),
           body.at
         ]
@@ -237,7 +256,7 @@ export async function POST(
         await recomputeMetricsForAgents(client, [...affectedAgents]);
       }
 
-      return { ok: true as const, chainKey: row.chain_key };
+      return { ok: true as const };
     });
 
     if (!updateResult.ok) {
@@ -327,26 +346,15 @@ export async function POST(
       );
     }
 
-    let agentProdTerminal: Awaited<ReturnType<typeof dispatchNonTelegramAgentProd>> | null = null;
-    if (isTradeTerminalStatus(body.toStatus)) {
-      agentProdTerminal = await dispatchNonTelegramAgentProd({
-        allowTelegramLastChannel: true,
-        message: buildWebTradeResultProdMessage({
-          status: body.toStatus,
-          tradeId: pathTradeId,
-          chainKey: updateResult.chainKey,
-          txHash: body.txHash ?? null,
-          source: 'web_trade_status',
-          reasonMessage: body.reasonMessage ?? null
-        })
-      });
-    }
-
     const responseBody = {
       ok: true,
       tradeId: pathTradeId,
       status: body.toStatus,
-      agentProdTerminal
+      agentProdTerminal: {
+        attempted: false,
+        skipped: true,
+        reason: 'agent_canonical_terminal_delivery'
+      }
     };
 
     await storeIdempotencyResponse(idempotency.ctx, 200, responseBody);
