@@ -75,6 +75,40 @@ Keep trade approvals visible in management approval history even after approved 
 
 ---
 
+# Hotfix Spec: Truthful ETH Sepolia Wallet Checks + Multi-Chain Register Sync (2026-02-20)
+
+## Goal
+1. Ensure wallet commands can query explicit non-default chains (for example `ethereum_sepolia`) without silently falling back to default chain.
+2. Ensure runtime `agent-register`/`profile set-name` upserts all locally bound wallet chains so web wallet views can show balances for those chains.
+
+## Non-goals
+1. No schema or migration changes.
+2. No chain capability changes.
+3. No UI redesign.
+
+## Locked scope
+1. `skills/xclaw-agent/scripts/xclaw_agent_skill.py`
+2. `apps/agent-runtime/xclaw_agent/cli.py`
+3. `apps/agent-runtime/tests/test_x402_skill_wrapper.py`
+4. `apps/agent-runtime/tests/test_trade_path.py`
+5. `spec.md`
+6. `tasks.md`
+7. `acceptance.md`
+
+## Acceptance checks
+- `python3 -m unittest -q apps.agent-runtime.tests.test_x402_skill_wrapper.X402SkillWrapperTests.test_wallet_balance_allows_explicit_chain_override`
+- `python3 -m unittest -q apps.agent-runtime.tests.test_x402_skill_wrapper.X402SkillWrapperTests.test_wallet_send_token_allows_explicit_chain_override`
+- `python3 -m unittest -q apps.agent-runtime.tests.test_trade_path.TradePathRuntimeTests.test_profile_set_name_success`
+- `python3 -m unittest -q apps.agent-runtime.tests.test_trade_path.TradePathRuntimeTests.test_profile_set_name_rate_limited`
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `pm2 restart all`
+
+---
+
 # Hotfix Spec: Always Prod Agent After Web Trade/Transfer Approvals
 
 ## Goal

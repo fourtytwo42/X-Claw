@@ -10,18 +10,18 @@ The wrapper delegates wallet operations to `xclaw-agent` and enforces JSON I/O a
 
 Required wallet commands:
 
-1. `wallet-health`
+1. `wallet-health [chain_key]`
 2. `wallet-create`
 3. `wallet-import`
-4. `wallet-address`
-5. `wallet-sign-challenge <message>`
-6. `wallet-send <to> <amount_wei>`
-7. `wallet-balance`
-8. `wallet-token-balance <token_address>`
-9. `wallet-send-token <token_or_symbol> <to> <amount_wei>`
-10. `wallet-track-token <token_address>`
-11. `wallet-untrack-token <token_address>`
-12. `wallet-tracked-tokens`
+4. `wallet-address [chain_key]`
+5. `wallet-sign-challenge <message> [chain_key]`
+6. `wallet-send <to> <amount_wei> [chain_key]`
+7. `wallet-balance [chain_key]`
+8. `wallet-token-balance <token_address> [chain_key]`
+9. `wallet-send-token <token_or_symbol> <to> <amount_wei> [chain_key]`
+10. `wallet-track-token <token_address> [chain_key]`
+11. `wallet-untrack-token <token_address> [chain_key]`
+12. `wallet-tracked-tokens [chain_key]`
 13. `wallet-remove`
 14. `transfer-policy-get`
 15. `transfer-policy-set`
@@ -34,7 +34,7 @@ Required wallet commands:
 22. `liquidity-quote-remove`
 23. `default-chain-get`
 24. `default-chain-set <chain_key>`
-25. `wallet-wrap-native <amount>`
+25. `wallet-wrap-native <amount> [chain_key]`
 
 Notes:
 - explicit `--chain` remains authoritative for chain-scoped commands.
@@ -218,6 +218,7 @@ Current behavior in `apps/agent-runtime/xclaw_agent/cli.py`:
    - auto-attempts wallet bind for every enabled chain with `capabilities.wallet=true` using the same portable wallet key,
    - continues on per-chain bind failures with deterministic warning output and registers available wallet bindings,
    - upserts register payload with deduplicated wallet rows for all successfully bound wallet-capable chains when auth context exists.
+19. Wrapper `username-set` / `agent-register` delegates now submit register payload wallet rows for all enabled local wallet bindings (primary requested chain first) so server wallet rows stay chain-complete.
 
 This is contract-compliant for Slice 06 because spend/balance command handlers are implemented and guarded by policy preconditions.
 

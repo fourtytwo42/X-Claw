@@ -3262,13 +3262,15 @@ Note:
   - [x] auto-bind portable wallet per discovered chain,
   - [x] build deduplicated register `wallets[]` from successful chain-address resolutions.
 - [x] `apps/network-web/src/app/skill-install.ps1/route.ts` mirrors the same chain discovery + auto-bind + register wallet payload behavior.
+- [x] `skills/xclaw-agent/scripts/xclaw_agent_skill.py` wallet command surface supports optional explicit chain override args (`[chain_key]`) while preserving runtime-default fallback.
+- [x] `apps/agent-runtime/xclaw_agent/cli.py` `profile set-name`/`agent-register` upsert payload includes all enabled local wallet bindings (primary chain first).
 
 ### 99.3 Validation + evidence
 - [x] installer scripts generate and include wallet-capable chain bindings for register payloads.
-- [ ] Required gates run sequentially:
-  - [ ] `npm run db:parity`
-  - [ ] `npm run seed:reset`
-  - [ ] `npm run seed:load`
-  - [ ] `npm run seed:verify`
-  - [ ] `npm run build`
-  - [ ] `pm2 restart all`
+- [x] Required gates run sequentially:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `pm2 restart all`

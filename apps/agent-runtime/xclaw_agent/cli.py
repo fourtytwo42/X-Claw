@@ -8215,12 +8215,34 @@ def cmd_profile_set_name(args: argparse.Namespace) -> int:
             )
 
         wallet_address = _wallet_address_for_chain(args.chain)
+        wallets: list[dict[str, str]] = [{"chainKey": args.chain, "address": wallet_address}]
+        seen_chains = {str(args.chain).strip().lower()}
+        try:
+            state = load_wallet_store()
+            chain_map = state.get("chains")
+            chain_keys = sorted(chain_map.keys()) if isinstance(chain_map, dict) else []
+            for chain_key in chain_keys:
+                key = str(chain_key or "").strip()
+                if not key or key.lower() in seen_chains:
+                    continue
+                if not chain_enabled(key):
+                    continue
+                try:
+                    address = _wallet_address_for_chain(key)
+                except WalletStoreError:
+                    continue
+                wallets.append({"chainKey": key, "address": address})
+                seen_chains.add(key.lower())
+        except WalletStoreError:
+            # Keep primary chain registration usable even when auxiliary bindings are malformed.
+            pass
+
         payload = {
             "schemaVersion": 1,
             "agentId": agent_id,
             "agentName": requested_name,
             "runtimePlatform": _runtime_platform_name(),
-            "wallets": [{"chainKey": args.chain, "address": wallet_address}],
+            "wallets": wallets,
         }
         status_code, body = _api_request("POST", "/agent/register", payload=payload, include_idempotency=True)
         if status_code < 200 or status_code >= 300:

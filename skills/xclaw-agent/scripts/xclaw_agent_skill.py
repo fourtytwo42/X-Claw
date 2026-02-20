@@ -1623,10 +1623,12 @@ def main(argv: List[str]) -> int:
         return _run_agent(["x402", "networks", "--json"])
 
     if cmd == "wallet-health":
-        return _run_agent(["wallet", "health", "--chain", chain, "--json"])
+        target_chain = str(argv[2]).strip() if len(argv) >= 3 and str(argv[2]).strip() else chain
+        return _run_agent(["wallet", "health", "--chain", target_chain, "--json"])
 
     if cmd == "wallet-address":
-        return _run_agent(["wallet", "address", "--chain", chain, "--json"])
+        target_chain = str(argv[2]).strip() if len(argv) >= 3 and str(argv[2]).strip() else chain
+        return _run_agent(["wallet", "address", "--chain", target_chain, "--json"])
 
     if cmd == "wallet-sign-challenge":
         if len(argv) < 3:
@@ -1639,7 +1641,8 @@ def main(argv: List[str]) -> int:
         message = argv[2].strip()
         if not message:
             return _err("invalid_input", "Challenge message cannot be empty.", exit_code=2)
-        return _run_agent(["wallet", "sign-challenge", "--message", message, "--chain", chain, "--json"])
+        target_chain = str(argv[3]).strip() if len(argv) >= 4 and str(argv[3]).strip() else chain
+        return _run_agent(["wallet", "sign-challenge", "--message", message, "--chain", target_chain, "--json"])
 
     if cmd == "wallet-send":
         if len(argv) < 4:
@@ -1650,7 +1653,8 @@ def main(argv: List[str]) -> int:
             return _err("invalid_input", "Invalid recipient address format.", "Use 0x-prefixed 20-byte hex address.", {"to": to_addr}, exit_code=2)
         if not _is_uint_string(amount_wei):
             return _err("invalid_input", "Invalid amount_wei format.", "Use base-unit integer string, for example 10000000000000000.", {"amountWei": amount_wei}, exit_code=2)
-        return _run_agent(["wallet", "send", "--to", to_addr, "--amount-wei", amount_wei, "--chain", chain, "--json"])
+        target_chain = str(argv[4]).strip() if len(argv) >= 5 and str(argv[4]).strip() else chain
+        return _run_agent(["wallet", "send", "--to", to_addr, "--amount-wei", amount_wei, "--chain", target_chain, "--json"])
 
     if cmd == "wallet-send-token":
         if len(argv) < 5:
@@ -1675,6 +1679,7 @@ def main(argv: List[str]) -> int:
             return _err("invalid_input", "Invalid recipient address format.", "Use 0x-prefixed 20-byte hex address.", {"to": to_addr}, exit_code=2)
         if not _is_uint_string(amount_wei):
             return _err("invalid_input", "Invalid amount_wei format.", "Use base-unit integer string.", {"amountWei": amount_wei}, exit_code=2)
+        target_chain = str(argv[5]).strip() if len(argv) >= 6 and str(argv[5]).strip() else chain
         return _run_agent(
             [
                 "wallet",
@@ -1686,13 +1691,14 @@ def main(argv: List[str]) -> int:
                 "--amount-wei",
                 amount_wei,
                 "--chain",
-                chain,
+                target_chain,
                 "--json",
             ]
         )
 
     if cmd == "wallet-balance":
-        return _run_agent(["wallet", "balance", "--chain", chain, "--json"])
+        target_chain = str(argv[2]).strip() if len(argv) >= 3 and str(argv[2]).strip() else chain
+        return _run_agent(["wallet", "balance", "--chain", target_chain, "--json"])
 
     if cmd == "wallet-token-balance":
         if len(argv) < 3:
@@ -1700,7 +1706,8 @@ def main(argv: List[str]) -> int:
         token_addr = argv[2]
         if not _is_hex_address(token_addr):
             return _err("invalid_input", "Invalid token address format.", "Use 0x-prefixed 20-byte hex address.", {"token": token_addr}, exit_code=2)
-        return _run_agent(["wallet", "token-balance", "--token", token_addr, "--chain", chain, "--json"])
+        target_chain = str(argv[3]).strip() if len(argv) >= 4 and str(argv[3]).strip() else chain
+        return _run_agent(["wallet", "token-balance", "--token", token_addr, "--chain", target_chain, "--json"])
 
     if cmd == "wallet-track-token":
         if len(argv) < 3:
@@ -1708,7 +1715,8 @@ def main(argv: List[str]) -> int:
         token_addr = argv[2].strip()
         if not _is_hex_address(token_addr):
             return _err("invalid_input", "Invalid token address format.", "Use 0x-prefixed 20-byte hex address.", {"token": token_addr}, exit_code=2)
-        return _run_agent(["wallet", "track-token", "--token", token_addr, "--chain", chain, "--json"])
+        target_chain = str(argv[3]).strip() if len(argv) >= 4 and str(argv[3]).strip() else chain
+        return _run_agent(["wallet", "track-token", "--token", token_addr, "--chain", target_chain, "--json"])
 
     if cmd == "wallet-untrack-token":
         if len(argv) < 3:
@@ -1716,10 +1724,12 @@ def main(argv: List[str]) -> int:
         token_addr = argv[2].strip()
         if not _is_hex_address(token_addr):
             return _err("invalid_input", "Invalid token address format.", "Use 0x-prefixed 20-byte hex address.", {"token": token_addr}, exit_code=2)
-        return _run_agent(["wallet", "untrack-token", "--token", token_addr, "--chain", chain, "--json"])
+        target_chain = str(argv[3]).strip() if len(argv) >= 4 and str(argv[3]).strip() else chain
+        return _run_agent(["wallet", "untrack-token", "--token", token_addr, "--chain", target_chain, "--json"])
 
     if cmd == "wallet-tracked-tokens":
-        return _run_agent(["wallet", "tracked-tokens", "--chain", chain, "--json"])
+        target_chain = str(argv[2]).strip() if len(argv) >= 3 and str(argv[2]).strip() else chain
+        return _run_agent(["wallet", "tracked-tokens", "--chain", target_chain, "--json"])
 
     if cmd == "wallet-wrap-native":
         if len(argv) < 3:
@@ -1732,10 +1742,12 @@ def main(argv: List[str]) -> int:
         amount = argv[2].strip()
         if not amount:
             return _err("invalid_input", "Amount must not be empty.", "usage: wallet-wrap-native <amount>", exit_code=2)
-        return _run_agent(["wallet", "wrap-native", "--amount", amount, "--chain", chain, "--json"])
+        target_chain = str(argv[3]).strip() if len(argv) >= 4 and str(argv[3]).strip() else chain
+        return _run_agent(["wallet", "wrap-native", "--amount", amount, "--chain", target_chain, "--json"])
 
     if cmd == "wallet-create":
-        return _run_agent(["wallet", "create", "--chain", chain, "--json"])
+        target_chain = str(argv[2]).strip() if len(argv) >= 3 and str(argv[2]).strip() else chain
+        return _run_agent(["wallet", "create", "--chain", target_chain, "--json"])
 
     return _err(
         "unknown_command",

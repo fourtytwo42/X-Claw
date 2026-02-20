@@ -61,6 +61,33 @@ Active slice context: `Slice 86` is in progress; this is an explicit user-report
 
 ---
 
+# Hotfix Tasks: Truthful ETH Sepolia Wallet Checks + Multi-Chain Register Sync (2026-02-20)
+
+Active slice context: `Slice 99` in progress.
+
+## 1) Scope lock
+- [x] Keep scope to skill/runtime wallet-chain routing and register payload composition.
+- [x] Avoid schema/API contract changes.
+
+## 2) Implementation
+- [x] Add optional explicit chain override support for skill wallet commands (`wallet-health/address/sign/send/send-token/balance/token-balance/track/untrack/tracked-tokens/wrap-native/create`).
+- [x] Update runtime `cmd_profile_set_name` register payload to include all enabled local wallet bindings from wallet store (primary chain first).
+- [x] Add regression coverage for explicit chain override routing and multi-chain register payload behavior.
+
+## 3) Validation
+- [x] `python3 -m unittest -q apps.agent-runtime.tests.test_x402_skill_wrapper.X402SkillWrapperTests.test_wallet_balance_allows_explicit_chain_override`
+- [x] `python3 -m unittest -q apps.agent-runtime.tests.test_x402_skill_wrapper.X402SkillWrapperTests.test_wallet_send_token_allows_explicit_chain_override`
+- [x] `python3 -m unittest -q apps.agent-runtime.tests.test_trade_path.TradePathRuntimeTests.test_profile_set_name_success`
+- [x] `python3 -m unittest -q apps.agent-runtime.tests.test_trade_path.TradePathRuntimeTests.test_profile_set_name_rate_limited`
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+
+---
+
 # Hotfix Tasks: Runtime-Canonical Approval Prompt Button Clear (Trade/Transfer/Policy)
 
 Active slice context: `Slice 87` in progress.

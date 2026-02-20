@@ -1889,4 +1889,6 @@ DoD:
 - [x] `/skill-install.ps1` mirrors the same wallet-capable chain auto-bind behavior.
 - [x] installer register payload upserts deduplicated wallet rows for all successfully bound wallet-capable chains.
 - [x] installer keeps bind failures non-fatal per chain and logs deterministic warning output.
+- [x] skill wallet commands accept explicit chain override args (chain-optional fallback remains runtime default chain).
+- [x] runtime `username-set`/`agent-register` register upsert includes all enabled local wallet bindings (primary requested chain first).
 - [x] canonical docs sync (`source-of-truth`, roadmap, tracker, wallet contract, spec/tasks/acceptance).

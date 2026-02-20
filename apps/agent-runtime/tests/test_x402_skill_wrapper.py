@@ -227,6 +227,43 @@ class X402SkillWrapperTests(unittest.TestCase):
             ["wallet", "track-token", "--token", "0x0000000000000000000000000000000000001549", "--chain", "hedera_testnet", "--json"]
         )
 
+    def test_wallet_balance_allows_explicit_chain_override(self) -> None:
+        with mock.patch.dict("os.environ", {"XCLAW_DEFAULT_CHAIN": "base_sepolia"}, clear=False):
+            with mock.patch.object(skill, "_run_agent", return_value=0) as run_mock:
+                code = skill.main(["xclaw_agent_skill.py", "wallet-balance", "ethereum_sepolia"])
+        self.assertEqual(code, 0)
+        run_mock.assert_called_once_with(["wallet", "balance", "--chain", "ethereum_sepolia", "--json"])
+
+    def test_wallet_send_token_allows_explicit_chain_override(self) -> None:
+        with mock.patch.dict("os.environ", {"XCLAW_DEFAULT_CHAIN": "base_sepolia"}, clear=False):
+            with mock.patch.object(skill, "_run_agent", return_value=0) as run_mock:
+                code = skill.main(
+                    [
+                        "xclaw_agent_skill.py",
+                        "wallet-send-token",
+                        "USDC",
+                        "0x9099d24D55c105818b4e9eE117d87BC11063CF10",
+                        "10000000",
+                        "ethereum_sepolia",
+                    ]
+                )
+        self.assertEqual(code, 0)
+        run_mock.assert_called_once_with(
+            [
+                "wallet",
+                "send-token",
+                "--token",
+                "USDC",
+                "--to",
+                "0x9099d24D55c105818b4e9eE117d87BC11063CF10",
+                "--amount-wei",
+                "10000000",
+                "--chain",
+                "ethereum_sepolia",
+                "--json",
+            ]
+        )
+
     def test_wallet_untrack_token_delegates_to_runtime(self) -> None:
         with mock.patch.dict("os.environ", {"XCLAW_DEFAULT_CHAIN": "hedera_testnet"}, clear=False):
             with mock.patch.object(skill, "_run_agent", return_value=0) as run_mock:

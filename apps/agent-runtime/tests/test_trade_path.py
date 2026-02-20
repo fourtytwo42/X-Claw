@@ -1865,13 +1865,40 @@ class TradePathRuntimeTests(unittest.TestCase):
 
     def test_profile_set_name_success(self) -> None:
         args = argparse.Namespace(name="harvey-ops", chain="hardhat_local", json=True)
+        captured: dict = {}
+
+        def fake_api_request(method: str, path: str, payload: dict | None = None, include_idempotency: bool = False):
+            captured["method"] = method
+            captured["path"] = path
+            captured["payload"] = payload
+            return 200, {"agentName": "harvey-ops"}
+
         with mock.patch.object(cli, "_resolve_api_key", return_value="xak1.ag_1.sig.payload"), mock.patch.object(
             cli, "_resolve_agent_id", return_value="ag_1"
-        ), mock.patch.object(cli, "_wallet_address_for_chain", return_value="0x1111111111111111111111111111111111111111"), mock.patch.object(
-            cli, "_api_request", return_value=(200, {"agentName": "harvey-ops"})
+        ), mock.patch.object(
+            cli,
+            "_wallet_address_for_chain",
+            side_effect=[
+                "0x1111111111111111111111111111111111111111",
+                "0x1111111111111111111111111111111111111111",
+            ],
+        ), mock.patch.object(
+            cli,
+            "load_wallet_store",
+            return_value={"version": 2, "wallets": {"w1": {}}, "chains": {"hardhat_local": "w1", "ethereum_sepolia": "w1"}},
+        ), mock.patch.object(cli, "chain_enabled", return_value=True), mock.patch.object(
+            cli, "_api_request", side_effect=fake_api_request
         ):
             code = cli.cmd_profile_set_name(args)
         self.assertEqual(code, 0)
+        payload = captured.get("payload") or {}
+        self.assertEqual(
+            payload.get("wallets"),
+            [
+                {"chainKey": "hardhat_local", "address": "0x1111111111111111111111111111111111111111"},
+                {"chainKey": "ethereum_sepolia", "address": "0x1111111111111111111111111111111111111111"},
+            ],
+        )
 
     def test_profile_set_name_rejects_empty_name(self) -> None:
         args = argparse.Namespace(name="   ", chain="hardhat_local", json=True)
@@ -1883,6 +1910,12 @@ class TradePathRuntimeTests(unittest.TestCase):
         with mock.patch.object(cli, "_resolve_api_key", return_value="xak1.ag_1.sig.payload"), mock.patch.object(
             cli, "_resolve_agent_id", return_value="ag_1"
         ), mock.patch.object(cli, "_wallet_address_for_chain", return_value="0x1111111111111111111111111111111111111111"), mock.patch.object(
+            cli,
+            "load_wallet_store",
+            return_value={"version": 2, "wallets": {}, "chains": {"hardhat_local": "w1"}},
+        ), mock.patch.object(
+            cli, "chain_enabled", return_value=True
+        ), mock.patch.object(
             cli,
             "_api_request",
             return_value=(

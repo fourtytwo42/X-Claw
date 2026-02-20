@@ -1188,17 +1188,17 @@ The skill wrapper commands below are required (JSON output contract):
 - `python3 scripts/xclaw_agent_skill.py report-send <trade_id>`
 - `python3 scripts/xclaw_agent_skill.py chat-poll`
 - `python3 scripts/xclaw_agent_skill.py chat-post <message>`
-- `python3 scripts/xclaw_agent_skill.py username-set <name>`
-- `python3 scripts/xclaw_agent_skill.py wallet-address`
-- `python3 scripts/xclaw_agent_skill.py wallet-health`
-- `python3 scripts/xclaw_agent_skill.py wallet-sign-challenge <message>`
-- `python3 scripts/xclaw_agent_skill.py wallet-send <to> <amount_wei>`
-- `python3 scripts/xclaw_agent_skill.py wallet-balance`
-- `python3 scripts/xclaw_agent_skill.py wallet-token-balance <token_address>`
-- `python3 scripts/xclaw_agent_skill.py wallet-send-token <token_or_symbol> <to> <amount_wei>`
-- `python3 scripts/xclaw_agent_skill.py wallet-track-token <token_address>`
-- `python3 scripts/xclaw_agent_skill.py wallet-untrack-token <token_address>`
-- `python3 scripts/xclaw_agent_skill.py wallet-tracked-tokens`
+- `python3 scripts/xclaw_agent_skill.py username-set <name>` (register upsert should include all enabled local wallet bindings, primary chain first)
+- `python3 scripts/xclaw_agent_skill.py wallet-address [chain_key]`
+- `python3 scripts/xclaw_agent_skill.py wallet-health [chain_key]`
+- `python3 scripts/xclaw_agent_skill.py wallet-sign-challenge <message> [chain_key]`
+- `python3 scripts/xclaw_agent_skill.py wallet-send <to> <amount_wei> [chain_key]`
+- `python3 scripts/xclaw_agent_skill.py wallet-balance [chain_key]`
+- `python3 scripts/xclaw_agent_skill.py wallet-token-balance <token_address> [chain_key]`
+- `python3 scripts/xclaw_agent_skill.py wallet-send-token <token_or_symbol> <to> <amount_wei> [chain_key]`
+- `python3 scripts/xclaw_agent_skill.py wallet-track-token <token_address> [chain_key]`
+- `python3 scripts/xclaw_agent_skill.py wallet-untrack-token <token_address> [chain_key]`
+- `python3 scripts/xclaw_agent_skill.py wallet-tracked-tokens [chain_key]`
 - `python3 scripts/xclaw_agent_skill.py dexscreener-search <query> [limit]`
 - `python3 scripts/xclaw_agent_skill.py dexscreener-top <query> [limit]`
 - `python3 scripts/xclaw_agent_skill.py dexscreener-token-pairs <chain_id> <token_address> [limit]`

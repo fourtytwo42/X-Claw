@@ -5407,3 +5407,26 @@ Date (UTC): 2026-02-19
 - `npm run seed:verify` -> PASS
 - `npm run build` -> PASS
 - `pm2 restart all` -> PASS
+
+## Hotfix: Truthful ETH Sepolia Wallet Checks + Multi-Chain Register Sync (UTC 2026-02-20)
+
+### Implementation evidence
+- `skills/xclaw-agent/scripts/xclaw_agent_skill.py`
+  - wallet commands now accept optional explicit chain override argument and pass it through to runtime (`wallet-health/address/sign/send/send-token/balance/token-balance/track/untrack/tracked-tokens/wrap-native/create`).
+- `apps/agent-runtime/xclaw_agent/cli.py`
+  - `cmd_profile_set_name` now builds register payload wallets from all enabled local wallet bindings in wallet store (primary requested chain first), instead of only one chain wallet row.
+- `apps/agent-runtime/tests/test_x402_skill_wrapper.py`
+  - added explicit chain override tests for `wallet-balance` and `wallet-send-token`.
+- `apps/agent-runtime/tests/test_trade_path.py`
+  - updated profile set-name success test to assert multi-chain wallet payload.
+
+### Runtime tests
+- `python3 -m unittest -q apps.agent-runtime.tests.test_x402_skill_wrapper.X402SkillWrapperTests.test_wallet_balance_allows_explicit_chain_override apps.agent-runtime.tests.test_x402_skill_wrapper.X402SkillWrapperTests.test_wallet_send_token_allows_explicit_chain_override apps.agent-runtime.tests.test_trade_path.TradePathRuntimeTests.test_profile_set_name_success apps.agent-runtime.tests.test_trade_path.TradePathRuntimeTests.test_profile_set_name_rate_limited` -> PASS
+
+### Required gates
+- `npm run db:parity` -> PASS
+- `npm run seed:reset` -> PASS
+- `npm run seed:load` -> PASS
+- `npm run seed:verify` -> PASS
+- `npm run build` -> PASS
+- `pm2 restart all` -> PASS
