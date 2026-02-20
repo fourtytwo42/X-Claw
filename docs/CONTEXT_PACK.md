@@ -1494,3 +1494,24 @@ Unify cross-chain execution/fallback contracts so active chains expose determini
   - `apps/agent-runtime/xclaw_agent/liquidity_adapter.py`
 - Chain config model:
   - `config/chains/*.json`
+
+## Slice 107 Context Pack (2026-02-20): Executable Cross-Chain Parity Completion
+
+### Objective
+Promote executable claim fallback behavior where adapter paths are real (Hedera first), and tighten claim failure payload provenance.
+
+### Constraints
+- Uniswap remains primary for configured Uniswap chains.
+- No synthetic success on unsupported claim operations.
+- Disabled/wallet-only chains remain unchanged in this slice.
+
+### Primary touchpoints
+- Runtime claim failure payloads:
+  - `apps/agent-runtime/xclaw_agent/cli.py`
+- Hedera claim bridge execution:
+  - `apps/agent-runtime/xclaw_agent/bridges/hedera_hts_bridge.py`
+- Hedera claim rollout config:
+  - `config/chains/hedera_mainnet.json`
+  - `config/chains/hedera_testnet.json`
+- Regression coverage:
+  - `apps/agent-runtime/tests/test_liquidity_cli.py`

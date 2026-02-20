@@ -55,11 +55,11 @@
   "version": 1,
   "liquidityOperations": {
     "claimFees": {
-      "legacyEnabled": false,
+      "legacyEnabled": true,
       "adapter": "hedera_hts"
     },
     "claimRewards": {
-      "legacyEnabled": false,
+      "legacyEnabled": true,
       "adapter": "hedera_hts",
       "rewardContracts": []
     }

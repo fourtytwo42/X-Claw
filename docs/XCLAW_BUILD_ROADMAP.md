@@ -3525,3 +3525,30 @@ Note:
   - [x] `npm run build`
   - [x] `pm2 restart all`
 - [x] Issue #49 evidence post + commit hash(es).
+
+## 107) Slice 107: Executable Cross-Chain Parity Completion
+
+### 107.1 Canonical/doc sync
+- [x] Add Slice 107 entries to `docs/XCLAW_SLICE_TRACKER.md` and this roadmap section.
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` with executable parity promotion contract.
+- [x] Update handoff artifacts: `docs/CONTEXT_PACK.md`, `spec.md`, `tasks.md`, `acceptance.md`.
+
+### 107.2 Runtime + adapter implementation
+- [x] Claim failure payloads in runtime include provider provenance fields.
+- [x] Hedera bridge no longer hard-blocks claim actions; claim actions execute through bridge path.
+- [x] Hedera claim promotion flags enabled in:
+  - [x] `config/chains/hedera_mainnet.json`
+  - [x] `config/chains/hedera_testnet.json`
+
+### 107.3 Validation + evidence
+- [x] Runtime tests:
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- [x] Required gates run sequentially:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `pm2 restart all`
+- [ ] Issue #50 evidence post + commit hash(es).

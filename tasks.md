@@ -3182,3 +3182,35 @@ Active slice context: `Slice 98`.
 - [x] `npm run build`.
 - [x] `pm2 restart all`.
 - [ ] Issue evidence post with commit hash(es).
+
+# Slice 107 Tasks: Executable Cross-Chain Parity Completion (UTC 2026-02-20)
+
+## 1) Canonical/doc sync
+- [x] Add Slice 107 tracker entry in `docs/XCLAW_SLICE_TRACKER.md`.
+- [x] Add Slice 107 roadmap section in `docs/XCLAW_BUILD_ROADMAP.md`.
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` with executable parity promotion contract.
+- [x] Update handoff artifacts (`docs/CONTEXT_PACK.md`, `spec.md`, `tasks.md`, `acceptance.md`).
+
+## 2) Runtime and bridge implementation
+- [x] Ensure claim-failure payloads include provider provenance fields.
+- [x] Remove hard-block for Hedera bridge `claim_fees` / `claim_rewards` actions.
+- [x] Add runtime test coverage for claim failure provenance fields.
+
+## 3) Chain config promotion
+- [x] Set `config/chains/hedera_mainnet.json`:
+  - [x] `liquidityOperations.claimFees.legacyEnabled=true`
+  - [x] `liquidityOperations.claimRewards.legacyEnabled=true`
+- [x] Set `config/chains/hedera_testnet.json`:
+  - [x] `liquidityOperations.claimFees.legacyEnabled=true`
+  - [x] `liquidityOperations.claimRewards.legacyEnabled=true`
+
+## 4) Validation/evidence
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v`.
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`.
+- [x] `npm run db:parity`.
+- [x] `npm run seed:reset`.
+- [x] `npm run seed:load`.
+- [x] `npm run seed:verify`.
+- [x] `npm run build`.
+- [x] `pm2 restart all`.
+- [ ] Issue evidence post with commit hash(es).

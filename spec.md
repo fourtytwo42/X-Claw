@@ -3065,3 +3065,19 @@ Establish operation-level parity contracts across active chains and make Uniswap
 2. Legacy fallback for claims requires config gate + adapter support.
 3. Reward claim fallback requires configured reward contracts when adapter requires them.
 4. Wallet-only/disabled chains remain fail-closed with explicit onboarding backlog.
+
+## Slice 107: Executable Cross-Chain Parity Completion
+
+### Goal
+Promote real executable claim fallback paths where adapter integration exists, and require provider provenance on claim failure payloads.
+
+### Non-goals
+1. Enabling disabled/wallet-only chains.
+2. Introducing synthetic rewards integrations for non-configured protocols.
+3. UI scope expansion.
+
+### Constraints
+1. Uniswap remains primary on configured chains.
+2. Legacy claim fallback requires config gate + adapter capability.
+3. Hedera claim promotion is limited to existing adapter/plugin path.
+4. Deterministic fail-closed behavior remains the default for unsupported paths.

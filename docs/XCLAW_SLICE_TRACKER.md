@@ -2058,3 +2058,21 @@ DoD:
 - [x] required gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
 - [x] runtime tests pass (`test_liquidity_cli.py`, `test_trade_path.py`).
 - [x] issue #49 evidence post + commit hash(es).
+
+## Slice 107: Executable Cross-Chain Parity Completion
+Status: [~]
+Issue: #50
+
+Goal:
+- Promote real executable claim fallbacks where adapters support them, while retaining deterministic fail-closed behavior for unsupported paths.
+
+DoD:
+- [x] claim command failure payloads include provider provenance (`providerRequested`, `providerUsed`, `fallbackUsed`, `fallbackReason`).
+- [x] Hedera bridge/plugin claim actions are executable (not hard-blocked) and remain deterministic on failure.
+- [x] Hedera chain configs promoted for legacy claim execution:
+  - `hedera_mainnet`
+  - `hedera_testnet`
+- [x] Uniswap claim fallback semantics remain unchanged (fallback only when configured and supported).
+- [x] required gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
+- [x] runtime tests pass (`test_liquidity_cli.py`, `test_trade_path.py`).
+- [ ] issue #50 evidence post + commit hash(es).

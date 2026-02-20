@@ -916,6 +916,56 @@ class LiquidityCliTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertEqual(payload.get("code"), "claim_rewards_not_configured")
 
+    def test_liquidity_claim_fees_failure_payload_has_provider_provenance(self) -> None:
+        args = argparse.Namespace(
+            chain="ethereum_sepolia",
+            dex="uniswap_v3",
+            position_id="123",
+            collect_as_weth=False,
+            json=True,
+        )
+        with mock.patch.object(cli, "assert_chain_capability"), mock.patch.object(
+            cli, "_liquidity_provider_settings", return_value=("uniswap_api", "legacy_router")
+        ), mock.patch.object(
+            cli, "load_wallet_store", return_value={}
+        ), mock.patch.object(
+            cli, "_execution_wallet", return_value=("0x" + "11" * 20, "0x" + "22" * 32)
+        ), mock.patch.object(
+            cli, "_uniswap_lp_call_via_proxy", side_effect=RuntimeError("upstream down")
+        ), mock.patch.object(
+            cli, "_legacy_liquidity_operation_available", return_value=False
+        ):
+            code, payload = self._run(lambda: cli.cmd_liquidity_claim_fees(args))
+        self.assertEqual(code, 1)
+        self.assertEqual(payload.get("code"), "no_execution_provider_available")
+        details = payload.get("details") or {}
+        self.assertEqual(details.get("operation"), "claim_fees")
+        self.assertEqual(details.get("providerRequested"), "uniswap_api")
+        self.assertEqual(details.get("providerUsed"), "uniswap_api")
+        self.assertEqual(details.get("fallbackUsed"), False)
+
+    def test_liquidity_claim_rewards_invalid_input_payload_has_provider_provenance(self) -> None:
+        args = argparse.Namespace(
+            chain="ethereum_sepolia",
+            dex="uniswap_v3",
+            position_id="123",
+            reward_token="",
+            request_json="",
+            json=True,
+        )
+        with mock.patch.object(cli, "assert_chain_capability"), mock.patch.object(
+            cli, "_liquidity_provider_settings", return_value=("uniswap_api", "legacy_router")
+        ), mock.patch.object(
+            cli, "_uniswap_lp_operation_enabled", return_value=True
+        ):
+            code, payload = self._run(lambda: cli.cmd_liquidity_claim_rewards(args))
+        self.assertEqual(code, 2)
+        self.assertEqual(payload.get("code"), "invalid_input")
+        details = payload.get("details") or {}
+        self.assertEqual(details.get("operation"), "claim_rewards")
+        self.assertEqual(details.get("providerRequested"), "uniswap_api")
+        self.assertEqual(details.get("fallbackUsed"), False)
+
     def test_liquidity_adapter_claim_methods_are_fail_closed(self) -> None:
         adapter = LiquidityAdapter(chain="base_sepolia", dex="aerodrome", protocol_family="amm_v2", position_type="v2")
         with self.assertRaisesRegex(Exception, "claim_fees_not_supported_for_protocol"):

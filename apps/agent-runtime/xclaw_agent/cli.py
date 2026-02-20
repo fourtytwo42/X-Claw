@@ -6671,14 +6671,33 @@ def cmd_liquidity_claim_fees(args: argparse.Namespace) -> int:
     chain = str(args.chain or "").strip()
     dex = str(args.dex or "").strip().lower()
     position_id = str(args.position_id or "").strip()
+    provider_requested = "legacy_router"
+    provider_used = ""
+    fallback_used = False
+    fallback_reason: dict[str, str] | None = None
+
+    def _claim_failure_details() -> dict[str, Any]:
+        details: dict[str, Any] = {
+            "chain": chain,
+            "dex": dex,
+            "positionId": position_id,
+            "operation": "claim_fees",
+            "providerRequested": provider_requested,
+            "fallbackUsed": bool(fallback_used),
+            "fallbackReason": fallback_reason,
+        }
+        if provider_used:
+            details["providerUsed"] = provider_used
+        return details
+
     try:
         assert_chain_capability(chain, "liquidity")
         if not position_id:
-            return fail("invalid_input", "position-id is required.", "Provide --position-id and retry.", {"chain": chain}, exit_code=2)
+            return fail("invalid_input", "position-id is required.", "Provide --position-id and retry.", _claim_failure_details(), exit_code=2)
         provider_requested, fallback_provider = _liquidity_provider_settings(chain)
         fallback_used = False
-        fallback_reason: dict[str, str] | None = None
-        provider_used = "legacy_router"
+        fallback_reason = None
+        provider_used = provider_requested
         uniswap_operation: str | None = None
         request_payload = {
             "tokenId": position_id,
@@ -6742,10 +6761,10 @@ def cmd_liquidity_claim_fees(args: argparse.Namespace) -> int:
         err = str(exc)
         for code in {"claim_fees_not_supported_for_protocol", "no_execution_provider_available"}:
             if err.startswith(f"{code}:"):
-                return fail(code, err.split(":", 1)[1].strip(), "Verify chain claim-fees support and retry.", {"chain": chain, "dex": dex, "positionId": position_id}, exit_code=1)
-        return fail("liquidity_claim_fees_failed", str(exc), "Verify Uniswap LP configuration and retry.", {"chain": chain, "dex": dex, "positionId": position_id}, exit_code=1)
+                return fail(code, err.split(":", 1)[1].strip(), "Verify chain claim-fees support and retry.", _claim_failure_details(), exit_code=1)
+        return fail("liquidity_claim_fees_failed", str(exc), "Verify Uniswap LP configuration and retry.", _claim_failure_details(), exit_code=1)
     except Exception as exc:
-        return fail("liquidity_claim_fees_failed", str(exc), "Inspect runtime liquidity fee-claim path and retry.", {"chain": chain, "dex": dex, "positionId": position_id}, exit_code=1)
+        return fail("liquidity_claim_fees_failed", str(exc), "Inspect runtime liquidity fee-claim path and retry.", _claim_failure_details(), exit_code=1)
 
 
 def cmd_liquidity_migrate(args: argparse.Namespace) -> int:
@@ -6860,13 +6879,33 @@ def cmd_liquidity_claim_rewards(args: argparse.Namespace) -> int:
     chain = str(args.chain or "").strip()
     dex = str(args.dex or "").strip().lower()
     position_id = str(args.position_id or "").strip()
+    provider_requested = "legacy_router"
+    provider_used = ""
+    fallback_used = False
+    fallback_reason: dict[str, str] | None = None
+
+    def _claim_failure_details() -> dict[str, Any]:
+        details: dict[str, Any] = {
+            "chain": chain,
+            "dex": dex,
+            "positionId": position_id,
+            "operation": "claim_rewards",
+            "providerRequested": provider_requested,
+            "fallbackUsed": bool(fallback_used),
+            "fallbackReason": fallback_reason,
+        }
+        if provider_used:
+            details["providerUsed"] = provider_used
+        return details
+
     try:
         assert_chain_capability(chain, "liquidity")
         if not position_id:
-            return fail("invalid_input", "position-id is required.", "Provide --position-id and retry.", {"chain": chain}, exit_code=2)
+            return fail("invalid_input", "position-id is required.", "Provide --position-id and retry.", _claim_failure_details(), exit_code=2)
         provider_requested, _ = _liquidity_provider_settings(chain)
         fallback_used = False
-        fallback_reason: dict[str, str] | None = None
+        fallback_reason = None
+        provider_used = provider_requested
         request_payload: dict[str, Any] = {"positionId": position_id}
         reward_token = str(args.reward_token or "").strip()
         if reward_token:
@@ -6885,7 +6924,7 @@ def cmd_liquidity_claim_rewards(args: argparse.Namespace) -> int:
                     "uniswap_claim_rewards_not_supported_on_chain",
                     f"Uniswap LP claim-rewards is not enabled on chain '{chain}'.",
                     "Use a chain where claim-rewards is enabled or rely on configured legacy path.",
-                    {"chain": chain},
+                    _claim_failure_details(),
                     exit_code=2,
                 )
             if "tokens" not in request_payload:
@@ -6893,7 +6932,7 @@ def cmd_liquidity_claim_rewards(args: argparse.Namespace) -> int:
                     "invalid_input",
                     "claim-rewards requires --reward-token or --request-json with tokens.",
                     "Provide a reward token symbol/address or full request payload.",
-                    {"chain": chain, "positionId": position_id},
+                    _claim_failure_details(),
                     exit_code=2,
                 )
 
@@ -6952,10 +6991,10 @@ def cmd_liquidity_claim_rewards(args: argparse.Namespace) -> int:
         err = str(exc)
         for code in {"claim_rewards_not_configured", "claim_rewards_not_supported_for_protocol", "no_execution_provider_available"}:
             if err.startswith(f"{code}:"):
-                return fail(code, err.split(":", 1)[1].strip(), "Verify chain claim-rewards support and retry.", {"chain": chain, "dex": dex, "positionId": position_id}, exit_code=1)
-        return fail("liquidity_claim_rewards_failed", str(exc), "Verify Uniswap LP claim-rewards configuration and retry.", {"chain": chain, "dex": dex, "positionId": position_id}, exit_code=1)
+                return fail(code, err.split(":", 1)[1].strip(), "Verify chain claim-rewards support and retry.", _claim_failure_details(), exit_code=1)
+        return fail("liquidity_claim_rewards_failed", str(exc), "Verify Uniswap LP claim-rewards configuration and retry.", _claim_failure_details(), exit_code=1)
     except Exception as exc:
-        return fail("liquidity_claim_rewards_failed", str(exc), "Inspect runtime liquidity claim-rewards path and retry.", {"chain": chain, "dex": dex, "positionId": position_id}, exit_code=1)
+        return fail("liquidity_claim_rewards_failed", str(exc), "Inspect runtime liquidity claim-rewards path and retry.", _claim_failure_details(), exit_code=1)
 
 
 def _run_liquidity_execute_inline(liquidity_intent_id: str, chain: str) -> tuple[int, dict[str, Any]]:

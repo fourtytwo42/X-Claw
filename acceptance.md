@@ -5686,3 +5686,31 @@ Date (UTC): 2026-02-19
 - `npm run seed:verify` -> PASS
 - `npm run build` -> PASS
 - `pm2 restart all` -> PASS
+
+## Slice 107 Executable Cross-Chain Parity Completion (UTC 2026-02-20)
+
+### Implementation evidence
+- Runtime claim failure provenance hardening:
+  - `apps/agent-runtime/xclaw_agent/cli.py`
+    - claim-fees and claim-rewards failures now consistently include operation + provider provenance fields.
+- Hedera bridge claim execution enablement:
+  - `apps/agent-runtime/xclaw_agent/bridges/hedera_hts_bridge.py`
+    - removed hard-block for `claim_fees`/`claim_rewards` actions.
+- Hedera claim promotion config:
+  - `config/chains/hedera_mainnet.json`
+  - `config/chains/hedera_testnet.json`
+    - `liquidityOperations.claimFees.legacyEnabled=true`
+    - `liquidityOperations.claimRewards.legacyEnabled=true`
+- Runtime tests:
+  - `apps/agent-runtime/tests/test_liquidity_cli.py`
+    - claim-failure provenance coverage added.
+
+### Validation status
+- `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v` -> PASS.
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS.
+- `npm run db:parity` -> PASS
+- `npm run seed:reset` -> PASS
+- `npm run seed:load` -> PASS
+- `npm run seed:verify` -> PASS
+- `npm run build` -> PASS
+- `pm2 restart all` -> PASS

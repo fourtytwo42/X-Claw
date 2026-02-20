@@ -4297,3 +4297,32 @@ Limitations / notes:
 6. Backlog contract for wallet-only/disabled chains:
 - `adi_mainnet`, `adi_testnet`, `og_mainnet`, `og_testnet`, `kite_ai_mainnet`, `canton_mainnet`, `canton_testnet` remain fail-closed in this slice.
 - Promotion requires chain-specific adapter onboarding and per-operation acceptance evidence.
+
+## 87) Slice 107 Executable Parity Completion (Locked)
+
+1. Scope:
+- Close the gap between deterministic claim contracts and executable adapter claim paths.
+- Preserve existing Uniswap-primary architecture and fail-closed behavior.
+
+2. Claim execution contract:
+- Runtime claim commands must include provider provenance fields on both success and failure payloads:
+  - `providerRequested`
+  - `providerUsed` (when resolved)
+  - `fallbackUsed`
+  - `fallbackReason`
+- Claim failures keep stable deterministic codes (`claim_fees_not_supported_for_protocol`, `claim_rewards_not_configured`, `claim_rewards_not_supported_for_protocol`, `no_execution_provider_available`).
+
+3. Hedera adapter promotion:
+- Hedera legacy claim execution is promoted for configured active Hedera chains:
+  - `hedera_mainnet`
+  - `hedera_testnet`
+- Promotion uses `liquidityOperations.claimFees.legacyEnabled=true` and `liquidityOperations.claimRewards.legacyEnabled=true` with adapter `hedera_hts`.
+
+4. Fallback architecture lock:
+- Uniswap chains keep `uniswap_api` as primary.
+- Fallback claim execution only runs when chain config gate is enabled and adapter capability checks pass.
+- No synthetic success paths for unsupported protocols/chains.
+
+5. Backlog contract:
+- Wallet-only/disabled chains remain unchanged and fail-closed in this slice:
+  - `adi_mainnet`, `adi_testnet`, `og_mainnet`, `og_testnet`, `kite_ai_mainnet`, `canton_mainnet`, `canton_testnet`.

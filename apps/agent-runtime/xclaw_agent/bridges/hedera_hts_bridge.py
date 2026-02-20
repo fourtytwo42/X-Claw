@@ -124,7 +124,14 @@ def _target_account() -> AccountId:
 
 
 def _transfer_tinybar_amount(action: str) -> int:
-    key = "XCLAW_HEDERA_HTS_BRIDGE_ADD_TINYBAR" if action == "add" else "XCLAW_HEDERA_HTS_BRIDGE_REMOVE_TINYBAR"
+    if action == "add":
+        key = "XCLAW_HEDERA_HTS_BRIDGE_ADD_TINYBAR"
+    elif action == "remove":
+        key = "XCLAW_HEDERA_HTS_BRIDGE_REMOVE_TINYBAR"
+    elif action == "claim_fees":
+        key = "XCLAW_HEDERA_HTS_BRIDGE_CLAIM_FEES_TINYBAR"
+    else:
+        key = "XCLAW_HEDERA_HTS_BRIDGE_CLAIM_REWARDS_TINYBAR"
     raw = str(os.environ.get(key) or os.environ.get("XCLAW_HEDERA_HTS_BRIDGE_TINYBAR") or "1").strip()
     try:
         amount = int(raw)
@@ -139,8 +146,6 @@ def _execute_hts_action(request: dict[str, Any]) -> dict[str, Any]:
     action = str(request.get("action") or "").strip().lower()
     if action not in {"add", "remove", "claim_fees", "claim_rewards"}:
         raise BridgeError("unsupported_action")
-    if action in {"claim_fees", "claim_rewards"}:
-        raise BridgeError(f"{action}_not_configured")
     chain = str(request.get("chain") or "").strip()
     if not chain:
         raise BridgeError("missing_chain")
