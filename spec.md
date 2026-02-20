@@ -3287,3 +3287,67 @@ Extend wallet-approval harness flow to run `hardhat_local -> base_sepolia -> eth
 - `invalid_amount`
 - `wrap_native_failed`
 3. Wrap failure action hint must include swap fallback guidance (`native -> wrapped`).
+
+---
+
+# Hotfix Spec: Slice 117 Hotfix D Trade-Cap Deprecation + Chain Context Parity (2026-02-20)
+
+## Goal
+1. Remove deprecated trade-cap blocking behavior from runtime/server trade and convert flows.
+2. Ensure omitted-chain skill commands resolve to runtime/web-synced default chain first.
+3. Keep chain support config-driven (`capabilities.trade=true`) with deterministic capability failures.
+
+## Non-goals
+1. No schema/migration deletion of trade-cap fields in this hotfix.
+2. No forced promotion of non-trade-capable chains.
+
+## Locked scope
+1. `apps/agent-runtime/xclaw_agent/cli.py`
+2. `apps/agent-runtime/tests/test_wallet_core.py`
+3. `skills/xclaw-agent/scripts/xclaw_agent_skill.py`
+4. `apps/agent-runtime/tests/test_x402_skill_wrapper.py`
+5. `apps/network-web/src/lib/trade-caps.ts`
+6. `apps/network-web/src/app/api/v1/agent/transfers/policy/route.ts`
+7. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+8. `docs/api/WALLET_COMMAND_CONTRACT.md`
+9. `docs/XCLAW_SLICE_TRACKER.md`
+10. `docs/XCLAW_BUILD_ROADMAP.md`
+11. `skills/xclaw-agent/SKILL.md`
+12. `skills/xclaw-agent/references/commands.md`
+13. `spec.md`
+14. `tasks.md`
+15. `acceptance.md`
+16. `docs/CONTEXT_PACK.md`
+
+---
+
+# Hotfix Spec: Slice 117 Hotfix E Transfer Approval Mirror Fail-Closed (2026-02-20)
+
+## Goal
+Ensure runtime never reports queued transfer approvals that are invisible in web management by requiring successful transfer mirror persistence for approval-required wallet sends.
+
+## Non-goals
+1. No schema/migration changes.
+2. No change to approval decision semantics.
+
+## Locked scope
+1. `apps/agent-runtime/xclaw_agent/cli.py`
+2. `apps/agent-runtime/tests/test_trade_path.py`
+3. `apps/network-web/src/lib/transfer-mirror-schema.ts`
+4. `apps/network-web/src/app/api/v1/agent/transfer-approvals/mirror/route.ts`
+5. `apps/network-web/src/app/api/v1/management/agent-state/route.ts`
+6. `skills/xclaw-agent/scripts/xclaw_agent_skill.py`
+7. `apps/agent-runtime/tests/test_x402_skill_wrapper.py`
+8. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+9. `docs/api/WALLET_COMMAND_CONTRACT.md`
+10. `docs/XCLAW_SLICE_TRACKER.md`
+11. `docs/XCLAW_BUILD_ROADMAP.md`
+12. `spec.md`
+13. `tasks.md`
+14. `acceptance.md`
+15. `docs/CONTEXT_PACK.md`
+
+## Hotfix E extension (server visibility + deterministic API contract)
+1. Transfer mirror write route (`/api/v1/agent/transfer-approvals/mirror`) must emit deterministic `transfer_mirror_unavailable` with HTTP 503 when mirror schema/storage is unavailable.
+2. Management read route (`/api/v1/management/agent-state`) must return deterministic `transfer_mirror_unavailable` with HTTP 503 for transfer-mirror schema/storage unavailability; no silent empty queue/history fallback.
+3. Skill wrapper must preserve mirror-sync failures as non-success (`approval_sync_failed`), never normalize them into `approval_pending`.

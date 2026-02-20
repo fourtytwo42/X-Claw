@@ -149,6 +149,7 @@ export async function GET(req: NextRequest) {
               updatedAt: capsRow.created_at
             }
           : null,
+        tradeCapsDeprecated: true,
         dailyUsage:
           (usageRow.rowCount ?? 0) > 0
             ? {
@@ -160,7 +161,8 @@ export async function GET(req: NextRequest) {
                 utcDay: new Date().toISOString().slice(0, 10),
                 dailySpendUsd: '0',
                 dailyFilledTrades: 0
-              }
+              },
+        dailyUsageDeprecated: true
       },
       200,
       requestId

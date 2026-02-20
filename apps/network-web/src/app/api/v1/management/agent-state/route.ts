@@ -8,12 +8,22 @@ import { ensureAgentWalletMappings } from '@/lib/agent-wallet-mappings';
 import { maybeSyncLiquiditySnapshots } from '@/lib/liquidity-indexer';
 import { requireManagementSession, sessionHasAgentAccess } from '@/lib/management-auth';
 import { getRequestId } from '@/lib/request-id';
+import { isTransferMirrorSchemaUnavailableError, transferMirrorSchemaErrorDetails } from '@/lib/transfer-mirror-schema';
 import { resolveTokenMetadata } from '@/lib/token-metadata';
 import { kickStaleTransferRecovery } from '@/lib/transfer-recovery';
 
 export const runtime = 'nodejs';
 
 type RpcReceipt = { blockNumber?: string | null };
+class TransferMirrorUnavailableError extends Error {
+  readonly originalError: unknown;
+
+  constructor(message: string, originalError: unknown) {
+    super(message);
+    this.name = 'TransferMirrorUnavailableError';
+    this.originalError = originalError;
+  }
+}
 
 function hexToBigInt(raw: string): bigint {
   if (!raw || typeof raw !== 'string') {
@@ -81,22 +91,7 @@ async function fetchTransferConfirmations(
 }
 
 function isMissingTransferMirrorSchema(error: unknown): boolean {
-  if (!error || typeof error !== 'object') {
-    return false;
-  }
-  const code = 'code' in error ? String((error as { code?: unknown }).code ?? '') : '';
-  if (code === '42703' || code === '42P01') {
-    return true;
-  }
-  const message = 'message' in error ? String((error as { message?: unknown }).message ?? '') : '';
-  return (
-    message.includes('agent_transfer_approval_mirror') ||
-    message.includes('agent_transfer_policy_mirror') ||
-    message.includes('policy_blocked_at_create') ||
-    message.includes('policy_block_reason_code') ||
-    message.includes('policy_block_reason_message') ||
-    message.includes('execution_mode')
-  );
+  return isTransferMirrorSchemaUnavailableError(error);
 }
 
 function isMissingTrackedSchema(error: unknown): boolean {
@@ -488,7 +483,7 @@ export async function GET(req: NextRequest) {
         [agentId, chainKey]
       ).catch((error) => {
         if (isMissingTransferMirrorSchema(error)) {
-          return { rowCount: 0, rows: [] };
+          throw new TransferMirrorUnavailableError('Transfer mirror queue read failed due to missing schema.', error);
         }
         throw error;
       }),
@@ -539,7 +534,7 @@ export async function GET(req: NextRequest) {
         [agentId, chainKey]
       ).catch((error) => {
         if (isMissingTransferMirrorSchema(error)) {
-          return { rowCount: 0, rows: [] };
+          throw new TransferMirrorUnavailableError('Transfer mirror history read failed due to missing schema.', error);
         }
         throw error;
       }),
@@ -563,7 +558,7 @@ export async function GET(req: NextRequest) {
         [agentId, chainKey]
       ).catch((error) => {
         if (isMissingTransferMirrorSchema(error)) {
-          return { rowCount: 0, rows: [] };
+          throw new TransferMirrorUnavailableError('Transfer mirror policy read failed due to missing schema.', error);
         }
         throw error;
       }),
@@ -958,6 +953,26 @@ export async function GET(req: NextRequest) {
       requestId
     );
   } catch (error) {
+    if (error instanceof TransferMirrorUnavailableError) {
+      const details = transferMirrorSchemaErrorDetails(error.originalError);
+      console.error('[management/agent-state] transfer mirror unavailable', {
+        requestId,
+        dbCode: details.dbCode,
+        dbMessage: details.dbMessage
+      });
+      return errorResponse(
+        503,
+        {
+          code: 'transfer_mirror_unavailable',
+          message: 'Transfer approval mirror storage is unavailable.',
+          actionHint: 'Run DB parity/migrations for transfer mirror tables and retry.',
+          details: {
+            dbCode: details.dbCode
+          }
+        },
+        requestId
+      );
+    }
     console.error('[management/agent-state] unhandled error', {
       requestId,
       error: error instanceof Error ? error.message : String(error)

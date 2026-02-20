@@ -38,7 +38,7 @@ Required wallet commands:
 
 Notes:
 - explicit `--chain` remains authoritative for chain-scoped commands.
-- runtime default chain is canonical in agent state (`state.json.defaultChain`) and used for chain-optional fallback behavior.
+- chain inference for omitted chain uses runtime/web-synced default chain (`state.json.defaultChain`) first, then `XCLAW_DEFAULT_CHAIN` env fallback.
 - `wallet-send` uses base-unit amount for deterministic automation.
 - Supported chain keys for this contract are config-driven (`config/chains/*.json` where `enabled=true`). Current visible examples include `base_mainnet`, `base_sepolia`, `ethereum`, `ethereum_sepolia`, `hedera_mainnet`, `hedera_testnet`, `kite_ai_mainnet`, `kite_ai_testnet`, `adi_mainnet`, `adi_testnet`, `og_mainnet`, and `og_testnet`.
 
@@ -132,6 +132,8 @@ Errors MUST be machine-parseable and human-readable:
 - local policy: `paused`, `chains.<chain>.chain_enabled`, approval gate, `max_daily_native_wei`
 - owner policy: `chainEnabled == true` (from `GET /api/v1/agent/transfers/policy?chainKey=...`).
 10. `wallet-wrap-native` requires a positive amount and chain config with wrapped-native target resolution; it fails deterministically with `invalid_amount`, `wrapped_native_helper_missing`, `wrapped_native_token_missing`, or `wrap_native_failed` when runtime preconditions are not met.
+11. `wallet-send` / `wallet-send-token` fail closed with `approval_sync_failed` when a required transfer approval cannot be mirrored to management inbox.
+12. Runtime transfer approval mirror endpoint (`POST /api/v1/agent/transfer-approvals/mirror`) may return deterministic `transfer_mirror_unavailable` when mirror schema/storage is unavailable; runtime must keep transfer send fail-closed and must not emit queued approval success text in this case.
 
 ## 6) Canonical Challenge Format (`wallet-sign-challenge`)
 

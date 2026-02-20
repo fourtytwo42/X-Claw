@@ -3777,6 +3777,41 @@ Note:
 - [x] `python3 -m unittest apps/agent-runtime/tests/test_wallet_core.py -v`
 - [x] `python3 -m unittest apps/agent-runtime/tests/test_x402_skill_wrapper.py -v`
 - [ ] Required gates run sequentially:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `pm2 restart all`
+- [ ] Issue #60 evidence post + commit hash(es).
+
+### 117.7 Hotfix D: Trade-Cap Deprecation + Chain Context Parity
+- [x] Runtime trade/limit execution paths no longer block on deprecated `tradeCaps` payload absence/mismatch.
+- [x] Server trade-cap evaluator converted to non-blocking compatibility mode (approval/tokens still read from snapshot defaults).
+- [x] Skill wrapper chain inference now resolves runtime default-chain first (webapp-synced), then env fallback.
+- [x] Skill trade commands accept optional explicit chain override:
+  - [x] `trade-spot ... [chain_key]`
+  - [x] `trade-exec <intent_id> [chain_key]`
+  - [x] `trade-resume <trade_id> [chain_key]`
+- [x] Canonical docs synchronized (`source-of-truth`, wallet contract, skill docs, command references).
+- [ ] Required gates run sequentially:
+  - [ ] `npm run db:parity`
+  - [ ] `npm run seed:reset`
+  - [ ] `npm run seed:load`
+  - [ ] `npm run seed:verify`
+  - [ ] `npm run build`
+  - [ ] `pm2 restart all`
+- [ ] Issue #60 evidence post + commit hash(es).
+
+### 117.8 Hotfix E: Transfer Approval Mirror Fail-Closed
+- [x] Runtime transfer mirror helper supports required-delivery mode.
+- [x] `wallet-send` / `wallet-send-token` approval-required paths fail with deterministic `approval_sync_failed` when mirror write fails.
+- [x] Runtime clears local pending transfer flow on required-delivery mirror failure to avoid invisible ghost approvals.
+- [x] Regression test added for token-send approval sync failure path.
+- [x] `POST /api/v1/agent/transfer-approvals/mirror` classifies schema/storage drift as deterministic `transfer_mirror_unavailable` (503) with structured error logging.
+- [x] `GET /api/v1/management/agent-state` surfaces transfer-mirror schema/storage drift as deterministic `transfer_mirror_unavailable` (503) instead of silent empty transfer approvals.
+- [x] Canonical docs + handoff artifacts synchronized.
+- [ ] Required gates run sequentially:
   - [ ] `npm run db:parity`
   - [ ] `npm run seed:reset`
   - [ ] `npm run seed:load`

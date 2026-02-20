@@ -11,6 +11,7 @@ import site
 import tempfile
 import unittest
 import textwrap
+from decimal import Decimal
 from contextlib import redirect_stdout
 from typing import Any
 from unittest import mock
@@ -192,6 +193,23 @@ class WalletCoreUnitTests(unittest.TestCase):
         self.assertEqual(code, 1)
         payload = json.loads(out.getvalue().strip())
         self.assertEqual(payload.get("code"), "wrap_native_failed")
+
+    def test_enforce_trade_caps_missing_caps_is_non_blocking(self) -> None:
+        with (
+            mock.patch.object(cli, "_fetch_outbound_transfer_policy", return_value={"chainEnabled": True}),
+            mock.patch.object(cli, "_enforce_owner_chain_enabled"),
+            mock.patch.object(cli, "_utc_day_key", return_value="2026-02-20"),
+            mock.patch.object(cli, "load_state", return_value={}),
+        ):
+            state, day_key, current_spend, current_filled, caps = cli._enforce_trade_caps("ethereum_sepolia", Decimal("10"), 1)
+        self.assertEqual(state, {})
+        self.assertEqual(day_key, "2026-02-20")
+        self.assertEqual(current_spend, Decimal("0"))
+        self.assertEqual(current_filled, 0)
+        self.assertEqual(caps.get("dailyCapUsdEnabled"), False)
+        self.assertEqual(caps.get("dailyTradeCapEnabled"), False)
+        self.assertIsNone(caps.get("maxDailyUsd"))
+        self.assertIsNone(caps.get("maxDailyTradeCount"))
 
     def test_fetch_wallet_holdings_includes_hedera_discovered_tokens(self) -> None:
         wallet = {"address": "0x" + "11" * 20, "crypto": {"enc": "aes-256-gcm", "kdf": "argon2id", "kdfParams": {}, "saltB64": "AA==", "nonceB64": "AA==", "ciphertextB64": "AA=="}}

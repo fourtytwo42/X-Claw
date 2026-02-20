@@ -2,6 +2,7 @@ import json
 import io
 import os
 import pathlib
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -152,6 +153,27 @@ class X402SkillWrapperTests(unittest.TestCase):
         self.assertEqual(code, 0)
         run_mock.assert_called_once_with(["tracked", "list", "--chain", "base_sepolia", "--json"])
 
+    def test_resolve_active_chain_prefers_runtime_default_chain(self) -> None:
+        runtime_payload = {"ok": True, "code": "ok", "chainKey": "ethereum_sepolia", "source": "state"}
+        with mock.patch.dict("os.environ", self._ENV, clear=False):
+            with mock.patch.object(skill, "_resolve_agent_binary", return_value="/usr/bin/xclaw-agent"), mock.patch.object(
+                skill.subprocess,
+                "run",
+                return_value=subprocess.CompletedProcess(
+                    args=["/usr/bin/xclaw-agent", "default-chain", "get", "--json"],
+                    returncode=0,
+                    stdout=json.dumps(runtime_payload),
+                    stderr="",
+                ),
+            ):
+                resolved = skill._resolve_active_chain()
+        self.assertEqual(resolved, "ethereum_sepolia")
+
+    def test_resolve_active_chain_falls_back_to_env_without_api_context(self) -> None:
+        with mock.patch.dict("os.environ", {"XCLAW_DEFAULT_CHAIN": "hedera_testnet"}, clear=False):
+            resolved = skill._resolve_active_chain()
+        self.assertEqual(resolved, "hedera_testnet")
+
     def test_tracked_trades_with_agent_and_limit(self) -> None:
         with mock.patch.dict("os.environ", self._ENV, clear=False):
             with mock.patch.object(skill, "_run_agent", return_value=0) as run_mock:
@@ -200,6 +222,56 @@ class X402SkillWrapperTests(unittest.TestCase):
                 "10000000",
                 "--chain",
                 "base_sepolia",
+                "--json",
+            ]
+        )
+
+    def test_trade_spot_uses_runtime_active_chain_when_chain_omitted(self) -> None:
+        with mock.patch.dict("os.environ", self._ENV, clear=False):
+            with mock.patch.object(skill, "_resolve_active_chain", return_value="ethereum_sepolia"), mock.patch.object(
+                skill, "_run_agent", return_value=0
+            ) as run_mock:
+                code = skill.main(["xclaw_agent_skill.py", "trade-spot", "WETH", "USDC", "0.25", "100"])
+        self.assertEqual(code, 0)
+        run_mock.assert_called_once_with(
+            [
+                "trade",
+                "spot",
+                "--chain",
+                "ethereum_sepolia",
+                "--token-in",
+                "WETH",
+                "--token-out",
+                "USDC",
+                "--amount-in",
+                "0.25",
+                "--slippage-bps",
+                "100",
+                "--json",
+            ]
+        )
+
+    def test_trade_spot_allows_explicit_chain_override(self) -> None:
+        with mock.patch.dict("os.environ", self._ENV, clear=False):
+            with mock.patch.object(skill, "_resolve_active_chain", return_value="base_sepolia"), mock.patch.object(
+                skill, "_run_agent", return_value=0
+            ) as run_mock:
+                code = skill.main(["xclaw_agent_skill.py", "trade-spot", "WETH", "USDC", "0.25", "100", "ethereum_sepolia"])
+        self.assertEqual(code, 0)
+        run_mock.assert_called_once_with(
+            [
+                "trade",
+                "spot",
+                "--chain",
+                "ethereum_sepolia",
+                "--token-in",
+                "WETH",
+                "--token-out",
+                "USDC",
+                "--amount-in",
+                "0.25",
+                "--slippage-bps",
+                "100",
                 "--json",
             ]
         )
@@ -466,7 +538,9 @@ class X402SkillWrapperTests(unittest.TestCase):
             "XCLAW_DEFAULT_CHAIN": "hedera_testnet",
         }
         with mock.patch.dict("os.environ", env, clear=False):
-            with mock.patch.object(skill, "_run_agent", return_value=0) as run_mock:
+            with mock.patch.object(skill, "_resolve_active_chain", return_value="hedera_testnet"), mock.patch.object(
+                skill, "_run_agent", return_value=0
+            ) as run_mock:
                 code = skill.main(["xclaw_agent_skill.py", "faucet-request", "native"])
         self.assertEqual(code, 0)
         run_mock.assert_called_once_with(["faucet-request", "--chain", "hedera_testnet", "--json"])
@@ -478,7 +552,9 @@ class X402SkillWrapperTests(unittest.TestCase):
             "XCLAW_DEFAULT_CHAIN": "hedera_testnet",
         }
         with mock.patch.dict("os.environ", env, clear=False):
-            with mock.patch.object(skill, "_run_agent", return_value=0) as run_mock:
+            with mock.patch.object(skill, "_resolve_active_chain", return_value="hedera_testnet"), mock.patch.object(
+                skill, "_run_agent", return_value=0
+            ) as run_mock:
                 code = skill.main(["xclaw_agent_skill.py", "faucet-request", "hbar"])
         self.assertEqual(code, 0)
         run_mock.assert_called_once_with(["faucet-request", "--chain", "hedera_testnet", "--json"])
@@ -502,7 +578,9 @@ class X402SkillWrapperTests(unittest.TestCase):
             "XCLAW_AGENT_ID": "ag_demo",
         }
         with mock.patch.dict("os.environ", env, clear=False):
-            with mock.patch.object(skill, "_run_agent", return_value=0) as run_mock:
+            with mock.patch.object(skill, "_resolve_active_chain", return_value="hedera_testnet"), mock.patch.object(
+                skill, "_run_agent", return_value=0
+            ) as run_mock:
                 code = skill.main(["xclaw_agent_skill.py", "auth-recover"])
         self.assertEqual(code, 0)
         run_mock.assert_called_once_with(["auth", "recover", "--chain", "hedera_testnet", "--json"])
@@ -514,7 +592,9 @@ class X402SkillWrapperTests(unittest.TestCase):
             "XCLAW_AGENT_API_KEY": "test-key",
         }
         with mock.patch.dict("os.environ", env, clear=False):
-            with mock.patch.object(skill, "_run_agent", return_value=0) as run_mock:
+            with mock.patch.object(skill, "_resolve_active_chain", return_value="hedera_testnet"), mock.patch.object(
+                skill, "_run_agent", return_value=0
+            ) as run_mock:
                 code = skill.main(["xclaw_agent_skill.py", "agent-register", "Slice95Runner"])
         self.assertEqual(code, 0)
         run_mock.assert_called_once_with(["profile", "set-name", "--name", "Slice95Runner", "--chain", "hedera_testnet", "--json"])
@@ -579,6 +659,27 @@ class X402SkillWrapperTests(unittest.TestCase):
         self.assertEqual(code, 1)
         emitted = json.loads(buf.getvalue().strip())
         self.assertEqual(emitted.get("code"), "send_failed")
+
+    def test_run_agent_keeps_approval_sync_failed_nonzero(self) -> None:
+        payload = {
+            "ok": False,
+            "code": "approval_sync_failed",
+            "message": "Transfer approval could not be synced to management inbox.",
+            "details": {"approvalId": "xfr_abc"},
+        }
+        child = mock.Mock()
+        child.returncode = 1
+        child.communicate.return_value = (json.dumps(payload), "")
+        with mock.patch.object(skill, "_resolve_agent_binary", return_value="/usr/bin/xclaw-agent"):
+            with mock.patch.object(skill, "_maybe_patch_openclaw_gateway"):
+                with mock.patch.object(skill.subprocess, "Popen", return_value=child):
+                    buf = io.StringIO()
+                    with redirect_stdout(buf):
+                        code = skill._run_agent(["wallet", "send-token"])
+        self.assertEqual(code, 1)
+        emitted = json.loads(buf.getvalue().strip())
+        self.assertEqual(emitted.get("code"), "approval_sync_failed")
+        self.assertFalse(emitted.get("ok"))
 
     def test_run_agent_normalizes_symbol_unit_mismatch_to_nonfatal(self) -> None:
         payload = {

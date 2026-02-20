@@ -1582,6 +1582,40 @@ class TradePathRuntimeTests(unittest.TestCase):
         self.assertEqual(details.get("policyBlockReasonCode"), "outbound_disabled")
         self.assertIn("one-off override", str(details.get("queuedMessage") or "").lower())
 
+    def test_wallet_send_token_fails_when_approval_sync_missing(self) -> None:
+        args = argparse.Namespace(
+            token="0x" + "11" * 20,
+            to="0x" + "22" * 20,
+            amount_wei="100",
+            chain="base_sepolia",
+            json=True,
+        )
+        with mock.patch.object(
+            cli,
+            "_evaluate_outbound_transfer_policy",
+            return_value={
+                "allowed": False,
+                "policyBlockedAtCreate": True,
+                "policyBlockReasonCode": "outbound_disabled",
+                "policyBlockReasonMessage": "Outbound transfers are disabled by owner policy.",
+            },
+        ), mock.patch.object(
+            cli, "_enforce_spend_preconditions", return_value=({}, "2026-02-16", 0, 10**30)
+        ), mock.patch.object(
+            cli, "_sync_transfer_policy_from_remote", return_value={"transferApprovalMode": "auto", "nativeTransferPreapproved": True, "allowedTransferTokens": []}
+        ), mock.patch.object(
+            cli, "_fetch_erc20_metadata", return_value={"symbol": "USDC", "decimals": 18}
+        ), mock.patch.object(
+            cli, "_resolve_token_address", return_value="0x" + "11" * 20
+        ), mock.patch.object(
+            cli, "_mirror_transfer_approval", side_effect=cli.WalletStoreError("mirror failed")
+        ):
+            payload = self._run_and_parse_stdout(lambda: cli.cmd_wallet_send_token(args))
+        self.assertFalse(payload.get("ok"))
+        self.assertEqual(payload.get("code"), "approval_sync_failed")
+        details = payload.get("details") or {}
+        self.assertTrue(str(details.get("approvalId") or "").startswith("xfr_"))
+
     def test_wallet_send_token_redacts_private_key_in_error_payload(self) -> None:
         args = argparse.Namespace(
             token="0x" + "11" * 20,

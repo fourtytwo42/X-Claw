@@ -1624,3 +1624,59 @@ Promote `wallet wrap-native` to config-driven cross-chain behavior for wallet-ca
   - `spec.md`
   - `tasks.md`
   - `acceptance.md`
+
+---
+
+## Hotfix Context: Slice 117 Hotfix D Trade-Cap Deprecation + Chain Context Parity
+
+Issue mapping: `#60`
+
+### Objective + scope lock
+- Objective: remove deprecated trade-cap gating and make omitted-chain trade/dashboard/wallet context follow runtime/web-synced default chain.
+- Scope guard: no schema deletions; no chain capability promotion beyond config.
+
+### Expected touched files
+- `apps/agent-runtime/xclaw_agent/cli.py`
+- `apps/agent-runtime/tests/test_wallet_core.py`
+- `skills/xclaw-agent/scripts/xclaw_agent_skill.py`
+- `apps/agent-runtime/tests/test_x402_skill_wrapper.py`
+- `apps/network-web/src/lib/trade-caps.ts`
+- `apps/network-web/src/app/api/v1/agent/transfers/policy/route.ts`
+- `docs/XCLAW_SOURCE_OF_TRUTH.md`
+- `docs/api/WALLET_COMMAND_CONTRACT.md`
+- `docs/XCLAW_SLICE_TRACKER.md`
+- `docs/XCLAW_BUILD_ROADMAP.md`
+- `skills/xclaw-agent/SKILL.md`
+- `skills/xclaw-agent/references/commands.md`
+- `spec.md`
+- `tasks.md`
+- `acceptance.md`
+- `docs/CONTEXT_PACK.md`
+
+---
+
+## Hotfix Context: Slice 117 Hotfix E Transfer Approval Mirror Fail-Closed
+
+Issue mapping: `#60`
+
+### Objective + scope lock
+- Objective: prevent transfer approvals from being reported as queued when mirror sync to web approvals inbox fails.
+- Scope guard: runtime + server mirror/read error-contract hardening + regression tests + canonical docs only; no schema changes.
+
+### Expected touched files
+- `apps/agent-runtime/xclaw_agent/cli.py`
+- `apps/agent-runtime/tests/test_trade_path.py`
+- `apps/network-web/src/lib/transfer-mirror-schema.ts`
+- `apps/network-web/src/app/api/v1/agent/transfer-approvals/mirror/route.ts`
+- `apps/network-web/src/app/api/v1/management/agent-state/route.ts`
+- `skills/xclaw-agent/scripts/xclaw_agent_skill.py`
+- `apps/agent-runtime/tests/test_x402_skill_wrapper.py`
+- `docs/XCLAW_SOURCE_OF_TRUTH.md`
+- `docs/api/WALLET_COMMAND_CONTRACT.md`
+- `docs/api/openapi.v1.yaml`
+- `docs/XCLAW_SLICE_TRACKER.md`
+- `docs/XCLAW_BUILD_ROADMAP.md`
+- `spec.md`
+- `tasks.md`
+- `acceptance.md`
+- `docs/CONTEXT_PACK.md`

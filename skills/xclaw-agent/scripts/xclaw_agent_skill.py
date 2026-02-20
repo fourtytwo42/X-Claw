@@ -198,6 +198,8 @@ def _normalize_faucet_asset(value: str) -> str:
 
 def _normalize_non_terminal_approval(runtime_json: dict) -> Optional[dict]:
     code = str(runtime_json.get("code") or "").strip().lower()
+    if code in {"approval_sync_failed", "transfer_mirror_unavailable"}:
+        return None
     if code != "approval_required":
         return None
     details = runtime_json.get("details")
@@ -590,6 +592,32 @@ def _chain_from_env() -> str:
     return os.environ.get("XCLAW_DEFAULT_CHAIN", "base_sepolia")
 
 
+def _resolve_active_chain() -> str:
+    fallback_chain = _chain_from_env()
+    if not os.environ.get("XCLAW_API_BASE_URL"):
+        return fallback_chain
+    binary = _resolve_agent_binary()
+    if not binary:
+        return fallback_chain
+    try:
+        proc = subprocess.run(
+            [binary, "default-chain", "get", "--json"],
+            text=True,
+            capture_output=True,
+            timeout=5,
+        )
+    except Exception:
+        return fallback_chain
+    if proc.returncode != 0:
+        return fallback_chain
+    payload = _extract_json_payload(proc.stdout or "")
+    if isinstance(payload, dict) and payload.get("ok") is True:
+        candidate = str(payload.get("chainKey") or "").strip()
+        if candidate:
+            return candidate
+    return fallback_chain
+
+
 def _is_hex_address(value: str) -> bool:
     return bool(re.fullmatch(r"0x[a-fA-F0-9]{40}", value))
 
@@ -912,7 +940,7 @@ def main(argv: List[str]) -> int:
     if env_required is not None:
         return env_required
 
-    chain = _chain_from_env()
+    chain = _resolve_active_chain()
 
     if cmd == "status":
         return _run_agent(["status", "--json"])
@@ -953,14 +981,15 @@ def main(argv: List[str]) -> int:
     if cmd == "trade-exec":
         if len(argv) < 3:
             return _err("usage", "trade-exec requires <intent_id>", "usage: trade-exec <intent_id>", exit_code=2)
-        return _run_agent(["trade", "execute", "--intent", argv[2], "--chain", chain, "--json"])
+        target_chain = str(argv[3]).strip() if len(argv) >= 4 and str(argv[3]).strip() else chain
+        return _run_agent(["trade", "execute", "--intent", argv[2], "--chain", target_chain, "--json"])
 
     if cmd == "trade-spot":
         if len(argv) < 6:
             return _err(
                 "usage",
                 "trade-spot requires <token_in> <token_out> <amount_in> <slippage_bps>",
-                "usage: trade-spot <token_in> <token_out> <amount_in> <slippage_bps>",
+                "usage: trade-spot <token_in> <token_out> <amount_in> <slippage_bps> [chain_key]",
                 exit_code=2,
             )
         token_in = argv[2]
@@ -984,12 +1013,13 @@ def main(argv: List[str]) -> int:
             )
         if not _is_uint_string(slippage_bps):
             return _err("invalid_input", "Invalid slippage_bps format.", "Use an integer like 50 or 500.", {"slippageBps": slippage_bps}, exit_code=2)
+        target_chain = str(argv[6]).strip() if len(argv) >= 7 and str(argv[6]).strip() else chain
         return _run_agent(
             [
                 "trade",
                 "spot",
                 "--chain",
-                chain,
+                target_chain,
                 "--token-in",
                 token_in,
                 "--token-out",
@@ -1008,7 +1038,8 @@ def main(argv: List[str]) -> int:
         trade_id = argv[2].strip()
         if not trade_id:
             return _err("invalid_input", "trade_id cannot be empty.", "usage: trade-resume <trade_id>", exit_code=2)
-        return _run_agent(["approvals", "resume-spot", "--trade-id", trade_id, "--chain", chain, "--json"])
+        target_chain = str(argv[3]).strip() if len(argv) >= 4 and str(argv[3]).strip() else chain
+        return _run_agent(["approvals", "resume-spot", "--trade-id", trade_id, "--chain", target_chain, "--json"])
 
     if cmd == "liquidity-add":
         if len(argv) < 8:

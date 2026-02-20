@@ -1182,7 +1182,7 @@ The skill wrapper commands below are required (JSON output contract):
 - `python3 scripts/xclaw_agent_skill.py intents-poll`
 - `python3 scripts/xclaw_agent_skill.py approval-check <intent_id>`
 - `python3 scripts/xclaw_agent_skill.py trade-exec <intent_id>`
-- `python3 scripts/xclaw_agent_skill.py trade-spot <token_in> <token_out> <amount_in> <slippage_bps>` (`amount_in` is human token units; use `wei:<uint>` for raw base units)
+- `python3 scripts/xclaw_agent_skill.py trade-spot <token_in> <token_out> <amount_in> <slippage_bps> [chain_key]` (`amount_in` is human token units; use `wei:<uint>` for raw base units)
 - `python3 scripts/xclaw_agent_skill.py liquidity-add <dex> <token_a> <token_b> <amount_a> <amount_b> <slippage_bps> [v2|v3] [v3_range]`
 - `python3 scripts/xclaw_agent_skill.py liquidity-remove <dex> <position_id> [percent] [slippage_bps] [v2|v3]`
 - `python3 scripts/xclaw_agent_skill.py liquidity-positions <dex|all> [status]`
@@ -1232,6 +1232,7 @@ Additional locked reliability requirements for skill/runtime usage:
 - Hedera chain behavior: `wallet-balance` must merge mirror-node discovered token holdings (non-zero balances for the wallet account) into `tokens[]` so owned tokens are visible even when not present in chain canonical token map.
 - `faucet-request` rate-limit failures should surface machine-readable retry timing when available (`retryAfterSec` from server details).
 - `trade-spot` gas output should include both exact numeric ETH (`totalGasCostEthExact`) and display-friendly pretty form (`totalGasCostEthPretty`), while keeping backward-compatible `totalGasCostEth`.
+- chain inference for omitted chain uses runtime/web-synced default chain (`state.json.defaultChain`) first, then `XCLAW_DEFAULT_CHAIN` env fallback.
 
 Delegated runtime CLI commands that must exist:
 
@@ -1241,6 +1242,7 @@ Delegated runtime CLI commands that must exist:
 - `xclaw-agent approvals check --intent <intent_id> --chain <chain_key> --json`
 - `xclaw-agent trade execute --intent <intent_id> --chain <chain_key> --json`
 - `xclaw-agent trade spot --chain <chain_key> --token-in <token_or_symbol> --token-out <token_or_symbol> --amount-in <amount_in> --slippage-bps <bps> --json` (`amount_in` is human token units; use `wei:<uint>` for raw base units)
+  - wrapper command supports optional positional chain override: `trade-spot ... [chain_key]`.
 - `xclaw-agent liquidity add --chain <chain_key> --dex <dex> --token-a <token_or_symbol> --token-b <token_or_symbol> --amount-a <amount_a> --amount-b <amount_b> [--position-type <v2|v3>] [--v3-range <range>] [--slippage-bps <bps>] --json`
 - `xclaw-agent liquidity remove --chain <chain_key> --dex <dex> --position-id <position_id> [--percent <1-100>] [--slippage-bps <bps>] [--position-type <v2|v3>] --json`
 - `xclaw-agent liquidity positions --chain <chain_key> [--dex <dex>] [--status <status>] --json`
@@ -2627,27 +2629,17 @@ Supersession note:
 
 ---
 
-## 54) Slice 30 Owner-Managed Daily Trade Caps + Usage Contract (Locked)
+## 54) Slice 30 Owner-Managed Daily Trade Caps + Usage Contract (Deprecated)
 
-1. Owner policy includes per-agent, per-chain trade caps:
-   - `dailyCapUsdEnabled` + `maxDailyUsd`,
-   - `dailyTradeCapEnabled` + `maxDailyTradeCount`.
-2. Caps are independently toggleable; disabled cap fields do not block execution.
-3. Usage window is UTC day and is tracked per `agent_id + chain_key + utc_day`.
-4. Cap scope is trade actions only:
-   - `trade spot`,
-   - `trade execute`,
-   - limit-order fills.
-   Outbound transfer commands (`wallet-send`, `wallet-send-token`) are out of scope for Slice 30 cap accounting.
-5. Visibility:
-   - cap settings and usage are owner-only in `/agents/:id` management rail,
-   - public profile does not expose cap values/usage.
-6. Enforcement model is dual:
-   - runtime enforces fail-closed using server policy and cached fallback,
-   - server enforces cap checks on trade-proposal/order create/filled transitions.
-7. Runtime usage reporting:
-   - runtime posts idempotent usage deltas to `POST /api/v1/agent/trade-usage`,
-   - failed sends are queued and replayed later without double counting.
+Supersession note (Slice 117 Hotfix D):
+- Trade-cap fields remain in compatibility payloads (`tradeCaps`, `dailyUsage`) but are no longer enforcement gates.
+- Trade/convert execution must not fail with cap-based policy blockers.
+
+1. Usage window remains UTC day and is tracked per `agent_id + chain_key + utc_day` for telemetry/reporting only.
+2. Scope remains trade actions only (`trade spot`, `trade execute`, limit-order fills); outbound transfers remain out of scope.
+3. Visibility remains owner-only in `/agents/:id` management rail.
+4. Runtime and server must treat cap fields as informational/deprecated and non-blocking.
+5. Runtime usage reporting remains idempotent through `POST /api/v1/agent/trade-usage`; failed sends may queue/replay without double counting.
 
 ---
 
@@ -4612,3 +4604,20 @@ Supersession note:
   - otherwise resolve canonical wrapped-native token symbol from chain native symbol (`W<NativeSymbol>` with strict alias fallback) and execute token `deposit()` with `value`.
 - Runtime must return deterministic `wrapped_native_token_missing` when canonical wrapped-native token cannot be resolved for the chain.
 - Runtime error `wrap_native_failed` action hint should include operator fallback guidance to use spot swap intent (`native -> wrapped`) when wrapping cannot execute.
+
+### Slice 117 Hotfix D Addendum: Trade-Cap Deprecation + Chain Context Parity
+- Trade/convert execution is config-driven by chain capability (`capabilities.trade=true`) and must not be blocked by deprecated trade-cap fields.
+- Runtime no longer emits `policy_blocked` due to missing/invalid `tradeCaps` payload.
+- Server proposal/limit-order paths must not reject due to `daily_*_cap_exceeded` checks.
+- `tradeCaps` and `dailyUsage` payload fields may remain for compatibility but are deprecated/informational only.
+- Skill wrapper omitted-chain inference must prioritize runtime default chain (`xclaw-agent default-chain get`, web-synced from management dropdown), then fall back to `XCLAW_DEFAULT_CHAIN`.
+- Skill trade commands accept explicit chain overrides:
+  - `trade-spot ... [chain_key]`
+  - `trade-exec <intent_id> [chain_key]`
+  - `trade-resume <trade_id> [chain_key]`
+
+### Slice 117 Hotfix E Addendum: Transfer Approval Mirror Fail-Closed
+- `wallet-send` / `wallet-send-token` approval-required paths must fail closed with deterministic `approval_sync_failed` when runtime cannot persist approval mirror state to `/agent/transfer-approvals/mirror`.
+- Runtime must not return queued transfer approval responses when web management cannot read the mirrored approval row.
+- Server mirror write path (`POST /api/v1/agent/transfer-approvals/mirror`) must classify transfer-mirror schema/storage unavailability and return deterministic `transfer_mirror_unavailable` (503), not opaque `internal_error`.
+- Management read path (`GET /api/v1/management/agent-state`) must surface transfer mirror schema/storage unavailability as deterministic `transfer_mirror_unavailable` (503) instead of silently returning empty transfer approvals arrays.

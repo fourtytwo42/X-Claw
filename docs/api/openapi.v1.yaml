@@ -192,6 +192,8 @@ paths:
           $ref: '#/components/responses/ErrorResponse'
         '401':
           $ref: '#/components/responses/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/ErrorResponse'
   /api/v1/agent/x402/outbound/proposed:
     post:
       summary: Mirror runtime-proposed outbound x402 payment intent (agent-auth).
@@ -1099,6 +1101,8 @@ paths:
         '200':
           description: Management state payload.
         '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '503':
           $ref: '#/components/responses/ErrorResponse'
   /api/v1/management/chains/update:
     post:

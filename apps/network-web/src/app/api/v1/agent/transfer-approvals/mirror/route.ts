@@ -5,6 +5,7 @@ import { dbQuery } from '@/lib/db';
 import { errorResponse, internalErrorResponse, successResponse } from '@/lib/errors';
 import { parseJsonBody } from '@/lib/http';
 import { getRequestId } from '@/lib/request-id';
+import { isTransferMirrorSchemaUnavailableError, transferMirrorSchemaErrorDetails } from '@/lib/transfer-mirror-schema';
 import { validatePayload } from '@/lib/validation';
 
 export const runtime = 'nodejs';
@@ -47,11 +48,15 @@ type AgentTransferApprovalsMirrorRequest = {
 
 export async function POST(req: NextRequest) {
   const requestId = getRequestId(req);
+  let requestApprovalId: string | null = null;
+  let requestAgentId: string | null = null;
+  let requestChainKey: string | null = null;
   try {
     const auth = authenticateAgentByToken(req, requestId);
     if (!auth.ok) {
       return auth.response;
     }
+    requestAgentId = auth.agentId;
 
     const parsed = await parseJsonBody(req, requestId);
     if (!parsed.ok) {
@@ -73,6 +78,8 @@ export async function POST(req: NextRequest) {
     }
 
     const body = validated.data;
+    requestApprovalId = body.approvalId;
+    requestChainKey = body.chainKey;
     const prior = await dbQuery<{ status: string }>(
       `
       select status::text
@@ -122,7 +129,7 @@ export async function POST(req: NextRequest) {
         decided_at,
         terminal_at
       ) values (
-        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10::numeric, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23::numeric, $24, $25, $26, $27, $28::timestamptz, $29, $30::timestamptz, $31::timestamptz, $32::timestamptz
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10::numeric, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23::numeric, $24, $25, $26, $27, $28::timestamptz, $29, $30::timestamptz, $31::timestamptz, $32::timestamptz, $33::timestamptz
       )
       on conflict (approval_id)
       do update set
@@ -208,7 +215,34 @@ export async function POST(req: NextRequest) {
       200,
       requestId
     );
-  } catch {
+  } catch (error) {
+    const schemaUnavailable = isTransferMirrorSchemaUnavailableError(error);
+    const { dbCode, dbMessage } = transferMirrorSchemaErrorDetails(error);
+    console.error('[agent/transfer-approvals/mirror] write failed', {
+      requestId,
+      approvalId: requestApprovalId,
+      agentId: requestAgentId,
+      chainKey: requestChainKey,
+      schemaUnavailable,
+      dbCode,
+      dbMessage
+    });
+    if (schemaUnavailable) {
+      return errorResponse(
+        503,
+        {
+          code: 'transfer_mirror_unavailable',
+          message: 'Transfer approval mirror storage is unavailable.',
+          actionHint: 'Run DB parity/migrations for transfer mirror tables and retry.',
+          details: {
+            approvalId: requestApprovalId,
+            chainKey: requestChainKey,
+            dbCode
+          }
+        },
+        requestId
+      );
+    }
     return internalErrorResponse(requestId);
   }
 }

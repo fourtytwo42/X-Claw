@@ -3482,3 +3482,73 @@ Active slice context: `Slice 117` in progress.
 - [x] `npm run build`
 - [x] `pm2 restart all`
 - [ ] Issue #60 evidence post with commit hash(es).
+
+---
+
+# Hotfix Tasks: Slice 117 Hotfix D Trade-Cap Deprecation + Chain Context Parity
+
+Active slice context: `Slice 117` in progress.
+
+## 1) Scope lock
+- [x] Keep scope to runtime/server cap gating removal, skill chain inference parity, and canonical sync.
+- [x] Preserve config-driven capability gates; do not auto-enable unsupported chains.
+
+## 2) Runtime + server behavior
+- [x] Remove runtime trade-cap blocking failure path (missing trade caps no longer fails).
+- [x] Keep runtime usage telemetry ledger/report flow for compatibility.
+- [x] Convert server trade-cap evaluator to non-blocking compatibility mode.
+- [x] Preserve approval-mode/allowed-token behavior for proposal approval routing.
+
+## 3) Skill chain inference + trade command overrides
+- [x] Add runtime-default-chain-first resolver in skill wrapper (webapp-synced chain awareness).
+- [x] Keep env fallback when runtime/default-chain lookup unavailable.
+- [x] Add optional chain override support for `trade-spot`, `trade-exec`, and `trade-resume`.
+
+## 4) Canonical docs sync
+- [x] Update source-of-truth with trade-cap deprecation and chain inference precedence.
+- [x] Update wallet/skill command contract docs for optional chain overrides and precedence.
+- [x] Add Slice 117 Hotfix D entries to tracker and roadmap.
+
+## 5) Validation
+- [ ] `python3 -m unittest apps/agent-runtime/tests/test_wallet_core.py -v`
+- [ ] `python3 -m unittest apps/agent-runtime/tests/test_x402_skill_wrapper.py -v`
+- [ ] `npm run db:parity`
+- [ ] `npm run seed:reset`
+- [ ] `npm run seed:load`
+- [ ] `npm run seed:verify`
+- [ ] `npm run build`
+- [ ] `pm2 restart all`
+
+---
+
+# Hotfix Tasks: Slice 117 Hotfix E Transfer Approval Mirror Fail-Closed
+
+Active slice context: `Slice 117` in progress.
+
+## 1) Scope lock
+- [x] Keep scope to runtime transfer mirror delivery guarantees for approval-required sends.
+- [x] Preserve transfer decision and execution semantics.
+
+## 2) Implementation
+- [x] Extend `_mirror_transfer_approval` with required-delivery mode and deterministic retry.
+- [x] Make `wallet-send` and `wallet-send-token` fail closed with `approval_sync_failed` when required mirror delivery fails.
+- [x] Remove pending local transfer flow when required mirror delivery fails to avoid ghost approvals.
+- [x] Add shared transfer-mirror schema drift classifier and wire deterministic `transfer_mirror_unavailable` handling into:
+  - [x] `POST /api/v1/agent/transfer-approvals/mirror`
+  - [x] `GET /api/v1/management/agent-state`
+- [x] Add structured logging for mirror route write failures (`requestId`, `approvalId`, `agentId`, db code/message).
+- [x] Ensure skill wrapper keeps `approval_sync_failed` non-success (no pending normalization).
+
+## 3) Tests
+- [x] Add regression test for approval sync failure path in `test_trade_path.py`.
+- [x] Add skill-wrapper regression that `approval_sync_failed` remains non-success/non-normalized.
+
+## 4) Validation
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_x402_skill_wrapper.py -v`
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`

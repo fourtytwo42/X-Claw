@@ -12,7 +12,7 @@ This reference defines the expected command surface for the Python-first skill w
 - `intents-poll`
 - `approval-check <intent_id>`
 - `trade-exec <intent_id>`
-- `trade-spot <token_in> <token_out> <amount_in> <slippage_bps>` (`amount_in` is human token units; use `wei:<uint>` for raw base units)
+- `trade-spot <token_in> <token_out> <amount_in> <slippage_bps> [chain_key]` (`amount_in` is human token units; use `wei:<uint>` for raw base units)
 - `trade-resume <trade_id>` (internal auto-resume path for single-trigger Telegram spot approvals)
 - `liquidity-add <dex> <token_a> <token_b> <amount_a> <amount_b> <slippage_bps> [v2|v3] [v3_range]`
 - `liquidity-remove <dex> <position_id> [percent] [slippage_bps] [v2|v3]`
@@ -257,3 +257,4 @@ Installer/bootstrap note:
 - x402 payment approvals use `xfr_...` IDs and deterministic statuses (`proposed|approval_pending|approved|rejected|executing|filled|failed`).
 - `request-x402-payment` creates hosted receive URLs on `xclaw.trade`; no local tunnel/cloudflared dependency exists in the skill/runtime path.
 - `request-x402-payment` rejects positional free text and accepts only explicit `--flag value` overrides to avoid accidental default-native requests.
+- Chain inference for omitted chain uses runtime default chain (`xclaw-agent default-chain get`) first, then `XCLAW_DEFAULT_CHAIN` env fallback.

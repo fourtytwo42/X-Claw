@@ -2257,5 +2257,37 @@ DoD:
 - [x] deterministic errors include `wrapped_native_token_missing` and retain `wrapped_native_helper_missing`, `invalid_amount`, `wrap_native_failed`.
 - [x] runtime wrap failure `actionHint` includes explicit swap fallback guidance (`native -> wrapped`).
 - [x] runtime tests updated for helper path + non-Hedera token path + deterministic negative cases.
+- [x] required gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
+- [ ] issue #60 updated with verification evidence + commit hash(es).
+
+## Slice 117 Hotfix D: Trade-Cap Deprecation + Chain Context Parity
+Status: [~]
+Issue: #60
+
+Goal:
+- Remove deprecated trade-cap blocking from runtime/server trade paths and align chain inference to runtime/web-synced default chain.
+
+DoD:
+- [x] runtime trade/limit execution no longer blocks on missing/invalid `tradeCaps`.
+- [x] server `evaluateTradeCaps` no longer returns blocking cap violations.
+- [x] skill wrapper chain inference uses runtime default-chain (webapp-synced) before env fallback.
+- [x] skill trade commands support optional explicit chain override (`trade-spot`, `trade-exec`, `trade-resume`).
+- [x] canonical docs/contracts/handoff artifacts synchronized.
+- [ ] required gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
+- [ ] issue #60 updated with verification evidence + commit hash(es).
+
+## Slice 117 Hotfix E: Transfer Approval Mirror Fail-Closed
+Status: [~]
+Issue: #60
+
+Goal:
+- Prevent ghost transfer approvals by failing wallet transfer approval creation when mirror sync to management inbox fails.
+
+DoD:
+- [x] runtime transfer mirror helper supports required-delivery mode for approval-required wallet sends.
+- [x] `wallet-send` and `wallet-send-token` return deterministic `approval_sync_failed` when mirror delivery cannot be confirmed.
+- [x] regression coverage added for mirror-sync failure path.
+- [x] server mirror/write + management/read routes return deterministic `transfer_mirror_unavailable` on transfer-mirror schema/storage unavailability (no silent empty approvals fallback).
+- [x] canonical docs/handoff artifacts synchronized.
 - [ ] required gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
 - [ ] issue #60 updated with verification evidence + commit hash(es).

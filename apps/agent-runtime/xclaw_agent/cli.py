@@ -1827,14 +1827,22 @@ def _replay_trade_usage_outbox() -> tuple[int, int]:
 def _enforce_trade_caps(chain: str, projected_spend_usd: Decimal, projected_filled_trades: int) -> tuple[dict[str, Any], str, Decimal, int, dict[str, Any]]:
     policy_payload = _fetch_outbound_transfer_policy(chain)
     _enforce_owner_chain_enabled(chain, policy_payload, action="Trade")
-    trade_caps = policy_payload.get("tradeCaps")
-    if not isinstance(trade_caps, dict):
-        raise WalletPolicyError(
-            "policy_blocked",
-            "Trade caps are unavailable from owner policy.",
-            "Ask the bot owner to save policy settings on the agent management page and retry.",
-            {"chain": chain},
-        )
+    trade_caps_payload = policy_payload.get("tradeCaps")
+    trade_caps: dict[str, Any]
+    if isinstance(trade_caps_payload, dict):
+        trade_caps = dict(trade_caps_payload)
+    else:
+        # Slice 117 Hotfix D: trade caps are deprecated for execution gating.
+        # Keep compatibility payload fields for downstream telemetry/output.
+        trade_caps = {
+            "approvalMode": "per_trade",
+            "maxTradeUsd": None,
+            "maxDailyUsd": None,
+            "allowedTokens": [],
+            "dailyCapUsdEnabled": False,
+            "dailyTradeCapEnabled": False,
+            "maxDailyTradeCount": None,
+        }
 
     day_key = _utc_day_key()
     state = load_state()
@@ -1850,45 +1858,8 @@ def _enforce_trade_caps(chain: str, projected_spend_usd: Decimal, projected_fill
     current_spend = server_spend if server_spend >= local_spend else local_spend
     current_filled = server_filled if server_filled >= local_filled else local_filled
 
-    daily_cap_usd_enabled = bool(trade_caps.get("dailyCapUsdEnabled", True))
-    daily_trade_cap_enabled = bool(trade_caps.get("dailyTradeCapEnabled", True))
-    max_daily_usd = _to_non_negative_decimal(trade_caps.get("maxDailyUsd", "0"))
-    max_daily_trade_count_raw = trade_caps.get("maxDailyTradeCount")
-    max_daily_trade_count = _to_non_negative_int(max_daily_trade_count_raw) if max_daily_trade_count_raw is not None else None
-
-    if daily_cap_usd_enabled and max_daily_usd > 0:
-        projected_total = current_spend + max(Decimal("0"), projected_spend_usd)
-        if projected_total > max_daily_usd:
-            raise WalletPolicyError(
-                "daily_usd_cap_exceeded",
-                "Trade blocked because daily USD cap would be exceeded.",
-                "Reduce amount, disable daily USD cap, or raise maxDailyUsd in owner policy.",
-                {
-                    "chain": chain,
-                    "utcDay": day_key,
-                    "currentSpendUsd": str(current_spend),
-                    "projectedSpendUsd": str(max(Decimal("0"), projected_spend_usd)),
-                    "maxDailyUsd": str(max_daily_usd),
-                    "dailyCapUsdEnabled": True,
-                },
-            )
-
-    if daily_trade_cap_enabled and max_daily_trade_count is not None:
-        projected_count = max(0, int(projected_filled_trades))
-        if (current_filled + projected_count) > max_daily_trade_count:
-            raise WalletPolicyError(
-                "daily_trade_count_cap_exceeded",
-                "Trade blocked because daily filled-trade cap would be exceeded.",
-                "Wait for next UTC day, disable trade-count cap, or raise maxDailyTradeCount in owner policy.",
-                {
-                    "chain": chain,
-                    "utcDay": day_key,
-                    "currentFilledTrades": int(current_filled),
-                    "projectedFilledTrades": int(projected_count),
-                    "maxDailyTradeCount": int(max_daily_trade_count),
-                    "dailyTradeCapEnabled": True,
-                },
-            )
+    _ = projected_spend_usd
+    _ = projected_filled_trades
 
     return state, day_key, current_spend, current_filled, trade_caps
 
@@ -2345,12 +2316,12 @@ def _sync_transfer_policy_from_remote(chain: str) -> dict[str, Any]:
         return local
 
 
-def _mirror_transfer_approval(flow: dict[str, Any]) -> None:
+def _mirror_transfer_approval(flow: dict[str, Any], *, require_delivery: bool = False) -> bool:
     try:
         approval_id = str(flow.get("approvalId") or "").strip()
         chain = str(flow.get("chainKey") or "").strip()
         if not approval_id or not chain:
-            return
+            return False
         payload = {
             "schemaVersion": 1,
             "approvalId": approval_id,
@@ -2378,15 +2349,32 @@ def _mirror_transfer_approval(flow: dict[str, Any]) -> None:
             "decidedAt": flow.get("decidedAt"),
             "terminalAt": flow.get("terminalAt"),
         }
-        _api_request(
-            "POST",
-            "/agent/transfer-approvals/mirror",
-            payload=payload,
-            include_idempotency=True,
-            idempotency_key=f"rt-transfer-mirror-{approval_id}-{secrets.token_hex(8)}",
-        )
-    except Exception:
-        pass
+
+        attempts = 2 if require_delivery else 1
+        last_error: str | None = None
+        for attempt in range(attempts):
+            status_code, body = _api_request(
+                "POST",
+                "/agent/transfer-approvals/mirror",
+                payload=payload,
+                include_idempotency=True,
+                idempotency_key=f"rt-transfer-mirror-{approval_id}-{secrets.token_hex(8)}",
+            )
+            if 200 <= status_code < 300:
+                return True
+            code = str(body.get("code", "api_error"))
+            message = str(body.get("message", f"transfer mirror failed ({status_code})"))
+            last_error = f"{code}: {message}"
+            if attempt < (attempts - 1):
+                time.sleep(0.2)
+
+        if require_delivery:
+            raise WalletStoreError(last_error or "transfer approval mirror failed.")
+        return False
+    except Exception as exc:
+        if require_delivery:
+            raise WalletStoreError(str(exc) or "transfer approval mirror failed.") from exc
+        return False
 
 
 def _mirror_transfer_policy(chain: str, policy: dict[str, Any]) -> None:
@@ -11573,7 +11561,17 @@ def cmd_wallet_send(args: argparse.Namespace) -> int:
             "executionMode": None,
         }
         _record_pending_transfer_flow(approval_id, flow)
-        _mirror_transfer_approval(flow)
+        try:
+            _mirror_transfer_approval(flow, require_delivery=approval_required)
+        except WalletStoreError as exc:
+            _remove_pending_transfer_flow(approval_id)
+            return fail(
+                "approval_sync_failed",
+                "Transfer approval could not be synced to management inbox.",
+                "Retry once. If this persists, run auth-recover and verify API connectivity before retrying send.",
+                {"approvalId": approval_id, "chain": chain, "error": str(exc)},
+                exit_code=1,
+            )
 
         if approval_required:
             try:
@@ -11821,7 +11819,17 @@ def cmd_wallet_send_token(args: argparse.Namespace) -> int:
             "executionMode": None,
         }
         _record_pending_transfer_flow(approval_id, flow)
-        _mirror_transfer_approval(flow)
+        try:
+            _mirror_transfer_approval(flow, require_delivery=approval_required)
+        except WalletStoreError as exc:
+            _remove_pending_transfer_flow(approval_id)
+            return fail(
+                "approval_sync_failed",
+                "Transfer approval could not be synced to management inbox.",
+                "Retry once. If this persists, run auth-recover and verify API connectivity before retrying send.",
+                {"approvalId": approval_id, "chain": chain, "error": str(exc)},
+                exit_code=1,
+            )
 
         if approval_required:
             try:

@@ -134,68 +134,18 @@ export async function evaluateTradeCaps(
     utcDay?: string;
   }
 ): Promise<{ ok: true; caps: EffectiveTradeCaps; usage: DailyTradeUsage } | { ok: false; violation: TradeCapViolation }> {
-  const caps = await readLatestTradeCaps(client, input.agentId, input.chainKey);
-  if (!caps) {
-    return {
-      ok: false,
-      violation: {
-        code: 'policy_denied',
-        message: 'Trade is blocked because no active policy snapshot exists for this agent.',
-        actionHint: 'Save policy settings from the management page, then retry.',
-        details: { agentId: input.agentId, chainKey: input.chainKey }
-      }
-    };
-  }
-
+  const caps =
+    (await readLatestTradeCaps(client, input.agentId, input.chainKey)) ??
+    ({
+      approvalMode: 'per_trade',
+      maxTradeUsd: null,
+      maxDailyUsd: null,
+      allowedTokens: [],
+      dailyCapUsdEnabled: false,
+      dailyTradeCapEnabled: false,
+      maxDailyTradeCount: null,
+      createdAt: new Date().toISOString()
+    } satisfies EffectiveTradeCaps);
   const usage = await readDailyTradeUsage(client, input.agentId, input.chainKey, input.utcDay);
-
-  const projectedSpend = asNonNegativeNumber(input.projectedSpendUsd);
-  const currentSpend = asNonNegativeNumber(usage.dailySpendUsd);
-
-  if (caps.dailyCapUsdEnabled) {
-    const maxDailyUsd = asNonNegativeNumber(caps.maxDailyUsd);
-    if (maxDailyUsd > 0 && currentSpend + projectedSpend > maxDailyUsd) {
-      return {
-        ok: false,
-        violation: {
-          code: 'daily_usd_cap_exceeded',
-          message: 'Trade is blocked because daily USD cap would be exceeded.',
-          actionHint: 'Reduce trade amount, disable the cap, or raise maxDailyUsd in management policy.',
-          details: {
-            chainKey: input.chainKey,
-            utcDay: usage.utcDay,
-            currentSpendUsd: String(currentSpend),
-            projectedSpendUsd: String(projectedSpend),
-            maxDailyUsd: String(maxDailyUsd),
-            dailyCapUsdEnabled: true
-          }
-        }
-      };
-    }
-  }
-
-  if (caps.dailyTradeCapEnabled && caps.maxDailyTradeCount !== null) {
-    const currentTrades = usage.dailyFilledTrades;
-    const projectedTrades = Math.max(0, Math.trunc(input.projectedFilledTrades));
-    if (currentTrades + projectedTrades > caps.maxDailyTradeCount) {
-      return {
-        ok: false,
-        violation: {
-          code: 'daily_trade_count_cap_exceeded',
-          message: 'Trade is blocked because daily filled-trade cap would be exceeded.',
-          actionHint: 'Wait for next UTC day, disable cap, or raise maxDailyTradeCount in management policy.',
-          details: {
-            chainKey: input.chainKey,
-            utcDay: usage.utcDay,
-            currentFilledTrades: currentTrades,
-            projectedFilledTrades: projectedTrades,
-            maxDailyTradeCount: caps.maxDailyTradeCount,
-            dailyTradeCapEnabled: true
-          }
-        }
-      };
-    }
-  }
-
   return { ok: true, caps, usage };
 }

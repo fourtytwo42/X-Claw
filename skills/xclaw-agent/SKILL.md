@@ -130,7 +130,7 @@ Common optional:
 - `wallet-track-token <token_address>`
 - `wallet-untrack-token <token_address>`
 - `wallet-tracked-tokens`
-- `trade-spot <token_in> <token_out> <amount_in> <slippage_bps>`
+- `trade-spot <token_in> <token_out> <amount_in> <slippage_bps> [chain_key]`
 - `liquidity-add <dex> <token_a> <token_b> <amount_a> <amount_b> <slippage_bps> [v2|v3] [v3_range]`
 - `liquidity-remove <dex> <position_id> [percent] [slippage_bps] [v2|v3]`
 - `liquidity-positions <dex|all> [status]`
@@ -164,7 +164,7 @@ Additional capabilities:
 - `dexscreener-top` sorts by liquidity descending and emits normalized decimal strings (`priceUsd` 8dp, USD metrics 2dp).
 - `token-research` is the preferred one-shot flow for small models: top-by-liquidity shortlist plus primary-token drilldown pairs in one response.
 - Transfer/trade policy is owner-controlled and may force approval.
-- Runtime default chain is agent-canonical (`state.json.defaultChain`); explicit `--chain` remains authoritative.
+- Runtime chain inference priority is: runtime/web-synced default chain (`state.json.defaultChain`) first, then env fallback (`XCLAW_DEFAULT_CHAIN`); explicit chain argument remains authoritative.
 - Runtime-canonical decision mode flag: `XCLAW_RUNTIME_CANONICAL_APPROVAL_DECISIONS=1`
   - Web management approvals route owner decisions through runtime `approvals decide-*` commands.
   - Telegram callback approvals route through runtime `approvals decide-*` commands (`xappr`, `xpol`, `xfer`) with deterministic callback idempotency metadata.

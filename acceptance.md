@@ -5979,3 +5979,82 @@ Active slice context: `Slice 117` in progress.
 
 ## Pending traceability
 - [ ] Issue #60 evidence post + commit hash(es).
+
+---
+
+# Hotfix Acceptance Evidence: Slice 117 Hotfix D Trade-Cap Deprecation + Chain Context Parity
+
+Date (UTC): 2026-02-20
+Active slice context: `Slice 117` in progress (issue `#60`).
+
+## Objective + Scope Lock
+- Objective: remove deprecated trade-cap runtime/server blocking and align omitted-chain command routing to runtime/web-synced default chain.
+- Scope lock:
+  - `apps/agent-runtime/xclaw_agent/cli.py`
+  - `apps/network-web/src/lib/trade-caps.ts`
+  - `skills/xclaw-agent/scripts/xclaw_agent_skill.py`
+  - related tests + canonical docs/handoff artifacts.
+
+## Behavior Checks
+- [x] Runtime trade cap enforcement no longer throws `policy_blocked` when `tradeCaps` payload is absent.
+- [x] Server `evaluateTradeCaps` no longer emits cap violation blockers.
+- [x] Skill wrapper resolves omitted chain from runtime default-chain in API-managed context.
+- [x] Skill trade commands support explicit chain override positional arg.
+
+## Required Validation Gates
+- [ ] `python3 -m unittest apps/agent-runtime/tests/test_wallet_core.py -v`
+- [ ] `python3 -m unittest apps/agent-runtime/tests/test_x402_skill_wrapper.py -v`
+- [ ] `npm run db:parity`
+- [ ] `npm run seed:reset`
+- [ ] `npm run seed:load`
+- [ ] `npm run seed:verify`
+- [ ] `npm run build`
+- [ ] `pm2 restart all`
+
+---
+
+# Hotfix Acceptance Evidence: Slice 117 Hotfix E Transfer Approval Mirror Fail-Closed
+
+Date (UTC): 2026-02-20
+Active slice context: `Slice 117` in progress (issue `#60`).
+
+## Objective + Scope Lock
+- Objective: prevent user-facing queued transfer approvals when web management has no mirrored approval row.
+- Scope lock:
+  - `apps/agent-runtime/xclaw_agent/cli.py`
+  - `apps/agent-runtime/tests/test_trade_path.py`
+  - `apps/network-web/src/lib/transfer-mirror-schema.ts`
+  - `apps/network-web/src/app/api/v1/agent/transfer-approvals/mirror/route.ts`
+  - `apps/network-web/src/app/api/v1/management/agent-state/route.ts`
+  - `skills/xclaw-agent/scripts/xclaw_agent_skill.py`
+  - `apps/agent-runtime/tests/test_x402_skill_wrapper.py`
+  - canonical docs/handoff artifacts.
+
+## Behavior Checks
+- [x] Approval-required wallet send paths enforce required mirror delivery before returning queued approval response.
+- [x] Mirror delivery failure returns deterministic `approval_sync_failed`.
+- [x] Failed mirror delivery clears local pending transfer flow for the generated approval id.
+- [x] `POST /api/v1/agent/transfer-approvals/mirror` returns deterministic `transfer_mirror_unavailable` (503) on schema/storage drift instead of opaque `internal_error`.
+- [x] `GET /api/v1/management/agent-state` returns deterministic `transfer_mirror_unavailable` (503) on transfer-mirror schema/storage drift instead of silently empty transfer approvals.
+- [x] Skill wrapper preserves `approval_sync_failed` as non-success (no `approval_pending` normalization).
+
+## Targeted Runtime/API Verification
+- [x] Direct mirror write accepted:
+  - `curl -H "authorization: Bearer <agentKey>" -H "content-type: application/json" -X POST http://127.0.0.1:3000/api/v1/agent/transfer-approvals/mirror --data @/tmp/mirror_payload_verify.json`
+  - Response: `{"ok":true,"approvalId":"xfr_dbg_1771623388","status":"approval_pending",...}`
+- [x] Mirrored approval row persisted:
+  - `select approval_id,status,chain_key from agent_transfer_approval_mirror where approval_id='xfr_dbg_1771623388';`
+  - Result: `xfr_dbg_1771623388 | approval_pending | base_sepolia`
+- [x] Management read model reflects mirrored row:
+  - `GET /api/v1/management/agent-state?agentId=ag_a123e3bc428c12675f93&chainKey=base_sepolia`
+  - Result summary: `queueCount: 2`, `containsDebug: true` for `xfr_dbg_1771623388`.
+
+## Required Validation Gates
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_x402_skill_wrapper.py -v`
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
