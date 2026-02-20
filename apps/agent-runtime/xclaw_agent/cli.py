@@ -8474,6 +8474,9 @@ def _fetch_wallet_holdings(chain: str) -> dict[str, Any]:
     for symbol, token_address in token_map.items():
         try:
             balance_wei = _fetch_token_balance_wei(chain, address, token_address)
+            balance_int = int(balance_wei)
+            if balance_int <= 0:
+                continue
             meta = _fetch_erc20_metadata(chain, token_address)
             decimals = int(meta.get("decimals", 18))
             token_balances.append(
@@ -8481,8 +8484,8 @@ def _fetch_wallet_holdings(chain: str) -> dict[str, Any]:
                     "symbol": str(meta.get("symbol") or symbol),
                     "token": token_address,
                     "balanceWei": balance_wei,
-                    "balance": _format_units(int(balance_wei), decimals),
-                    "balancePretty": _format_units_pretty(int(balance_wei), decimals),
+                    "balance": _format_units(balance_int, decimals),
+                    "balancePretty": _format_units_pretty(balance_int, decimals),
                     "decimals": decimals,
                 }
             )

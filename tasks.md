@@ -2719,3 +2719,23 @@ Active slice context: `Slice 95` closure hardening.
 - [x] `npm run test:faucet:contract`
 - [x] `npm run ops:faucet:audit-mappings`
 - [x] `npm run ops:faucet:fix-mapping -- --agent-id ag_3cfbc4cd0949d3f4c933 --chain hedera_testnet --address 0x582f6f293e0f49855bb752ae29d6b0565c500d87` (dry-run)
+
+# Slice 95M Tasks Update: Wallet Holdings Fidelity (UTC 2026-02-20)
+
+## 1) Runtime holdings
+- [x] Filter canonical token rows with zero balance from runtime `wallet balance` output.
+- [x] Keep Hedera mirror discovery merge for non-canonical owned tokens.
+
+## 2) Web holdings
+- [x] Extend management deposit sync to ingest Hedera mirror discovered non-zero token balances into snapshots.
+- [x] Filter zero-balance token rows in agent-page holdings builder.
+
+## 3) Validation + evidence
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+- [!] `python3 -m unittest apps/agent-runtime/tests/test_wallet_core.py -v` (3 existing env-sensitive failures unrelated to holdings changes in this shell context).
+- [!] `curl -sS http://127.0.0.1:3000/api/v1/management/deposit?agentId=<agent>&chainKey=hedera_testnet` authenticated live verification pending valid management session cookie in this shell.

@@ -176,7 +176,7 @@ Current behavior in `apps/agent-runtime/xclaw_agent/cli.py`:
    - `chain_disabled` remains hard block.
 8. `wallet-balance` returns combined holdings for wallet address and chain RPC:
    - native balance fields (`balanceWei`, `balanceEth`, `symbol`, `decimals`),
-   - canonical token balances in `tokens[]` (best effort per configured chain canonical tokens),
+   - token holdings in `tokens[]` include only non-zero balances (canonical + discovered),
    - Hedera chains additionally include discovered token holdings from mirror-node account token relationships (non-zero balances) merged into `tokens[]`,
    - token query/discovery failures in `tokenErrors[]` without failing native balance fetch.
 9. `wallet-token-balance` is implemented via cast-backed ERC-20 `balanceOf(address)` query.

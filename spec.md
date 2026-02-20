@@ -2623,3 +2623,23 @@ Ensure `wallet balance --chain hedera_testnet` shows all owned Hedera tokens for
 - Non-demo success/failure remains deterministic and does not regress to opaque `internal_error`.
 - Ops audit script reports impacted `agent_wallets` rows where recipient equals faucet signer.
 - Ops fix script supports deterministic dry-run and explicit apply for one `(agent, chain)` mapping.
+
+# Slice 95M Spec Addendum: Wallet Holdings Fidelity (UTC 2026-02-20)
+
+## Goals
+1. Hide zero-balance token rows from runtime/web wallet holdings.
+2. Ensure Hedera wallet holdings shown in management UI include non-canonical owned tokens (for example USDC) via mirror discovery.
+
+## Locked scope
+1. `apps/agent-runtime/xclaw_agent/cli.py`
+2. `apps/network-web/src/app/api/v1/management/deposit/route.ts`
+3. `apps/network-web/src/lib/agent-page-view-model.ts`
+4. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+5. `docs/api/WALLET_COMMAND_CONTRACT.md`
+6. `acceptance.md`
+7. `tasks.md`
+
+## Acceptance checks
+- Runtime `wallet balance --chain hedera_testnet --json` excludes zero-balance token rows.
+- Management deposit sync merges Hedera mirror non-zero token balances into wallet snapshots, enabling USDC visibility in web holdings.
+- Agent page wallet holdings hide zero-balance tokens for the active chain.

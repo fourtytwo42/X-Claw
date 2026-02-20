@@ -5199,3 +5199,18 @@ Date (UTC): 2026-02-19
 - `E48` Faucet route deterministic self-recipient contract:
   - code path now returns `400 faucet_recipient_not_eligible` and includes `chainKey`, `recipient`, `faucetAddress`.
   - regression harness accepts this as deterministic known failure and has optional live assertion path when self-recipient test credentials are supplied.
+
+## Slice 95M Wallet Holdings Fidelity (UTC 2026-02-20)
+
+### Implementation updates
+- Runtime `wallet balance` now excludes canonical zero-balance token rows from `tokens[]`.
+- Management deposit sync now augments Hedera chain snapshots with mirror-discovered non-zero token holdings (symbol/decimals aware) so owned non-canonical tokens (for example USDC) surface in web wallet holdings.
+- Agent page holdings view now filters out zero-balance token rows for the active chain.
+
+### Evidence updates (`E49+`)
+- `E49` Runtime zero-token suppression:
+  - command: `apps/agent-runtime/bin/xclaw-agent wallet balance --chain hedera_testnet --json`
+  - outcome: zero-balance tokens (for example `SAUCE` when balance is 0) are omitted from `tokens[]`.
+- `E50` Hedera discovered token visibility in management holdings:
+  - command: `GET /api/v1/management/deposit?agentId=<agent>&chainKey=hedera_testnet` (authenticated session)
+  - outcome: pending live authenticated verification; implementation now syncs mirror-discovered non-zero Hedera token balances into `wallet_balance_snapshots`.

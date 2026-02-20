@@ -464,9 +464,23 @@ export function buildHoldings(
   chainKey: string
 ): HoldingRow[] {
   const byToken = new Map<string, HoldingRow>();
+  const hasPositiveBalance = (raw: string): boolean => {
+    const value = String(raw ?? '').trim();
+    if (!value) {
+      return false;
+    }
+    try {
+      return BigInt(value) > BigInt(0);
+    } catch {
+      return false;
+    }
+  };
 
   for (const item of profile?.walletBalances ?? []) {
     if (item.chain_key !== chainKey) {
+      continue;
+    }
+    if (!hasPositiveBalance(item.balance)) {
       continue;
     }
     byToken.set(item.token, {
@@ -478,6 +492,9 @@ export function buildHoldings(
 
   const chain = depositData?.chains.find((entry) => entry.chainKey === chainKey);
   for (const item of chain?.balances ?? []) {
+    if (!hasPositiveBalance(item.balance)) {
+      continue;
+    }
     byToken.set(item.token, {
       token: item.token,
       amountRaw: item.balance,

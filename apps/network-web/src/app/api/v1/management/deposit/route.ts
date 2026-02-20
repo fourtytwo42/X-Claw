@@ -21,6 +21,19 @@ type RpcLog = {
   data: string;
 };
 
+type HederaDiscoveredToken = {
+  symbol: string;
+  balance: string;
+  decimals: number;
+};
+
+type DepositSyncResult = {
+  syncStatus: 'ok' | 'degraded';
+  syncDetail: string | null;
+  minConfirmations: number;
+  discoveredTokenDecimals: Record<string, number>;
+};
+
 function toHexBlock(blockNumber: bigint): string {
   return `0x${blockNumber.toString(16)}`;
 }
@@ -34,6 +47,102 @@ function hexToBigInt(raw: string): bigint {
 
 function topicAddress(address: string): string {
   return `0x${'0'.repeat(24)}${address.toLowerCase().slice(2)}`;
+}
+
+function isHederaChain(chainKey: string): boolean {
+  return chainKey.startsWith('hedera_');
+}
+
+function chainEnvSuffix(chainKey: string): string {
+  return chainKey.replace(/[^a-zA-Z0-9]/g, '_').toUpperCase();
+}
+
+function hederaMirrorApiBase(chainKey: string): string {
+  const scoped = process.env[`XCLAW_HEDERA_MIRROR_API_URL_${chainEnvSuffix(chainKey)}`]?.trim();
+  if (scoped) {
+    return scoped.replace(/\/+$/, '');
+  }
+  const shared = process.env.XCLAW_HEDERA_MIRROR_API_URL?.trim();
+  if (shared) {
+    return shared.replace(/\/+$/, '');
+  }
+  if (chainKey === 'hedera_mainnet') {
+    return 'https://mainnet-public.mirrornode.hedera.com/api/v1';
+  }
+  return 'https://testnet.mirrornode.hedera.com/api/v1';
+}
+
+async function hederaDiscoverWalletTokens(chainKey: string, walletAddress: string): Promise<HederaDiscoveredToken[]> {
+  const base = hederaMirrorApiBase(chainKey);
+  let nextUrl = `${base}/accounts/${walletAddress}/tokens?limit=100`;
+  const visited = new Set<string>();
+  const out = new Map<string, HederaDiscoveredToken>();
+
+  while (nextUrl && !visited.has(nextUrl) && visited.size < 20) {
+    visited.add(nextUrl);
+    const res = await fetch(nextUrl, {
+      method: 'GET',
+      headers: {
+        accept: 'application/json',
+        'user-agent': 'xclaw-web/1.0 (+https://xclaw.trade)',
+      },
+      cache: 'no-store',
+    });
+    if (!res.ok) {
+      throw new Error(`Hedera mirror tokens request failed with HTTP ${res.status}`);
+    }
+    const page = (await res.json()) as {
+      tokens?: Array<{ token_id?: string; balance?: number | string }>;
+      links?: { next?: string | null };
+    };
+    const rows = Array.isArray(page.tokens) ? page.tokens : [];
+    for (const row of rows) {
+      const tokenId = String(row.token_id ?? '').trim();
+      if (!tokenId) {
+        continue;
+      }
+      let balanceUnits = BigInt(0);
+      try {
+        balanceUnits = BigInt(String(row.balance ?? '0'));
+      } catch {
+        continue;
+      }
+      if (balanceUnits <= BigInt(0)) {
+        continue;
+      }
+      const metaRes = await fetch(`${base}/tokens/${tokenId}`, {
+        method: 'GET',
+        headers: {
+          accept: 'application/json',
+          'user-agent': 'xclaw-web/1.0 (+https://xclaw.trade)',
+        },
+        cache: 'no-store',
+      });
+      if (!metaRes.ok) {
+        continue;
+      }
+      const meta = (await metaRes.json()) as { symbol?: string | null; decimals?: number | string | null };
+      const symbol = String(meta.symbol ?? tokenId).trim().toUpperCase();
+      if (!symbol) {
+        continue;
+      }
+      let decimals = 0;
+      try {
+        decimals = Number.parseInt(String(meta.decimals ?? '0'), 10);
+      } catch {
+        decimals = 0;
+      }
+      out.set(symbol, {
+        symbol,
+        balance: balanceUnits.toString(),
+        decimals: Number.isFinite(decimals) && decimals >= 0 ? decimals : 0,
+      });
+    }
+    const rawNext = String(page.links?.next ?? '').trim();
+    nextUrl = rawNext ? new URL(rawNext, `${base}/`).toString() : '';
+  }
+
+  return Array.from(out.values());
 }
 
 async function rpcRequest(rpcUrl: string, method: string, params: unknown[]): Promise<unknown> {
@@ -54,11 +163,11 @@ async function rpcRequest(rpcUrl: string, method: string, params: unknown[]): Pr
   return parsed.result;
 }
 
-async function syncChainDeposits(agentId: string, chainKey: string, walletAddress: string) {
+async function syncChainDeposits(agentId: string, chainKey: string, walletAddress: string): Promise<DepositSyncResult> {
   const rpcUrl = chainRpcUrl(chainKey);
   const cfg = getChainConfig(chainKey);
   if (!rpcUrl || !cfg) {
-    return { syncStatus: 'degraded' as const, syncDetail: 'Missing chain RPC config.', minConfirmations: 1 };
+    return { syncStatus: 'degraded' as const, syncDetail: 'Missing chain RPC config.', minConfirmations: 1, discoveredTokenDecimals: {} };
   }
 
   const minConfirmations = chainKey === 'hardhat_local' ? 1 : 2;
@@ -85,6 +194,7 @@ async function syncChainDeposits(agentId: string, chainKey: string, walletAddres
 
     const canonicalTokens = cfg.canonicalTokens ?? {};
     const fromBlock = latestBlock > BigInt(3000) ? latestBlock - BigInt(3000) : BigInt(0);
+    const discoveredTokenDecimals = new Map<string, number>();
 
     for (const [symbol, tokenAddress] of Object.entries(canonicalTokens)) {
       const balanceResult = (await rpcRequest(rpcUrl, 'eth_call', [
@@ -151,12 +261,37 @@ async function syncChainDeposits(agentId: string, chainKey: string, walletAddres
       }
     }
 
-    return { syncStatus: 'ok' as const, syncDetail: null, minConfirmations };
+    if (isHederaChain(chainKey)) {
+      const discovered = await hederaDiscoverWalletTokens(chainKey, walletAddress);
+      for (const token of discovered) {
+        discoveredTokenDecimals.set(token.symbol, token.decimals);
+        await withTransaction(async (client) => {
+          await client.query(
+            `
+            insert into wallet_balance_snapshots (
+              snapshot_id, agent_id, chain_key, token, balance, block_number, observed_at, created_at
+            ) values ($1, $2, $3, $4, $5, $6, now(), now())
+            on conflict (agent_id, chain_key, token)
+            do update set balance = excluded.balance, block_number = excluded.block_number, observed_at = now()
+            `,
+            [makeId('wbs'), agentId, chainKey, token.symbol, token.balance, Number(latestBlock)]
+          );
+        });
+      }
+    }
+
+    return {
+      syncStatus: 'ok' as const,
+      syncDetail: null,
+      minConfirmations,
+      discoveredTokenDecimals: Object.fromEntries(discoveredTokenDecimals.entries()),
+    };
   } catch (error) {
     return {
       syncStatus: 'degraded' as const,
       syncDetail: error instanceof Error ? error.message : 'Unknown RPC failure',
-      minConfirmations
+      minConfirmations,
+      discoveredTokenDecimals: {},
     };
   }
 }
@@ -267,13 +402,21 @@ export async function GET(req: NextRequest) {
         lastSyncedAt,
         syncStatus: sync.syncStatus,
         syncDetail: sync.syncDetail,
-        balances: balances.rows.map((row) => ({
-          token: row.token,
-          balance: row.balance,
-          decimals: decimalsByToken.get(row.token) ?? 18,
-          blockNumber: row.block_number ? Number(row.block_number) : null,
-          observedAt: row.observed_at
-        })),
+        balances: balances.rows
+          .filter((row) => {
+            try {
+              return BigInt(String(row.balance ?? '0')) > BigInt(0);
+            } catch {
+              return false;
+            }
+          })
+          .map((row) => ({
+            token: row.token,
+            balance: row.balance,
+            decimals: sync.discoveredTokenDecimals?.[row.token] ?? decimalsByToken.get(row.token) ?? 18,
+            blockNumber: row.block_number ? Number(row.block_number) : null,
+            observedAt: row.observed_at
+          })),
         recentDeposits: deposits.rows.map((row) => ({
           token: row.token,
           amount: row.amount,
