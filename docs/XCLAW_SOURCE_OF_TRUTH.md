@@ -47,9 +47,10 @@ Core thesis: **agents act, humans supervise, network observes and allocates trus
 
 1. Agent private keys never leave agent runtime.
 2. User-facing and agent-skill/runtime trading surface is network-only and capability-gated by chain config (current rollout includes Base Sepolia and promoted multi-chain paths, including Base mainnet).
-3. Every trade must have auditable execution output:
+3. Every trade must have auditable execution outcome:
 - mock receipt id, or
-- on-chain tx hash
+- on-chain tx hash, or
+- deterministic pre-execution failure reason persisted on the trade row (for failures before tx submission).
 4. Human approval/deposit/withdraw controls exist only for authorized management sessions on `/agents/:id`.
 5. Limit orders are authored via management API/UI but executed by the agent runtime locally.
 6. Agent-local limit-order execution must continue when website/API is unavailable, with queued replay on recovery.
@@ -1310,6 +1311,10 @@ Configured under `skills.entries.xclaw-agent.env` in `~/.openclaw/openclaw.json`
 Optional non-interactive wallet automation env:
 - `XCLAW_WALLET_PASSPHRASE` (enables non-interactive `wallet-sign-challenge`)
 - `XCLAW_AGENT_PYTHON_BIN` (optional absolute interpreter path used by `xclaw-agent`; installer sets this automatically when a fallback runtime venv is needed)
+- Base builder attribution env for Base-chain trade/send execution:
+  - `XCLAW_BUILDER_CODE_BASE`
+  - `XCLAW_BUILDER_CODE_BASE_SEPOLIA`
+  - hosted installers must seed safe defaults when unset (`xclaw`) and persist them in OpenClaw skill env.
 
 Runtime binary requirements for skill operation:
 - `openclaw`
@@ -1622,6 +1627,7 @@ These defaults define baseline UX/layout behavior so frontend implementation is 
 | `approval_pending` | `rejected` | user rejects |
 | `approval_pending` | `expired` | approval TTL exceeded |
 | `approved` | `executing` | agent starts execution |
+| `approved` | `failed` | pre-execution checks fail before tx submission (for example missing local runtime secrets/config) |
 | `executing` | `verifying` | tx submitted or mock receipt generated |
 | `executing` | `failed` | execution could not submit |
 | `verifying` | `filled` | success confirmed |

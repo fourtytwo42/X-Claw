@@ -526,11 +526,34 @@ persist_runtime_path
 
 echo "[xclaw] configuring OpenClaw skill env defaults"
 XCLAW_HEDERA_HTS_BRIDGE_CMD="\${XCLAW_HEDERA_HTS_BRIDGE_CMD:-$XCLAW_AGENT_PYTHON_BIN $XCLAW_WORKDIR/apps/agent-runtime/xclaw_agent/bridges/hedera_hts_bridge.py}"
+
+if [ -z "\${XCLAW_BUILDER_CODE_BASE:-}" ]; then
+  existing_cfg_builder_base="$(openclaw config get skills.entries.xclaw-agent.env.XCLAW_BUILDER_CODE_BASE 2>/dev/null | tail -n1 | sed -E 's/^\"(.*)\"$/\\1/' || true)"
+  if [ -n "$existing_cfg_builder_base" ] && [ "$existing_cfg_builder_base" != "null" ]; then
+    export XCLAW_BUILDER_CODE_BASE="$existing_cfg_builder_base"
+  else
+    export XCLAW_BUILDER_CODE_BASE="xclaw"
+    echo "[xclaw] defaulted XCLAW_BUILDER_CODE_BASE=xclaw"
+  fi
+fi
+
+if [ -z "\${XCLAW_BUILDER_CODE_BASE_SEPOLIA:-}" ]; then
+  existing_cfg_builder_base_sepolia="$(openclaw config get skills.entries.xclaw-agent.env.XCLAW_BUILDER_CODE_BASE_SEPOLIA 2>/dev/null | tail -n1 | sed -E 's/^\"(.*)\"$/\\1/' || true)"
+  if [ -n "$existing_cfg_builder_base_sepolia" ] && [ "$existing_cfg_builder_base_sepolia" != "null" ]; then
+    export XCLAW_BUILDER_CODE_BASE_SEPOLIA="$existing_cfg_builder_base_sepolia"
+  else
+    export XCLAW_BUILDER_CODE_BASE_SEPOLIA="$XCLAW_BUILDER_CODE_BASE"
+    echo "[xclaw] defaulted XCLAW_BUILDER_CODE_BASE_SEPOLIA=$XCLAW_BUILDER_CODE_BASE_SEPOLIA"
+  fi
+fi
+
 openclaw config set skills.entries.xclaw-agent.env.XCLAW_AGENT_RUNTIME_BIN "$XCLAW_AGENT_BIN" || true
 openclaw config set skills.entries.xclaw-agent.env.XCLAW_API_BASE_URL "$XCLAW_API_BASE_URL" || true
 openclaw config set skills.entries.xclaw-agent.env.XCLAW_DEFAULT_CHAIN "$XCLAW_DEFAULT_CHAIN" || true
 openclaw config set skills.entries.xclaw-agent.env.XCLAW_AGENT_PYTHON_BIN "$XCLAW_AGENT_PYTHON_BIN" || true
 openclaw config set skills.entries.xclaw-agent.env.XCLAW_HEDERA_HTS_BRIDGE_CMD "$XCLAW_HEDERA_HTS_BRIDGE_CMD" || true
+openclaw config set skills.entries.xclaw-agent.env.XCLAW_BUILDER_CODE_BASE "$XCLAW_BUILDER_CODE_BASE" || true
+openclaw config set skills.entries.xclaw-agent.env.XCLAW_BUILDER_CODE_BASE_SEPOLIA "$XCLAW_BUILDER_CODE_BASE_SEPOLIA" || true
 openclaw config set skills.entries.xclaw-agent.env.XCLAW_TELEGRAM_APPROVALS_FORCE_MANAGEMENT "$xclaw_telegram_force_management" || true
 if [ -n "\${XCLAW_AGENT_ID:-}" ]; then
   openclaw config set skills.entries.xclaw-agent.env.XCLAW_AGENT_ID "$XCLAW_AGENT_ID" || true

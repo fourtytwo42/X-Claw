@@ -453,9 +453,29 @@ try {
     Persist-UserPath -RuntimeBin $xclawAgentBin
 
     Write-Host "[xclaw] configuring OpenClaw skill env defaults"
+    if (-not $env:XCLAW_BUILDER_CODE_BASE) {
+      $existingBuilderBase = Get-OpenClawConfigValue "skills.entries.xclaw-agent.env.XCLAW_BUILDER_CODE_BASE"
+      if ($existingBuilderBase) {
+        $env:XCLAW_BUILDER_CODE_BASE = $existingBuilderBase
+      } else {
+        $env:XCLAW_BUILDER_CODE_BASE = "xclaw"
+        Write-Host "[xclaw] defaulted XCLAW_BUILDER_CODE_BASE=xclaw"
+      }
+    }
+    if (-not $env:XCLAW_BUILDER_CODE_BASE_SEPOLIA) {
+      $existingBuilderBaseSepolia = Get-OpenClawConfigValue "skills.entries.xclaw-agent.env.XCLAW_BUILDER_CODE_BASE_SEPOLIA"
+      if ($existingBuilderBaseSepolia) {
+        $env:XCLAW_BUILDER_CODE_BASE_SEPOLIA = $existingBuilderBaseSepolia
+      } else {
+        $env:XCLAW_BUILDER_CODE_BASE_SEPOLIA = $env:XCLAW_BUILDER_CODE_BASE
+        Write-Host "[xclaw] defaulted XCLAW_BUILDER_CODE_BASE_SEPOLIA=$($env:XCLAW_BUILDER_CODE_BASE_SEPOLIA)"
+      }
+    }
     Set-OpenClawConfigSafe "skills.entries.xclaw-agent.env.XCLAW_API_BASE_URL" "$($env:XCLAW_API_BASE_URL)"
     Set-OpenClawConfigSafe "skills.entries.xclaw-agent.env.XCLAW_DEFAULT_CHAIN" "$($env:XCLAW_DEFAULT_CHAIN)"
     Set-OpenClawConfigSafe "skills.entries.xclaw-agent.env.XCLAW_AGENT_PYTHON_BIN" "$($env:XCLAW_AGENT_PYTHON_BIN)"
+    Set-OpenClawConfigSafe "skills.entries.xclaw-agent.env.XCLAW_BUILDER_CODE_BASE" "$($env:XCLAW_BUILDER_CODE_BASE)"
+    Set-OpenClawConfigSafe "skills.entries.xclaw-agent.env.XCLAW_BUILDER_CODE_BASE_SEPOLIA" "$($env:XCLAW_BUILDER_CODE_BASE_SEPOLIA)"
     Set-OpenClawConfigSafe "skills.entries.xclaw-agent.env.XCLAW_TELEGRAM_APPROVALS_FORCE_MANAGEMENT" "disabled"
     if ($env:XCLAW_AGENT_ID) {
       Set-OpenClawConfigSafe "skills.entries.xclaw-agent.env.XCLAW_AGENT_ID" "$($env:XCLAW_AGENT_ID)"

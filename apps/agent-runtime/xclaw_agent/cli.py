@@ -3930,6 +3930,30 @@ def cmd_approvals_resume_spot(args: argparse.Namespace) -> int:
             payload["message"] = str(payload.get("message") or "Spot trade resumed and executed.")
             return emit(payload)
 
+        # If resume failed before any status transition, avoid leaving the trade stuck as approved.
+        try:
+            latest_after_fail = _read_trade_details(trade_id)
+            latest_status = str(latest_after_fail.get("status") or "").strip().lower()
+            if latest_status == "approved":
+                reason_code = str(payload.get("code") or "resume_failed").strip() or "resume_failed"
+                reason_message = str(payload.get("message") or "Spot trade resume failed before execution status transition.").strip()
+                _post_trade_status(
+                    trade_id,
+                    "approved",
+                    "failed",
+                    {
+                        "reasonCode": reason_code[:64],
+                        "reasonMessage": reason_message[:500],
+                    },
+                )
+                payload["statusMirrored"] = True
+                payload["mirroredFromStatus"] = "approved"
+                payload["mirroredToStatus"] = "failed"
+            else:
+                payload["statusMirrored"] = False
+        except Exception:
+            payload["statusMirrored"] = False
+
         # Keep flow only if still pending; otherwise clear stale entry.
         try:
             latest = _read_trade_details(trade_id)

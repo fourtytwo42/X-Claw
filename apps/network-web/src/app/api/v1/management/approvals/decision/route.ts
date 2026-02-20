@@ -1,6 +1,7 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { spawn, spawnSync } from 'node:child_process';
 import { join } from 'node:path';
+import { homedir } from 'node:os';
 
 import type { NextRequest } from 'next/server';
 
@@ -87,6 +88,35 @@ function resolveRuntimeApiBase(req: NextRequest): string {
   return `${req.nextUrl.origin}/api/v1`;
 }
 
+function resolveOpenClawConfigPath(): string {
+  const explicit = (process.env.OPENCLAW_CONFIG_FILE ?? '').trim();
+  if (explicit) {
+    return explicit;
+  }
+  return join(homedir(), '.openclaw', 'openclaw.json');
+}
+
+function readOpenClawSkillEnvValue(key: string): string | null {
+  try {
+    const configPath = resolveOpenClawConfigPath();
+    if (!existsSync(configPath)) {
+      return null;
+    }
+    const raw = readFileSync(configPath, 'utf8');
+    const parsed = JSON.parse(raw || '{}') as {
+      skills?: { entries?: { 'xclaw-agent'?: { env?: Record<string, unknown> } } };
+    };
+    const value = parsed?.skills?.entries?.['xclaw-agent']?.env?.[key];
+    if (typeof value !== 'string') {
+      return null;
+    }
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  } catch {
+    return null;
+  }
+}
+
 function runtimeSpawnEnv(req: NextRequest, agentId: string, chainKey: string): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {
     ...process.env,
@@ -103,6 +133,12 @@ function runtimeSpawnEnv(req: NextRequest, agentId: string, chainKey: string): N
       if (signed) {
         env.XCLAW_AGENT_API_KEY = signed;
       }
+    }
+  }
+  if (!(env.XCLAW_WALLET_PASSPHRASE ?? '').trim()) {
+    const passphrase = readOpenClawSkillEnvValue('XCLAW_WALLET_PASSPHRASE');
+    if (passphrase) {
+      env.XCLAW_WALLET_PASSPHRASE = passphrase;
     }
   }
   return env;

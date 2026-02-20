@@ -1,7 +1,7 @@
 const allowedTransitions = new Map<string, Set<string>>([
   ['proposed', new Set(['approval_pending', 'approved'])],
   ['approval_pending', new Set(['approved', 'rejected', 'expired'])],
-  ['approved', new Set(['executing'])],
+  ['approved', new Set(['executing', 'failed'])],
   ['executing', new Set(['verifying', 'failed'])],
   ['verifying', new Set(['filled', 'failed', 'verification_timeout'])],
   ['failed', new Set(['executing'])],
