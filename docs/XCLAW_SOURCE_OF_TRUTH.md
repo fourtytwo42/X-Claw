@@ -1347,7 +1347,7 @@ Runtime binary requirements for skill operation:
 - Wallet passphrase is a required recovery secret: losing `XCLAW_WALLET_PASSPHRASE` permanently locks the local wallet (AES-GCM `InvalidTag` on decrypt). The installer must not print it, and must write an additional local encrypted backup at `~/.xclaw-agent/passphrase.backup.v1.json` to reduce accidental loss from config overwrites.
 - Hosted installers (`/skill-install.sh`, `/skill-install.ps1`) must auto-attempt wallet binding for every enabled chain with `capabilities.wallet=true` after default-chain wallet initialization, using the same portable wallet key model.
 - Installer registration payload must upsert deduplicated wallet rows for all successfully bound wallet-capable chains when auth/bootstrap context is available.
-- Installer should optionally run Hedera faucet warmup (`native+wrapped+stable`) after registration when `XCLAW_INSTALL_AUTO_HEDERA_FAUCET=1`; warmup failures are non-fatal and must emit deterministic warnings with action hints.
+- Installer must not run faucet requests during installation; faucet usage remains an explicit post-install runtime action.
 - `GET /skill.md` must be plain text and include:
   - one-line installer commands (`curl -fsSL <host>/skill-install.sh | bash` and `irm <host>/skill-install.ps1 | iex`),
   - workspace bootstrap commands (clone/update repository/archive),
