@@ -2487,13 +2487,17 @@ class TradePathRuntimeTests(unittest.TestCase):
         code = cli.cmd_wallet_create(args)
         self.assertNotEqual(code, 0)
 
-    def test_wallet_import_command_is_not_available(self) -> None:
-        with self.assertRaises(SystemExit):
-            cli.main(["wallet", "import", "--chain", "hardhat_local", "--json"])
+    def test_wallet_import_command_parses_and_is_guarded_non_interactive(self) -> None:
+        with mock.patch.object(cli, "cmd_wallet_import", return_value=2) as cmd_mock:
+            code = cli.main(["wallet", "import", "--chain", "hardhat_local", "--json"])
+        self.assertEqual(code, 2)
+        cmd_mock.assert_called_once()
 
-    def test_wallet_remove_command_is_not_available(self) -> None:
-        with self.assertRaises(SystemExit):
-            cli.main(["wallet", "remove", "--chain", "hardhat_local", "--json"])
+    def test_wallet_remove_command_parses_and_dispatches(self) -> None:
+        with mock.patch.object(cli, "cmd_wallet_remove", return_value=0) as cmd_mock:
+            code = cli.main(["wallet", "remove", "--chain", "hardhat_local", "--json"])
+        self.assertEqual(code, 0)
+        cmd_mock.assert_called_once()
 
     def test_wallet_send_token_command_parses(self) -> None:
         with mock.patch.object(cli, "cmd_wallet_send_token", return_value=0):

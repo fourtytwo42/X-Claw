@@ -1831,10 +1831,10 @@ Goal:
 - Deliver a deterministic Python-first harness that executes real Base Sepolia wallet/approval flows (trade, transfer, liquidity, x402, pause/resume) with Telegram dispatch suppressed for test runs.
 
 DoD:
-- [~] runtime env gate `XCLAW_TEST_HARNESS_DISABLE_TELEGRAM` suppresses Telegram prompt/decision sends without affecting approval/execution state transitions.
-- [~] add harness entrypoint `apps/agent-runtime/scripts/wallet_approval_harness.py` with management-API approval driver.
-- [~] harness supports `--scenario-set smoke|full` and default `full`.
-- [~] harness validates tolerance-based end-balance convergence using configurable bps/floor args.
-- [~] harness covers trade pending approve/reject, dedupe, global/per-token policy transitions, transfer approvals, x402 loopback, liquidity approvals, and pause/resume block/recover behavior.
-- [~] add unit tests for harness planner/tolerance/runtime parsing and runtime Telegram suppression behavior.
-- [~] docs/handoff sync completed in same change (`source-of-truth`, roadmap, tracker, context/spec/tasks/acceptance).
+- [x] runtime env gate `XCLAW_TEST_HARNESS_DISABLE_TELEGRAM` suppresses Telegram prompt/decision sends without affecting approval/execution state transitions.
+- [x] add harness entrypoint `apps/agent-runtime/scripts/wallet_approval_harness.py` with management-API approval driver.
+- [x] harness supports `--scenario-set smoke|full` and default `full`.
+- [x] harness validates tolerance-based end-balance convergence using configurable bps/floor args.
+- [x] harness stabilization includes strict hardhat-first gating, wallet decrypt preflight fail-fast, and retry-backed management writes with diagnostics.
+- [x] add unit tests for harness planner/tolerance/runtime parsing, retry/preflight behavior, and runtime Telegram suppression behavior.
+- [x] docs/handoff sync completed in same change (`source-of-truth`, roadmap, tracker, context/spec/tasks/acceptance).

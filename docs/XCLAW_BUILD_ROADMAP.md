@@ -3154,3 +3154,20 @@ Note:
   - [x] `npm run build`
   - [x] `pm2 restart all`
 - [ ] Issue #42 updated with verification evidence + commit hash(es).
+
+### 96.4 Stabilization pass (reliability remediation)
+- [x] Harness strict hardhat gate added:
+  - [x] `hardhat_local` preflight probes `eth_chainId` at `--hardhat-rpc-url`.
+  - [x] Base Sepolia runs are blocked unless `--hardhat-evidence-report` exists and has `ok=true`.
+- [x] Wallet decrypt preflight added:
+  - [x] preflight runtime checks for `wallet address`, `wallet health`, and `wallet sign-challenge`.
+  - [x] deterministic fail-fast `wallet_passphrase_mismatch` with `walletStorePath`, `passphraseSource`, `chain`.
+- [x] Management API resilience:
+  - [x] retry/backoff+jitter wrapper for permission updates and management write calls.
+  - [x] retry exhaustion diagnostics include `requestId/status/code/attempts/path/payloadHash`.
+- [x] Runtime test baseline fixed:
+  - [x] stale `wallet import/remove` not-available tests replaced with parser/dispatch contract tests.
+- [x] Harness report hardening:
+  - [x] preflight block emitted in JSON report,
+  - [x] retry failure diagnostics emitted in JSON report,
+  - [x] pending cleanup includes unresolved list for traceability.

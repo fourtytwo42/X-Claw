@@ -1287,6 +1287,7 @@ Issue mapping: `#32`
 - Approval driver for this harness slice is management API only.
 - No Node/npm requirement for invoking runtime harness command flow.
 - Hardhat-local evidence precedes external testnet evidence.
+- Base Sepolia execution is hard-blocked until a green Hardhat smoke report is present.
 
 ## Expected touched artifacts
 - `apps/agent-runtime/xclaw_agent/cli.py`
@@ -1298,4 +1299,8 @@ Issue mapping: `#32`
 ## Verification targets
 - runtime Telegram suppression guard behavior covered in unit tests.
 - harness unit tests for scenario parsing/tolerance/report flow.
+- harness preflight/report behavior validated:
+  - hardhat RPC probe,
+  - wallet decrypt/sign fail-fast,
+  - management write retry diagnostics.
 - required repo gates executed sequentially.

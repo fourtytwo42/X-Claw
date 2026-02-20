@@ -2796,39 +2796,38 @@ Active slice context: `Slice 96`.
 - [x] Implement management permission updates + restore.
 - [x] Implement scenario execution orchestration and report output.
 - [x] Implement tolerance-based balance checks.
+- [x] Implement hardhat RPC preflight gate (`--hardhat-rpc-url`).
+- [x] Implement strict base-sepolia block on missing/non-green hardhat evidence (`--hardhat-evidence-report`).
+- [x] Implement wallet decrypt/sign preflight fail-fast (`wallet_passphrase_mismatch`).
+- [x] Implement management write retries with exponential backoff + jitter (`--max-api-retries`, `--api-retry-base-ms`).
+- [x] Emit retry diagnostics + preflight objects in JSON report.
 
 ## 4) Tests
 - [x] Extend `apps/agent-runtime/tests/test_trade_path.py` with Telegram suppression tests.
 - [x] Add `apps/agent-runtime/tests/test_wallet_approval_harness.py`.
 
 ## 5) Validation/evidence
-- [ ] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
-- [ ] `python3 -m unittest apps/agent-runtime/tests/test_wallet_approval_harness.py -v`
-- [ ] `npm run db:parity`
-- [ ] `npm run seed:reset`
-- [ ] `npm run seed:load`
-- [ ] `npm run seed:verify`
-- [ ] `npm run build`
-- [ ] `pm2 restart all`
-- [ ] hardhat-local harness subset evidence
-- [ ] base-sepolia harness full evidence
-- [ ] issue #42 evidence post + commit hash(es)
-
-## Slice 96 Task Execution Update (UTC 2026-02-20)
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
 - [x] `python3 -m unittest apps/agent-runtime/tests/test_wallet_approval_harness.py -v`
-- [~] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
-  - current repo baseline still has 2 pre-existing failures unrelated to Slice 96 changes:
-    - `test_wallet_import_command_is_not_available`
-    - `test_wallet_remove_command_is_not_available`
 - [x] `npm run db:parity`
 - [x] `npm run seed:reset`
 - [x] `npm run seed:load`
 - [x] `npm run seed:verify`
 - [x] `npm run build`
 - [x] `pm2 restart all`
-- [!] hardhat-local harness smoke run blocked in this session:
-  - management bootstrap token was expired for localhost scope,
-  - when switched to hosted scope, `hardhat_local` RPC (`127.0.0.1:8545`) was unavailable.
-- [~] base-sepolia full harness run executed; scenarios currently failing with reproducible errors:
-  - runtime `trade spot` returns `InvalidTag` under this wallet context,
-  - management permissions update endpoint returns intermittent `500 internal_error` during scenario setup/restore.
+- [ ] hardhat-local harness subset evidence
+- [ ] base-sepolia harness full evidence
+- [ ] issue #42 evidence post + commit hash(es)
+
+## Slice 96 Task Execution Update (UTC 2026-02-20)
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_wallet_approval_harness.py -v`
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+- [x] Harness now fails fast deterministically when hardhat rpc is unavailable (`hardhat_rpc_unavailable`).
+- [x] Harness now blocks base-sepolia run when hardhat evidence report missing/non-green.
+- [x] Harness now retries transient management `500` responses with bounded backoff+jitter and structured diagnostics.

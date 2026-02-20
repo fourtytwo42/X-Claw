@@ -2701,3 +2701,22 @@ Ensure `wallet balance --chain hedera_testnet` shows all owned Hedera tokens for
 5. Unit coverage:
 - runtime Telegram suppression tests,
 - harness unit tests for parsing/tolerance/failure paths.
+
+## Stabilization update (Slice 96b)
+1. Add strict Hardhat-first preflight contract:
+- hardhat RPC probe via `eth_chainId` (`--hardhat-rpc-url`),
+- non-hardhat runs require green `--hardhat-evidence-report`.
+2. Add wallet decrypt preflight:
+- `wallet address`,
+- `wallet health`,
+- `wallet sign-challenge` canonical probe.
+3. Add deterministic fail-fast for passphrase drift:
+- `code=wallet_passphrase_mismatch`,
+- details include `walletStorePath`, `passphraseSource`, `chain`.
+4. Add management API retry policy:
+- retry statuses/network (`0/500/502/503/504`) with exponential backoff + jitter,
+- terminal failure includes request diagnostics (`requestId/status/code/attempts/path/payloadHash`).
+5. Harden harness report:
+- preflight block (`hardhatRpc`, `walletDecryptProbe`, `managementSession`),
+- `retryFailures`,
+- `unresolvedPending`.

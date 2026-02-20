@@ -1199,6 +1199,9 @@ The skill wrapper commands below are required (JSON output contract):
 - `python3 scripts/xclaw_agent_skill.py wallet-track-token <token_address>`
 - `python3 scripts/xclaw_agent_skill.py wallet-untrack-token <token_address>`
 - `python3 scripts/xclaw_agent_skill.py wallet-tracked-tokens`
+- `python3 scripts/xclaw_agent_skill.py dexscreener-search <query> [limit]`
+- `python3 scripts/xclaw_agent_skill.py dexscreener-top <query> [limit]`
+- `python3 scripts/xclaw_agent_skill.py dexscreener-token-pairs <chain_id> <token_address> [limit]`
 - `python3 scripts/xclaw_agent_skill.py default-chain-get`
 - `python3 scripts/xclaw_agent_skill.py default-chain-set <chain_key>`
 - `python3 scripts/xclaw_agent_skill.py request-x402-payment`
@@ -1221,6 +1224,8 @@ Additional locked reliability requirements for skill/runtime usage:
 - `wallet-balance` should return combined holdings in one payload: native fields plus token balances (`tokens[]`) and non-fatal token fetch failures (`tokenErrors[]`).
 - `tokens[]` should include only owned/non-zero token holdings for the requested chain (zero-balance token rows should not be rendered in runtime or web holdings views).
 - tracked token behavior: users can register EVM token addresses per chain (`wallet-track-token`), and those tracked token addresses participate in runtime holdings fetch and `wallet-send-token` symbol/address resolution.
+- Dexscreener research commands in the skill wrapper must query Dexscreener REST directly from agent runtime and must not depend on Node/server proxy paths.
+- `dexscreener-top` output contract is normalized: `priceUsd` as decimal string with 8 fractional digits; USD aggregates (`liquidityUsd`, `volumeH24Usd`, `marketCapUsd`, `fdvUsd`) as decimal strings with 2 fractional digits.
 - Hedera chain behavior: `wallet-balance` must merge mirror-node discovered token holdings (non-zero balances for the wallet account) into `tokens[]` so owned tokens are visible even when not present in chain canonical token map.
 - `faucet-request` rate-limit failures should surface machine-readable retry timing when available (`retryAfterSec` from server details).
 - `trade-spot` gas output should include both exact numeric ETH (`totalGasCostEthExact`) and display-friendly pretty form (`totalGasCostEthPretty`), while keeping backward-compatible `totalGasCostEth`.
@@ -3880,6 +3885,10 @@ Limitations / notes:
 - Config surface:
   - `--scenario-set <smoke|full>` (default `full`)
   - `--approve-driver <management_api>` (fixed for Slice 96)
+  - `--hardhat-rpc-url <url>` (default `http://127.0.0.1:8545`)
+  - `--hardhat-evidence-report <path>` (default `/tmp/xclaw-slice96-hardhat-smoke.json`; required gate for non-hardhat runs)
+  - `--max-api-retries <int>` (default `4`)
+  - `--api-retry-base-ms <int>` (default `400`)
   - `--balance-tolerance-bps` (default `40`)
   - `--balance-tolerance-floor-native` (default `0.0005`)
   - `--balance-tolerance-floor-stable` (default `5`)
@@ -3905,3 +3914,10 @@ Limitations / notes:
 - Required gates remain mandatory and sequential (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
 - Hardhat-local evidence must be captured before Base Sepolia evidence.
 - Harness report must include machine-readable per-scenario pass/fail outputs with failure details.
+- Harness report preflight section must include:
+  - `preflight.hardhatRpc`,
+  - `preflight.walletDecryptProbe`,
+  - `preflight.managementSession`.
+- Hardhat gating is strict: Base Sepolia harness runs are blocked unless a green Hardhat smoke report exists.
+- Wallet decrypt preflight must fail fast with deterministic `wallet_passphrase_mismatch` (instead of late `InvalidTag` in scenarios) and include actionable details (`walletStorePath`, `passphraseSource`, `chain`).
+- Management write retries must use bounded exponential backoff + jitter and include request diagnostics (`requestId`, `status`, `code`, `attempts`, `path`, `payloadHash`) on terminal failure.

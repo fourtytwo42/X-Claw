@@ -7,6 +7,7 @@ import tempfile
 import unittest
 from decimal import Decimal
 from unittest import mock
+import urllib.error
 
 HARNESS_PATH = pathlib.Path("apps/agent-runtime/scripts/wallet_approval_harness.py").resolve()
 spec = importlib.util.spec_from_file_location("wallet_approval_harness", HARNESS_PATH)
@@ -46,6 +47,10 @@ class WalletApprovalHarnessUnitTests(unittest.TestCase):
             mode="full",
             scenario_set="smoke",
             approve_driver="management_api",
+            hardhat_rpc_url="http://127.0.0.1:8545",
+            hardhat_evidence_report="/tmp/xclaw-slice96-hardhat-smoke.json",
+            max_api_retries=4,
+            api_retry_base_ms=1,
             balance_tolerance_bps=40,
             balance_tolerance_floor_native="0.0005",
             balance_tolerance_floor_stable="5",
@@ -81,6 +86,73 @@ class WalletApprovalHarnessUnitTests(unittest.TestCase):
                 ]
             )
         self.assertEqual(rc, 1)
+
+    def test_hardhat_rpc_preflight_fails_when_unavailable(self) -> None:
+        args = self._args()
+        args.chain = "hardhat_local"
+        runner = harness.WalletApprovalHarness(args)
+        with mock.patch.object(harness.urllib.request, "urlopen", side_effect=urllib.error.URLError("refused")):
+            with self.assertRaises(harness.HarnessError) as ctx:
+                runner._probe_hardhat_rpc()
+        self.assertEqual(ctx.exception.code, "hardhat_rpc_unavailable")
+        self.assertFalse(bool(runner.preflight["hardhatRpc"]["ok"]))
+
+    def test_base_sepolia_requires_green_hardhat_report(self) -> None:
+        args = self._args()
+        args.chain = "base_sepolia"
+        args.hardhat_evidence_report = "/tmp/nonexistent-hardhat-report.json"
+        runner = harness.WalletApprovalHarness(args)
+        with self.assertRaises(harness.HarnessError) as ctx:
+            runner._assert_hardhat_evidence_gate()
+        self.assertEqual(ctx.exception.code, "hardhat_evidence_missing")
+
+    def test_management_post_with_retry_succeeds_after_transient_500s(self) -> None:
+        runner = harness.WalletApprovalHarness(self._args())
+        with mock.patch.object(
+            runner,
+            "_http",
+            side_effect=[
+                (500, {"ok": False, "code": "internal_error", "requestId": "req_1"}),
+                (500, {"ok": False, "code": "internal_error", "requestId": "req_2"}),
+                (200, {"ok": True}),
+            ],
+        ):
+            out = runner._management_post_with_retry("/management/permissions/update", {"agentId": "ag_test"}, label="permissions_update")
+        self.assertTrue(out.get("ok"))
+        self.assertEqual(runner.retry_failures, [])
+
+    def test_management_post_with_retry_exhaustion_contains_attempts(self) -> None:
+        args = self._args()
+        args.max_api_retries = 2
+        runner = harness.WalletApprovalHarness(args)
+        with mock.patch.object(
+            runner,
+            "_http",
+            side_effect=[
+                (500, {"ok": False, "code": "internal_error", "requestId": "req_1"}),
+                (500, {"ok": False, "code": "internal_error", "requestId": "req_2"}),
+            ],
+        ):
+            with self.assertRaises(harness.HarnessError) as ctx:
+                runner._management_post_with_retry("/management/permissions/update", {"agentId": "ag_test"}, label="permissions_update")
+        self.assertEqual(ctx.exception.code, "management_api_retry_exhausted")
+        self.assertGreaterEqual(len((ctx.exception.details or {}).get("attempts", [])), 2)
+
+    def test_wallet_decrypt_probe_fails_fast_with_mismatch_code(self) -> None:
+        runner = harness.WalletApprovalHarness(self._args())
+        with mock.patch.object(
+            runner,
+            "_runtime",
+            side_effect=[
+                (0, {"ok": True, "address": "0x1111111111111111111111111111111111111111"}, "", ""),
+                (0, {"ok": True}, "", ""),
+                (1, {"ok": False, "code": "sign_failed"}, "", "InvalidTag"),
+            ],
+        ):
+            with self.assertRaises(harness.HarnessError) as ctx:
+                runner._wallet_decrypt_probe()
+        self.assertEqual(ctx.exception.code, "wallet_passphrase_mismatch")
+        self.assertFalse(bool(runner.preflight["walletDecryptProbe"]["ok"]))
 
 
 if __name__ == "__main__":
