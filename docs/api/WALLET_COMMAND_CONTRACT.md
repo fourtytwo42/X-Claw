@@ -131,7 +131,7 @@ Errors MUST be machine-parseable and human-readable:
 9. `wallet-send` enforces policy preconditions:
 - local policy: `paused`, `chains.<chain>.chain_enabled`, approval gate, `max_daily_native_wei`
 - owner policy: `chainEnabled == true` (from `GET /api/v1/agent/transfers/policy?chainKey=...`).
-10. `wallet-wrap-native` requires a Hedera chain and a positive amount; it fails deterministically with `invalid_amount`, `wrapped_native_helper_missing`, or `wrap_native_failed` when runtime preconditions are not met.
+10. `wallet-wrap-native` requires a positive amount and chain config with wrapped-native target resolution; it fails deterministically with `invalid_amount`, `wrapped_native_helper_missing`, `wrapped_native_token_missing`, or `wrap_native_failed` when runtime preconditions are not met.
 
 ## 6) Canonical Challenge Format (`wallet-sign-challenge`)
 
@@ -188,7 +188,10 @@ Current behavior in `apps/agent-runtime/xclaw_agent/cli.py`:
    - Hedera chains additionally include discovered token holdings from mirror-node account token relationships (non-zero balances) merged into `tokens[]`,
    - token query/discovery failures in `tokenErrors[]` without failing native balance fetch.
 9. `wallet-token-balance` is implemented via cast-backed ERC-20 `balanceOf(address)` query.
-10. `wallet-wrap-native` is implemented for Hedera chains and calls payable `deposit()` on `coreContracts.wrappedNativeHelper`, verifies receipt, then reports `txHash`, helper address, wrapped token address, and wrapped balance delta.
+10. `wallet-wrap-native` is implemented as config-driven cross-chain behavior:
+   - if `coreContracts.wrappedNativeHelper` exists and is valid, runtime calls payable `deposit()` on helper contract.
+   - otherwise runtime resolves canonical wrapped-native token from `canonicalTokens` via native-symbol mapping (`W<NativeSymbol>` + strict aliases) and calls payable `deposit()` on that token contract.
+   - runtime verifies receipt and reports `txHash`, wrapped token address, wrapped balance delta, and helper address only when helper path is used.
 11. Missing cast dependency returns structured `missing_dependency` error.
 12. Wrapper-level input validation executes before runtime delegation.
 13. On delegated non-zero exits, wrapper passes runtime JSON through unchanged when stdout is parseable JSON payload with `ok` and `code`; otherwise wrapper emits structured `agent_command_failed`.

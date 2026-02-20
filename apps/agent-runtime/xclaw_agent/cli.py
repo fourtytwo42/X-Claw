@@ -10418,6 +10418,57 @@ def _native_symbol_for_chain(chain: str) -> str:
     return "ETH"
 
 
+_WRAPPED_NATIVE_ALIAS_BY_NATIVE_SYMBOL: dict[str, tuple[str, ...]] = {
+    "ETH": ("WETH",),
+    "HBAR": ("WHBAR",),
+    "KITE": ("WKITE",),
+    "BNB": ("WBNB",),
+    "AVAX": ("WAVAX",),
+    "POL": ("WPOL",),
+    "MATIC": ("WMATIC", "WPOL"),
+    "MON": ("WMON",),
+}
+
+
+def _suggest_wrapped_native_symbols(chain: str) -> list[str]:
+    native_symbol = _native_symbol_for_chain(chain).strip().upper()
+    candidates: list[str] = []
+    if native_symbol:
+        if native_symbol.startswith("W") and len(native_symbol) > 1:
+            candidates.append(native_symbol)
+        else:
+            candidates.append(f"W{native_symbol}")
+        aliases = _WRAPPED_NATIVE_ALIAS_BY_NATIVE_SYMBOL.get(native_symbol, ())
+        for alias in aliases:
+            if alias not in candidates:
+                candidates.append(alias)
+    return candidates
+
+
+def _resolve_wrapped_native_target(chain: str) -> tuple[str | None, str, str]:
+    cfg = _load_chain_config(chain)
+    contracts = cfg.get("coreContracts")
+    if isinstance(contracts, dict) and "wrappedNativeHelper" in contracts:
+        helper = contracts.get("wrappedNativeHelper")
+        if not isinstance(helper, str) or not is_hex_address(helper):
+            raise WalletStoreError(f"Chain config for '{chain}' has invalid coreContracts.wrappedNativeHelper.")
+        for symbol in _suggest_wrapped_native_symbols(chain):
+            token = _canonical_token_map(chain).get(symbol)
+            if isinstance(token, str) and is_hex_address(token):
+                return helper, token, symbol
+        raise WalletStoreError(
+            f"Chain config for '{chain}' has no canonical wrapped native token for native symbol '{_native_symbol_for_chain(chain)}'."
+        )
+
+    for symbol in _suggest_wrapped_native_symbols(chain):
+        token = _canonical_token_map(chain).get(symbol)
+        if isinstance(token, str) and is_hex_address(token):
+            return None, token, symbol
+    raise WalletStoreError(
+        f"Chain config for '{chain}' has no canonical wrapped native token for native symbol '{_native_symbol_for_chain(chain)}'."
+    )
+
+
 def _fetch_wallet_holdings(chain: str) -> dict[str, Any]:
     store = load_wallet_store()
     _, wallet = _chain_wallet(store, chain)
@@ -11969,14 +12020,9 @@ def cmd_wallet_wrap_native(args: argparse.Namespace) -> int:
     if chk is not None:
         return chk
     chain = args.chain
-    if not chain.startswith("hedera"):
-        return fail(
-            "unsupported_chain_capability",
-            "wallet wrap-native is currently supported on Hedera chains only.",
-            "Use --chain hedera_testnet (or hedera mainnet) for wrap-native operations.",
-            {"chain": chain, "requiredCapability": "wallet"},
-            exit_code=2,
-        )
+    native_symbol = _native_symbol_for_chain(chain)
+    wrapped_candidates = _suggest_wrapped_native_symbols(chain)
+    wrapped_symbol_hint = wrapped_candidates[0] if wrapped_candidates else "wrapped native token"
     try:
         amount_in_units, amount_mode = _parse_amount_in_units(str(args.amount), 18)
         amount_in_int = int(amount_in_units)
@@ -11985,18 +12031,18 @@ def cmd_wallet_wrap_native(args: argparse.Namespace) -> int:
 
         store = load_wallet_store()
         wallet_address, private_key_hex = _execution_wallet(store, chain)
-        helper = _require_chain_contract_address(chain, "wrappedNativeHelper")
-        wrapped_token = _chain_token_address(chain, "WHBAR")
+        helper, wrapped_token, wrapped_symbol_hint = _resolve_wrapped_native_target(chain)
         cast_bin = _require_cast_bin()
         rpc_url = _chain_rpc_url(chain)
 
         wrapped_before = int(_fetch_token_balance_wei(chain, wallet_address, wrapped_token))
         calldata = _cast_calldata("deposit()", [])
+        target = helper if isinstance(helper, str) and is_hex_address(helper) else wrapped_token
         tx_hash = _cast_rpc_send_transaction(
             rpc_url,
             {
                 "from": wallet_address,
-                "to": helper,
+                "to": target,
                 "data": calldata,
                 "value": amount_in_units,
             },
@@ -12021,22 +12067,24 @@ def cmd_wallet_wrap_native(args: argparse.Namespace) -> int:
         wrapped_delta = max(0, wrapped_after - wrapped_before)
         wrapped_meta = _fetch_erc20_metadata(chain, wrapped_token)
         wrapped_decimals = int(wrapped_meta.get("decimals", 18))
-        wrapped_symbol = str(wrapped_meta.get("symbol") or "WHBAR").strip() or "WHBAR"
-        return ok(
-            "Native asset wrapped via official helper contract.",
-            chain=chain,
-            address=wallet_address,
-            helper=helper,
-            wrappedToken=wrapped_token,
-            txHash=tx_hash,
-            amountInWei=amount_in_units,
-            amountIn=_format_units(int(amount_in_units), 18),
-            amountInInputMode=amount_mode,
-            amountWrappedUnits=str(wrapped_delta),
-            amountWrapped=_format_units(int(wrapped_delta), wrapped_decimals),
-            wrappedDecimals=wrapped_decimals,
-            wrappedSymbol=wrapped_symbol,
-        )
+        wrapped_symbol = str(wrapped_meta.get("symbol") or wrapped_symbol_hint).strip() or wrapped_symbol_hint
+        success_message = "Native asset wrapped via official helper contract." if target == helper else "Native asset wrapped via canonical wrapped token contract."
+        payload: dict[str, Any] = {
+            "chain": chain,
+            "address": wallet_address,
+            "wrappedToken": wrapped_token,
+            "txHash": tx_hash,
+            "amountInWei": amount_in_units,
+            "amountIn": _format_units(int(amount_in_units), 18),
+            "amountInInputMode": amount_mode,
+            "amountWrappedUnits": str(wrapped_delta),
+            "amountWrapped": _format_units(int(wrapped_delta), wrapped_decimals),
+            "wrappedDecimals": wrapped_decimals,
+            "wrappedSymbol": wrapped_symbol,
+        }
+        if target == helper:
+            payload["helper"] = helper
+        return ok(success_message, **payload)
     except WalletSecurityError as exc:
         return fail("unsafe_permissions", str(exc), "Restrict permissions to owner-only (0700/0600) and retry.", {"chain": chain}, exit_code=1)
     except WalletStoreError as exc:
@@ -12047,6 +12095,14 @@ def cmd_wallet_wrap_native(args: argparse.Namespace) -> int:
                 msg,
                 "Set coreContracts.wrappedNativeHelper in config/chains/<chain>.json and retry.",
                 {"chain": chain},
+                exit_code=1,
+            )
+        if "no canonical wrapped native token" in msg:
+            return fail(
+                "wrapped_native_token_missing",
+                msg,
+                f"Set canonicalTokens.{wrapped_symbol_hint} for this chain, or run a swap trade ({native_symbol}->{wrapped_symbol_hint}).",
+                {"chain": chain, "nativeSymbol": native_symbol, "wrappedSymbolHint": wrapped_symbol_hint},
                 exit_code=1,
             )
         if "Amount" in msg and ("too small" in msg or "must be positive" in msg):
@@ -12061,9 +12117,21 @@ def cmd_wallet_wrap_native(args: argparse.Namespace) -> int:
             )
         if "Chain config" in msg:
             return fail("chain_config_invalid", msg, "Repair config/chains/<chain>.json and retry.", {"chain": chain}, exit_code=1)
-        return fail("wrap_native_failed", msg, "Verify wallet passphrase, helper contract, and RPC connectivity, then retry.", {"chain": chain}, exit_code=1)
+        return fail(
+            "wrap_native_failed",
+            msg,
+            f"Verify wallet/RPC/wrapped contract connectivity, then retry. You can swap {native_symbol}->{wrapped_symbol_hint} as fallback.",
+            {"chain": chain, "nativeSymbol": native_symbol, "wrappedSymbolHint": wrapped_symbol_hint},
+            exit_code=1,
+        )
     except Exception as exc:
-        return fail("wrap_native_failed", str(exc), "Inspect runtime wrap-native path and retry.", {"chain": chain}, exit_code=1)
+        return fail(
+            "wrap_native_failed",
+            str(exc),
+            f"Inspect runtime wrap-native path and retry. You can swap {native_symbol}->{wrapped_symbol_hint} as fallback.",
+            {"chain": chain, "nativeSymbol": native_symbol, "wrappedSymbolHint": wrapped_symbol_hint},
+            exit_code=1,
+        )
 
 
 def cmd_wallet_remove(args: argparse.Namespace) -> int:

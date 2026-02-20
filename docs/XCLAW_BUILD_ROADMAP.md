@@ -3741,13 +3741,13 @@ Note:
 
 ### 117.4 Validation + evidence
 - [ ] `python3 apps/agent-runtime/scripts/wallet_approval_chain_matrix.py ...` (hardhat/base/ethereum sepolia/hedera testnet)
-- [ ] Required gates run sequentially:
-  - [ ] `npm run db:parity`
-  - [ ] `npm run seed:reset`
-  - [ ] `npm run seed:load`
-  - [ ] `npm run seed:verify`
-  - [ ] `npm run build`
-  - [ ] `pm2 restart all`
+- [x] Required gates run sequentially:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `pm2 restart all`
 - [ ] Issue #60 evidence post + commit hash(es).
 - [x] Harness preflight supports local encrypted passphrase backup recovery (`passphrase.backup.v1.json`) with `--disable-passphrase-recovery` override.
 
@@ -3758,6 +3758,29 @@ Note:
 - [x] Disable server terminal result synthetic fanout for:
   - [x] `POST /api/v1/trades/{tradeId}/status`
   - [x] `POST /api/v1/agent/transfer-approvals/mirror`
-  - [x] terminal branch in `POST /api/v1/management/transfer-approvals/decision`
+- [x] terminal branch in `POST /api/v1/management/transfer-approvals/decision`
 - [x] Keep server deposit poller in dual-run comparator mode (`legacy_server_poller` tagging), while exposing watcher-authority metadata in management deposit response.
 - [x] Add dedicated dual-run parity + cross-talk regression script evidence.
+
+### 117.6 Hotfix C: Cross-Chain `wallet wrap-native` Parity
+- [x] Update source-of-truth + wallet command contract for config-driven cross-chain wrap-native behavior.
+- [x] Runtime `wallet wrap-native` removes Hedera-only hard guard and supports:
+  - [x] helper-based payable `deposit()` when `coreContracts.wrappedNativeHelper` exists.
+  - [x] canonical wrapped-token payable `deposit()` via native-symbol mapping (`W<NativeSymbol>` + strict alias fallback).
+- [x] Add deterministic error `wrapped_native_token_missing` while retaining existing deterministic wrap errors.
+- [x] Runtime wrap failure `actionHint` includes explicit swap fallback guidance (`native -> wrapped`).
+- [x] Update tests in `apps/agent-runtime/tests/test_wallet_core.py` for:
+  - [x] helper success path.
+  - [x] non-Hedera wrapped-token success path.
+  - [x] deterministic missing-helper and missing-token failures.
+  - [x] deterministic wrap failure on receipt error.
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_wallet_core.py -v`
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_x402_skill_wrapper.py -v`
+- [ ] Required gates run sequentially:
+  - [ ] `npm run db:parity`
+  - [ ] `npm run seed:reset`
+  - [ ] `npm run seed:load`
+  - [ ] `npm run seed:verify`
+  - [ ] `npm run build`
+  - [ ] `pm2 restart all`
+- [ ] Issue #60 evidence post + commit hash(es).

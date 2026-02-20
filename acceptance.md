@@ -5940,3 +5940,42 @@ Active slice context: `Slice 117` in progress.
   - PASS: `[PM2] [xclaw-web](0) ✓` and process status `online`
 - `2026-02-20T19:03:22Z` `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
   - PASS: `Ran 119 tests` and `OK`
+
+---
+
+# Slice 117 Hotfix C Acceptance Evidence: Cross-Chain `wallet wrap-native` Parity
+
+Date (UTC): 2026-02-20  
+Active slice context: `Slice 117` in progress.
+
+## Objective + Scope Lock
+- Objective: make `wallet wrap-native` config-driven across wallet-capable chains and preserve deterministic wrap failure contracts.
+- Scope lock:
+  - `apps/agent-runtime/xclaw_agent/cli.py`
+  - `apps/agent-runtime/tests/test_wallet_core.py`
+  - canonical docs + handoff artifacts listed in `spec.md`.
+
+## Behavior checks
+- [x] `wallet wrap-native` succeeds on helper path (Hedera-compatible flow).
+- [x] `wallet wrap-native` succeeds on non-helper wrapped-token path (non-Hedera EVM flow).
+- [x] Missing helper config remains deterministic (`wrapped_native_helper_missing`).
+- [x] Missing wrapped-native token mapping is deterministic (`wrapped_native_token_missing`).
+- [x] Receipt failure path remains deterministic (`wrap_native_failed`) with swap fallback action hint.
+
+## Unit test validation
+- `python3 -m unittest apps/agent-runtime/tests/test_wallet_core.py -v`
+  - PASS: `Ran 45 tests` and `OK`
+  - Includes explicit wrap-native helper/non-helper/missing-token/receipt-failure cases.
+- `python3 -m unittest apps/agent-runtime/tests/test_x402_skill_wrapper.py -v`
+  - PASS: `Ran 47 tests` and `OK`
+
+## Required validation gates
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+
+## Pending traceability
+- [ ] Issue #60 evidence post + commit hash(es).

@@ -2225,7 +2225,7 @@ DoD:
 - [x] harness transfer and x402 scenarios are split so `ethereum_sepolia` asserts deterministic x402 unsupported behavior (`unsupported_chain_capability`).
 - [x] unit tests added/updated for harness bootstrap/capability behavior and matrix runner sequencing.
 - [ ] runtime matrix evidence captured for hardhat/base/ethereum sepolia.
-- [ ] required gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
+- [x] required gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
 - [ ] issue #60 updated with verification evidence + commit hash(es).
 
 ## Slice 117 Hotfix B: Agent-Canonical Confirmation Pipeline (Dual-Run Start)
@@ -2241,3 +2241,21 @@ DoD:
 - [x] terminal server synthetic fanout removed from trade/transfer status ingest paths.
 - [x] server deposit poll path marked/tagged as `legacy_server_poller` comparator during dual-run.
 - [x] dual-run parity + cross-talk regression evidence captured.
+
+## Slice 117 Hotfix C: Cross-Chain `wallet wrap-native` Parity
+Status: [~]
+Issue: #60
+
+Goal:
+- Expand runtime `wallet wrap-native` from Hedera-only to config-driven cross-chain support for wallet-capable chains with resolvable wrapped-native targets.
+
+DoD:
+- [x] runtime no longer hard-rejects non-Hedera chains for `wallet wrap-native`.
+- [x] runtime resolves wrapped-native target config-driven:
+  - [x] helper `deposit()` path when `coreContracts.wrappedNativeHelper` is configured and valid.
+  - [x] canonical wrapped-token `deposit()` path via native-symbol mapping (`W<NativeSymbol>` + strict alias fallback).
+- [x] deterministic errors include `wrapped_native_token_missing` and retain `wrapped_native_helper_missing`, `invalid_amount`, `wrap_native_failed`.
+- [x] runtime wrap failure `actionHint` includes explicit swap fallback guidance (`native -> wrapped`).
+- [x] runtime tests updated for helper path + non-Hedera token path + deterministic negative cases.
+- [ ] required gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
+- [ ] issue #60 updated with verification evidence + commit hash(es).

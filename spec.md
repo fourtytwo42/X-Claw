@@ -3248,3 +3248,42 @@ Extend wallet-approval harness flow to run `hardhat_local -> base_sepolia -> eth
 - `npm run build`
 - `pm2 restart all`
 - Runtime regression sweep for trade/transfer status mirror behavior.
+
+---
+
+# Slice 117 Hotfix C Spec: Cross-Chain `wallet wrap-native` Parity
+
+## Goal
+1. Expand `wallet wrap-native` from Hedera-only support to config-driven chain support.
+2. Keep deterministic failure contracts for missing helper/token/runtime failures.
+3. Preserve existing command surface and JSON output conventions.
+
+## Non-goals
+1. No OpenAPI endpoint additions.
+2. No dependency additions.
+3. No automatic trade execution when wrap fails.
+
+## Locked scope
+1. `apps/agent-runtime/xclaw_agent/cli.py`
+2. `apps/agent-runtime/tests/test_wallet_core.py`
+3. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+4. `docs/api/WALLET_COMMAND_CONTRACT.md`
+5. `docs/XCLAW_SLICE_TRACKER.md`
+6. `docs/XCLAW_BUILD_ROADMAP.md`
+7. `skills/xclaw-agent/SKILL.md`
+8. `skills/xclaw-agent/references/commands.md`
+9. `spec.md`
+10. `tasks.md`
+11. `acceptance.md`
+12. `docs/CONTEXT_PACK.md`
+
+## Constraints
+1. Resolution order:
+- helper path first when `coreContracts.wrappedNativeHelper` is configured/valid.
+- otherwise canonical wrapped token from `canonicalTokens` using `W<NativeSymbol>` + strict alias fallback.
+2. Deterministic errors must include:
+- `wrapped_native_helper_missing`
+- `wrapped_native_token_missing`
+- `invalid_amount`
+- `wrap_native_failed`
+3. Wrap failure action hint must include swap fallback guidance (`native -> wrapped`).

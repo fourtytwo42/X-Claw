@@ -130,6 +130,8 @@ Underlying runtime delegation (performed by wrapper):
 - `xclaw-agent wallet untrack-token --token <token_address> --chain <chain_key> --json`
 - `xclaw-agent wallet tracked-tokens --chain <chain_key> --json`
 - `xclaw-agent wallet wrap-native --amount <amount> --chain <chain_key> --json`
+  - config-driven execution: helper `deposit()` path when `coreContracts.wrappedNativeHelper` exists, otherwise canonical wrapped-token `deposit()` path.
+  - deterministic errors include `wrapped_native_helper_missing`, `wrapped_native_token_missing`, and `wrap_native_failed`.
 - `xclaw-agent wallet create --chain <chain_key> --json`
 
 Installer/bootstrap note:

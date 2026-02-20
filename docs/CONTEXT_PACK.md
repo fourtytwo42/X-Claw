@@ -1595,3 +1595,32 @@ Run deterministic wallet-approval harness evidence in strict sequence (`hardhat_
   - `spec.md`
   - `tasks.md`
   - `acceptance.md`
+
+## Slice 117 Hotfix C Context Pack (2026-02-20): Cross-Chain `wallet wrap-native` Parity
+
+### Objective
+Promote `wallet wrap-native` to config-driven cross-chain behavior for wallet-capable chains without changing CLI surface, while preserving deterministic error contracts and operational fallback guidance.
+
+### Constraints
+- No dependency additions.
+- No server/web API contract changes.
+- Resolution must be config-driven:
+  - helper `deposit()` when `coreContracts.wrappedNativeHelper` exists and is valid,
+  - otherwise canonical wrapped token `deposit()` from `canonicalTokens` (`W<NativeSymbol>` + strict alias fallback).
+- Deterministic failures must include `wrapped_native_token_missing` for unresolved wrapped-native token mapping.
+
+### Primary touchpoints
+- Runtime command path:
+  - `apps/agent-runtime/xclaw_agent/cli.py`
+- Runtime regression tests:
+  - `apps/agent-runtime/tests/test_wallet_core.py`
+- Canonical/handoff docs:
+  - `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - `docs/api/WALLET_COMMAND_CONTRACT.md`
+  - `docs/XCLAW_SLICE_TRACKER.md`
+  - `docs/XCLAW_BUILD_ROADMAP.md`
+  - `skills/xclaw-agent/SKILL.md`
+  - `skills/xclaw-agent/references/commands.md`
+  - `spec.md`
+  - `tasks.md`
+  - `acceptance.md`

@@ -3725,7 +3725,13 @@ Supersession note:
 - Runtime commands:
   - `faucet-request --chain <chain> [--asset native|wrapped|stable]... --json`
   - `faucet-networks --json`
-  - `wallet wrap-native --chain <chain> --amount <human_or_wei> --json` (Hedera-only helper `deposit()` path)
+  - `wallet wrap-native --chain <chain> --amount <human_or_wei> --json` (config-driven wrapped-native path)
+    - when `coreContracts.wrappedNativeHelper` is configured, runtime uses helper `deposit()` payable path.
+    - otherwise runtime uses canonical wrapped token `deposit()` payable path resolved from `canonicalTokens` using native-symbol mapping (`W<NativeSymbol>` + strict aliases).
+    - deterministic failures:
+      - `wrapped_native_helper_missing` when helper key exists but is invalid.
+      - `wrapped_native_token_missing` when no canonical wrapped-native token is resolvable.
+      - `wrap_native_failed` for runtime/RPC/receipt failures.
 - Skill wrapper commands:
   - `faucet-request [chain] [asset ...]`
   - `faucet-networks`
@@ -4594,3 +4600,11 @@ Supersession note:
 - Harness wallet preflight may auto-recover `XCLAW_WALLET_PASSPHRASE` from local encrypted backup (`~/.xclaw-agent/passphrase.backup.v1.json`) when passphrase-gated checks fail.
 - Recovery is local-only best-effort and does not persist decrypted passphrase outside process memory.
 - Recovery can be disabled explicitly with `--disable-passphrase-recovery`.
+
+### Slice 117 Hotfix C Addendum: Cross-Chain `wallet wrap-native` Parity
+- `wallet wrap-native` is no longer Hedera-only; it is enabled for any wallet-capable chain where wrapped-native target resolution succeeds from chain config.
+- Resolution order:
+  - if `coreContracts.wrappedNativeHelper` exists and is valid, execute helper `deposit()` with `value`.
+  - otherwise resolve canonical wrapped-native token symbol from chain native symbol (`W<NativeSymbol>` with strict alias fallback) and execute token `deposit()` with `value`.
+- Runtime must return deterministic `wrapped_native_token_missing` when canonical wrapped-native token cannot be resolved for the chain.
+- Runtime error `wrap_native_failed` action hint should include operator fallback guidance to use spot swap intent (`native -> wrapped`) when wrapping cannot execute.

@@ -3436,3 +3436,49 @@ Active slice context: `Slice 117` in progress.
 - [x] `npm run seed:verify`
 - [x] `npm run build`
 - [x] `pm2 restart all`
+
+---
+
+# Slice 117 Hotfix C Tasks: Cross-Chain `wallet wrap-native` Parity
+
+Active slice context: `Slice 117` in progress.
+
+## 1) Runtime implementation
+- [x] Remove Hedera-only guard from `wallet wrap-native`.
+- [x] Add config-driven target resolution:
+  - [x] helper path (`coreContracts.wrappedNativeHelper`) when present/valid.
+  - [x] canonical wrapped-token path from `canonicalTokens` via native-symbol mapping.
+- [x] Keep payable `deposit()` execution semantics and receipt verification.
+
+## 2) Deterministic error/output contract
+- [x] Add deterministic `wrapped_native_token_missing`.
+- [x] Retain deterministic `wrapped_native_helper_missing`, `invalid_amount`, `wrap_native_failed`.
+- [x] Include swap fallback guidance in `wrap_native_failed` action hints.
+
+## 3) Tests
+- [x] Update `apps/agent-runtime/tests/test_wallet_core.py`:
+  - [x] helper success path.
+  - [x] non-Hedera wrapped-token success path.
+  - [x] deterministic missing helper failure.
+  - [x] deterministic missing wrapped token failure.
+  - [x] deterministic receipt failure path.
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_wallet_core.py -v`
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_x402_skill_wrapper.py -v`
+
+## 4) Canonical sync
+- [x] `docs/XCLAW_SOURCE_OF_TRUTH.md`
+- [x] `docs/api/WALLET_COMMAND_CONTRACT.md`
+- [x] `docs/XCLAW_SLICE_TRACKER.md`
+- [x] `docs/XCLAW_BUILD_ROADMAP.md`
+- [x] `skills/xclaw-agent/SKILL.md`
+- [x] `skills/xclaw-agent/references/commands.md`
+- [x] handoff artifacts (`spec.md`, `tasks.md`, `acceptance.md`, `docs/CONTEXT_PACK.md`)
+
+## 5) Required validations + evidence
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+- [ ] Issue #60 evidence post with commit hash(es).
