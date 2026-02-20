@@ -4536,3 +4536,41 @@ Supersession note:
 3. Stream boundaries:
 - Wallet-only/disabled chains remain backlog in this stream:
   - `adi_mainnet`, `adi_testnet`, `og_mainnet`, `og_testnet`, `kite_ai_mainnet`, `canton_mainnet`, `canton_testnet`.
+
+## 98) Slice 117 Ethereum Sepolia Harness Matrix Expansion (Locked)
+
+1. Scope:
+- Extend harness validation sequence to strict chain order:
+  - `hardhat_local` smoke,
+  - `base_sepolia` full,
+  - `ethereum_sepolia` full.
+- Preserve Python-first runtime invocation model.
+
+2. Harness sequence contract:
+- Add matrix entrypoint:
+  - `python3 apps/agent-runtime/scripts/wallet_approval_chain_matrix.py --agent-id <id> --bootstrap-token-file <path> --harvy-address <0x...> --json-report <path>`
+- Runner must stop on first failing chain and emit consolidated JSON summary.
+- Non-hardhat chains remain hardhat-gated through green `--hardhat-evidence-report`.
+
+3. Ethereum Sepolia bootstrap contract:
+- Harness may auto-bootstrap trade funding on `ethereum_sepolia` only when wallet has native ETH but no `WETH`/`USDC`.
+- Bootstrap path:
+  - send native ETH to canonical `WETH` contract address,
+  - approve/resume transfer when approval-gated,
+  - execute small `WETH -> USDC` trade,
+  - fail fast with deterministic `scenario_funding_missing` if funding remains unusable.
+- Canonical trade target remains `USDC` (no USDT routing in this slice).
+
+4. Capability-truth contract:
+- `ethereum_sepolia` keeps `x402=false` and `faucet=false`.
+- Harness must assert deterministic unsupported behavior for x402 on `ethereum_sepolia` (`unsupported_chain_capability`) instead of treating it as a flaky failure.
+- Capability-valid actions still execute normally (trade/liquidity/transfer/pause/resume/approval lifecycle).
+
+5. Identity assertion contract:
+- Harness supports optional `--expected-wallet-address`.
+- When provided, runtime wallet address for the selected chain must match or fail fast with `wallet_address_mismatch`.
+
+### Slice 117 Addendum: Harness Passphrase Recovery
+- Harness wallet preflight may auto-recover `XCLAW_WALLET_PASSPHRASE` from local encrypted backup (`~/.xclaw-agent/passphrase.backup.v1.json`) when passphrase-gated checks fail.
+- Recovery is local-only best-effort and does not persist decrypted passphrase outside process memory.
+- Recovery can be disabled explicitly with `--disable-passphrase-recovery`.

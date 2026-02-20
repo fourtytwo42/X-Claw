@@ -1568,3 +1568,30 @@ Promote legacy trade fallback only where the current v2-router runtime is techni
   - `spec.md`
   - `tasks.md`
   - `acceptance.md`
+
+## Slice 117 Context Pack (2026-02-20): Ethereum Sepolia Harness Matrix Expansion
+
+### Objective
+Run deterministic wallet-approval harness evidence in strict sequence (`hardhat_local`, `base_sepolia`, `ethereum_sepolia`) and prove Ethereum Sepolia capability-valid flow success with deterministic unsupported x402 behavior.
+
+### Constraints
+- Keep Python-first runtime execution.
+- Keep `ethereum_sepolia` capability truth (`x402=false`, `faucet=false`).
+- No new API contracts and no dependency additions.
+- Hardhat evidence is a strict gate for non-hardhat runs.
+
+### Primary touchpoints
+- Harness runtime script:
+  - `apps/agent-runtime/scripts/wallet_approval_harness.py`
+- New matrix runner:
+  - `apps/agent-runtime/scripts/wallet_approval_chain_matrix.py`
+- Unit tests:
+  - `apps/agent-runtime/tests/test_wallet_approval_harness.py`
+  - `apps/agent-runtime/tests/test_wallet_approval_chain_matrix.py`
+- Canonical/handoff docs:
+  - `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - `docs/XCLAW_SLICE_TRACKER.md`
+  - `docs/XCLAW_BUILD_ROADMAP.md`
+  - `spec.md`
+  - `tasks.md`
+  - `acceptance.md`

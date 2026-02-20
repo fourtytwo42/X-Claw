@@ -3716,3 +3716,36 @@ Note:
 - [x] `npm run seed:verify`
 - [x] `npm run build`
 - [x] `pm2 restart all`
+
+## 117) Slice 117: Ethereum Sepolia Harness Matrix Expansion
+
+### 117.1 Canonical/doc sync
+- [x] Add Slice 117 entries to `docs/XCLAW_SOURCE_OF_TRUTH.md`, `docs/XCLAW_SLICE_TRACKER.md`, and this roadmap.
+- [x] Update handoff artifacts (`docs/CONTEXT_PACK.md`, `spec.md`, `tasks.md`, `acceptance.md`).
+
+### 117.2 Harness/runtime implementation
+- [x] Extend `apps/agent-runtime/scripts/wallet_approval_harness.py` with:
+  - [x] Ethereum Sepolia funding bootstrap (`ETH -> WETH -> USDC`) and deterministic fail-fast.
+  - [x] optional `--expected-wallet-address` preflight assertion.
+  - [x] transfer scenario split from x402 scenario.
+  - [x] deterministic x402 unsupported assertion path on `ethereum_sepolia`.
+- [x] Add matrix orchestrator `apps/agent-runtime/scripts/wallet_approval_chain_matrix.py`:
+  - [x] run order: hardhat smoke -> base full -> ethereum sepolia full,
+  - [x] stop-on-first-failure,
+  - [x] consolidated JSON report output.
+
+### 117.3 Tests
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_wallet_approval_harness.py -v`
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_wallet_approval_chain_matrix.py -v`
+
+### 117.4 Validation + evidence
+- [ ] `python3 apps/agent-runtime/scripts/wallet_approval_chain_matrix.py ...` (hardhat/base/ethereum sepolia)
+- [ ] Required gates run sequentially:
+  - [ ] `npm run db:parity`
+  - [ ] `npm run seed:reset`
+  - [ ] `npm run seed:load`
+  - [ ] `npm run seed:verify`
+  - [ ] `npm run build`
+  - [ ] `pm2 restart all`
+- [ ] Issue #60 evidence post + commit hash(es).
+- [x] Harness preflight supports local encrypted passphrase backup recovery (`passphrase.backup.v1.json`) with `--disable-passphrase-recovery` override.

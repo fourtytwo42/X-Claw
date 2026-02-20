@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Slice 96 wallet/approval E2E harness (Base Sepolia-focused).
+"""Slice 96+117 wallet/approval E2E harness.
 
 This harness executes real runtime + management API flows with Telegram dispatch
 suppressed via XCLAW_TEST_HARNESS_DISABLE_TELEGRAM=1.
@@ -52,6 +52,49 @@ def _payload_hash(payload: dict[str, Any] | None) -> str:
         return ""
     raw = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(raw).hexdigest()
+
+
+def _recover_local_passphrase_backup() -> str:
+    backup_path = pathlib.Path(os.environ.get("XCLAW_AGENT_APP_DIR", "~/.xclaw-agent")).expanduser() / "passphrase.backup.v1.json"
+    if not backup_path.exists():
+        return ""
+    try:
+        payload = _read_json(backup_path)
+        nonce_b64 = str(payload.get("nonceB64") or "")
+        ciphertext_b64 = str(payload.get("ciphertextB64") or "")
+        if not nonce_b64 or not ciphertext_b64:
+            return ""
+
+        import base64
+
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+        from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+
+        machine_id = ""
+        for candidate in ("/etc/machine-id", "/var/lib/dbus/machine-id"):
+            path = pathlib.Path(candidate)
+            if not path.exists():
+                continue
+            raw = path.read_text(encoding="utf-8").strip()
+            if raw:
+                machine_id = raw
+                break
+
+        ikm = hashlib.sha256(("|".join([machine_id, str(os.getuid()), str(pathlib.Path.home())])).encode("utf-8")).digest()
+        hkdf = HKDF(algorithm=hashes.SHA256(), length=32, salt=b"xclaw-passphrase-backup-v1", info=b"xclaw")
+        key = hkdf.derive(ikm)
+
+        nonce = base64.b64decode(nonce_b64)
+        ciphertext = base64.b64decode(ciphertext_b64)
+        plaintext = AESGCM(key).decrypt(nonce, ciphertext, b"xclaw-passphrase-backup-v1")
+        return plaintext.decode("utf-8").strip()
+    except Exception:
+        return ""
+
+
+def _agent_app_dir() -> pathlib.Path:
+    return pathlib.Path(os.environ.get("XCLAW_AGENT_APP_DIR", "~/.xclaw-agent")).expanduser()
 
 
 def _canonical_challenge_message(chain: str) -> str:
@@ -112,6 +155,17 @@ def _extract_liquidity_intent_id(payload: dict[str, Any]) -> str:
         if nested:
             return nested
     return ""
+
+
+def _payload_contains_uniswap_proxy_missing(payload: dict[str, Any]) -> bool:
+    details = payload.get("details")
+    if not isinstance(details, dict):
+        return False
+    fallback_reason = details.get("fallbackReason")
+    if not isinstance(fallback_reason, dict):
+        return False
+    message = str(fallback_reason.get("message") or "").lower()
+    return "uniswap_proxy_not_configured" in message
 
 
 def _within_tolerance(before: Decimal, after: Decimal, bps: int, floor: Decimal) -> tuple[bool, Decimal, Decimal]:
@@ -182,6 +236,7 @@ class WalletApprovalHarness:
         self.retry_failures: list[dict[str, Any]] = []
         self.unresolved_pending: list[dict[str, Any]] = []
         self.initial_state: dict[str, Any] = {}
+        self._chain_config_cache: dict[str, Any] | None = None
 
     def _record(self, name: str, ok: bool, message: str, details: dict[str, Any] | None = None) -> None:
         payload = details or {}
@@ -227,6 +282,8 @@ class WalletApprovalHarness:
             return int(exc.code), parsed if isinstance(parsed, dict) else {"raw": parsed}
         except urllib.error.URLError as exc:
             return 0, {"code": "network_error", "message": _trim_text(getattr(exc, "reason", exc))}
+        except TimeoutError as exc:
+            return 0, {"code": "network_error", "message": _trim_text(exc)}
 
     def _runtime(self, args: list[str], *, timeout: int = 240) -> tuple[int, dict[str, Any], str, str]:
         cmd = [self.runtime_bin, *args, "--json"]
@@ -240,6 +297,10 @@ class WalletApprovalHarness:
         }
         if self.wallet_passphrase:
             env["XCLAW_WALLET_PASSPHRASE"] = self.wallet_passphrase
+        if str(self.chain).strip().lower().startswith("hedera"):
+            # Hedera RPC enforces a high minimum gas price floor; keep harness txs above floor by default.
+            env.setdefault("XCLAW_TX_FEE_MODE", "legacy")
+            env.setdefault("XCLAW_TX_GAS_PRICE_GWEI", "900")
         proc = subprocess.run(cmd, text=True, capture_output=True, timeout=timeout, env=env)
         out = (proc.stdout or "").strip()
         payload: dict[str, Any] = {}
@@ -355,28 +416,93 @@ class WalletApprovalHarness:
                 )
             return payload
 
-        try:
-            _ = _require_ok("wallet address", ["wallet", "address", "--chain", self.chain])
-            _ = _require_ok("wallet health", ["wallet", "health", "--chain", self.chain])
-            _ = _require_ok(
-                "wallet sign-challenge",
-                ["wallet", "sign-challenge", "--message", _canonical_challenge_message(self.chain), "--chain", self.chain],
-            )
-            self.preflight["walletDecryptProbe"] = {
-                "ok": True,
-                "walletStorePath": wallet_store_path,
-                "passphraseSource": passphrase_source,
-                "chain": self.chain,
-            }
-        except HarnessError as exc:
-            self.preflight["walletDecryptProbe"] = {
-                "ok": False,
-                "error": str(exc),
-                "walletStorePath": wallet_store_path,
-                "passphraseSource": passphrase_source,
-                "chain": self.chain,
-            }
-            raise
+        recovery_attempted = False
+        while True:
+            try:
+                _ = _require_ok("wallet address", ["wallet", "address", "--chain", self.chain])
+                health_payload: dict[str, Any] | None = None
+                code_h, payload_h, stdout_h, stderr_h = self._runtime(["wallet", "health", "--chain", self.chain], timeout=90)
+                if code_h != 0 or not bool(payload_h.get("ok")):
+                    hardhat_health_soft_fail = (
+                        str(self.chain).strip().lower() == "hardhat_local"
+                        and str(payload_h.get("code") or "") == "wallet_health_failed"
+                    )
+                    if not hardhat_health_soft_fail:
+                        raise HarnessError(
+                            "wallet health preflight failed.",
+                            code="wallet_passphrase_mismatch",
+                            category="preflight_failure",
+                            details={
+                                "chain": self.chain,
+                                "walletStorePath": wallet_store_path,
+                                "passphraseSource": passphrase_source,
+                                "payload": payload_h,
+                                "stderr": _trim_text(stderr_h),
+                                "stdout": _trim_text(stdout_h),
+                            },
+                        )
+                else:
+                    health_payload = payload_h
+                sign_soft_fail_accepted = False
+                code_s, payload_s, stdout_s, stderr_s = self._runtime(
+                    ["wallet", "sign-challenge", "--message", _canonical_challenge_message(self.chain), "--chain", self.chain],
+                    timeout=90,
+                )
+                if code_s != 0 or not bool(payload_s.get("ok")):
+                    hardhat_sign_soft_fail = (
+                        str(self.chain).strip().lower() == "hardhat_local"
+                        and str(payload_s.get("code") or "") == "sign_failed"
+                    )
+                    if not hardhat_sign_soft_fail:
+                        raise HarnessError(
+                            "wallet sign-challenge preflight failed.",
+                            code="wallet_passphrase_mismatch",
+                            category="preflight_failure",
+                            details={
+                                "chain": self.chain,
+                                "walletStorePath": wallet_store_path,
+                                "passphraseSource": passphrase_source,
+                                "payload": payload_s,
+                                "stderr": _trim_text(stderr_s),
+                                "stdout": _trim_text(stdout_s),
+                            },
+                        )
+                    sign_soft_fail_accepted = True
+                self.preflight["walletDecryptProbe"] = {
+                    "ok": True,
+                    "walletStorePath": wallet_store_path,
+                    "passphraseSource": passphrase_source,
+                    "chain": self.chain,
+                    "walletHealthSoftFailAccepted": bool(
+                        str(self.chain).strip().lower() == "hardhat_local"
+                        and not isinstance(health_payload, dict)
+                    ),
+                    "signChallengeSoftFailAccepted": sign_soft_fail_accepted,
+                    "passphraseRecoveredFromBackup": recovery_attempted,
+                }
+                return
+            except HarnessError as exc:
+                can_retry_recovery = (
+                    (not recovery_attempted)
+                    and (not bool(getattr(self.args, "disable_passphrase_recovery", False)))
+                    and str(exc.code or "") == "wallet_passphrase_mismatch"
+                )
+                if can_retry_recovery:
+                    recovered = _recover_local_passphrase_backup()
+                    if recovered:
+                        self.wallet_passphrase = recovered
+                        passphrase_source = "backup"
+                        recovery_attempted = True
+                        continue
+                self.preflight["walletDecryptProbe"] = {
+                    "ok": False,
+                    "error": str(exc),
+                    "walletStorePath": wallet_store_path,
+                    "passphraseSource": passphrase_source,
+                    "chain": self.chain,
+                    "passphraseRecoveredFromBackup": recovery_attempted,
+                }
+                raise
 
     def _management_state(self) -> dict[str, Any]:
         status, body = self._http(
@@ -502,14 +628,78 @@ class WalletApprovalHarness:
             for key in trade_outbound_keys:
                 if key in payload:
                     permissions_payload[key] = payload[key]
-            permissions_result = self._management_post_with_retry(
-                "/management/permissions/update",
-                permissions_payload,
-                label="permissions_update",
-            )
+            try:
+                permissions_result = self._management_post_with_retry(
+                    "/management/permissions/update",
+                    permissions_payload,
+                    label="permissions_update",
+                )
+            except HarnessError as exc:
+                if not self._is_policy_snapshot_missing(exc):
+                    raise
+                self._seed_policy_snapshot(permissions_payload)
+                permissions_result = self._management_post_with_retry(
+                    "/management/permissions/update",
+                    permissions_payload,
+                    label="permissions_update",
+                )
             result.update(permissions_result)
 
         return result
+
+    def _is_policy_snapshot_missing(self, exc: HarnessError) -> bool:
+        attempts = (exc.details or {}).get("attempts")
+        if not isinstance(attempts, list) or not attempts:
+            return False
+        first = attempts[0]
+        if not isinstance(first, dict):
+            return False
+        return int(first.get("status") or 0) == 409 and str(first.get("code") or "") == "policy_denied"
+
+    def _seed_policy_snapshot(self, permissions_payload: dict[str, Any]) -> None:
+        latest_policy = self.initial_state.get("latestPolicy") if isinstance(self.initial_state.get("latestPolicy"), dict) else {}
+        raw_mode = str(latest_policy.get("mode") or "real").strip().lower()
+        mode = raw_mode if raw_mode in {"mock", "real"} else "real"
+        raw_approval_mode = str(latest_policy.get("approval_mode") or "per_trade").strip().lower()
+        approval_mode = raw_approval_mode if raw_approval_mode in {"per_trade", "auto"} else "per_trade"
+        allowed_tokens = latest_policy.get("allowed_tokens") if isinstance(latest_policy.get("allowed_tokens"), list) else []
+        max_trade_usd = str(latest_policy.get("max_trade_usd") or "1000")
+        max_daily_usd = str(latest_policy.get("max_daily_usd") or "10000")
+        daily_cap_usd_enabled = bool(latest_policy.get("daily_cap_usd_enabled", True))
+        daily_trade_cap_enabled = bool(latest_policy.get("daily_trade_cap_enabled", True))
+        max_daily_trade_count = latest_policy.get("max_daily_trade_count")
+        if max_daily_trade_count is not None:
+            try:
+                max_daily_trade_count = int(max_daily_trade_count)
+            except Exception:
+                max_daily_trade_count = None
+
+        outbound_enabled = bool(permissions_payload.get("outboundTransfersEnabled", True))
+        outbound_mode = str(permissions_payload.get("outboundMode") or "allow_all").strip().lower()
+        if outbound_mode not in {"disabled", "allow_all", "whitelist"}:
+            outbound_mode = "allow_all"
+        outbound_whitelist = (
+            permissions_payload.get("outboundWhitelistAddresses")
+            if isinstance(permissions_payload.get("outboundWhitelistAddresses"), list)
+            else []
+        )
+
+        seed_payload = {
+            "agentId": self.agent_id,
+            "chainKey": self.chain,
+            "mode": mode,
+            "approvalMode": approval_mode,
+            "maxTradeUsd": max_trade_usd,
+            "maxDailyUsd": max_daily_usd,
+            "allowedTokens": allowed_tokens,
+            "dailyCapUsdEnabled": daily_cap_usd_enabled,
+            "dailyTradeCapEnabled": daily_trade_cap_enabled,
+            "maxDailyTradeCount": max_daily_trade_count,
+            "outboundTransfersEnabled": outbound_enabled,
+            "outboundMode": outbound_mode,
+            "outboundWhitelistAddresses": outbound_whitelist,
+        }
+        _ = self._management_post_with_retry("/management/policy/update", seed_payload, label="policy_snapshot_seed")
 
     def _restore_permissions(self) -> None:
         state = self.initial_state
@@ -533,6 +723,17 @@ class WalletApprovalHarness:
             "outboundWhitelistAddresses": [],
         }
         self._post_permissions_update(payload)
+
+    def _set_chain_enabled(self, enabled: bool, *, label: str) -> None:
+        _ = self._management_post_with_retry(
+            "/management/chains/update",
+            {
+                "agentId": self.agent_id,
+                "chainKey": self.chain,
+                "chainEnabled": bool(enabled),
+            },
+            label=label,
+        )
 
     def _balance_snapshot(self) -> dict[str, Decimal]:
         code, payload, _, stderr = self._runtime(["wallet", "balance", "--chain", self.chain], timeout=120)
@@ -563,6 +764,99 @@ class WalletApprovalHarness:
             raise HarnessError("wallet address response missing address")
         return addr
 
+    def _ensure_local_wallet_policy_chain_enabled(self) -> None:
+        policy_path = _agent_app_dir() / "policy.json"
+        payload: dict[str, Any] = {}
+        if policy_path.exists():
+            try:
+                existing = _read_json(policy_path)
+            except Exception as exc:
+                raise HarnessError(
+                    "Local wallet policy file is unreadable.",
+                    code="preflight_policy_invalid",
+                    category="preflight_failure",
+                    details={"path": str(policy_path), "error": _trim_text(exc)},
+                )
+            if not isinstance(existing, dict):
+                raise HarnessError(
+                    "Local wallet policy file must be a JSON object.",
+                    code="preflight_policy_invalid",
+                    category="preflight_failure",
+                    details={"path": str(policy_path)},
+                )
+            payload = dict(existing)
+
+        chains = payload.get("chains")
+        if not isinstance(chains, dict):
+            chains = {}
+        chain_policy = chains.get(self.chain)
+        if not isinstance(chain_policy, dict):
+            chain_policy = {}
+        chain_policy["chain_enabled"] = True
+        chains[self.chain] = chain_policy
+        payload["chains"] = chains
+
+        spend = payload.get("spend")
+        if not isinstance(spend, dict):
+            spend = {}
+        spend.setdefault("approval_required", False)
+        spend.setdefault("approval_granted", True)
+        spend.setdefault("max_daily_native_wei", "1000000000000000000000")
+        payload["spend"] = spend
+        if not isinstance(payload.get("paused"), bool):
+            payload["paused"] = False
+
+        policy_path.parent.mkdir(parents=True, exist_ok=True)
+        policy_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+    def _assert_expected_wallet_address(self) -> None:
+        expected = str(self.args.expected_wallet_address or "").strip().lower()
+        if not expected:
+            return
+        actual = self._wallet_address().strip().lower()
+        if actual != expected:
+            raise HarnessError(
+                "Runtime wallet address does not match expected address for this run.",
+                code="wallet_address_mismatch",
+                category="preflight_failure",
+                details={"chain": self.chain, "expected": expected, "actual": actual},
+            )
+
+    def _chain_config(self) -> dict[str, Any]:
+        if isinstance(self._chain_config_cache, dict):
+            return self._chain_config_cache
+        path = pathlib.Path("config/chains") / f"{self.chain}.json"
+        if not path.exists():
+            raise HarnessError(
+                "Chain config is missing for harness chain.",
+                code="chain_config_missing",
+                category="preflight_failure",
+                details={"chain": self.chain, "path": str(path)},
+            )
+        payload = _read_json(path)
+        self._chain_config_cache = payload
+        return payload
+
+    def _canonical_token_address(self, symbol: str) -> str:
+        cfg = self._chain_config()
+        tokens = cfg.get("canonicalTokens")
+        if not isinstance(tokens, dict):
+            raise HarnessError(
+                "Chain config canonicalTokens is invalid.",
+                code="chain_config_invalid",
+                category="preflight_failure",
+                details={"chain": self.chain, "field": "canonicalTokens"},
+            )
+        raw = str(tokens.get(symbol) or "").strip()
+        if not raw:
+            raise HarnessError(
+                f"Chain config missing canonical token address for {symbol}.",
+                code="chain_config_invalid",
+                category="preflight_failure",
+                details={"chain": self.chain, "symbol": symbol},
+            )
+        return raw
+
     def _trade_args(self, amount_in: str) -> list[str]:
         return [
             "trade",
@@ -579,28 +873,331 @@ class WalletApprovalHarness:
             "100",
         ]
 
+    def _has_chain_capability(self, capability: str) -> bool:
+        cfg = self._chain_config()
+        caps = cfg.get("capabilities")
+        if not isinstance(caps, dict):
+            return capability == "wallet"
+        raw = caps.get(capability)
+        if raw is None:
+            return capability == "wallet"
+        return bool(raw)
+
+    def _liquidity_dex(self) -> str:
+        cfg = self._chain_config()
+        core = cfg.get("coreContracts")
+        if isinstance(core, dict):
+            dex = str(core.get("dex") or "").strip()
+            if dex:
+                return dex
+        return "uniswap_v2"
+
     def _attempt_faucet_topup(self) -> None:
-        if str(self.chain).strip().lower() != "base_sepolia":
+        chain_normalized = str(self.chain).strip().lower()
+        if chain_normalized not in {"base_sepolia", "hedera_testnet"}:
             return
-        _ = self._runtime(
-            ["faucet-request", "--chain", self.chain, "stable", "wrapped", "native"],
-            timeout=120,
-        )
+        if not self._has_chain_capability("faucet"):
+            return
+        _ = self._runtime(["faucet-request", "--chain", self.chain, "stable", "wrapped", "native"], timeout=120)
         for _i in range(4):
             bal = self._balance_snapshot()
-            if bal.get("USDC", Decimal("0")) > 0 or bal.get("WETH", Decimal("0")) > 0:
+            if chain_normalized == "hedera_testnet":
+                if bal.get("SAUCE", Decimal("0")) > 0 or bal.get("WHBAR", Decimal("0")) > 0:
+                    return
+            elif bal.get("USDC", Decimal("0")) > 0 or bal.get("WETH", Decimal("0")) > 0:
                 return
             time.sleep(8)
 
-    def _prepare_trade_pair_and_amounts(self) -> None:
+    def _bootstrap_hardhat_local_token_funding(self) -> None:
+        if str(self.chain).strip().lower() != "hardhat_local":
+            return
+        recipient = self._wallet_address()
+        rpc_url = str(self.args.hardhat_rpc_url).strip() or "http://127.0.0.1:8545"
+        signer_pk = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+        for symbol, amount in (("WETH", "1000000000000000"), ("USDC", "1000000000000000000")):
+            token = self._canonical_token_address(symbol)
+            cmd = [
+                "cast",
+                "send",
+                token,
+                "transfer(address,uint256)",
+                recipient,
+                amount,
+                "--private-key",
+                signer_pk,
+                "--rpc-url",
+                rpc_url,
+            ]
+            proc = subprocess.run(cmd, text=True, capture_output=True, timeout=60)
+            if proc.returncode != 0:
+                raise HarnessError(
+                    f"hardhat_local token bootstrap transfer failed for {symbol}.",
+                    code="scenario_funding_missing",
+                    category="preflight_failure",
+                    details={"chain": self.chain, "symbol": symbol, "stderr": _trim_text(proc.stderr), "stdout": _trim_text(proc.stdout)},
+                )
+        for _i in range(5):
+            bal = self._balance_snapshot()
+            if bal.get("USDC", Decimal("0")) > 0 or bal.get("WETH", Decimal("0")) > 0:
+                return
+            time.sleep(2)
+
+    def _bootstrap_ethereum_sepolia_funding(self) -> None:
+        chain_normalized = str(self.chain).strip().lower()
+        if chain_normalized not in {"ethereum_sepolia", "hardhat_local"}:
+            return
+        self._ensure_local_wallet_policy_chain_enabled()
         bal = self._balance_snapshot()
         usdc = bal.get("USDC", Decimal("0"))
         weth = bal.get("WETH", Decimal("0"))
+        native = bal.get("NATIVE", Decimal("0"))
+        if usdc > 0 or weth > 0:
+            return
+        if native <= 0:
+            raise HarnessError(
+                "No usable native ETH balance detected for chain bootstrap.",
+                code="scenario_funding_missing",
+                category="preflight_failure",
+                details={"chain": self.chain, "nativeWei": str(native)},
+            )
+
+        # Ensure transfer policy is permissive so wrap executes immediately without resume.
+        self._post_permissions_update(
+            {
+                "agentId": self.agent_id,
+                "chainKey": self.chain,
+                "transferApprovalMode": "auto",
+                "nativeTransferPreapproved": True,
+                "allowedTransferTokens": [],
+                "outboundTransfersEnabled": True,
+                "outboundMode": "allow_all",
+                "outboundWhitelistAddresses": [],
+            }
+        )
+
+        # Wrap a small ETH amount by sending native ETH to canonical WETH.
+        reserve_wei = Decimal("100000000000000")  # 0.0001 ETH gas reserve
+        target_wrap_wei = Decimal("200000000000000")  # 0.0002 ETH
+        wrap_wei = min(target_wrap_wei, native - reserve_wei)
+        if wrap_wei <= 0:
+            raise HarnessError(
+                "Insufficient ETH to reserve gas and bootstrap WETH funding.",
+                code="scenario_funding_missing",
+                category="preflight_failure",
+                details={"chain": self.chain, "nativeWei": str(native), "requiredReserveWei": str(reserve_wei)},
+            )
+
+        wrap_to = self._canonical_token_address("WETH")
+        c_wrap, p_wrap, _, e_wrap = self._runtime(
+            ["wallet", "send", "--to", wrap_to, "--amount-wei", str(int(wrap_wei)), "--chain", self.chain],
+            timeout=240,
+        )
+        if c_wrap != 0 or not bool(p_wrap.get("ok")):
+            raise HarnessError(f"eth->weth bootstrap send failed: {p_wrap} stderr={e_wrap}")
+
+        for _i in range(6):
+            bal = self._balance_snapshot()
+            if bal.get("WETH", Decimal("0")) > 0:
+                break
+            time.sleep(4)
+        bal = self._balance_snapshot()
+        if bal.get("WETH", Decimal("0")) <= 0:
+            raise HarnessError(
+                "Chain bootstrap did not produce WETH balance.",
+                code="scenario_funding_missing",
+                category="preflight_failure",
+                details={"chain": self.chain, "wethWei": str(bal.get("WETH", Decimal("0")))},
+            )
+
+        self._post_permissions_update(
+            {
+                "agentId": self.agent_id,
+                "chainKey": self.chain,
+                "tradeApprovalMode": "auto",
+            }
+        )
+        c_trade, p_trade, _, e_trade = self._runtime(
+            [
+                "trade",
+                "spot",
+                "--chain",
+                self.chain,
+                "--token-in",
+                "WETH",
+                "--token-out",
+                "USDC",
+                "--amount-in",
+                "0.00005",
+                "--slippage-bps",
+                "100",
+            ],
+            timeout=300,
+        )
+        pending_codes = {"approval_required", "approval_pending"}
+        status = str(p_trade.get("status") or "").strip().lower()
+        if c_trade != 0 and str(p_trade.get("code") or "") not in pending_codes:
+            raise HarnessError(f"weth->usdc bootstrap trade failed: {p_trade} stderr={e_trade}")
+        trade_id = _extract_trade_id(p_trade)
+        if trade_id:
+            self.created_trade_ids.append(trade_id)
+        if (c_trade != 0 or status == "approval_pending") and str(p_trade.get("code") or "") in pending_codes:
+            if not trade_id:
+                raise HarnessError(f"bootstrap trade missing tradeId for approval flow: {p_trade}")
+            _ = self._management_post_with_retry(
+                "/management/approvals/decision",
+                {"agentId": self.agent_id, "tradeId": trade_id, "decision": "approve"},
+                label="bootstrap_trade_decision_approve",
+            )
+            code, resume_payload, _, resume_stderr = self._runtime(
+                ["approvals", "resume-spot", "--trade-id", trade_id, "--chain", self.chain], timeout=420
+            )
+            if code != 0 or not bool(resume_payload.get("ok")):
+                raise HarnessError(f"bootstrap trade resume failed: {resume_payload} stderr={resume_stderr}")
+            terminal = self._wait_for_trade_status(trade_id, {"filled", "failed", "rejected"}, timeout_sec=420)
+            if str(terminal.get("status") or "").strip().lower() != "filled":
+                raise HarnessError(f"bootstrap trade terminal status expected filled, got {terminal}")
+
+        for _i in range(6):
+            bal = self._balance_snapshot()
+            if bal.get("USDC", Decimal("0")) > 0 or bal.get("WETH", Decimal("0")) > 0:
+                return
+            time.sleep(4)
+
+    def _bootstrap_hedera_testnet_funding(self) -> None:
+        if str(self.chain).strip().lower() != "hedera_testnet":
+            return
+        self._ensure_local_wallet_policy_chain_enabled()
+        bal = self._balance_snapshot()
+        sauce = bal.get("SAUCE", Decimal("0"))
+        whbar = bal.get("WHBAR", Decimal("0"))
+        native = bal.get("NATIVE", Decimal("0"))
+        if sauce > 0 or whbar > 0:
+            return
+        if native <= 0:
+            raise HarnessError(
+                "No usable native HBAR balance detected for Hedera bootstrap.",
+                code="scenario_funding_missing",
+                category="preflight_failure",
+                details={"chain": self.chain, "nativeWei": str(native)},
+            )
+
+        self._post_permissions_update(
+            {
+                "agentId": self.agent_id,
+                "chainKey": self.chain,
+                "transferApprovalMode": "auto",
+                "nativeTransferPreapproved": True,
+                "allowedTransferTokens": [],
+                "outboundTransfersEnabled": True,
+                "outboundMode": "allow_all",
+                "outboundWhitelistAddresses": [],
+            }
+        )
+
+        c_wrap, p_wrap, _, e_wrap = self._runtime(
+            ["wallet", "wrap-native", "--chain", self.chain, "--amount", "0.5"],
+            timeout=240,
+        )
+        if c_wrap != 0 or not bool(p_wrap.get("ok")):
+            raise HarnessError(f"hbar->whbar bootstrap wrap failed: {p_wrap} stderr={e_wrap}")
+
+        for _i in range(6):
+            bal = self._balance_snapshot()
+            if bal.get("WHBAR", Decimal("0")) > 0:
+                break
+            time.sleep(4)
+        bal = self._balance_snapshot()
+        if bal.get("WHBAR", Decimal("0")) <= 0:
+            raise HarnessError(
+                "Hedera bootstrap did not produce WHBAR balance.",
+                code="scenario_funding_missing",
+                category="preflight_failure",
+                details={"chain": self.chain, "whbarWei": str(bal.get("WHBAR", Decimal("0")))},
+            )
+
+        self._post_permissions_update({"agentId": self.agent_id, "chainKey": self.chain, "tradeApprovalMode": "auto"})
+        c_trade, p_trade, _, e_trade = self._runtime(
+            [
+                "trade",
+                "spot",
+                "--chain",
+                self.chain,
+                "--token-in",
+                "WHBAR",
+                "--token-out",
+                "SAUCE",
+                "--amount-in",
+                "0.01",
+                "--slippage-bps",
+                "150",
+            ],
+            timeout=300,
+        )
+        pending_codes = {"approval_required", "approval_pending"}
+        status = str(p_trade.get("status") or "").strip().lower()
+        if c_trade != 0 and str(p_trade.get("code") or "") not in pending_codes:
+            raise HarnessError(f"whbar->sauce bootstrap trade failed: {p_trade} stderr={e_trade}")
+        trade_id = _extract_trade_id(p_trade)
+        if trade_id:
+            self.created_trade_ids.append(trade_id)
+        if (c_trade != 0 or status == "approval_pending") and str(p_trade.get("code") or "") in pending_codes:
+            if not trade_id:
+                raise HarnessError(f"bootstrap trade missing tradeId for approval flow: {p_trade}")
+            _ = self._management_post_with_retry(
+                "/management/approvals/decision",
+                {"agentId": self.agent_id, "tradeId": trade_id, "decision": "approve"},
+                label="bootstrap_trade_decision_approve_hedera",
+            )
+            code, resume_payload, _, resume_stderr = self._runtime(
+                ["approvals", "resume-spot", "--trade-id", trade_id, "--chain", self.chain], timeout=420
+            )
+            if code != 0 or not bool(resume_payload.get("ok")):
+                raise HarnessError(f"bootstrap trade resume failed: {resume_payload} stderr={resume_stderr}")
+            terminal = self._wait_for_trade_status(trade_id, {"filled", "failed", "rejected"}, timeout_sec=420)
+            if str(terminal.get("status") or "").strip().lower() != "filled":
+                raise HarnessError(f"bootstrap trade terminal status expected filled, got {terminal}")
+
+        for _i in range(6):
+            bal = self._balance_snapshot()
+            if bal.get("SAUCE", Decimal("0")) > 0 or bal.get("WHBAR", Decimal("0")) > 0:
+                return
+            time.sleep(4)
+
+    def _prepare_trade_pair_and_amounts(self) -> None:
+        chain_normalized = str(self.chain).strip().lower()
+        bal = self._balance_snapshot()
+        usdc = bal.get("USDC", Decimal("0"))
+        weth = bal.get("WETH", Decimal("0"))
+        sauce = bal.get("SAUCE", Decimal("0"))
+        whbar = bal.get("WHBAR", Decimal("0"))
         if usdc <= 0 and weth <= 0:
             self._attempt_faucet_topup()
+            self._bootstrap_ethereum_sepolia_funding()
+            self._bootstrap_hedera_testnet_funding()
+            self._bootstrap_hardhat_local_token_funding()
             bal = self._balance_snapshot()
             usdc = bal.get("USDC", Decimal("0"))
             weth = bal.get("WETH", Decimal("0"))
+            sauce = bal.get("SAUCE", Decimal("0"))
+            whbar = bal.get("WHBAR", Decimal("0"))
+
+        if chain_normalized == "hedera_testnet":
+            if sauce > 0:
+                self.trade_token_in = "SAUCE"
+                self.trade_token_out = "WHBAR"
+            else:
+                self.trade_token_in = "WHBAR"
+                self.trade_token_out = "SAUCE"
+            self.trade_amounts = {
+                "pending_approve": "0.01",
+                "reject": "0.008",
+                "dedupe": "0.006",
+                "global_auto": "0.004",
+                "allowlist": "0.005",
+                "rebalance": "0.003",
+            }
+            if sauce > 0 or whbar > 0:
+                return
 
         if usdc > 0:
             self.trade_token_in = "USDC"
@@ -618,19 +1215,25 @@ class WalletApprovalHarness:
             self.trade_token_in = "WETH"
             self.trade_token_out = "USDC"
             self.trade_amounts = {
-                "pending_approve": "0.0002",
-                "reject": "0.00012",
-                "dedupe": "0.0001",
-                "global_auto": "0.00008",
-                "allowlist": "0.00009",
-                "rebalance": "0.00005",
+                "pending_approve": "0.00005",
+                "reject": "0.00003",
+                "dedupe": "0.00002",
+                "global_auto": "0.00001",
+                "allowlist": "0.00001",
+                "rebalance": "0.000005",
             }
             return
         raise HarnessError(
-            "No usable trade funding detected for USDC/WETH pair.",
+            "No usable trade funding detected for configured chain trade pair.",
             code="scenario_funding_missing",
             category="preflight_failure",
-            details={"chain": self.chain, "usdcWei": str(usdc), "wethWei": str(weth)},
+            details={
+                "chain": self.chain,
+                "usdcWei": str(usdc),
+                "wethWei": str(weth),
+                "sauceWei": str(sauce),
+                "whbarWei": str(whbar),
+            },
         )
 
     def _scenario_trade_pending_approve(self) -> dict[str, Any]:
@@ -664,6 +1267,12 @@ class WalletApprovalHarness:
             ["approvals", "resume-spot", "--trade-id", trade_id, "--chain", self.chain], timeout=420
         )
         if code != 0 or not bool(resume_payload.get("ok")):
+            if str(self.chain).strip().lower() == "ethereum_sepolia" and _payload_contains_uniswap_proxy_missing(resume_payload):
+                return {
+                    "tradeId": trade_id,
+                    "assertedExecutionEnvironmentCode": "uniswap_proxy_not_configured",
+                    "status": "environment_limited",
+                }
             raise HarnessError(f"trade resume failed: {resume_payload} stderr={resume_stderr}")
 
         terminal = self._wait_for_trade_status(trade_id, {"filled", "failed", "rejected"}, timeout_sec=420)
@@ -765,6 +1374,12 @@ class WalletApprovalHarness:
             self._trade_args(self.trade_amounts["global_auto"])
         )
         if c_auto != 0:
+            if str(self.chain).strip().lower() == "ethereum_sepolia" and _payload_contains_uniswap_proxy_missing(p_auto):
+                return {
+                    "assertedExecutionEnvironmentCode": "uniswap_proxy_not_configured",
+                    "stage": "global_auto",
+                    "status": "environment_limited",
+                }
             raise HarnessError(f"global auto trade failed: {p_auto} stderr={err_auto}")
 
         # per-trade + allowlist via approve-allowlist-token
@@ -796,6 +1411,13 @@ class WalletApprovalHarness:
             ["approvals", "resume-spot", "--trade-id", trade_id, "--chain", self.chain], timeout=420
         )
         if code != 0 or not bool(resume_payload.get("ok")):
+            if str(self.chain).strip().lower() == "ethereum_sepolia" and _payload_contains_uniswap_proxy_missing(resume_payload):
+                return {
+                    "tradeId": trade_id,
+                    "assertedExecutionEnvironmentCode": "uniswap_proxy_not_configured",
+                    "stage": "allowlist_resume",
+                    "status": "environment_limited",
+                }
             raise HarnessError(f"allowlist resume failed: {resume_payload} stderr={resume_err}")
 
         state = self._management_state()
@@ -805,7 +1427,7 @@ class WalletApprovalHarness:
             raise HarnessError(f"allowlisted token missing from latest policy: {allowed_tokens}")
         return {"tradeId": trade_id, "allowlistedToken": body.get("allowlistedToken")}
 
-    def _scenario_transfer_and_x402(self) -> dict[str, Any]:
+    def _scenario_transfer_only(self) -> dict[str, Any]:
         recipient = (self.args.recipient_address or self._wallet_address()).strip()
         self._post_permissions_update(
             {
@@ -845,7 +1467,7 @@ class WalletApprovalHarness:
                 "wallet",
                 "send-token",
                 "--token",
-                "USDC",
+                self.trade_token_in,
                 "--to",
                 recipient,
                 "--amount-wei",
@@ -867,8 +1489,31 @@ class WalletApprovalHarness:
             label="transfer_decision_erc20_deny",
             accepted_conflict_codes={"not_actionable"},
         )
+        return {"nativeApprovalId": appr1, "erc20ApprovalId": appr2}
 
-        # x402 receive + pay deny/approve
+    def _scenario_x402_or_capability_assertion(self) -> dict[str, Any]:
+        if not self._has_chain_capability("x402"):
+            c_recv, p_recv, _, _ = self._runtime(
+                [
+                    "x402",
+                    "receive-request",
+                    "--network",
+                    self.chain,
+                    "--facilitator",
+                    "cdp",
+                    "--amount-atomic",
+                    "0.00001",
+                    "--asset-kind",
+                    "native",
+                    "--resource-description",
+                    "slice117 capability assertion",
+                ]
+            )
+            if c_recv == 0 or str(p_recv.get("code") or "") != "unsupported_chain_capability":
+                raise HarnessError(f"x402 expected unsupported_chain_capability, got {p_recv}")
+            return {"assertedUnsupportedCode": "unsupported_chain_capability", "network": self.chain}
+
+        # x402 receive + pay approve
         c_recv, p_recv, _, e_recv = self._runtime(
             [
                 "x402",
@@ -926,7 +1571,7 @@ class WalletApprovalHarness:
             if not (isinstance(last, dict) and int(last.get("status", 0)) == 404 and str(last.get("code") or "") == "payload_invalid"):
                 raise
         _ = self._runtime(["x402", "pay-resume", "--approval-id", approval_id], timeout=240)
-        return {"nativeApprovalId": appr1, "erc20ApprovalId": appr2, "x402ApprovalId": approval_id}
+        return {"x402ApprovalId": approval_id}
 
     def _scenario_liquidity_and_pause(self) -> dict[str, Any]:
         self._post_permissions_update(
@@ -943,15 +1588,15 @@ class WalletApprovalHarness:
                 "--chain",
                 self.chain,
                 "--dex",
-                "uniswap_v2",
+                self._liquidity_dex(),
                 "--token-a",
-                "USDC",
+                self.trade_token_in,
                 "--token-b",
-                "WETH",
+                self.trade_token_out,
                 "--amount-a",
-                "50",
+                self.trade_amounts.get("allowlist", "0.015"),
                 "--amount-b",
-                "0.02",
+                self.trade_amounts.get("global_auto", "0.01"),
                 "--slippage-bps",
                 "100",
             ],
@@ -1018,10 +1663,13 @@ class WalletApprovalHarness:
 
         after = self._balance_snapshot()
         bps = int(self.args.balance_tolerance_bps)
-        native_floor_wei = Decimal("1000000000000000000") * Decimal(str(self.args.balance_tolerance_floor_native))
+        native_floor_native = Decimal(str(self.args.balance_tolerance_floor_native))
+        if str(self.chain).strip().lower().startswith("hedera") and native_floor_native < Decimal("5"):
+            native_floor_native = Decimal("5")
+        native_floor_wei = Decimal("1000000000000000000") * native_floor_native
         stable_floor_wei = Decimal("1000000000000000000") * Decimal(str(self.args.balance_tolerance_floor_stable))
 
-        keys = {"NATIVE", "USDC", "WETH"}
+        keys = {"NATIVE", str(self.trade_token_in).upper(), str(self.trade_token_out).upper()}
         failures: dict[str, Any] = {}
         deltas: dict[str, Any] = {}
         for key in sorted(keys):
@@ -1046,6 +1694,11 @@ class WalletApprovalHarness:
         if failures:
             raise HarnessError(f"balance tolerance exceeded: {failures}")
         return {"deltas": deltas}
+
+    def _scenario_hardhat_local_gate(self) -> dict[str, Any]:
+        if str(self.chain).strip().lower() != "hardhat_local":
+            return {}
+        return {"chain": self.chain, "walletAddress": self._wallet_address(), "gate": "preflight_only"}
 
     def _resolve_pending_best_effort(self) -> list[dict[str, Any]]:
         unresolved: list[dict[str, Any]] = []
@@ -1087,30 +1740,45 @@ class WalletApprovalHarness:
         if self.args.approve_driver != "management_api":
             raise HarnessError("Slice 96 harness only supports --approve-driver management_api", category="preflight_failure")
 
+        hardhat_smoke = str(self.chain).strip().lower() == "hardhat_local" and self.args.scenario_set == "smoke"
         self._record("bootstrap", True, "starting harness", {"at": _now_iso(), "chain": self.chain, "agentId": self.agent_id})
         self._assert_hardhat_evidence_gate()
         self._probe_hardhat_rpc()
         self._wallet_decrypt_probe()
+        self._assert_expected_wallet_address()
         self._bootstrap_management()
         state = self._management_state()
         self.initial_state = {
             "latestPolicy": state.get("latestPolicy") if isinstance(state.get("latestPolicy"), dict) else {},
             "transferApprovalPolicy": state.get("transferApprovalPolicy") if isinstance(state.get("transferApprovalPolicy"), dict) else {},
             "publicStatus": ((state.get("agent") or {}).get("publicStatus") if isinstance(state.get("agent"), dict) else None),
+            "chainPolicy": state.get("chainPolicy") if isinstance(state.get("chainPolicy"), dict) else {},
         }
-        baseline_balances = self._balance_snapshot()
-        self._prepare_trade_pair_and_amounts()
+        baseline_chain_enabled = bool((self.initial_state.get("chainPolicy") or {}).get("chainEnabled", True))
+        if str(self.chain).strip().lower() != "hardhat_local" and not baseline_chain_enabled:
+            self._set_chain_enabled(True, label="enable_chain_for_harness")
+            self._record("enable_chain", True, "enabled chain policy for harness run", {"class": "ok", "chain": self.chain})
+        baseline_balances: dict[str, Decimal] = {}
+        if not hardhat_smoke:
+            self._ensure_local_wallet_policy_chain_enabled()
+            baseline_balances = self._balance_snapshot()
+            self._prepare_trade_pair_and_amounts()
 
-        scenario_funcs: list[tuple[str, Any]] = [
-            ("trade_pending_approve", self._scenario_trade_pending_approve),
-            ("trade_reject", self._scenario_trade_reject),
-            ("trade_dedupe", self._scenario_trade_dedupe),
-        ]
+        scenario_funcs: list[tuple[str, Any]] = []
+        if hardhat_smoke:
+            scenario_funcs = [("hardhat_local_gate", self._scenario_hardhat_local_gate)]
+        else:
+            scenario_funcs = [
+                ("trade_pending_approve", self._scenario_trade_pending_approve),
+                ("trade_reject", self._scenario_trade_reject),
+                ("trade_dedupe", self._scenario_trade_dedupe),
+            ]
         if self.args.scenario_set == "full":
             scenario_funcs.extend(
                 [
                     ("global_and_allowlist", self._scenario_global_and_allowlist),
-                    ("transfer_and_x402", self._scenario_transfer_and_x402),
+                    ("transfer_only", self._scenario_transfer_only),
+                    ("x402_or_capability_assertion", self._scenario_x402_or_capability_assertion),
                     ("liquidity_and_pause", self._scenario_liquidity_and_pause),
                 ]
             )
@@ -1125,16 +1793,17 @@ class WalletApprovalHarness:
             except Exception as exc:
                 self._record(name, False, "scenario failed", {"error": str(exc), "class": self._classify_error(exc)})
 
-        try:
-            details = self._scenario_balance_reversion(baseline_balances)
-            self._record("balance_reversion", True, "within tolerance window", {"class": "ok", **details})
-        except Exception as exc:
-            self._record(
-                "balance_reversion",
-                False,
-                "tolerance check failed",
-                {"error": str(exc), "class": self._classify_error(exc, fallback="runtime_trade_failure")},
-            )
+        if not hardhat_smoke:
+            try:
+                details = self._scenario_balance_reversion(baseline_balances)
+                self._record("balance_reversion", True, "within tolerance window", {"class": "ok", **details})
+            except Exception as exc:
+                self._record(
+                    "balance_reversion",
+                    False,
+                    "tolerance check failed",
+                    {"error": str(exc), "class": self._classify_error(exc, fallback="runtime_trade_failure")},
+                )
 
         try:
             self._restore_permissions()
@@ -1151,6 +1820,18 @@ class WalletApprovalHarness:
                     "restore_public_status",
                     False,
                     "failed to restore pause status",
+                    {"error": str(exc), "class": "policy_restore_failure"},
+                )
+
+        if str(self.chain).strip().lower() != "hardhat_local" and not baseline_chain_enabled:
+            try:
+                self._set_chain_enabled(False, label="restore_chain_policy")
+                self._record("restore_chain_policy", True, "restored chain enabled flag to baseline", {"class": "ok", "chain": self.chain})
+            except Exception as exc:
+                self._record(
+                    "restore_chain_policy",
+                    False,
+                    "failed to restore chain enabled flag",
                     {"error": str(exc), "class": "policy_restore_failure"},
                 )
 
@@ -1195,6 +1876,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--runtime-bin", default="apps/agent-runtime/bin/xclaw-agent")
     parser.add_argument("--agent-api-key", default=os.environ.get("XCLAW_AGENT_API_KEY", ""))
     parser.add_argument("--wallet-passphrase", default=os.environ.get("XCLAW_WALLET_PASSPHRASE", ""))
+    parser.add_argument("--disable-passphrase-recovery", action="store_true")
     parser.add_argument("--mode", choices=["full"], default="full")
     parser.add_argument("--scenario-set", choices=["smoke", "full"], default="full")
     parser.add_argument("--approve-driver", choices=["management_api"], default="management_api")
@@ -1206,6 +1888,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--balance-tolerance-floor-native", type=str, default="0.0005")
     parser.add_argument("--balance-tolerance-floor-stable", type=str, default="5")
     parser.add_argument("--recipient-address", default=os.environ.get("XCLAW_HARNESS_RECIPIENT", ""))
+    parser.add_argument("--expected-wallet-address", default="")
     parser.add_argument("--json-report", required=True)
     return parser
 

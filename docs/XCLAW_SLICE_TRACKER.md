@@ -2209,3 +2209,20 @@ DoD:
 - [x] matrix includes send/trade/liquidity/claims plus primary/fallback/fail code columns.
 - [x] promoted vs non-promoted fallback states are explicit per chain.
 - [x] canonical docs/handoff artifacts synchronized.
+
+## Slice 117: Ethereum Sepolia Harness Matrix Expansion
+Status: [~]
+Issue: #60
+
+Goal:
+- Extend wallet-approval harness execution from `hardhat_local -> base_sepolia` to `hardhat_local -> base_sepolia -> ethereum_sepolia`, with deterministic capability-aware assertions.
+
+DoD:
+- [x] add matrix runner `apps/agent-runtime/scripts/wallet_approval_chain_matrix.py` with strict sequential stop-on-failure behavior.
+- [x] harness supports optional wallet identity assertion (`--expected-wallet-address`).
+- [x] harness includes Ethereum Sepolia ETH bootstrap path (`ETH -> WETH -> USDC`) and deterministic `scenario_funding_missing` fail-fast.
+- [x] harness transfer and x402 scenarios are split so `ethereum_sepolia` asserts deterministic x402 unsupported behavior (`unsupported_chain_capability`).
+- [x] unit tests added/updated for harness bootstrap/capability behavior and matrix runner sequencing.
+- [ ] runtime matrix evidence captured for hardhat/base/ethereum sepolia.
+- [ ] required gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
+- [ ] issue #60 updated with verification evidence + commit hash(es).

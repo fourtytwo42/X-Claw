@@ -5846,3 +5846,33 @@ Date (UTC): 2026-02-19
 - `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS
 - `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v` -> PASS
 - required gates rerun sequentially for this stream (see final gate block below).
+
+## Slice 117: Ethereum Sepolia Harness Matrix Expansion (UTC 2026-02-20)
+
+### Implementation evidence
+- Updated harness: `apps/agent-runtime/scripts/wallet_approval_harness.py`
+  - Ethereum Sepolia funding bootstrap (`ETH -> WETH -> USDC`).
+  - Optional wallet identity assertion (`--expected-wallet-address`).
+  - Split transfer-only and x402 capability-aware scenarios.
+- Added matrix runner: `apps/agent-runtime/scripts/wallet_approval_chain_matrix.py`
+  - strict order: hardhat -> base -> ethereum sepolia,
+  - stop-on-first-failure,
+  - consolidated JSON report.
+- Added/updated tests:
+  - `apps/agent-runtime/tests/test_wallet_approval_harness.py`
+  - `apps/agent-runtime/tests/test_wallet_approval_chain_matrix.py`
+
+### Unit test validation
+- `python3 -m unittest apps/agent-runtime/tests/test_wallet_approval_harness.py -v` -> PASS
+- `python3 -m unittest apps/agent-runtime/tests/test_wallet_approval_chain_matrix.py -v` -> PASS
+
+### Pending runtime/gate evidence
+- [ ] Matrix runtime run command:
+  - `python3 apps/agent-runtime/scripts/wallet_approval_chain_matrix.py --base-url http://127.0.0.1:3000 --agent-id <agent_id> --bootstrap-token-file <token_file> --agent-api-key <api_key> --wallet-passphrase <passphrase> --harvy-address 0x582f6f293e0f49855bb752ae29d6b0565c500d87 --json-report /tmp/xclaw-slice117-matrix.json`
+- [ ] Required sequential gates:
+  - `npm run db:parity`
+  - `npm run seed:reset`
+  - `npm run seed:load`
+  - `npm run seed:verify`
+  - `npm run build`
+  - `pm2 restart all`

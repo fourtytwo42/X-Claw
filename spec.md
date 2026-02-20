@@ -3192,3 +3192,18 @@ Publish a final active-chain matrix that reflects v2-only fallback promotions an
 1. Matrix rows include send/trade/liquidity/claim-fees/claim-rewards.
 2. Matrix columns include primary provider, fallback provider, deterministic fail code.
 3. Wallet-only/disabled chains remain backlog in this stream.
+
+## Slice 117: Ethereum Sepolia Harness Matrix Expansion
+
+### Goal
+Extend wallet-approval harness flow to run `hardhat_local -> base_sepolia -> ethereum_sepolia` with deterministic gating and capability-aware behavior.
+
+### Non-goals
+1. Enabling x402 or faucet on `ethereum_sepolia`.
+2. USDT-specific bootstrap routing.
+3. API/OpenAPI contract changes.
+
+### Constraints
+1. `ethereum_sepolia` bootstrap uses canonical `WETH` and `USDC` only.
+2. Hardhat report must be green before non-hardhat chain runs.
+3. Identity assertion for Harvy is optional via `--expected-wallet-address` and fail-fast when mismatched.

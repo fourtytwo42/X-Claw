@@ -3359,3 +3359,28 @@ Active slice context: `Slice 98`.
 ## 1) Evidence closeout
 - [x] Publish final active-chain parity matrix with provider/fallback/fail-code columns.
 - [x] Run required gates sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
+
+# Slice 117 Tasks: Ethereum Sepolia Harness Matrix Expansion (UTC 2026-02-20)
+
+## 1) Harness updates
+- [x] Add Ethereum Sepolia funding bootstrap (`ETH -> WETH -> USDC`) in `apps/agent-runtime/scripts/wallet_approval_harness.py`.
+- [x] Add optional wallet identity assertion (`--expected-wallet-address`).
+- [x] Split transfer and x402 scenarios.
+- [x] Add deterministic x402 unsupported assertion path on `ethereum_sepolia`.
+
+## 2) Matrix runner
+- [x] Add `apps/agent-runtime/scripts/wallet_approval_chain_matrix.py`.
+- [x] Enforce run order: hardhat smoke -> base full -> ethereum sepolia full.
+- [x] Stop on first failure and emit consolidated JSON report.
+
+## 3) Tests
+- [x] Update `apps/agent-runtime/tests/test_wallet_approval_harness.py` for bootstrap and x402 capability assertions.
+- [x] Add `apps/agent-runtime/tests/test_wallet_approval_chain_matrix.py` for order/failure gating.
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_wallet_approval_harness.py -v`
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_wallet_approval_chain_matrix.py -v`
+
+## 4) Validation/evidence
+- [ ] Run chain matrix against runtime environment and capture reports.
+- [ ] Run required gates sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
+- [ ] Issue #60 evidence post with commit hash(es).
+- [x] Add harness passphrase recovery from local encrypted backup and opt-out flag (`--disable-passphrase-recovery`).
