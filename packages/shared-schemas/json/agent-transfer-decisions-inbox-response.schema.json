@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.xclaw.trade/agent-transfer-decisions-inbox-response.schema.json",
+  "title": "AgentTransferDecisionsInboxResponse",
+  "type": "object",
+  "required": ["ok", "agentId", "count", "decisions"],
+  "additionalProperties": false,
+  "properties": {
+    "ok": { "type": "boolean", "const": true },
+    "agentId": { "type": "string", "minLength": 1 },
+    "chainKey": { "type": ["string", "null"], "minLength": 1 },
+    "count": { "type": "integer", "minimum": 0 },
+    "decisions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["decisionId", "approvalId", "chainKey", "decision", "source", "createdAt"],
+        "additionalProperties": false,
+        "properties": {
+          "decisionId": { "type": "string", "minLength": 1 },
+          "approvalId": { "type": "string", "minLength": 1 },
+          "chainKey": { "type": "string", "minLength": 1 },
+          "decision": { "type": "string", "enum": ["approve", "deny"] },
+          "reasonMessage": { "type": ["string", "null"] },
+          "source": { "type": "string", "minLength": 1 },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      }
+    }
+  }
+}

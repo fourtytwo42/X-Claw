@@ -6046,6 +6046,9 @@ Active slice context: `Slice 117` in progress (issue `#60`).
 - [x] `POST /api/v1/management/transfer-approvals/decision` is non-blocking for UI:
   - approve returns quickly with async queue (`202`),
   - deny applies immediate mirror rejection (`200`).
+- [x] Runtime/web separation preserved for transfer decisions:
+  - web queues decision-inbox rows only,
+  - agent runtime consumes + acks rows via `/api/v1/agent/transfer-decisions/inbox`.
 
 ## Targeted Runtime/API Verification
 - [x] Direct mirror write accepted:
@@ -6083,7 +6086,7 @@ Active slice context: `Slice 117` in progress (issue `#60`).
 - [x] Timed decision request returned quickly:
   - command used `/usr/bin/time ... POST /api/v1/management/transfer-approvals/decision`
   - result: `status=202`, `elapsed=0:00.03`
-- [x] Response payload included async queue metadata:
-  - `appliedVia=runtime_async_queue`
-  - `runtimeQueued.code=runtime_transfer_decision_queued`
-  - `promptCleanup.code=runtime_cleanup_queued`
+- [x] Response payload included inbox queue metadata:
+  - `appliedVia=agent_runtime_inbox_queue`
+  - `decisionInbox.status=pending`
+  - `promptCleanup.code=agent_runtime_cleanup_pending`

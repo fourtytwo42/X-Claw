@@ -3365,10 +3365,10 @@ Ensure runtime never reports queued transfer approvals that are invisible in web
 ## Hotfix E extension (non-blocking transfer decision UX)
 1. `POST /api/v1/management/transfer-approvals/decision` must not block UI on runtime send execution.
 2. Approve flow:
-   - queue runtime transfer decision in background,
-   - return quickly with `202` + queue metadata,
+   - queue transfer decision row in server inbox for agent-runtime polling,
+   - return quickly with `202` + inbox metadata,
    - update mirror to `approved` decision state while runtime continues to `executing|filled|failed`.
 3. Deny flow:
    - apply mirror rejection immediately,
    - return quickly with `200`,
-   - queue runtime prompt cleanup asynchronously.
+   - leave prompt cleanup to agent-runtime decision consumption path.

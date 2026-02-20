@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.xclaw.trade/agent-transfer-decisions-ack-request.schema.json",
+  "title": "AgentTransferDecisionsAckRequest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "decisionId", "status"],
+  "properties": {
+    "schemaVersion": { "type": "integer", "const": 1 },
+    "decisionId": { "type": "string", "minLength": 1 },
+    "status": { "type": "string", "enum": ["applied", "failed"] },
+    "reasonCode": { "type": ["string", "null"], "maxLength": 64 },
+    "reasonMessage": { "type": ["string", "null"], "maxLength": 500 }
+  }
+}

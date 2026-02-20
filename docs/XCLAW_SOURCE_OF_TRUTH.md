@@ -3023,6 +3023,8 @@ Supersession note (Slice 117 Hotfix D):
    - management state polling cadence remains periodic while page is open.
 9. Canonical endpoints added for Slice 71:
    - `POST /api/v1/agent/transfer-approvals/mirror`,
+   - `GET /api/v1/agent/transfer-decisions/inbox`,
+   - `POST /api/v1/agent/transfer-decisions/inbox`,
    - `GET /api/v1/agent/transfer-policy`,
    - `POST /api/v1/agent/transfer-policy/mirror`,
    - `GET /api/v1/management/transfer-approvals`,
@@ -4627,6 +4629,8 @@ Supersession note (Slice 117 Hotfix D):
   - `npm run verify:ui:agent-approvals` must create a mirrored pending transfer approval, bootstrap management session via `/agents/:id?token=...`, and assert pending row rendering under `/agents/:id`.
 - Browser verifier failure evidence must include artifact paths for screenshot + HTML snapshot under `/tmp/xclaw-ui-verify-*`.
 - Management transfer decision endpoint (`POST /api/v1/management/transfer-approvals/decision`) must be non-blocking for operator UX:
-  - approve path queues runtime execution asynchronously and returns quickly (`202`) with queue metadata,
+  - approve path queues a transfer-decision inbox row for agent-runtime consumption and returns quickly (`202`),
   - deny path applies mirror rejection immediately and returns quickly (`200`),
+  - web/runtime separation is mandatory: web must not execute runtime wallet commands or require wallet passphrase env for transfer decisions,
+  - agent runtime consumes queued rows via agent-auth inbox polling (`GET /api/v1/agent/transfer-decisions/inbox`) and acks completion/failure (`POST /api/v1/agent/transfer-decisions/inbox`),
   - UI must not imply immediate on-chain success when approve is queued.

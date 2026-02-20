@@ -194,6 +194,53 @@ paths:
           $ref: '#/components/responses/ErrorResponse'
         '503':
           $ref: '#/components/responses/ErrorResponse'
+  /api/v1/agent/transfer-decisions/inbox:
+    get:
+      summary: Poll pending transfer approval decisions queued by management for this agent (agent-auth).
+      security:
+        - agentBearer: []
+      parameters:
+        - name: chainKey
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+      responses:
+        '200':
+          description: Pending transfer decisions for runtime consumption.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentTransferDecisionsInboxResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+    post:
+      summary: Ack one transfer decision row as applied/failed after runtime processing (agent-auth).
+      security:
+        - agentBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentTransferDecisionsAckRequest'
+      responses:
+        '200':
+          description: Transfer decision inbox ack accepted.
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
   /api/v1/agent/x402/outbound/proposed:
     post:
       summary: Mirror runtime-proposed outbound x402 payment intent (agent-auth).
@@ -1380,7 +1427,7 @@ paths:
         '200':
           description: Transfer deny accepted and applied immediately.
         '202':
-          description: Transfer approve accepted and queued for asynchronous runtime execution.
+          description: Transfer approve accepted and queued in runtime decision inbox.
         '400':
           $ref: '#/components/responses/ErrorResponse'
         '401':
@@ -1388,8 +1435,6 @@ paths:
         '404':
           $ref: '#/components/responses/ErrorResponse'
         '409':
-          $ref: '#/components/responses/ErrorResponse'
-        '503':
           $ref: '#/components/responses/ErrorResponse'
   /api/v1/management/x402/payments:
     get:
@@ -3376,6 +3421,61 @@ components:
         terminalAt:
           type: string
           format: date-time
+          nullable: true
+    AgentTransferDecisionsInboxResponse:
+      type: object
+      required: [ok, agentId, count, decisions]
+      properties:
+        ok:
+          type: boolean
+        agentId:
+          type: string
+        chainKey:
+          type: string
+          nullable: true
+        count:
+          type: integer
+          minimum: 0
+        decisions:
+          type: array
+          items:
+            type: object
+            required: [decisionId, approvalId, chainKey, decision, source, createdAt]
+            properties:
+              decisionId:
+                type: string
+              approvalId:
+                type: string
+              chainKey:
+                type: string
+              decision:
+                type: string
+                enum: [approve, deny]
+              reasonMessage:
+                type: string
+                nullable: true
+              source:
+                type: string
+              createdAt:
+                type: string
+                format: date-time
+    AgentTransferDecisionsAckRequest:
+      type: object
+      required: [schemaVersion, decisionId, status]
+      properties:
+        schemaVersion:
+          type: integer
+          enum: [1]
+        decisionId:
+          type: string
+        status:
+          type: string
+          enum: [applied, failed]
+        reasonCode:
+          type: string
+          nullable: true
+        reasonMessage:
+          type: string
           nullable: true
     AgentX402OutboundProposedRequest:
       type: object

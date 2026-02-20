@@ -3814,8 +3814,9 @@ Note:
 - [x] Added executable browser verifier: `npm run verify:ui:agent-approvals`.
 - [x] Verifier writes pending transfer mirror row, bootstraps management session from owner link token, and asserts `/agents/:id` pending approval row rendering.
 - [x] `POST /api/v1/management/transfer-approvals/decision` moved to non-blocking operator semantics:
-  - [x] approve returns async-queued response quickly (`202`) instead of waiting for runtime transfer execution.
-  - [x] deny applies mirror rejection immediately (`200`) with async prompt cleanup.
+  - [x] approve returns async-queued response quickly (`202`) by queueing agent-runtime inbox row (no web runtime execution).
+  - [x] deny applies mirror rejection immediately (`200`) and leaves prompt cleanup to runtime inbox consumption.
+- [x] runtime separation preserved: web does not require wallet passphrase env for transfer decisions; agent runtime consumes/acks queued decisions via `/api/v1/agent/transfer-decisions/inbox`.
 - [x] Canonical docs + handoff artifacts synchronized.
 - [ ] Required gates run sequentially:
   - [ ] `npm run db:parity`

@@ -3701,6 +3701,71 @@ def _cleanup_policy_approval_prompt(approval_id: str) -> dict[str, Any]:
     return dict(result.get("promptCleanup") or {"ok": bool(result.get("ok")), "code": str(result.get("code") or "unknown")})
 
 
+def _fetch_transfer_decision_inbox(chain: str, limit: int = 20) -> list[dict[str, Any]]:
+    safe_chain = str(chain or "").strip()
+    safe_limit = max(1, min(int(limit), 50))
+    query = urllib.parse.urlencode({"chainKey": safe_chain, "limit": str(safe_limit)})
+    status_code, body = _api_request("GET", f"/agent/transfer-decisions/inbox?{query}")
+    if status_code < 200 or status_code >= 300:
+        raise WalletStoreError(
+            f"{str(body.get('code', 'api_error'))}: {str(body.get('message', f'transfer decision inbox fetch failed ({status_code})'))}"
+        )
+    rows = body.get("decisions")
+    if not isinstance(rows, list):
+        return []
+    return [row for row in rows if isinstance(row, dict)]
+
+
+def _ack_transfer_decision_inbox(
+    decision_id: str,
+    status: str,
+    reason_code: str | None = None,
+    reason_message: str | None = None,
+) -> tuple[int, dict[str, Any]]:
+    payload: dict[str, Any] = {
+        "schemaVersion": 1,
+        "decisionId": decision_id,
+        "status": status,
+    }
+    if reason_code:
+        payload["reasonCode"] = reason_code
+    if reason_message:
+        payload["reasonMessage"] = reason_message
+    return _api_request("POST", "/agent/transfer-decisions/inbox", payload=payload, include_idempotency=True)
+
+
+def _run_decide_transfer_inline(
+    approval_id: str,
+    decision: str,
+    chain: str,
+    source: str,
+    reason_message: str | None,
+) -> tuple[int, dict[str, Any]]:
+    nested = argparse.Namespace(
+        approval_id=approval_id,
+        decision=decision,
+        reason_message=reason_message,
+        source=source,
+        idempotency_key=None,
+        decision_at=None,
+        chain=chain,
+        json=True,
+    )
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        code = cmd_approvals_decide_transfer(nested)
+    raw = buf.getvalue().strip()
+    payload: dict[str, Any] = {"ok": bool(code == 0), "code": "decision_result_unavailable", "message": "Decision result unavailable."}
+    if raw:
+        try:
+            parsed = json.loads(raw)
+            if isinstance(parsed, dict):
+                payload = parsed
+        except Exception:
+            payload = {"ok": False, "code": "decision_parse_failed", "message": raw[:400]}
+    return code, payload
+
+
 def _maybe_send_owner_link_to_active_chat(management_url: str, expires_at: str | None) -> dict[str, Any]:
     """
     Best-effort direct owner-link handoff into the currently active chat channel.
@@ -3771,7 +3836,96 @@ def cmd_approvals_sync(args: argparse.Namespace) -> int:
                 deleted += 1
             except Exception as exc:
                 failures.append({"tradeId": str(trade_id), "error": str(exc)})
-        return ok("Approval prompts synced.", chain=chain, checked=checked, deleted=deleted, skipped=skipped, failures=failures or None)
+        transfer_decisions_checked = 0
+        transfer_decisions_applied = 0
+        transfer_decisions_failed = 0
+        transfer_decision_failures: list[dict[str, Any]] = []
+        transfer_decisions = _fetch_transfer_decision_inbox(chain, limit=20)
+        for row in transfer_decisions:
+            decision_id = str(row.get("decisionId") or "").strip()
+            approval_id = str(row.get("approvalId") or "").strip()
+            decision = str(row.get("decision") or "").strip().lower()
+            decision_chain = str(row.get("chainKey") or chain).strip()
+            reason_message = str(row.get("reasonMessage") or "").strip() or None
+            source = str(row.get("source") or "web").strip().lower() or "web"
+            if not decision_id or not approval_id or decision not in {"approve", "deny"} or not decision_chain:
+                transfer_decisions_failed += 1
+                transfer_decision_failures.append(
+                    {
+                        "decisionId": decision_id,
+                        "approvalId": approval_id,
+                        "code": "invalid_inbox_row",
+                        "message": "Missing required transfer decision inbox fields.",
+                    }
+                )
+                if decision_id:
+                    try:
+                        _ack_transfer_decision_inbox(
+                            decision_id,
+                            "failed",
+                            reason_code="invalid_inbox_row",
+                            reason_message="Missing required transfer decision inbox fields.",
+                        )
+                    except Exception:
+                        pass
+                continue
+
+            transfer_decisions_checked += 1
+            code, payload = _run_decide_transfer_inline(
+                approval_id=approval_id,
+                decision=decision,
+                chain=decision_chain,
+                source=source,
+                reason_message=reason_message,
+            )
+            payload_code = str(payload.get("code") or "").strip() or ("ok" if code == 0 else "runtime_decision_failed")
+            payload_message = str(payload.get("message") or "").strip() or (
+                "Transfer decision applied." if code == 0 else "Transfer decision failed."
+            )
+            ack_status = "applied" if code == 0 else "failed"
+            ack_status_code = 0
+            try:
+                ack_status_code, _ = _ack_transfer_decision_inbox(
+                    decision_id,
+                    ack_status,
+                    reason_code=payload_code if ack_status == "failed" else None,
+                    reason_message=payload_message if ack_status == "failed" else None,
+                )
+            except Exception:
+                ack_status_code = 0
+            if ack_status_code < 200 or ack_status_code >= 300:
+                transfer_decision_failures.append(
+                    {
+                        "decisionId": decision_id,
+                        "approvalId": approval_id,
+                        "code": "inbox_ack_failed",
+                        "message": "Decision processing finished but inbox ack failed.",
+                    }
+                )
+            if code == 0:
+                transfer_decisions_applied += 1
+            else:
+                transfer_decisions_failed += 1
+                transfer_decision_failures.append(
+                    {
+                        "decisionId": decision_id,
+                        "approvalId": approval_id,
+                        "code": payload_code,
+                        "message": payload_message,
+                    }
+                )
+        return ok(
+            "Approval prompts synced.",
+            chain=chain,
+            checked=checked,
+            deleted=deleted,
+            skipped=skipped,
+            failures=failures or None,
+            transferDecisionsChecked=transfer_decisions_checked,
+            transferDecisionsApplied=transfer_decisions_applied,
+            transferDecisionsFailed=transfer_decisions_failed,
+            transferDecisionFailures=transfer_decision_failures or None,
+        )
     except Exception as exc:
         return fail("approvals_sync_failed", str(exc), "Verify API auth and OpenClaw availability, then retry.", {"chain": chain}, exit_code=1)
 
