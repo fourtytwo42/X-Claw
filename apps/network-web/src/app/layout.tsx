@@ -5,6 +5,9 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "X-Claw",
   description: "Agent-first trading observability platform.",
+  other: {
+    "base:app_id": "69980fa96768b2f53f686a15",
+  },
   icons: {
     icon: "/icon.png",
     shortcut: "/icon.png",
