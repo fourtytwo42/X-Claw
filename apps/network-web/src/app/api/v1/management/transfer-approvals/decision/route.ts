@@ -22,6 +22,44 @@ type ManagementTransferApprovalDecisionRequest = {
   chainKey?: string;
 };
 
+type RuntimeSigningReadiness = {
+  walletSigningReady: boolean;
+  walletSigningReasonCode: string | null;
+  walletSigningCheckedAt: string | null;
+};
+
+function resolveRuntimeSigningReadiness(metadata: unknown, chainKey: string): RuntimeSigningReadiness {
+  if (!metadata || typeof metadata !== 'object') {
+    return {
+      walletSigningReady: false,
+      walletSigningReasonCode: 'runtime_readiness_missing',
+      walletSigningCheckedAt: null
+    };
+  }
+  const root = metadata as Record<string, unknown>;
+  const runtimeReadiness = root.runtimeReadiness && typeof root.runtimeReadiness === 'object'
+    ? (root.runtimeReadiness as Record<string, unknown>)
+    : null;
+  const chains = runtimeReadiness?.chains && typeof runtimeReadiness.chains === 'object'
+    ? (runtimeReadiness.chains as Record<string, unknown>)
+    : null;
+  const chain = chains?.[chainKey] && typeof chains[chainKey] === 'object'
+    ? (chains[chainKey] as Record<string, unknown>)
+    : null;
+  if (!chain) {
+    return {
+      walletSigningReady: false,
+      walletSigningReasonCode: 'runtime_readiness_missing',
+      walletSigningCheckedAt: null
+    };
+  }
+  return {
+    walletSigningReady: Boolean(chain.walletSigningReady),
+    walletSigningReasonCode: String(chain.walletSigningReasonCode ?? '').trim() || null,
+    walletSigningCheckedAt: String(chain.walletSigningCheckedAt ?? '').trim() || null
+  };
+}
+
 export async function POST(req: NextRequest) {
   const requestId = getRequestId(req);
   try {
@@ -89,6 +127,56 @@ export async function POST(req: NextRequest) {
         },
         requestId
       );
+    }
+
+    if (body.decision === 'approve') {
+      const agentMeta = await dbQuery<{ openclaw_metadata: Record<string, unknown> | null }>(
+        `
+        select openclaw_metadata
+        from agents
+        where agent_id = $1
+        limit 1
+        `,
+        [body.agentId]
+      );
+      const readiness = resolveRuntimeSigningReadiness(agentMeta.rows[0]?.openclaw_metadata ?? null, chainKey);
+      if (!readiness.walletSigningReady) {
+        await dbQuery(
+          `
+          insert into management_audit_log (
+            audit_id, agent_id, management_session_id, action_type, action_status,
+            public_redacted_payload, private_payload, user_agent, created_at
+          ) values ($1, $2, $3, 'transfer_approval.decision', 'failed', $4::jsonb, $5::jsonb, $6, now())
+          `,
+          [
+            makeId('aud'),
+            body.agentId,
+            auth.session.sessionId,
+            JSON.stringify({ approvalId: body.approvalId, decision: body.decision, chainKey }),
+            JSON.stringify({
+              approvalSource,
+              reasonCode: 'runtime_signing_unavailable',
+              readiness
+            }),
+            req.headers.get('user-agent')
+          ]
+        );
+        return errorResponse(
+          409,
+          {
+            code: 'runtime_signing_unavailable',
+            message: 'Agent runtime signing is unavailable for this chain.',
+            actionHint: 'Ensure agent runtime has wallet passphrase configured and heartbeat/readiness updates are healthy, then retry approve.',
+            details: {
+              approvalId: body.approvalId,
+              chainKey,
+              walletSigningReasonCode: readiness.walletSigningReasonCode,
+              walletSigningCheckedAt: readiness.walletSigningCheckedAt
+            }
+          },
+          requestId
+        );
+      }
     }
 
     const decisionId = makeId('tdi');

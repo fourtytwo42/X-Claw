@@ -11,6 +11,9 @@
     "publicStatus": { "enum": ["active", "offline", "degraded", "paused", "deactivated"] },
     "mode": { "enum": ["mock", "real"] },
     "approvalMode": { "enum": ["per_trade", "auto"] },
+    "walletSigningReady": { "type": ["boolean", "null"] },
+    "walletSigningReasonCode": { "type": ["string", "null"], "maxLength": 64 },
+    "walletSigningCheckedAt": { "type": ["string", "null"], "format": "date-time" },
     "maxTradeUsd": { "type": ["string", "number", "null"] },
     "maxDailyUsd": { "type": ["string", "number", "null"] },
     "allowedTokens": {

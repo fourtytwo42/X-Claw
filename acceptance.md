@@ -6090,3 +6090,56 @@ Active slice context: `Slice 117` in progress (issue `#60`).
   - `appliedVia=agent_runtime_inbox_queue`
   - `decisionInbox.status=pending`
   - `promptCleanup.code=agent_runtime_cleanup_pending`
+
+---
+
+# Hotfix Acceptance Evidence: Slice 117 Hotfix F Transfer Decision Reliability + Prompt Convergence
+
+Date (UTC): 2026-02-20
+Active slice context: `Slice 117` in progress (issue `#60`).
+
+## Objective + Scope Lock
+- Objective: make transfer approval decision execution converge reliably across web and agent runtime while preserving strict runtime separation.
+- Scope lock:
+  - `apps/agent-runtime/xclaw_agent/cli.py`
+  - `apps/agent-runtime/tests/test_approvals_run_loop.py`
+  - `skills/xclaw-agent/scripts/setup_agent_skill.py`
+  - `apps/network-web/src/app/api/v1/agent/runtime-readiness/route.ts`
+  - `apps/network-web/src/app/api/v1/agent/heartbeat/route.ts`
+  - `apps/network-web/src/app/api/v1/management/transfer-approvals/decision/route.ts`
+  - `apps/network-web/src/lib/transfer-recovery.ts`
+  - `apps/network-web/src/app/api/v1/management/agent-state/route.ts`
+  - `apps/network-web/src/app/api/v1/management/transfer-approvals/route.ts`
+  - `packages/shared-schemas/json/agent-heartbeat-request.schema.json`
+  - `packages/shared-schemas/json/agent-runtime-readiness-request.schema.json`
+  - canonical docs/handoff artifacts.
+
+## Behavior Checks
+- [x] Runtime exposes always-on transfer decision consumer command (`approvals run-loop`) with bounded backoff.
+- [x] Runtime publishes chain-scoped signing readiness snapshot (`walletSigningReady`, reason code, checked timestamp).
+- [x] Management approve preflight blocks with deterministic `runtime_signing_unavailable` when runtime signing is not ready.
+- [x] Blocked approve preflight does not enqueue transfer decision inbox rows.
+- [x] Deny path still mirrors immediate rejection semantics.
+- [x] Server terminal sweeper fallback dispatches runtime prompt cleanup for terminal transfer rows.
+- [x] Transfer approvals UI remains non-actionable for terminal rows regardless of cleanup metadata.
+
+## Required Validation Gates
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_approvals_run_loop.py -v`
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+- [x] `npm run verify:ui:agent-approvals`
+
+## Validation Evidence Notes
+- [x] `test_approvals_run_loop.py` passed (`3 tests`, includes retry/backoff path and readiness publish summary assertions).
+- [x] `test_trade_path.py` regression passed (`122 tests`) after run-loop integration.
+- [x] Browser verifier final pass:
+  - approval row selector:
+    - `approval-row-transfer-xfr_ui_1771628838835_w6khemsv`
+  - artifact dir:
+    - `/tmp/xclaw-ui-verify-xfr_ui_1771628838835_w6khemsv`
+  - note:
+    - one initial verifier attempt failed due stale bootstrap token; rerun passed after minting fresh owner-link token.

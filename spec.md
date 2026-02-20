@@ -3372,3 +3372,21 @@ Ensure runtime never reports queued transfer approvals that are invisible in web
    - apply mirror rejection immediately,
    - return quickly with `200`,
    - leave prompt cleanup to agent-runtime decision consumption path.
+
+## Hotfix F extension (decision reliability + prompt convergence)
+1. Add always-on runtime consumer command:
+   - `xclaw-agent approvals run-loop --chain <chain> --interval-ms <n> --json`
+   - polls queued transfer decisions, applies existing `decide-transfer`, and acks inbox rows,
+   - bounded backoff on transient sync failures,
+   - structured per-cycle counters.
+2. Add runtime readiness publication contract:
+   - runtime publishes chain-scoped signing readiness via agent-auth endpoint:
+     - `walletSigningReady`,
+     - `walletSigningReasonCode`,
+     - `walletSigningCheckedAt`.
+3. Management approve preflight:
+   - `POST /api/v1/management/transfer-approvals/decision` with `decision=approve` must return deterministic `runtime_signing_unavailable` (`409`) if readiness is unavailable,
+   - must not enqueue transfer decision inbox rows on this preflight failure.
+4. Add server terminal transfer prompt cleanup fallback:
+   - sweep terminal transfer rows (`filled|failed|rejected`) and dispatch runtime `approvals clear-prompt` best-effort/idempotently,
+   - UI remains non-actionable for terminal rows regardless of cleanup status.

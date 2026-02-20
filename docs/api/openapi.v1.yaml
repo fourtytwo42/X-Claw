@@ -104,6 +104,24 @@ paths:
           $ref: '#/components/responses/ErrorResponse'
         '409':
           $ref: '#/components/responses/ErrorResponse'
+  /api/v1/agent/runtime-readiness:
+    post:
+      summary: Publish chain-scoped runtime wallet-signing readiness snapshot (agent-auth).
+      security:
+        - agentBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentRuntimeReadinessRequest'
+      responses:
+        '200':
+          description: Runtime readiness accepted.
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
   /api/v1/agent/management-link:
     post:
       summary: Issue a short-lived owner management URL for this authenticated agent.
@@ -196,7 +214,7 @@ paths:
           $ref: '#/components/responses/ErrorResponse'
   /api/v1/agent/transfer-decisions/inbox:
     get:
-      summary: Poll pending transfer approval decisions queued by management for this agent (agent-auth).
+      summary: Poll pending transfer approval decisions queued by management for this agent (agent-auth, consumed by always-on runtime approvals run-loop).
       security:
         - agentBearer: []
       parameters:
@@ -223,7 +241,7 @@ paths:
         '401':
           $ref: '#/components/responses/ErrorResponse'
     post:
-      summary: Ack one transfer decision row as applied/failed after runtime processing (agent-auth).
+      summary: Ack one transfer decision row as applied/failed after runtime processing (agent-auth, emitted by always-on runtime approvals run-loop).
       security:
         - agentBearer: []
       requestBody:
@@ -1435,7 +1453,11 @@ paths:
         '404':
           $ref: '#/components/responses/ErrorResponse'
         '409':
-          $ref: '#/components/responses/ErrorResponse'
+          description: Deterministic preflight rejection when runtime signing is unavailable (`runtime_signing_unavailable`), or decision conflict.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/v1/management/x402/payments:
     get:
       summary: List x402 inbound/outbound queue and history for authorized management session.
@@ -2855,6 +2877,16 @@ components:
         approvalMode:
           type: string
           enum: [per_trade, auto]
+        walletSigningReady:
+          type: boolean
+          nullable: true
+        walletSigningReasonCode:
+          type: string
+          nullable: true
+        walletSigningCheckedAt:
+          type: string
+          format: date-time
+          nullable: true
         balances:
           type: array
           items:
@@ -2866,6 +2898,25 @@ components:
                 type: string
               amount:
                 type: string
+    AgentRuntimeReadinessRequest:
+      type: object
+      required: [schemaVersion, chainKey, walletSigningReady]
+      properties:
+        schemaVersion:
+          type: integer
+          enum: [1]
+        chainKey:
+          type: string
+          minLength: 1
+        walletSigningReady:
+          type: boolean
+        walletSigningReasonCode:
+          type: string
+          nullable: true
+        walletSigningCheckedAt:
+          type: string
+          format: date-time
+          nullable: true
     AgentAuthChallengeRequest:
       type: object
       required: [agentId, chainKey, walletAddress, action]

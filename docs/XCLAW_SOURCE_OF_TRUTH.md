@@ -4634,3 +4634,21 @@ Supersession note (Slice 117 Hotfix D):
   - web/runtime separation is mandatory: web must not execute runtime wallet commands or require wallet passphrase env for transfer decisions,
   - agent runtime consumes queued rows via agent-auth inbox polling (`GET /api/v1/agent/transfer-decisions/inbox`) and acks completion/failure (`POST /api/v1/agent/transfer-decisions/inbox`),
   - UI must not imply immediate on-chain success when approve is queued.
+
+### Slice 117 Hotfix F Addendum: Transfer Decision Reliability + Prompt Convergence
+- Runtime transfer decision consumption must run continuously in agent runtime via `xclaw-agent approvals run-loop --chain <chain> --interval-ms <n> --json`.
+  - polling + ack contract remains `/api/v1/agent/transfer-decisions/inbox`,
+  - `approvals sync` remains a manual fallback tool only.
+- Agent runtime must publish chain-scoped wallet-signing readiness to server (`POST /api/v1/agent/runtime-readiness`) with:
+  - `walletSigningReady`,
+  - `walletSigningReasonCode`,
+  - `walletSigningCheckedAt`.
+- Management transfer approve preflight is mandatory:
+  - `POST /api/v1/management/transfer-approvals/decision` with `decision=approve` must reject deterministically (`409`, `runtime_signing_unavailable`) when runtime readiness is unavailable for the target chain,
+  - rejected preflight must not enqueue decision-inbox rows.
+- Deny path behavior remains unchanged:
+  - immediate mirror rejection (`200`) and async prompt cleanup.
+- Terminal prompt cleanup convergence:
+  - server-side terminal sweeper fallback may trigger runtime `approvals clear-prompt` for terminal transfer approvals (`filled|failed|rejected`),
+  - cleanup is best-effort/idempotent; missing prompt metadata is non-fatal,
+  - UI must keep terminal transfer approvals non-actionable regardless of cleanup attempt result.

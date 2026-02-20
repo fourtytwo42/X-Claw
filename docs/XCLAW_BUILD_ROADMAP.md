@@ -3827,3 +3827,24 @@ Note:
   - [ ] `pm2 restart all`
 - [x] `npm run verify:ui:agent-approvals`
 - [ ] Issue #60 evidence post + commit hash(es).
+
+### 117.9 Hotfix F: Transfer Decision Reliability + Prompt Convergence
+- [x] Runtime command `xclaw-agent approvals run-loop --chain <chain> --interval-ms <n> --json` added:
+  - [x] polls transfer decision inbox,
+  - [x] applies/acks decisions through existing runtime paths,
+  - [x] retries with bounded backoff on transient failures,
+  - [x] emits structured per-cycle counters/logs.
+- [x] Skill setup script adds best-effort user-service wiring for always-on run-loop execution on agent host.
+- [x] Agent runtime readiness publish path added (`POST /api/v1/agent/runtime-readiness`) and heartbeat payload supports readiness fields.
+- [x] `POST /api/v1/management/transfer-approvals/decision` approve preflight rejects deterministically when runtime signing readiness is unavailable (`runtime_signing_unavailable`, `409`) and skips decision enqueue.
+- [x] Server-side terminal transfer prompt cleanup fallback added for terminal statuses (`filled|failed|rejected`) with idempotent best-effort runtime cleanup dispatch.
+- [ ] Required gates run sequentially:
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_approvals_run_loop.py -v`
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `pm2 restart all`
+  - [x] `npm run verify:ui:agent-approvals`
+- [ ] Issue #60 evidence post + commit hash(es).

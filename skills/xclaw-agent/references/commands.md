@@ -87,6 +87,8 @@ Underlying runtime delegation (performed by wrapper):
 - `xclaw-agent liquidity resume --intent <liquidity_intent_id> --chain <chain_key> --json`
 - `xclaw-agent approvals cleanup-spot --trade-id <trade_id> --json`
 - `xclaw-agent approvals clear-prompt --subject-type <trade|transfer|policy> --subject-id <id> [--chain <chain_key>] --json`
+- `xclaw-agent approvals sync --chain <chain_key> --json` (manual fallback)
+- `xclaw-agent approvals run-loop --chain <chain_key> [--interval-ms <ms>] --json` (always-on transfer decision consumer)
 - `xclaw-agent approvals resume-spot --trade-id <trade_id> --chain <chain_key> --json`
 - `xclaw-agent approvals decide-spot --trade-id <trade_id> --decision <approve|reject> --chain <chain_key> [--source <web|telegram|runtime>] [--idempotency-key <key>] [--decision-at <iso8601>] --json`
 - `xclaw-agent approvals decide-liquidity --intent-id <liquidity_intent_id> --decision <approve|reject> --chain <chain_key> [--source <web|telegram|runtime>] [--reason-message <text>] --json`

@@ -6,7 +6,7 @@ import { errorResponse, internalErrorResponse, successResponse } from '@/lib/err
 import { fetchWithTimeout, upstreamFetchTimeoutMs } from '@/lib/fetch-timeout';
 import { requireManagementSession, sessionHasAgentAccess } from '@/lib/management-auth';
 import { getRequestId } from '@/lib/request-id';
-import { kickStaleTransferRecovery } from '@/lib/transfer-recovery';
+import { kickStaleTransferRecovery, kickTerminalTransferPromptCleanup } from '@/lib/transfer-recovery';
 
 export const runtime = 'nodejs';
 
@@ -108,6 +108,7 @@ export async function GET(req: NextRequest) {
     const chainKey = req.nextUrl.searchParams.get('chainKey')?.trim() || 'base_sepolia';
     try {
       await kickStaleTransferRecovery(agentId, chainKey);
+      await kickTerminalTransferPromptCleanup(agentId, chainKey);
     } catch {}
     const [queue, history] = await Promise.all([
       dbQuery<{

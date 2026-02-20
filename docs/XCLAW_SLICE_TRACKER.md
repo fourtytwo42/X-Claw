@@ -2292,6 +2292,22 @@ DoD:
 - [x] executable browser smoke verifier validates management-session-gated approval row rendering on `/agents/:id`.
 - [x] transfer decision endpoint is non-blocking for UI operations: approve returns async-queued response quickly and deny applies immediate mirror rejection.
 - [x] transfer decisions preserve runtime separation: web queues decision inbox rows only; agent runtime consumes/acks decisions via agent-auth inbox polling.
+
+## Slice 117 Hotfix F: Transfer Decision Reliability + Prompt Convergence
+Status: [ ]
+Issue: #60
+
+Goal:
+- Guarantee transfer approval decision convergence with always-on runtime consumption, deterministic approve preflight gating for runtime signing readiness, and terminal prompt cleanup fallback.
+
+DoD:
+- [x] agent runtime exposes continuous transfer decision loop command (`approvals run-loop`) with bounded backoff and cycle counters.
+- [x] skill setup wires best-effort daemon/service activation for continuous run-loop execution on agent host (no web/pm2 dependency).
+- [x] agent publishes chain-scoped runtime signing readiness snapshot (`walletSigningReady`, `walletSigningReasonCode`, `walletSigningCheckedAt`).
+- [x] management transfer approve path blocks with deterministic `runtime_signing_unavailable` when runtime readiness is not sign-capable and does not enqueue inbox rows.
+- [x] server terminal sweeper fallback dispatches runtime prompt cleanup for terminal transfer approvals (`filled|failed|rejected`) idempotently.
+- [x] transfer approvals UI remains non-actionable for terminal rows even if cleanup metadata is missing.
+- [x] required gates pass: `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`, runtime tests, browser verifier.
 - [x] canonical docs/handoff artifacts synchronized.
 - [ ] required gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
 - [x] browser verification gate rerun (`npm run verify:ui:agent-approvals`) after build + PM2 restart.

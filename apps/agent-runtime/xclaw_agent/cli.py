@@ -100,6 +100,8 @@ MAX_TRADE_RETRIES = 3
 APPROVAL_WAIT_TIMEOUT_SEC = 1800
 # Poll faster while waiting so Telegram/web decisions feel instant.
 APPROVAL_WAIT_POLL_SEC = 1
+APPROVAL_RUN_LOOP_INTERVAL_MS = 1500
+APPROVAL_RUN_LOOP_BACKOFF_MAX_MS = 15000
 DEFAULT_TX_GAS_PRICE_GWEI = 30
 DEFAULT_TX_SEND_MAX_ATTEMPTS = 5
 TX_GAS_PRICE_BUMP_GWEI = 20
@@ -1244,6 +1246,50 @@ def _require_wallet_passphrase_for_signing(chain: str) -> str:
             f"wallet.sign-challenge requires XCLAW_WALLET_PASSPHRASE in non-interactive mode for chain '{chain}'."
         )
     return _prompt_existing_passphrase()
+
+
+def _runtime_wallet_signing_readiness(chain: str) -> dict[str, Any]:
+    checked_at = utc_now()
+    try:
+        store = load_wallet_store()
+    except Exception as exc:
+        return {
+            "walletSigningReady": False,
+            "walletSigningReasonCode": "wallet_store_unavailable",
+            "walletSigningCheckedAt": checked_at,
+            "walletSigningMessage": str(exc),
+        }
+    _, wallet = _chain_wallet(store, chain)
+    if not isinstance(wallet, dict):
+        return {
+            "walletSigningReady": False,
+            "walletSigningReasonCode": "wallet_missing",
+            "walletSigningCheckedAt": checked_at,
+            "walletSigningMessage": f"No wallet configured for chain '{chain}'.",
+        }
+    passphrase = str(os.environ.get("XCLAW_WALLET_PASSPHRASE") or "").strip()
+    if not passphrase:
+        return {
+            "walletSigningReady": False,
+            "walletSigningReasonCode": "wallet_passphrase_missing",
+            "walletSigningCheckedAt": checked_at,
+            "walletSigningMessage": "XCLAW_WALLET_PASSPHRASE is missing.",
+        }
+    try:
+        _decrypt_private_key(wallet, passphrase)
+    except Exception as exc:
+        return {
+            "walletSigningReady": False,
+            "walletSigningReasonCode": "wallet_passphrase_invalid",
+            "walletSigningCheckedAt": checked_at,
+            "walletSigningMessage": str(exc),
+        }
+    return {
+        "walletSigningReady": True,
+        "walletSigningReasonCode": None,
+        "walletSigningCheckedAt": checked_at,
+        "walletSigningMessage": None,
+    }
 
 
 def _parse_challenge_timestamp(value: str) -> datetime:
@@ -3766,6 +3812,34 @@ def _run_decide_transfer_inline(
     return code, payload
 
 
+def _run_approvals_sync_inline(chain: str) -> tuple[int, dict[str, Any]]:
+    nested = argparse.Namespace(chain=chain, json=True)
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        code = cmd_approvals_sync(nested)
+    raw = buf.getvalue().strip()
+    payload: dict[str, Any] = {"ok": bool(code == 0), "code": "sync_result_unavailable", "message": "Sync result unavailable."}
+    if raw:
+        try:
+            parsed = json.loads(raw)
+            if isinstance(parsed, dict):
+                payload = parsed
+        except Exception:
+            payload = {"ok": False, "code": "sync_parse_failed", "message": raw[:400]}
+    return code, payload
+
+
+def _publish_runtime_signing_readiness(chain: str, readiness: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+    payload = {
+        "schemaVersion": 1,
+        "chainKey": chain,
+        "walletSigningReady": bool(readiness.get("walletSigningReady")),
+        "walletSigningReasonCode": readiness.get("walletSigningReasonCode"),
+        "walletSigningCheckedAt": readiness.get("walletSigningCheckedAt"),
+    }
+    return _api_request("POST", "/agent/runtime-readiness", payload=payload, include_idempotency=True)
+
+
 def _maybe_send_owner_link_to_active_chat(management_url: str, expires_at: str | None) -> dict[str, Any]:
     """
     Best-effort direct owner-link handoff into the currently active chat channel.
@@ -3928,6 +4002,75 @@ def cmd_approvals_sync(args: argparse.Namespace) -> int:
         )
     except Exception as exc:
         return fail("approvals_sync_failed", str(exc), "Verify API auth and OpenClaw availability, then retry.", {"chain": chain}, exit_code=1)
+
+
+def cmd_approvals_run_loop(args: argparse.Namespace) -> int:
+    chk = require_json_flag(args)
+    if chk is not None:
+        return chk
+    chain = str(args.chain or "").strip()
+    if not chain:
+        return fail("invalid_input", "chain is required.", "Provide --chain and retry.", exit_code=2)
+    interval_ms_raw = int(args.interval_ms) if isinstance(args.interval_ms, int) else APPROVAL_RUN_LOOP_INTERVAL_MS
+    interval_ms = max(250, min(interval_ms_raw, 60000))
+    once = bool(getattr(args, "once", False))
+    iteration = 0
+    backoff_ms = interval_ms
+    consecutive_failures = 0
+    while True:
+        iteration += 1
+        cycle_started = time.time()
+        readiness = _runtime_wallet_signing_readiness(chain)
+        readiness_status = 0
+        readiness_code = "ok"
+        try:
+            readiness_status, readiness_body = _publish_runtime_signing_readiness(chain, readiness)
+            if readiness_status < 200 or readiness_status >= 300:
+                readiness_code = str(readiness_body.get("code", "api_error"))
+        except Exception as exc:
+            readiness_status = 0
+            readiness_code = f"publish_error:{str(exc)[:120]}"
+        sync_code, sync_payload = _run_approvals_sync_inline(chain)
+        cycle_ok = sync_code == 0
+        if cycle_ok:
+            consecutive_failures = 0
+            backoff_ms = interval_ms
+        else:
+            consecutive_failures += 1
+            backoff_ms = min(APPROVAL_RUN_LOOP_BACKOFF_MAX_MS, max(interval_ms, backoff_ms * 2))
+        elapsed_ms = int((time.time() - cycle_started) * 1000)
+        cycle_log = {
+            "event": "approvals_run_loop_cycle",
+            "chain": chain,
+            "iteration": iteration,
+            "ok": cycle_ok,
+            "syncCode": str(sync_payload.get("code") or ("ok" if cycle_ok else "sync_failed")),
+            "transferDecisionsChecked": int(sync_payload.get("transferDecisionsChecked") or 0),
+            "transferDecisionsApplied": int(sync_payload.get("transferDecisionsApplied") or 0),
+            "transferDecisionsFailed": int(sync_payload.get("transferDecisionsFailed") or 0),
+            "walletSigningReady": bool(readiness.get("walletSigningReady")),
+            "walletSigningReasonCode": readiness.get("walletSigningReasonCode"),
+            "readinessPublishStatus": readiness_status,
+            "readinessPublishCode": readiness_code,
+            "consecutiveFailures": consecutive_failures,
+            "elapsedMs": elapsed_ms,
+            "sleepMs": 0 if once else (interval_ms if cycle_ok else backoff_ms),
+            "at": utc_now(),
+        }
+        print(json.dumps(cycle_log, separators=(",", ":")), file=sys.stderr)
+        if once:
+            summary = dict(sync_payload)
+            summary.setdefault("ok", cycle_ok)
+            summary.setdefault("code", "ok" if cycle_ok else "approvals_run_loop_cycle_failed")
+            summary["chain"] = chain
+            summary["iteration"] = iteration
+            summary["walletSigningReady"] = bool(readiness.get("walletSigningReady"))
+            summary["walletSigningReasonCode"] = readiness.get("walletSigningReasonCode")
+            summary["readinessPublishStatus"] = readiness_status
+            summary["readinessPublishCode"] = readiness_code
+            summary["elapsedMs"] = elapsed_ms
+            return emit(summary)
+        time.sleep((interval_ms if cycle_ok else backoff_ms) / 1000.0)
 
 
 def cmd_approvals_cleanup_spot(args: argparse.Namespace) -> int:
@@ -12545,6 +12688,13 @@ def build_parser() -> argparse.ArgumentParser:
     approvals_sync.add_argument("--chain", required=True)
     approvals_sync.add_argument("--json", action="store_true")
     approvals_sync.set_defaults(func=cmd_approvals_sync)
+
+    approvals_run_loop = approvals_sub.add_parser("run-loop")
+    approvals_run_loop.add_argument("--chain", required=True)
+    approvals_run_loop.add_argument("--interval-ms", type=int, default=APPROVAL_RUN_LOOP_INTERVAL_MS)
+    approvals_run_loop.add_argument("--once", action="store_true")
+    approvals_run_loop.add_argument("--json", action="store_true")
+    approvals_run_loop.set_defaults(func=cmd_approvals_run_loop)
 
     approvals_cleanup_spot = approvals_sub.add_parser("cleanup-spot")
     approvals_cleanup_spot.add_argument("--trade-id", required=True)

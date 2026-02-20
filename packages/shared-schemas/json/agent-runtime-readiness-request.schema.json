@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.xclaw.trade/agent-runtime-readiness-request.schema.json",
+  "title": "AgentRuntimeReadinessRequest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "chainKey", "walletSigningReady"],
+  "properties": {
+    "schemaVersion": { "type": "integer", "const": 1 },
+    "chainKey": { "type": "string", "minLength": 1 },
+    "walletSigningReady": { "type": "boolean" },
+    "walletSigningReasonCode": { "type": ["string", "null"], "maxLength": 64 },
+    "walletSigningCheckedAt": { "type": ["string", "null"], "format": "date-time" }
+  }
+}

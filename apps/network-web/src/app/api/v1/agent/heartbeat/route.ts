@@ -17,6 +17,9 @@ type HeartbeatRequest = {
   publicStatus: 'active' | 'offline' | 'degraded' | 'paused' | 'deactivated';
   mode: 'mock' | 'real';
   approvalMode: 'per_trade' | 'auto';
+  walletSigningReady?: boolean | null;
+  walletSigningReasonCode?: string | null;
+  walletSigningCheckedAt?: string | null;
   maxTradeUsd?: string | number | null;
   maxDailyUsd?: string | number | null;
   allowedTokens?: string[];
@@ -69,15 +72,27 @@ export async function POST(req: NextRequest) {
     }
 
     const statusResult = await withTransaction(async (client) => {
+      const readinessChain = {
+        walletSigningReady: typeof body.walletSigningReady === 'boolean' ? body.walletSigningReady : null,
+        walletSigningReasonCode: String(body.walletSigningReasonCode ?? '').trim() || null,
+        walletSigningCheckedAt: body.walletSigningCheckedAt ?? null,
+        updatedAt: new Date().toISOString()
+      };
       const updated = await client.query(
         `
         update agents
         set public_status = $1,
+            openclaw_metadata = jsonb_set(
+              coalesce(openclaw_metadata, '{}'::jsonb),
+              array['runtimeReadiness', 'chains', $2::text],
+              $3::jsonb,
+              true
+            ),
             updated_at = now()
-        where agent_id = $2
+        where agent_id = $4
         returning agent_id
         `,
-        [body.publicStatus, body.agentId]
+        [body.publicStatus, policyChainKey, JSON.stringify(readinessChain), body.agentId]
       );
 
       if (updated.rowCount === 0) {

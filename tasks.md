@@ -3560,3 +3560,43 @@ Active slice context: `Slice 117` in progress.
 - [x] `npm run build`
 - [x] `pm2 restart all`
 - [x] `npm run verify:ui:agent-approvals`
+
+---
+
+# Hotfix Tasks: Slice 117 Hotfix F Transfer Decision Reliability + Prompt Convergence
+
+Active slice context: `Slice 117` in progress.
+
+## 1) Scope lock
+- [x] Preserve web/runtime separation: web never executes wallet operations.
+- [x] Keep transfer policy semantics unchanged (`outbound_disabled`, whitelist, override model).
+
+## 2) Runtime always-on decision consumer
+- [x] Add `approvals run-loop` command with interval + bounded backoff.
+- [x] Reuse existing transfer decision sync/apply/ack behavior.
+- [x] Add structured loop-cycle counters/logging for observability.
+- [x] Keep `approvals sync` backward-compatible as manual fallback.
+- [x] Wire best-effort skill setup service for continuous run-loop execution.
+
+## 3) Approve preflight readiness gate
+- [x] Extend runtime readiness payload contract (`walletSigningReady`, reason code, checked timestamp).
+- [x] Add agent-auth runtime readiness update endpoint.
+- [x] Heartbeat route stores readiness snapshot when provided.
+- [x] Block `decision=approve` with deterministic `runtime_signing_unavailable` when readiness is not sign-capable.
+- [x] Ensure blocked approve does not queue transfer decision inbox row.
+
+## 4) Terminal prompt convergence fallback
+- [x] Add server-side terminal transfer prompt cleanup sweeper fallback.
+- [x] Sweeper targets terminal transfer rows (`filled|failed|rejected`) and dispatches runtime `approvals clear-prompt`.
+- [x] Cleanup fallback is idempotent and safe when prompt metadata is missing.
+- [x] Keep UI terminal approvals non-actionable independent of cleanup result.
+
+## 5) Validation
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_approvals_run_loop.py -v`
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+- [x] `npm run verify:ui:agent-approvals`

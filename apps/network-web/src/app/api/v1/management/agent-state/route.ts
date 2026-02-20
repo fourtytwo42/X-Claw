@@ -10,7 +10,7 @@ import { requireManagementSession, sessionHasAgentAccess } from '@/lib/managemen
 import { getRequestId } from '@/lib/request-id';
 import { isTransferMirrorSchemaUnavailableError, transferMirrorSchemaErrorDetails } from '@/lib/transfer-mirror-schema';
 import { resolveTokenMetadata } from '@/lib/token-metadata';
-import { kickStaleTransferRecovery } from '@/lib/transfer-recovery';
+import { kickStaleTransferRecovery, kickTerminalTransferPromptCleanup } from '@/lib/transfer-recovery';
 
 export const runtime = 'nodejs';
 
@@ -180,6 +180,7 @@ export async function GET(req: NextRequest) {
     await maybeSyncLiquiditySnapshots(agentId, chainKey, { force: false });
     try {
       await kickStaleTransferRecovery(agentId, chainKey);
+      await kickTerminalTransferPromptCleanup(agentId, chainKey);
     } catch {}
 
     const chainTokens = await Promise.all(

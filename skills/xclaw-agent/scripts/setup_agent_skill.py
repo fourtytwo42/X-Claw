@@ -15,6 +15,8 @@ from typing import Optional
 APP_DIR = Path.home() / ".xclaw-agent"
 POLICY_FILE = APP_DIR / "policy.json"
 PATCHER = Path(__file__).resolve().parent / "openclaw_gateway_patch.py"
+RUN_LOOP_ENV_FILE = APP_DIR / "approvals-run-loop.env"
+RUN_LOOP_SERVICE = Path.home() / ".config" / "systemd" / "user" / "xclaw-agent-approvals-loop.service"
 
 
 def run(
@@ -264,6 +266,83 @@ def ensure_default_policy_file(default_chain: str) -> None:
     _chmod_if_posix(POLICY_FILE, 0o600)
 
 
+def ensure_approvals_run_loop_service(default_chain: str) -> dict[str, object]:
+    """Best-effort systemd user wiring for continuous transfer decision consumption."""
+    if os.name == "nt":
+        return {"enabled": False, "reason": "windows_unsupported"}
+    if shutil.which("systemctl") is None:
+        return {"enabled": False, "reason": "systemctl_missing"}
+    api_base = os.environ.get("XCLAW_API_BASE_URL", "").strip()
+    agent_id = os.environ.get("XCLAW_AGENT_ID", "").strip()
+    api_key = os.environ.get("XCLAW_AGENT_API_KEY", "").strip()
+    if not api_base or not agent_id or not api_key:
+        return {
+            "enabled": False,
+            "reason": "env_missing",
+            "missing": [
+                name
+                for name, value in [
+                    ("XCLAW_API_BASE_URL", api_base),
+                    ("XCLAW_AGENT_ID", agent_id),
+                    ("XCLAW_AGENT_API_KEY", "set" if api_key else ""),
+                ]
+                if not value
+            ],
+        }
+
+    APP_DIR.mkdir(parents=True, exist_ok=True)
+    _chmod_if_posix(APP_DIR, 0o700)
+    RUN_LOOP_ENV_FILE.write_text(
+        "\n".join(
+            [
+                f"XCLAW_API_BASE_URL={api_base}",
+                f"XCLAW_AGENT_ID={agent_id}",
+                f"XCLAW_AGENT_API_KEY={api_key}",
+                f"XCLAW_DEFAULT_CHAIN={default_chain}",
+                "XCLAW_APPROVALS_RUN_LOOP=1",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    _chmod_if_posix(RUN_LOOP_ENV_FILE, 0o600)
+
+    RUN_LOOP_SERVICE.parent.mkdir(parents=True, exist_ok=True)
+    unit = "\n".join(
+        [
+            "[Unit]",
+            "Description=X-Claw agent approvals run-loop",
+            "After=network-online.target",
+            "",
+            "[Service]",
+            "Type=simple",
+            f"EnvironmentFile={RUN_LOOP_ENV_FILE}",
+            f"ExecStart={shutil.which('xclaw-agent') or 'xclaw-agent'} approvals run-loop --chain {default_chain} --interval-ms 1500 --json",
+            "Restart=always",
+            "RestartSec=2",
+            "",
+            "[Install]",
+            "WantedBy=default.target",
+            "",
+        ]
+    )
+    RUN_LOOP_SERVICE.write_text(unit, encoding="utf-8")
+    _chmod_if_posix(RUN_LOOP_SERVICE, 0o644)
+    try:
+        run(["systemctl", "--user", "daemon-reload"], check=True)
+        run(["systemctl", "--user", "enable", "--now", RUN_LOOP_SERVICE.name], check=True)
+        return {"enabled": True, "service": RUN_LOOP_SERVICE.name, "envFile": str(RUN_LOOP_ENV_FILE)}
+    except subprocess.CalledProcessError as exc:
+        stderr = (exc.stderr or "").strip()
+        stdout = (exc.stdout or "").strip()
+        return {
+            "enabled": False,
+            "reason": "systemctl_failed",
+            "service": RUN_LOOP_SERVICE.name,
+            "error": stderr or stdout or str(exc),
+        }
+
+
 def main() -> int:
     script_dir = Path(__file__).resolve().parent
     workspace = script_dir.parent.parent.parent.resolve()
@@ -273,7 +352,9 @@ def main() -> int:
         managed_skill = ensure_managed_skill_copy(workspace)
         launcher = ensure_launcher(workspace, openclaw_bin)
         ensure_runtime_bin_env(launcher)
-        ensure_default_policy_file(os.environ.get("XCLAW_DEFAULT_CHAIN", "base_sepolia"))
+        default_chain = os.environ.get("XCLAW_DEFAULT_CHAIN", "base_sepolia")
+        ensure_default_policy_file(default_chain)
+        approvals_loop = ensure_approvals_run_loop_service(default_chain)
         gateway_patch: dict[str, object] | None = None
         # Portable Telegram approvals: patch OpenClaw gateway bundle idempotently.
         try:
@@ -334,6 +415,7 @@ def main() -> int:
         "openclawPath": str(openclaw_bin),
         "python": versions["python"],
         "openclaw": versions["openclaw"],
+        "approvalsRunLoop": approvals_loop,
     }
     if gateway_patch is not None:
         payload["gatewayPatch"] = gateway_patch

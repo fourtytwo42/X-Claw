@@ -29,6 +29,7 @@ export type ApiErrorCode =
   | 'uniswap_migrate_not_supported_on_chain'
   | 'uniswap_claim_rewards_not_supported_on_chain'
   | 'transfer_mirror_unavailable'
+  | 'runtime_signing_unavailable'
   | 'faucet_config_invalid'
   | 'faucet_fee_too_low_for_chain'
   | 'faucet_native_insufficient'
