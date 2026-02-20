@@ -20,7 +20,11 @@
     "deploymentStatus": "pending_verification",
     "notes": "Uniswap API primary routing enabled. Legacy router fallback is capability-gated by configured router address."
   },
-  "canonicalTokens": {},
+  "canonicalTokens": {
+    "WAVAX": "0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7",
+    "WETH": "0x49d5c2bdffac6ce2bfdb6640f4f80f226bc10bab",
+    "USDC": "0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E"
+  },
   "capabilities": {
     "wallet": true,
     "trade": true,
@@ -36,6 +40,9 @@
   },
   "uniswapApi": {
     "enabled": true
+  },
+  "marketData": {
+    "dexscreenerChainId": "avalanche"
   },
   "updatedAt": "2026-02-20T10:00:00.000Z",
   "version": 1,

@@ -356,6 +356,16 @@ function formatSignedPct(value: string | null): string {
   return `${parsed > 0 ? '+' : ''}${parsed.toFixed(2)}%`;
 }
 
+async function fetchWithTimeout(input: string, timeoutMs: number): Promise<Response> {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, { cache: 'no-store', signal: controller.signal });
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
 function DashboardPage() {
   const router = useRouter();
   const [chainKey, setChainKey, chainLabel] = useDashboardChainKey();
@@ -404,14 +414,16 @@ function DashboardPage() {
       }
 
       try {
-        const [leaderboardRes, activityRes, chatRes, summaryRes, trendingRes] = await Promise.all([
-          fetch(`/api/v1/public/leaderboard?window=${metricWindow}&mode=real&chain=${chainQuery}`, { cache: 'no-store' }),
-          fetch(`/api/v1/public/activity?${activityQuery.toString()}`, { cache: 'no-store' }),
-          fetch('/api/v1/chat/messages?limit=40', { cache: 'no-store' }),
-          fetch(`/api/v1/public/dashboard/summary?chainKey=${encodeURIComponent(chainQuery)}&range=${encodeURIComponent(timeRange)}`, {
-            cache: 'no-store',
-          }),
-          fetch(`/api/v1/public/dashboard/trending-tokens?chainKey=${encodeURIComponent(chainQuery)}&limit=10`, { cache: 'no-store' }),
+        const [leaderboardRes, activityRes, summaryRes, chatResult] = await Promise.all([
+          fetchWithTimeout(`/api/v1/public/leaderboard?window=${metricWindow}&mode=real&chain=${chainQuery}`, 10000),
+          fetchWithTimeout(`/api/v1/public/activity?${activityQuery.toString()}`, 10000),
+          fetchWithTimeout(
+            `/api/v1/public/dashboard/summary?chainKey=${encodeURIComponent(chainQuery)}&range=${encodeURIComponent(timeRange)}`,
+            10000
+          ),
+          fetchWithTimeout('/api/v1/chat/messages?limit=40', 4000)
+            .then((response) => ({ ok: true as const, response }))
+            .catch(() => ({ ok: false as const })),
         ]);
 
         if (!leaderboardRes.ok || !activityRes.ok || !summaryRes.ok) {
@@ -421,13 +433,10 @@ function DashboardPage() {
         const leaderboardPayload = (await leaderboardRes.json()) as { items: LeaderboardItem[] };
         const activityPayload = (await activityRes.json()) as { items: ActivityItem[] };
         const summaryPayload = (await summaryRes.json()) as DashboardSummary;
-        const trendingPayload = trendingRes.ok
-          ? ((await trendingRes.json()) as { items?: TrendingTokenItem[]; warnings?: string[] })
-          : ({ items: [], warnings: [] } as { items?: TrendingTokenItem[]; warnings?: string[] });
         let chatPayload: { items: ChatItem[] } | null = null;
 
-        if (chatRes.ok) {
-          chatPayload = (await chatRes.json()) as { items: ChatItem[] };
+        if (chatResult.ok && chatResult.response.ok) {
+          chatPayload = (await chatResult.response.json()) as { items: ChatItem[] };
         } else if (!cancelled) {
           setChatError('Agent Trade Room is temporarily unavailable.');
         }
@@ -440,15 +449,11 @@ function DashboardPage() {
         setActivity(activityPayload.items ?? []);
         setSummary(summaryPayload ?? null);
         setChat(chatPayload?.items ?? []);
-        setTrendingTokens(trendingPayload.items ?? []);
-        setTrendingWarnings(Array.isArray(trendingPayload.warnings) ? trendingPayload.warnings : []);
       } catch (loadError) {
         if (!cancelled) {
           setError(loadError instanceof Error ? loadError.message : 'Failed to load dashboard.');
           setChat([]);
           setSummary(null);
-          setTrendingTokens([]);
-          setTrendingWarnings([]);
         }
       }
     };
@@ -463,12 +468,15 @@ function DashboardPage() {
   useEffect(() => {
     let cancelled = false;
     const chainQuery = chainKey === 'all' ? 'all' : chainKey;
+    setTrendingTokens(null);
+    setTrendingWarnings([]);
 
     const refresh = async () => {
       try {
-        const response = await fetch(`/api/v1/public/dashboard/trending-tokens?chainKey=${encodeURIComponent(chainQuery)}&limit=10`, {
-          cache: 'no-store',
-        });
+        const response = await fetchWithTimeout(
+          `/api/v1/public/dashboard/trending-tokens?chainKey=${encodeURIComponent(chainQuery)}&limit=10`,
+          4000
+        );
         if (!response.ok) {
           return;
         }
@@ -482,6 +490,8 @@ function DashboardPage() {
         // Preserve current rows on polling failures.
       }
     };
+
+    void refresh();
 
     const timerId = window.setInterval(() => {
       void refresh();

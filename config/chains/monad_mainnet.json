@@ -20,7 +20,10 @@
     "deploymentStatus": "pending_verification",
     "notes": "Uniswap API primary routing enabled. Legacy router fallback is capability-gated by configured router address."
   },
-  "canonicalTokens": {},
+  "canonicalTokens": {
+    "MON": "0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A",
+    "USDC": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603"
+  },
   "capabilities": {
     "wallet": true,
     "trade": true,
@@ -36,6 +39,9 @@
   },
   "uniswapApi": {
     "enabled": true
+  },
+  "marketData": {
+    "dexscreenerChainId": "monad"
   },
   "updatedAt": "2026-02-20T10:00:00.000Z",
   "version": 1,

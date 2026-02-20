@@ -39,6 +39,9 @@
     "pangolin": { "family": "amm_v2", "enabled": true },
     "hedera_hts": { "family": "hedera_hts", "enabled": true }
   },
+  "marketData": {
+    "dexscreenerChainId": "hedera"
+  },
   "updatedAt": "2026-02-19T00:00:00.000Z",
   "version": 1
 }

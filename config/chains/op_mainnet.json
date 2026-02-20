@@ -20,7 +20,10 @@
     "deploymentStatus": "pending_verification",
     "notes": "Uniswap API primary routing enabled. Legacy router fallback is capability-gated by configured router address."
   },
-  "canonicalTokens": {},
+  "canonicalTokens": {
+    "WETH": "0x4200000000000000000000000000000000000006",
+    "USDC": "0x0b2c639c533813f4aa9d7837caf62653d097ff85"
+  },
   "capabilities": {
     "wallet": true,
     "trade": true,
@@ -36,6 +39,9 @@
   },
   "uniswapApi": {
     "enabled": true
+  },
+  "marketData": {
+    "dexscreenerChainId": "optimism"
   },
   "updatedAt": "2026-02-20T10:00:00.000Z",
   "version": 1,
