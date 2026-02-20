@@ -1840,7 +1840,7 @@ DoD:
 - [x] docs/handoff sync completed in same change (`source-of-truth`, roadmap, tracker, context/spec/tasks/acceptance).
 
 ## Slice 97: Ethereum + Ethereum Sepolia Wallet-First Chain Onboarding
-Status: [~]
+Status: [x]
 Issue: #43
 
 Goal:
@@ -2039,4 +2039,4 @@ DoD:
 - [x] claim command outputs include provider provenance fields consistently.
 - [x] Required gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
 - [x] Runtime tests pass (`test_liquidity_cli.py`, `test_trade_path.py`).
-- [ ] Issue #48 evidence post + commit hash(es).
+- [x] Issue #48 evidence post + commit hash(es).
