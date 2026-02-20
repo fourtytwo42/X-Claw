@@ -34,6 +34,18 @@ const FALLBACK_REGISTRY: ChainDescriptor[] = [
   { chainKey: 'og_testnet', displayName: '0G Galileo Testnet', nativeCurrency: { symbol: '0G', decimals: 18 } },
 ];
 
+function fallbackNativeDecimalsFor(chainKey: string, nativeSymbol: string): number {
+  const fromChain = FALLBACK_REGISTRY.find((row) => row.chainKey === chainKey)?.nativeCurrency?.decimals;
+  if (typeof fromChain === 'number' && Number.isFinite(fromChain) && fromChain > 0) {
+    return Math.floor(fromChain);
+  }
+  const upperSymbol = nativeSymbol.trim().toUpperCase();
+  if (upperSymbol === 'HBAR') {
+    return 8;
+  }
+  return 18;
+}
+
 function loadRegistryFromStorage(): ChainDescriptor[] {
   if (typeof window === 'undefined') {
     return FALLBACK_REGISTRY;
@@ -58,7 +70,9 @@ function loadRegistryFromStorage(): ChainDescriptor[] {
         const nativeSymbol = typeof symbolRaw === 'string' && symbolRaw.trim() ? symbolRaw.trim() : 'ETH';
         const decimalsRaw = row?.nativeCurrency?.decimals;
         const nativeDecimals =
-          typeof decimalsRaw === 'number' && Number.isFinite(decimalsRaw) && decimalsRaw >= 0 ? Math.floor(decimalsRaw) : 18;
+          typeof decimalsRaw === 'number' && Number.isFinite(decimalsRaw) && decimalsRaw > 0
+            ? Math.floor(decimalsRaw)
+            : fallbackNativeDecimalsFor(chainKey, nativeSymbol);
         return { chainKey, displayName, nativeCurrency: { symbol: nativeSymbol, decimals: nativeDecimals } };
       })
       .filter(Boolean) as ChainDescriptor[];
@@ -88,11 +102,12 @@ export function nativeSymbolForChainKey(chainKey: ChainKey): string {
 export function nativeDecimalsForChainKey(chainKey: ChainKey): number {
   const registry = loadRegistryFromStorage();
   const found = registry.find((row) => row.chainKey === chainKey);
+  const symbol = found?.nativeCurrency?.symbol ?? '';
   const decimals = found?.nativeCurrency?.decimals;
-  if (typeof decimals === 'number' && Number.isFinite(decimals) && decimals >= 0) {
+  if (typeof decimals === 'number' && Number.isFinite(decimals) && decimals > 0) {
     return Math.floor(decimals);
   }
-  return 18;
+  return fallbackNativeDecimalsFor(chainKey, symbol);
 }
 
 function isChainKey(value: unknown): value is ChainKey {
