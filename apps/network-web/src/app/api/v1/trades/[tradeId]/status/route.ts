@@ -27,6 +27,11 @@ type TradeStatusRequest = {
   txHash?: string | null;
   mockReceiptId?: string | null;
   errorMessage?: string | null;
+  providerRequested?: 'uniswap_api' | 'legacy_router' | null;
+  providerUsed?: 'uniswap_api' | 'legacy_router' | null;
+  fallbackUsed?: boolean | null;
+  fallbackReason?: { code: string; message: string } | null;
+  uniswapRouteType?: string | null;
   at: string;
 };
 
@@ -198,7 +203,12 @@ export async function POST(
             amountIn: body.amountIn ?? null,
             amountOut: body.amountOut ?? null,
             txHash: body.txHash ?? null,
-            mockReceiptId: body.mockReceiptId ?? null
+            mockReceiptId: body.mockReceiptId ?? null,
+            providerRequested: body.providerRequested ?? null,
+            providerUsed: body.providerUsed ?? null,
+            fallbackUsed: body.fallbackUsed ?? null,
+            fallbackReason: body.fallbackReason ?? null,
+            uniswapRouteType: body.uniswapRouteType ?? null
           }),
           body.at
         ]

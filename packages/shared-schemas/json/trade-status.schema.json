@@ -60,6 +60,19 @@
     },
     "mockReceiptId": { "type": ["string", "null"] },
     "errorMessage": { "type": ["string", "null"] },
+    "providerRequested": { "type": ["string", "null"], "enum": ["uniswap_api", "legacy_router", null] },
+    "providerUsed": { "type": ["string", "null"], "enum": ["uniswap_api", "legacy_router", null] },
+    "fallbackUsed": { "type": ["boolean", "null"] },
+    "fallbackReason": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["code", "message"],
+      "properties": {
+        "code": { "type": "string", "minLength": 1 },
+        "message": { "type": "string", "minLength": 1 }
+      }
+    },
+    "uniswapRouteType": { "type": ["string", "null"] },
     "at": { "type": "string", "format": "date-time" }
   }
 }

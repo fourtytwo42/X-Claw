@@ -1,0 +1,47 @@
+{
+  "chainKey": "polygon_mainnet",
+  "family": "evm",
+  "enabled": true,
+  "uiVisible": true,
+  "chainId": 137,
+  "displayName": "Polygon Mainnet",
+  "nativeCurrency": {
+    "name": "MATIC",
+    "symbol": "POL",
+    "decimals": 18
+  },
+  "explorerBaseUrl": "https://polygonscan.com",
+  "rpc": {
+    "primary": "https://polygon-rpc.com",
+    "fallback": "https://polygon-bor-rpc.publicnode.com"
+  },
+  "coreContracts": {
+    "dex": "adapter_pending",
+    "deploymentStatus": "pending_verification",
+    "notes": "Uniswap API primary routing enabled. Legacy router fallback is capability-gated by configured router address."
+  },
+  "canonicalTokens": {},
+  "capabilities": {
+    "wallet": true,
+    "trade": true,
+    "liquidity": false,
+    "limitOrders": false,
+    "x402": false,
+    "faucet": false,
+    "deposits": false
+  },
+  "tradeProviders": {
+    "primary": "uniswap_api",
+    "fallback": "legacy_router"
+  },
+  "uniswapApi": {
+    "enabled": true
+  },
+  "updatedAt": "2026-02-20T10:00:00.000Z",
+  "version": 1,
+  "sources": {
+    "chainMetadata": [
+      "https://raw.githubusercontent.com/ethereum-lists/chains/master/_data/chains/eip155-137.json"
+    ]
+  }
+}

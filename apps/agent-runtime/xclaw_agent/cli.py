@@ -6852,6 +6852,187 @@ def cmd_liquidity_positions(args: argparse.Namespace) -> int:
         return fail("liquidity_positions_failed", str(exc), "Inspect runtime liquidity positions path and retry.", {"chain": chain, "dex": dex}, exit_code=1)
 
 
+def _trade_provider_settings(chain: str) -> tuple[str, str]:
+    cfg = _load_chain_config(chain)
+    providers = cfg.get("tradeProviders")
+    if isinstance(providers, dict):
+        primary = str(providers.get("primary") or "").strip().lower()
+        fallback = str(providers.get("fallback") or "").strip().lower()
+        if primary in {"uniswap_api", "legacy_router"}:
+            return primary, fallback or "legacy_router"
+    return "legacy_router", "legacy_router"
+
+
+def _legacy_router_available(chain: str) -> bool:
+    try:
+        _require_chain_contract_address(chain, "router")
+        _chain_rpc_url(chain)
+        return True
+    except Exception:
+        return False
+
+
+def _fallback_reason(code: str, message: str) -> dict[str, str]:
+    return {"code": code, "message": message[:500]}
+
+
+def _build_provider_meta(
+    provider_requested: str,
+    provider_used: str,
+    fallback_used: bool,
+    fallback_reason: dict[str, str] | None,
+    uniswap_route_type: str | None,
+) -> dict[str, Any]:
+    return {
+        "providerRequested": provider_requested,
+        "providerUsed": provider_used,
+        "fallbackUsed": bool(fallback_used),
+        "fallbackReason": fallback_reason if fallback_used and isinstance(fallback_reason, dict) else None,
+        "uniswapRouteType": (str(uniswap_route_type or "").strip().upper() or None),
+    }
+
+
+def _uniswap_quote_via_proxy(
+    chain: str,
+    wallet_address: str,
+    token_in: str,
+    token_out: str,
+    amount_in_units: str,
+    slippage_bps: int,
+) -> dict[str, Any]:
+    agent_id = _resolve_agent_id_or_fail(chain)
+    payload = {
+        "agentId": agent_id,
+        "chainKey": chain,
+        "walletAddress": wallet_address,
+        "tokenIn": token_in,
+        "tokenOut": token_out,
+        "amountInUnits": str(amount_in_units),
+        "slippageBps": int(slippage_bps),
+    }
+    status_code, body = _api_request("POST", "/agent/trade/uniswap/quote", payload=payload)
+    if status_code < 200 or status_code >= 300:
+        code = str(body.get("code", "uniswap_quote_failed"))
+        message = str(body.get("message", f"Uniswap quote failed ({status_code})"))
+        raise WalletStoreError(f"{code}: {message}")
+    amount_out_units = str(body.get("amountOutUnits") or "").strip()
+    if not re.fullmatch(r"[0-9]+", amount_out_units):
+        raise WalletStoreError("uniswap_payload_invalid: quote response missing amountOutUnits.")
+    quote = body.get("quote")
+    if not isinstance(quote, dict):
+        raise WalletStoreError("uniswap_payload_invalid: quote response missing quote object.")
+    return {
+        "amountOutUnits": amount_out_units,
+        "routeType": str(body.get("routeType") or "").strip().upper() or "UNKNOWN",
+        "quote": quote,
+    }
+
+
+def _uniswap_build_via_proxy(chain: str, wallet_address: str, quote_payload: dict[str, Any]) -> dict[str, Any]:
+    agent_id = _resolve_agent_id_or_fail(chain)
+    payload = {"agentId": agent_id, "chainKey": chain, "walletAddress": wallet_address, "quote": quote_payload}
+    status_code, body = _api_request("POST", "/agent/trade/uniswap/build", payload=payload)
+    if status_code < 200 or status_code >= 300:
+        code = str(body.get("code", "uniswap_build_failed"))
+        message = str(body.get("message", f"Uniswap build failed ({status_code})"))
+        raise WalletStoreError(f"{code}: {message}")
+    swap_tx = body.get("swapTx")
+    if not isinstance(swap_tx, dict):
+        raise WalletStoreError("uniswap_payload_invalid: build response missing swapTx object.")
+    approval_tx = body.get("approvalTx")
+    if approval_tx is not None and not isinstance(approval_tx, dict):
+        raise WalletStoreError("uniswap_payload_invalid: build response approvalTx must be object or null.")
+    route_type = str(body.get("routeType") or "").strip().upper() or "UNKNOWN"
+    amount_out_units = str(body.get("amountOutUnits") or "").strip()
+    if amount_out_units and not re.fullmatch(r"[0-9]+", amount_out_units):
+        amount_out_units = ""
+    return {
+        "routeType": route_type,
+        "amountOutUnits": amount_out_units or None,
+        "approvalTx": approval_tx,
+        "swapTx": swap_tx,
+    }
+
+
+def _normalize_uniswap_tx_payload(tx_payload: dict[str, Any], label: str) -> dict[str, str]:
+    to_addr = str(tx_payload.get("to") or "").strip()
+    data = str(tx_payload.get("data") or "").strip()
+    value = str(tx_payload.get("value") or "0").strip() or "0"
+    if not is_hex_address(to_addr):
+        raise WalletStoreError(f"uniswap_payload_invalid: {label}.to is invalid.")
+    if not re.fullmatch(r"0x[a-fA-F0-9]+", data):
+        raise WalletStoreError(f"uniswap_payload_invalid: {label}.data is invalid.")
+    if not re.fullmatch(r"[0-9]+", value):
+        raise WalletStoreError(f"uniswap_payload_invalid: {label}.value must be an unsigned integer string.")
+    return {"to": to_addr, "data": data, "value": value}
+
+
+def _execute_uniswap_swap_via_proxy(
+    chain: str,
+    wallet_address: str,
+    private_key_hex: str,
+    token_in: str,
+    token_out: str,
+    amount_in_units: str,
+    slippage_bps: int,
+) -> dict[str, Any]:
+    rpc_url = _chain_rpc_url(chain)
+    cast_bin = _require_cast_bin()
+    quoted = _uniswap_quote_via_proxy(chain, wallet_address, token_in, token_out, amount_in_units, slippage_bps)
+    built = _uniswap_build_via_proxy(chain, wallet_address, quoted["quote"])
+    route_type = str(built.get("routeType") or quoted.get("routeType") or "UNKNOWN").upper()
+    approval_tx_hash: str | None = None
+    swap_tx_hash: str | None = None
+
+    approval_payload = built.get("approvalTx")
+    if isinstance(approval_payload, dict):
+        approval_tx = _normalize_uniswap_tx_payload(approval_payload, "approvalTx")
+        approval_tx_hash = _cast_rpc_send_transaction(
+            rpc_url,
+            {"from": wallet_address, "to": approval_tx["to"], "data": approval_tx["data"], "value": approval_tx["value"]},
+            private_key_hex,
+        )
+        approval_receipt = _run_subprocess(
+            [cast_bin, "receipt", "--json", "--rpc-url", rpc_url, approval_tx_hash],
+            timeout_sec=_cast_receipt_timeout_sec(),
+            kind="cast_receipt",
+        )
+        if approval_receipt.returncode != 0:
+            stderr = (approval_receipt.stderr or "").strip()
+            stdout = (approval_receipt.stdout or "").strip()
+            raise WalletStoreError(stderr or stdout or "cast receipt failed for uniswap approval tx.")
+        approval_receipt_payload = json.loads((approval_receipt.stdout or "{}").strip() or "{}")
+        approval_status = str(approval_receipt_payload.get("status", "0x0")).lower()
+        if approval_status not in {"0x1", "1"}:
+            raise WalletStoreError(f"Uniswap approval receipt indicates failure status '{approval_status}'.")
+
+    swap_tx = _normalize_uniswap_tx_payload(built["swapTx"], "swapTx")
+    swap_tx_hash = _cast_rpc_send_transaction(
+        rpc_url,
+        {"from": wallet_address, "to": swap_tx["to"], "data": swap_tx["data"], "value": swap_tx["value"]},
+        private_key_hex,
+    )
+    receipt_proc = _run_subprocess(
+        [cast_bin, "receipt", "--json", "--rpc-url", rpc_url, swap_tx_hash],
+        timeout_sec=_cast_receipt_timeout_sec(),
+        kind="cast_receipt",
+    )
+    if receipt_proc.returncode != 0:
+        stderr = (receipt_proc.stderr or "").strip()
+        stdout = (receipt_proc.stdout or "").strip()
+        raise WalletStoreError(stderr or stdout or "cast receipt failed for uniswap swap tx.")
+    receipt_payload = json.loads((receipt_proc.stdout or "{}").strip() or "{}")
+    receipt_status = str(receipt_payload.get("status", "0x0")).lower()
+    if receipt_status not in {"0x1", "1"}:
+        raise WalletStoreError(f"Uniswap on-chain receipt indicates failure status '{receipt_status}'.")
+    return {
+        "approveTxHash": approval_tx_hash,
+        "txHash": swap_tx_hash,
+        "amountOutUnits": built.get("amountOutUnits") or quoted.get("amountOutUnits"),
+        "routeType": route_type,
+    }
+
+
 def cmd_trade_spot(args: argparse.Namespace) -> int:
     chk = require_json_flag(args)
     if chk is not None:
@@ -6862,6 +7043,11 @@ def cmd_trade_spot(args: argparse.Namespace) -> int:
     transition_state = "init"
     last_tx_hash: str | None = None
     last_approve_tx_hash: str | None = None
+    provider_requested, _ = _trade_provider_settings(chain)
+    provider_used = "legacy_router"
+    fallback_used = False
+    fallback_reason: dict[str, str] | None = None
+    uniswap_route_type: str | None = None
     try:
         # Best-effort: usage outbox replay should not block input validation or proposing.
         try:
@@ -6893,7 +7079,9 @@ def cmd_trade_spot(args: argparse.Namespace) -> int:
         wallet_address, private_key_hex = _execution_wallet(store, chain)
         cast_bin = _require_cast_bin()
         rpc_url = _chain_rpc_url(chain)
-        router = _require_chain_contract_address(chain, "router")
+        router: str | None = None
+        if _legacy_router_available(chain):
+            router = _require_chain_contract_address(chain, "router")
 
         token_in_meta = _fetch_erc20_metadata(chain, token_in)
         token_out_meta = _fetch_erc20_metadata(chain, token_out)
@@ -6904,7 +7092,21 @@ def cmd_trade_spot(args: argparse.Namespace) -> int:
         amount_in_int = int(amount_in_units)
         state, day_key, current_spend, max_daily_wei = _enforce_spend_preconditions(chain, amount_in_int, enforce_native_cap=False)
 
-        expected_out_int = _router_get_amount_out(chain, amount_in_units, token_in, token_out)
+        expected_out_int: int
+        if provider_requested == "uniswap_api":
+            try:
+                uniswap_quote = _uniswap_quote_via_proxy(chain, wallet_address, token_in, token_out, amount_in_units, slippage_bps)
+                expected_out_int = int(str(uniswap_quote.get("amountOutUnits") or "0"))
+                uniswap_route_type = str(uniswap_quote.get("routeType") or "").strip().upper() or None
+            except Exception as exc:
+                if router:
+                    fallback_used = True
+                    fallback_reason = _fallback_reason("uniswap_quote_failed", str(exc))
+                else:
+                    raise WalletStoreError(f"no_execution_provider_available: {exc}") from exc
+                expected_out_int = _router_get_amount_out(chain, amount_in_units, token_in, token_out)
+        else:
+            expected_out_int = _router_get_amount_out(chain, amount_in_units, token_in, token_out)
         min_out_int = (expected_out_int * (10000 - slippage_bps)) // 10000
         if min_out_int <= 0:
             raise WalletStoreError("Computed amountOutMin is zero; reduce slippage or increase amount.")
@@ -7020,7 +7222,20 @@ def cmd_trade_spot(args: argparse.Namespace) -> int:
 
         # Re-quote right before execution so amountOutMin reflects post-approval market state.
         # Approval waits can be long enough that an earlier quote becomes stale and causes SLIPPAGE_NET.
-        expected_out_int = _router_get_amount_out(chain, amount_in_units, token_in, token_out)
+        if provider_requested == "uniswap_api" and not fallback_used:
+            try:
+                uniswap_quote = _uniswap_quote_via_proxy(chain, wallet_address, token_in, token_out, amount_in_units, slippage_bps)
+                expected_out_int = int(str(uniswap_quote.get("amountOutUnits") or "0"))
+                uniswap_route_type = str(uniswap_quote.get("routeType") or "").strip().upper() or uniswap_route_type
+            except Exception as exc:
+                if router:
+                    fallback_used = True
+                    fallback_reason = _fallback_reason("uniswap_quote_failed", str(exc))
+                else:
+                    raise WalletStoreError(f"no_execution_provider_available: {exc}") from exc
+                expected_out_int = _router_get_amount_out(chain, amount_in_units, token_in, token_out)
+        else:
+            expected_out_int = _router_get_amount_out(chain, amount_in_units, token_in, token_out)
         min_out_int = (expected_out_int * (10000 - slippage_bps)) // 10000
         if min_out_int <= 0:
             raise WalletStoreError("Computed amountOutMin is zero after approval; reduce slippage or increase amount.")
@@ -7039,33 +7254,6 @@ def cmd_trade_spot(args: argparse.Namespace) -> int:
 
         approve_tx_hash: str | None = None
         approve_receipt_payload: dict[str, Any] | None = None
-        # Approve router (proxy) to spend tokenIn if needed.
-        allowance_wei = int(_fetch_token_allowance_wei(chain, token_in, wallet_address, router))
-        if allowance_wei < int(amount_in_units):
-            approve_data = _cast_calldata("approve(address,uint256)(bool)", [router, amount_in_units])
-            approve_tx_hash = _cast_rpc_send_transaction(
-                rpc_url,
-                {
-                    "from": wallet_address,
-                    "to": token_in,
-                    "data": approve_data,
-                },
-                private_key_hex,
-            )
-            last_approve_tx_hash = approve_tx_hash
-            approve_receipt = _run_subprocess(
-                [cast_bin, "receipt", "--json", "--rpc-url", rpc_url, approve_tx_hash],
-                timeout_sec=_cast_receipt_timeout_sec(),
-                kind="cast_receipt",
-            )
-            if approve_receipt.returncode != 0:
-                stderr = (approve_receipt.stderr or "").strip()
-                stdout = (approve_receipt.stdout or "").strip()
-                raise WalletStoreError(stderr or stdout or "cast receipt failed for approve tx.")
-            approve_receipt_payload = json.loads((approve_receipt.stdout or "{}").strip() or "{}")
-            approve_status = str(approve_receipt_payload.get("status", "0x0")).lower()
-            if approve_status not in {"0x1", "1"}:
-                raise WalletStoreError(f"Approve receipt indicates failure status '{approve_status}'.")
 
         to_addr = str(args.to or "").strip() or wallet_address
         if not is_hex_address(to_addr):
@@ -7077,23 +7265,123 @@ def cmd_trade_spot(args: argparse.Namespace) -> int:
                 exit_code=2,
             )
 
-        swap_data = _cast_calldata(
-            "swapExactTokensForTokens(uint256,uint256,address[],address,uint256)(uint256[])",
-            [amount_in_units, str(min_out_int), f"[{token_in},{token_out}]", to_addr, deadline],
-        )
-        tx_hash = _cast_rpc_send_transaction(
-            rpc_url,
-            {
-                "from": wallet_address,
-                "to": router,
-                "data": swap_data,
-            },
-            private_key_hex,
-        )
+        tx_hash: str
+        if provider_requested == "uniswap_api" and not fallback_used:
+            try:
+                uniswap_exec = _execute_uniswap_swap_via_proxy(
+                    chain,
+                    wallet_address,
+                    private_key_hex,
+                    token_in,
+                    token_out,
+                    amount_in_units,
+                    slippage_bps,
+                )
+                provider_used = "uniswap_api"
+                approve_tx_hash = str(uniswap_exec.get("approveTxHash") or "") or None
+                tx_hash = str(uniswap_exec.get("txHash") or "")
+                if not re.fullmatch(r"0x[a-fA-F0-9]{64}", tx_hash):
+                    raise WalletStoreError("uniswap_payload_invalid: missing txHash from execution.")
+                if approve_tx_hash:
+                    last_approve_tx_hash = approve_tx_hash
+                uniswap_route_type = str(uniswap_exec.get("routeType") or "").strip().upper() or uniswap_route_type
+                amount_out_units_from_uni = str(uniswap_exec.get("amountOutUnits") or "").strip()
+                if re.fullmatch(r"[0-9]+", amount_out_units_from_uni):
+                    expected_out_int = int(amount_out_units_from_uni)
+            except Exception as exc:
+                if router:
+                    fallback_used = True
+                    fallback_reason = _fallback_reason("uniswap_execution_failed", str(exc))
+                else:
+                    raise WalletStoreError(f"no_execution_provider_available: {exc}") from exc
+                provider_used = "legacy_router"
+                allowance_wei = int(_fetch_token_allowance_wei(chain, token_in, wallet_address, str(router)))
+                if allowance_wei < int(amount_in_units):
+                    approve_data = _cast_calldata("approve(address,uint256)(bool)", [str(router), amount_in_units])
+                    approve_tx_hash = _cast_rpc_send_transaction(
+                        rpc_url,
+                        {
+                            "from": wallet_address,
+                            "to": token_in,
+                            "data": approve_data,
+                        },
+                        private_key_hex,
+                    )
+                    last_approve_tx_hash = approve_tx_hash
+                    approve_receipt = _run_subprocess(
+                        [cast_bin, "receipt", "--json", "--rpc-url", rpc_url, approve_tx_hash],
+                        timeout_sec=_cast_receipt_timeout_sec(),
+                        kind="cast_receipt",
+                    )
+                    if approve_receipt.returncode != 0:
+                        stderr = (approve_receipt.stderr or "").strip()
+                        stdout = (approve_receipt.stdout or "").strip()
+                        raise WalletStoreError(stderr or stdout or "cast receipt failed for approve tx.")
+                    approve_receipt_payload = json.loads((approve_receipt.stdout or "{}").strip() or "{}")
+                    approve_status = str(approve_receipt_payload.get("status", "0x0")).lower()
+                    if approve_status not in {"0x1", "1"}:
+                        raise WalletStoreError(f"Approve receipt indicates failure status '{approve_status}'.")
+                swap_data = _cast_calldata(
+                    "swapExactTokensForTokens(uint256,uint256,address[],address,uint256)(uint256[])",
+                    [amount_in_units, str(min_out_int), f"[{token_in},{token_out}]", to_addr, deadline],
+                )
+                tx_hash = _cast_rpc_send_transaction(
+                    rpc_url,
+                    {
+                        "from": wallet_address,
+                        "to": str(router),
+                        "data": swap_data,
+                    },
+                    private_key_hex,
+                )
+        else:
+            if not router:
+                raise WalletStoreError("no_execution_provider_available: legacy router is not configured for this chain.")
+            provider_used = "legacy_router"
+            allowance_wei = int(_fetch_token_allowance_wei(chain, token_in, wallet_address, str(router)))
+            if allowance_wei < int(amount_in_units):
+                approve_data = _cast_calldata("approve(address,uint256)(bool)", [str(router), amount_in_units])
+                approve_tx_hash = _cast_rpc_send_transaction(
+                    rpc_url,
+                    {
+                        "from": wallet_address,
+                        "to": token_in,
+                        "data": approve_data,
+                    },
+                    private_key_hex,
+                )
+                last_approve_tx_hash = approve_tx_hash
+                approve_receipt = _run_subprocess(
+                    [cast_bin, "receipt", "--json", "--rpc-url", rpc_url, approve_tx_hash],
+                    timeout_sec=_cast_receipt_timeout_sec(),
+                    kind="cast_receipt",
+                )
+                if approve_receipt.returncode != 0:
+                    stderr = (approve_receipt.stderr or "").strip()
+                    stdout = (approve_receipt.stdout or "").strip()
+                    raise WalletStoreError(stderr or stdout or "cast receipt failed for approve tx.")
+                approve_receipt_payload = json.loads((approve_receipt.stdout or "{}").strip() or "{}")
+                approve_status = str(approve_receipt_payload.get("status", "0x0")).lower()
+                if approve_status not in {"0x1", "1"}:
+                    raise WalletStoreError(f"Approve receipt indicates failure status '{approve_status}'.")
+            swap_data = _cast_calldata(
+                "swapExactTokensForTokens(uint256,uint256,address[],address,uint256)(uint256[])",
+                [amount_in_units, str(min_out_int), f"[{token_in},{token_out}]", to_addr, deadline],
+            )
+            tx_hash = _cast_rpc_send_transaction(
+                rpc_url,
+                {
+                    "from": wallet_address,
+                    "to": str(router),
+                    "data": swap_data,
+                },
+                private_key_hex,
+            )
         last_tx_hash = tx_hash
-        _post_trade_status(trade_id, "approved", "executing", {"txHash": tx_hash})
+        provider_meta = _build_provider_meta(provider_requested, provider_used, fallback_used, fallback_reason, uniswap_route_type)
+        _post_trade_status(trade_id, "approved", "executing", {"txHash": tx_hash, **provider_meta})
         transition_state = "executing"
-        _post_trade_status(trade_id, "executing", "verifying", {"txHash": tx_hash})
+        _post_trade_status(trade_id, "executing", "verifying", {"txHash": tx_hash, **provider_meta})
         transition_state = "verifying"
 
         receipt_proc = _run_subprocess(
@@ -7126,7 +7414,7 @@ def cmd_trade_spot(args: argparse.Namespace) -> int:
             trade_id,
             "verifying",
             "filled",
-            {"txHash": tx_hash, "amountOut": _format_units(int(expected_out_int), token_out_decimals)},
+            {"txHash": tx_hash, "amountOut": _format_units(int(expected_out_int), token_out_decimals), **provider_meta},
         )
         _remove_pending_spot_trade_flow(trade_id)
 
@@ -7203,9 +7491,23 @@ def cmd_trade_spot(args: argparse.Namespace) -> int:
             totalGasCostEth=total_gas_cost_eth_exact,
             totalGasCostEthExact=total_gas_cost_eth_exact,
             totalGasCostEthPretty=_format_eth_cost_from_wei(total_cost_wei),
+            providerRequested=provider_requested,
+            providerUsed=provider_used,
+            fallbackUsed=fallback_used,
+            fallbackReason=fallback_reason,
+            uniswapRouteType=uniswap_route_type,
         )
     except SubprocessTimeout as exc:
-        details: dict[str, Any] = {"chain": chain, "timeoutSec": exc.timeout_sec, "kind": exc.kind}
+        details: dict[str, Any] = {
+            "chain": chain,
+            "timeoutSec": exc.timeout_sec,
+            "kind": exc.kind,
+            "providerRequested": provider_requested,
+            "providerUsed": provider_used,
+            "fallbackUsed": fallback_used,
+            "fallbackReason": fallback_reason,
+            "uniswapRouteType": uniswap_route_type,
+        }
         if last_tx_hash:
             details["txHash"] = last_tx_hash
         if last_approve_tx_hash:
@@ -7213,7 +7515,13 @@ def cmd_trade_spot(args: argparse.Namespace) -> int:
         if trade_id and transition_state in {"executing", "verifying"}:
             try:
                 from_status = "executing" if transition_state == "executing" else "verifying"
-                _post_trade_status(trade_id, from_status, "failed", {"reasonCode": "verification_timeout", "reasonMessage": str(exc), "txHash": last_tx_hash})
+                provider_meta = _build_provider_meta(provider_requested, provider_used, fallback_used, fallback_reason, uniswap_route_type)
+                _post_trade_status(
+                    trade_id,
+                    from_status,
+                    "failed",
+                    {"reasonCode": "verification_timeout", "reasonMessage": str(exc), "txHash": last_tx_hash, **provider_meta},
+                )
                 _remove_pending_spot_trade_flow(trade_id)
             except Exception:
                 pass
@@ -7236,11 +7544,19 @@ def cmd_trade_spot(args: argparse.Namespace) -> int:
         if trade_id and transition_state in {"executing", "verifying"}:
             try:
                 from_status = "executing" if transition_state == "executing" else "verifying"
-                _post_trade_status(trade_id, from_status, "failed", {"reasonCode": "policy_denied", "reasonMessage": str(exc), "txHash": last_tx_hash})
+                provider_meta = _build_provider_meta(provider_requested, provider_used, fallback_used, fallback_reason, uniswap_route_type)
+                _post_trade_status(
+                    trade_id,
+                    from_status,
+                    "failed",
+                    {"reasonCode": "policy_denied", "reasonMessage": str(exc), "txHash": last_tx_hash, **provider_meta},
+                )
                 _remove_pending_spot_trade_flow(trade_id)
             except Exception:
                 pass
-        return fail(exc.code, str(exc), exc.action_hint, exc.details, exit_code=1)
+        details = dict(exc.details or {})
+        details.update(_build_provider_meta(provider_requested, provider_used, fallback_used, fallback_reason, uniswap_route_type))
+        return fail(exc.code, str(exc), exc.action_hint, details, exit_code=1)
     except WalletSecurityError as exc:
         return fail("unsafe_permissions", str(exc), "Restrict permissions to owner-only (0700/0600) and retry.", {"chain": chain}, exit_code=1)
     except WalletStoreError as exc:
@@ -7258,12 +7574,39 @@ def cmd_trade_spot(args: argparse.Namespace) -> int:
                 _remove_pending_spot_trade_flow(trade_id)
             except Exception:
                 pass
-        return fail("trade_spot_failed", msg, "Verify wallet, RPC, token addresses, and retry.", {"chain": chain}, exit_code=1)
+        return fail(
+            "trade_spot_failed",
+            msg,
+            "Verify wallet, RPC, token addresses, and retry.",
+            {
+                "chain": chain,
+                "providerRequested": provider_requested,
+                "providerUsed": provider_used,
+                "fallbackUsed": fallback_used,
+                "fallbackReason": fallback_reason,
+                "uniswapRouteType": uniswap_route_type,
+            },
+            exit_code=1,
+        )
     except Exception as exc:
         msg = (str(exc) or "").strip()
         if not msg:
             msg = f"{type(exc).__name__}: (no message)"
-        return fail("trade_spot_failed", msg, "Inspect runtime trade spot path and retry.", {"chain": chain, "exceptionType": type(exc).__name__}, exit_code=1)
+        return fail(
+            "trade_spot_failed",
+            msg,
+            "Inspect runtime trade spot path and retry.",
+            {
+                "chain": chain,
+                "exceptionType": type(exc).__name__,
+                "providerRequested": provider_requested,
+                "providerUsed": provider_used,
+                "fallbackUsed": fallback_used,
+                "fallbackReason": fallback_reason,
+                "uniswapRouteType": uniswap_route_type,
+            },
+            exit_code=1,
+        )
 
 
 def _read_trade_details(trade_id: str) -> dict[str, Any]:
@@ -7775,6 +8118,11 @@ def cmd_trade_execute(args: argparse.Namespace) -> int:
 
     transition_state = "init"
     previous_status = "approved"
+    provider_requested, _ = _trade_provider_settings(args.chain)
+    provider_used = "legacy_router"
+    fallback_used = False
+    fallback_reason: dict[str, str] | None = None
+    uniswap_route_type: str | None = None
     try:
         # Best-effort: usage outbox replay should not block intent validation/execution.
         try:
@@ -7826,7 +8174,9 @@ def cmd_trade_execute(args: argparse.Namespace) -> int:
         wallet_address, private_key_hex = _execution_wallet(store, args.chain)
         cast_bin = _require_cast_bin()
         rpc_url = _chain_rpc_url(args.chain)
-        router = _require_chain_contract_address(args.chain, "router")
+        router: str | None = None
+        if _legacy_router_available(args.chain):
+            router = _require_chain_contract_address(args.chain, "router")
 
         token_in_raw = str(trade.get("tokenIn") or "").strip()
         token_out_raw = str(trade.get("tokenOut") or "").strip()
@@ -7848,47 +8198,110 @@ def cmd_trade_execute(args: argparse.Namespace) -> int:
         projected_spend_usd = _to_non_negative_decimal(trade.get("amountIn") or "0")
         cap_state, _, current_spend_usd, current_filled_trades, trade_caps = _enforce_trade_caps(args.chain, projected_spend_usd, 1)
         deadline = str(int(datetime.now(timezone.utc).timestamp()) + 120)
-
-        approve_data = _cast_calldata("approve(address,uint256)(bool)", [router, amount_wei_str])
-        approve_tx_hash = _cast_rpc_send_transaction(
-            rpc_url,
-            {
-                "from": wallet_address,
-                "to": token_in,
-                "data": approve_data,
-            },
-            private_key_hex,
-        )
-        approve_receipt = _run_subprocess(
-            [cast_bin, "receipt", "--json", "--rpc-url", rpc_url, approve_tx_hash],
-            timeout_sec=_cast_receipt_timeout_sec(),
-            kind="cast_receipt",
-        )
-        if approve_receipt.returncode != 0:
-            stderr = (approve_receipt.stderr or "").strip()
-            stdout = (approve_receipt.stdout or "").strip()
-            raise WalletStoreError(stderr or stdout or "cast receipt failed for approve tx.")
-        approve_payload = json.loads((approve_receipt.stdout or "{}").strip() or "{}")
-        approve_status = str(approve_payload.get("status", "0x0")).lower()
-        if approve_status not in {"0x1", "1"}:
-            raise WalletStoreError(f"Approve receipt indicates failure status '{approve_status}'.")
-
-        swap_data = _cast_calldata(
-            "swapExactTokensForTokens(uint256,uint256,address[],address,uint256)(uint256[])",
-            [amount_wei_str, "1", f"[{token_in},{token_out}]", wallet_address, deadline],
-        )
-        tx_hash = _cast_rpc_send_transaction(
-            rpc_url,
-            {
-                "from": wallet_address,
-                "to": router,
-                "data": swap_data,
-            },
-            private_key_hex,
-        )
-        _post_trade_status(args.intent, previous_status, "executing", {"txHash": tx_hash})
+        tx_hash: str
+        if provider_requested == "uniswap_api":
+            try:
+                uniswap_exec = _execute_uniswap_swap_via_proxy(
+                    args.chain,
+                    wallet_address,
+                    private_key_hex,
+                    token_in,
+                    token_out,
+                    amount_wei_str,
+                    500,
+                )
+                provider_used = "uniswap_api"
+                tx_hash = str(uniswap_exec.get("txHash") or "")
+                if not re.fullmatch(r"0x[a-fA-F0-9]{64}", tx_hash):
+                    raise WalletStoreError("uniswap_payload_invalid: missing txHash from execution.")
+                uniswap_route_type = str(uniswap_exec.get("routeType") or "").strip().upper() or None
+            except Exception as exc:
+                if router:
+                    fallback_used = True
+                    fallback_reason = _fallback_reason("uniswap_execution_failed", str(exc))
+                    provider_used = "legacy_router"
+                else:
+                    raise WalletStoreError(f"no_execution_provider_available: {exc}") from exc
+                approve_data = _cast_calldata("approve(address,uint256)(bool)", [str(router), amount_wei_str])
+                approve_tx_hash = _cast_rpc_send_transaction(
+                    rpc_url,
+                    {
+                        "from": wallet_address,
+                        "to": token_in,
+                        "data": approve_data,
+                    },
+                    private_key_hex,
+                )
+                approve_receipt = _run_subprocess(
+                    [cast_bin, "receipt", "--json", "--rpc-url", rpc_url, approve_tx_hash],
+                    timeout_sec=_cast_receipt_timeout_sec(),
+                    kind="cast_receipt",
+                )
+                if approve_receipt.returncode != 0:
+                    stderr = (approve_receipt.stderr or "").strip()
+                    stdout = (approve_receipt.stdout or "").strip()
+                    raise WalletStoreError(stderr or stdout or "cast receipt failed for approve tx.")
+                approve_payload = json.loads((approve_receipt.stdout or "{}").strip() or "{}")
+                approve_status = str(approve_payload.get("status", "0x0")).lower()
+                if approve_status not in {"0x1", "1"}:
+                    raise WalletStoreError(f"Approve receipt indicates failure status '{approve_status}'.")
+                swap_data = _cast_calldata(
+                    "swapExactTokensForTokens(uint256,uint256,address[],address,uint256)(uint256[])",
+                    [amount_wei_str, "1", f"[{token_in},{token_out}]", wallet_address, deadline],
+                )
+                tx_hash = _cast_rpc_send_transaction(
+                    rpc_url,
+                    {
+                        "from": wallet_address,
+                        "to": str(router),
+                        "data": swap_data,
+                    },
+                    private_key_hex,
+                )
+        else:
+            if not router:
+                raise WalletStoreError("no_execution_provider_available: legacy router is not configured for this chain.")
+            provider_used = "legacy_router"
+            approve_data = _cast_calldata("approve(address,uint256)(bool)", [str(router), amount_wei_str])
+            approve_tx_hash = _cast_rpc_send_transaction(
+                rpc_url,
+                {
+                    "from": wallet_address,
+                    "to": token_in,
+                    "data": approve_data,
+                },
+                private_key_hex,
+            )
+            approve_receipt = _run_subprocess(
+                [cast_bin, "receipt", "--json", "--rpc-url", rpc_url, approve_tx_hash],
+                timeout_sec=_cast_receipt_timeout_sec(),
+                kind="cast_receipt",
+            )
+            if approve_receipt.returncode != 0:
+                stderr = (approve_receipt.stderr or "").strip()
+                stdout = (approve_receipt.stdout or "").strip()
+                raise WalletStoreError(stderr or stdout or "cast receipt failed for approve tx.")
+            approve_payload = json.loads((approve_receipt.stdout or "{}").strip() or "{}")
+            approve_status = str(approve_payload.get("status", "0x0")).lower()
+            if approve_status not in {"0x1", "1"}:
+                raise WalletStoreError(f"Approve receipt indicates failure status '{approve_status}'.")
+            swap_data = _cast_calldata(
+                "swapExactTokensForTokens(uint256,uint256,address[],address,uint256)(uint256[])",
+                [amount_wei_str, "1", f"[{token_in},{token_out}]", wallet_address, deadline],
+            )
+            tx_hash = _cast_rpc_send_transaction(
+                rpc_url,
+                {
+                    "from": wallet_address,
+                    "to": str(router),
+                    "data": swap_data,
+                },
+                private_key_hex,
+            )
+        provider_meta = _build_provider_meta(provider_requested, provider_used, fallback_used, fallback_reason, uniswap_route_type)
+        _post_trade_status(args.intent, previous_status, "executing", {"txHash": tx_hash, **provider_meta})
         transition_state = "executing"
-        _post_trade_status(args.intent, "executing", "verifying", {"txHash": tx_hash})
+        _post_trade_status(args.intent, "executing", "verifying", {"txHash": tx_hash, **provider_meta})
         transition_state = "verifying"
 
         receipt_proc = _run_subprocess(
@@ -7921,7 +8334,7 @@ def cmd_trade_execute(args: argparse.Namespace) -> int:
             args.intent,
             "verifying",
             "filled",
-            {"txHash": tx_hash, "amountOut": str(trade.get("amountOut") or "") or None},
+            {"txHash": tx_hash, "amountOut": str(trade.get("amountOut") or "") or None, **provider_meta},
         )
         report_result = {
             "ok": False,
@@ -7943,34 +8356,73 @@ def cmd_trade_execute(args: argparse.Namespace) -> int:
             maxDailyTradeCount=trade_caps.get("maxDailyTradeCount"),
             dailySpendWei=str(current_spend + amount_wei),
             maxDailyNativeWei=str(max_daily_wei),
+            providerRequested=provider_requested,
+            providerUsed=provider_used,
+            fallbackUsed=fallback_used,
+            fallbackReason=fallback_reason,
+            uniswapRouteType=uniswap_route_type,
             report=report_result,
         )
     except WalletPolicyError as exc:
         if transition_state == "executing":
             try:
-                _post_trade_status(args.intent, "executing", "failed", {"reasonCode": "policy_denied", "reasonMessage": str(exc)})
+                provider_meta = _build_provider_meta(provider_requested, provider_used, fallback_used, fallback_reason, uniswap_route_type)
+                _post_trade_status(args.intent, "executing", "failed", {"reasonCode": "policy_denied", "reasonMessage": str(exc), **provider_meta})
             except Exception:
                 pass
-        return fail(exc.code, str(exc), exc.action_hint, exc.details, exit_code=1)
+        details = dict(exc.details or {})
+        details.update(_build_provider_meta(provider_requested, provider_used, fallback_used, fallback_reason, uniswap_route_type))
+        return fail(exc.code, str(exc), exc.action_hint, details, exit_code=1)
     except WalletStoreError as exc:
         if transition_state == "executing":
             try:
-                _post_trade_status(args.intent, "executing", "failed", {"reasonCode": "rpc_unavailable", "reasonMessage": str(exc)})
+                provider_meta = _build_provider_meta(provider_requested, provider_used, fallback_used, fallback_reason, uniswap_route_type)
+                _post_trade_status(args.intent, "executing", "failed", {"reasonCode": "rpc_unavailable", "reasonMessage": str(exc), **provider_meta})
             except Exception:
                 pass
         elif transition_state == "init":
             try:
-                _post_trade_status(args.intent, previous_status, "failed", {"reasonCode": "rpc_unavailable", "reasonMessage": str(exc)})
+                provider_meta = _build_provider_meta(provider_requested, provider_used, fallback_used, fallback_reason, uniswap_route_type)
+                _post_trade_status(args.intent, previous_status, "failed", {"reasonCode": "rpc_unavailable", "reasonMessage": str(exc), **provider_meta})
             except Exception:
                 pass
         elif transition_state == "verifying":
             try:
-                _post_trade_status(args.intent, "verifying", "failed", {"reasonCode": "verification_timeout", "reasonMessage": str(exc)})
+                provider_meta = _build_provider_meta(provider_requested, provider_used, fallback_used, fallback_reason, uniswap_route_type)
+                _post_trade_status(args.intent, "verifying", "failed", {"reasonCode": "verification_timeout", "reasonMessage": str(exc), **provider_meta})
             except Exception:
                 pass
-        return fail("trade_execute_failed", str(exc), "Verify approval state, wallet setup, and local chain connectivity.", {"tradeId": args.intent, "chain": args.chain}, exit_code=1)
+        return fail(
+            "trade_execute_failed",
+            str(exc),
+            "Verify approval state, wallet setup, and local chain connectivity.",
+            {
+                "tradeId": args.intent,
+                "chain": args.chain,
+                "providerRequested": provider_requested,
+                "providerUsed": provider_used,
+                "fallbackUsed": fallback_used,
+                "fallbackReason": fallback_reason,
+                "uniswapRouteType": uniswap_route_type,
+            },
+            exit_code=1,
+        )
     except Exception as exc:
-        return fail("trade_execute_failed", str(exc), "Inspect runtime trade execute path and retry.", {"tradeId": args.intent, "chain": args.chain}, exit_code=1)
+        return fail(
+            "trade_execute_failed",
+            str(exc),
+            "Inspect runtime trade execute path and retry.",
+            {
+                "tradeId": args.intent,
+                "chain": args.chain,
+                "providerRequested": provider_requested,
+                "providerUsed": provider_used,
+                "fallbackUsed": fallback_used,
+                "fallbackReason": fallback_reason,
+                "uniswapRouteType": uniswap_route_type,
+            },
+            exit_code=1,
+        )
 
 
 def _send_trade_execution_report(trade_id: str) -> dict[str, Any]:

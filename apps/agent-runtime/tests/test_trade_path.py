@@ -7,7 +7,7 @@ import unittest
 from unittest import mock
 from decimal import Decimal
 
-from contextlib import redirect_stdout
+from contextlib import ExitStack, redirect_stdout
 
 import pathlib
 import sys
@@ -2640,6 +2640,99 @@ class TradePathRuntimeTests(unittest.TestCase):
             code = cli.cmd_limit_orders_run_once(args)
         self.assertEqual(code, 0)
         self.assertEqual(statuses, ["triggered", "failed"])
+
+    def test_trade_spot_prefers_uniswap_proxy_when_enabled(self) -> None:
+        args = argparse.Namespace(
+            chain="ethereum_sepolia",
+            token_in="WETH",
+            token_out="USDC",
+            amount_in="1",
+            slippage_bps=50,
+            deadline_sec=120,
+            to=None,
+            json=True,
+        )
+        with ExitStack() as stack:
+            stack.enter_context(mock.patch.object(cli, "_replay_trade_usage_outbox"))
+            stack.enter_context(mock.patch.object(cli, "_trade_provider_settings", return_value=("uniswap_api", "legacy_router")))
+            stack.enter_context(mock.patch.object(cli, "_resolve_token_address", side_effect=["0x" + "11" * 20, "0x" + "22" * 20]))
+            stack.enter_context(mock.patch.object(cli, "load_wallet_store", return_value={}))
+            stack.enter_context(mock.patch.object(cli, "_execution_wallet", return_value=("0x" + "33" * 20, "0x" + "44" * 32)))
+            stack.enter_context(mock.patch.object(cli, "_require_cast_bin", return_value="cast"))
+            stack.enter_context(mock.patch.object(cli, "_chain_rpc_url", return_value="https://rpc.example"))
+            stack.enter_context(mock.patch.object(cli, "_legacy_router_available", return_value=False))
+            stack.enter_context(
+                mock.patch.object(cli, "_fetch_erc20_metadata", side_effect=[{"symbol": "WETH", "decimals": 18}, {"symbol": "USDC", "decimals": 6}])
+            )
+            stack.enter_context(mock.patch.object(cli, "_enforce_spend_preconditions", return_value=({}, "2026-02-20", 0, 10**30)))
+            stack.enter_context(
+                mock.patch.object(cli, "_uniswap_quote_via_proxy", return_value={"amountOutUnits": str(10**6), "routeType": "CLASSIC", "quote": {"k": "v"}})
+            )
+            stack.enter_context(
+                mock.patch.object(cli, "_enforce_trade_caps", return_value=({}, "2026-02-20", Decimal("0"), 0, {"maxDailyUsd": "1000", "maxDailyTradeCount": 10}))
+            )
+            stack.enter_context(mock.patch.object(cli, "_post_trade_proposed", return_value={"ok": True, "tradeId": "trd_1", "status": "approved"}))
+            stack.enter_context(
+                mock.patch.object(
+                    cli,
+                    "_execute_uniswap_swap_via_proxy",
+                    return_value={"txHash": "0x" + "ab" * 32, "approveTxHash": None, "amountOutUnits": str(10**6), "routeType": "CLASSIC"},
+                )
+            )
+            stack.enter_context(mock.patch.object(cli.subprocess, "run", return_value=mock.Mock(returncode=0, stdout='{\"status\":\"0x1\"}', stderr="")))
+            stack.enter_context(mock.patch.object(cli, "_post_trade_status"))
+            stack.enter_context(mock.patch.object(cli, "_record_spend"))
+            stack.enter_context(mock.patch.object(cli, "_record_trade_cap_ledger"))
+            stack.enter_context(mock.patch.object(cli, "_post_trade_usage"))
+            payload = self._run_and_parse_stdout(lambda: cli.cmd_trade_spot(args))
+        self.assertTrue(payload.get("ok"))
+        self.assertEqual(payload.get("providerUsed"), "uniswap_api")
+        self.assertEqual(payload.get("fallbackUsed"), False)
+        self.assertEqual(payload.get("uniswapRouteType"), "CLASSIC")
+
+    def test_trade_spot_falls_back_to_legacy_when_uniswap_quote_fails(self) -> None:
+        args = argparse.Namespace(
+            chain="ethereum_sepolia",
+            token_in="WETH",
+            token_out="USDC",
+            amount_in="1",
+            slippage_bps=50,
+            deadline_sec=120,
+            to=None,
+            json=True,
+        )
+        with ExitStack() as stack:
+            stack.enter_context(mock.patch.object(cli, "_replay_trade_usage_outbox"))
+            stack.enter_context(mock.patch.object(cli, "_trade_provider_settings", return_value=("uniswap_api", "legacy_router")))
+            stack.enter_context(mock.patch.object(cli, "_resolve_token_address", side_effect=["0x" + "11" * 20, "0x" + "22" * 20]))
+            stack.enter_context(mock.patch.object(cli, "load_wallet_store", return_value={}))
+            stack.enter_context(mock.patch.object(cli, "_execution_wallet", return_value=("0x" + "33" * 20, "0x" + "44" * 32)))
+            stack.enter_context(mock.patch.object(cli, "_require_cast_bin", return_value="cast"))
+            stack.enter_context(mock.patch.object(cli, "_chain_rpc_url", return_value="https://rpc.example"))
+            stack.enter_context(mock.patch.object(cli, "_legacy_router_available", return_value=True))
+            stack.enter_context(mock.patch.object(cli, "_require_chain_contract_address", return_value="0x" + "66" * 20))
+            stack.enter_context(
+                mock.patch.object(cli, "_fetch_erc20_metadata", side_effect=[{"symbol": "WETH", "decimals": 18}, {"symbol": "USDC", "decimals": 6}])
+            )
+            stack.enter_context(mock.patch.object(cli, "_enforce_spend_preconditions", return_value=({}, "2026-02-20", 0, 10**30)))
+            stack.enter_context(mock.patch.object(cli, "_uniswap_quote_via_proxy", side_effect=cli.WalletStoreError("proxy down")))
+            stack.enter_context(mock.patch.object(cli, "_router_get_amount_out", return_value=10**6))
+            stack.enter_context(
+                mock.patch.object(cli, "_enforce_trade_caps", return_value=({}, "2026-02-20", Decimal("0"), 0, {"maxDailyUsd": "1000", "maxDailyTradeCount": 10}))
+            )
+            stack.enter_context(mock.patch.object(cli, "_post_trade_proposed", return_value={"ok": True, "tradeId": "trd_1", "status": "approved"}))
+            stack.enter_context(mock.patch.object(cli, "_fetch_token_allowance_wei", return_value=str(10**30)))
+            stack.enter_context(mock.patch.object(cli, "_cast_calldata", return_value="0xdeadbeef"))
+            stack.enter_context(mock.patch.object(cli, "_cast_rpc_send_transaction", return_value="0x" + "ab" * 32))
+            stack.enter_context(mock.patch.object(cli.subprocess, "run", return_value=mock.Mock(returncode=0, stdout='{\"status\":\"0x1\"}', stderr="")))
+            stack.enter_context(mock.patch.object(cli, "_post_trade_status"))
+            stack.enter_context(mock.patch.object(cli, "_record_spend"))
+            stack.enter_context(mock.patch.object(cli, "_record_trade_cap_ledger"))
+            stack.enter_context(mock.patch.object(cli, "_post_trade_usage"))
+            payload = self._run_and_parse_stdout(lambda: cli.cmd_trade_spot(args))
+        self.assertTrue(payload.get("ok"))
+        self.assertEqual(payload.get("providerUsed"), "legacy_router")
+        self.assertEqual(payload.get("fallbackUsed"), True)
 
 
 if __name__ == "__main__":

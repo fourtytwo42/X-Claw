@@ -1,0 +1,47 @@
+{
+  "chainKey": "monad_mainnet",
+  "family": "evm",
+  "enabled": true,
+  "uiVisible": true,
+  "chainId": 143,
+  "displayName": "Monad Mainnet",
+  "nativeCurrency": {
+    "name": "MON",
+    "symbol": "MON",
+    "decimals": 18
+  },
+  "explorerBaseUrl": "https://explorer.monad.xyz",
+  "rpc": {
+    "primary": "https://monad.drpc.org",
+    "fallback": "https://rpc.monad.xyz"
+  },
+  "coreContracts": {
+    "dex": "adapter_pending",
+    "deploymentStatus": "pending_verification",
+    "notes": "Uniswap API primary routing enabled. Legacy router fallback is capability-gated by configured router address."
+  },
+  "canonicalTokens": {},
+  "capabilities": {
+    "wallet": true,
+    "trade": true,
+    "liquidity": false,
+    "limitOrders": false,
+    "x402": false,
+    "faucet": false,
+    "deposits": false
+  },
+  "tradeProviders": {
+    "primary": "uniswap_api",
+    "fallback": "legacy_router"
+  },
+  "uniswapApi": {
+    "enabled": true
+  },
+  "updatedAt": "2026-02-20T10:00:00.000Z",
+  "version": 1,
+  "sources": {
+    "chainMetadata": [
+      "https://raw.githubusercontent.com/ethereum-lists/chains/master/_data/chains/eip155-143.json"
+    ]
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "chainKey": "avalanche_mainnet",
+  "family": "evm",
+  "enabled": true,
+  "uiVisible": true,
+  "chainId": 43114,
+  "displayName": "Avalanche C-Chain",
+  "nativeCurrency": {
+    "name": "Avalanche",
+    "symbol": "AVAX",
+    "decimals": 18
+  },
+  "explorerBaseUrl": "https://snowtrace.io",
+  "rpc": {
+    "primary": "https://api.avax.network/ext/bc/C/rpc",
+    "fallback": "https://avalanche-c-chain-rpc.publicnode.com"
+  },
+  "coreContracts": {
+    "dex": "adapter_pending",
+    "deploymentStatus": "pending_verification",
+    "notes": "Uniswap API primary routing enabled. Legacy router fallback is capability-gated by configured router address."
+  },
+  "canonicalTokens": {},
+  "capabilities": {
+    "wallet": true,
+    "trade": true,
+    "liquidity": false,
+    "limitOrders": false,
+    "x402": false,
+    "faucet": false,
+    "deposits": false
+  },
+  "tradeProviders": {
+    "primary": "uniswap_api",
+    "fallback": "legacy_router"
+  },
+  "uniswapApi": {
+    "enabled": true
+  },
+  "updatedAt": "2026-02-20T10:00:00.000Z",
+  "version": 1,
+  "sources": {
+    "chainMetadata": [
+      "https://raw.githubusercontent.com/ethereum-lists/chains/master/_data/chains/eip155-43114.json"
+    ]
+  }
+}
