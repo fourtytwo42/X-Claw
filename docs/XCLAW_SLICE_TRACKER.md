@@ -1996,4 +1996,4 @@ DoD:
   - `ethereum_sepolia` has `uniswapApi.migrateEnabled=true` and `claimRewardsEnabled=true`
   - mainnet targets set `migrateEnabled=false` and `claimRewardsEnabled=false` pending promotion.
 - [x] required gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
-- [ ] issue #46 updated with verification evidence + commit hash(es).
+- [x] issue #46 updated with verification evidence + commit hash(es).
