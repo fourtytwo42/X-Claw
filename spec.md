@@ -3081,3 +3081,47 @@ Promote real executable claim fallback paths where adapter integration exists, a
 2. Legacy claim fallback requires config gate + adapter capability.
 3. Hedera claim promotion is limited to existing adapter/plugin path.
 4. Deterministic fail-closed behavior remains the default for unsupported paths.
+
+## Slice 108: Config-Truth + Runtime Gate Tightening
+
+### Goal
+Ensure active-chain fallback behavior is deterministic and provenance-complete across trade and claim operations.
+
+### Non-goals
+1. Adding new adapter families.
+2. Enabling wallet-only/disabled chains.
+3. UI feature expansion.
+
+### Constraints
+1. Fallback requires config gate + capability support.
+2. Unsupported operations remain deterministic fail-closed.
+3. Provider provenance remains mandatory in failure/success payloads for relevant operations.
+
+## Slice 109: Uniswap-Chain Fallback Promotion
+
+### Goal
+Promote fallback only on Uniswap chains with validated legacy metadata.
+
+### Constraints
+1. Keep Uniswap as primary provider.
+2. Only `ethereum` and `ethereum_sepolia` are currently fallback-eligible.
+3. Other Uniswap chains remain deterministic fail-closed on primary failure until legacy metadata is onboarded.
+
+## Slice 110: Non-Uniswap Active Claims Completion
+
+### Goal
+Finalize non-Uniswap active-chain claim behavior as executable where integrated and deterministic otherwise.
+
+### Constraints
+1. Hedera claims remain executable via `hedera_hts`.
+2. Non-integrated claim paths remain deterministic (`claim_fees_not_supported_for_protocol`, `claim_rewards_not_configured`).
+3. No synthetic rewards support.
+
+## Slice 111: Active-Chain Parity Evidence Matrix
+
+### Goal
+Publish final active-chain parity matrix and close evidence trail for slices 108-111.
+
+### Constraints
+1. Matrix must include operation-level truth and provider/fallback status per active chain.
+2. Wallet-only/disabled chains remain documented as fail-closed backlog.

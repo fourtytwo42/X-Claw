@@ -5714,3 +5714,36 @@ Date (UTC): 2026-02-19
 - `npm run seed:verify` -> PASS
 - `npm run build` -> PASS
 - `pm2 restart all` -> PASS
+
+## Slice 108-111 Active-Chain Parity Matrix (UTC 2026-02-20)
+
+### Active-chain operation truth
+
+| Chain | Send | Trade/Convert | LP Add/Remove | Claim Fees | Claim Rewards | Primary | Fallback | Deterministic fail code when non-executable |
+|---|---|---|---|---|---|---|---|---|
+| ethereum | ✅ | ✅ | ✅ | ✅ (Uniswap primary) | ✅ (Uniswap primary) | uniswap_api | legacy_router (trade only) | `no_execution_provider_available` |
+| ethereum_sepolia | ✅ | ✅ | ✅ | ✅ (Uniswap primary) | ✅ (Uniswap primary) | uniswap_api | legacy_router (trade only) | `no_execution_provider_available` |
+| base_mainnet | ✅ | ✅ | ✅ | ✅ (Uniswap primary) | ✅ (Uniswap primary) | uniswap_api | none | `no_execution_provider_available` |
+| arbitrum_mainnet | ✅ | ✅ | ✅ | ✅ (Uniswap primary) | ✅ (Uniswap primary) | uniswap_api | none | `no_execution_provider_available` |
+| op_mainnet | ✅ | ✅ | ✅ | ✅ (Uniswap primary) | ✅ (Uniswap primary) | uniswap_api | none | `no_execution_provider_available` |
+| polygon_mainnet | ✅ | ✅ | ✅ | ✅ (Uniswap primary) | ✅ (Uniswap primary) | uniswap_api | none | `no_execution_provider_available` |
+| avalanche_mainnet | ✅ | ✅ | ✅ | ✅ (Uniswap primary) | ✅ (Uniswap primary) | uniswap_api | none | `no_execution_provider_available` |
+| bnb_mainnet | ✅ | ✅ | ✅ | ✅ (Uniswap primary) | ✅ (Uniswap primary) | uniswap_api | none | `no_execution_provider_available` |
+| zksync_mainnet | ✅ | ✅ | ✅ | ✅ (Uniswap primary) | ✅ (Uniswap primary) | uniswap_api | none | `no_execution_provider_available` |
+| unichain_mainnet | ✅ | ✅ | ✅ | ✅ (Uniswap primary) | ✅ (Uniswap primary) | uniswap_api | none | `no_execution_provider_available` |
+| monad_mainnet | ✅ | ✅ | ✅ | ✅ (Uniswap primary) | ✅ (Uniswap primary) | uniswap_api | none | `no_execution_provider_available` |
+| base_sepolia | ✅ | ✅ | ✅ | ❌ | ❌ | legacy_router | n/a | `claim_fees_not_supported_for_protocol`, `claim_rewards_not_configured` |
+| hardhat_local | ✅ | ✅ | ✅ | ❌ | ❌ | legacy_router | n/a | `claim_fees_not_supported_for_protocol`, `claim_rewards_not_configured` |
+| kite_ai_testnet | ✅ | ✅ | ✅ | ❌ | ❌ | legacy_router | n/a | `claim_fees_not_supported_for_protocol`, `claim_rewards_not_configured` |
+| hedera_mainnet | ✅ | ✅ | ✅ | ✅ (hedera_hts) | ✅ (hedera_hts) | legacy_router | n/a | `claim_rewards_not_configured` (when plugin/config absent) |
+| hedera_testnet | ✅ | ✅ | ✅ | ✅ (hedera_hts) | ✅ (hedera_hts) | legacy_router | n/a | `claim_rewards_not_configured` (when plugin/config absent) |
+
+### Required validation for 108-111 stream
+- `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v` -> PASS
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS
+- `npm run db:parity` -> PASS
+- `npm run seed:reset` -> PASS
+- `npm run seed:load` -> PASS
+- `npm run seed:verify` -> PASS
+- `npm run build` -> PASS
+- `pm2 restart all` -> PASS

@@ -1655,7 +1655,7 @@ class TradePathRuntimeTests(unittest.TestCase):
                 return mock.Mock(returncode=0, stdout='{"status":"0x1"}', stderr="")
             raise AssertionError(f"Unexpected command {cmd}")
 
-        def fake_send(rpc_url: str, tx_obj: dict, private_key_hex: str) -> str:
+        def fake_send(rpc_url: str, tx_obj: dict, private_key_hex: str, **kwargs) -> str:
             # First send = approve, second send = swap
             return "0x" + ("ab" * 32)
 
@@ -2457,7 +2457,7 @@ class TradePathRuntimeTests(unittest.TestCase):
         sent_txs: list[dict] = []
         captured: dict[str, list[object]] = {}
 
-        def fake_send(rpc_url: str, tx_obj: dict, private_key_hex: str) -> str:
+        def fake_send(rpc_url: str, tx_obj: dict, private_key_hex: str, **kwargs) -> str:
             sent_txs.append(tx_obj)
             return "0x" + "ab" * 32
 

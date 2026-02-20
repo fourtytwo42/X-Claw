@@ -3552,3 +3552,77 @@ Note:
   - [x] `npm run build`
   - [x] `pm2 restart all`
 - [ ] Issue #50 evidence post + commit hash(es).
+
+## 108) Slice 108: Config-Truth + Runtime Gate Tightening
+
+### 108.1 Canonical/doc sync
+- [x] Add Slice 108 entries to `docs/XCLAW_SLICE_TRACKER.md` and this roadmap section.
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` with deterministic gate/provenance contract.
+- [x] Update handoff artifacts: `docs/CONTEXT_PACK.md`, `spec.md`, `tasks.md`, `acceptance.md`.
+
+### 108.2 Runtime/config verification
+- [x] Verify fallback attempts are gated by operation config + capability checks.
+- [x] Verify trade/claim failures include provider provenance fields.
+- [x] Keep unsupported paths explicitly fail-closed.
+
+### 108.3 Validation + evidence
+- [x] Runtime tests:
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v`
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- [x] Required gates run sequentially:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `pm2 restart all`
+- [ ] Issue #51 evidence post + commit hash(es).
+
+## 109) Slice 109: Uniswap-Chain Fallback Promotion
+
+### 109.1 Canonical/doc sync
+- [x] Add Slice 109 entries to tracker and roadmap.
+- [x] Document per-chain fallback truth for Uniswap-primary chains.
+
+### 109.2 Fallback promotion truth
+- [x] Keep fallback enabled where validated metadata exists:
+  - [x] `ethereum`
+  - [x] `ethereum_sepolia`
+- [x] Keep fallback disabled where metadata is not yet onboarded:
+  - [x] `base_mainnet`, `arbitrum_mainnet`, `op_mainnet`, `polygon_mainnet`, `avalanche_mainnet`, `bnb_mainnet`, `zksync_mainnet`, `unichain_mainnet`, `monad_mainnet`
+
+### 109.3 Validation + evidence
+- [x] Runtime regression tests run.
+- [x] Required gates run sequentially.
+- [ ] Issue #52 evidence post + commit hash(es).
+
+## 110) Slice 110: Non-Uniswap Active Claims Completion
+
+### 110.1 Canonical/doc sync
+- [x] Add Slice 110 entries to tracker and roadmap.
+- [x] Document executable-vs-deterministic claim truth for non-Uniswap active chains.
+
+### 110.2 Claims completion truth
+- [x] Hedera legacy claim execution enabled and retained:
+  - [x] `hedera_mainnet`
+  - [x] `hedera_testnet`
+- [x] Non-integrated chains remain deterministic fail-closed:
+  - [x] `base_sepolia`
+  - [x] `hardhat_local`
+  - [x] `kite_ai_testnet`
+
+### 110.3 Validation + evidence
+- [x] Runtime regression tests run.
+- [x] Required gates run sequentially.
+- [ ] Issue #53 evidence post + commit hash(es).
+
+## 111) Slice 111: Active-Chain Parity Evidence Matrix
+
+### 111.1 Canonical/doc sync
+- [x] Add Slice 111 entries to tracker and roadmap.
+- [x] Publish active-chain parity matrix in `acceptance.md`.
+- [x] Sync handoff docs (`spec.md`, `tasks.md`, `docs/CONTEXT_PACK.md`).
+
+### 111.2 Validation + evidence
+- [x] Required gates run sequentially.
+- [ ] Issue #54 evidence post + commit hash(es).

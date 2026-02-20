@@ -2076,3 +2076,59 @@ DoD:
 - [x] required gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
 - [x] runtime tests pass (`test_liquidity_cli.py`, `test_trade_path.py`).
 - [ ] issue #50 evidence post + commit hash(es).
+
+## Slice 108: Config-Truth + Runtime Gate Tightening
+Status: [~]
+Issue: #51
+
+Goal:
+- Lock deterministic fallback behavior and provenance across active-chain trade and claim paths.
+
+DoD:
+- [x] runtime fallback behavior remains gate-driven (config + capability).
+- [x] claim/trade failure payloads include provider provenance details.
+- [x] active-chain config operation contracts are explicit and deterministic.
+- [x] required gates run sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
+- [x] runtime tests pass (`test_liquidity_cli.py`, `test_trade_path.py`).
+- [ ] issue #51 evidence post + commit hash(es).
+
+## Slice 109: Uniswap-Chain Fallback Promotion
+Status: [~]
+Issue: #52
+
+Goal:
+- Promote fallback only on Uniswap chains with real legacy execution metadata.
+
+DoD:
+- [x] validated fallback remains enabled on `ethereum`, `ethereum_sepolia`.
+- [x] unsupported Uniswap chains remain explicit fallback-disabled (`legacyEnabled=false`, `adapter=none`).
+- [x] forced-primary-failure behavior remains deterministic on non-enabled chains.
+- [x] required gates run sequentially.
+- [ ] issue #52 evidence post + commit hash(es).
+
+## Slice 110: Non-Uniswap Active Claims Completion
+Status: [~]
+Issue: #53
+
+Goal:
+- Close non-Uniswap active-chain claim behavior as executable-or-deterministic.
+
+DoD:
+- [x] Hedera claim legacy execution remains enabled (`hedera_mainnet`, `hedera_testnet`).
+- [x] non-integrated chains preserve deterministic claim error contract (no synthetic success).
+- [x] required gates run sequentially.
+- [x] runtime tests pass.
+- [ ] issue #53 evidence post + commit hash(es).
+
+## Slice 111: Active-Chain Parity Evidence Matrix
+Status: [~]
+Issue: #54
+
+Goal:
+- Publish canonical active-chain parity matrix and close 108-111 evidence trail.
+
+DoD:
+- [x] matrix added to `acceptance.md` with per-chain operation/provider truth.
+- [x] canonical docs/handoff sync completed for 108-111.
+- [x] required gates run sequentially.
+- [ ] issue #54 evidence post + commit hash(es).

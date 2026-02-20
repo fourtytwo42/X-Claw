@@ -1515,3 +1515,27 @@ Promote executable claim fallback behavior where adapter paths are real (Hedera 
   - `config/chains/hedera_testnet.json`
 - Regression coverage:
   - `apps/agent-runtime/tests/test_liquidity_cli.py`
+
+## Slice 108-111 Context Pack (2026-02-20): Active-Chain Parity Completion
+
+### Objective
+Close active-chain parity gaps with deterministic operation contracts and evidence-first rollout under concurrent multi-agent development.
+
+### Constraints
+- Uniswap remains primary on configured Uniswap chains.
+- Fallback execution requires explicit config gate + real capability support.
+- Unsupported paths remain deterministic fail-closed.
+- Wallet-only/disabled chains are out-of-scope for this stream.
+
+### Primary touchpoints
+- Runtime contract/gating validation:
+  - `apps/agent-runtime/xclaw_agent/cli.py`
+- Active-chain config truth:
+  - `config/chains/*.json` (active-chain subset)
+- Canonical/handoff artifacts:
+  - `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - `docs/XCLAW_SLICE_TRACKER.md`
+  - `docs/XCLAW_BUILD_ROADMAP.md`
+  - `spec.md`
+  - `tasks.md`
+  - `acceptance.md`

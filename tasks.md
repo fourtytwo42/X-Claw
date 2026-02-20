@@ -3214,3 +3214,75 @@ Active slice context: `Slice 98`.
 - [x] `npm run build`.
 - [x] `pm2 restart all`.
 - [ ] Issue evidence post with commit hash(es).
+
+# Slice 108 Tasks: Config-Truth + Runtime Gate Tightening (UTC 2026-02-20)
+
+## 1) Canonical/doc sync
+- [x] Add Slice 108 tracker entry in `docs/XCLAW_SLICE_TRACKER.md`.
+- [x] Add Slice 108 roadmap section in `docs/XCLAW_BUILD_ROADMAP.md`.
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` with deterministic gate/provenance contract.
+- [x] Update handoff artifacts (`docs/CONTEXT_PACK.md`, `spec.md`, `tasks.md`, `acceptance.md`).
+
+## 2) Runtime/config contract checks
+- [x] Ensure fallback attempts require config gate + capability support.
+- [x] Ensure claim/trade failure payloads carry provider provenance fields.
+- [x] Keep unsupported operation paths explicit and deterministic.
+
+## 3) Validation/evidence
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v`.
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`.
+- [x] `npm run db:parity`.
+- [x] `npm run seed:reset`.
+- [x] `npm run seed:load`.
+- [x] `npm run seed:verify`.
+- [x] `npm run build`.
+- [x] `pm2 restart all`.
+- [ ] Issue evidence post with commit hash(es).
+
+# Slice 109 Tasks: Uniswap-Chain Fallback Promotion (UTC 2026-02-20)
+
+## 1) Promotion truth
+- [x] Keep fallback enabled on validated chains:
+  - [x] `ethereum`
+  - [x] `ethereum_sepolia`
+- [x] Keep fallback disabled where legacy metadata is not onboarded:
+  - [x] `base_mainnet`
+  - [x] `arbitrum_mainnet`
+  - [x] `op_mainnet`
+  - [x] `polygon_mainnet`
+  - [x] `avalanche_mainnet`
+  - [x] `bnb_mainnet`
+  - [x] `zksync_mainnet`
+  - [x] `unichain_mainnet`
+  - [x] `monad_mainnet`
+
+## 2) Validation/evidence
+- [x] Runtime regression tests run.
+- [x] Required gates run sequentially.
+- [ ] Issue evidence post with commit hash(es).
+
+# Slice 110 Tasks: Non-Uniswap Active Claims Completion (UTC 2026-02-20)
+
+## 1) Claim completion truth
+- [x] Keep Hedera claim execution enabled:
+  - [x] `hedera_mainnet`
+  - [x] `hedera_testnet`
+- [x] Keep non-integrated chains deterministic fail-closed:
+  - [x] `base_sepolia`
+  - [x] `hardhat_local`
+  - [x] `kite_ai_testnet`
+
+## 2) Validation/evidence
+- [x] Runtime regression tests run.
+- [x] Required gates run sequentially.
+- [ ] Issue evidence post with commit hash(es).
+
+# Slice 111 Tasks: Active-Chain Parity Evidence Matrix (UTC 2026-02-20)
+
+## 1) Canonical evidence
+- [x] Add active-chain parity matrix to `acceptance.md`.
+- [x] Sync source-of-truth, tracker, roadmap, spec, and context pack with 108-111 outcomes.
+
+## 2) Validation/evidence
+- [x] Required gates run sequentially.
+- [ ] Issue evidence post with commit hash(es).

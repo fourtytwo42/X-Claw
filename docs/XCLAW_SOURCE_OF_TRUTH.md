@@ -2,7 +2,7 @@
 ## Source of Truth (Canonical Build + Execution Spec)
 
 **Status:** Canonical and authoritative  
-**Last updated:** 2026-02-16  
+**Last updated:** 2026-02-20  
 **Owner:** X-Claw core team  
 **Purpose:** This is the only planning/build document to execute from.
 
@@ -27,7 +27,7 @@ X-Claw is an **agent-first liquidity and trading network** with:
 - Runs on Windows, Linux, and macOS.
 - Runs independently from the network server runtime and connects outbound to server APIs.
 - Owns wallet keys locally.
-- Proposes and executes network trades (Base Sepolia in current release).
+- Proposes and executes network trades on enabled chains (Base Sepolia plus promoted mainnet/testnet chains, capability-gated by `config/chains/*.json`).
 - Polls server for approvals/copy intents and executes locally.
 - Supports a global agent-only trade room for token discovery and market observations.
 
@@ -46,7 +46,7 @@ Core thesis: **agents act, humans supervise, network observes and allocates trus
 ## 3) Non-Negotiable Product Rules
 
 1. Agent private keys never leave agent runtime.
-2. User-facing and agent-skill/runtime trading surface is network-only (Base Sepolia) in current release.
+2. User-facing and agent-skill/runtime trading surface is network-only and capability-gated by chain config (current rollout includes Base Sepolia and promoted multi-chain paths, including Base mainnet).
 3. Every trade must have auditable execution output:
 - mock receipt id, or
 - on-chain tx hash
@@ -2554,6 +2554,10 @@ Limitations / notes:
 
 ## 52) Slice 28 Mock Deprecation Contract (Locked)
 
+Supersession note:
+- This slice locked Base Sepolia-only network mode at that time.
+- Current execution scope is superseded by later locked contracts in Slices 100-107 with multi-chain rollout and capability gating.
+
 1. Product surface for this release is network-only on Base Sepolia.
 2. User-facing web pages and agent skill guidance must not present mock mode controls or mock/real marketing language.
 3. Public read APIs remain backward-compatible for `mode` query shape in this slice, but effective output is real/network-only.
@@ -2596,6 +2600,10 @@ Limitations / notes:
 ---
 
 ## 53) Slice 29 Dashboard Chain-Scoped UX Contract (Locked)
+
+Supersession note:
+- This slice reflects the then-current Base Sepolia-focused dashboard scope.
+- Current dashboard chain behavior is expanded by later slices and chain capability rollout.
 
 1. Dashboard is single-chain in the current release context (Base Sepolia only); dashboard-specific controls/copy must not repeat redundant chain labels.
 2. Dashboard Trade Room and Live Activity are displayed as active-chain feeds (Base Sepolia in this release).
@@ -4325,4 +4333,72 @@ Limitations / notes:
 
 5. Backlog contract:
 - Wallet-only/disabled chains remain unchanged and fail-closed in this slice:
+  - `adi_mainnet`, `adi_testnet`, `og_mainnet`, `og_testnet`, `kite_ai_mainnet`, `canton_mainnet`, `canton_testnet`.
+
+## 88) Slice 108 Config-Truth + Runtime Gate Tightening (Locked)
+
+1. Scope:
+- Normalize active-chain operation contracts and runtime failure determinism.
+- No new adapter families introduced in this slice.
+
+2. Runtime error contract:
+- Trade and liquidity claim failures must include provider provenance details:
+  - `providerRequested`
+  - `providerUsed` (when resolved)
+  - `fallbackUsed`
+  - `fallbackReason`
+
+3. Fallback semantics:
+- Runtime fallback attempts are allowed only when both are true:
+  - chain config gate is enabled for the operation, and
+  - resolved adapter/provider supports the operation.
+- Unsupported operations remain explicit deterministic fail-closed responses.
+
+## 89) Slice 109 Uniswap-Chain Fallback Promotion (Locked)
+
+1. Scope:
+- Promote legacy fallback on Uniswap-primary chains only where real legacy router/adapter metadata exists and passes validation.
+
+2. Promotion rule:
+- Set `tradeOperations.legacyEnabled=true` only for chains with validated legacy execution metadata.
+- Keep `tradeOperations.legacyEnabled=false` for chains without real legacy metadata.
+
+3. Current canonical truth:
+- Legacy trade fallback is executable on:
+  - `ethereum`
+  - `ethereum_sepolia`
+- Other Uniswap-primary chains remain deterministic fail-closed on primary failure until real legacy metadata is onboarded.
+
+## 90) Slice 110 Non-Uniswap Active Claim Completion (Locked)
+
+1. Scope:
+- Complete claim-fees/claim-rewards behavior on non-Uniswap active chains where execution is concrete.
+
+2. Canonical truth:
+- Hedera chains are enabled for legacy claim execution via `hedera_hts`:
+  - `hedera_mainnet`
+  - `hedera_testnet`
+- Non-Uniswap AMM-v2 style chains without explicit claim integrations remain deterministic:
+  - `claim_fees_not_supported_for_protocol` and/or
+  - `claim_rewards_not_configured`.
+
+3. No synthetic enablement:
+- Reward claiming remains disabled unless concrete reward integration/contract wiring exists.
+
+## 91) Slice 111 Active-Chain Parity Evidence Contract (Locked)
+
+1. Scope:
+- Publish canonical active-chain parity matrix and close evidence trail for slices 108-111.
+
+2. Matrix requirements:
+- For each active chain, publish operation truth for:
+  - send
+  - trade/convert
+  - liquidity add/remove
+  - claim-fees
+  - claim-rewards
+- Include provider primary/fallback and deterministic fail code when non-executable.
+
+3. Out-of-scope lock remains:
+- Wallet-only/disabled chains continue fail-closed in this stream:
   - `adi_mainnet`, `adi_testnet`, `og_mainnet`, `og_testnet`, `kite_ai_mainnet`, `canton_mainnet`, `canton_testnet`.
