@@ -5430,3 +5430,82 @@ Date (UTC): 2026-02-19
 - `npm run seed:verify` -> PASS
 - `npm run build` -> PASS
 - `pm2 restart all` -> PASS
+
+## Slice 100 Uniswap Proxy-First Trade Execution (UTC 2026-02-20)
+
+### Implementation evidence
+- Runtime provider orchestration:
+  - `apps/agent-runtime/xclaw_agent/cli.py`
+    - added chain-config-driven provider selection (`tradeProviders.primary/fallback`).
+    - `cmd_trade_spot` now attempts `uniswap_api` first and falls back to `legacy_router` on proxy errors.
+    - `cmd_trade_execute` now attempts `uniswap_api` first and falls back to `legacy_router` on proxy errors.
+    - deterministic no-provider failure path: `no_execution_provider_available`.
+    - provider provenance fields emitted in runtime payloads and status transitions.
+- Server proxy integration:
+  - `apps/network-web/src/lib/uniswap-proxy.ts`
+    - server-only key injection (`XCLAW_UNISWAP_API_KEY`), strict payload normalization, deterministic upstream errors.
+  - `apps/network-web/src/app/api/v1/agent/trade/uniswap/quote/route.ts`
+  - `apps/network-web/src/app/api/v1/agent/trade/uniswap/build/route.ts`
+- Trade status provenance support:
+  - `packages/shared-schemas/json/trade-status.schema.json`
+  - `apps/network-web/src/app/api/v1/trades/[tradeId]/status/route.ts`
+- Chain rollout configuration:
+  - updated `config/chains/ethereum.json`, `config/chains/ethereum_sepolia.json`, `config/chains/base_mainnet.json`.
+  - added `config/chains/unichain_mainnet.json`, `config/chains/bnb_mainnet.json`, `config/chains/polygon_mainnet.json`, `config/chains/avalanche_mainnet.json`, `config/chains/op_mainnet.json`, `config/chains/arbitrum_mainnet.json`, `config/chains/zksync_mainnet.json`, `config/chains/monad_mainnet.json`.
+
+### Runtime tests
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS.
+
+### Required gates
+- `npm run db:parity` -> PASS
+- `npm run seed:reset` -> PASS
+- `npm run seed:load` -> PASS
+- `npm run seed:verify` -> PASS
+- `npm run build` -> PASS
+- `pm2 restart all` -> PASS
+
+## Slice 101 Dashboard Dexscreener Top Tokens (UTC 2026-02-20)
+
+### Implementation evidence
+- Added chain-config market mapping support:
+  - `apps/network-web/src/lib/chains.ts` now supports `marketData.dexscreenerChainId`.
+  - mappings configured in:
+    - `config/chains/base_mainnet.json` -> `base`
+    - `config/chains/base_sepolia.json` -> `base`
+    - `config/chains/ethereum.json` -> `ethereum`
+    - `config/chains/ethereum_sepolia.json` -> `ethereum`
+- Added new public route:
+  - `apps/network-web/src/app/api/v1/public/dashboard/trending-tokens/route.ts`
+  - validates `chainKey`, supports `limit` (capped at 10), aggregates mapped chains for `all`,
+  - fetches/normalizes Dexscreener rows, dedupes by token+chain, sorts by 24h volume desc,
+  - soft-fails upstream issues and exposes warning metadata,
+  - uses 60-second in-memory cache.
+- Dashboard integration:
+  - `apps/network-web/src/app/dashboard/page.tsx` fetches `trending-tokens` by current dashboard chain and refreshes every 60s.
+  - `apps/network-web/src/app/dashboard/page.module.css` adds desktop table + mobile card styles.
+  - section is hidden when no token rows are available for selected chain.
+  - only data-backed columns render (no placeholder columns).
+- Canonical contract/artifact updates:
+  - `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - `docs/XCLAW_SLICE_TRACKER.md`
+  - `docs/XCLAW_BUILD_ROADMAP.md`
+  - `docs/api/openapi.v1.yaml`
+  - `packages/shared-schemas/json/public-dashboard-trending-tokens-response.schema.json`
+  - `docs/CONTEXT_PACK.md`, `spec.md`, `tasks.md`, `acceptance.md`
+
+### Feature checks
+- `GET /api/v1/public/dashboard/trending-tokens?chainKey=all&limit=10` -> PASS (`status=200`, `count=10`, `sorted=true`, chains include `ethereum` + `base`).
+- chain dropdown update reflects token list changes -> PASS (API queries by selected chain key and dashboard effect dependencies include `chainKey`; verified chain-specific outputs differ for `base_sepolia` vs `ethereum_sepolia`).
+- `base_sepolia` / `ethereum_sepolia` map to mainnet Dexscreener chain IDs -> PASS:
+  - `chainKey=base_sepolia` -> `status=200`, rows `chainId=base`.
+  - `chainKey=ethereum_sepolia` -> `status=200`, rows `chainId=ethereum`.
+- unmapped chain hides section -> PASS (`chainKey=hedera_testnet` returns `status=200` with `items=[]`; dashboard module conditionally renders only when rows exist).
+- invalid `chainKey` returns `400 payload_invalid` -> PASS (`chainKey=not_real_chain` -> `status=400`, `code=payload_invalid`).
+
+### Required gates
+- `npm run db:parity` -> PASS
+- `npm run seed:reset` -> PASS
+- `npm run seed:load` -> PASS
+- `npm run seed:verify` -> PASS
+- `npm run build` -> PASS
+- `pm2 restart all` -> PASS

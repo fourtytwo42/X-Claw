@@ -1304,3 +1304,72 @@ Issue mapping: `#32`
   - wallet decrypt/sign fail-fast,
   - management write retry diagnostics.
 - required repo gates executed sequentially.
+
+## Context Pack Addendum: Slice 101 Dashboard Dexscreener Top Tokens (UTC 2026-02-20)
+
+### Objective
+- Add a dashboard `Top Trending Tokens` module sourced from Dexscreener, chain-aware via existing dashboard chain dropdown, with top-10 ranking by 24h volume.
+
+### Scope lock
+- In scope:
+  - public route `GET /api/v1/public/dashboard/trending-tokens`,
+  - chain config mapping `marketData.dexscreenerChainId`,
+  - dashboard UI module (desktop table + mobile cards),
+  - 60-second refresh loop and soft-failure handling.
+- Out of scope:
+  - skill/runtime Dexscreener command changes,
+  - additional chain mapping beyond validated Base/Ethereum mappings,
+  - replacing dashboard summary endpoint.
+
+### Constraints
+- Canonical authority: `docs/XCLAW_SOURCE_OF_TRUTH.md`.
+- Dashboard chain selector remains single source of truth (no secondary selector).
+- If selected chain has no mapped Dexscreener data, section is hidden.
+- Render only columns with available data (no placeholder columns).
+
+### Expected touched artifacts
+- `apps/network-web/src/app/api/v1/public/dashboard/trending-tokens/route.ts`
+- `apps/network-web/src/app/dashboard/page.tsx`
+- `apps/network-web/src/app/dashboard/page.module.css`
+- `apps/network-web/src/lib/chains.ts`
+- `config/chains/base_mainnet.json`
+- `config/chains/base_sepolia.json`
+- `config/chains/ethereum.json`
+- `config/chains/ethereum_sepolia.json`
+- `packages/shared-schemas/json/public-dashboard-trending-tokens-response.schema.json`
+- `docs/api/openapi.v1.yaml`
+- `docs/XCLAW_SOURCE_OF_TRUTH.md`
+- `docs/XCLAW_SLICE_TRACKER.md`
+- `docs/XCLAW_BUILD_ROADMAP.md`
+- `spec.md`
+- `tasks.md`
+- `acceptance.md`
+
+### Verification targets
+- Route returns max 10 items sorted by 24h volume descending.
+- Chain switch updates token rows (`all` aggregation + specific chain mapping).
+- Invalid `chainKey` returns deterministic `payload_invalid` error.
+- Dexscreener failures are soft and do not break dashboard shell rendering.
+
+## Slice 100 Context Pack (2026-02-20): Uniswap Proxy-First Execution
+
+### Objective
+Implement Uniswap API integration as server-side proxy execution for runtime trade commands with deterministic fallback to legacy router path.
+
+### Constraints
+- Runtime/skill wallet remains source-of-truth execution authority.
+- Uniswap API key remains server-only (`XCLAW_UNISWAP_API_KEY`).
+- Unsupported chains stay legacy-only.
+- Supported-chain Uniswap failures auto-fallback to legacy when available.
+
+### Decision locks
+- Provider precedence: `uniswap_api` -> `legacy_router`.
+- Fallback trigger: any Uniswap proxy error class.
+- Provenance fields are mandatory in runtime outputs and trade status payloads.
+
+### Primary touchpoints
+- Runtime: `apps/agent-runtime/xclaw_agent/cli.py`
+- Server proxy: `apps/network-web/src/lib/uniswap-proxy.ts`
+- API routes: `/api/v1/agent/trade/uniswap/quote`, `/api/v1/agent/trade/uniswap/build`
+- Chain config rollout: requested Uniswap-supported chain set in `config/chains/`
+- Contracts/docs: `openapi.v1.yaml`, shared schemas, source-of-truth, tracker, roadmap, handoff artifacts.

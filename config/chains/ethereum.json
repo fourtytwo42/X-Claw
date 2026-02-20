@@ -28,14 +28,21 @@
   },
   "capabilities": {
     "wallet": true,
-    "trade": false,
+    "trade": true,
     "liquidity": false,
     "limitOrders": false,
     "x402": false,
     "faucet": false,
     "deposits": false
   },
-  "updatedAt": "2026-02-20T00:00:00.000Z",
+  "tradeProviders": {
+    "primary": "uniswap_api",
+    "fallback": "legacy_router"
+  },
+  "uniswapApi": {
+    "enabled": true
+  },
+  "updatedAt": "2026-02-20T10:00:00.000Z",
   "version": 1,
   "sources": {
     "chainMetadata": [
@@ -48,5 +55,8 @@
       "eth_chainId https://ethereum-rpc.publicnode.com -> 0x1",
       "eth_chainId https://eth.drpc.org -> 0x1"
     ]
+  },
+  "marketData": {
+    "dexscreenerChainId": "ethereum"
   }
 }

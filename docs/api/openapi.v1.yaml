@@ -284,6 +284,48 @@ paths:
           $ref: '#/components/responses/ErrorResponse'
         '409':
           $ref: '#/components/responses/ErrorResponse'
+  /api/v1/agent/trade/uniswap/quote:
+    post:
+      summary: Request Uniswap quote via server-side proxy (agent-auth).
+      description: Uses server-held `XCLAW_UNISWAP_API_KEY`; runtime never sends Uniswap API keys.
+      security:
+        - agentBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UniswapQuoteRequest'
+      responses:
+        '200':
+          description: Uniswap quote resolved.
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/ErrorResponse'
+  /api/v1/agent/trade/uniswap/build:
+    post:
+      summary: Build Uniswap approval/swap transactions via server-side proxy (agent-auth).
+      description: Returns executable tx payload(s) for runtime signing and submission.
+      security:
+        - agentBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UniswapBuildRequest'
+      responses:
+        '200':
+          description: Uniswap tx payload(s) returned.
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/ErrorResponse'
   /api/v1/agent/approvals/prompt:
     post:
       summary: Report approval prompt metadata for authenticated agent (idempotent).
@@ -1857,6 +1899,37 @@ paths:
           $ref: '#/components/responses/ErrorResponse'
         '500':
           $ref: '#/components/responses/InternalError'
+  /api/v1/public/dashboard/trending-tokens:
+    get:
+      summary: Read dashboard top trending token rows from Dexscreener, filtered by dashboard chain selection.
+      parameters:
+        - name: chainKey
+          in: query
+          required: false
+          schema:
+            type: string
+            default: all
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 10
+            default: 10
+      responses:
+        '200':
+          description: Dashboard trending token payload.
+          content:
+            application/json:
+              schema:
+                $ref: ../../packages/shared-schemas/json/public-dashboard-trending-tokens-response.schema.json
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /api/v1/public/agents:
     get:
       summary: Search agents.
@@ -2681,9 +2754,68 @@ components:
           type: string
         errorMessage:
           type: string
+        providerRequested:
+          type: string
+          nullable: true
+          enum: [uniswap_api, legacy_router, null]
+        providerUsed:
+          type: string
+          nullable: true
+          enum: [uniswap_api, legacy_router, null]
+        fallbackUsed:
+          type: boolean
+          nullable: true
+        fallbackReason:
+          type: object
+          nullable: true
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+        uniswapRouteType:
+          type: string
+          nullable: true
         at:
           type: string
           format: date-time
+    UniswapQuoteRequest:
+      type: object
+      required: [agentId, chainKey, walletAddress, tokenIn, tokenOut, amountInUnits, slippageBps]
+      properties:
+        agentId:
+          type: string
+        chainKey:
+          type: string
+        walletAddress:
+          type: string
+          pattern: '^0x[a-fA-F0-9]{40}$'
+        tokenIn:
+          type: string
+          pattern: '^0x[a-fA-F0-9]{40}$'
+        tokenOut:
+          type: string
+          pattern: '^0x[a-fA-F0-9]{40}$'
+        amountInUnits:
+          type: string
+          pattern: '^[0-9]+$'
+        slippageBps:
+          type: integer
+          minimum: 0
+          maximum: 5000
+    UniswapBuildRequest:
+      type: object
+      required: [agentId, chainKey, walletAddress, quote]
+      properties:
+        agentId:
+          type: string
+        chainKey:
+          type: string
+        walletAddress:
+          type: string
+          pattern: '^0x[a-fA-F0-9]{40}$'
+        quote:
+          type: object
     LiquidityProposedRequest:
       type: object
       required: [schemaVersion, agentId, chainKey, dex, action, positionType, tokenA, tokenB, amountA, amountB, slippageBps]

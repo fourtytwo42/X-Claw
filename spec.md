@@ -2882,3 +2882,95 @@ Ensure hosted installers bind portable wallet entries across all enabled wallet-
 - `npm run seed:verify`
 - `npm run build`
 - `pm2 restart all`
+
+---
+
+# Slice 100 Spec: Uniswap Proxy-First Trade Execution With Runtime Fallback (2026-02-20)
+
+## Goal
+Route agent `trade spot` and `trade execute` through server-side Uniswap API proxy on supported chains, while preserving deterministic fallback to legacy router execution.
+
+## Non-goals
+1. No LP integration via Uniswap API in this slice.
+2. No standalone Uniswap UI flow; runtime remains source of truth.
+3. No agent-local Uniswap key storage.
+
+## Locked scope
+1. `apps/agent-runtime/xclaw_agent/cli.py`
+2. `apps/agent-runtime/tests/test_trade_path.py`
+3. `apps/network-web/src/lib/env.ts`
+4. `apps/network-web/src/lib/uniswap-proxy.ts`
+5. `apps/network-web/src/app/api/v1/agent/trade/uniswap/quote/route.ts`
+6. `apps/network-web/src/app/api/v1/agent/trade/uniswap/build/route.ts`
+7. `apps/network-web/src/app/api/v1/trades/[tradeId]/status/route.ts`
+8. `config/chains/*.json` (requested rollout)
+9. `packages/shared-schemas/json/trade-status.schema.json`
+10. `packages/shared-schemas/json/uniswap-quote-request.schema.json`
+11. `packages/shared-schemas/json/uniswap-build-request.schema.json`
+12. `docs/api/openapi.v1.yaml`
+13. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+14. `docs/XCLAW_SLICE_TRACKER.md`
+15. `docs/XCLAW_BUILD_ROADMAP.md`
+16. `docs/CONTEXT_PACK.md`
+17. `spec.md`
+18. `tasks.md`
+19. `acceptance.md`
+
+## Acceptance checks
+- runtime never requires/stores Uniswap API key.
+- server proxy routes authenticate agent bearer and inject `XCLAW_UNISWAP_API_KEY` server-side.
+- `trade spot` and `trade execute` prefer `uniswap_api` when configured.
+- any Uniswap proxy error triggers legacy fallback when legacy router path is available.
+- runtime output + trade status payloads include provider provenance fields.
+- requested chains are present in config with truthful capabilities and provider metadata.
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `pm2 restart all`
+
+---
+
+# Slice 101 Spec: Dashboard Dexscreener Top Tokens (Chain-Aware, Top 10) (2026-02-20)
+
+## Goal
+Add a Dexscreener-style Top 10 token module to `/dashboard` that tracks the existing chain dropdown (`all` and specific chain), refreshes every 60 seconds, and hides the module when selected chain has no mapped market data.
+
+## Non-goals
+1. No changes to Python skill/runtime Dexscreener commands.
+2. No replacement of existing dashboard summary endpoint.
+3. No speculative chain mappings beyond Base/Ethereum mappings requested in this slice.
+
+## Locked scope
+1. `apps/network-web/src/app/api/v1/public/dashboard/trending-tokens/route.ts`
+2. `apps/network-web/src/app/dashboard/page.tsx`
+3. `apps/network-web/src/app/dashboard/page.module.css`
+4. `apps/network-web/src/lib/chains.ts`
+5. `config/chains/base_mainnet.json`
+6. `config/chains/base_sepolia.json`
+7. `config/chains/ethereum.json`
+8. `config/chains/ethereum_sepolia.json`
+9. `packages/shared-schemas/json/public-dashboard-trending-tokens-response.schema.json`
+10. `docs/api/openapi.v1.yaml`
+11. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+12. `docs/XCLAW_SLICE_TRACKER.md`
+13. `docs/XCLAW_BUILD_ROADMAP.md`
+14. `docs/CONTEXT_PACK.md`
+15. `spec.md`
+16. `tasks.md`
+17. `acceptance.md`
+
+## Acceptance checks
+- `GET /api/v1/public/dashboard/trending-tokens?chainKey=all&limit=10` returns max 10 rows sorted by `volumeH24Usd desc`.
+- Specific chain selection updates rows and uses config mapping (`marketData.dexscreenerChainId`) where configured.
+- Unmapped chains return empty item set and dashboard hides the module.
+- Invalid `chainKey` returns `400` with `payload_invalid`.
+- Dashboard refreshes token module every 60 seconds without breaking existing dashboard fetches.
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `pm2 restart all`

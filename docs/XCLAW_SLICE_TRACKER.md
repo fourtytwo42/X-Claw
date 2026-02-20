@@ -1892,3 +1892,56 @@ DoD:
 - [x] skill wallet commands accept explicit chain override args (chain-optional fallback remains runtime default chain).
 - [x] runtime `username-set`/`agent-register` register upsert includes all enabled local wallet bindings (primary requested chain first).
 - [x] canonical docs sync (`source-of-truth`, roadmap, tracker, wallet contract, spec/tasks/acceptance).
+
+## Slice 100: Uniswap Proxy-First Trade Execution With Legacy Fallback
+Status: [~]
+Issue: #46
+
+Goal:
+- Route runtime spot/execute trading through server-side Uniswap API proxy for supported chains while preserving deterministic legacy-router fallback behavior.
+
+DoD:
+- [x] server-side `XCLAW_UNISWAP_API_KEY` env contract added; runtime/skill do not require or store Uniswap key.
+- [x] add agent-auth Uniswap proxy endpoints:
+  - `POST /api/v1/agent/trade/uniswap/quote`
+  - `POST /api/v1/agent/trade/uniswap/build`
+- [x] runtime `trade spot` provider orchestration added:
+  - supported chain + proxy success -> `providerUsed=uniswap_api`
+  - proxy error -> auto fallback to `legacy_router` (when available)
+  - unsupported/missing fallback -> deterministic `no_execution_provider_available`.
+- [x] runtime `trade execute` provider orchestration added with same precedence.
+- [x] provider provenance surfaced in runtime outputs and status transitions:
+  - `providerRequested`
+  - `providerUsed`
+  - `fallbackUsed`
+  - `fallbackReason`
+  - `uniswapRouteType`
+- [x] `trade-status` schema + route payload now accept/provider-pass-through provenance fields.
+- [x] requested chain rollout config added/updated for Uniswap-eligible scope:
+  - `ethereum`, `ethereum_sepolia`, `unichain_mainnet`, `bnb_mainnet`, `polygon_mainnet`, `base_mainnet`, `avalanche_mainnet`, `op_mainnet`, `arbitrum_mainnet`, `zksync_mainnet`, `monad_mainnet`.
+- [x] runtime unit coverage added for proxy-success and fallback paths.
+- [x] required gates run sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
+- [ ] issue #46 updated with evidence + commit hash(es).
+
+## Slice 101: Dashboard Dexscreener Top Tokens (Chain-Aware, Top 10)
+Status: [~]
+Issue: #47
+
+Goal:
+- Add a dashboard `Top Trending Tokens` section powered by Dexscreener data, filtered by dashboard chain selector (`all` + chain-specific), with 60-second refresh and no placeholder columns.
+
+DoD:
+- [x] docs sync first: source-of-truth + roadmap + tracker + openapi + schema + context/spec/tasks/acceptance aligned to Slice 101 scope.
+- [x] add public endpoint `GET /api/v1/public/dashboard/trending-tokens` with `chainKey` + `limit` query contract.
+- [x] add shared schema `public-dashboard-trending-tokens-response.schema.json` and openapi route reference.
+- [x] chain config supports optional `marketData.dexscreenerChainId` mapping and includes:
+  - `base_mainnet` + `base_sepolia` -> `base`,
+  - `ethereum` + `ethereum_sepolia` -> `ethereum`.
+- [x] route resolves selected dashboard chain to mapped Dexscreener chain(s), dedupes token rows, sorts by `volume.h24 desc`, and returns top 10.
+- [x] route soft-fails upstream chain fetch errors (non-fatal to endpoint) and includes deterministic warning metadata when upstream data is unavailable.
+- [x] route includes 60-second in-memory TTL cache to reduce upstream rate-limit pressure.
+- [x] dashboard integrates the new endpoint and refreshes token data every 60 seconds while mounted.
+- [x] dashboard chain dropdown updates token rows without extra selector controls.
+- [x] table/card rendering includes only columns with available data; section is hidden when selected chain has no mapped/unavailable data.
+- [x] required repo gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
+- [ ] issue #47 updated with verification evidence + commit hash(es).

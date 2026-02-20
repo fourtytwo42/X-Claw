@@ -2926,3 +2926,69 @@ Active slice context: `Slice 98`.
 ## 3) Cross-platform parity + docs
 - [x] Mirror wallet auto-bind + register payload behavior in `/skill-install.ps1`.
 - [x] Sync canonical docs (`source-of-truth`, tracker, roadmap, wallet contract, spec/tasks/acceptance).
+
+# Slice 100 Tasks: Uniswap Proxy-First Trade Execution + Fallback (UTC 2026-02-20)
+
+## 1) Canonical/doc sync
+- [x] Add Slice 100 tracker entry.
+- [x] Add Slice 100 roadmap section.
+- [x] Update source-of-truth for proxy-first execution + fallback semantics.
+- [x] Update OpenAPI for new Uniswap proxy routes and trade status provenance fields.
+- [x] Update handoff artifacts (`docs/CONTEXT_PACK.md`, `spec.md`, `tasks.md`, `acceptance.md`).
+
+## 2) Server/runtime implementation
+- [x] Add `XCLAW_UNISWAP_API_KEY` support to web env parser.
+- [x] Add Uniswap proxy helper with chain support gating and deterministic error mapping.
+- [x] Add `POST /api/v1/agent/trade/uniswap/quote`.
+- [x] Add `POST /api/v1/agent/trade/uniswap/build`.
+- [x] Add runtime provider selector and fallback behavior to `cmd_trade_spot`.
+- [x] Add runtime provider selector and fallback behavior to `cmd_trade_execute`.
+- [x] Surface provider provenance in runtime OK/fail payloads and trade status transitions.
+- [x] Extend trade status schema/route for provenance fields.
+- [x] Add/update chain configs for requested rollout (`ethereum`, `ethereum_sepolia`, `unichain_mainnet`, `bnb_mainnet`, `polygon_mainnet`, `base_mainnet`, `avalanche_mainnet`, `op_mainnet`, `arbitrum_mainnet`, `zksync_mainnet`, `monad_mainnet`).
+
+## 3) Validation/evidence
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`.
+- [x] `npm run db:parity`.
+- [x] `npm run seed:reset`.
+- [x] `npm run seed:load`.
+- [x] `npm run seed:verify`.
+- [x] `npm run build`.
+- [x] `pm2 restart all`.
+- [ ] issue evidence post with commit hash(es).
+
+# Slice 101 Tasks: Dashboard Dexscreener Top Tokens (UTC 2026-02-20)
+
+## 1) Canonical/doc sync
+- [x] Add Slice 101 tracker entry in `docs/XCLAW_SLICE_TRACKER.md`.
+- [x] Add Slice 101 roadmap section in `docs/XCLAW_BUILD_ROADMAP.md`.
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` dashboard contract for top-token module + chain filtering + hide-on-empty behavior.
+- [x] Update OpenAPI with `GET /api/v1/public/dashboard/trending-tokens`.
+- [x] Add shared response schema for dashboard trending tokens.
+- [x] Update handoff artifacts (`docs/CONTEXT_PACK.md`, `spec.md`, `tasks.md`, `acceptance.md`).
+
+## 2) Backend implementation
+- [x] Extend chain config type with `marketData.dexscreenerChainId`.
+- [x] Add mapping to `base_mainnet`, `base_sepolia`, `ethereum`, `ethereum_sepolia`.
+- [x] Add route `apps/network-web/src/app/api/v1/public/dashboard/trending-tokens/route.ts`.
+- [x] Validate `chainKey` against enabled+visible chains.
+- [x] Resolve mapped Dexscreener chain IDs for selected chain or `all`.
+- [x] Fetch Dexscreener data server-side with timeout + soft-failure handling.
+- [x] Rank rows by 24h volume descending, dedupe by token+chain, cap to top 10.
+- [x] Add 60-second in-memory cache for upstream fetches.
+
+## 3) Dashboard UI integration
+- [x] Add trending-token fetch bound to dashboard chain selection.
+- [x] Add 60-second refresh loop for token module.
+- [x] Render desktop table and mobile cards under existing dashboard insights.
+- [x] Render only columns that have data in current dataset.
+- [x] Hide section when current chain has no rows.
+
+## 4) Validation/evidence
+- [x] `npm run db:parity`.
+- [x] `npm run seed:reset`.
+- [x] `npm run seed:load`.
+- [x] `npm run seed:verify`.
+- [x] `npm run build`.
+- [x] `pm2 restart all`.
+- [ ] Issue evidence post with commit hash(es).

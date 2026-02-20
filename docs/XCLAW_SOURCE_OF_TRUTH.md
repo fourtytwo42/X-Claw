@@ -2891,6 +2891,7 @@ Limitations / notes:
   - right rail (`Live Trade Feed`, `Top Agents (24H)`, docs/help card),
   - mid-row (`Chain Breakdown`, `Trade Snapshot (24H)`),
   - `Trending Agents` section,
+  - `Top Trending Tokens` section (Dexscreener-style table/card list),
   - footer links (`Docs`, `API`, `Terms`, `Security Guide`).
 
 7. Derived metric contract (slice-scoped):
@@ -2900,6 +2901,11 @@ Limitations / notes:
   - `chainBreakdown` with zero-state rows for enabled visible chains.
 - where exact metrics are unavailable from existing public endpoints, dashboard must display visibly labeled derived/estimated values.
 - unsupported precision must fail soft with empty/low-data hints, not hard errors.
+- dashboard trending-token data is served by `GET /api/v1/public/dashboard/trending-tokens`:
+  - `chainKey=all` aggregates mapped Dexscreener chains and returns top 10 by `volume.h24`.
+  - specific dashboard chain selection must resolve through config mapping (`marketData.dexscreenerChainId`).
+  - if selected chain has no Dexscreener mapping/data, dashboard must hide the section (no empty placeholder table).
+  - section refresh cadence is 60 seconds; fetch failures are soft-fail and must not break the rest of dashboard rendering.
 
 8. Search contract:
 - top bar search placeholder: `Search agent... wallet... tx hash... token...`.
@@ -4027,6 +4033,57 @@ Limitations / notes:
 - Chain metadata references:
   - `https://raw.githubusercontent.com/ethereum-lists/chains/master/_data/chains/eip155-36900.json`
   - `https://raw.githubusercontent.com/ethereum-lists/chains/master/_data/chains/eip155-16661.json`
-  - `https://raw.githubusercontent.com/ethereum-lists/chains/master/_data/chains/eip155-16602.json`
-  - `https://raw.githubusercontent.com/ethereum-lists/chains/master/_data/chains/eip155-2366.json`
+- `https://raw.githubusercontent.com/ethereum-lists/chains/master/_data/chains/eip155-16602.json`
+- `https://raw.githubusercontent.com/ethereum-lists/chains/master/_data/chains/eip155-2366.json`
 - Live RPC chain-id verification evidence is required in config `sources.rpcVerification` for each normalized chain.
+
+## 81) Slice 100 Uniswap Proxy-First Trade Execution Contract (Locked)
+
+1. Security boundary:
+- Uniswap API key is server-only (`XCLAW_UNISWAP_API_KEY`).
+- Runtime/skill/web-client never require or store Uniswap API keys in agent-local config.
+- Runtime reaches Uniswap only through authenticated X-Claw API proxy routes.
+
+2. Provider orchestration:
+- Runtime trade execution provider selection is chain-config-driven:
+  - `tradeProviders.primary` (`uniswap_api|legacy_router`)
+  - `tradeProviders.fallback` (`legacy_router|none`)
+- Supported-chain behavior:
+  - attempt `uniswap_api` first,
+  - on any Uniswap proxy error (timeout/4xx/5xx/malformed payload/build mismatch), auto-fallback to legacy router when available.
+- Unsupported-chain behavior:
+  - execute legacy router path directly.
+- If neither provider can execute, fail closed with deterministic `no_execution_provider_available`.
+
+3. API proxy surface (agent-auth):
+- `POST /api/v1/agent/trade/uniswap/quote`
+- `POST /api/v1/agent/trade/uniswap/build`
+- Proxy validates payloads and chain support, injects server-held key, and returns deterministic error contracts.
+
+4. Runtime provenance contract (mandatory):
+- `trade spot` and `trade execute` success/failure payloads must include:
+  - `providerRequested`
+  - `providerUsed`
+  - `fallbackUsed`
+  - `fallbackReason` (`code`, `message`) when fallback triggered
+  - `uniswapRouteType` when known (`CLASSIC|DUTCH_V2|DUTCH_V3|...`)
+- Trade status transitions posted to server must mirror these provenance fields.
+
+5. Chain scope for this slice:
+- Uniswap provider-eligible scope:
+  - `ethereum`, `ethereum_sepolia`, `unichain_mainnet`, `bnb_mainnet`, `polygon_mainnet`, `base_mainnet`,
+  - `avalanche_mainnet`, `op_mainnet`, `arbitrum_mainnet`, `zksync_mainnet`, `monad_mainnet`.
+- Legacy router fallback remains availability-gated by chain config (`coreContracts.router`).
+
+6. Validation requirements:
+- Runtime tests must cover:
+  - Uniswap proxy success,
+  - Uniswap failure -> legacy fallback success,
+  - unsupported/no-provider deterministic failure path.
+- Required repo gates remain sequential and mandatory:
+  - `npm run db:parity`
+  - `npm run seed:reset`
+  - `npm run seed:load`
+  - `npm run seed:verify`
+  - `npm run build`
+  - `pm2 restart all`

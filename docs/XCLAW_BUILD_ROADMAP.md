@@ -3274,3 +3274,88 @@ Note:
   - [x] `npm run seed:verify`
   - [x] `npm run build`
   - [x] `pm2 restart all`
+
+## 100) Slice 100: Uniswap Proxy-First Trade Execution + Runtime Fallback
+
+### 100.1 Canonical/doc sync
+- [x] Add Slice 100 entries to `docs/XCLAW_SLICE_TRACKER.md` and this roadmap section.
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` with Uniswap proxy-first execution contract and fallback semantics.
+- [x] Update `docs/api/openapi.v1.yaml` with new Uniswap proxy routes and trade status provenance fields.
+- [x] Update handoff artifacts: `docs/CONTEXT_PACK.md`, `spec.md`, `tasks.md`, `acceptance.md`.
+
+### 100.2 Implementation
+- [x] Add server-side env contract in `apps/network-web/src/lib/env.ts` for `XCLAW_UNISWAP_API_KEY`.
+- [x] Add Uniswap proxy client helper `apps/network-web/src/lib/uniswap-proxy.ts`:
+  - [x] server-held key injection only,
+  - [x] supported-chain gate by chain config/chainId,
+  - [x] strict payload normalization and deterministic upstream error mapping.
+- [x] Add agent-auth routes:
+  - [x] `POST /api/v1/agent/trade/uniswap/quote`
+  - [x] `POST /api/v1/agent/trade/uniswap/build`
+- [x] Runtime `trade spot` updated for provider orchestration:
+  - [x] `provider=uniswap_api` primary path for configured chains,
+  - [x] fallback to legacy router on any Uniswap proxy failure,
+  - [x] deterministic `no_execution_provider_available` when neither path can execute.
+- [x] Runtime `trade execute` updated with matching provider orchestration + fallback behavior.
+- [x] Provider provenance surfaced in runtime outputs and status transitions:
+  - [x] `providerRequested`, `providerUsed`, `fallbackUsed`, `fallbackReason`, `uniswapRouteType`.
+- [x] Trade status schema/route updated to accept and mirror provider provenance metadata.
+- [x] Chain rollout configs added/updated for requested Uniswap scope:
+  - [x] `ethereum`, `ethereum_sepolia`, `unichain_mainnet`, `bnb_mainnet`, `polygon_mainnet`, `base_mainnet`,
+  - [x] `avalanche_mainnet`, `op_mainnet`, `arbitrum_mainnet`, `zksync_mainnet`, `monad_mainnet`.
+
+### 100.3 Validation + evidence
+- [x] Runtime unit tests pass with new provider/fallback cases:
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- [x] Required gates run sequentially:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `pm2 restart all`
+- [ ] Issue #46 evidence post + commit hash(es).
+
+## 101) Slice 101: Dashboard Dexscreener Top Tokens (Chain-Aware, Top 10)
+
+### 101.1 Canonical/doc sync
+- [x] Add Slice 101 entries to `docs/XCLAW_SLICE_TRACKER.md` and this roadmap section.
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` dashboard contract with `Top Trending Tokens` behavior and chain-filter rules.
+- [x] Update `docs/api/openapi.v1.yaml` with `GET /api/v1/public/dashboard/trending-tokens`.
+- [x] Add shared response schema `packages/shared-schemas/json/public-dashboard-trending-tokens-response.schema.json`.
+- [x] Update handoff artifacts: `docs/CONTEXT_PACK.md`, `spec.md`, `tasks.md`, `acceptance.md`.
+
+### 101.2 Implementation
+- [x] Add optional chain mapping field `marketData.dexscreenerChainId` in `apps/network-web/src/lib/chains.ts`.
+- [x] Populate mapping in chain configs:
+  - [x] `base_mainnet` + `base_sepolia` -> `base`
+  - [x] `ethereum` + `ethereum_sepolia` -> `ethereum`
+- [x] Add route `apps/network-web/src/app/api/v1/public/dashboard/trending-tokens/route.ts`:
+  - [x] validate `chainKey` against enabled+visible chains,
+  - [x] resolve mapped Dexscreener chains (`all` aggregates mapped chains),
+  - [x] fetch Dexscreener rows server-side with timeout and structured soft-failure handling,
+  - [x] normalize token rows and dedupe by token+chain,
+  - [x] rank by `volume.h24 desc` and return top 10.
+- [x] Add 60s in-memory cache for upstream Dexscreener reads.
+- [x] Update dashboard page integration:
+  - [x] fetch `/api/v1/public/dashboard/trending-tokens?chainKey=<selected>&limit=10`,
+  - [x] refresh token data every 60 seconds,
+  - [x] render desktop table + mobile cards below existing dashboard insights,
+  - [x] include only columns with available data across returned rows,
+  - [x] hide section when no rows for current chain.
+
+### 101.3 Validation + evidence
+- [x] Feature checks:
+  - [x] `chainKey=all` returns max 10 sorted by 24h volume descending.
+  - [x] selected chain updates rows on dropdown change.
+  - [x] mapped testnet selections (`base_sepolia`, `ethereum_sepolia`) resolve to mainnet Dexscreener chain data.
+  - [x] unmapped chains hide token section.
+  - [x] invalid `chainKey` returns `400 payload_invalid`.
+- [ ] Required gates run sequentially:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `pm2 restart all`
+- [ ] Issue #47 evidence post + commit hash(es).

@@ -60,7 +60,9 @@
       "https://docs.base.org/chain/run-a-base-node"
     ],
     "wethAddress": "slice21_mock_token_deploy",
-    "usdcAddress": ["slice21_mock_token_deploy"],
+    "usdcAddress": [
+      "slice21_mock_token_deploy"
+    ],
     "aerodromeDeployments": [
       "https://aerodrome.finance/security",
       "https://github.com/aerodrome-finance/contracts",
@@ -95,5 +97,8 @@
       "quoter": true,
       "escrow": true
     }
+  },
+  "marketData": {
+    "dexscreenerChainId": "base"
   }
 }

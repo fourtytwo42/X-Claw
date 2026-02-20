@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.xclaw.trade/public-dashboard-trending-tokens-response.schema.json",
+  "type": "object",
+  "required": ["ok", "chainKey", "generatedAt", "items"],
+  "properties": {
+    "ok": { "type": "boolean", "const": true },
+    "chainKey": { "type": "string" },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "warnings": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "rank",
+          "chainId",
+          "dexId",
+          "pairAddress",
+          "pairUrl",
+          "tokenAddress",
+          "tokenSymbol",
+          "tokenName",
+          "quoteSymbol",
+          "priceUsd",
+          "volumeH24Usd"
+        ],
+        "properties": {
+          "rank": { "type": "integer", "minimum": 1 },
+          "chainId": { "type": "string", "minLength": 1 },
+          "dexId": { "type": "string", "minLength": 1 },
+          "pairAddress": { "type": "string", "minLength": 1 },
+          "pairUrl": { "type": "string", "minLength": 1 },
+          "tokenAddress": { "type": "string", "minLength": 1 },
+          "tokenSymbol": { "type": "string", "minLength": 1 },
+          "tokenName": { "type": "string", "minLength": 1 },
+          "quoteSymbol": { "type": "string", "minLength": 1 },
+          "pairLabel": { "type": ["string", "null"] },
+          "priceUsd": { "type": ["string", "null"] },
+          "ageMinutes": { "type": ["integer", "null"], "minimum": 0 },
+          "txnsM5": { "$ref": "#/$defs/txnWindow" },
+          "txnsH1": { "$ref": "#/$defs/txnWindow" },
+          "txnsH6": { "$ref": "#/$defs/txnWindow" },
+          "txnsH24": { "$ref": "#/$defs/txnWindow" },
+          "volumeM5Usd": { "type": ["string", "null"] },
+          "volumeH1Usd": { "type": ["string", "null"] },
+          "volumeH6Usd": { "type": ["string", "null"] },
+          "volumeH24Usd": { "type": ["string", "null"] },
+          "priceChangeM5Pct": { "type": ["string", "null"] },
+          "priceChangeH1Pct": { "type": ["string", "null"] },
+          "priceChangeH6Pct": { "type": ["string", "null"] },
+          "priceChangeH24Pct": { "type": ["string", "null"] }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "$defs": {
+    "txnWindow": {
+      "type": ["object", "null"],
+      "required": ["buys", "sells", "total"],
+      "properties": {
+        "buys": { "type": "integer", "minimum": 0 },
+        "sells": { "type": "integer", "minimum": 0 },
+        "total": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

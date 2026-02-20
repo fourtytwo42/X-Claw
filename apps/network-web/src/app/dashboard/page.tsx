@@ -91,6 +91,39 @@ type DashboardSummary = {
   }>;
 };
 
+type TrendingTokenTxn = {
+  buys: number;
+  sells: number;
+  total: number;
+};
+
+type TrendingTokenItem = {
+  rank: number;
+  chainId: string;
+  dexId: string;
+  pairAddress: string;
+  pairUrl: string;
+  tokenAddress: string;
+  tokenSymbol: string;
+  tokenName: string;
+  quoteSymbol: string;
+  pairLabel: string | null;
+  priceUsd: string | null;
+  ageMinutes: number | null;
+  txnsM5: TrendingTokenTxn | null;
+  txnsH1: TrendingTokenTxn | null;
+  txnsH6: TrendingTokenTxn | null;
+  txnsH24: TrendingTokenTxn | null;
+  volumeM5Usd: string | null;
+  volumeH1Usd: string | null;
+  volumeH6Usd: string | null;
+  volumeH24Usd: string | null;
+  priceChangeM5Pct: string | null;
+  priceChangeH1Pct: string | null;
+  priceChangeH6Pct: string | null;
+  priceChangeH24Pct: string | null;
+};
+
 type ChartPoint = {
   value: number;
   label: string;
@@ -299,6 +332,30 @@ function formatBucketLabel(value: string, range: TimeRange): string {
   return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
+function formatAgeMinutes(value: number | null): string {
+  if (!Number.isFinite(value) || value === null || value < 0) {
+    return 'n/a';
+  }
+  if (value >= 24 * 60) {
+    return `${Math.floor(value / (24 * 60))}d`;
+  }
+  if (value >= 60) {
+    return `${Math.floor(value / 60)}h`;
+  }
+  return `${value}m`;
+}
+
+function formatSignedPct(value: string | null): string {
+  if (!value) {
+    return 'n/a';
+  }
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return 'n/a';
+  }
+  return `${parsed > 0 ? '+' : ''}${parsed.toFixed(2)}%`;
+}
+
 function DashboardPage() {
   const router = useRouter();
   const [chainKey, setChainKey, chainLabel] = useDashboardChainKey();
@@ -311,6 +368,8 @@ function DashboardPage() {
   const [activity, setActivity] = useState<ActivityItem[] | null>(null);
   const [chat, setChat] = useState<ChatItem[] | null>(null);
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
+  const [trendingTokens, setTrendingTokens] = useState<TrendingTokenItem[] | null>(null);
+  const [trendingWarnings, setTrendingWarnings] = useState<string[]>([]);
   const [chatError, setChatError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
@@ -345,13 +404,14 @@ function DashboardPage() {
       }
 
       try {
-        const [leaderboardRes, activityRes, chatRes, summaryRes] = await Promise.all([
+        const [leaderboardRes, activityRes, chatRes, summaryRes, trendingRes] = await Promise.all([
           fetch(`/api/v1/public/leaderboard?window=${metricWindow}&mode=real&chain=${chainQuery}`, { cache: 'no-store' }),
           fetch(`/api/v1/public/activity?${activityQuery.toString()}`, { cache: 'no-store' }),
           fetch('/api/v1/chat/messages?limit=40', { cache: 'no-store' }),
           fetch(`/api/v1/public/dashboard/summary?chainKey=${encodeURIComponent(chainQuery)}&range=${encodeURIComponent(timeRange)}`, {
             cache: 'no-store',
-          })
+          }),
+          fetch(`/api/v1/public/dashboard/trending-tokens?chainKey=${encodeURIComponent(chainQuery)}&limit=10`, { cache: 'no-store' }),
         ]);
 
         if (!leaderboardRes.ok || !activityRes.ok || !summaryRes.ok) {
@@ -361,6 +421,9 @@ function DashboardPage() {
         const leaderboardPayload = (await leaderboardRes.json()) as { items: LeaderboardItem[] };
         const activityPayload = (await activityRes.json()) as { items: ActivityItem[] };
         const summaryPayload = (await summaryRes.json()) as DashboardSummary;
+        const trendingPayload = trendingRes.ok
+          ? ((await trendingRes.json()) as { items?: TrendingTokenItem[]; warnings?: string[] })
+          : ({ items: [], warnings: [] } as { items?: TrendingTokenItem[]; warnings?: string[] });
         let chatPayload: { items: ChatItem[] } | null = null;
 
         if (chatRes.ok) {
@@ -377,11 +440,15 @@ function DashboardPage() {
         setActivity(activityPayload.items ?? []);
         setSummary(summaryPayload ?? null);
         setChat(chatPayload?.items ?? []);
+        setTrendingTokens(trendingPayload.items ?? []);
+        setTrendingWarnings(Array.isArray(trendingPayload.warnings) ? trendingPayload.warnings : []);
       } catch (loadError) {
         if (!cancelled) {
           setError(loadError instanceof Error ? loadError.message : 'Failed to load dashboard.');
           setChat([]);
           setSummary(null);
+          setTrendingTokens([]);
+          setTrendingWarnings([]);
         }
       }
     };
@@ -392,6 +459,39 @@ function DashboardPage() {
       cancelled = true;
     };
   }, [chainKey, timeRange]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const chainQuery = chainKey === 'all' ? 'all' : chainKey;
+
+    const refresh = async () => {
+      try {
+        const response = await fetch(`/api/v1/public/dashboard/trending-tokens?chainKey=${encodeURIComponent(chainQuery)}&limit=10`, {
+          cache: 'no-store',
+        });
+        if (!response.ok) {
+          return;
+        }
+        const payload = (await response.json()) as { items?: TrendingTokenItem[]; warnings?: string[] };
+        if (cancelled) {
+          return;
+        }
+        setTrendingTokens(payload.items ?? []);
+        setTrendingWarnings(Array.isArray(payload.warnings) ? payload.warnings : []);
+      } catch {
+        // Preserve current rows on polling failures.
+      }
+    };
+
+    const timerId = window.setInterval(() => {
+      void refresh();
+    }, 60_000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timerId);
+    };
+  }, [chainKey]);
 
   const filteredLeaderboard = useMemo(() => {
     return leaderboard ?? [];
@@ -547,6 +647,15 @@ function DashboardPage() {
   );
 
   const trending = rankedAgents.slice(0, 6);
+  const trendingTokenRows = trendingTokens ?? [];
+  const hasTrendingChain = chainKey === 'all' && new Set(trendingTokenRows.map((row) => row.chainId)).size > 1;
+  const hasTrendingAge = trendingTokenRows.some((row) => row.ageMinutes !== null);
+  const hasTrendingTxns = trendingTokenRows.some((row) => (row.txnsH24?.total ?? 0) > 0);
+  const hasTrendingVolume = trendingTokenRows.some((row) => row.volumeH24Usd !== null);
+  const hasTrending5m = trendingTokenRows.some((row) => row.priceChangeM5Pct !== null);
+  const hasTrending1h = trendingTokenRows.some((row) => row.priceChangeH1Pct !== null);
+  const hasTrending6h = trendingTokenRows.some((row) => row.priceChangeH6Pct !== null);
+  const hasTrending24h = trendingTokenRows.some((row) => row.priceChangeH24Pct !== null);
   const liveFeed = tradeEvents.slice(0, 20);
   const topPairs = useMemo(() => {
     const counts = new Map<string, number>();
@@ -875,6 +984,90 @@ function DashboardPage() {
                     ))}
                   </div>
                 </section>
+
+                {trendingTokenRows.length > 0 ? (
+                  <section className={styles.card}>
+                    <div className={styles.sectionHeaderRow}>
+                      <div className={styles.cardTitle}>Top Trending Tokens</div>
+                      <span className={styles.trendingTokensRefresh}>Auto-refresh 60s</span>
+                    </div>
+                    {trendingWarnings.length > 0 ? <div className={styles.trendingTokensWarning}>{trendingWarnings[0]}</div> : null}
+
+                    <div className={styles.trendingTokensDesktop}>
+                      <div className={styles.trendingTokensTableWrap}>
+                        <table className={styles.trendingTokensTable}>
+                          <thead>
+                            <tr>
+                              <th>TOKEN</th>
+                              <th>PRICE</th>
+                              {hasTrendingChain ? <th>CHAIN</th> : null}
+                              {hasTrendingAge ? <th>AGE</th> : null}
+                              {hasTrendingTxns ? <th>TXNS</th> : null}
+                              {hasTrendingVolume ? <th>VOLUME</th> : null}
+                              {hasTrending5m ? <th>5M</th> : null}
+                              {hasTrending1h ? <th>1H</th> : null}
+                              {hasTrending6h ? <th>6H</th> : null}
+                              {hasTrending24h ? <th>24H</th> : null}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {trendingTokenRows.map((row) => (
+                              <tr key={`${row.chainId}:${row.tokenAddress}`}>
+                                <td>
+                                  <div className={styles.trendingTokenCell}>
+                                    <span className={styles.trendingTokenRank}>#{row.rank}</span>
+                                    <a href={row.pairUrl} target="_blank" rel="noreferrer" className={styles.trendingTokenLink}>
+                                      {row.tokenSymbol}
+                                    </a>
+                                    <span className={styles.trendingTokenPair}>/{row.quoteSymbol}</span>
+                                  </div>
+                                </td>
+                                <td>{row.priceUsd ? `$${row.priceUsd}` : 'n/a'}</td>
+                                {hasTrendingChain ? <td>{row.chainId}</td> : null}
+                                {hasTrendingAge ? <td>{formatAgeMinutes(row.ageMinutes)}</td> : null}
+                                {hasTrendingTxns ? <td>{formatNumber(row.txnsH24?.total ?? 0)}</td> : null}
+                                {hasTrendingVolume ? <td>{row.volumeH24Usd ? formatUsd(Number(row.volumeH24Usd)) : 'n/a'}</td> : null}
+                                {hasTrending5m ? <td className={toNumber(row.priceChangeM5Pct) >= 0 ? styles.deltaUp : styles.deltaDown}>{formatSignedPct(row.priceChangeM5Pct)}</td> : null}
+                                {hasTrending1h ? <td className={toNumber(row.priceChangeH1Pct) >= 0 ? styles.deltaUp : styles.deltaDown}>{formatSignedPct(row.priceChangeH1Pct)}</td> : null}
+                                {hasTrending6h ? <td className={toNumber(row.priceChangeH6Pct) >= 0 ? styles.deltaUp : styles.deltaDown}>{formatSignedPct(row.priceChangeH6Pct)}</td> : null}
+                                {hasTrending24h ? <td className={toNumber(row.priceChangeH24Pct) >= 0 ? styles.deltaUp : styles.deltaDown}>{formatSignedPct(row.priceChangeH24Pct)}</td> : null}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    <div className={styles.trendingTokensMobile}>
+                      {trendingTokenRows.map((row) => (
+                        <article key={`mobile:${row.chainId}:${row.tokenAddress}`} className={styles.trendingTokenCard}>
+                          <div className={styles.trendingTokenCardTop}>
+                            <div className={styles.trendingTokenCell}>
+                              <span className={styles.trendingTokenRank}>#{row.rank}</span>
+                              <a href={row.pairUrl} target="_blank" rel="noreferrer" className={styles.trendingTokenLink}>
+                                {row.tokenSymbol}
+                              </a>
+                              <span className={styles.trendingTokenPair}>/{row.quoteSymbol}</span>
+                            </div>
+                            <strong>{row.priceUsd ? `$${row.priceUsd}` : 'n/a'}</strong>
+                          </div>
+                          <div className={styles.trendingTokenCardMeta}>
+                            {hasTrendingChain ? <span>{row.chainId}</span> : null}
+                            {hasTrendingAge ? <span>Age {formatAgeMinutes(row.ageMinutes)}</span> : null}
+                            {hasTrendingVolume ? <span>Vol {row.volumeH24Usd ? formatUsd(Number(row.volumeH24Usd)) : 'n/a'}</span> : null}
+                            {hasTrendingTxns ? <span>Txns {formatNumber(row.txnsH24?.total ?? 0)}</span> : null}
+                          </div>
+                          <div className={styles.trendingTokenCardChanges}>
+                            {hasTrending5m ? <span className={toNumber(row.priceChangeM5Pct) >= 0 ? styles.deltaUp : styles.deltaDown}>5M {formatSignedPct(row.priceChangeM5Pct)}</span> : null}
+                            {hasTrending1h ? <span className={toNumber(row.priceChangeH1Pct) >= 0 ? styles.deltaUp : styles.deltaDown}>1H {formatSignedPct(row.priceChangeH1Pct)}</span> : null}
+                            {hasTrending6h ? <span className={toNumber(row.priceChangeH6Pct) >= 0 ? styles.deltaUp : styles.deltaDown}>6H {formatSignedPct(row.priceChangeH6Pct)}</span> : null}
+                            {hasTrending24h ? <span className={toNumber(row.priceChangeH24Pct) >= 0 ? styles.deltaUp : styles.deltaDown}>24H {formatSignedPct(row.priceChangeH24Pct)}</span> : null}
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
               </>
             ) : null}
           </div>

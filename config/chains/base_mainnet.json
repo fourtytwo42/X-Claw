@@ -20,17 +20,27 @@
     "deploymentStatus": "pending_verification",
     "notes": "Wallet-first chain profile. Trade/liquidity activation remains blocked until router/factory/token metadata is verified."
   },
-  "canonicalTokens": {},
+  "canonicalTokens": {
+    "WETH": "0x4200000000000000000000000000000000000006",
+    "USDC": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+  },
   "capabilities": {
     "wallet": true,
-    "trade": false,
+    "trade": true,
     "liquidity": false,
     "limitOrders": false,
     "x402": false,
     "faucet": false,
     "deposits": false
   },
-  "updatedAt": "2026-02-20T00:00:00.000Z",
+  "tradeProviders": {
+    "primary": "uniswap_api",
+    "fallback": "legacy_router"
+  },
+  "uniswapApi": {
+    "enabled": true
+  },
+  "updatedAt": "2026-02-20T10:00:00.000Z",
   "version": 1,
   "sources": {
     "networkInfo": [
@@ -44,5 +54,8 @@
     "verifiedAt": "2026-02-20T00:00:00.000Z",
     "verifiedViaRpc": true,
     "verifiedChainIdHex": "0x2105"
+  },
+  "marketData": {
+    "dexscreenerChainId": "base"
   }
 }

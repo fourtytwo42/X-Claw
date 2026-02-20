@@ -32,6 +32,16 @@ export type ChainConfig = {
     faucet?: boolean;
     deposits?: boolean;
   };
+  tradeProviders?: {
+    primary?: 'uniswap_api' | 'legacy_router' | string;
+    fallback?: 'legacy_router' | 'none' | string;
+  };
+  uniswapApi?: {
+    enabled?: boolean;
+  };
+  marketData?: {
+    dexscreenerChainId?: string;
+  };
   canonicalTokens?: Record<string, string>;
 };
 
