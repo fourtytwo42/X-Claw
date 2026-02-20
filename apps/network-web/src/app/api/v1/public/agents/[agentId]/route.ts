@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server';
 
 import { chainRpcUrl, getChainConfig } from '@/lib/chains';
+import { ensureAgentWalletMappings } from '@/lib/agent-wallet-mappings';
 import { dbQuery } from '@/lib/db';
 import { errorResponse, internalErrorResponse, successResponse } from '@/lib/errors';
 import { enforcePublicReadRateLimit } from '@/lib/rate-limit';
@@ -98,6 +99,8 @@ export async function GET(
         requestId
       );
     }
+
+    await ensureAgentWalletMappings(agentId, chainKey === 'all' ? undefined : chainKey);
 
     const wallets = await dbQuery<{
       chain_key: string;

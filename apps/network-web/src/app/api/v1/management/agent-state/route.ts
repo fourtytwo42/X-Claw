@@ -3,6 +3,7 @@ import type { NextRequest } from 'next/server';
 import { dbQuery } from '@/lib/db';
 import { errorResponse, internalErrorResponse, successResponse } from '@/lib/errors';
 import { chainRpcUrl, getChainConfig, supportedChainHint } from '@/lib/chains';
+import { ensureAgentWalletMappings } from '@/lib/agent-wallet-mappings';
 import { maybeSyncLiquiditySnapshots } from '@/lib/liquidity-indexer';
 import { requireManagementSession, sessionHasAgentAccess } from '@/lib/management-auth';
 import { getRequestId } from '@/lib/request-id';
@@ -173,6 +174,8 @@ export async function GET(req: NextRequest) {
         requestId
       );
     }
+
+    await ensureAgentWalletMappings(agentId, chainKey);
 
     await maybeSyncLiquiditySnapshots(agentId, chainKey, { force: false });
     try {

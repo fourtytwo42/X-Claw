@@ -3,6 +3,7 @@ import type { NextRequest } from 'next/server';
 import { chainRpcUrl, getChainConfig } from '@/lib/chains';
 import { dbQuery, withTransaction } from '@/lib/db';
 import { errorResponse, internalErrorResponse, successResponse } from '@/lib/errors';
+import { ensureAgentWalletMappings } from '@/lib/agent-wallet-mappings';
 import { makeId } from '@/lib/ids';
 import { requireCsrfToken, requireManagementSession, sessionHasAgentAccess } from '@/lib/management-auth';
 import { getRequestId } from '@/lib/request-id';
@@ -364,6 +365,7 @@ export async function GET(req: NextRequest) {
     }
 
     const chainFilter = req.nextUrl.searchParams.get('chainKey')?.trim();
+    await ensureAgentWalletMappings(agentId, chainFilter);
 
     const wallets = await dbQuery<{ chain_key: string; address: string }>(
       `
