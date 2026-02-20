@@ -16,9 +16,11 @@
     "fallback": "https://arbitrum-one-rpc.publicnode.com"
   },
   "coreContracts": {
-    "dex": "adapter_pending",
-    "deploymentStatus": "pending_verification",
-    "notes": "Uniswap API primary routing enabled. Legacy router fallback is capability-gated by configured router address."
+    "dex": "uniswap_v2",
+    "deploymentStatus": "external",
+    "notes": "Uniswap API remains primary; v2 router fallback is enabled from official deployment metadata and chain RPC verification.",
+    "factory": "0xf1D7CC64Fb4452F05c498126312eBE29f30Fbcf9",
+    "router": "0x4752ba5dbc23f44d87826276bf6fd6b1c372ad24"
   },
   "canonicalTokens": {
     "WETH": "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1",
@@ -46,11 +48,26 @@
   "marketData": {
     "dexscreenerChainId": "arbitrum"
   },
-  "updatedAt": "2026-02-20T10:00:00.000Z",
+  "updatedAt": "2026-02-20T23:55:00.000Z",
   "version": 1,
   "sources": {
     "chainMetadata": [
       "https://raw.githubusercontent.com/ethereum-lists/chains/master/_data/chains/eip155-42161.json"
+    ],
+    "uniswapV2Deployments": [
+      "https://docs.uniswap.org/contracts/v2/reference/smart-contracts/v2-deployments"
+    ],
+    "uniswapRepositories": [
+      "https://github.com/Uniswap/v2-core/blob/master/contracts/UniswapV2Factory.sol",
+      "https://github.com/Uniswap/v2-periphery/blob/master/contracts/UniswapV2Router02.sol"
+    ],
+    "contractVerification": [
+      "https://arbiscan.io/address/0xf1D7CC64Fb4452F05c498126312eBE29f30Fbcf9#code",
+      "https://arbiscan.io/address/0x4752ba5dbc23f44d87826276bf6fd6b1c372ad24#code"
+    ],
+    "rpcVerification": [
+      "router.factory() 0x4752ba5dbc23f44d87826276bf6fd6b1c372ad24 -> 0xf1D7CC64Fb4452F05c498126312eBE29f30Fbcf9",
+      "eth_chainId https://arb1.arbitrum.io/rpc -> expected 0xa4b1"
     ]
   },
   "liquidityProviders": {
@@ -69,7 +86,7 @@
     }
   },
   "tradeOperations": {
-    "legacyEnabled": false,
-    "adapter": "none"
+    "legacyEnabled": true,
+    "adapter": "legacy_router"
   }
 }

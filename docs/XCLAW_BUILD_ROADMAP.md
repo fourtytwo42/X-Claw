@@ -3653,3 +3653,66 @@ Note:
   - [x] `npm run build`
   - [x] `pm2 restart all`
 - [ ] Issue #50 evidence post + commit hash(es).
+
+## 112) Slice 112: v2-Only Fallback Research Contract
+
+### 112.1 Canonical/doc sync
+- [x] Add Slice 112 entries to tracker and roadmap.
+- [x] Update `docs/XCLAW_SOURCE_OF_TRUTH.md` with v2-only promotion contract.
+- [x] Update handoff artifacts (`docs/CONTEXT_PACK.md`, `spec.md`, `tasks.md`, `acceptance.md`).
+
+### 112.2 Research template
+- [x] Add per-chain research evidence table scaffold in `acceptance.md`.
+- [x] Lock required source classes: official docs + official repos + explorer verification.
+
+## 113) Slice 113: Uniswap-Primary v2 Fallback Promotion
+
+### 113.1 Chain config promotion
+- [x] Promote verified v2 fallback chains:
+  - [x] `ethereum`
+  - [x] `ethereum_sepolia`
+  - [x] `base_mainnet`
+  - [x] `arbitrum_mainnet`
+  - [x] `op_mainnet`
+  - [x] `polygon_mainnet`
+  - [x] `avalanche_mainnet`
+  - [x] `bnb_mainnet`
+  - [x] `unichain_mainnet`
+  - [x] `monad_mainnet`
+- [x] Keep `zksync_mainnet` fallback disabled pending official v2 deployment evidence.
+
+### 113.2 Test coverage
+- [x] Trade path tests cover fallback-enabled and fallback-disabled primary-failure behavior.
+
+## 114) Slice 114: Non-Uniswap Active Claims Truth Finalization
+
+### 114.1 Claim truth
+- [x] Keep Hedera claims executable (`hedera_mainnet`, `hedera_testnet`).
+- [x] Keep non-integrated claims deterministic fail-closed (`base_sepolia`, `hardhat_local`, `kite_ai_testnet`).
+
+### 114.2 Evidence
+- [x] Acceptance matrix includes explicit per-chain claim reason mapping.
+
+## 115) Slice 115: Determinism + Provenance Guardrail
+
+### 115.1 Runtime behavior guardrail
+- [x] Ensure trade/claim failure payloads retain provider provenance fields.
+- [x] Keep behavior bounded to v2-only fallback rules (no v3/universal additions).
+
+### 115.2 Regression tests
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`.
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v`.
+
+## 116) Slice 116: Final Active-Chain Matrix + Closeout
+
+### 116.1 Matrix publish
+- [x] Publish final active-chain parity matrix in `acceptance.md`.
+- [x] Include provider primary/fallback plus deterministic fail code for non-executable operations.
+
+### 116.2 Required gates
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`

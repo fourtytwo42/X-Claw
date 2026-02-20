@@ -16,9 +16,11 @@
     "fallback": "https://base-rpc.publicnode.com"
   },
   "coreContracts": {
-    "dex": "adapter_pending",
-    "deploymentStatus": "pending_verification",
-    "notes": "Wallet-first chain profile. Trade/liquidity activation remains blocked until router/factory/token metadata is verified."
+    "dex": "uniswap_v2",
+    "deploymentStatus": "external",
+    "notes": "Uniswap API remains primary; v2 router fallback is enabled from official deployment metadata and chain RPC verification.",
+    "factory": "0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6",
+    "router": "0x4752ba5dbc23f44d87826276bf6fd6b1c372ad24"
   },
   "canonicalTokens": {
     "WETH": "0x4200000000000000000000000000000000000006",
@@ -43,14 +45,27 @@
     "migrateEnabled": true,
     "claimRewardsEnabled": true
   },
-  "updatedAt": "2026-02-20T10:00:00.000Z",
+  "updatedAt": "2026-02-20T23:55:00.000Z",
   "version": 1,
   "sources": {
     "networkInfo": [
       "https://docs.base.org/chain/network-information"
     ],
     "rpcVerification": [
-      "eth_chainId https://mainnet.base.org -> 0x2105"
+      "eth_chainId https://mainnet.base.org -> 0x2105",
+      "eth_chainId https://mainnet.base.org -> expected 0x2105",
+      "router.factory() 0x4752ba5dbc23f44d87826276bf6fd6b1c372ad24 -> 0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6"
+    ],
+    "uniswapV2Deployments": [
+      "https://docs.uniswap.org/contracts/v2/reference/smart-contracts/v2-deployments"
+    ],
+    "uniswapRepositories": [
+      "https://github.com/Uniswap/v2-core/blob/master/contracts/UniswapV2Factory.sol",
+      "https://github.com/Uniswap/v2-periphery/blob/master/contracts/UniswapV2Router02.sol"
+    ],
+    "contractVerification": [
+      "https://basescan.org/address/0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6#code",
+      "https://basescan.org/address/0x4752ba5dbc23f44d87826276bf6fd6b1c372ad24#code"
     ]
   },
   "verification": {
@@ -77,7 +92,7 @@
     }
   },
   "tradeOperations": {
-    "legacyEnabled": false,
-    "adapter": "none"
+    "legacyEnabled": true,
+    "adapter": "legacy_router"
   }
 }

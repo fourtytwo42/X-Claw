@@ -3144,3 +3144,51 @@ Implement ERC-8021 builder code attribution in runtime send paths for Base chain
 3. Safe mode: append suffix only for non-empty calldata.
 4. Fail closed when Base non-empty calldata requires suffix but builder code env is missing.
 5. Runtime CLI tx outputs include additive builder attribution metadata fields.
+
+## Slice 112: v2-Only Fallback Research Contract
+
+### Goal
+Lock a conservative v2-only fallback promotion contract for active chains using official-source evidence.
+
+### Constraints
+1. No v3/universal-router fallback in this stream.
+2. Promotion evidence requires official Uniswap docs + official repo references + explorer verification links.
+3. Unsupported chains remain deterministic fail-closed.
+
+## Slice 113: Verified v2 Fallback Promotion
+
+### Goal
+Promote legacy trade fallback only on Uniswap-primary chains with verified v2 router/factory metadata and runtime compatibility checks.
+
+### Constraints
+1. Promote: `ethereum`, `ethereum_sepolia`, `base_mainnet`, `arbitrum_mainnet`, `op_mainnet`, `polygon_mainnet`, `avalanche_mainnet`, `bnb_mainnet`, `unichain_mainnet`, `monad_mainnet`.
+2. Keep `zksync_mainnet` fallback disabled pending official Uniswap v2 deployment evidence.
+3. CLI/API command surface remains unchanged.
+
+## Slice 114: Non-Uniswap Claims Truth Finalization
+
+### Goal
+Keep non-Uniswap active chain claims in executable-or-deterministic truth with no synthetic success.
+
+### Constraints
+1. `hedera_mainnet` and `hedera_testnet` claim paths remain executable.
+2. `base_sepolia`, `hardhat_local`, `kite_ai_testnet` claim paths remain deterministic fail-closed.
+
+## Slice 115: Determinism + Provenance Guardrail
+
+### Goal
+Verify provider provenance fields remain present on relevant trade/claim failures with no behavior broadening.
+
+### Constraints
+1. Runtime output contract retains `providerRequested`, `providerUsed`, `fallbackUsed`, `fallbackReason`.
+2. Operation context remains present.
+
+## Slice 116: Final Active-Chain Parity Matrix
+
+### Goal
+Publish a final active-chain matrix that reflects v2-only fallback promotions and deterministic non-promoted behavior.
+
+### Constraints
+1. Matrix rows include send/trade/liquidity/claim-fees/claim-rewards.
+2. Matrix columns include primary provider, fallback provider, deterministic fail code.
+3. Wallet-only/disabled chains remain backlog in this stream.

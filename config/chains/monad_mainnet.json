@@ -16,9 +16,11 @@
     "fallback": "https://rpc.monad.xyz"
   },
   "coreContracts": {
-    "dex": "adapter_pending",
-    "deploymentStatus": "pending_verification",
-    "notes": "Uniswap API primary routing enabled. Legacy router fallback is capability-gated by configured router address."
+    "dex": "uniswap_v2",
+    "deploymentStatus": "external",
+    "notes": "Uniswap API remains primary; v2 router fallback is enabled from official deployment metadata and chain RPC verification.",
+    "factory": "0x182a927119d56008d921126764bf884221b10f59",
+    "router": "0x4b2ab38dbf28d31d467aa8993f6c2585981d6804"
   },
   "canonicalTokens": {
     "MON": "0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A",
@@ -46,11 +48,26 @@
   "marketData": {
     "dexscreenerChainId": "monad"
   },
-  "updatedAt": "2026-02-20T10:00:00.000Z",
+  "updatedAt": "2026-02-20T23:55:00.000Z",
   "version": 1,
   "sources": {
     "chainMetadata": [
       "https://raw.githubusercontent.com/ethereum-lists/chains/master/_data/chains/eip155-143.json"
+    ],
+    "uniswapV2Deployments": [
+      "https://docs.uniswap.org/contracts/v2/reference/smart-contracts/v2-deployments"
+    ],
+    "uniswapRepositories": [
+      "https://github.com/Uniswap/v2-core/blob/master/contracts/UniswapV2Factory.sol",
+      "https://github.com/Uniswap/v2-periphery/blob/master/contracts/UniswapV2Router02.sol"
+    ],
+    "contractVerification": [
+      "https://explorer.monad.xyz/address/0x182a927119d56008d921126764bf884221b10f59#code",
+      "https://explorer.monad.xyz/address/0x4b2ab38dbf28d31d467aa8993f6c2585981d6804#code"
+    ],
+    "rpcVerification": [
+      "router.factory() 0x4b2ab38dbf28d31d467aa8993f6c2585981d6804 -> 0x182a927119d56008d921126764bf884221b10f59",
+      "eth_chainId https://monad.drpc.org -> expected 0x8f"
     ]
   },
   "liquidityProviders": {
@@ -69,7 +86,7 @@
     }
   },
   "tradeOperations": {
-    "legacyEnabled": false,
-    "adapter": "none"
+    "legacyEnabled": true,
+    "adapter": "legacy_router"
   }
 }

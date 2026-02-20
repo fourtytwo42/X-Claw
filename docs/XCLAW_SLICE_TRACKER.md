@@ -2148,3 +2148,64 @@ DoD:
 - [x] required gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
 - [x] runtime tests pass (`test_trade_path.py`, `test_wallet_core.py` where applicable).
 - [ ] issue #50 evidence post + commit hash(es).
+
+## Slice 112: v2-Only Fallback Research Contract + Canonical Sync
+Status: [x]
+Issue: #55
+
+Goal:
+- Lock v2-only fallback promotion criteria with official-source evidence requirements.
+
+DoD:
+- [x] source-of-truth updated with v2-only promotion contract.
+- [x] roadmap/tracker/spec/tasks/acceptance/context pack synchronized.
+- [x] acceptance research template includes source URLs + verification outcomes.
+
+## Slice 113: Uniswap-Primary Trade Fallback Promotion (Verified v2)
+Status: [x]
+Issue: #56
+
+Goal:
+- Promote legacy trade fallback on Uniswap-primary chains only when verified v2 router/factory metadata is present and chain-checked.
+
+DoD:
+- [x] promoted chains updated with `coreContracts.factory/router` and `tradeOperations.legacyEnabled=true`.
+- [x] promoted chains include official docs/repo/explorer source links.
+- [x] `zksync_mainnet` remains explicitly fallback-disabled with deterministic reason.
+- [x] runtime trade tests include primary-fail fallback-enabled and fallback-disabled expectations.
+
+## Slice 114: Non-Uniswap Active Claims Truth Finalization
+Status: [x]
+Issue: #57
+
+Goal:
+- Preserve executable claims where integrated and deterministic fail-closed claims where not integrated.
+
+DoD:
+- [x] Hedera claim execution remains enabled.
+- [x] base_sepolia/hardhat_local/kite_ai_testnet claim paths remain deterministic fail-closed.
+- [x] acceptance matrix documents explicit reason mapping.
+
+## Slice 115: Runtime Determinism + Provenance Guardrail Sweep
+Status: [x]
+Issue: #58
+
+Goal:
+- Ensure trade/claim failure outputs remain provenance-complete with no broadening beyond v2-only behavior.
+
+DoD:
+- [x] provider provenance fields present in tested failure outputs.
+- [x] no new fallback engine introduced.
+- [x] runtime unit tests pass.
+
+## Slice 116: Final Active-Chain Parity Matrix + Closeout
+Status: [x]
+Issue: #59
+
+Goal:
+- Publish final active-chain parity matrix aligned to v2-only fallback truth and deterministic contracts.
+
+DoD:
+- [x] matrix includes send/trade/liquidity/claims plus primary/fallback/fail code columns.
+- [x] promoted vs non-promoted fallback states are explicit per chain.
+- [x] canonical docs/handoff artifacts synchronized.

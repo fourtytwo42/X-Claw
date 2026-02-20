@@ -5784,3 +5784,65 @@ Date (UTC): 2026-02-19
   - `builderCodeSource`
   - `builderCodeStandard`
 - Live Base Sepolia/Mainnet tx hash validation is not included in this session because onchain execution credentials/funded wallets were not used in test runs.
+
+## Slice 112-116 v2-Only Fallback Promotion Evidence (UTC 2026-02-20)
+
+### Official sources used
+- Uniswap v2 deployment addresses (official docs):
+  - https://docs.uniswap.org/contracts/v2/reference/smart-contracts/v2-deployments
+- Uniswap v2 factory source (official repo):
+  - https://github.com/Uniswap/v2-core/blob/master/contracts/UniswapV2Factory.sol
+- Uniswap v2 router source (official repo):
+  - https://github.com/Uniswap/v2-periphery/blob/master/contracts/UniswapV2Router02.sol
+
+### Research/promotion matrix (v2 trade fallback)
+
+| Chain | Promotion | Factory | Router | Explorer verification links | Runtime compatibility check | Result |
+|---|---|---|---|---|---|---|
+| ethereum | enabled | `0x5C69...aA6f` | `0x7a25...48D` | etherscan factory/router `#code` | `eth_chainId=0x1`, `router.factory() match` | promoted |
+| ethereum_sepolia | enabled | `0xF62c...80E6` | `0xeE56...CfE3` | sepolia.etherscan factory/router `#code` | `eth_chainId=0xaa36a7`, `router.factory() match` | promoted |
+| base_mainnet | enabled | `0x8909...8eC6` | `0x4752...ad24` | basescan factory/router `#code` | `eth_chainId=0x2105`, `router.factory() match` | promoted |
+| arbitrum_mainnet | enabled | `0xf1D7...bcf9` | `0x4752...ad24` | arbiscan factory/router `#code` | `eth_chainId=0xa4b1`, `router.factory() match` | promoted |
+| op_mainnet | enabled | `0x0c3c...74Bf` | `0x4A7b...62c2` | optimistic.etherscan factory/router `#code` | `eth_chainId=0xa`, `router.factory() match` | promoted |
+| polygon_mainnet | enabled | `0x9e5A...2799C` | `0xedf6...7AD1` | polygonscan factory/router `#code` | primary RPC failed auth; fallback RPC `eth_chainId=0x89`, `router.factory() match` | promoted |
+| avalanche_mainnet | enabled | `0x9e5A...2799C` | `0x4752...ad24` | snowtrace factory/router `#code` | `eth_chainId=0xa86a`, `router.factory() match` | promoted |
+| bnb_mainnet | enabled | `0x8909...8eC6` | `0x4752...aD24` | bscscan factory/router `#code` | `eth_chainId=0x38`, `router.factory() match` | promoted |
+| unichain_mainnet | enabled | `0x1f98...0002` | `0x284f...63ff` | uniscan factory/router `#code` | `eth_chainId=0x82`, `router.factory() match` | promoted |
+| monad_mainnet | enabled | `0x182a...0f59` | `0x4b2a...6804` | explorer.monad factory/router pages | `eth_chainId=0x8f`, `router.factory() match` | promoted |
+| zksync_mainnet | disabled | n/a | n/a | n/a | no official Uniswap v2 deployment entry in current docs table | keep deterministic |
+
+### Non-Uniswap active claim truth (slice 114)
+
+| Chain | claim-fees | claim-rewards | Outcome contract |
+|---|---|---|---|
+| hedera_mainnet | executable (`hedera_hts`) | executable (`hedera_hts`) | executable where configured/plugin supports |
+| hedera_testnet | executable (`hedera_hts`) | executable (`hedera_hts`) | executable where configured/plugin supports |
+| base_sepolia | deterministic fail | deterministic fail | `claim_fees_not_supported_for_protocol`, `claim_rewards_not_configured` |
+| hardhat_local | deterministic fail | deterministic fail | `claim_fees_not_supported_for_protocol`, `claim_rewards_not_configured` |
+| kite_ai_testnet | deterministic fail | deterministic fail | `claim_fees_not_supported_for_protocol`, `claim_rewards_not_configured` |
+
+### Final active-chain parity matrix (slice 116)
+
+| Chain | Send | Trade | LP add/remove | Claim fees | Claim rewards | Primary | Fallback | Deterministic fail code |
+|---|---|---|---|---|---|---|---|---|
+| ethereum | ✅ | ✅ | ✅ | ✅ (Uniswap) | ✅ (Uniswap) | uniswap_api | legacy_router | `no_execution_provider_available` |
+| ethereum_sepolia | ✅ | ✅ | ✅ | ✅ (Uniswap) | ✅ (Uniswap) | uniswap_api | legacy_router | `no_execution_provider_available` |
+| base_mainnet | ✅ | ✅ | ✅ | ✅ (Uniswap) | ✅ (Uniswap) | uniswap_api | legacy_router | `no_execution_provider_available` |
+| arbitrum_mainnet | ✅ | ✅ | ✅ | ✅ (Uniswap) | ✅ (Uniswap) | uniswap_api | legacy_router | `no_execution_provider_available` |
+| op_mainnet | ✅ | ✅ | ✅ | ✅ (Uniswap) | ✅ (Uniswap) | uniswap_api | legacy_router | `no_execution_provider_available` |
+| polygon_mainnet | ✅ | ✅ | ✅ | ✅ (Uniswap) | ✅ (Uniswap) | uniswap_api | legacy_router | `no_execution_provider_available` |
+| avalanche_mainnet | ✅ | ✅ | ✅ | ✅ (Uniswap) | ✅ (Uniswap) | uniswap_api | legacy_router | `no_execution_provider_available` |
+| bnb_mainnet | ✅ | ✅ | ✅ | ✅ (Uniswap) | ✅ (Uniswap) | uniswap_api | legacy_router | `no_execution_provider_available` |
+| unichain_mainnet | ✅ | ✅ | ✅ | ✅ (Uniswap) | ✅ (Uniswap) | uniswap_api | legacy_router | `no_execution_provider_available` |
+| monad_mainnet | ✅ | ✅ | ✅ | ✅ (Uniswap) | ✅ (Uniswap) | uniswap_api | legacy_router | `no_execution_provider_available` |
+| zksync_mainnet | ✅ | ✅ | ✅ | ✅ (Uniswap) | ✅ (Uniswap) | uniswap_api | none | `no_execution_provider_available` |
+| base_sepolia | ✅ | ✅ | ✅ | ❌ | ❌ | legacy_router | n/a | `claim_fees_not_supported_for_protocol`, `claim_rewards_not_configured` |
+| hardhat_local | ✅ | ✅ | ✅ | ❌ | ❌ | legacy_router | n/a | `claim_fees_not_supported_for_protocol`, `claim_rewards_not_configured` |
+| kite_ai_testnet | ✅ | ✅ | ✅ | ❌ | ❌ | legacy_router | n/a | `claim_fees_not_supported_for_protocol`, `claim_rewards_not_configured` |
+| hedera_mainnet | ✅ | ✅ | ✅ | ✅ (hedera_hts) | ✅ (hedera_hts) | legacy_router | n/a | `claim_rewards_not_configured` when reward wiring absent |
+| hedera_testnet | ✅ | ✅ | ✅ | ✅ (hedera_hts) | ✅ (hedera_hts) | legacy_router | n/a | `claim_rewards_not_configured` when reward wiring absent |
+
+### Validation
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS
+- `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v` -> PASS
+- required gates rerun sequentially for this stream (see final gate block below).

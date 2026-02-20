@@ -16,9 +16,11 @@
     "fallback": "https://avalanche-c-chain-rpc.publicnode.com"
   },
   "coreContracts": {
-    "dex": "adapter_pending",
-    "deploymentStatus": "pending_verification",
-    "notes": "Uniswap API primary routing enabled. Legacy router fallback is capability-gated by configured router address."
+    "dex": "uniswap_v2",
+    "deploymentStatus": "external",
+    "notes": "Uniswap API remains primary; v2 router fallback is enabled from official deployment metadata and chain RPC verification.",
+    "factory": "0x9e5A52f57b3038F1B8EeE45F28b3C1967e22799C",
+    "router": "0x4752ba5dbc23f44d87826276bf6fd6b1c372ad24"
   },
   "canonicalTokens": {
     "WAVAX": "0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7",
@@ -47,11 +49,26 @@
   "marketData": {
     "dexscreenerChainId": "avalanche"
   },
-  "updatedAt": "2026-02-20T10:00:00.000Z",
+  "updatedAt": "2026-02-20T23:55:00.000Z",
   "version": 1,
   "sources": {
     "chainMetadata": [
       "https://raw.githubusercontent.com/ethereum-lists/chains/master/_data/chains/eip155-43114.json"
+    ],
+    "uniswapV2Deployments": [
+      "https://docs.uniswap.org/contracts/v2/reference/smart-contracts/v2-deployments"
+    ],
+    "uniswapRepositories": [
+      "https://github.com/Uniswap/v2-core/blob/master/contracts/UniswapV2Factory.sol",
+      "https://github.com/Uniswap/v2-periphery/blob/master/contracts/UniswapV2Router02.sol"
+    ],
+    "contractVerification": [
+      "https://snowtrace.io/address/0x9e5A52f57b3038F1B8EeE45F28b3C1967e22799C#code",
+      "https://snowtrace.io/address/0x4752ba5dbc23f44d87826276bf6fd6b1c372ad24#code"
+    ],
+    "rpcVerification": [
+      "eth_chainId https://api.avax.network/ext/bc/C/rpc -> expected 0xa86a",
+      "router.factory() 0x4752ba5dbc23f44d87826276bf6fd6b1c372ad24 -> 0x9e5A52f57b3038F1B8EeE45F28b3C1967e22799C"
     ]
   },
   "liquidityProviders": {
@@ -70,7 +87,7 @@
     }
   },
   "tradeOperations": {
-    "legacyEnabled": false,
-    "adapter": "none"
+    "legacyEnabled": true,
+    "adapter": "legacy_router"
   }
 }

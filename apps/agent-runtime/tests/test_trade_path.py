@@ -3016,6 +3016,33 @@ class TradePathRuntimeTests(unittest.TestCase):
         self.assertEqual(meta.get("fallbackReason"), {"code": "uniswap_lp_failed", "message": "boom"})
         self.assertEqual(meta.get("uniswapLpOperation"), "decrease")
 
+    def test_trade_provider_settings_uses_chain_config_for_promoted_v2_fallback(self) -> None:
+        with mock.patch.object(
+            cli,
+            "_load_chain_config",
+            return_value={
+                "tradeProviders": {"primary": "uniswap_api", "fallback": "legacy_router"},
+                "tradeOperations": {"legacyEnabled": True, "adapter": "legacy_router"},
+                "coreContracts": {"router": "0x" + "11" * 20},
+            },
+        ):
+            primary, fallback = cli._trade_provider_settings("base_mainnet")
+        self.assertEqual(primary, "uniswap_api")
+        self.assertEqual(fallback, "legacy_router")
+
+    def test_trade_provider_settings_keeps_fallback_disabled_when_legacy_not_enabled(self) -> None:
+        with mock.patch.object(
+            cli,
+            "_load_chain_config",
+            return_value={
+                "tradeProviders": {"primary": "uniswap_api", "fallback": "legacy_router"},
+                "tradeOperations": {"legacyEnabled": False, "adapter": "none"},
+            },
+        ):
+            primary, fallback = cli._trade_provider_settings("zksync_mainnet")
+        self.assertEqual(primary, "uniswap_api")
+        self.assertEqual(fallback, "none")
+
 
 if __name__ == "__main__":
     unittest.main()

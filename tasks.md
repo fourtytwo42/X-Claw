@@ -3314,3 +3314,48 @@ Active slice context: `Slice 98`.
 - [x] `npm run build`.
 - [x] `pm2 restart all`.
 - [ ] Issue evidence post with commit hash(es).
+
+# Slice 112 Tasks: v2-Only Fallback Research Contract (UTC 2026-02-20)
+
+## 1) Canonical/doc sync
+- [x] Add Slice 112 entries to `docs/XCLAW_SOURCE_OF_TRUTH.md`, `docs/XCLAW_SLICE_TRACKER.md`, and `docs/XCLAW_BUILD_ROADMAP.md`.
+- [x] Update handoff artifacts (`docs/CONTEXT_PACK.md`, `spec.md`, `tasks.md`, `acceptance.md`).
+- [x] Add research-evidence template in `acceptance.md`.
+
+# Slice 113 Tasks: Verified v2 Fallback Promotion (UTC 2026-02-20)
+
+## 1) Chain config promotions
+- [x] Promote fallback-enabled v2 chains:
+  - [x] `arbitrum_mainnet`
+  - [x] `base_mainnet`
+  - [x] `op_mainnet`
+  - [x] `polygon_mainnet`
+  - [x] `avalanche_mainnet`
+  - [x] `bnb_mainnet`
+  - [x] `unichain_mainnet`
+  - [x] `monad_mainnet`
+- [x] Keep `ethereum` and `ethereum_sepolia` fallback-enabled.
+- [x] Keep `zksync_mainnet` fallback-disabled with deterministic reason.
+
+## 2) Tests
+- [x] Update trade-path tests for fallback-enabled and fallback-disabled primary-failure behavior.
+
+# Slice 114 Tasks: Non-Uniswap Active Claims Truth Finalization (UTC 2026-02-20)
+
+## 1) Truth lock
+- [x] Preserve Hedera executable claims (`hedera_mainnet`, `hedera_testnet`).
+- [x] Preserve deterministic fail-closed claims (`base_sepolia`, `hardhat_local`, `kite_ai_testnet`).
+- [x] Record per-chain reason mapping in acceptance matrix.
+
+# Slice 115 Tasks: Runtime Determinism/Provenance Sweep (UTC 2026-02-20)
+
+## 1) Guardrail verification
+- [x] Ensure trade/claim failure payloads include provider provenance fields.
+- [x] Keep behavior constrained to v2-only fallback contract.
+- [x] Run runtime regressions (`test_trade_path.py`, `test_liquidity_cli.py`).
+
+# Slice 116 Tasks: Final Matrix + Closeout (UTC 2026-02-20)
+
+## 1) Evidence closeout
+- [x] Publish final active-chain parity matrix with provider/fallback/fail-code columns.
+- [x] Run required gates sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).

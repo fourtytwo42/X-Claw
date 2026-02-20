@@ -4438,3 +4438,101 @@ Supersession note:
   - `builderCodeSource`
   - `builderCodeStandard` (`erc8021` when chain-eligible)
 - Applies to wallet send, trade spot/execute, and liquidity execution responses that return tx results.
+
+## 93) Slice 112 Research Artifact + v2-Only Promotion Contract (Locked)
+
+1. Scope:
+- Establish a v2-only fallback promotion rule for active chains.
+- Promotion requires official deployment evidence plus runtime compatibility checks.
+
+2. Evidence contract (required for promotion):
+- Official Uniswap deployment source:
+  - `https://docs.uniswap.org/contracts/v2/reference/smart-contracts/v2-deployments`
+- Official Uniswap contract repositories:
+  - `https://github.com/Uniswap/v2-core/blob/master/contracts/UniswapV2Factory.sol`
+  - `https://github.com/Uniswap/v2-periphery/blob/master/contracts/UniswapV2Router02.sol`
+- Chain explorer contract verification links for promoted factory/router addresses.
+- Runtime compatibility checks for current v2 path:
+  - `eth_chainId` on configured RPC,
+  - non-empty router bytecode,
+  - `router.factory()(address)` equals configured factory.
+
+3. Behavioral lock:
+- v2-only fallback stream; no v3/universal-router fallback in this slice set.
+- Unsupported chains remain deterministic fail-closed.
+
+## 94) Slice 113 Uniswap-Primary Trade Fallback Promotion (Locked)
+
+1. Scope:
+- Promote legacy trade fallback only for Uniswap-primary chains with verified v2 router/factory metadata.
+
+2. Promotion truth:
+- Legacy v2 trade fallback enabled:
+  - `ethereum`
+  - `ethereum_sepolia`
+  - `base_mainnet`
+  - `arbitrum_mainnet`
+  - `op_mainnet`
+  - `polygon_mainnet`
+  - `avalanche_mainnet`
+  - `bnb_mainnet`
+  - `unichain_mainnet`
+  - `monad_mainnet`
+- Legacy v2 trade fallback remains disabled:
+  - `zksync_mainnet` (no official Uniswap v2 deployment entry in current docs table).
+
+3. Runtime contract:
+- On Uniswap proxy failure:
+  - if chain fallback enabled and legacy router available -> execute legacy path,
+  - otherwise -> deterministic `no_execution_provider_available`.
+
+## 95) Slice 114 Non-Uniswap Active Claim Truth (Locked)
+
+1. Scope:
+- Preserve executable claims where integrated and deterministic fail-closed where not integrated.
+
+2. Canonical truth:
+- Hedera executable claim chains:
+  - `hedera_mainnet`
+  - `hedera_testnet`
+- Deterministic non-integrated claim chains:
+  - `base_sepolia`
+  - `hardhat_local`
+  - `kite_ai_testnet`
+
+3. Deterministic claim codes:
+- `claim_fees_not_supported_for_protocol`
+- `claim_rewards_not_configured`
+- `claim_rewards_not_supported_for_protocol`
+
+## 96) Slice 115 Runtime Determinism and Provenance Guardrail (Locked)
+
+1. Scope:
+- Enforce provenance fields on relevant trade/claim failure payloads with no behavior broadening beyond v2-only fallback.
+
+2. Payload requirements:
+- `providerRequested`
+- `providerUsed` (when resolved)
+- `fallbackUsed`
+- `fallbackReason`
+- operation context (`operation` and/or existing operation marker fields)
+
+## 97) Slice 116 Final Active-Chain Parity Matrix Contract (Locked)
+
+1. Scope:
+- Publish final active-chain matrix with executable-or-deterministic truth.
+
+2. Matrix requirements:
+- Per active chain include:
+  - send,
+  - trade,
+  - liquidity add/remove,
+  - claim-fees,
+  - claim-rewards,
+  - primary provider,
+  - fallback provider,
+  - deterministic fail code when non-executable.
+
+3. Stream boundaries:
+- Wallet-only/disabled chains remain backlog in this stream:
+  - `adi_mainnet`, `adi_testnet`, `og_mainnet`, `og_testnet`, `kite_ai_mainnet`, `canton_mainnet`, `canton_testnet`.

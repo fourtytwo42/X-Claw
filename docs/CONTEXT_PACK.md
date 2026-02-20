@@ -1539,3 +1539,32 @@ Close active-chain parity gaps with deterministic operation contracts and eviden
   - `spec.md`
   - `tasks.md`
   - `acceptance.md`
+
+## Slice 112-116 Context Pack (2026-02-20): Chain-Verified v2 Fallback Completion
+
+### Objective
+Promote legacy trade fallback only where the current v2-router runtime is technically valid and chain-verified, while preserving deterministic fail-closed behavior elsewhere.
+
+### Constraints
+- v2-only fallback stream (no v3/universal adapter work).
+- Active chains only in this stream.
+- Official-source evidence required for fallback promotion:
+  - Uniswap deployment docs,
+  - Uniswap official contract repos,
+  - chain explorer contract verification links.
+
+### Promotion outcome target
+- Promote fallback for verified v2-compatible Uniswap-primary chains.
+- Keep non-verified chains fallback-disabled with deterministic `no_execution_provider_available` behavior.
+- Keep non-Uniswap claim truth unchanged: Hedera executable, others deterministic where not integrated.
+
+### Primary touchpoints
+- `config/chains/{arbitrum_mainnet,base_mainnet,op_mainnet,polygon_mainnet,avalanche_mainnet,bnb_mainnet,unichain_mainnet,monad_mainnet,zksync_mainnet}.json`
+- `apps/agent-runtime/tests/test_trade_path.py`
+- canonical/handoff docs:
+  - `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - `docs/XCLAW_SLICE_TRACKER.md`
+  - `docs/XCLAW_BUILD_ROADMAP.md`
+  - `spec.md`
+  - `tasks.md`
+  - `acceptance.md`

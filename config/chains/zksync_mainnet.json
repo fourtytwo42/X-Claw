@@ -18,7 +18,7 @@
   "coreContracts": {
     "dex": "adapter_pending",
     "deploymentStatus": "pending_verification",
-    "notes": "Uniswap API primary routing enabled. Legacy router fallback is capability-gated by configured router address."
+    "notes": "Uniswap API remains primary; legacy v2 fallback is disabled in Slice 113 because official Uniswap v2 deployment metadata for zkSync is not present."
   },
   "canonicalTokens": {
     "WETH": "0x5AEa5775959fBC2557Cc8789bC1bf90A239D9a91",
@@ -46,11 +46,14 @@
   "marketData": {
     "dexscreenerChainId": "zksync"
   },
-  "updatedAt": "2026-02-20T10:00:00.000Z",
+  "updatedAt": "2026-02-20T23:55:00.000Z",
   "version": 1,
   "sources": {
     "chainMetadata": [
       "https://raw.githubusercontent.com/ethereum-lists/chains/master/_data/chains/eip155-324.json"
+    ],
+    "rpcVerification": [
+      "Slice 113: legacy v2 fallback left disabled; no official Uniswap v2 deployment entry for zkSync in docs table."
     ]
   },
   "liquidityProviders": {
