@@ -218,6 +218,42 @@ class X402SkillWrapperTests(unittest.TestCase):
         self.assertEqual(code, 0)
         run_mock.assert_called_once_with(["wallet", "wrap-native", "--amount", "1", "--chain", "hedera_testnet", "--json"])
 
+    def test_faucet_request_native_only_uses_all_asset_default(self) -> None:
+        env = {
+            "XCLAW_API_BASE_URL": "https://xclaw.trade/api/v1",
+            "XCLAW_AGENT_API_KEY": "test-key",
+            "XCLAW_DEFAULT_CHAIN": "hedera_testnet",
+        }
+        with mock.patch.dict("os.environ", env, clear=False):
+            with mock.patch.object(skill, "_run_agent", return_value=0) as run_mock:
+                code = skill.main(["xclaw_agent_skill.py", "faucet-request", "native"])
+        self.assertEqual(code, 0)
+        run_mock.assert_called_once_with(["faucet-request", "--chain", "hedera_testnet", "--json"])
+
+    def test_faucet_request_hbar_alias_uses_all_asset_default(self) -> None:
+        env = {
+            "XCLAW_API_BASE_URL": "https://xclaw.trade/api/v1",
+            "XCLAW_AGENT_API_KEY": "test-key",
+            "XCLAW_DEFAULT_CHAIN": "hedera_testnet",
+        }
+        with mock.patch.dict("os.environ", env, clear=False):
+            with mock.patch.object(skill, "_run_agent", return_value=0) as run_mock:
+                code = skill.main(["xclaw_agent_skill.py", "faucet-request", "hbar"])
+        self.assertEqual(code, 0)
+        run_mock.assert_called_once_with(["faucet-request", "--chain", "hedera_testnet", "--json"])
+
+    def test_faucet_request_chain_and_specific_asset_preserved(self) -> None:
+        env = {
+            "XCLAW_API_BASE_URL": "https://xclaw.trade/api/v1",
+            "XCLAW_AGENT_API_KEY": "test-key",
+            "XCLAW_DEFAULT_CHAIN": "base_sepolia",
+        }
+        with mock.patch.dict("os.environ", env, clear=False):
+            with mock.patch.object(skill, "_run_agent", return_value=0) as run_mock:
+                code = skill.main(["xclaw_agent_skill.py", "faucet-request", "hedera_testnet", "stable"])
+        self.assertEqual(code, 0)
+        run_mock.assert_called_once_with(["faucet-request", "--chain", "hedera_testnet", "--asset", "stable", "--json"])
+
     def test_auth_recover_delegates_to_runtime(self) -> None:
         env = {
             "XCLAW_API_BASE_URL": "https://xclaw.trade/api/v1",

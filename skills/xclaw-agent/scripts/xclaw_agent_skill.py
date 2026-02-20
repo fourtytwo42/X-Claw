@@ -181,6 +181,17 @@ def _env_truthy(name: str, default: bool = False) -> bool:
     return raw in {"1", "true", "yes", "on", "enabled"}
 
 
+def _normalize_faucet_asset(value: str) -> str:
+    token = str(value or "").strip().lower()
+    if token in {"native", "eth", "hbar", "kite"}:
+        return "native"
+    if token in {"wrapped", "weth", "whbar", "wkite"}:
+        return "wrapped"
+    if token in {"stable", "usdc", "usdt"}:
+        return "stable"
+    return token
+
+
 def _normalize_non_terminal_approval(runtime_json: dict) -> Optional[dict]:
     code = str(runtime_json.get("code") or "").strip().lower()
     if code != "approval_required":
@@ -1060,12 +1071,13 @@ def main(argv: List[str]) -> int:
         assets = argv[2:]
         if assets:
             first = str(assets[0] or "").strip().lower()
-            if first in {"base_sepolia", "kite_ai_testnet"}:
+            if first in {"base_sepolia", "kite_ai_testnet", "hedera_testnet"}:
                 request_chain = first
                 assets = assets[1:]
         args = ["faucet-request", "--chain", request_chain]
+        normalized_assets: list[str] = []
         for asset in assets:
-            normalized = str(asset or "").strip().lower()
+            normalized = _normalize_faucet_asset(asset)
             if normalized not in {"native", "wrapped", "stable"}:
                 return _err(
                     "invalid_input",
@@ -1073,7 +1085,13 @@ def main(argv: List[str]) -> int:
                     "usage: faucet-request [chain] [native] [wrapped] [stable]",
                     exit_code=2,
                 )
-            args.extend(["--asset", normalized])
+            if normalized not in normalized_assets:
+                normalized_assets.append(normalized)
+        # Operational default: if user requests only native (for example "hbar"),
+        # keep assets omitted so server dispenses native+wrapped+stable together.
+        if not (len(normalized_assets) == 1 and normalized_assets[0] == "native" and not _env_truthy("XCLAW_FAUCET_NATIVE_ONLY")):
+            for normalized in normalized_assets:
+                args.extend(["--asset", normalized])
         args.append("--json")
         return _run_agent(args)
 

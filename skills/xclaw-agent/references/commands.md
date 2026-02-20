@@ -95,6 +95,8 @@ Underlying runtime delegation (performed by wrapper):
 - `xclaw-agent management-link --ttl-seconds <seconds> --json`
 - `xclaw-agent faucet-request --chain <chain_key> --json`
 - `xclaw-agent faucet-request --chain <chain_key> [--asset <native|wrapped|stable>]... --json`
+  - skill-wrapper aliases: `hbar|eth|kite -> native`, `whbar|weth|wkite -> wrapped`, `usdc|usdt -> stable`
+  - skill-wrapper behavior: if only `native` is requested, it omits asset flags so faucet defaults to all assets.
 - `xclaw-agent faucet-networks --json`
 - `xclaw-agent chains --json`
 - `xclaw-agent chains --include-disabled --json`

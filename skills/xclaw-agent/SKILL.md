@@ -139,7 +139,7 @@ Common optional:
 - `default-chain-set <chain_key>`
 - `chains`
 - `owner-link`
-- `faucet-request [chain] [native] [wrapped] [stable]`
+- `faucet-request [chain] [native|wrapped|stable|hbar|whbar|usdc|usdt]`
 
 Additional capabilities:
 - approvals: `approval-check`, `cleanup-spot`, `clear-prompt`, `trade-resume`, `trade-decide`, `transfer-resume`, `transfer-decide`, `policy-decide`
@@ -163,6 +163,7 @@ Additional capabilities:
 - Wallet native wrapping is exposed as `wallet-wrap-native <amount>` and delegates to runtime `wallet wrap-native --chain <chain> --amount <amount> --json`.
 - Hosted installer auto-binds `hedera_testnet` wallet context to the same portable wallet key when available; skill commands should assume chain wallet bindings may be pre-created for both default chain and Hedera testnet.
 - Hedera faucet failures are deterministic (`faucet_*` codes) and include `requestId`; treat `faucet_rpc_unavailable` / `faucet_send_preflight_failed` as retryable operational signals, not generic runtime crashes.
+- Faucet default behavior is all-assets (`native+wrapped+stable`) when asset flags are omitted; skill wrapper also keeps this default when only native is requested (for example `faucet-request hbar`).
 
 ## References
 
