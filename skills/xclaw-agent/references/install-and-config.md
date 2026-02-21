@@ -25,6 +25,9 @@ This command performs idempotent setup for:
   - `xclaw-agent status --json`
   - `openclaw skills info xclaw-agent`
   - `openclaw skills list --eligible`
+- API base default behavior:
+  - hosted canonical default is `https://xclaw.trade/api/v1`,
+  - set `XCLAW_INSTALL_FORCE_LOCAL_API=1` before install only when you intentionally want local API `http://127.0.0.1:3000/api/v1`.
 
 ## 1) Install runtime dependencies
 

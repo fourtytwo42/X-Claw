@@ -25,8 +25,11 @@ if (-not $env:XCLAW_WORKDIR) { $env:XCLAW_WORKDIR = Join-Path $HOME "xclaw" }
 if (-not $env:XCLAW_REPO_REF) { $env:XCLAW_REPO_REF = "main" }
 if (-not $env:XCLAW_REPO_URL) { $env:XCLAW_REPO_URL = "https://github.com/fourtytwo42/ETHDenver2026" }
 $env:XCLAW_INSTALL_ORIGIN = "${origin}"
-if ($env:XCLAW_INSTALL_ORIGIN -match '^https?://(127\\.0\\.0\\.1|localhost)(:[0-9]+)?$') {
+if (-not $env:XCLAW_INSTALL_FORCE_LOCAL_API) { $env:XCLAW_INSTALL_FORCE_LOCAL_API = "0" }
+if ($env:XCLAW_INSTALL_FORCE_LOCAL_API -eq "1") {
   $env:XCLAW_INSTALL_CANONICAL_API_BASE = "http://127.0.0.1:3000/api/v1"
+} elseif ($env:XCLAW_INSTALL_ORIGIN -match '^https?://(127\\.0\\.0\\.1|localhost)(:[0-9]+)?$') {
+  $env:XCLAW_INSTALL_CANONICAL_API_BASE = "https://xclaw.trade/api/v1"
 } elseif ($env:XCLAW_INSTALL_ORIGIN -match '^https?://xclaw\\.trade$') {
   $env:XCLAW_INSTALL_CANONICAL_API_BASE = "https://xclaw.trade/api/v1"
 } else {

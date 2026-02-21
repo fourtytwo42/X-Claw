@@ -42,8 +42,11 @@ export XCLAW_WORKDIR="\${XCLAW_WORKDIR:-$HOME/xclaw}"
 export XCLAW_REPO_REF="\${XCLAW_REPO_REF:-main}"
 export XCLAW_REPO_URL="\${XCLAW_REPO_URL:-https://github.com/fourtytwo42/ETHDenver2026}"
 export XCLAW_INSTALL_ORIGIN="${origin}"
-if echo "$XCLAW_INSTALL_ORIGIN" | grep -Eq '^https?://(127\\.0\\.0\\.1|localhost)(:[0-9]+)?$'; then
+export XCLAW_INSTALL_FORCE_LOCAL_API="\${XCLAW_INSTALL_FORCE_LOCAL_API:-0}"
+if [ "$XCLAW_INSTALL_FORCE_LOCAL_API" = "1" ]; then
   export XCLAW_INSTALL_CANONICAL_API_BASE="http://127.0.0.1:3000/api/v1"
+elif echo "$XCLAW_INSTALL_ORIGIN" | grep -Eq '^https?://(127\\.0\\.0\\.1|localhost)(:[0-9]+)?$'; then
+  export XCLAW_INSTALL_CANONICAL_API_BASE="https://xclaw.trade/api/v1"
 elif echo "$XCLAW_INSTALL_ORIGIN" | grep -Eq '^https?://xclaw\\.trade$'; then
   export XCLAW_INSTALL_CANONICAL_API_BASE="https://xclaw.trade/api/v1"
 else
