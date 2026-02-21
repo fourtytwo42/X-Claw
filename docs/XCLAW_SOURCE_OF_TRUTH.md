@@ -1287,6 +1287,8 @@ Liquidity adapter execution contract:
 - Runtime routes liquidity commands by `(chain, dex, position_type)` using chain-config `liquidityProtocols`.
 - `liquidity add/remove` must run adapter preflight quote simulation before proposal submission.
 - `liquidity add/remove` auto-executes when resulting intent status is `approved` (no extra manual execute step in normal flow).
+- `liquidity add/remove` returning `status=approval_pending` must produce deterministic pending payload (`liquidityIntentId`, `status`, `queuedMessage`) and runtime must best-effort send Telegram Approve/Deny prompt when `lastChannel == telegram`.
+- Telegram liquidity callback format is locked: `xliq|a|<liquidityIntentId>|<chainKey>` approve and `xliq|r|<liquidityIntentId>|<chainKey>` deny.
 - Management liquidity approvals must auto-queue runtime continuation: `xclaw-agent liquidity execute --intent <id> --chain <chain_key> --json`.
 - `liquidity quote-add` uses EVM router quote + ERC20 metadata only for `amm_v2` / `amm_v3` families.
 - `liquidity quote-add` for `hedera_hts` is router-independent and must execute adapter preflight without requiring `coreContracts.router`/ERC20 metadata.

@@ -3420,6 +3420,93 @@ def _maybe_send_telegram_policy_approval_prompt(flow: dict[str, Any]) -> None:
     )
 
 
+def _maybe_send_telegram_liquidity_approval_prompt(flow: dict[str, Any]) -> None:
+    if _telegram_dispatch_suppressed_for_harness():
+        return
+    liquidity_intent_id = str(flow.get("liquidityIntentId") or "").strip()
+    chain = str(flow.get("chainKey") or "").strip()
+    if not liquidity_intent_id or not chain:
+        return
+    existing = _get_approval_prompt(liquidity_intent_id)
+    if existing and str(existing.get("channel") or "") == "telegram":
+        return
+
+    delivery = _read_openclaw_last_delivery()
+    if not delivery or str(delivery.get("lastChannel") or "").lower() != "telegram":
+        return
+
+    chat_id = str(delivery.get("lastTo") or "").strip()
+    if not chat_id:
+        return
+
+    thread_raw = delivery.get("lastThreadId")
+    thread_id: str | None = None
+    if isinstance(thread_raw, int):
+        thread_id = str(thread_raw)
+    elif isinstance(thread_raw, str) and thread_raw.strip():
+        thread_id = thread_raw.strip()
+
+    callback_approve = f"xliq|a|{liquidity_intent_id}|{chain}"
+    callback_deny = f"xliq|r|{liquidity_intent_id}|{chain}"
+    if len(callback_approve.encode("utf-8")) > 64 or len(callback_deny.encode("utf-8")) > 64:
+        return
+
+    action = str(flow.get("action") or "remove").strip().lower()
+    dex = str(flow.get("dex") or "unknown").strip().lower() or "unknown"
+    token_a = str(flow.get("tokenA") or "POSITION").strip() or "POSITION"
+    token_b = str(flow.get("tokenB") or "POSITION").strip() or "POSITION"
+    amount_a = str(flow.get("amountA") or "").strip()
+    amount_b = str(flow.get("amountB") or "").strip()
+    position_id = str(flow.get("positionId") or "").strip()
+    percent = str(flow.get("percent") or "").strip()
+
+    lines = [
+        "Approve liquidity action",
+        f"Action: {action}",
+        f"Pair: {token_a}/{token_b}",
+        f"Chain: `{chain}`",
+        f"DEX: `{dex}`",
+        f"Intent ID: `{liquidity_intent_id}`",
+        "Status: approval_pending",
+    ]
+    if position_id:
+        lines.append(f"Position ID: `{position_id}`")
+    if percent:
+        lines.append(f"Percent: {percent}%")
+    if amount_a or amount_b:
+        lines.append(f"Amounts: {amount_a or '?'} / {amount_b or '?'}")
+    lines.extend(["", "Tap Approve to execute (or Deny to reject)."])
+    text = "\n".join(lines)
+
+    buttons = json.dumps(
+        [[{"text": "Approve", "callback_data": callback_approve}, {"text": "Deny", "callback_data": callback_deny}]],
+        separators=(",", ":"),
+    )
+    openclaw = _require_openclaw_bin()
+    cmd = [openclaw, "message", "send", "--channel", "telegram", "--target", chat_id, "--message", text, "--buttons", buttons, "--json"]
+    if thread_id:
+        cmd.extend(["--thread-id", thread_id])
+    proc = _run_subprocess(cmd, timeout_sec=30, kind="openclaw_send")
+    if proc.returncode != 0:
+        stderr = (proc.stderr or "").strip()
+        stdout = (proc.stdout or "").strip()
+        raise WalletStoreError(stderr or stdout or "openclaw message send failed.")
+    message_id = _extract_openclaw_message_id(proc.stdout or "")
+    if not message_id:
+        message_id = "unknown"
+    _record_approval_prompt(
+        liquidity_intent_id,
+        {
+            "channel": "telegram",
+            "chainKey": chain,
+            "to": chat_id,
+            "threadId": thread_id,
+            "messageId": message_id,
+            "createdAt": utc_now(),
+        },
+    )
+
+
 def _maybe_send_telegram_decision_message(
     *,
     trade_id: str,
@@ -6962,11 +7049,43 @@ def cmd_liquidity_add(args: argparse.Namespace) -> int:
         liquidity_intent_id = str(body.get("liquidityIntentId") or "").strip()
         status = str(body.get("status") or "")
         if status == "approval_pending":
+            flow = {
+                "liquidityIntentId": liquidity_intent_id,
+                "chainKey": chain,
+                "dex": adapter_dex,
+                "action": "add",
+                "tokenA": token_a,
+                "tokenB": token_b,
+                "amountA": _decimal_text(amount_a_h),
+                "amountB": _decimal_text(amount_b_h),
+            }
+            try:
+                _maybe_send_telegram_liquidity_approval_prompt(flow)
+            except Exception:
+                pass
+            queued_message = (
+                "Approval required (liquidity)\n\n"
+                "Request: Add liquidity\n"
+                f"Pair: {token_a}/{token_b}\n"
+                f"Amounts: {_decimal_text(amount_a_h)} / {_decimal_text(amount_b_h)}\n"
+                f"Chain: `{chain}`\n"
+                f"DEX: `{adapter_dex}`\n"
+                f"Intent ID: `{liquidity_intent_id}`\n"
+                "Status: approval_pending\n\n"
+                "Tap Approve or Deny."
+            )
             return fail(
                 "approval_required",
                 "Liquidity add is waiting for management approval.",
-                "Approve from authorized management view; approved intents auto-execute.",
-                {"liquidityIntentId": liquidity_intent_id, "chain": chain, "dex": dex, "status": status},
+                "Send queuedMessage verbatim so Telegram buttons can attach, then wait for Approve/Deny.",
+                {
+                    "liquidityIntentId": liquidity_intent_id,
+                    "chain": chain,
+                    "dex": adapter_dex,
+                    "status": status,
+                    "queuedMessage": queued_message,
+                    "nextAction": "Post queuedMessage verbatim to the user in the active chat.",
+                },
                 exit_code=1,
             )
         if status == "approved":
@@ -7084,11 +7203,46 @@ def cmd_liquidity_remove(args: argparse.Namespace) -> int:
         liquidity_intent_id = str(body.get("liquidityIntentId") or "").strip()
         status = str(body.get("status") or "")
         if status == "approval_pending":
+            flow = {
+                "liquidityIntentId": liquidity_intent_id,
+                "chainKey": chain,
+                "dex": adapter_dex,
+                "action": "remove",
+                "tokenA": str(args.token_a or "POSITION").strip(),
+                "tokenB": str(args.token_b or "POSITION").strip(),
+                "positionId": position_id,
+                "percent": percent,
+                "amountA": str(percent),
+                "amountB": "0",
+            }
+            try:
+                _maybe_send_telegram_liquidity_approval_prompt(flow)
+            except Exception:
+                pass
+            queued_message = (
+                "Approval required (liquidity)\n\n"
+                "Request: Remove liquidity\n"
+                f"Pair: {str(args.token_a or 'POSITION').strip()}/{str(args.token_b or 'POSITION').strip()}\n"
+                f"Position ID: `{position_id}`\n"
+                f"Percent: {percent}%\n"
+                f"Chain: `{chain}`\n"
+                f"DEX: `{adapter_dex}`\n"
+                f"Intent ID: `{liquidity_intent_id}`\n"
+                "Status: approval_pending\n\n"
+                "Tap Approve or Deny."
+            )
             return fail(
                 "approval_required",
                 "Liquidity remove is waiting for management approval.",
-                "Approve from authorized management view; approved intents auto-execute.",
-                {"liquidityIntentId": liquidity_intent_id, "chain": chain, "dex": dex, "status": status},
+                "Send queuedMessage verbatim so Telegram buttons can attach, then wait for Approve/Deny.",
+                {
+                    "liquidityIntentId": liquidity_intent_id,
+                    "chain": chain,
+                    "dex": adapter_dex,
+                    "status": status,
+                    "queuedMessage": queued_message,
+                    "nextAction": "Post queuedMessage verbatim to the user in the active chat.",
+                },
                 exit_code=1,
             )
         if status == "approved":

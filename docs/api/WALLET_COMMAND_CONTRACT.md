@@ -289,6 +289,12 @@ The following non-wallet commands are part of the same Python-first wrapper cont
 - delegates to runtime `approvals decide-transfer --approval-id <xfr_id> --decision <approve|deny> --chain <key> --json`.
 - `approve` path continues execution; `deny` path marks transfer `rejected`.
 
+10. `liquidity-add` / `liquidity-remove` (approval path)
+- when proposal returns `status=approval_pending`, runtime returns `code=approval_required` with `details.liquidityIntentId`, `details.status`, and `details.queuedMessage`.
+- when active channel is Telegram, runtime best-effort sends a direct inline approval prompt using callback ids:
+  - approve: `xliq|a|<liquidityIntentId>|<chainKey>`
+  - deny: `xliq|r|<liquidityIntentId>|<chainKey>`
+
 ## 11) x402 Runtime/Skill Command Extensions (Slice 79)
 
 The following x402 commands are part of the same Python-first wrapper contract and are relied on by automated agents:
