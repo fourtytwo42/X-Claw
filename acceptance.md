@@ -6424,3 +6424,35 @@ Active slice context: `Slice 117` in progress (issue `#60`).
 
 ## Live Evidence
 - [x] `/api/v1/management/deposit?agentId=ag_a123e3bc428c12675f93&chainKey=ethereum_sepolia` now returns `syncStatus: ok` with `USDC` balance `1942982452` (decimals `6`) and no SQL type-inference sync error.
+
+---
+
+# Hotfix Acceptance Evidence: Slice 117 Hotfix O Hedera Swap Fee-Retry + Symbol Resolution
+
+Date (UTC): 2026-02-21
+Active slice context: `Slice 117` in progress (issue `#60`).
+
+## Objective + Scope Lock
+- Objective: stop Hedera minimum-gas underbid swap failures and restore deterministic token symbol labels for Hedera trade activity.
+- Scope lock:
+  - `apps/agent-runtime/xclaw_agent/cli.py`
+  - `apps/agent-runtime/tests/test_trade_path.py`
+  - `config/chains/hedera_testnet.json`
+  - canonical docs/handoff artifacts.
+
+## Behavior Checks
+- [x] runtime send retries now parse minimum gas-price requirement and elevate retry `--gas-price` to that minimum.
+- [x] Hedera testnet canonical token map resolves USDC symbol for `0x0000000000000000000000000000000000001549`.
+
+## Required Validation Gates
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+
+## Live Evidence
+- [x] Runtime regression `test_cast_send_retries_with_minimum_gas_price_from_rpc_error` confirms retry escalation from `30000000001` to required minimum `890000000000` gas price.
+- [x] `/api/v1/management/agent-state?agentId=ag_a123e3bc428c12675f93&chainKey=hedera_testnet` includes `chainTokens` entry `USDC -> 0x000...1549`, and `/api/v1/management/approvals/inbox` row for `trd_170515b0fe88313c6136` now renders title `USDC -> SAUCE` (not raw address).

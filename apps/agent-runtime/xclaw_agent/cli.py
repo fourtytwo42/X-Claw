@@ -9033,6 +9033,18 @@ def _retryable_send_error(stderr: str) -> bool:
     return any(fragment in normalized for fragment in retryable_fragments)
 
 
+def _parse_min_gas_price_wei_from_error(stderr: str) -> int | None:
+    normalized = str(stderr or "")
+    match = re.search(r"minimum gas price '([0-9]+)'", normalized, flags=re.IGNORECASE)
+    if not match:
+        return None
+    try:
+        value = int(match.group(1))
+    except Exception:
+        return None
+    return value if value > 0 else None
+
+
 def _is_base_builder_chain(chain: str) -> bool:
     return str(chain or "").strip() in BASE_BUILDER_CHAINS
 
@@ -9424,6 +9436,7 @@ def _cast_rpc_send_transaction(
         attempts = _tx_send_max_attempts()
         last_err = "cast send failed."
         nonce_override: int | None = None
+        forced_legacy_gas_price_wei: int | None = None
         for attempt in range(attempts):
             nonce: int | None
             if nonce_override is not None:
@@ -9454,6 +9467,8 @@ def _cast_rpc_send_transaction(
                 send_cmd.extend(["--max-fee-per-gas", str(max_fee), "--priority-gas-price", str(max_priority)])
             else:
                 gas_price = int(fee_plan.get("gasPrice", 0))
+                if forced_legacy_gas_price_wei is not None:
+                    gas_price = max(gas_price, forced_legacy_gas_price_wei)
                 if gas_price <= 0:
                     raise WalletStoreError("Legacy fee estimation returned invalid gas price.")
                 send_cmd.extend(["--gas-price", str(gas_price)])
@@ -9479,6 +9494,12 @@ def _cast_rpc_send_transaction(
             stderr = (proc.stderr or "").strip()
             stdout = (proc.stdout or "").strip()
             last_err = stderr or stdout or "cast send failed."
+            min_gas_price = _parse_min_gas_price_wei_from_error(last_err)
+            if min_gas_price is not None:
+                forced_legacy_gas_price_wei = max(forced_legacy_gas_price_wei or 0, min_gas_price)
+            if attempt < (attempts - 1) and min_gas_price is not None:
+                time.sleep(0.25)
+                continue
             next_nonce = _parse_next_nonce_from_error(last_err)
             if attempt < (attempts - 1) and next_nonce is not None:
                 nonce_override = next_nonce

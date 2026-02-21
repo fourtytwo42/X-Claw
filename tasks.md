@@ -3787,3 +3787,25 @@ Active slice context: `Slice 117` in progress.
 - [x] `npm run build`
 - [x] `pm2 restart all`
 - [x] Live evidence: `management/deposit` returns `syncStatus=ok` and non-zero `USDC` balance on `ethereum_sepolia` after filled swap.
+
+---
+
+# Hotfix Tasks: Slice 117 Hotfix O Hedera Swap Fee-Retry + Symbol Resolution
+
+Active slice context: `Slice 117` in progress.
+
+## 1) Implementation
+- [x] Add minimum-gas-price parsing for send failures and carry enforced gas-price floor across retries.
+- [x] Add runtime regression test for minimum gas-price retry behavior.
+- [x] Add Hedera testnet canonical `USDC` mapping for symbol resolution.
+- [x] Sync canonical docs + handoff artifacts.
+
+## 2) Validation
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+- [x] Evidence: Hedera trade labels resolve `USDC`; minimum-gas underbid retry path is covered by runtime regression test.

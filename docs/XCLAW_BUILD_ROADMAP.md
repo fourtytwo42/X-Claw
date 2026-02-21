@@ -3975,3 +3975,21 @@ Note:
   - [x] `pm2 restart all`
 - [x] Live evidence: `ethereum_sepolia` wallet balances include non-zero `USDC` after filled `WETH -> USDC` swap.
 - [ ] Issue #60 evidence post + commit hash(es).
+
+### 117.18 Hotfix O: Hedera Swap Fee-Retry + Symbol Resolution
+- [x] runtime send path detects minimum gas-price rejection (`minimum gas price '...'`) and retries with an enforced minimum gas price floor.
+- [x] regression test added for minimum-gas-price retry escalation.
+- [x] `config/chains/hedera_testnet.json` canonical tokens now include `USDC` (`0x0000000000000000000000000000000000001549`) for consistent symbol rendering.
+- [x] canonical docs/handoff artifacts synchronized.
+- [x] Required gates run sequentially:
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `pm2 restart all`
+- [x] Evidence:
+  - [x] runtime regression enforces minimum-gas retry escalation on Hedera-style rejection.
+  - [x] Hedera wallet activity/approvals now render `USDC` symbol instead of raw `0x0000...1549`.
+- [ ] Issue #60 evidence post + commit hash(es).

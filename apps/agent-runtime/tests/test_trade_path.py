@@ -156,6 +156,50 @@ class TradePathRuntimeTests(unittest.TestCase):
 
         self.assertIn("after 2 attempts", str(ctx.exception))
 
+    def test_cast_send_retries_with_minimum_gas_price_from_rpc_error(self) -> None:
+        tx_obj = {
+            "from": "0x1111111111111111111111111111111111111111",
+            "to": "0x2222222222222222222222222222222222222222",
+            "data": "0xdeadbeef",
+        }
+        send_cmds: list[list[str]] = []
+        send_attempt = {"count": 0}
+
+        def fake_run(cmd: list[str], text: bool = True, capture_output: bool = True, **kwargs):  # type: ignore[override]
+            if cmd[1] == "nonce":
+                return mock.Mock(returncode=0, stdout="0x2", stderr="")
+            if cmd[1] == "send":
+                send_cmds.append(cmd)
+                send_attempt["count"] += 1
+                if send_attempt["count"] == 1:
+                    return mock.Mock(
+                        returncode=1,
+                        stdout="",
+                        stderr="Gas price '30000000001' is below configured minimum gas price '890000000000'",
+                    )
+                return mock.Mock(returncode=0, stdout='{"transactionHash":"0x' + "ab" * 32 + '"}', stderr="")
+            raise AssertionError(f"Unexpected command {cmd}")
+
+        with mock.patch.dict(
+            cli.os.environ, {"XCLAW_TX_FEE_MODE": "legacy", "XCLAW_TX_SEND_MAX_ATTEMPTS": "2"}, clear=False
+        ), mock.patch.object(
+            cli, "_require_cast_bin", return_value="cast"
+        ), mock.patch.object(
+            cli.subprocess, "run", side_effect=fake_run
+        ), mock.patch.object(
+            cli, "_estimate_tx_fees", return_value={"mode": "legacy", "gasPrice": 30_000_000_001}
+        ):
+            tx_hash = cli._cast_rpc_send_transaction("https://rpc.example", tx_obj, "0x" + "33" * 32)
+
+        self.assertEqual(tx_hash, "0x" + "ab" * 32)
+        self.assertEqual(len(send_cmds), 2)
+        first_cmd = send_cmds[0]
+        second_cmd = send_cmds[1]
+        self.assertIn("--gas-price", first_cmd)
+        self.assertIn("30000000001", first_cmd)
+        self.assertIn("--gas-price", second_cmd)
+        self.assertIn("890000000000", second_cmd)
+
     def test_estimate_tx_fees_eip1559_happy_path(self) -> None:
         with mock.patch.dict(
             cli.os.environ,

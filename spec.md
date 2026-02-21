@@ -3450,3 +3450,8 @@ Ensure runtime never reports queued transfer approvals that are invisible in web
 1. Management deposit sync must avoid shared SQL bind positions that are inferred across heterogeneous table column contexts in dedupe subqueries.
 2. Deposit-event dedupe should use separate bind placeholders for mirrored `chain_key` comparisons to prevent runtime SQL type-inference failures.
 3. Wallet balance snapshots must continue updating canonical token balances after filled swaps even when transfer-log dedupe checks run.
+
+## Hotfix O extension (hedera swap fee-retry + symbol resolution)
+1. Runtime send retry path must parse RPC minimum-gas rejections and raise retry gas price to at least the required minimum on subsequent attempts.
+2. Hedera canonical token map must include stable tokens used by trade intents so symbol rendering remains deterministic in approvals/wallet activity.
+3. Hedera trade UX must not report a successful fill when execution status is failed due gas-floor underbid.

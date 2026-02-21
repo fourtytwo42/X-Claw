@@ -2424,3 +2424,17 @@ DoD:
 - [x] `wallet_balance_snapshots` update path continues for canonical tokens (`WETH`, `USDC`) on `ethereum_sepolia`.
 - [x] required gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
 - [x] live evidence recorded: `ethereum_sepolia` chain balances include non-zero `USDC` after filled swap.
+
+## Slice 117 Hotfix O: Hedera Swap Fee-Retry + Symbol Resolution
+Status: [ ]
+Issue: #60
+
+Goal:
+- Ensure approved Hedera swaps do not fail on minimum gas-price floor and that trade activity labels resolve canonical symbols (no raw `0x...` token aliases).
+
+DoD:
+- [x] runtime cast-send retry path parses minimum gas-price rejection and retries with at-least-minimum gas price.
+- [x] regression test covers minimum gas-price retry escalation behavior.
+- [x] Hedera testnet canonical token map includes `USDC` address used by swap intents for UI/runtime symbol resolution.
+- [x] required gates rerun sequentially (`test_trade_path`, `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
+- [x] evidence recorded for Hedera token labels (`USDC` symbol resolution restored in approvals/inbox for `trd_170515b0fe88313c6136`); minimum-gas retry path covered by runtime regression.

@@ -22,6 +22,7 @@
     "notes": "Wave-1 target for Hedera EVM and optional HTS SDK plugin support. SaucerSwap testnet router contract id 0.0.19264 (EVM 0x...4b40) and testnet SAUCE token id 0.0.1183558 from docs: https://docs.saucerswap.finance/v/developer/saucerswap-v1/contract-deployments . Runtime canonical WHBAR is pinned to 0x...3ad2 based on successful transfer/swap path evidence; legacy 0x...3ad1 is retained as an address alias for backward compatibility. HTS-native path remains plugin-dependent and fail-closed."
   },
   "canonicalTokens": {
+    "USDC": "0x0000000000000000000000000000000000001549",
     "WHBAR": "0x0000000000000000000000000000000000003ad2",
     "SAUCE": "0x0000000000000000000000000000000000120f46"
   },
