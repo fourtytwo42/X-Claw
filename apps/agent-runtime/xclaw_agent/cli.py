@@ -9776,45 +9776,8 @@ def cmd_trade_execute(args: argparse.Namespace) -> int:
         _post_trade_status(args.intent, "executing", "verifying", {"txHash": tx_hash, **provider_meta})
         transition_state = "verifying"
 
-        receipt_proc = _run_subprocess(
-            [cast_bin, "receipt", "--json", "--rpc-url", rpc_url, tx_hash],
-            timeout_sec=_cast_receipt_timeout_sec(),
-            kind="cast_receipt",
-        )
-        if receipt_proc.returncode != 0:
-            stderr = (receipt_proc.stderr or "").strip()
-            stdout = (receipt_proc.stdout or "").strip()
-            raise WalletStoreError(stderr or stdout or "cast receipt failed.")
-        receipt_payload = json.loads((receipt_proc.stdout or "{}").strip() or "{}")
-        receipt_status = str(receipt_payload.get("status", "0x0")).lower()
-        if receipt_status not in {"0x1", "1"}:
-            raise WalletStoreError(f"On-chain receipt indicates failure status '{receipt_status}'.")
-
-        _record_spend(state, args.chain, day_key, current_spend + amount_wei)
-        _record_trade_cap_ledger(
-            cap_state,
-            args.chain,
-            day_key,
-            current_spend_usd + projected_spend_usd,
-            current_filled_trades + 1,
-        )
-        try:
-            _post_trade_usage(args.chain, day_key, projected_spend_usd, 1)
-        except Exception:
-            pass
-        _post_trade_status(
-            args.intent,
-            "verifying",
-            "filled",
-            {
-                "txHash": tx_hash,
-                "amountOut": str(trade.get("amountOut") or "") or None,
-                "observationSource": "rpc_receipt",
-                "confirmationCount": 1,
-                "observedAt": utc_now(),
-                **provider_meta,
-            },
-        )
+        # Do not block foreground chat/tool execution on confirmation latency.
+        # Real-mode terminal status is tracked asynchronously via server-side watcher paths.
         report_result = {
             "ok": False,
             "skipped": True,
@@ -9823,18 +9786,18 @@ def cmd_trade_execute(args: argparse.Namespace) -> int:
         }
         builder_meta = _builder_output_from_hashes(args.chain, [approve_tx_hash, tx_hash])
         return ok(
-            "Trade executed in real mode.",
+            "Trade broadcast in real mode; confirmation is asynchronous.",
             tradeId=args.intent,
             chain=args.chain,
             mode=mode,
-            status="filled",
+            status="verifying",
             txHash=tx_hash,
             day=day_key,
-            dailySpendUsd=_decimal_text(current_spend_usd + projected_spend_usd),
+            dailySpendUsd=_decimal_text(current_spend_usd),
             maxDailyUsd=trade_caps.get("maxDailyUsd"),
-            dailyFilledTrades=int(current_filled_trades + 1),
+            dailyFilledTrades=int(current_filled_trades),
             maxDailyTradeCount=trade_caps.get("maxDailyTradeCount"),
-            dailySpendWei=str(current_spend + amount_wei),
+            dailySpendWei=str(current_spend),
             maxDailyNativeWei=str(max_daily_wei),
             providerRequested=provider_requested,
             providerUsed=provider_used,
@@ -9842,6 +9805,7 @@ def cmd_trade_execute(args: argparse.Namespace) -> int:
             fallbackReason=fallback_reason,
             uniswapRouteType=uniswap_route_type,
             report=report_result,
+            actionHint="Execution is in verifying state; watcher will publish terminal filled/failed status.",
             **builder_meta,
         )
     except WalletPolicyError as exc:

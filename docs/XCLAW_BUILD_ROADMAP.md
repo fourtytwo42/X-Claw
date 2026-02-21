@@ -3916,3 +3916,17 @@ Note:
   - [x] `pm2 restart all`
 - [x] Live evidence: Telegram buttons removed immediately after web decision and terminal transfer follow-up message delivered with tx context.
 - [ ] Issue #60 evidence post + commit hash(es).
+
+### 117.14 Hotfix K: Non-Blocking Swap Confirmation Path
+- [x] `cmd_trade_execute` no longer waits in-band on swap tx receipt after entering `verifying`.
+- [x] runtime execute result now returns immediate `status=verifying` with asynchronous convergence hint.
+- [x] canonical docs/handoff artifacts synchronized.
+- [ ] Required gates run sequentially:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `pm2 restart all`
+- [ ] Live evidence: approved swap path no longer blocks next foreground message while waiting for confirmation.
+- [ ] Issue #60 evidence post + commit hash(es).

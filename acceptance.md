@@ -6305,3 +6305,36 @@ Active slice context: `Slice 117` in progress (issue `#60`).
 - [x] browser verifier pass:
   - selector: `approval-row-transfer-xfr_ui_1771632662476_jzafc0md`
   - artifact dir: `/tmp/xclaw-ui-verify-xfr_ui_1771632662476_jzafc0md`
+
+---
+
+# Hotfix Acceptance Evidence: Slice 117 Hotfix K Non-Blocking Swap Confirmation Path
+
+Date (UTC): 2026-02-21
+Active slice context: `Slice 117` in progress (issue `#60`).
+
+## Objective + Scope Lock
+- Objective: prevent foreground agent/chat blocking caused by in-band swap receipt confirmation waits.
+- Scope lock:
+  - `apps/agent-runtime/xclaw_agent/cli.py`
+  - canonical docs/handoff artifacts.
+
+## Behavior Checks
+- [x] `trade execute` returns after broadcast with `status=verifying` (no in-band receipt wait).
+- [x] runtime message/action hint now indicates asynchronous terminal convergence path.
+
+## Required Validation Gates
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` (new test `test_trade_execute_real_returns_verifying_without_receipt_wait` passed).
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+- [ ] live repro check on approved swap path.
+
+## Notes / Blockers
+- Existing host launcher drift was discovered and corrected during validation:
+  - `~/.local/bin/xclaw-agent` wrapper previously targeted `/home/hendo420/xclaw/...` (stale tree),
+  - wrapper now targets `/home/hendo420/ETHDenver2026/apps/agent-runtime/bin/xclaw-agent`.
+- Live execute attempts in this session were dominated by upstream path behavior (approval state drift and one `ERC20_CALL_FAIL` revert), so deterministic non-blocking proof is locked by unit regression in this change plus launcher correction.

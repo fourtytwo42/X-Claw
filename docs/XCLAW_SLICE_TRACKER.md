@@ -2370,3 +2370,17 @@ DoD:
 - [x] terminal transfer-result dispatch allows Telegram last-channel delivery.
 - [x] required gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
 - [x] live verification evidence recorded for immediate button convergence + terminal follow-up notification.
+
+## Slice 117 Hotfix K: Non-Blocking Swap Confirmation Path
+Status: [ ]
+Issue: #60
+
+Goal:
+- Ensure approved real-mode swap execution does not block foreground agent chat while waiting for on-chain confirmation.
+
+DoD:
+- [x] runtime `trade execute` returns immediately after broadcast with `status=verifying`.
+- [x] in-band receipt wait is removed from foreground trade execute path.
+- [x] action hint and result payload explicitly communicate asynchronous terminal convergence.
+- [x] required gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
+- [ ] live repro evidence recorded: post-approve swap no longer blocks subsequent chat turn while waiting on confirmation.

@@ -3705,3 +3705,24 @@ Active slice context: `Slice 117` in progress.
 - [x] `npm run build`
 - [x] `pm2 restart all`
 - [x] Live transfer approval + terminal follow-up behavior check on `xclaw.trade`.
+
+---
+
+# Hotfix Tasks: Slice 117 Hotfix K Non-Blocking Swap Confirmation Path
+
+Active slice context: `Slice 117` in progress.
+
+## 1) Implementation
+- [x] runtime `cmd_trade_execute` no longer waits in-band on swap receipt confirmation.
+- [x] runtime returns immediate success payload in `verifying` state after broadcast.
+- [x] source-of-truth and handoff artifacts synchronized.
+
+## 2) Validation
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` (includes new non-blocking execute regression).
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+- [ ] live repro: message agent immediately after approved swap no longer blocked by receipt wait.

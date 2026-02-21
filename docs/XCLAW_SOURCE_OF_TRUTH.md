@@ -4687,3 +4687,6 @@ Supersession note (Slice 117 Hotfix D):
   - if heartbeat payload omits readiness fields, existing readiness map remains unchanged.
 - Transfer terminal convergence notifications:
   - when transfer mirror status transitions into terminal (`filled|failed|rejected`), server must dispatch a one-time prod instruction to the active channel context (Telegram-allowed) so owner receives transaction outcome follow-up.
+- Real-mode trade execution responsiveness:
+  - runtime `trade execute` must not block foreground command/chat handling on on-chain swap receipt confirmation,
+  - after broadcast, runtime transitions trade to `verifying` and returns immediately; terminal `filled|failed` is converged asynchronously by watcher/server paths.

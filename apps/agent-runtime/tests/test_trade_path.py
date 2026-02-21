@@ -2725,6 +2725,55 @@ class TradePathRuntimeTests(unittest.TestCase):
         self.assertIn("builderCodeSource", payload)
         self.assertIn("builderCodeStandard", payload)
 
+    def test_trade_execute_real_returns_verifying_without_receipt_wait(self) -> None:
+        args = argparse.Namespace(intent="trd_real_async", chain="base_sepolia", json=True)
+        trade_payload = {
+            "tradeId": "trd_real_async",
+            "chainKey": "base_sepolia",
+            "status": "approved",
+            "mode": "real",
+            "retry": {"eligible": False},
+            "tokenIn": "0x1111111111111111111111111111111111111111",
+            "tokenOut": "0x2222222222222222222222222222222222222222",
+            "amountIn": "1",
+            "slippageBps": 50,
+        }
+        with mock.patch.object(cli, "_read_trade_details", return_value=trade_payload), mock.patch.object(
+            cli, "_trade_provider_settings", return_value=("uniswap_api", {})
+        ), mock.patch.object(
+            cli, "_replay_trade_usage_outbox", return_value=(0, 0)
+        ), mock.patch.object(
+            cli, "_enforce_spend_preconditions", return_value=({}, "2026-02-14", 0, 1000000000)
+        ), mock.patch.object(
+            cli, "_enforce_trade_caps", return_value=({}, "2026-02-14", cli.Decimal("0"), 0, {"maxDailyUsd": "1000", "maxDailyTradeCount": 10})
+        ), mock.patch.object(
+            cli, "_execution_wallet", return_value=("0x1111111111111111111111111111111111111111", "11" * 32)
+        ), mock.patch.object(
+            cli, "_resolve_token_address", side_effect=["0x" + "11" * 20, "0x" + "22" * 20]
+        ), mock.patch.object(
+            cli, "_fetch_erc20_metadata", return_value={"decimals": 18, "symbol": "USDC"}
+        ), mock.patch.object(
+            cli, "_execute_uniswap_swap_via_proxy", return_value={"txHash": "0x" + "ab" * 32, "routeType": "EXACT_INPUT"}
+        ), mock.patch.object(
+            cli, "_post_trade_status"
+        ), mock.patch.object(
+            cli, "_run_subprocess"
+        ) as run_subprocess_mock, mock.patch.object(
+            cli, "_record_spend"
+        ) as record_spend_mock, mock.patch.object(
+            cli, "_record_trade_cap_ledger"
+        ) as record_cap_mock, mock.patch.object(
+            cli, "_post_trade_usage"
+        ) as post_usage_mock:
+            payload = self._run_and_parse_stdout(lambda: cli.cmd_trade_execute(args))
+
+        self.assertTrue(payload.get("ok"))
+        self.assertEqual(payload.get("status"), "verifying")
+        run_subprocess_mock.assert_not_called()
+        record_spend_mock.assert_not_called()
+        record_cap_mock.assert_not_called()
+        post_usage_mock.assert_not_called()
+
     def test_trade_execute_blocks_on_daily_trade_cap(self) -> None:
         args = argparse.Namespace(intent="trd_real_2", chain="base_sepolia", json=True)
         trade_payload = {
