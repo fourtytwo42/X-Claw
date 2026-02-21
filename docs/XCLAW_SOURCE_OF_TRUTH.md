@@ -2786,7 +2786,7 @@ Supersession note (Slice 117 Hotfix D):
 8. Canonical endpoints:
    - `POST /api/v1/management/approval-channels/update` (owner-auth):
      - enables/disables Telegram approval prompts (no secret issuance).
-   - Telegram callback trade/policy decisions dispatch runtime commands (`approvals decide-spot|decide-policy`) and runtime performs canonical server transitions.
+   - Telegram callback trade/policy/liquidity decisions dispatch runtime commands (`approvals decide-spot|decide-policy|decide-liquidity`) and runtime performs canonical server transitions.
      - Telegram callback idempotency must not conflict on retries:
        - use `Idempotency-Key: tg-cb-<callbackId>` (Telegram callback_query id),
        - set `at` deterministically from the callback/query timestamp so replays are byte-stable.
@@ -2798,6 +2798,7 @@ Supersession note (Slice 117 Hotfix D):
    - after deny in Telegram, the system posts a deterministic confirmation message directly in the same chat (tradeId/policyId + chain + decision).
    - Reliability requirement:
      - policy (`xpol`) and transfer (`xfer`) callbacks must emit immediate visible confirmation (`Approved/Denied ...`), including converged terminal `409`,
+     - liquidity (`xliq`) callbacks must emit immediate visible confirmation (`Approved/Denied ...`) and keep callback handling LLM-free via runtime `approvals decide-liquidity`,
      - trade approve (`xappr approve`) must not emit an intermediate `Approved trade ...` message; approval is confirmed by the final trade-result message after auto-resume.
    - Single-trigger spot flow requirement (Telegram-focused): for `trade spot` approvals (`xappr approve`), the system must auto-resume execution without requiring a second user message.
    - Final-result requirement: after auto-resume execution, the system must emit a deterministic final result message in the same chat (status + tradeId + chain + tx hash when available).
@@ -3146,7 +3147,7 @@ Supersession note (Slice 117 Hotfix D):
 3. Feature-flagged rollout:
 - flag: `XCLAW_RUNTIME_CANONICAL_APPROVAL_DECISIONS`.
 - when enabled, management decision routes dispatch runtime `approvals decide-*` commands and treat runtime output as authoritative.
-- Telegram callback routing (`xappr`/`xpol`/`xfer`) must dispatch runtime `approvals decide-*` commands and not directly mutate trade/policy status via bespoke callback fetch logic.
+- Telegram callback routing (`xappr`/`xpol`/`xfer`/`xliq`) must dispatch runtime `approvals decide-*` commands and not directly mutate trade/policy/liquidity status via bespoke callback fetch logic.
 - legacy web-canonical decision mutation path remains fallback when flag is disabled.
 
 4. Prompt cleanup contract:
