@@ -1,5 +1,26 @@
 # Slice 95 Closure Spec: Hedera EVM Pair Discovery + HTS JDK Auto-Setup (2026-02-19)
 
+# Hotfix Spec: Liquidity Approval Runtime Env Hydration Parity (2026-02-21)
+
+## Goal
+1. Ensure management approval runtime execution inherits critical liquidity env flags even when PM2/server env is missing them.
+2. Keep web/Telegram approval execution behavior aligned with direct CLI behavior for Sepolia Uniswap liquidity flows.
+
+## Non-goals
+1. No API/schema/migration changes.
+2. No liquidity execution algorithm changes.
+
+## Locked scope
+1. `apps/network-web/src/app/api/v1/management/approvals/decision/route.ts`
+2. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+3. `spec.md`
+4. `tasks.md`
+5. `acceptance.md`
+
+## Acceptance checks
+- `npm run build`
+- `pm2 restart all`
+
 # Hotfix Spec: Sepolia Remove Gas-Estimate False-Negative Recovery (2026-02-21)
 
 ## Goal

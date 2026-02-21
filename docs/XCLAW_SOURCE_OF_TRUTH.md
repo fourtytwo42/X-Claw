@@ -1339,6 +1339,7 @@ Configured under `skills.entries.xclaw-agent.env` in `~/.openclaw/openclaw.json`
 
 Optional non-interactive wallet automation env:
 - `XCLAW_WALLET_PASSPHRASE` (enables non-interactive `wallet-sign-challenge`)
+- Management approval runtime dispatch (`/api/v1/management/approvals/decision`) must hydrate missing env from skill config before spawning `xclaw-agent` for liquidity execution, including `XCLAW_WALLET_PASSPHRASE`, `XCLAW_LIQUIDITY_ALLOW_SEPOLIA_TRANSFERFROM_BYPASS`, and `XCLAW_UNISWAP_API_KEY`.
 - `XCLAW_AGENT_PYTHON_BIN` (optional absolute interpreter path used by `xclaw-agent`; installer sets this automatically when a fallback runtime venv is needed)
 - Base builder attribution env for Base-chain trade/send execution:
   - `XCLAW_BUILDER_CODE_BASE`

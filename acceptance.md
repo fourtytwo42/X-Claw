@@ -1,5 +1,27 @@
 # Hotfix Acceptance Evidence: Preserve Trade Approval History After Execution
 
+# Hotfix Acceptance Evidence: Liquidity Approval Runtime Env Hydration Parity
+
+Date (UTC): 2026-02-21
+Active slice context: `Slice 118` in progress (`Follow-Up E` hardening).
+
+## Objective + Scope Lock
+- Objective:
+  - ensure web/Telegram liquidity approval execution gets required env parity with CLI even when server env misses specific keys.
+- Scope lock:
+  - `apps/network-web/src/app/api/v1/management/approvals/decision/route.ts`
+  - `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - `spec.md`, `tasks.md`, `acceptance.md`
+
+## Behavior Checks
+- [x] approval runtime spawn env now backfills missing `XCLAW_LIQUIDITY_ALLOW_SEPOLIA_TRANSFERFROM_BYPASS` from OpenClaw skill env.
+- [x] approval runtime spawn env now backfills missing `XCLAW_UNISWAP_API_KEY` from OpenClaw skill env.
+- [x] existing `XCLAW_WALLET_PASSPHRASE` fallback behavior remains intact.
+
+## Required Validation Gates
+- [x] `npm run build`
+- [x] `pm2 restart all`
+
 # Hotfix Acceptance Evidence: Sepolia Remove Gas-Estimate False-Negative Recovery
 
 Date (UTC): 2026-02-21

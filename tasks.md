@@ -1,5 +1,23 @@
 # Slice 95 Tasks: Hedera EVM Pair Discovery + HTS JDK Auto-Setup (2026-02-19)
 
+# Hotfix Tasks: Liquidity Approval Runtime Env Hydration Parity (2026-02-21)
+
+Active slice context: `Slice 118` in progress (`Follow-Up E` hardening).
+
+## 1) Scope lock
+- [x] Restrict scope to management approval runtime env hydration for liquidity execution parity.
+- [x] Avoid API/schema/migration and liquidity math/provider-flow changes.
+
+## 2) Implementation
+- [x] In approvals decision runtime spawn env, hydrate missing `XCLAW_LIQUIDITY_ALLOW_SEPOLIA_TRANSFERFROM_BYPASS` from OpenClaw skill env.
+- [x] In approvals decision runtime spawn env, hydrate missing `XCLAW_UNISWAP_API_KEY` from OpenClaw skill env.
+- [x] Keep existing passphrase hydration behavior intact.
+- [x] Sync source-of-truth + handoff docs.
+
+## 3) Validation
+- [x] `npm run build`
+- [x] `pm2 restart all`
+
 # Hotfix Tasks: Sepolia Remove Gas-Estimate False-Negative Recovery (2026-02-21)
 
 Active slice context: `Slice 118` in progress (`Follow-Up E`).
