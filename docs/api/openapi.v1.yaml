@@ -1453,7 +1453,7 @@ paths:
         '404':
           $ref: '#/components/responses/ErrorResponse'
         '409':
-          description: Deterministic preflight rejection when runtime signing is unavailable (`runtime_signing_unavailable`), or decision conflict.
+          description: Deterministic preflight rejection when runtime signing is explicitly unavailable (`runtime_signing_unavailable`) or decision conflict. Readiness-missing snapshots are degraded-preflight warnings and do not hard-block decision queueing.
           content:
             application/json:
               schema:

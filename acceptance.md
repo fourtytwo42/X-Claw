@@ -6223,3 +6223,39 @@ Active slice context: `Slice 117` in progress (issue `#60`).
 ## Browser Verifier Evidence
 - [x] selector: `approval-row-transfer-xfr_ui_1771631356653_njxfnktm`
 - [x] artifact dir: `/tmp/xclaw-ui-verify-xfr_ui_1771631356653_njxfnktm`
+
+---
+
+# Hotfix Acceptance Evidence: Slice 117 Hotfix I Degraded Readiness Approve Fallback
+
+Date (UTC): 2026-02-20
+Active slice context: `Slice 117` in progress (issue `#60`).
+
+## Objective + Scope Lock
+- Objective: remove false hard-block (`runtime_signing_unavailable`) when readiness snapshot is missing but runtime signing is healthy.
+- Scope lock:
+  - `apps/network-web/src/app/api/v1/management/transfer-approvals/decision/route.ts`
+  - `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - `docs/api/openapi.v1.yaml`
+  - handoff artifacts.
+
+## Behavior Checks
+- [x] approve preflight still blocks deterministic explicit signer failures (`wallet_passphrase_missing|wallet_passphrase_invalid|wallet_store_unavailable|wallet_missing`).
+- [x] readiness-missing snapshot (`runtime_readiness_missing`) no longer hard-blocks decision queueing.
+- [x] degraded preflight queue path is audit-logged with `runtime_signing_preflight_degraded`.
+
+## Required Validation Gates
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+- [x] `npm run verify:ui:agent-approvals`
+
+## Live Approve Regression Evidence (xclaw.trade)
+- [x] before patch/deploy: `POST /api/v1/management/transfer-approvals/decision` returned `runtime_signing_unavailable` with `walletSigningReasonCode=runtime_readiness_missing`.
+- [x] after patch/deploy: same path accepted approve and queued inbox decision:
+  - response: `ok=true`, `status=approved`, `appliedVia=agent_runtime_inbox_queue`, `decisionInbox.status=pending`.
+- [x] transfer lifecycle convergence observed:
+  - `xfr_972249e7d6e889bbe488` reached terminal `filled` after approve.

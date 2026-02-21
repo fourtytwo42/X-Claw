@@ -3882,3 +3882,22 @@ Note:
   - [x] `pm2 restart all`
   - [x] `npm run verify:ui:agent-approvals`
 - [ ] Issue #60 evidence post + commit hash(es).
+
+### 117.12 Hotfix I: Degraded Readiness Approve Fallback
+- [x] management transfer approve preflight hard-block narrowed to explicit signer-unavailable reason codes:
+  - [x] `wallet_passphrase_missing`
+  - [x] `wallet_passphrase_invalid`
+  - [x] `wallet_store_unavailable`
+  - [x] `wallet_missing`
+- [x] readiness-missing snapshot (`runtime_readiness_missing`) now follows degraded-preflight path (queue decision + audit trace), not hard-block.
+- [x] audit trace added for degraded preflight queue path (`runtime_signing_preflight_degraded`).
+- [x] canonical docs/contracts synchronized (`XCLAW_SOURCE_OF_TRUTH`, OpenAPI, handoff artifacts).
+- [x] Required gates run sequentially:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `pm2 restart all`
+  - [x] `npm run verify:ui:agent-approvals`
+- [ ] Issue #60 evidence post + commit hash(es).

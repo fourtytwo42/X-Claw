@@ -4644,7 +4644,8 @@ Supersession note (Slice 117 Hotfix D):
   - `walletSigningReasonCode`,
   - `walletSigningCheckedAt`.
 - Management transfer approve preflight is mandatory:
-  - `POST /api/v1/management/transfer-approvals/decision` with `decision=approve` must reject deterministically (`409`, `runtime_signing_unavailable`) when runtime readiness is unavailable for the target chain,
+  - `POST /api/v1/management/transfer-approvals/decision` with `decision=approve` must reject deterministically (`409`, `runtime_signing_unavailable`) when runtime readiness returns explicit signer-unavailable states (`wallet_passphrase_missing|wallet_passphrase_invalid|wallet_store_unavailable|wallet_missing`) for the target chain,
+  - readiness-missing snapshots (`runtime_readiness_missing`) are treated as degraded preflight (audit warning) and must not hard-block queueing,
   - rejected preflight must not enqueue decision-inbox rows.
 - Deny path behavior remains unchanged:
   - immediate mirror rejection (`200`) and async prompt cleanup.
@@ -4680,5 +4681,6 @@ Supersession note (Slice 117 Hotfix D):
   - normalized underscore/hyphen variant match,
   - case-insensitive equivalent chain key match.
 - Defensive fallback: when chain-specific readiness record is missing, preflight may use most-recent `walletSigningReady=true` readiness snapshot from runtime readiness map to prevent false-negative blocks in single-chain runtime contexts.
+- Degraded preflight fallback: if readiness remains missing (`runtime_readiness_missing`) after lookup/fallback, approve must queue decision with audit warning (`runtime_signing_preflight_degraded`) instead of hard-blocking; hard-block remains only for explicit signer-unavailable readiness reasons.
 - Heartbeat updates must not clobber runtime readiness state with null fields:
   - if heartbeat payload omits readiness fields, existing readiness map remains unchanged.

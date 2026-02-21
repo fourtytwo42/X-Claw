@@ -3413,3 +3413,16 @@ Ensure runtime never reports queued transfer approvals that are invisible in web
 1. Heartbeat route must preserve prior readiness when readiness fields are omitted.
 2. Transfer approve preflight readiness lookup must support normalized chain key matches (`-` vs `_`, case-insensitive).
 3. If chain-specific readiness record is absent, preflight may use latest positive readiness snapshot as defensive fallback to avoid false-negative operator blocks in single-chain runtime operation.
+
+## Hotfix I extension (degraded-readiness approve fallback)
+1. Transfer approve preflight must hard-block only explicit signer-unavailable readiness reasons:
+   - `wallet_passphrase_missing`,
+   - `wallet_passphrase_invalid`,
+   - `wallet_store_unavailable`,
+   - `wallet_missing`.
+2. Readiness-lookup-missing state (`runtime_readiness_missing`) is treated as degraded preflight:
+   - decision is queued (no hard block),
+   - audit log records `runtime_signing_preflight_degraded` for traceability.
+3. Web/runtime separation remains unchanged:
+   - web queues decision inbox rows only,
+   - runtime executes/signs locally.

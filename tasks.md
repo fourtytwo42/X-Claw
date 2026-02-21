@@ -3661,3 +3661,25 @@ Active slice context: `Slice 117` in progress.
 - [x] `npm run build`
 - [x] `pm2 restart all`
 - [x] `npm run verify:ui:agent-approvals`
+
+---
+
+# Hotfix Tasks: Slice 117 Hotfix I Degraded Readiness Approve Fallback
+
+Active slice context: `Slice 117` in progress.
+
+## 1) Implementation
+- [x] Transfer approve preflight hard-block narrowed to explicit signer-unavailable readiness reason codes.
+- [x] Readiness-missing preflight (`runtime_readiness_missing`) no longer hard-blocks approval queueing.
+- [x] Added audit trace for degraded preflight queue path (`runtime_signing_preflight_degraded`).
+- [x] Canonical docs synchronized (`XCLAW_SOURCE_OF_TRUTH`, OpenAPI, handoff artifacts).
+
+## 2) Validation
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+- [x] `npm run verify:ui:agent-approvals`
+- [x] Live prod-path approve regression check via `POST /api/v1/management/transfer-approvals/decision` no longer returns `runtime_signing_unavailable` for readiness-missing snapshots.

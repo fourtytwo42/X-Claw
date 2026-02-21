@@ -28,6 +28,13 @@ type RuntimeSigningReadiness = {
   walletSigningCheckedAt: string | null;
 };
 
+const HARD_BLOCK_RUNTIME_SIGNING_REASONS = new Set<string>([
+  'wallet_passphrase_missing',
+  'wallet_passphrase_invalid',
+  'wallet_store_unavailable',
+  'wallet_missing'
+]);
+
 function normalizeChainKey(value: string): string {
   return String(value || '').trim().toLowerCase().replace(/-/g, '_');
 }
@@ -189,7 +196,9 @@ export async function POST(req: NextRequest) {
         [body.agentId]
       );
       const readiness = resolveRuntimeSigningReadiness(agentMeta.rows[0]?.openclaw_metadata ?? null, chainKey);
-      if (!readiness.walletSigningReady) {
+      const readinessReasonCode = String(readiness.walletSigningReasonCode ?? '').trim() || 'runtime_readiness_missing';
+      const shouldHardBlock = !readiness.walletSigningReady && HARD_BLOCK_RUNTIME_SIGNING_REASONS.has(readinessReasonCode);
+      if (shouldHardBlock) {
         await dbQuery(
           `
           insert into management_audit_log (
@@ -219,11 +228,33 @@ export async function POST(req: NextRequest) {
             details: {
               approvalId: body.approvalId,
               chainKey,
-              walletSigningReasonCode: readiness.walletSigningReasonCode,
+              walletSigningReasonCode: readinessReasonCode,
               walletSigningCheckedAt: readiness.walletSigningCheckedAt
             }
           },
           requestId
+        );
+      }
+      if (!readiness.walletSigningReady && !shouldHardBlock) {
+        await dbQuery(
+          `
+          insert into management_audit_log (
+            audit_id, agent_id, management_session_id, action_type, action_status,
+            public_redacted_payload, private_payload, user_agent, created_at
+          ) values ($1, $2, $3, 'transfer_approval.decision', 'accepted', $4::jsonb, $5::jsonb, $6, now())
+          `,
+          [
+            makeId('aud'),
+            body.agentId,
+            auth.session.sessionId,
+            JSON.stringify({ approvalId: body.approvalId, decision: body.decision, chainKey }),
+            JSON.stringify({
+              approvalSource,
+              reasonCode: 'runtime_signing_preflight_degraded',
+              readiness
+            }),
+            req.headers.get('user-agent')
+          ]
         );
       }
     }

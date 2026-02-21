@@ -2341,3 +2341,17 @@ DoD:
 - [ ] required gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
 - [x] browser verification gate rerun (`npm run verify:ui:agent-approvals`) after build + PM2 restart.
 - [ ] issue #60 updated with verification evidence + commit hash(es).
+
+## Slice 117 Hotfix I: Degraded Readiness Approve Fallback
+Status: [ ]
+Issue: #60
+
+Goal:
+- Eliminate false `runtime_signing_unavailable` hard-blocks when readiness snapshot lookup is missing but runtime signing remains healthy.
+
+DoD:
+- [x] management approve preflight hard-block is limited to explicit signer-unavailable reason codes (`wallet_passphrase_missing|wallet_passphrase_invalid|wallet_store_unavailable|wallet_missing`).
+- [x] readiness-missing snapshots (`runtime_readiness_missing`) no longer hard-block decision queueing.
+- [x] degraded readiness preflight queue path emits audit trace (`runtime_signing_preflight_degraded`) for observability.
+- [x] required gates pass: `db:parity`, seed gates, `build`, `pm2 restart all`, UI verifier.
+- [x] live production-path approval no longer returns false `runtime_signing_unavailable` for readiness-missing snapshots.
