@@ -3456,3 +3456,8 @@ Ensure runtime never reports queued transfer approvals that are invisible in web
 2. Hedera testnet legacy-fee sends must apply deterministic `2x` gas-price multiplier prior to min-gas-floor enforcement.
 3. Hedera canonical token map must include stable tokens used by trade intents so symbol rendering remains deterministic in approvals/wallet activity.
 4. Hedera trade UX must not report a successful fill when execution status is failed due gas-floor underbid.
+
+## Hotfix P extension (telegram callback terminal truthfulness fail-closed)
+1. Telegram callback trade-result synthesis must classify success only when `executionStatus|status == filled` and `txHash` is non-empty.
+2. Runtime `approvals decide-spot` must not output terminal filled state when tx hash is absent; emit deterministic `terminal_status_unverified` and failed status.
+3. Terminal follow-up Telegram helper must downgrade `filled` + missing tx hash to failed/unverified copy.

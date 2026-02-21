@@ -447,7 +447,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         )
         text6, n5 = re.subn(
             r'(const finalMsg = `\$\{head\}\$\{pairLine\}\\nTrade: \$\{subjectId\}\\nChain: \$\{chainKey\}\$\{txLine\}\$\{reasonLine\}`;)',
-            r'\1 try { const statusWord = String(body?.status ?? (body?.ok ? "filled" : "failed")).trim(); const statusNormalized = statusWord.toLowerCase(); const isSuccess = statusNormalized === "filled"; const decisionWord = isSuccess ? "FILLED" : "FAILED"; const instruction = isSuccess ? "Reply to the user confirming the trade succeeded with tx details." : "Reply to the user confirming the trade failed and provide next steps."; const syntheticText = `[X-CLAW TRADE RESULT]\\nDecision: ${decisionWord}\\nTrade: ${subjectId}\\nChain: ${chainKey}\\nTxHash: ${txHash || "n/a"}${pairLine ? `\\nPair: ${amountHuman} ${tokenInSym} -> ${tokenOutSym}` : ""}\\nSource: telegram_callback_trade\\nInstruction: ${instruction}`; const storeAllowFrom2 = await readChannelAllowFromStore("telegram").catch(() => []); const syntheticAllowFrom = Array.from(new Set([...(Array.isArray(storeAllowFrom2) ? storeAllowFrom2.map((v) => String(v)) : []), String(callback?.from?.id ?? ""), String(chatId ?? "")])).filter((v) => !!v); const getFile2 = typeof ctx.getFile === "function" ? ctx.getFile.bind(ctx) : async () => ({}); const syntheticMessage2 = { ...callbackMessage, from: callback.from, text: syntheticText, caption: void 0, caption_entities: void 0, entities: void 0, date: Math.floor(Date.now() / 1000) }; await processMessage({ message: syntheticMessage2, me: ctx.me, getFile: getFile2 }, [], syntheticAllowFrom, { messageIdOverride: `xclaw-trade-result-${callback.id}` }); } catch {}',
+            r'\1 try { const statusWord = String(body?.executionStatus ?? body?.status ?? "").trim(); const statusNormalized = statusWord.toLowerCase(); const isSuccess = statusNormalized === "filled" && !!txHash; const decisionWord = isSuccess ? "FILLED" : "FAILED"; const instruction = isSuccess ? "Reply to the user confirming the trade succeeded with tx details." : "Reply to the user confirming the trade failed or unverified and provide next steps."; const syntheticText = `[X-CLAW TRADE RESULT]\\nDecision: ${decisionWord}\\nTrade: ${subjectId}\\nChain: ${chainKey}\\nTxHash: ${txHash || "n/a"}${pairLine ? `\\nPair: ${amountHuman} ${tokenInSym} -> ${tokenOutSym}` : ""}\\nSource: telegram_callback_trade\\nInstruction: ${instruction}`; const storeAllowFrom2 = await readChannelAllowFromStore("telegram").catch(() => []); const syntheticAllowFrom = Array.from(new Set([...(Array.isArray(storeAllowFrom2) ? storeAllowFrom2.map((v) => String(v)) : []), String(callback?.from?.id ?? ""), String(chatId ?? "")])).filter((v) => !!v); const getFile2 = typeof ctx.getFile === "function" ? ctx.getFile.bind(ctx) : async () => ({}); const syntheticMessage2 = { ...callbackMessage, from: callback.from, text: syntheticText, caption: void 0, caption_entities: void 0, entities: void 0, date: Math.floor(Date.now() / 1000) }; await processMessage({ message: syntheticMessage2, me: ctx.me, getFile: getFile2 }, [], syntheticAllowFrom, { messageIdOverride: `xclaw-trade-result-${callback.id}` }); } catch {}',
             text5,
         )
         text7, n6 = re.subn(
@@ -510,10 +510,10 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
             '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst lines = out.split(/\\r?\\n/).map((v) => String(v || "").trim()).filter((v) => v.length > 0);\n'
             '\t\t\t\t\t\t\t\t\t\t\t\t\t\tlet body = null;\n'
             '\t\t\t\t\t\t\t\t\t\t\t\t\t\ttry { body = lines.length > 0 ? JSON.parse(lines[lines.length - 1]) : null; } catch {}\n'
-            '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst statusWord = String(body?.status ?? (body?.ok ? "filled" : "failed")).trim();\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst statusWord = String(body?.executionStatus ?? body?.status ?? "").trim();\n'
             '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst statusNormalized = statusWord.toLowerCase();\n'
-            '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst isSuccess = statusNormalized === "filled";\n'
             '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst txHash = String(body?.txHash ?? "").trim();\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst isSuccess = statusNormalized === "filled" && !!txHash;\n'
             '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst flow = body?.flowSummary ?? {};\n'
             '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst promptText = String(callbackMessage.text ?? "");\n'
             '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst pairMatch = promptText.match(/\\n\\s*([0-9]+(?:\\.[0-9]+)?)\\s+([A-Z0-9_]+)\\s*->\\s*([A-Z0-9_]+)/i);\n'
@@ -529,7 +529,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
             '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst decisionWord = isSuccess ? "FILLED" : "FAILED";\n'
             '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst instruction = isSuccess\n'
             '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t? "Reply to the user confirming the trade succeeded with tx details."\n'
-            '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t: "Reply to the user confirming the trade failed and provide next steps.";\n'
+            '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t: "Reply to the user confirming the trade failed or is unverified and provide next steps.";\n'
             '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst syntheticText = `[X-CLAW TRADE RESULT]\\nDecision: ${decisionWord}\\nTrade: ${subjectId}\\nChain: ${chainKey}\\nTxHash: ${txHash || "n/a"}${pairLine ? `\\nPair: ${amountHuman} ${tokenInSym} -> ${tokenOutSym}` : ""}\\nSource: telegram_callback_trade\\nInstruction: ${instruction}`;\n'
             '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst storeAllowFrom2 = await readChannelAllowFromStore("telegram").catch(() => []);\n'
             '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst syntheticAllowFrom = Array.from(new Set([...(Array.isArray(storeAllowFrom2) ? storeAllowFrom2.map((v) => String(v)) : []), String(callback?.from?.id ?? ""), String(chatId ?? "")])).filter((v) => !!v);\n'
@@ -824,10 +824,10 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst lines = out.split(/\\r?\\n/).map((v) => String(v || "").trim()).filter((v) => v.length > 0);\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\tlet body = null;\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\ttry { body = lines.length > 0 ? JSON.parse(lines[lines.length - 1]) : null; } catch {}\n'
-        '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst statusWord = String(body?.status ?? (body?.ok ? "filled" : "failed")).trim();\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst statusWord = String(body?.executionStatus ?? body?.status ?? "").trim();\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst statusNormalized = statusWord.toLowerCase();\n'
-        '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst isSuccess = statusNormalized === "filled";\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst txHash = String(body?.txHash ?? "").trim();\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst isSuccess = statusNormalized === "filled" && !!txHash;\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst flow = body?.flowSummary ?? {};\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst promptText = String(callbackMessage.text ?? "");\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst pairMatch = promptText.match(/\\n\\s*([0-9]+(?:\\.[0-9]+)?)\\s+([A-Z0-9_]+)\\s*->\\s*([A-Z0-9_]+)/i);\n'
@@ -843,7 +843,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst decisionWord = isSuccess ? "FILLED" : "FAILED";\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst instruction = isSuccess\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t? "Reply to the user confirming the trade succeeded with tx details."\n'
-        '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t: "Reply to the user confirming the trade failed and provide next steps.";\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t: "Reply to the user confirming the trade failed or is unverified and provide next steps.";\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst syntheticText = `[X-CLAW TRADE RESULT]\\nDecision: ${decisionWord}\\nTrade: ${subjectId}\\nChain: ${chainKey}\\nTxHash: ${txHash || "n/a"}${pairLine ? `\\nPair: ${amountHuman} ${tokenInSym} -> ${tokenOutSym}` : ""}\\nSource: telegram_callback_trade\\nInstruction: ${instruction}`;\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst storeAllowFrom2 = await readChannelAllowFromStore("telegram").catch(() => []);\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst syntheticAllowFrom = Array.from(new Set([...(Array.isArray(storeAllowFrom2) ? storeAllowFrom2.map((v) => String(v)) : []), String(callback?.from?.id ?? ""), String(chatId ?? "")])).filter((v) => !!v);\n'
@@ -983,10 +983,10 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst lines = out.split(/\\r?\\n/).map((v) => String(v || "").trim()).filter((v) => v.length > 0);\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\tlet body = null;\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\ttry { body = lines.length > 0 ? JSON.parse(lines[lines.length - 1]) : null; } catch {}\n'
-        '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst statusWord = String(body?.status ?? (body?.ok ? "filled" : "failed")).trim();\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst statusWord = String(body?.executionStatus ?? body?.status ?? "").trim();\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst statusNormalized = statusWord.toLowerCase();\n'
-        '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst isSuccess = statusNormalized === "filled";\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst txHash = String(body?.txHash ?? "").trim();\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst isSuccess = statusNormalized === "filled" && !!txHash;\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst flow = body?.flowSummary ?? {};\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst promptText = String(callbackMessage.text ?? "");\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst pairMatch = promptText.match(/\\n\\s*([0-9]+(?:\\.[0-9]+)?)\\s+([A-Z0-9_]+)\\s*->\\s*([A-Z0-9_]+)/i);\n'
@@ -1002,7 +1002,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst decisionWord = isSuccess ? "FILLED" : "FAILED";\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst instruction = isSuccess\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t? "Reply to the user confirming the trade succeeded with tx details."\n'
-        '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t: "Reply to the user confirming the trade failed and provide next steps.";\n'
+        '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t: "Reply to the user confirming the trade failed or is unverified and provide next steps.";\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst syntheticText = `[X-CLAW TRADE RESULT]\\nDecision: ${decisionWord}\\nTrade: ${subjectId}\\nChain: ${chainKey}\\nTxHash: ${txHash || "n/a"}${pairLine ? `\\nPair: ${amountHuman} ${tokenInSym} -> ${tokenOutSym}` : ""}\\nSource: telegram_callback_trade\\nInstruction: ${instruction}`;\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst storeAllowFrom2 = await readChannelAllowFromStore("telegram").catch(() => []);\n'
         '\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tconst syntheticAllowFrom = Array.from(new Set([...(Array.isArray(storeAllowFrom2) ? storeAllowFrom2.map((v) => String(v)) : []), String(callback?.from?.id ?? ""), String(chatId ?? "")])).filter((v) => !!v);\n'

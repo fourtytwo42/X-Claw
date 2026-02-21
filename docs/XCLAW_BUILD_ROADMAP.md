@@ -3995,3 +3995,19 @@ Note:
   - [x] runtime regression enforces Hedera testnet legacy gas-price doubling (`123 -> 246`) on first send.
   - [x] Hedera wallet activity/approvals now render `USDC` symbol instead of raw `0x0000...1549`.
 - [ ] Issue #60 evidence post + commit hash(es).
+
+### 117.19 Hotfix P: Telegram Callback Trade Result Fail-Closed
+- [x] Runtime `cmd_approvals_decide_spot` no longer trusts implicit `ok=true` as terminal fill when `txHash` is missing; emits `terminal_status_unverified` and failed execution status.
+- [x] Telegram terminal helper now downgrades `filled` + missing tx hash into failed/unverified copy.
+- [x] OpenClaw gateway callback synthesis now derives status from `executionStatus|status` and only emits `FILLED` when `status=filled && txHash`.
+- [x] Regression test added: missing-tx-hash filled callback path fail-closes to failed.
+- [x] Required gates run sequentially:
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `pm2 restart all`
+  - [x] `python3 skills/xclaw-agent/scripts/openclaw_gateway_patch.py --json --restart`
+- [ ] Issue #60 evidence post + commit hash(es).

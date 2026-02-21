@@ -2440,3 +2440,18 @@ DoD:
 - [x] required gates rerun sequentially (`test_trade_path`, `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
 - [x] evidence recorded for Hedera token labels (`USDC` symbol resolution restored in approvals/inbox for `trd_170515b0fe88313c6136`); minimum-gas retry path covered by runtime regression.
 - [x] runtime regression validates Hedera testnet legacy send uses doubled gas-price (`123 -> 246`) before submission.
+
+## Slice 117 Hotfix P: Telegram Callback Trade Result Fail-Closed
+Status: [ ]
+Issue: #60
+
+Goal:
+- Prevent Telegram from claiming swap success when runtime has no tx-hash-backed terminal fill evidence.
+
+DoD:
+- [x] runtime `approvals decide-spot` fail-closes `filled` outcomes with missing `txHash` to `failed` (`terminal_status_unverified`).
+- [x] terminal Telegram follow-up helper no longer emits success copy when status is `filled` but tx hash is missing.
+- [x] OpenClaw gateway patcher callback synthesis uses `executionStatus|status` and only marks success when `status=filled && txHash`.
+- [x] regression test added for missing-tx-hash fail-closed behavior.
+- [x] required gates rerun sequentially (`test_trade_path`, `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
+- [x] live gateway patch applied to installed OpenClaw bundles.

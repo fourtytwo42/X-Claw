@@ -2566,6 +2566,40 @@ class TradePathRuntimeTests(unittest.TestCase):
         self.assertEqual(kwargs.get("idempotency_key"), "tg-cb-123")
         self.assertEqual(kwargs.get("decision_at"), "2026-02-19T20:00:00+00:00")
 
+    def test_approvals_decide_spot_filled_without_txhash_is_failed_unverified(self) -> None:
+        args = argparse.Namespace(
+            trade_id="trd_1",
+            decision="approve",
+            chain="hedera_testnet",
+            source="telegram",
+            idempotency_key="tg-cb-999",
+            decision_at="2026-02-21T01:18:40Z",
+            reason_message="",
+            json=True,
+        )
+        with mock.patch.object(
+            cli, "_read_trade_details", return_value={"tradeId": "trd_1", "status": "approval_pending", "chainKey": "hedera_testnet"}
+        ), mock.patch.object(
+            cli, "_post_trade_status"
+        ), mock.patch.object(
+            cli, "_cleanup_trade_approval_prompt", return_value={"ok": True, "code": "buttons_cleared"}
+        ), mock.patch.object(
+            cli, "_maybe_send_telegram_decision_message"
+        ), mock.patch.object(
+            cli, "_maybe_send_telegram_trade_terminal_message"
+        ) as terminal_msg_mock, mock.patch.object(
+            cli, "_run_resume_spot_inline", return_value=(0, {"ok": True, "code": "ok", "status": "filled"})
+        ):
+            payload = self._run_and_parse_stdout(lambda: cli.cmd_approvals_decide_spot(args))
+        self.assertTrue(payload.get("ok"))
+        self.assertEqual(payload.get("executionStatus"), "failed")
+        self.assertEqual(payload.get("status"), "failed")
+        self.assertEqual(payload.get("code"), "terminal_status_unverified")
+        self.assertIn("failed/unverified", str(payload.get("message")))
+        _, kwargs = terminal_msg_mock.call_args
+        self.assertEqual(kwargs.get("status"), "failed")
+        self.assertIsNone(kwargs.get("tx_hash"))
+
     def test_approvals_decide_policy_posts_decision_and_envelope(self) -> None:
         args = argparse.Namespace(
             approval_id="ppr_1",

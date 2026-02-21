@@ -3811,3 +3811,26 @@ Active slice context: `Slice 117` in progress.
 - [x] `npm run build`
 - [x] `pm2 restart all`
 - [x] Evidence: Hedera trade labels resolve `USDC`; minimum-gas underbid retry path is covered by runtime regression test.
+
+---
+
+# Hotfix Tasks: Slice 117 Hotfix P Telegram Callback Trade Result Fail-Closed
+
+Active slice context: `Slice 117` in progress.
+
+## 1) Implementation
+- [x] Fail-close runtime trade decision envelope when status=`filled` but `txHash` is missing (`terminal_status_unverified`).
+- [x] Fail-close runtime terminal Telegram helper to avoid "Swap completed" copy without tx hash.
+- [x] Harden OpenClaw gateway callback synthesis to require `status=filled && txHash` before emitting success decision.
+- [x] Add regression test for missing-tx-hash fail-closed behavior.
+- [x] Sync canonical docs + handoff artifacts.
+
+## 2) Validation
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+- [x] `python3 skills/xclaw-agent/scripts/openclaw_gateway_patch.py --json --restart`

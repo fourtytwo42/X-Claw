@@ -4698,3 +4698,4 @@ Supersession note (Slice 117 Hotfix D):
 - Telegram trade decision messaging truthfulness:
   - approval decision acknowledgement must be non-terminal (no success claim before execution outcome),
   - runtime must send a terminal follow-up message for trade outcome (`filled|failed|rejected|verification_timeout`) with tx/reason context when available.
+  - Telegram callback synthesis must fail closed: treat trade result as success only when terminal status is `filled` and `txHash` is present; missing tx-hash outcomes must be classified as failed/unverified.

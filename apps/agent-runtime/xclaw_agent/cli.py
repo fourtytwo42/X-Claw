@@ -3540,7 +3540,14 @@ def _maybe_send_telegram_trade_terminal_message(
         elif isinstance(thread_raw, str) and thread_raw.strip():
             thread_id = thread_raw.strip()
 
-    tx_line = f"\nTx: `{tx_hash}`" if str(tx_hash or "").strip() else ""
+    tx_hash_clean = str(tx_hash or "").strip()
+    # Fail closed for owner UX truthfulness: do not send a success terminal message
+    # when runtime cannot provide a transaction hash.
+    if normalized == "filled" and not tx_hash_clean:
+        normalized = "failed"
+        if not str(reason_message or "").strip():
+            reason_message = "Execution reported filled without tx hash; treating as unverified."
+    tx_line = f"\nTx: `{tx_hash_clean}`" if tx_hash_clean else ""
     if normalized == "filled":
         text = (
             "Swap completed.\n\n"
@@ -4545,13 +4552,29 @@ def cmd_approvals_decide_spot(args: argparse.Namespace) -> int:
     except Exception:
         pass
     resume_code, resume_payload = _run_resume_spot_inline(trade_id, chain)
-    exec_status = str(resume_payload.get("status") or ("filled" if bool(resume_payload.get("ok")) else "failed")).strip().lower()
+    tx_hash = str(resume_payload.get("txHash") or "").strip()
+    raw_exec_status = str(
+        resume_payload.get("executionStatus") or resume_payload.get("status") or ""
+    ).strip().lower()
+    exec_status = raw_exec_status or "failed"
+    # Fail closed: never claim terminal "filled" when tx hash is missing.
+    if exec_status == "filled" and not tx_hash:
+        exec_status = "failed"
+        resume_payload = {
+            **resume_payload,
+            "code": "terminal_status_unverified",
+            "message": str(
+                resume_payload.get("message")
+                or "Runtime reported filled without tx hash; treating as failed/unverified."
+            ),
+            "reasonCode": str(resume_payload.get("reasonCode") or "terminal_status_unverified"),
+        }
     try:
         _maybe_send_telegram_trade_terminal_message(
             trade_id=trade_id,
             chain=chain,
             status=exec_status,
-            tx_hash=str(resume_payload.get("txHash") or "").strip() or None,
+            tx_hash=tx_hash or None,
             reason_message=str(resume_payload.get("message") or "").strip() or None,
         )
     except Exception:

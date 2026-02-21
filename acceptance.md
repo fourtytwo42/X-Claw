@@ -6458,3 +6458,35 @@ Active slice context: `Slice 117` in progress (issue `#60`).
 - [x] Runtime regression `test_cast_send_retries_with_minimum_gas_price_from_rpc_error` confirms retry escalation from `30000000001` to required minimum `890000000000` gas price.
 - [x] Runtime regression `test_cast_send_doubles_legacy_gas_price_on_hedera_testnet` confirms Hedera first-send legacy gas-price doubling (`123 -> 246`).
 - [x] `/api/v1/management/agent-state?agentId=ag_a123e3bc428c12675f93&chainKey=hedera_testnet` includes `chainTokens` entry `USDC -> 0x000...1549`, and `/api/v1/management/approvals/inbox` row for `trd_170515b0fe88313c6136` now renders title `USDC -> SAUCE` (not raw address).
+
+---
+
+# Hotfix Acceptance Evidence: Slice 117 Hotfix P Telegram Callback Trade Result Fail-Closed
+
+Date (UTC): 2026-02-21
+Active slice context: `Slice 117` in progress (issue `#60`).
+
+## Objective + Scope Lock
+- Objective: prevent Telegram from reporting trade success when no tx-hash-backed terminal fill exists.
+- Scope lock:
+  - `apps/agent-runtime/xclaw_agent/cli.py`
+  - `apps/agent-runtime/tests/test_trade_path.py`
+  - `skills/xclaw-agent/scripts/openclaw_gateway_patch.py`
+  - canonical docs/handoff artifacts.
+
+## Behavior Checks
+- [x] `cmd_approvals_decide_spot` now downgrades `filled` + missing `txHash` to `failed` with `code=terminal_status_unverified`.
+- [x] terminal Telegram helper no longer emits "Swap completed" when tx hash is missing.
+- [x] OpenClaw Telegram callback synthesis marks trade success only when `status=filled` and `txHash` is present.
+
+## Required Validation Gates
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+
+## Live Runtime Patch Evidence
+- [x] `python3 skills/xclaw-agent/scripts/openclaw_gateway_patch.py --json --restart` -> `{"ok":true,"patched":true,...,"loaderPaths":[".../dist/plugin-sdk/reply-BKdTPI2b.js",".../dist/reply-oSe13ewW.js"]}`.
