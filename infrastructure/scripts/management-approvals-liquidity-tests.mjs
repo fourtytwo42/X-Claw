@@ -319,8 +319,46 @@ async function main() {
     approveRes.body
   );
 
+  const agentStateRes = await requestManagement(
+    'GET',
+    `/management/agent-state?agentId=${encodeURIComponent(AGENT_ID)}&chainKey=${encodeURIComponent(CHAIN_KEY)}`,
+    undefined,
+    session
+  );
+  expect(agentStateRes.status === 200, 'agent_state_status_200', agentStateRes);
+  const stateQueue = Array.isArray(agentStateRes.body?.liquidityApprovalsQueue) ? agentStateRes.body.liquidityApprovalsQueue : [];
+  const stateHistory = Array.isArray(agentStateRes.body?.liquidityApprovalsHistory) ? agentStateRes.body.liquidityApprovalsHistory : [];
+  expect(stateHistory.some((row) => String(row?.liquidity_intent_id || '') === liquidityIntentId), 'agent_state_liquidity_history_contains_approved', { liquidityIntentId });
+
+  const inboxAllRes = await requestManagement(
+    'GET',
+    `/management/approvals/inbox?chainKey=${encodeURIComponent(CHAIN_KEY)}&status=all&types=liquidity&limit=200`,
+    undefined,
+    session
+  );
+  expect(inboxAllRes.status === 200, 'approvals_inbox_liquidity_status_200', inboxAllRes);
+  const inboxRows = Array.isArray(inboxAllRes.body?.rows) ? inboxAllRes.body.rows : [];
+  expect(inboxRows.some((row) => String(row?.rowKind || '') === 'liquidity'), 'approvals_inbox_contains_liquidity_row_kind', inboxAllRes.body);
+  expect(
+    inboxRows.some((row) => String(row?.requestId || '') === liquidityIntentId && String(row?.status || '') === 'approved'),
+    'approvals_inbox_liquidity_status_normalized_approved',
+    { liquidityIntentId }
+  );
+
   const rejectIntent = await createApprovalPendingLiquidityIntent();
   const rejectLiquidityIntentId = String(rejectIntent.body?.liquidityIntentId || '').trim();
+  const queueStateRes = await requestManagement(
+    'GET',
+    `/management/agent-state?agentId=${encodeURIComponent(AGENT_ID)}&chainKey=${encodeURIComponent(CHAIN_KEY)}`,
+    undefined,
+    session
+  );
+  const queueRows = Array.isArray(queueStateRes.body?.liquidityApprovalsQueue) ? queueStateRes.body.liquidityApprovalsQueue : [];
+  expect(
+    queueRows.some((row) => String(row?.liquidity_intent_id || '') === rejectLiquidityIntentId),
+    'agent_state_liquidity_queue_contains_pending',
+    { rejectLiquidityIntentId }
+  );
   const rejectRes = await requestManagement(
     'POST',
     '/management/approvals/decision',
@@ -349,6 +387,50 @@ async function main() {
   );
   expect(invalidTransitionRes.status === 409, 'liquidity_invalid_transition_status_409', invalidTransitionRes);
   expect(invalidTransitionRes.body?.code === 'liquidity_invalid_transition', 'liquidity_invalid_transition_code', invalidTransitionRes.body);
+
+  const batchRejectIntent = await createApprovalPendingLiquidityIntent();
+  const batchRejectIntentId = String(batchRejectIntent.body?.liquidityIntentId || '').trim();
+  const batchRejectRes = await requestManagement(
+    'POST',
+    '/management/approvals/decision-batch',
+    {
+      items: [
+        {
+          agentId: AGENT_ID,
+          rowKind: 'liquidity',
+          requestId: batchRejectIntentId,
+          decision: 'reject',
+          chainKey: CHAIN_KEY
+        }
+      ]
+    },
+    session
+  );
+  expect(batchRejectRes.status === 200, 'batch_liquidity_reject_status_200', batchRejectRes);
+  const batchRejectResult = Array.isArray(batchRejectRes.body?.results) ? batchRejectRes.body.results[0] : null;
+  expect(Boolean(batchRejectResult?.ok), 'batch_liquidity_reject_ok_true', batchRejectResult);
+
+  const batchInvalidAllowlistRes = await requestManagement(
+    'POST',
+    '/management/approvals/decision-batch',
+    {
+      items: [
+        {
+          agentId: AGENT_ID,
+          rowKind: 'liquidity',
+          requestId: batchRejectIntentId,
+          decision: 'approve_allowlist',
+          chainKey: CHAIN_KEY
+        }
+      ]
+    },
+    session
+  );
+  expect(batchInvalidAllowlistRes.status === 200, 'batch_liquidity_allowlist_status_200', batchInvalidAllowlistRes);
+  const batchInvalidResult = Array.isArray(batchInvalidAllowlistRes.body?.results) ? batchInvalidAllowlistRes.body.results[0] : null;
+  expect(batchInvalidResult?.ok === false, 'batch_liquidity_allowlist_rejected', batchInvalidResult);
+  expect(batchInvalidResult?.status === 400, 'batch_liquidity_allowlist_status_400', batchInvalidResult);
+  expect(String(batchInvalidResult?.response?.code || '') === 'payload_invalid', 'batch_liquidity_allowlist_payload_invalid_code', batchInvalidResult);
 
   const authMismatchRes = await requestManagement(
     'POST',

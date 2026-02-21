@@ -2455,3 +2455,23 @@ DoD:
 - [x] regression test added for missing-tx-hash fail-closed behavior.
 - [x] required gates rerun sequentially (`test_trade_path`, `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
 - [x] live gateway patch applied to installed OpenClaw bundles.
+
+## Slice 118: Liquidity Approval + Wallet Activity Parity (All Chains)
+Status: [~]
+Issue: #61
+
+Goal:
+- Deliver owner-surface parity for liquidity approval flows (`add/remove`) across `/agents/:id` and `/approvals`, including chain-scoped wallet activity visibility for pending + terminal lifecycle states.
+
+DoD:
+- [x] `GET /api/v1/management/agent-state` returns `liquidityApprovalsQueue` (`approval_pending`) and `liquidityApprovalsHistory` (`approved|executing|verifying|filled|failed|rejected|expired|verification_timeout`) for active chain.
+- [x] `GET /api/v1/management/approvals/inbox` supports `types=...liquidity...` and returns normalized liquidity rows with deterministic status bucketing.
+- [x] `POST /api/v1/management/approvals/decision-batch` accepts `rowKind=liquidity` and routes decisions to canonical liquidity approval decision route.
+- [x] batch decision path rejects `approve_allowlist` for liquidity rows with deterministic `payload_invalid` (`400`).
+- [x] `/agents/:id` wallet activity includes liquidity approval lifecycle rows (pending + terminal).
+- [x] `/agents/:id` approval history includes liquidity rows, pending actions, and non-actionable terminal entries.
+- [x] `/approvals` type filter includes liquidity, rows are actionable, and bulk approve/reject includes liquidity while allowlist remains trade-only.
+- [x] canonical artifacts sync in same change (`docs/XCLAW_SOURCE_OF_TRUTH.md`, `docs/api/openapi.v1.yaml`, `packages/shared-schemas/json/management-approvals-decision-batch-request.schema.json`).
+- [x] handoff artifacts updated in same change (`spec.md`, `tasks.md`, `acceptance.md`).
+- [x] required gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, task-specific tests, `build`, `pm2 restart all`).
+- [ ] issue #61 updated with verification evidence + commit hash(es).

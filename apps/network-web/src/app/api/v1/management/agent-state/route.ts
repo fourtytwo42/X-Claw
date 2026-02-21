@@ -219,6 +219,8 @@ export async function GET(req: NextRequest) {
       approvalChannel,
       transferApprovalsQueue,
       transferApprovalsHistory,
+      liquidityApprovalsQueue,
+      liquidityApprovalsHistory,
       transferPolicyMirror,
       liquidityPositions,
       trackedAgents,
@@ -540,6 +542,92 @@ export async function GET(req: NextRequest) {
         throw error;
       }),
       dbQuery<{
+        liquidity_intent_id: string;
+        chain_key: string;
+        dex_key: string;
+        action_type: string;
+        position_type: string;
+        token_a: string | null;
+        token_b: string | null;
+        amount_a: string | null;
+        amount_b: string | null;
+        status: string;
+        reason_code: string | null;
+        reason_message: string | null;
+        tx_hash: string | null;
+        created_at: string;
+        updated_at: string;
+      }>(
+        `
+        select
+          liquidity_intent_id,
+          chain_key,
+          dex_key,
+          action_type,
+          position_type,
+          token_a,
+          token_b,
+          amount_a::text,
+          amount_b::text,
+          status::text,
+          reason_code,
+          reason_message,
+          tx_hash,
+          created_at::text,
+          updated_at::text
+        from liquidity_intents
+        where agent_id = $1
+          and chain_key = $2
+          and status = 'approval_pending'
+        order by created_at asc
+        limit 50
+        `,
+        [agentId, chainKey]
+      ),
+      dbQuery<{
+        liquidity_intent_id: string;
+        chain_key: string;
+        dex_key: string;
+        action_type: string;
+        position_type: string;
+        token_a: string | null;
+        token_b: string | null;
+        amount_a: string | null;
+        amount_b: string | null;
+        status: string;
+        reason_code: string | null;
+        reason_message: string | null;
+        tx_hash: string | null;
+        created_at: string;
+        updated_at: string;
+      }>(
+        `
+        select
+          liquidity_intent_id,
+          chain_key,
+          dex_key,
+          action_type,
+          position_type,
+          token_a,
+          token_b,
+          amount_a::text,
+          amount_b::text,
+          status::text,
+          reason_code,
+          reason_message,
+          tx_hash,
+          created_at::text,
+          updated_at::text
+        from liquidity_intents
+        where agent_id = $1
+          and chain_key = $2
+          and status in ('approved', 'executing', 'verifying', 'filled', 'failed', 'rejected', 'expired', 'verification_timeout')
+        order by created_at desc
+        limit 100
+        `,
+        [agentId, chainKey]
+      ),
+      dbQuery<{
         transfer_approval_mode: 'auto' | 'per_transfer';
         native_transfer_preapproved: boolean;
         allowed_transfer_tokens: unknown;
@@ -810,6 +898,8 @@ export async function GET(req: NextRequest) {
           ...row,
           confirmations: row.tx_hash ? (transferConfirmationsByTx.get(row.tx_hash) ?? null) : null
         })),
+        liquidityApprovalsQueue: liquidityApprovalsQueue.rows,
+        liquidityApprovalsHistory: liquidityApprovalsHistory.rows,
         liquidityPositions: liquidityPositions.rows.map((row) => ({
           position_id: row.position_id,
           chain_key: row.chain_key,

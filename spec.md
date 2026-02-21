@@ -3461,3 +3461,10 @@ Ensure runtime never reports queued transfer approvals that are invisible in web
 1. Telegram callback trade-result synthesis must classify success only when `executionStatus|status == filled` and `txHash` is non-empty.
 2. Runtime `approvals decide-spot` must not output terminal filled state when tx hash is absent; emit deterministic `terminal_status_unverified` and failed status.
 3. Terminal follow-up Telegram helper must downgrade `filled` + missing tx hash to failed/unverified copy.
+
+## Slice 118 extension (liquidity approval + wallet activity parity)
+1. Owner approval surfaces must treat liquidity intents (`add/remove`) as first-class approval subjects alongside trade/policy/transfer.
+2. `GET /api/v1/management/agent-state` must return chain-scoped liquidity approval queue/history rows from `liquidity_intents`.
+3. `GET /api/v1/management/approvals/inbox` must support `liquidity` row kind and `types=...liquidity...` filtering with deterministic status normalization.
+4. `/agents/:id` wallet activity and approval history modules must render liquidity pending + terminal lifecycle rows with owner approve/reject controls for pending entries only.
+5. `/approvals` must expose liquidity filter rows and decision actions; allowlist decision remains trade-only.

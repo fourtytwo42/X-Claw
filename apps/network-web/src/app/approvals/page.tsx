@@ -24,13 +24,13 @@ type OwnerContext =
   | { phase: 'ready'; managedAgents: string[]; activeAgentId: string };
 
 type StatusTab = 'pending' | 'approved' | 'rejected' | 'all';
-type TypeFilter = 'all' | 'trade' | 'policy' | 'transfer';
+type TypeFilter = 'all' | 'trade' | 'policy' | 'transfer' | 'liquidity';
 type SortFilter = 'newest' | 'oldest';
 
 type InboxRow = {
   id: string;
   requestId: string;
-  rowKind: 'trade' | 'policy' | 'transfer';
+  rowKind: 'trade' | 'policy' | 'transfer' | 'liquidity';
   agentId: string;
   agentName: string;
   chainKey: string;
@@ -207,7 +207,7 @@ export default function ApprovalsCenterPage() {
       setError(null);
       try {
         const response = await fetchWithTimeout(
-          `/api/v1/management/approvals/inbox?chainKey=${encodeURIComponent(effectiveChain)}&status=all&types=trade,policy,transfer&limit=400`,
+          `/api/v1/management/approvals/inbox?chainKey=${encodeURIComponent(effectiveChain)}&status=all&types=trade,policy,transfer,liquidity&limit=400`,
           { cache: 'no-store', credentials: 'same-origin' },
           uiFetchTimeoutMs(),
         );
@@ -275,9 +275,14 @@ export default function ApprovalsCenterPage() {
     };
   }, [rows, state]);
 
+  const canBulkAllowlist = useMemo(() => {
+    const selectedRows = filteredRows.filter((row) => selectedIds.includes(row.id) && row.status === 'pending');
+    return selectedRows.length > 0 && selectedRows.every((row) => row.rowKind === 'trade');
+  }, [filteredRows, selectedIds]);
+
   async function reloadInbox() {
     const response = await fetchWithTimeout(
-      `/api/v1/management/approvals/inbox?chainKey=${encodeURIComponent(effectiveChain)}&status=all&types=trade,policy,transfer&limit=400`,
+      `/api/v1/management/approvals/inbox?chainKey=${encodeURIComponent(effectiveChain)}&status=all&types=trade,policy,transfer,liquidity&limit=400`,
       { cache: 'no-store', credentials: 'same-origin' },
       uiFetchTimeoutMs(),
     );
@@ -311,6 +316,13 @@ export default function ApprovalsCenterPage() {
           policyApprovalId: row.requestId,
           decision
         });
+      } else if (row.rowKind === 'liquidity') {
+        await managementPost('/api/v1/management/approvals/decision', {
+          agentId: row.agentId,
+          subjectType: 'liquidity',
+          liquidityIntentId: row.requestId,
+          decision
+        });
       } else {
         await managementPost('/api/v1/management/transfer-approvals/decision', {
           agentId: row.agentId,
@@ -337,6 +349,13 @@ export default function ApprovalsCenterPage() {
     const selectedRows = filteredRows.filter((row) => selectedIds.includes(row.id) && row.status === 'pending');
     if (selectedRows.length === 0) {
       return;
+    }
+    if (decision === 'approve_allowlist') {
+      const nonTradeRow = selectedRows.find((row) => row.rowKind !== 'trade');
+      if (nonTradeRow) {
+        setError('Approve + Allowlist is only available for trade approvals.');
+        return;
+      }
     }
 
     try {
@@ -452,6 +471,7 @@ export default function ApprovalsCenterPage() {
                     <option value="trade">Trade approval</option>
                     <option value="policy">Policy approval</option>
                     <option value="transfer">Withdraw approval</option>
+                    <option value="liquidity">Liquidity approval</option>
                   </select>
                   <select aria-label="Sort" value={sort} onChange={(event) => setSort(event.target.value as SortFilter)}>
                     <option value="newest">Newest</option>
@@ -469,7 +489,7 @@ export default function ApprovalsCenterPage() {
                   <button type="button" onClick={() => void handleBatch('approve')} disabled={selectedIds.length === 0}>
                     Bulk Approve
                   </button>
-                  <button type="button" onClick={() => void handleBatch('approve_allowlist')} disabled={selectedIds.length === 0}>
+                  <button type="button" onClick={() => void handleBatch('approve_allowlist')} disabled={!canBulkAllowlist}>
                     Bulk Approve + Allowlist
                   </button>
                   <button type="button" className={styles.dangerButton} onClick={() => void handleBatch('reject')} disabled={selectedIds.length === 0}>

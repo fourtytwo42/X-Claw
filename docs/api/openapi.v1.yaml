@@ -1371,7 +1371,7 @@ paths:
           in: query
           schema:
             type: string
-            description: Comma-separated row kinds (`trade,policy,transfer`).
+            description: Comma-separated row kinds (`trade,policy,transfer,liquidity`).
         - name: limit
           in: query
           schema:
@@ -3870,7 +3870,7 @@ components:
                 type: string
               rowKind:
                 type: string
-                enum: [trade, policy, transfer]
+                enum: [trade, policy, transfer, liquidity]
               requestId:
                 type: string
               decision:

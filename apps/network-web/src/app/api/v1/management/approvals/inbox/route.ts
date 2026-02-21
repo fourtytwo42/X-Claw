@@ -10,7 +10,7 @@ import { resolveTokenMetadata } from '@/lib/token-metadata';
 export const runtime = 'nodejs';
 
 type InboxStatus = 'pending' | 'approved' | 'rejected' | 'all';
-type InboxType = 'trade' | 'policy' | 'transfer';
+type InboxType = 'trade' | 'policy' | 'transfer' | 'liquidity';
 
 function parseStatus(raw: string | null): InboxStatus {
   const value = String(raw ?? '').trim().toLowerCase();
@@ -24,8 +24,8 @@ function parseTypes(raw: string | null): InboxType[] {
   const normalized = String(raw ?? '')
     .split(',')
     .map((item) => item.trim().toLowerCase())
-    .filter((item): item is InboxType => item === 'trade' || item === 'policy' || item === 'transfer');
-  return normalized.length > 0 ? Array.from(new Set(normalized)) : ['trade', 'policy', 'transfer'];
+    .filter((item): item is InboxType => item === 'trade' || item === 'policy' || item === 'transfer' || item === 'liquidity');
+  return normalized.length > 0 ? Array.from(new Set(normalized)) : ['trade', 'policy', 'transfer', 'liquidity'];
 }
 
 function parseLimit(raw: string | null): number {
@@ -91,7 +91,7 @@ export async function GET(req: NextRequest) {
       return successResponse({ ok: true, activeAgentId: auth.session.agentId, managedAgents: [], rows: [], permissionInventory: [] }, 200, requestId);
     }
 
-    const [agents, tradeRows, policyRows, transferRows, policySnapshots, transferPolicyMirror, outboundPolicy] = await Promise.all([
+    const [agents, tradeRows, policyRows, transferRows, liquidityRows, policySnapshots, transferPolicyMirror, outboundPolicy] = await Promise.all([
       dbQuery<{ agent_id: string; agent_name: string; public_status: string }>(
         `
         select agent_id, agent_name, public_status::text
@@ -176,6 +176,41 @@ export async function GET(req: NextRequest) {
         where agent_id = any($1::text[])
           and ($2::text = 'all' or chain_key = $2)
           and status in ('approval_pending', 'approved', 'rejected')
+        order by created_at desc
+        limit $3
+        `,
+        [managedAgentIds, chainKey, limit]
+      ),
+      dbQuery<{
+        agent_id: string;
+        liquidity_intent_id: string;
+        chain_key: string;
+        dex_key: string;
+        action_type: string;
+        token_a: string | null;
+        token_b: string | null;
+        status: string;
+        reason_code: string | null;
+        reason_message: string | null;
+        created_at: string;
+      }>(
+        `
+        select
+          agent_id,
+          liquidity_intent_id,
+          chain_key,
+          dex_key,
+          action_type,
+          token_a,
+          token_b,
+          status::text,
+          reason_code,
+          reason_message,
+          created_at::text
+        from liquidity_intents
+        where agent_id = any($1::text[])
+          and ($2::text = 'all' or chain_key = $2)
+          and status in ('approval_pending', 'approved', 'executing', 'verifying', 'filled', 'failed', 'rejected', 'expired', 'verification_timeout')
         order by created_at desc
         limit $3
         `,
@@ -311,6 +346,16 @@ export async function GET(req: NextRequest) {
         tokensToWarm.set(`${row.chain_key}:${token.toLowerCase()}`, token);
       }
     }
+    for (const row of liquidityRows.rows) {
+      if (isHexAddress(String(row.token_a ?? ''))) {
+        const token = String(row.token_a);
+        tokensToWarm.set(`${row.chain_key}:${token.toLowerCase()}`, token);
+      }
+      if (isHexAddress(String(row.token_b ?? ''))) {
+        const token = String(row.token_b);
+        tokensToWarm.set(`${row.chain_key}:${token.toLowerCase()}`, token);
+      }
+    }
     await Promise.all(
       [...tokensToWarm.keys()].map(async (key) => {
         const splitAt = key.indexOf(':');
@@ -414,6 +459,36 @@ export async function GET(req: NextRequest) {
         requestTypeLabel: 'Withdraw Approval',
         reasonLine: row.policy_block_reason_message || row.reason_message || 'Transfer requires owner confirmation.',
         riskLabel: riskForRow({ rowKind: 'transfer', reason: row.reason_message, policyBlocked: row.policy_blocked_at_create }),
+        createdAt: row.created_at
+      });
+    }
+
+    for (const row of liquidityRows.rows) {
+      if (!typeFilter.includes('liquidity')) {
+        continue;
+      }
+      const normalizedStatus = normalizeStatus(row.status);
+      if (!normalizedStatus) {
+        continue;
+      }
+      if (statusFilter !== 'all' && normalizedStatus !== statusFilter) {
+        continue;
+      }
+      const tokenALabel = await resolveTokenLabel(row.chain_key, row.token_a);
+      const tokenBLabel = await resolveTokenLabel(row.chain_key, row.token_b);
+      rows.push({
+        id: `liquidity:${row.liquidity_intent_id}`,
+        requestId: row.liquidity_intent_id,
+        rowKind: 'liquidity',
+        agentId: row.agent_id,
+        agentName: namesByAgent.get(row.agent_id)?.name ?? row.agent_id,
+        chainKey: row.chain_key,
+        status: normalizedStatus,
+        title: `Liquidity ${row.action_type} ${tokenALabel}/${tokenBLabel} (${row.dex_key})`,
+        subtitle: `Liquidity ${row.liquidity_intent_id} (${row.status})`,
+        requestTypeLabel: 'Liquidity Approval',
+        reasonLine: row.reason_message || row.reason_code || 'Liquidity action requires owner confirmation.',
+        riskLabel: riskForRow({ rowKind: 'liquidity', reason: row.reason_message || row.reason_code }),
         createdAt: row.created_at
       });
     }

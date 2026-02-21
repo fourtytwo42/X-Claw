@@ -3070,6 +3070,7 @@ Supersession note (Slice 117 Hotfix D):
     - assets + approvals module (global and per-token approvals inline),
     - liquidity positions must display canonical token symbols (and token names when available) for pair/pool rows, with shortened-address fallback when metadata is unavailable,
     - unified wallet activity timeline,
+    - wallet activity timeline must include liquidity approval lifecycle rows (pending + terminal) when liquidity intents exist for the active chain,
     - approval history module,
     - withdraw module in wallet context,
     - copy relationships, limit orders, and audit modules below wallet-primary stack.
@@ -3132,7 +3133,7 @@ Supersession note (Slice 117 Hotfix D):
 ## 87) Runtime-Canonical Approval Decisions (Locked)
 
 1. Runtime authority:
-- `xclaw-agent` is canonical for trade/policy/transfer approval decision execution paths.
+- `xclaw-agent` is canonical for trade/policy/transfer/liquidity approval decision execution paths.
 - Web and Telegram are interface channels that submit owner decisions.
 
 2. Canonical decision commands:
@@ -3172,7 +3173,7 @@ Supersession note (Slice 117 Hotfix D):
 - Slice 74 must not add speculative endpoints for cross-agent aggregation or allowances inventory.
 
 5. Placeholder requirements:
-- approvals inbox may normalize available queue data (trade/policy/transfer) from existing single-agent state.
+- approvals inbox may normalize available queue data (trade/policy/transfer/liquidity) from existing single-agent state.
 - unsupported modules must remain explicit placeholders with disabled CTAs:
   - cross-agent aggregation views,
   - allowances inventory/revoke-management table,
@@ -3829,12 +3830,15 @@ Supersession note (Slice 117 Hotfix D):
 
 2. Unified approvals inbox:
 - Endpoint: `GET /api/v1/management/approvals/inbox`.
-- Provides normalized rows across trade/policy/transfer approval surfaces for agents linked to current management session.
+- Provides normalized rows across trade/policy/transfer/liquidity approval surfaces for agents linked to current management session.
 - Includes deterministic risk labels and chain-scoped permission inventory blocks.
-- Trade/policy/transfer token labels in inbox rows must prefer canonical token symbols and RPC-resolved metadata (fallback to shortened address when metadata is unavailable).
+- Trade/policy/transfer/liquidity token labels in inbox rows must prefer canonical token symbols and RPC-resolved metadata (fallback to shortened address when metadata is unavailable).
 - Trade rows must remain visible after approval execution transitions:
   - include trade statuses `approved|executing|verifying|filled|failed|rejected` in inbox source selection,
   - normalize `executing|verifying|filled|failed` into the `approved` tab so owner approval history does not disappear immediately after execution.
+- Liquidity rows must remain visible after approval execution transitions:
+  - include liquidity statuses `approved|executing|verifying|filled|failed|rejected|expired|verification_timeout` in inbox source selection,
+  - normalize `executing|verifying|filled` into the `approved` tab and `failed|expired|verification_timeout` into rejected semantics.
 
 3. Direct permissions update endpoint:
 - Endpoint: `POST /api/v1/management/permissions/update`.

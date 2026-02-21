@@ -1530,6 +1530,40 @@ export default function AgentPublicProfilePage() {
           tokenSymbols: [tokenIn, tokenOut].filter(Boolean)
         });
       }
+      for (const item of management.data.liquidityApprovalsHistory ?? []) {
+        const tokenALabel = resolveTokenLabel(item.token_a, chainTokenSymbolByAddress);
+        const tokenBLabel = resolveTokenLabel(item.token_b, chainTokenSymbolByAddress);
+        const tokenA = normalizeTokenSelectionSymbol(tokenALabel, activeNativeSymbol);
+        const tokenB = normalizeTokenSelectionSymbol(tokenBLabel, activeNativeSymbol);
+        items.push({
+          id: `liqh-${item.liquidity_intent_id}`,
+          at: item.updated_at ?? item.created_at,
+          kind: 'approvals',
+          title: `Liquidity ${item.action_type} ${tokenALabel}/${tokenBLabel} (${item.dex_key})`,
+          subtitle: item.reason_message || item.reason_code || `Liquidity ${item.liquidity_intent_id} (${item.status})`,
+          status: item.status,
+          txHash: item.tx_hash ?? null,
+          txExplorerUrl: toTxExplorerUrl(item.tx_hash),
+          tokenSymbols: [tokenA, tokenB].filter(Boolean)
+        });
+      }
+      for (const item of management.data.liquidityApprovalsQueue ?? []) {
+        const tokenALabel = resolveTokenLabel(item.token_a, chainTokenSymbolByAddress);
+        const tokenBLabel = resolveTokenLabel(item.token_b, chainTokenSymbolByAddress);
+        const tokenA = normalizeTokenSelectionSymbol(tokenALabel, activeNativeSymbol);
+        const tokenB = normalizeTokenSelectionSymbol(tokenBLabel, activeNativeSymbol);
+        items.push({
+          id: `liqq-${item.liquidity_intent_id}`,
+          at: item.created_at,
+          kind: 'approvals',
+          title: `Liquidity ${item.action_type} ${tokenALabel}/${tokenBLabel} (${item.dex_key})`,
+          subtitle: item.reason_message || item.reason_code || 'Waiting for liquidity approval',
+          status: 'pending',
+          txHash: null,
+          txExplorerUrl: null,
+          tokenSymbols: [tokenA, tokenB].filter(Boolean)
+        });
+      }
     }
 
     items.sort((a, b) => {
@@ -1593,7 +1627,7 @@ export default function AgentPublicProfilePage() {
         title: string;
         status: string;
         subtitle: string;
-        type: 'trade' | 'policy' | 'transfer';
+        type: 'trade' | 'policy' | 'transfer' | 'liquidity';
         tokenSymbols: string[];
         raw: any;
       }>;
@@ -1604,7 +1638,7 @@ export default function AgentPublicProfilePage() {
       title: string;
       status: string;
       subtitle: string;
-      type: 'trade' | 'policy' | 'transfer';
+      type: 'trade' | 'policy' | 'transfer' | 'liquidity';
       tokenSymbols: string[];
       raw: any;
     }> = [];
@@ -1620,6 +1654,7 @@ export default function AgentPublicProfilePage() {
       return formatHumanAmount(item.amount_wei, transferTokenLabel, transferDecimals);
     };
     const pendingTradeIds = new Set((management.data.approvalsQueue ?? []).map((item) => item.trade_id));
+    const pendingLiquidityIds = new Set((management.data.liquidityApprovalsQueue ?? []).map((item) => item.liquidity_intent_id));
     for (const item of management.data.approvalsQueue) {
       const tokenInLabel = resolveTokenLabel(item.token_in, chainTokenSymbolByAddress);
       const tokenOutLabel = resolveTokenLabel(item.token_out, chainTokenSymbolByAddress);
@@ -1744,6 +1779,52 @@ export default function AgentPublicProfilePage() {
             : `To: ${shortenAddress(item.to_address)}; Amount: ${transferAmount}; Network: ${humanizeKeyLabel(item.chain_key)}`,
         type: 'transfer',
         tokenSymbols: transferSymbol ? [transferSymbol] : [],
+        raw: item
+      });
+    }
+    for (const item of management.data.liquidityApprovalsQueue ?? []) {
+      const tokenALabel = resolveTokenLabel(item.token_a, chainTokenSymbolByAddress);
+      const tokenBLabel = resolveTokenLabel(item.token_b, chainTokenSymbolByAddress);
+      const tokenA = normalizeTokenSelectionSymbol(tokenALabel, activeNativeSymbol);
+      const tokenB = normalizeTokenSelectionSymbol(tokenBLabel, activeNativeSymbol);
+      rows.push({
+        id: `liquidity-pending-${item.liquidity_intent_id}`,
+        at: item.created_at,
+        title: `Liquidity ${item.action_type} ${tokenALabel}/${tokenBLabel} (${item.dex_key})`,
+        status: 'pending',
+        subtitle: item.reason_message || item.reason_code || 'Waiting for liquidity approval',
+        type: 'liquidity',
+        tokenSymbols: [tokenA, tokenB].filter(Boolean),
+        raw: item
+      });
+    }
+    for (const item of management.data.liquidityApprovalsHistory ?? []) {
+      if ((item.status === 'pending' || item.status === 'approval_pending') && pendingLiquidityIds.has(item.liquidity_intent_id)) {
+        continue;
+      }
+      const tokenALabel = resolveTokenLabel(item.token_a, chainTokenSymbolByAddress);
+      const tokenBLabel = resolveTokenLabel(item.token_b, chainTokenSymbolByAddress);
+      const tokenA = normalizeTokenSelectionSymbol(tokenALabel, activeNativeSymbol);
+      const tokenB = normalizeTokenSelectionSymbol(tokenBLabel, activeNativeSymbol);
+      const normalized = String(item.status ?? '').trim().toLowerCase();
+      const status =
+        normalized === 'approval_pending' || normalized === 'pending'
+          ? 'pending'
+          : normalized === 'rejected' || normalized === 'deny' || normalized === 'denied'
+            ? 'rejected'
+            : normalized === 'failed' || normalized === 'expired' || normalized === 'verification_timeout'
+              ? 'failed'
+              : normalized === 'approved' || normalized === 'executing' || normalized === 'verifying' || normalized === 'filled'
+                ? 'approved'
+                : normalized;
+      rows.push({
+        id: `liquidity-history-${item.liquidity_intent_id}`,
+        at: item.updated_at ?? item.created_at,
+        title: `Liquidity ${item.action_type} ${tokenALabel}/${tokenBLabel} (${item.dex_key})`,
+        status,
+        subtitle: item.reason_message || item.reason_code || `Liquidity ${item.liquidity_intent_id} (${item.status})`,
+        type: 'liquidity',
+        tokenSymbols: [tokenA, tokenB].filter(Boolean),
         raw: item
       });
     }
@@ -2652,6 +2733,57 @@ export default function AgentPublicProfilePage() {
                                   reasonMessage: (approvalRejectReasons[row.raw.approval_id] ?? '').trim() || 'Rejected by owner.'
                                 }).then(() => Promise.resolve()),
                               'Transfer denial submitted.'
+                            )
+                          }
+                        >
+                          Deny
+                        </button>
+                      </>
+                    ) : null}
+                    {isOwner && (row.status === 'pending' || row.status === 'approval_pending') && row.type === 'liquidity' ? (
+                      <>
+                        <input
+                          value={approvalRejectReasons[row.raw.liquidity_intent_id] ?? ''}
+                          onChange={(event) =>
+                            setApprovalRejectReasons((current) => ({
+                              ...current,
+                              [row.raw.liquidity_intent_id]: event.target.value
+                            }))
+                          }
+                          placeholder="Reason (optional)"
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void runManagementAction(
+                              () =>
+                                managementPost('/api/v1/management/approvals/decision', {
+                                  agentId,
+                                  subjectType: 'liquidity',
+                                  liquidityIntentId: row.raw.liquidity_intent_id,
+                                  decision: 'approve'
+                                }).then(() => Promise.resolve()),
+                              'Liquidity approval submitted.'
+                            )
+                          }
+                        >
+                          Approve
+                        </button>
+                        <button
+                          type="button"
+                          className={styles.dangerButton}
+                          onClick={() =>
+                            void runManagementAction(
+                              () =>
+                                managementPost('/api/v1/management/approvals/decision', {
+                                  agentId,
+                                  subjectType: 'liquidity',
+                                  liquidityIntentId: row.raw.liquidity_intent_id,
+                                  decision: 'reject',
+                                  reasonCode: 'approval_rejected',
+                                  reasonMessage: (approvalRejectReasons[row.raw.liquidity_intent_id] ?? '').trim() || 'Rejected by owner.'
+                                }).then(() => Promise.resolve()),
+                              'Liquidity rejection submitted.'
                             )
                           }
                         >

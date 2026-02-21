@@ -4011,3 +4011,40 @@ Note:
   - [x] `pm2 restart all`
   - [x] `python3 skills/xclaw-agent/scripts/openclaw_gateway_patch.py --json --restart`
 - [ ] Issue #60 evidence post + commit hash(es).
+
+### 118.1 Liquidity Approval + Wallet Activity Parity (All Chains)
+- [x] Add chain-scoped liquidity approval read models to management state:
+  - [x] `liquidityApprovalsQueue` from `liquidity_intents.status='approval_pending'`
+  - [x] `liquidityApprovalsHistory` from terminal/non-pending liquidity statuses.
+- [x] Extend approvals inbox API row kinds to include liquidity:
+  - [x] `types` filter supports `liquidity`
+  - [x] source query includes liquidity rows
+  - [x] status normalization parity (`approval_pending -> pending`, `approved|executing|verifying|filled -> approved`, `rejected|failed|expired|verification_timeout -> rejected`)
+  - [x] row copy contract: `Liquidity <action> <tokenA>/<tokenB> (<dex>)`.
+- [x] Extend batch decision API for liquidity:
+  - [x] `rowKind=liquidity` accepted
+  - [x] routes to `/api/v1/management/approvals/decision` with `subjectType=liquidity` + `liquidityIntentId`
+  - [x] reject `approve_allowlist` for non-trade rows with deterministic `payload_invalid` (`400`).
+- [x] Update `/agents/:id` owner surfaces:
+  - [x] wallet activity includes liquidity approval queue/history rows
+  - [x] approval history includes actionable pending liquidity rows and non-actionable terminal liquidity rows.
+- [x] Update `/approvals`:
+  - [x] liquidity type filter option
+  - [x] request fetch includes `types=trade,policy,transfer,liquidity`
+  - [x] decision handling supports liquidity approve/reject
+  - [x] bulk allowlist remains trade-only.
+- [x] Canonical docs/contracts synchronized:
+  - [x] `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - [x] `docs/api/openapi.v1.yaml`
+  - [x] `packages/shared-schemas/json/management-approvals-decision-batch-request.schema.json`
+  - [x] handoff artifacts (`spec.md`, `tasks.md`, `acceptance.md`).
+- [x] Required gates run sequentially:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run test:management:liquidity:decision`
+  - [x] task-specific inbox/agent-state liquidity verification
+  - [x] `npm run build`
+  - [x] `pm2 restart all`
+- [ ] Issue #61 evidence post + commit hash(es).

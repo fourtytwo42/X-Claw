@@ -3834,3 +3834,27 @@ Active slice context: `Slice 117` in progress.
 - [x] `npm run build`
 - [x] `pm2 restart all`
 - [x] `python3 skills/xclaw-agent/scripts/openclaw_gateway_patch.py --json --restart`
+
+---
+
+# Slice Tasks: Slice 118 Liquidity Approval + Wallet Activity Parity (Issue #61)
+
+Active slice context: `Slice 118`.
+
+## 1) Implementation
+- [x] Extend management agent-state payload with `liquidityApprovalsQueue` and `liquidityApprovalsHistory` (chain-scoped).
+- [x] Extend approvals inbox row kinds/filter parsing to include `liquidity`.
+- [x] Extend batch decision API to accept `rowKind=liquidity` and reject liquidity `approve_allowlist` with `payload_invalid`.
+- [x] Update `/agents/:id` wallet activity + approval history rendering/actions for liquidity pending + terminal rows.
+- [x] Update `/approvals` type filter and decision handling for liquidity rows and bulk actions.
+- [x] Sync canonical contracts/docs (`source-of-truth`, `openapi`, shared schema, tracker, roadmap, handoff artifacts).
+
+## 2) Validation
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run test:management:liquidity:decision`
+- [x] task-specific verification for inbox + agent-state liquidity rows
+- [x] `npm run build`
+- [x] `pm2 restart all`

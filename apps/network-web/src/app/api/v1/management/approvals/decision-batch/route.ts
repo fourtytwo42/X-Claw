@@ -9,7 +9,7 @@ import { validatePayload } from '@/lib/validation';
 type BatchDecisionRequest = {
   items: Array<{
     agentId: string;
-    rowKind: 'trade' | 'policy' | 'transfer';
+    rowKind: 'trade' | 'policy' | 'transfer' | 'liquidity';
     requestId: string;
     decision: 'approve' | 'reject' | 'approve_allowlist';
     chainKey?: string;
@@ -65,12 +65,38 @@ export async function POST(req: NextRequest) {
       let path = '';
       let payload: Record<string, unknown> = {};
 
+      if (item.rowKind !== 'trade' && item.decision === 'approve_allowlist') {
+        results.push({
+          requestId: item.requestId,
+          rowKind: item.rowKind,
+          decision: item.decision,
+          ok: false,
+          status: 400,
+          response: {
+            code: 'payload_invalid',
+            message: 'approve_allowlist is only supported for trade rows.',
+            actionHint: 'Use approve/reject for liquidity, policy, or transfer rows.'
+          }
+        });
+        continue;
+      }
+
       if (item.rowKind === 'trade' && item.decision === 'approve_allowlist') {
         path = '/api/v1/management/approvals/approve-allowlist-token';
         payload = { agentId: item.agentId, tradeId: item.requestId };
       } else if (item.rowKind === 'trade') {
         path = '/api/v1/management/approvals/decision';
         payload = { agentId: item.agentId, tradeId: item.requestId, decision: item.decision === 'reject' ? 'reject' : 'approve' };
+      } else if (item.rowKind === 'liquidity') {
+        const reasonMessage = typeof item.reasonMessage === 'string' ? item.reasonMessage.trim() : '';
+        path = '/api/v1/management/approvals/decision';
+        payload = {
+          agentId: item.agentId,
+          subjectType: 'liquidity',
+          liquidityIntentId: item.requestId,
+          decision: item.decision === 'reject' ? 'reject' : 'approve',
+          ...(reasonMessage ? { reasonMessage } : {})
+        };
       } else if (item.rowKind === 'policy') {
         path = '/api/v1/management/policy-approvals/decision';
         payload = {

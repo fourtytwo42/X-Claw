@@ -6490,3 +6490,41 @@ Active slice context: `Slice 117` in progress (issue `#60`).
 
 ## Live Runtime Patch Evidence
 - [x] `python3 skills/xclaw-agent/scripts/openclaw_gateway_patch.py --json --restart` -> `{"ok":true,"patched":true,...,"loaderPaths":[".../dist/plugin-sdk/reply-BKdTPI2b.js",".../dist/reply-oSe13ewW.js"]}`.
+
+---
+
+# Slice 118 Acceptance Evidence: Liquidity Approval + Wallet Activity Parity
+
+Date (UTC): 2026-02-21
+Issue: `#61`
+
+## Objective + Scope Lock
+- Objective: owner-surface parity for liquidity approvals/activity across `/agents/:id` and `/approvals`.
+- Scope lock:
+  - `apps/network-web/src/app/api/v1/management/agent-state/route.ts`
+  - `apps/network-web/src/app/api/v1/management/approvals/inbox/route.ts`
+  - `apps/network-web/src/app/api/v1/management/approvals/decision-batch/route.ts`
+  - `apps/network-web/src/lib/agent-page-view-model.ts`
+  - `apps/network-web/src/app/agents/[agentId]/page.tsx`
+  - `apps/network-web/src/app/approvals/page.tsx`
+  - canonical docs/schemas/handoff artifacts.
+
+## Behavior Checks
+- [x] agent-state includes chain-scoped `liquidityApprovalsQueue` + `liquidityApprovalsHistory`.
+- [x] approvals inbox supports `types=liquidity` with normalized status buckets.
+- [x] batch decisions support `rowKind=liquidity` approve/reject.
+- [x] batch decisions reject liquidity `approve_allowlist` with `payload_invalid`.
+- [x] `/agents/:id` wallet activity + approval history display liquidity pending and terminal rows.
+- [x] `/approvals` includes liquidity filter rows with actionable decisions.
+
+## Required Validation Gates
+- [x] `npm run db:parity` -> pass (`ok: true`).
+- [x] `npm run seed:reset` -> pass (`ok: true`).
+- [x] `npm run seed:load` -> pass (`ok: true`).
+- [x] `npm run seed:verify` -> pass (`ok: true`).
+- [x] `npm run test:management:liquidity:decision` -> pass (`ok: true`, `passed: 26`, `failed: 0`).
+- [x] `npm run build` -> pass (Next.js production build succeeded).
+- [x] `pm2 restart all` -> pass (`xclaw-web` online).
+
+## Task-Specific Evidence
+- [x] `XCLAW_UI_VERIFY_AGENT_ID=ag_slice7 XCLAW_UI_VERIFY_AGENT_API_KEY=slice7_token_abc12345 XCLAW_UI_VERIFY_BOOTSTRAP_TOKEN_FILE=/home/hendo420/.xclaw-secrets/management/ag_slice7-bootstrap-token.json npm run verify:ui:agent-approvals` -> pass (`ok: true`, approval row rendered under management session).

@@ -207,6 +207,40 @@ export type ManagementStatePayload = {
     decided_at: string | null;
     terminal_at: string | null;
   }>;
+  liquidityApprovalsQueue?: Array<{
+    liquidity_intent_id: string;
+    chain_key: string;
+    dex_key: string;
+    action_type: 'add' | 'remove' | string;
+    position_type: 'v2' | 'v3' | string;
+    token_a: string | null;
+    token_b: string | null;
+    amount_a: string | null;
+    amount_b: string | null;
+    status: string;
+    reason_code: string | null;
+    reason_message: string | null;
+    tx_hash: string | null;
+    created_at: string;
+    updated_at: string;
+  }>;
+  liquidityApprovalsHistory?: Array<{
+    liquidity_intent_id: string;
+    chain_key: string;
+    dex_key: string;
+    action_type: 'add' | 'remove' | string;
+    position_type: 'v2' | 'v3' | string;
+    token_a: string | null;
+    token_b: string | null;
+    amount_a: string | null;
+    amount_b: string | null;
+    status: string;
+    reason_code: string | null;
+    reason_message: string | null;
+    tx_hash: string | null;
+    created_at: string;
+    updated_at: string;
+  }>;
   transferApprovalPolicy?: {
     chainKey: string;
     transferApprovalMode: 'auto' | 'per_transfer';
