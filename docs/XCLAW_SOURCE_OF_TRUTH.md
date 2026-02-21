@@ -4690,3 +4690,6 @@ Supersession note (Slice 117 Hotfix D):
 - Real-mode trade execution responsiveness:
   - runtime `trade execute` must not block foreground command/chat handling on on-chain swap receipt confirmation,
   - after broadcast, runtime transitions trade to `verifying` and returns immediately; terminal `filled|failed` is converged asynchronously by watcher/server paths.
+- Telegram trade decision messaging truthfulness:
+  - approval decision acknowledgement must be non-terminal (no success claim before execution outcome),
+  - runtime must send a terminal follow-up message for trade outcome (`filled|failed|rejected|verification_timeout`) with tx/reason context when available.

@@ -3726,3 +3726,23 @@ Active slice context: `Slice 117` in progress.
 - [x] `npm run build`
 - [x] `pm2 restart all`
 - [ ] live repro: message agent immediately after approved swap no longer blocked by receipt wait.
+
+---
+
+# Hotfix Tasks: Slice 117 Hotfix L Truthful Trade Decision Messaging
+
+Active slice context: `Slice 117` in progress.
+
+## 1) Implementation
+- [x] Telegram trade approval acknowledgement copy no longer claims terminal success before execution outcome.
+- [x] Runtime trade decision path sends terminal follow-up Telegram message for `filled|failed|rejected|verification_timeout`.
+- [x] Added regression tests for copy contract and terminal follow-up emission.
+
+## 2) Validation
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`

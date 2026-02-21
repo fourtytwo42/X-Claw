@@ -3475,11 +3475,11 @@ def _maybe_send_telegram_decision_message(
 
     if decision == "approved":
         text = (
-            "Approved — swap accepted ✅\n\n"
+            "Approval received.\n\n"
             f"• Pair: {amount} {token_in} -> {token_out}{slip_str}\n"
             f"• Trade ID: `{trade_id}`\n"
             f"• Chain: `{chain}`\n\n"
-            "Executing now."
+            "Executing now. I will send a final success/failure update after on-chain outcome is known."
         )
     else:
         reason_code = str(trade.get("reasonCode") or "").strip()
@@ -3493,6 +3493,70 @@ def _maybe_send_telegram_decision_message(
             f"Reason: {reason}"
         )
 
+    openclaw = shutil.which("openclaw")
+    if not openclaw:
+        return
+    cmd = [openclaw, "message", "send", "--channel", "telegram", "--target", chat_id, "--message", text, "--json"]
+    if thread_id:
+        cmd.extend(["--thread-id", thread_id])
+    proc = _run_subprocess(cmd, timeout_sec=20, kind="openclaw_send")
+    if proc.returncode != 0:
+        return
+
+
+def _maybe_send_telegram_trade_terminal_message(
+    *,
+    trade_id: str,
+    chain: str,
+    status: str,
+    tx_hash: str | None = None,
+    reason_message: str | None = None,
+) -> None:
+    if _telegram_dispatch_suppressed_for_harness():
+        return
+    normalized = str(status or "").strip().lower()
+    if normalized not in {"filled", "failed", "rejected", "verification_timeout"}:
+        return
+    chat_id = ""
+    thread_id: str | None = None
+    prompt = _get_approval_prompt(trade_id)
+    if prompt and str(prompt.get("channel") or "") == "telegram":
+        chat_id = str(prompt.get("to") or "").strip()
+        thread_raw = prompt.get("threadId")
+        if isinstance(thread_raw, int):
+            thread_id = str(thread_raw)
+        elif isinstance(thread_raw, str) and thread_raw.strip():
+            thread_id = thread_raw.strip()
+    if not chat_id:
+        delivery = _read_openclaw_last_delivery()
+        if not delivery or str(delivery.get("lastChannel") or "").lower() != "telegram":
+            return
+        chat_id = str(delivery.get("lastTo") or "").strip()
+        if not chat_id:
+            return
+        thread_raw = delivery.get("lastThreadId")
+        if isinstance(thread_raw, int):
+            thread_id = str(thread_raw)
+        elif isinstance(thread_raw, str) and thread_raw.strip():
+            thread_id = thread_raw.strip()
+
+    tx_line = f"\nTx: `{tx_hash}`" if str(tx_hash or "").strip() else ""
+    if normalized == "filled":
+        text = (
+            "Swap completed.\n\n"
+            f"Trade: `{trade_id}`\n"
+            f"Chain: `{chain}`"
+            f"{tx_line}"
+        )
+    else:
+        reason = str(reason_message or "").strip() or "Execution failed."
+        text = (
+            "Swap failed.\n\n"
+            f"Trade: `{trade_id}`\n"
+            f"Chain: `{chain}`\n"
+            f"Reason: {reason}"
+            f"{tx_line}"
+        )
     openclaw = shutil.which("openclaw")
     if not openclaw:
         return
@@ -4482,6 +4546,16 @@ def cmd_approvals_decide_spot(args: argparse.Namespace) -> int:
         pass
     resume_code, resume_payload = _run_resume_spot_inline(trade_id, chain)
     exec_status = str(resume_payload.get("status") or ("filled" if bool(resume_payload.get("ok")) else "failed")).strip().lower()
+    try:
+        _maybe_send_telegram_trade_terminal_message(
+            trade_id=trade_id,
+            chain=chain,
+            status=exec_status,
+            tx_hash=str(resume_payload.get("txHash") or "").strip() or None,
+            reason_message=str(resume_payload.get("message") or "").strip() or None,
+        )
+    except Exception:
+        pass
     return emit(
         {
             "ok": bool(resume_code == 0),

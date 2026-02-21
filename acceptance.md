@@ -6338,3 +6338,31 @@ Active slice context: `Slice 117` in progress (issue `#60`).
   - `~/.local/bin/xclaw-agent` wrapper previously targeted `/home/hendo420/xclaw/...` (stale tree),
   - wrapper now targets `/home/hendo420/ETHDenver2026/apps/agent-runtime/bin/xclaw-agent`.
 - Live execute attempts in this session were dominated by upstream path behavior (approval state drift and one `ERC20_CALL_FAIL` revert), so deterministic non-blocking proof is locked by unit regression in this change plus launcher correction.
+
+---
+
+# Hotfix Acceptance Evidence: Slice 117 Hotfix L Truthful Trade Decision Messaging
+
+Date (UTC): 2026-02-21
+Active slice context: `Slice 117` in progress (issue `#60`).
+
+## Objective + Scope Lock
+- Objective: remove misleading pre-terminal success copy and ensure terminal trade outcome follow-up is emitted.
+- Scope lock:
+  - `apps/agent-runtime/xclaw_agent/cli.py`
+  - `apps/agent-runtime/tests/test_trade_path.py`
+  - canonical docs/handoff artifacts.
+
+## Behavior Checks
+- [x] approval decision copy is non-terminal (execution in progress, not success).
+- [x] terminal follow-up message helper exists and is called from `cmd_approvals_decide_spot` after resume result.
+- [x] regression tests cover copy contract and failure follow-up invocation.
+
+## Required Validation Gates
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`

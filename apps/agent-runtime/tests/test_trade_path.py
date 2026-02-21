@@ -406,6 +406,52 @@ class TradePathRuntimeTests(unittest.TestCase):
             trade = cli._wait_for_trade_approval("trd_1", "base_sepolia", {"tokenInSymbol": "WETH", "tokenOutSymbol": "USDC"})
         self.assertEqual(str(trade.get("status")), "approved")
 
+    def test_decision_message_approved_is_not_terminal_success_claim(self) -> None:
+        with mock.patch.object(
+            cli, "_get_approval_prompt", return_value={"channel": "telegram", "to": "123", "threadId": None}
+        ), mock.patch.object(
+            cli, "_run_subprocess", return_value=mock.Mock(returncode=0, stdout='{"ok":true}', stderr="")
+        ) as run_mock:
+            cli._maybe_send_telegram_decision_message(
+                trade_id="trd_demo",
+                chain="base_sepolia",
+                decision="approved",
+                summary={"amountInHuman": "10", "tokenInSymbol": "USDC", "tokenOutSymbol": "WETH"},
+                trade={"reasonMessage": None},
+            )
+        sent_cmd = run_mock.call_args.args[0]
+        message = sent_cmd[sent_cmd.index("--message") + 1]
+        self.assertIn("Approval received.", message)
+        self.assertIn("final success/failure update", message)
+        self.assertNotIn("swap accepted ✅", message)
+
+    def test_approvals_decide_spot_sends_terminal_failure_followup(self) -> None:
+        args = argparse.Namespace(
+            trade_id="trd_terminal",
+            decision="approve",
+            chain="base_sepolia",
+            source="runtime",
+            reason_message="",
+            idempotency_key=None,
+            decision_at=None,
+            json=True,
+        )
+        with mock.patch.object(
+            cli, "_read_trade_details", return_value={"status": "approved", "chainKey": "base_sepolia"}
+        ), mock.patch.object(
+            cli, "_cleanup_trade_approval_prompt", return_value={"ok": True, "code": "buttons_cleared"}
+        ), mock.patch.object(
+            cli, "_maybe_send_telegram_decision_message"
+        ), mock.patch.object(
+            cli, "_run_resume_spot_inline", return_value=(1, {"ok": False, "status": "failed", "message": "Insufficient USDC on chain."})
+        ), mock.patch.object(
+            cli, "_maybe_send_telegram_trade_terminal_message"
+        ) as terminal_msg_mock:
+            payload = self._run_and_parse_stdout(lambda: cli.cmd_approvals_decide_spot(args))
+        self.assertFalse(payload.get("ok"))
+        self.assertEqual(payload.get("status"), "failed")
+        terminal_msg_mock.assert_called_once()
+
     def test_intents_poll_success(self) -> None:
         args = argparse.Namespace(chain="hardhat_local", json=True)
         with mock.patch.object(
@@ -1285,7 +1331,8 @@ class TradePathRuntimeTests(unittest.TestCase):
         self.assertIn("--message", cmd)
         message = str(cmd[cmd.index("--message") + 1])
         self.assertIn("0.11 WETH -> USDC", message)
-        self.assertIn("Approved — swap accepted ✅", message)
+        self.assertIn("Approval received.", message)
+        self.assertIn("final success/failure update", message)
         self.assertIn("• Trade ID: `trd_1`", message)
         self.assertIn("• Chain: `base_sepolia`", message)
         self.assertNotIn("0xC97e903056f679ea1Db80893008A92578aDfE609", message)

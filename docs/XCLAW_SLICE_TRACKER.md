@@ -2384,3 +2384,16 @@ DoD:
 - [x] action hint and result payload explicitly communicate asynchronous terminal convergence.
 - [x] required gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
 - [ ] live repro evidence recorded: post-approve swap no longer blocks subsequent chat turn while waiting on confirmation.
+
+## Slice 117 Hotfix L: Truthful Trade Decision Messaging
+Status: [ ]
+Issue: #60
+
+Goal:
+- Keep owner-facing Telegram trade messaging truthful and concise across approval/execution outcomes.
+
+DoD:
+- [x] approval acknowledgment no longer claims terminal success before execution outcome.
+- [x] runtime decision path emits terminal trade follow-up message (`filled|failed|rejected|verification_timeout`).
+- [x] regression tests cover new copy contract + follow-up invocation.
+- [x] required gates rerun sequentially (`test_trade_path`, `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).

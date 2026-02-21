@@ -3930,3 +3930,19 @@ Note:
   - [x] `pm2 restart all`
 - [ ] Live evidence: approved swap path no longer blocks next foreground message while waiting for confirmation.
 - [ ] Issue #60 evidence post + commit hash(es).
+
+### 117.15 Hotfix L: Truthful Trade Decision Messaging
+- [x] Telegram approval acknowledgment copy changed from terminal-success wording to in-progress execution wording.
+- [x] `cmd_approvals_decide_spot` now sends terminal trade follow-up message for final outcome (`filled|failed|rejected|verification_timeout`).
+- [x] Runtime regression tests added/updated for:
+  - [x] non-terminal approval copy contract
+  - [x] terminal failure follow-up invocation
+- [x] Required gates run sequentially:
+  - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `pm2 restart all`
+- [ ] Issue #60 evidence post + commit hash(es).

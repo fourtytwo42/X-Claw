@@ -3436,3 +3436,7 @@ Ensure runtime never reports queued transfer approvals that are invisible in web
 1. Runtime `trade execute` must return immediately after tx broadcast and `verifying` transition (no foreground wait on swap receipt confirmation).
 2. Terminal status convergence for real-mode trades remains asynchronous via watcher/server status paths.
 3. Foreground agent chat responsiveness must not depend on on-chain confirmation latency.
+
+## Hotfix L extension (truthful decision copy + terminal trade follow-up)
+1. Telegram trade approval acknowledgement must be phrased as in-progress execution, not terminal success.
+2. Runtime `approvals decide-spot` must emit terminal Telegram follow-up message after resume result (`filled|failed|rejected|verification_timeout`).
