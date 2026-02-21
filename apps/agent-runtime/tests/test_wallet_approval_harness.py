@@ -124,6 +124,20 @@ class WalletApprovalHarnessUnitTests(unittest.TestCase):
         self.assertTrue(out.get("ok"))
         self.assertEqual(runner.retry_failures, [])
 
+    def test_management_post_with_retry_accepts_async_202_success(self) -> None:
+        runner = harness.WalletApprovalHarness(self._args())
+        with mock.patch.object(
+            runner,
+            "_http",
+            return_value=(202, {"ok": True, "status": "approved", "decisionInbox": {"status": "pending"}}),
+        ):
+            out = runner._management_post_with_retry(
+                "/management/transfer-approvals/decision",
+                {"agentId": "ag_test", "approvalId": "xfr_1", "decision": "approve"},
+                label="transfer_decision_native_approve",
+            )
+        self.assertTrue(out.get("ok"))
+
     def test_management_post_with_retry_exhaustion_contains_attempts(self) -> None:
         args = self._args()
         args.max_api_retries = 2
@@ -510,6 +524,75 @@ class WalletApprovalHarnessUnitTests(unittest.TestCase):
             runner._ensure_local_wallet_policy_chain_enabled()
             payload = json.loads(policy_path.read_text(encoding="utf-8"))
         self.assertTrue(bool(payload["chains"]["ethereum_sepolia"]["chain_enabled"]))
+
+    def test_wait_for_trade_status_uses_receipt_fallback_for_verifying_trade(self) -> None:
+        args = self._args()
+        args.chain = "hedera_testnet"
+        runner = harness.WalletApprovalHarness(args)
+        with mock.patch.object(
+            runner,
+            "_trade_read",
+            side_effect=[
+                {"tradeId": "trd_1", "status": "verifying", "txHash": "0x" + "aa" * 32},
+                {"tradeId": "trd_1", "status": "verifying", "txHash": "0x" + "aa" * 32},
+            ],
+        ), mock.patch.object(runner, "_trade_receipt_succeeded", return_value=True), mock.patch.object(
+            harness.time, "time", side_effect=[0, 1, 999]
+        ), mock.patch.object(harness.time, "sleep", return_value=None):
+            out = runner._wait_for_trade_status("trd_1", {"filled", "failed"}, timeout_sec=3)
+        self.assertEqual(str(out.get("status")), "filled")
+        self.assertEqual(str(out.get("statusSource")), "tx_receipt_fallback")
+
+    def test_wait_for_trade_status_raises_when_receipt_fallback_not_available(self) -> None:
+        args = self._args()
+        args.chain = "hedera_testnet"
+        runner = harness.WalletApprovalHarness(args)
+        with mock.patch.object(
+            runner,
+            "_trade_read",
+            side_effect=[
+                {"tradeId": "trd_2", "status": "verifying", "txHash": "0x" + "bb" * 32},
+                {"tradeId": "trd_2", "status": "verifying", "txHash": "0x" + "bb" * 32},
+            ],
+        ), mock.patch.object(runner, "_trade_receipt_succeeded", return_value=False), mock.patch.object(
+            harness.time, "time", side_effect=[0, 1, 999]
+        ), mock.patch.object(harness.time, "sleep", return_value=None):
+            with self.assertRaises(harness.HarnessError):
+                runner._wait_for_trade_status("trd_2", {"filled", "failed"}, timeout_sec=3)
+
+    def test_prepare_trade_pair_prefers_whbar_over_sauce_on_hedera(self) -> None:
+        args = self._args()
+        args.chain = "hedera_testnet"
+        runner = harness.WalletApprovalHarness(args)
+        with mock.patch.object(
+            runner,
+            "_balance_snapshot",
+            return_value={
+                "USDC": Decimal("0"),
+                "WETH": Decimal("0"),
+                "SAUCE": Decimal("20000000"),
+                "WHBAR": Decimal("900000000"),
+            },
+        ):
+            runner._prepare_trade_pair_and_amounts()
+        self.assertEqual(runner.trade_token_in, "WHBAR")
+        self.assertEqual(runner.trade_token_out, "SAUCE")
+
+    def test_prepare_trade_pair_requests_faucet_when_hedera_native_low(self) -> None:
+        args = self._args()
+        args.chain = "hedera_testnet"
+        runner = harness.WalletApprovalHarness(args)
+        with mock.patch.object(
+            runner,
+            "_balance_snapshot",
+            side_effect=[
+                {"NATIVE": Decimal("1000000000000000000"), "USDC": Decimal("0"), "WETH": Decimal("0"), "SAUCE": Decimal("0"), "WHBAR": Decimal("1")},
+                {"NATIVE": Decimal("6000000000000000000"), "USDC": Decimal("0"), "WETH": Decimal("0"), "SAUCE": Decimal("0"), "WHBAR": Decimal("1")},
+                {"NATIVE": Decimal("6000000000000000000"), "USDC": Decimal("0"), "WETH": Decimal("0"), "SAUCE": Decimal("0"), "WHBAR": Decimal("1")},
+            ],
+        ), mock.patch.object(runner, "_attempt_faucet_topup") as faucet_mock:
+            runner._prepare_trade_pair_and_amounts()
+        faucet_mock.assert_called_once()
 
 
 if __name__ == "__main__":

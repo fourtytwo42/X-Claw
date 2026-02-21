@@ -3068,6 +3068,7 @@ Supersession note (Slice 117 Hotfix D):
   - compact KPI chip row (wallet context preserved, analytics de-emphasized),
   - single continuous wallet workspace (no tab-primary navigation):
     - assets + approvals module (global and per-token approvals inline),
+    - liquidity positions must display canonical token symbols (and token names when available) for pair/pool rows, with shortened-address fallback when metadata is unavailable,
     - unified wallet activity timeline,
     - approval history module,
     - withdraw module in wallet context,

@@ -5517,6 +5517,38 @@ def _estimate_remove_amount_out_min(
     return max(0, min_a), max(0, min_b)
 
 
+def _estimate_add_amount_in_with_min(
+    *,
+    reserve_a: int,
+    reserve_b: int,
+    desired_a: int,
+    desired_b: int,
+    slippage_bps: int,
+) -> tuple[int, int, int, int]:
+    if reserve_a <= 0 or reserve_b <= 0:
+        raise WalletStoreError("Pair reserves must be greater than zero for add-liquidity estimate.")
+    if desired_a <= 0 or desired_b <= 0:
+        raise WalletStoreError("Desired token amounts must be greater than zero for add-liquidity estimate.")
+    if slippage_bps < 0 or slippage_bps > 5000:
+        raise WalletStoreError("slippageBps must be between 0 and 5000 for add-liquidity estimate.")
+
+    amount_b_optimal = (desired_a * reserve_b) // reserve_a
+    if amount_b_optimal <= desired_b:
+        amount_a = desired_a
+        amount_b = amount_b_optimal
+    else:
+        amount_a_optimal = (desired_b * reserve_a) // reserve_b
+        amount_a = amount_a_optimal
+        amount_b = desired_b
+    if amount_a <= 0 or amount_b <= 0:
+        amount_a = desired_a
+        amount_b = desired_b
+
+    min_a = (amount_a * max(0, 10000 - slippage_bps)) // 10000
+    min_b = (amount_b * max(0, 10000 - slippage_bps)) // 10000
+    return max(0, amount_a), max(0, amount_b), max(0, min_a), max(0, min_b)
+
+
 def _is_truthy_solidity_bool_output(raw_result: str) -> bool:
     text = str(raw_result or "").strip().lower()
     if text in {"0x1", "0x01"}:
@@ -5843,9 +5875,15 @@ def _preflight_liquidity_v2_add_execution(
         )
     except WalletStoreError as exc:
         msg_lower = str(exc).lower()
+        probe_a_kind = str(probe_a.get("kind") or "").strip().lower()
+        probe_b_kind = str(probe_b.get("kind") or "").strip().lower()
+        probe_unverifiable = probe_a_kind == "rpc_forbidden_unverifiable" and probe_b_kind == "rpc_forbidden_unverifiable"
         allow_bypass = (
             chain.startswith("hedera")
-            and str(os.environ.get("XCLAW_LIQUIDITY_ALLOW_SIMULATION_BYPASS") or "").strip() == "1"
+            and (
+                str(os.environ.get("XCLAW_LIQUIDITY_ALLOW_SIMULATION_BYPASS") or "").strip() == "1"
+                or probe_unverifiable
+            )
             and (
                 "safe token transfer failed" in msg_lower
                 or "sender account is a smart contract" in msg_lower
@@ -5915,8 +5953,25 @@ def _execute_liquidity_v2_add(intent: dict[str, Any], chain: str) -> dict[str, A
     token_b_decimals = int(token_b_meta.get("decimals", 18))
     amount_a_units = int(_to_units_uint(_decimal_text(amount_a_h), token_a_decimals))
     amount_b_units = int(_to_units_uint(_decimal_text(amount_b_h), token_b_decimals))
-    min_a_units = (amount_a_units * max(0, 10000 - slippage_bps)) // 10000
-    min_b_units = (amount_b_units * max(0, 10000 - slippage_bps)) // 10000
+    factory = _resolve_factory_from_router(chain, router)
+    pair = _resolve_pair_from_factory(chain, factory, token_a, token_b)
+    token0 = _parse_address_from_cast_output(_cast_call_stdout(chain, pair, "token0()(address)")).lower()
+    reserves_out = _cast_call_stdout(chain, pair, "getReserves()(uint112,uint112,uint32)")
+    reserve_values = _parse_uint_tuple_from_cast_output(reserves_out)
+    if len(reserve_values) < 2:
+        raise WalletStoreError("Unable to parse pair reserves for add-liquidity estimate.")
+    reserve0 = int(reserve_values[0])
+    reserve1 = int(reserve_values[1])
+    token_a_is_token0 = token_a.lower() == token0
+    reserve_a = reserve0 if token_a_is_token0 else reserve1
+    reserve_b = reserve1 if token_a_is_token0 else reserve0
+    amount_a_estimate_units, amount_b_estimate_units, min_a_units, min_b_units = _estimate_add_amount_in_with_min(
+        reserve_a=reserve_a,
+        reserve_b=reserve_b,
+        desired_a=amount_a_units,
+        desired_b=amount_b_units,
+        slippage_bps=slippage_bps,
+    )
 
     store = load_wallet_store()
     wallet_address, private_key_hex = _execution_wallet(store, chain)
@@ -5926,7 +5981,7 @@ def _execute_liquidity_v2_add(intent: dict[str, Any], chain: str) -> dict[str, A
         token_address=token_a,
         owner=wallet_address,
         spender=router,
-        required_units=amount_a_units,
+        required_units=amount_a_estimate_units,
         private_key_hex=private_key_hex,
     )
     _ensure_token_allowance(
@@ -5934,7 +5989,7 @@ def _execute_liquidity_v2_add(intent: dict[str, Any], chain: str) -> dict[str, A
         token_address=token_b,
         owner=wallet_address,
         spender=router,
-        required_units=amount_b_units,
+        required_units=amount_b_estimate_units,
         private_key_hex=private_key_hex,
     )
     preflight_details = _preflight_liquidity_v2_add_execution(
@@ -5975,6 +6030,8 @@ def _execute_liquidity_v2_add(intent: dict[str, Any], chain: str) -> dict[str, A
             "adapterFamily": adapter.protocol_family,
             "dex": adapter.dex,
             "action": "add",
+            "amountAEstimate": str(amount_a_estimate_units),
+            "amountBEstimate": str(amount_b_estimate_units),
             "minAmountA": str(min_a_units),
             "minAmountB": str(min_b_units),
             "preflight": preflight_details,

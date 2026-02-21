@@ -1078,6 +1078,23 @@ export default function AgentPublicProfilePage() {
     () => tokenSymbolByAddress(management.phase === 'ready' ? management.data.chainTokens : undefined),
     [management]
   );
+  const chainTokenNameByAddress = useMemo(() => {
+    const out = new Map<string, string>();
+    if (management.phase !== 'ready') {
+      return out;
+    }
+    for (const entry of management.data.chainTokens ?? []) {
+      const address = String(entry?.address ?? '').trim().toLowerCase();
+      if (!address) {
+        continue;
+      }
+      const displayName = String(entry?.tokenDisplay?.name ?? entry?.name ?? '').trim();
+      if (displayName) {
+        out.set(address, displayName);
+      }
+    }
+    return out;
+  }, [management]);
 
   const policyAllowedTokenSet = useMemo(
     () =>
@@ -2258,15 +2275,35 @@ export default function AgentPublicProfilePage() {
               <span className={styles.muted}>Chain-scoped LP and concentrated positions</span>
             </div>
             {liquidityPositions.length === 0 ? <p className={styles.muted}>No liquidity positions detected for this chain.</p> : null}
-            {liquidityPositions.map((position) => (
-              <div key={position.position_id} className={styles.listRow}>
-                <div>
-                  <div className={styles.listTitle}>
-                    {position.chain_key} • {position.dex_key.toUpperCase()} • {position.token_a}/{position.token_b}
-                  </div>
-                  <div className={styles.muted}>
-                    Type {position.position_type.toUpperCase()} • Pool/Pair {position.pool_ref}
-                  </div>
+            {liquidityPositions.map((position) => {
+              const tokenALabel = resolveTokenLabel(position.token_a, chainTokenSymbolByAddress);
+              const tokenBLabel = resolveTokenLabel(position.token_b, chainTokenSymbolByAddress);
+              const tokenAName = position.token_a?.startsWith('0x')
+                ? chainTokenNameByAddress.get(position.token_a.toLowerCase()) ?? null
+                : null;
+              const tokenBName = position.token_b?.startsWith('0x')
+                ? chainTokenNameByAddress.get(position.token_b.toLowerCase()) ?? null
+                : null;
+              const pairAddressParts = String(position.pool_ref ?? '')
+                .split('/')
+                .map((value) => value.trim())
+                .filter((value) => value.length > 0);
+              const pairRefDisplay =
+                pairAddressParts.length === 2
+                  ? `${resolveTokenLabel(pairAddressParts[0], chainTokenSymbolByAddress)}/${resolveTokenLabel(pairAddressParts[1], chainTokenSymbolByAddress)}`
+                  : position.pool_ref;
+              return (
+                <div key={position.position_id} className={styles.listRow}>
+                  <div>
+                    <div className={styles.listTitle}>
+                      {position.chain_key} • {position.dex_key.toUpperCase()} • {tokenALabel}/{tokenBLabel}
+                    </div>
+                    <div className={styles.muted}>
+                      Type {position.position_type.toUpperCase()} • Pool/Pair {pairRefDisplay}
+                    </div>
+                    <div className={styles.muted}>
+                      Tokens {tokenALabel}{tokenAName ? ` (${tokenAName})` : ''} / {tokenBLabel}{tokenBName ? ` (${tokenBName})` : ''}
+                    </div>
                   <div className={styles.muted}>
                     Deposited basis {position.deposited_a} / {position.deposited_b} • Current underlying {position.current_a} / {position.current_b}
                   </div>
@@ -2291,8 +2328,9 @@ export default function AgentPublicProfilePage() {
                   {position.stale ? <span className={`${styles.statusChip} ${styles.staleChip}`}>Stale</span> : null}
                   <span>{formatUtc(position.updated_at)} UTC</span>
                 </div>
-              </div>
-            ))}
+                </div>
+              );
+            })}
           </article>
 
             <article className={`${styles.card} ${styles.walletCard}`}>

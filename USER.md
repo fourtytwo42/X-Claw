@@ -6,7 +6,7 @@ _Learn about the person you're helping. Update this as you go._
 - **What to call them:**
 - **Pronouns:** _(optional)_
 - **Timezone:**
-- **Notes:**
+- **Notes:** Uses a custom USDC token on Base Sepolia that has 18 decimals (not 6).
 
 ## Context
 

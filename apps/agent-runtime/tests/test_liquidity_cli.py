@@ -383,6 +383,32 @@ class LiquidityCliTests(unittest.TestCase):
         self.assertEqual(mocked_post.call_args_list[1].args[1], "verifying")
         self.assertEqual(mocked_post.call_args_list[2].args[1], "filled")
 
+    def test_estimate_add_amount_in_with_min_uses_pool_ratio(self) -> None:
+        amount_a, amount_b, min_a, min_b = cli._estimate_add_amount_in_with_min(
+            reserve_a=1_000,
+            reserve_b=2_000,
+            desired_a=100,
+            desired_b=250,
+            slippage_bps=100,
+        )
+        self.assertEqual(amount_a, 100)
+        self.assertEqual(amount_b, 200)
+        self.assertEqual(min_a, 99)
+        self.assertEqual(min_b, 198)
+
+    def test_estimate_add_amount_in_with_min_falls_back_when_optimal_rounds_zero(self) -> None:
+        amount_a, amount_b, min_a, min_b = cli._estimate_add_amount_in_with_min(
+            reserve_a=1_000_000_000,
+            reserve_b=1,
+            desired_a=10,
+            desired_b=100,
+            slippage_bps=100,
+        )
+        self.assertEqual(amount_a, 10)
+        self.assertEqual(amount_b, 100)
+        self.assertEqual(min_a, 9)
+        self.assertEqual(min_b, 99)
+
     def test_execute_liquidity_v2_remove_allows_pair_id_fallback_without_snapshot(self) -> None:
         adapter = mock.Mock()
         adapter.protocol_family = "amm_v2"
@@ -710,6 +736,51 @@ class LiquidityCliTests(unittest.TestCase):
                     deadline="9999999999",
                 )
         self.assertEqual(ctx.exception.reason_code, "liquidity_preflight_router_revert")
+
+    def test_preflight_hedera_simulation_bypass_auto_when_probes_unverifiable(self) -> None:
+        sim_err = cli.WalletStoreError("execution reverted: Safe token transfer failed!")
+        with mock.patch.object(cli, "_fetch_token_balance_wei", side_effect=["1000", "1000"]), mock.patch.object(
+            cli, "_fetch_token_allowance_wei", side_effect=["1000", "1000"]
+        ), mock.patch.object(
+            cli, "_fetch_native_balance_wei", return_value=str(10**18)
+        ), mock.patch.object(
+            cli, "_resolve_factory_from_router", return_value="0x" + "aa" * 20
+        ), mock.patch.object(
+            cli, "_resolve_pair_from_factory", return_value="0x" + "bb" * 20
+        ), mock.patch.object(
+            cli, "_cast_call_stdout", side_effect=["(1000,1000,1)", sim_err]
+        ), mock.patch.object(
+            cli,
+            "_probe_transfer_from_eth_call",
+            side_effect=[
+                {"ok": False, "kind": "rpc_forbidden", "error": "HTTP Error 403"},
+                {"ok": False, "kind": "rpc_forbidden", "error": "HTTP Error 403"},
+            ],
+        ), mock.patch.object(
+            cli,
+            "_probe_transfer_eth_call",
+            side_effect=[
+                {"ok": False, "kind": "revert", "error": "HTTP Error 403"},
+                {"ok": False, "kind": "revert", "error": "HTTP Error 403"},
+            ],
+        ), mock.patch.dict(
+            cli.os.environ,
+            {"XCLAW_LIQUIDITY_ALLOW_SIMULATION_BYPASS": "0"},
+            clear=False,
+        ):
+            details = cli._preflight_liquidity_v2_add_execution(
+                chain="hedera_testnet",
+                token_a="0x" + "11" * 20,
+                token_b="0x" + "22" * 20,
+                amount_a_units=10,
+                amount_b_units=10,
+                min_a_units=1,
+                min_b_units=1,
+                wallet_address="0x" + "33" * 20,
+                router="0x" + "44" * 20,
+                deadline="9999999999",
+            )
+        self.assertEqual((details.get("simulationWarning") or {}).get("code"), "liquidity_preflight_router_revert_bypassed")
 
     def test_resolve_token_address_applies_chain_alias_mapping(self) -> None:
         with mock.patch.object(
