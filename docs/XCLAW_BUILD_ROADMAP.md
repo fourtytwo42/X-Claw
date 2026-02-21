@@ -4047,4 +4047,4 @@ Note:
   - [x] task-specific inbox/agent-state liquidity verification
   - [x] `npm run build`
   - [x] `pm2 restart all`
-- [ ] Issue #61 evidence post + commit hash(es).
+- [x] Issue #61 evidence post + commit hash(es).

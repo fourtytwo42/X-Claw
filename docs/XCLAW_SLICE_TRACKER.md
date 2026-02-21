@@ -2474,4 +2474,4 @@ DoD:
 - [x] canonical artifacts sync in same change (`docs/XCLAW_SOURCE_OF_TRUTH.md`, `docs/api/openapi.v1.yaml`, `packages/shared-schemas/json/management-approvals-decision-batch-request.schema.json`).
 - [x] handoff artifacts updated in same change (`spec.md`, `tasks.md`, `acceptance.md`).
 - [x] required gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, task-specific tests, `build`, `pm2 restart all`).
-- [ ] issue #61 updated with verification evidence + commit hash(es).
+- [x] issue #61 updated with verification evidence + commit hash(es).
