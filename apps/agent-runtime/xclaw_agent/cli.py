@@ -107,6 +107,7 @@ DEFAULT_TX_SEND_MAX_ATTEMPTS = 5
 TX_GAS_PRICE_BUMP_GWEI = 20
 DEFAULT_TX_RETRY_BUMP_BPS = 1250
 DEFAULT_TX_PRIORITY_FLOOR_GWEI = 1
+DEFAULT_TX_ESTIMATE_BYPASS_GAS_LIMIT = 900000
 LIMIT_ORDER_STORE_VERSION = 1
 AGENT_RECOVERY_ACTION = "agent_key_recovery"
 ERC8021_MAGIC_REPEAT_COUNT = 8
@@ -858,6 +859,17 @@ def _is_rpc_endpoint_healthy(rpc_url: str) -> bool:
 
 
 def _chain_rpc_url(chain: str) -> str:
+    candidates = _chain_rpc_candidates(chain)
+    if len(candidates) == 1:
+        return candidates[0]
+    for candidate in candidates:
+        if _is_rpc_endpoint_healthy(candidate):
+            return candidate
+    # If health probes fail for all, return the configured fallback endpoint first.
+    return candidates[-1]
+
+
+def _chain_rpc_candidates(chain: str) -> list[str]:
     cfg = _load_chain_config(chain)
     rpc = cfg.get("rpc")
     if not isinstance(rpc, dict):
@@ -872,13 +884,7 @@ def _chain_rpc_url(chain: str) -> str:
                 candidates.append(normalized)
     if not candidates:
         raise WalletStoreError(f"Chain config for '{chain}' has no usable rpc URL.")
-    if len(candidates) == 1:
-        return candidates[0]
-    for candidate in candidates:
-        if _is_rpc_endpoint_healthy(candidate):
-            return candidate
-    # If health probes fail for all, return the configured fallback endpoint first.
-    return candidates[-1]
+    return candidates
 
 
 def _utc_day_key(now_utc: datetime | None = None) -> str:
@@ -5987,6 +5993,38 @@ def _preflight_liquidity_v2_add_execution(
         probe_a_kind = str(probe_a.get("kind") or "").strip().lower()
         probe_b_kind = str(probe_b.get("kind") or "").strip().lower()
         probe_unverifiable = probe_a_kind == "rpc_forbidden_unverifiable" and probe_b_kind == "rpc_forbidden_unverifiable"
+        if probe_unverifiable and "transferhelper::transferfrom: transferfrom failed" in msg_lower:
+            retry_errors: list[str] = []
+            for rpc_url in _chain_rpc_candidates(chain):
+                try:
+                    _cast_call_stdout_with_rpc(
+                        rpc_url,
+                        router,
+                        "addLiquidity(address,address,uint256,uint256,uint256,uint256,address,uint256)(uint256,uint256,uint256)",
+                        token_a,
+                        token_b,
+                        str(amount_a_units),
+                        str(amount_b_units),
+                        str(min_a_units),
+                        str(min_b_units),
+                        wallet_address,
+                        deadline,
+                    )
+                    simulation_warning = {
+                        "code": "liquidity_preflight_router_transfer_from_retry_success",
+                        "message": "addLiquidity simulation passed on alternate RPC after initial transferFrom failure.",
+                    }
+                    break
+                except WalletStoreError as retry_exc:
+                    retry_errors.append(str(retry_exc)[:180])
+            if simulation_warning is None and retry_errors:
+                msg_lower = f"{msg_lower}; retry={'; '.join(retry_errors)}"
+        allow_sepolia_transferfrom_bypass = (
+            chain == "ethereum_sepolia"
+            and str(os.environ.get("XCLAW_LIQUIDITY_ALLOW_SEPOLIA_TRANSFERFROM_BYPASS") or "").strip() == "1"
+            and probe_unverifiable
+            and "transferhelper::transferfrom: transferfrom failed" in msg_lower
+        )
         allow_bypass = (
             chain.startswith("hedera")
             and (
@@ -5998,14 +6036,24 @@ def _preflight_liquidity_v2_add_execution(
                 or "sender account is a smart contract" in msg_lower
             )
         )
-        if allow_bypass:
+        if simulation_warning is not None:
+            pass
+        elif allow_sepolia_transferfrom_bypass:
+            simulation_warning = {
+                "code": "liquidity_preflight_router_transfer_from_unverifiable_bypassed",
+                "message": str(exc)[:500],
+            }
+        elif allow_bypass:
             simulation_warning = {
                 "code": "liquidity_preflight_router_revert_bypassed",
                 "message": str(exc)[:500],
             }
         else:
+            reason_code = "liquidity_preflight_router_revert"
+            if "transferhelper::transferfrom: transferfrom failed" in msg_lower:
+                reason_code = "liquidity_preflight_router_transfer_from_failed"
             raise LiquidityExecutionError(
-                "liquidity_preflight_router_revert",
+                reason_code,
                 f"addLiquidity simulation failed before submit: {exc}",
                 details={
                     "pair": pair.lower(),
@@ -6085,12 +6133,14 @@ def _execute_liquidity_v2_add(intent: dict[str, Any], chain: str) -> dict[str, A
     store = load_wallet_store()
     wallet_address, private_key_hex = _execution_wallet(store, chain)
     deadline = str(int(datetime.now(timezone.utc).timestamp()) + 120)
+    # Approve desired max units (not only estimate) so reserve drift between estimate and submit
+    # cannot under-approve and cause router transferFrom failures.
     _ensure_token_allowance(
         chain=chain,
         token_address=token_a,
         owner=wallet_address,
         spender=router,
-        required_units=amount_a_estimate_units,
+        required_units=max(amount_a_units, amount_a_estimate_units),
         private_key_hex=private_key_hex,
     )
     _ensure_token_allowance(
@@ -6098,7 +6148,7 @@ def _execute_liquidity_v2_add(intent: dict[str, Any], chain: str) -> dict[str, A
         token_address=token_b,
         owner=wallet_address,
         spender=router,
-        required_units=amount_b_estimate_units,
+        required_units=max(amount_b_units, amount_b_estimate_units),
         private_key_hex=private_key_hex,
     )
     preflight_details = _preflight_liquidity_v2_add_execution(
@@ -6733,9 +6783,8 @@ def _router_get_amount_out(chain: str, amount_in_units: str, token_in: str, toke
         raise WalletStoreError(str(exc)) from exc
 
 
-def _cast_call_stdout(chain: str, contract: str, signature: str, *args: str) -> str:
+def _cast_call_stdout_with_rpc(rpc_url: str, contract: str, signature: str, *args: str) -> str:
     cast_bin = _require_cast_bin()
-    rpc_url = _chain_rpc_url(chain)
     cmd = [cast_bin, "call", contract, signature]
     cmd.extend([str(a) for a in args])
     cmd.extend(["--rpc-url", rpc_url])
@@ -6746,6 +6795,10 @@ def _cast_call_stdout(chain: str, contract: str, signature: str, *args: str) -> 
         msg = stderr or stdout or "cast call failed"
         raise WalletStoreError(msg)
     return (proc.stdout or "").strip()
+
+
+def _cast_call_stdout(chain: str, contract: str, signature: str, *args: str) -> str:
+    return _cast_call_stdout_with_rpc(_chain_rpc_url(chain), contract, signature, *args)
 
 
 def _parse_address_from_cast_output(raw: str) -> str:
@@ -9461,8 +9514,38 @@ def _retryable_send_error(stderr: str) -> bool:
         "already known",
         "temporarily underpriced",
         "transaction underpriced",
+        "temporary internal error",
+        '"code":19',
+        "error code 19",
     )
     return any(fragment in normalized for fragment in retryable_fragments)
+
+
+def _send_error_requires_estimate_bypass(stderr: str) -> bool:
+    normalized = str(stderr or "").strip().lower()
+    if not normalized:
+        return False
+    bypass_fragments = (
+        "failed to estimate gas",
+        "eth_estimategas",
+        "execution reverted: ds-math-sub-underflow",
+    )
+    return any(fragment in normalized for fragment in bypass_fragments)
+
+
+def _tx_estimate_bypass_gas_limit(chain: str | None) -> int | None:
+    raw = (os.environ.get("XCLAW_TX_ESTIMATE_BYPASS_GAS_LIMIT") or "").strip()
+    if raw:
+        if not re.fullmatch(r"[0-9]+", raw):
+            raise WalletStoreError("XCLAW_TX_ESTIMATE_BYPASS_GAS_LIMIT must be an integer >= 21000.")
+        parsed = int(raw)
+        if parsed < 21000:
+            raise WalletStoreError("XCLAW_TX_ESTIMATE_BYPASS_GAS_LIMIT must be >= 21000.")
+        return parsed
+    chain_key = str(chain or "").strip().lower()
+    if chain_key in {"ethereum_sepolia", "base_sepolia"}:
+        return DEFAULT_TX_ESTIMATE_BYPASS_GAS_LIMIT
+    return None
 
 
 def _legacy_gas_price_multiplier(chain: str | None) -> int:
@@ -9874,84 +9957,105 @@ def _cast_rpc_send_transaction(
             data, attribution_meta = _apply_builder_code_suffix_if_needed(str(chain), data)
         attempts = _tx_send_max_attempts()
         last_err = "cast send failed."
-        nonce_override: int | None = None
-        forced_legacy_gas_price_wei: int | None = None
-        for attempt in range(attempts):
-            nonce: int | None
-            if nonce_override is not None:
-                nonce = nonce_override
-            elif attempt == 0:
-                # Let the RPC assign nonce for first submit to avoid accidental
-                # replacement races with concurrent in-flight txs.
-                nonce = None
-            else:
-                nonce_pending = _cast_nonce(cast_bin, rpc_url, from_addr, "pending")
-                nonce_latest = _cast_nonce(cast_bin, rpc_url, from_addr, "latest")
-                nonce_candidates = [value for value in (nonce_pending, nonce_latest) if value is not None]
-                nonce = max(nonce_candidates) if nonce_candidates else None
+        rpc_candidates = [rpc_url]
+        if chain:
+            for candidate in _chain_rpc_candidates(str(chain)):
+                if candidate not in rpc_candidates:
+                    rpc_candidates.append(candidate)
+        for rpc_index, rpc_candidate in enumerate(rpc_candidates):
+            nonce_override: int | None = None
+            forced_legacy_gas_price_wei: int | None = None
+            forced_gas_limit: int | None = None
+            for attempt in range(attempts):
+                nonce: int | None
+                if nonce_override is not None:
+                    nonce = nonce_override
+                elif attempt == 0:
+                    # Let the RPC assign nonce for first submit to avoid accidental
+                    # replacement races with concurrent in-flight txs.
+                    nonce = None
+                else:
+                    nonce_pending = _cast_nonce(cast_bin, rpc_candidate, from_addr, "pending")
+                    nonce_latest = _cast_nonce(cast_bin, rpc_candidate, from_addr, "latest")
+                    nonce_candidates = [value for value in (nonce_pending, nonce_latest) if value is not None]
+                    nonce = max(nonce_candidates) if nonce_candidates else None
 
-            fee_plan = _estimate_tx_fees(rpc_url, attempt)
-            send_cmd = [
-                cast_bin,
-                "send",
-                "--json",
-                "--rpc-url",
-                rpc_url,
-                "--private-key",
-                private_key_hex,
-            ]
-            if str(fee_plan.get("mode")) == "eip1559":
-                max_fee = int(fee_plan.get("maxFeePerGas", 0))
-                max_priority = int(fee_plan.get("maxPriorityFeePerGas", 0))
-                send_cmd.extend(["--max-fee-per-gas", str(max_fee), "--priority-gas-price", str(max_priority)])
-            else:
-                gas_price = int(fee_plan.get("gasPrice", 0))
-                gas_price *= _legacy_gas_price_multiplier(chain)
-                if forced_legacy_gas_price_wei is not None:
-                    gas_price = max(gas_price, forced_legacy_gas_price_wei)
-                if gas_price <= 0:
-                    raise WalletStoreError("Legacy fee estimation returned invalid gas price.")
-                send_cmd.extend(["--gas-price", str(gas_price)])
-            if nonce is not None:
-                send_cmd.extend(["--nonce", str(nonce)])
-            send_cmd.extend(
-                [
-                    "--from",
-                    from_addr,
-                    to_addr,
+                fee_plan = _estimate_tx_fees(rpc_candidate, attempt)
+                send_cmd = [
+                    cast_bin,
+                    "send",
+                    "--json",
+                    "--rpc-url",
+                    rpc_candidate,
+                    "--private-key",
+                    private_key_hex,
                 ]
-            )
-            if data != "0x":
-                send_cmd.append(data)
-            if value_wei is not None and value_wei != "0":
-                send_cmd.extend(["--value", value_wei])
-            proc = _run_subprocess(send_cmd, timeout_sec=_cast_send_timeout_sec(), kind="cast_send")
-            if proc.returncode == 0:
-                tx_hash = _extract_tx_hash(proc.stdout)
-                _record_tx_builder_attribution(tx_hash, attribution_meta)
-                return tx_hash
+                if str(fee_plan.get("mode")) == "eip1559":
+                    max_fee = int(fee_plan.get("maxFeePerGas", 0))
+                    max_priority = int(fee_plan.get("maxPriorityFeePerGas", 0))
+                    send_cmd.extend(["--max-fee-per-gas", str(max_fee), "--priority-gas-price", str(max_priority)])
+                else:
+                    gas_price = int(fee_plan.get("gasPrice", 0))
+                    gas_price *= _legacy_gas_price_multiplier(chain)
+                    if forced_legacy_gas_price_wei is not None:
+                        gas_price = max(gas_price, forced_legacy_gas_price_wei)
+                    if gas_price <= 0:
+                        raise WalletStoreError("Legacy fee estimation returned invalid gas price.")
+                    send_cmd.extend(["--gas-price", str(gas_price)])
+                if forced_gas_limit is not None:
+                    send_cmd.extend(["--gas-limit", str(forced_gas_limit)])
+                if nonce is not None:
+                    send_cmd.extend(["--nonce", str(nonce)])
+                send_cmd.extend(
+                    [
+                        "--from",
+                        from_addr,
+                        to_addr,
+                    ]
+                )
+                if data != "0x":
+                    send_cmd.append(data)
+                if value_wei is not None and value_wei != "0":
+                    send_cmd.extend(["--value", value_wei])
+                proc = _run_subprocess(send_cmd, timeout_sec=_cast_send_timeout_sec(), kind="cast_send")
+                if proc.returncode == 0:
+                    tx_hash = _extract_tx_hash(proc.stdout)
+                    _record_tx_builder_attribution(tx_hash, attribution_meta)
+                    return tx_hash
 
-            stderr = (proc.stderr or "").strip()
-            stdout = (proc.stdout or "").strip()
-            last_err = stderr or stdout or "cast send failed."
-            min_gas_price = _parse_min_gas_price_wei_from_error(last_err)
-            if min_gas_price is not None:
-                forced_legacy_gas_price_wei = max(forced_legacy_gas_price_wei or 0, min_gas_price)
-            if attempt < (attempts - 1) and min_gas_price is not None:
+                stderr = (proc.stderr or "").strip()
+                stdout = (proc.stdout or "").strip()
+                last_err = stderr or stdout or "cast send failed."
+                min_gas_price = _parse_min_gas_price_wei_from_error(last_err)
+                if min_gas_price is not None:
+                    forced_legacy_gas_price_wei = max(forced_legacy_gas_price_wei or 0, min_gas_price)
+                if attempt < (attempts - 1) and min_gas_price is not None:
+                    time.sleep(0.25)
+                    continue
+                if attempt < (attempts - 1) and forced_gas_limit is None and _send_error_requires_estimate_bypass(last_err):
+                    bypass_gas_limit = _tx_estimate_bypass_gas_limit(chain)
+                    if bypass_gas_limit is not None:
+                        forced_gas_limit = bypass_gas_limit
+                        time.sleep(0.2)
+                        continue
+                next_nonce = _parse_next_nonce_from_error(last_err)
+                if attempt < (attempts - 1) and next_nonce is not None:
+                    nonce_override = next_nonce
+                    time.sleep(0.25)
+                    continue
+                if attempt < (attempts - 1) and _retryable_send_error(last_err):
+                    time.sleep(0.25)
+                    continue
+                if attempt < (attempts - 1):
+                    raise WalletStoreError(last_err)
+            if rpc_index < (len(rpc_candidates) - 1) and (
+                _retryable_send_error(last_err) or _send_error_requires_estimate_bypass(last_err)
+            ):
                 time.sleep(0.25)
                 continue
-            next_nonce = _parse_next_nonce_from_error(last_err)
-            if attempt < (attempts - 1) and next_nonce is not None:
-                nonce_override = next_nonce
-                time.sleep(0.25)
-                continue
-            if attempt < (attempts - 1) and _retryable_send_error(last_err):
-                time.sleep(0.25)
-                continue
-            if attempt < (attempts - 1):
-                raise WalletStoreError(last_err)
+            break
 
-        raise WalletStoreError(f"{last_err} (after {attempts} attempts)")
+        raise WalletStoreError(f"{last_err} (after {attempts} attempts across {len(rpc_candidates)} rpc candidate(s))")
     else:
         tx_payload = dict(tx_obj or {})
         attribution_meta = _default_builder_attribution(str(chain or "").strip())

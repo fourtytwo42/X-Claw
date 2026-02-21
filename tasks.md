@@ -1,5 +1,118 @@
 # Slice 95 Tasks: Hedera EVM Pair Discovery + HTS JDK Auto-Setup (2026-02-19)
 
+# Hotfix Tasks: Sepolia Remove Gas-Estimate False-Negative Recovery (2026-02-21)
+
+Active slice context: `Slice 118` in progress (`Follow-Up E`).
+
+## 1) Scope lock
+- [x] Restrict scope to runtime send reliability for Sepolia LP remove false-negative estimate failures.
+- [x] Avoid API/schema/migration/provider-selection changes.
+
+## 2) Implementation
+- [x] Extend runtime send retry classification to include temporary upstream/internal RPC failures (including code `19`).
+- [x] Add explicit gas-limit retry fallback for estimate-failure signatures on Sepolia chains (`XCLAW_TX_ESTIMATE_BYPASS_GAS_LIMIT`, default `900000`).
+- [x] Add regression tests for estimate-failure detection and gas-limit retry behavior.
+- [x] Capture closed-loop Sepolia remove evidence with terminal `filled` state.
+- [x] Sync canonical artifacts and handoff docs in the same change.
+
+## 3) Validation
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v`
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+
+# Hotfix Tasks: Sepolia TransferFrom Unverifiable Opt-In Bypass (2026-02-21)
+
+Active slice context: `Slice 118` in progress (`Follow-Up D`).
+
+## 1) Scope lock
+- [x] Restrict scope to Sepolia LP-add preflight false-negative override, default fail-closed.
+- [x] Avoid API/schema/migration/provider-selection changes.
+
+## 2) Implementation
+- [x] Add `ethereum_sepolia`-only env-gated bypass for transferFrom simulation failures under probe-unverifiable conditions.
+- [x] Surface deterministic warning code `liquidity_preflight_router_transfer_from_unverifiable_bypassed` on bypassed preflight.
+- [x] Add regression tests for bypass enabled/disabled behavior.
+- [x] Enable local env toggle in runtime config: `XCLAW_LIQUIDITY_ALLOW_SEPOLIA_TRANSFERFROM_BYPASS=1`.
+- [x] Sync canonical artifacts and handoff docs in the same change.
+
+## 3) Validation
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v`
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+
+# Hotfix Tasks: Sepolia LP Add RPC-Retry Preflight Stability (2026-02-21)
+
+Active slice context: `Slice 118` in progress (`Follow-Up C`).
+
+## 1) Scope lock
+- [x] Restrict scope to LP add preflight simulation resilience and deterministic metadata.
+- [x] Avoid API/schema/migration changes.
+
+## 2) Implementation
+- [x] Add chain RPC-candidate helper and explicit cast-call-by-rpc helper in runtime CLI.
+- [x] Retry `addLiquidity` simulation across configured RPC candidates only when probes are `rpc_forbidden_unverifiable` and initial simulation reports `TransferHelper::transferFrom` failure.
+- [x] Emit deterministic warning metadata (`liquidity_preflight_router_transfer_from_retry_success`) when retry succeeds.
+- [x] Preserve fail-closed preflight rejection when all retry attempts fail.
+- [x] Add regression test for alternate-RPC retry success path.
+- [x] Sync canonical artifacts and handoff docs in the same change.
+
+## 3) Validation
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v`
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+
+# Hotfix Tasks: Installer Hosted-Default API Base + Local Opt-In (2026-02-21)
+
+Active slice context: `Slice 117 Hotfix G` installer contract addendum.
+
+## 1) Scope lock
+- [x] Keep scope limited to installer API base selection and documentation sync.
+- [x] Preserve existing explicit override behavior via env.
+
+## 2) Implementation
+- [x] Shell installer defaults canonical API base to hosted endpoint unless `XCLAW_INSTALL_FORCE_LOCAL_API=1`.
+- [x] PowerShell installer mirrors the same hosted-default/local-opt-in behavior.
+- [x] Installer reference docs and source-of-truth addendum updated in the same change.
+
+## 3) Validation
+- [x] `npm run build`
+- [x] `pm2 restart all`
+
+# Hotfix Tasks: Sepolia Uniswap LP Add TransferFrom Determinism + Allowance Coverage (2026-02-21)
+
+Active slice context: `Slice 118` in progress (`Follow-Up B`).
+
+## 1) Scope lock
+- [x] Restrict scope to runtime LP add allowance coverage and preflight reason-code determinism.
+- [x] Avoid API/schema/migration changes.
+
+## 2) Implementation
+- [x] Update v2 add execution allowance approvals to cover desired max units (`amountA`/`amountB`), not estimate-only units.
+- [x] Map router simulation `TransferHelper::transferFrom` revert signature to deterministic `liquidity_preflight_router_transfer_from_failed`.
+- [x] Add regression tests for desired-max allowance coverage and transferFrom-specific reason-code mapping.
+- [x] Sync canonical artifacts and handoff docs in the same change.
+
+## 3) Validation
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v`
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+
 Active slice context: `Slice 95` remains in progress.
 
 ## 1) Scope lock

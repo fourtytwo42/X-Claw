@@ -1304,9 +1304,15 @@ Liquidity adapter execution contract:
 - `liquidity execute/resume` runtime execution scope for Slice 95 is limited to `amm_v2` and `hedera_hts`; `amm_v3` execution must fail with `unsupported_liquidity_execution_family`.
 - Runtime liquidity execution must persist lifecycle transitions through `/api/v1/liquidity/{intentId}/status`: `approved -> executing -> verifying -> filled|failed|verification_timeout` with `txHash` when available.
 - `amm_v2` add execution must run deterministic pre-submit checks (wallet token/native balance, pair reserves, router simulation) and emit explicit preflight reason codes (`liquidity_preflight_*`) when blocked.
+- `amm_v2` add execution must ensure ERC20 allowances cover desired add inputs (`amountA`/`amountB`) so reserve drift cannot under-approve between estimate and submit.
+- Router simulation failures containing `TransferHelper::transferFrom: transferFrom failed` must map to deterministic preflight reason code `liquidity_preflight_router_transfer_from_failed`.
+- If `amm_v2` add preflight probes are RPC-forbidden/unverifiable and router simulation hits `TransferHelper::transferFrom: transferFrom failed`, runtime must retry simulation across configured chain RPC candidates before failing closed.
+- For `ethereum_sepolia` only, runtime may opt-in bypass of the above unverifiable transferFrom simulation failure when `XCLAW_LIQUIDITY_ALLOW_SEPOLIA_TRANSFERFROM_BYPASS=1`, surfacing warning code `liquidity_preflight_router_transfer_from_unverifiable_bypassed`.
 - Hedera EVM `amm_v2` add supports opt-in simulation bypass for known false-positive simulation signatures when `XCLAW_LIQUIDITY_ALLOW_SIMULATION_BYPASS=1`; bypass metadata must be returned in preflight details.
 - `liquidity remove` execution derives token pair and LP amount from stored position snapshot + on-chain LP balance percent; when snapshot is unavailable and `positionRef` is a pair address, runtime may resolve `token0/token1` directly from pair.
 - `liquidity remove` must preflight computed LP units before proposal and execution; when computed units are zero, runtime must fail deterministically with `liquidity_preflight_zero_lp_balance` (no approval queue for proposal path).
+- Runtime transaction submission must recover from retryable RPC send failures by retrying across configured chain RPC candidates; retryable classes include temporary upstream/internal errors (for example RPC code `19`).
+- On `ethereum_sepolia` and `base_sepolia`, when `cast send` fails with gas-estimation false-negative signatures (`Failed to estimate gas`, including `ds-math-sub-underflow` estimate-time reverts), runtime may retry submit with explicit gas limit (`XCLAW_TX_ESTIMATE_BYPASS_GAS_LIMIT`, default `900000`) before failing.
 - Hedera pair remove path must resolve LP token via `pair.lpToken()` when available (fallback to pair contract token model otherwise).
 - Liquidity status writer must treat `remove` intents as percent-based, not token-underlying amounts: on `filled remove`, snapshot current balances are reduced/closed without overwriting deposited/current with intent `amount_a/amount_b` (`100/0` must never become POSITION underlying).
 - Snapshot sync must heal placeholder liquidity rows by backfilling token/pool from canonical add provenance and auto-close active rows when a canonical `filled remove` at `100%` exists for that `position_ref`.
@@ -4694,9 +4700,10 @@ Supersession note (Slice 117 Hotfix D):
   - `XCLAW_AGENT_API_KEY`: explicit env -> bootstrap-issued env -> OpenClaw config/env/apiKey,
   - `XCLAW_DEFAULT_CHAIN`: explicit env -> OpenClaw config -> `base_sepolia`,
   - `XCLAW_WALLET_PASSPHRASE`: explicit env -> OpenClaw config -> encrypted local backup.
-- Installer canonical API base must derive from install origin:
-  - local installer origin (`localhost|127.0.0.1`) -> `http://127.0.0.1:3000/api/v1`,
-  - production installer origin (`https://xclaw.trade`) -> `https://xclaw.trade/api/v1`.
+- Installer canonical API base contract:
+  - default canonical API base is hosted `https://xclaw.trade/api/v1`,
+  - local API base `http://127.0.0.1:3000/api/v1` is opt-in only via `XCLAW_INSTALL_FORCE_LOCAL_API=1`,
+  - production installer origin (`https://xclaw.trade`) remains hosted canonical.
 - Single-agent host policy is authoritative for installer-managed run-loop:
   - bootstrap-issued agent credentials replace stale run-loop env credentials on final setup pass.
 - Installer must emit deterministic run-loop summary lines:

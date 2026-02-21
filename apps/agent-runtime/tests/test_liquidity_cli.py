@@ -497,6 +497,63 @@ class LiquidityCliTests(unittest.TestCase):
         self.assertEqual(min_a, 9)
         self.assertEqual(min_b, 99)
 
+    def test_execute_liquidity_v2_add_approves_desired_max_units(self) -> None:
+        adapter = mock.Mock()
+        adapter.protocol_family = "amm_v2"
+        adapter.dex = "uniswap_v2"
+        adapter.quote_add.return_value = {"ok": True}
+
+        with mock.patch.object(
+            cli, "build_liquidity_adapter_for_request", return_value=adapter
+        ), mock.patch.object(
+            cli, "_resolve_token_address", side_effect=["0x" + "11" * 20, "0x" + "22" * 20]
+        ), mock.patch.object(
+            cli, "_fetch_erc20_metadata", side_effect=[{"decimals": 6}, {"decimals": 6}]
+        ), mock.patch.object(
+            cli, "_to_units_uint", side_effect=["100", "200"]
+        ), mock.patch.object(
+            cli, "_require_chain_contract_address", return_value="0x" + "44" * 20
+        ), mock.patch.object(
+            cli, "_resolve_factory_from_router", return_value="0x" + "55" * 20
+        ), mock.patch.object(
+            cli, "_resolve_pair_from_factory", return_value="0x" + "66" * 20
+        ), mock.patch.object(
+            cli, "_cast_call_stdout", side_effect=["0x" + "11" * 20, "(1000,1000,1)"]
+        ), mock.patch.object(
+            cli, "_estimate_add_amount_in_with_min", return_value=(80, 150, 79, 149)
+        ), mock.patch.object(
+            cli, "load_wallet_store", return_value=object()
+        ), mock.patch.object(
+            cli, "_execution_wallet", return_value=("0x" + "33" * 20, "11" * 32)
+        ), mock.patch.object(
+            cli, "_ensure_token_allowance", return_value=None
+        ) as mocked_allowance, mock.patch.object(
+            cli, "_preflight_liquidity_v2_add_execution", return_value={}
+        ), mock.patch.object(
+            cli, "_cast_calldata", return_value="0xdeadbeef"
+        ), mock.patch.object(
+            cli, "_cast_rpc_send_transaction", return_value="0xabc"
+        ):
+            out = cli._execute_liquidity_v2_add(
+                {
+                    "dex": "uniswap_v2",
+                    "positionType": "v2",
+                    "tokenA": "USDC",
+                    "tokenB": "WETH",
+                    "amountA": "100",
+                    "amountB": "200",
+                    "slippageBps": 100,
+                },
+                "ethereum_sepolia",
+            )
+
+        self.assertEqual(mocked_allowance.call_count, 2)
+        first_required = mocked_allowance.call_args_list[0].kwargs.get("required_units")
+        second_required = mocked_allowance.call_args_list[1].kwargs.get("required_units")
+        self.assertEqual(first_required, 100)
+        self.assertEqual(second_required, 200)
+        self.assertEqual(out.get("txHash"), "0xabc")
+
     def test_execute_liquidity_v2_remove_allows_pair_id_fallback_without_snapshot(self) -> None:
         adapter = mock.Mock()
         adapter.protocol_family = "amm_v2"
@@ -911,6 +968,194 @@ class LiquidityCliTests(unittest.TestCase):
                     deadline="9999999999",
                 )
         self.assertEqual(ctx.exception.reason_code, "liquidity_preflight_router_revert")
+
+    def test_preflight_router_transferfrom_revert_maps_specific_reason_code(self) -> None:
+        sim_err = cli.WalletStoreError("execution reverted: TransferHelper::transferFrom: transferFrom failed")
+        with mock.patch.object(cli, "_fetch_token_balance_wei", side_effect=["1000", "1000"]), mock.patch.object(
+            cli, "_fetch_token_allowance_wei", side_effect=["1000", "1000"]
+        ), mock.patch.object(
+            cli, "_fetch_native_balance_wei", return_value=str(10**18)
+        ), mock.patch.object(
+            cli, "_resolve_factory_from_router", return_value="0x" + "aa" * 20
+        ), mock.patch.object(
+            cli, "_resolve_pair_from_factory", return_value="0x" + "bb" * 20
+        ), mock.patch.object(
+            cli, "_cast_call_stdout", side_effect=["(1000,1000,1)", sim_err]
+        ), mock.patch.object(
+            cli,
+            "_probe_transfer_from_eth_call",
+            side_effect=[{"ok": True, "kind": "ok"}, {"ok": True, "kind": "ok"}],
+        ):
+            with self.assertRaises(cli.LiquidityExecutionError) as ctx:
+                cli._preflight_liquidity_v2_add_execution(
+                    chain="ethereum_sepolia",
+                    token_a="0x" + "11" * 20,
+                    token_b="0x" + "22" * 20,
+                    amount_a_units=10,
+                    amount_b_units=10,
+                    min_a_units=1,
+                    min_b_units=1,
+                    wallet_address="0x" + "33" * 20,
+                    router="0x" + "44" * 20,
+                    deadline="9999999999",
+                )
+        self.assertEqual(ctx.exception.reason_code, "liquidity_preflight_router_transfer_from_failed")
+
+    def test_preflight_router_transferfrom_revert_retries_alternate_rpc_when_probes_unverifiable(self) -> None:
+        sim_err = cli.WalletStoreError("execution reverted: TransferHelper::transferFrom: transferFrom failed")
+        with mock.patch.object(cli, "_fetch_token_balance_wei", side_effect=["1000", "1000"]), mock.patch.object(
+            cli, "_fetch_token_allowance_wei", side_effect=["1000", "1000"]
+        ), mock.patch.object(
+            cli, "_fetch_native_balance_wei", return_value=str(10**18)
+        ), mock.patch.object(
+            cli, "_resolve_factory_from_router", return_value="0x" + "aa" * 20
+        ), mock.patch.object(
+            cli, "_resolve_pair_from_factory", return_value="0x" + "bb" * 20
+        ), mock.patch.object(
+            cli, "_cast_call_stdout", side_effect=["(1000,1000,1)", sim_err]
+        ), mock.patch.object(
+            cli, "_chain_rpc_candidates", return_value=["https://rpc-1", "https://rpc-2"]
+        ), mock.patch.object(
+            cli,
+            "_cast_call_stdout_with_rpc",
+            side_effect=[sim_err, "(10,10,10)"],
+        ), mock.patch.object(
+            cli,
+            "_probe_transfer_from_eth_call",
+            side_effect=[
+                {"ok": False, "kind": "rpc_forbidden", "error": "HTTP Error 403"},
+                {"ok": False, "kind": "rpc_forbidden", "error": "HTTP Error 403"},
+            ],
+        ), mock.patch.object(
+            cli,
+            "_probe_transfer_eth_call",
+            side_effect=[
+                {"ok": False, "kind": "revert", "error": "HTTP Error 403"},
+                {"ok": False, "kind": "revert", "error": "HTTP Error 403"},
+            ],
+        ):
+            details = cli._preflight_liquidity_v2_add_execution(
+                chain="ethereum_sepolia",
+                token_a="0x" + "11" * 20,
+                token_b="0x" + "22" * 20,
+                amount_a_units=10,
+                amount_b_units=10,
+                min_a_units=1,
+                min_b_units=1,
+                wallet_address="0x" + "33" * 20,
+                router="0x" + "44" * 20,
+                deadline="9999999999",
+            )
+        self.assertEqual(
+            (details.get("simulationWarning") or {}).get("code"),
+            "liquidity_preflight_router_transfer_from_retry_success",
+        )
+
+    def test_preflight_sepolia_transferfrom_unverifiable_bypass_enabled(self) -> None:
+        sim_err = cli.WalletStoreError("execution reverted: TransferHelper::transferFrom: transferFrom failed")
+        with mock.patch.object(cli, "_fetch_token_balance_wei", side_effect=["1000", "1000"]), mock.patch.object(
+            cli, "_fetch_token_allowance_wei", side_effect=["1000", "1000"]
+        ), mock.patch.object(
+            cli, "_fetch_native_balance_wei", return_value=str(10**18)
+        ), mock.patch.object(
+            cli, "_resolve_factory_from_router", return_value="0x" + "aa" * 20
+        ), mock.patch.object(
+            cli, "_resolve_pair_from_factory", return_value="0x" + "bb" * 20
+        ), mock.patch.object(
+            cli, "_cast_call_stdout", side_effect=["(1000,1000,1)", sim_err]
+        ), mock.patch.object(
+            cli, "_chain_rpc_candidates", return_value=["https://rpc-1"]
+        ), mock.patch.object(
+            cli,
+            "_cast_call_stdout_with_rpc",
+            side_effect=[sim_err],
+        ), mock.patch.object(
+            cli,
+            "_probe_transfer_from_eth_call",
+            side_effect=[
+                {"ok": False, "kind": "rpc_forbidden", "error": "HTTP Error 403"},
+                {"ok": False, "kind": "rpc_forbidden", "error": "HTTP Error 403"},
+            ],
+        ), mock.patch.object(
+            cli,
+            "_probe_transfer_eth_call",
+            side_effect=[
+                {"ok": False, "kind": "revert", "error": "HTTP Error 403"},
+                {"ok": False, "kind": "revert", "error": "HTTP Error 403"},
+            ],
+        ), mock.patch.dict(
+            cli.os.environ,
+            {"XCLAW_LIQUIDITY_ALLOW_SEPOLIA_TRANSFERFROM_BYPASS": "1"},
+            clear=False,
+        ):
+            details = cli._preflight_liquidity_v2_add_execution(
+                chain="ethereum_sepolia",
+                token_a="0x" + "11" * 20,
+                token_b="0x" + "22" * 20,
+                amount_a_units=10,
+                amount_b_units=10,
+                min_a_units=1,
+                min_b_units=1,
+                wallet_address="0x" + "33" * 20,
+                router="0x" + "44" * 20,
+                deadline="9999999999",
+            )
+        self.assertEqual(
+            (details.get("simulationWarning") or {}).get("code"),
+            "liquidity_preflight_router_transfer_from_unverifiable_bypassed",
+        )
+
+    def test_preflight_sepolia_transferfrom_unverifiable_bypass_disabled_raises(self) -> None:
+        sim_err = cli.WalletStoreError("execution reverted: TransferHelper::transferFrom: transferFrom failed")
+        with mock.patch.object(cli, "_fetch_token_balance_wei", side_effect=["1000", "1000"]), mock.patch.object(
+            cli, "_fetch_token_allowance_wei", side_effect=["1000", "1000"]
+        ), mock.patch.object(
+            cli, "_fetch_native_balance_wei", return_value=str(10**18)
+        ), mock.patch.object(
+            cli, "_resolve_factory_from_router", return_value="0x" + "aa" * 20
+        ), mock.patch.object(
+            cli, "_resolve_pair_from_factory", return_value="0x" + "bb" * 20
+        ), mock.patch.object(
+            cli, "_cast_call_stdout", side_effect=["(1000,1000,1)", sim_err]
+        ), mock.patch.object(
+            cli, "_chain_rpc_candidates", return_value=["https://rpc-1"]
+        ), mock.patch.object(
+            cli,
+            "_cast_call_stdout_with_rpc",
+            side_effect=[sim_err],
+        ), mock.patch.object(
+            cli,
+            "_probe_transfer_from_eth_call",
+            side_effect=[
+                {"ok": False, "kind": "rpc_forbidden", "error": "HTTP Error 403"},
+                {"ok": False, "kind": "rpc_forbidden", "error": "HTTP Error 403"},
+            ],
+        ), mock.patch.object(
+            cli,
+            "_probe_transfer_eth_call",
+            side_effect=[
+                {"ok": False, "kind": "revert", "error": "HTTP Error 403"},
+                {"ok": False, "kind": "revert", "error": "HTTP Error 403"},
+            ],
+        ), mock.patch.dict(
+            cli.os.environ,
+            {"XCLAW_LIQUIDITY_ALLOW_SEPOLIA_TRANSFERFROM_BYPASS": "0"},
+            clear=False,
+        ):
+            with self.assertRaises(cli.LiquidityExecutionError) as ctx:
+                cli._preflight_liquidity_v2_add_execution(
+                    chain="ethereum_sepolia",
+                    token_a="0x" + "11" * 20,
+                    token_b="0x" + "22" * 20,
+                    amount_a_units=10,
+                    amount_b_units=10,
+                    min_a_units=1,
+                    min_b_units=1,
+                    wallet_address="0x" + "33" * 20,
+                    router="0x" + "44" * 20,
+                    deadline="9999999999",
+                )
+        self.assertEqual(ctx.exception.reason_code, "liquidity_preflight_router_transfer_from_failed")
 
     def test_preflight_hedera_simulation_bypass_auto_when_probes_unverifiable(self) -> None:
         sim_err = cli.WalletStoreError("execution reverted: Safe token transfer failed!")
@@ -1381,6 +1626,44 @@ class LiquidityCliTests(unittest.TestCase):
             adapter.claim_rewards({"positionId": "1"})
         hts = HederaHtsLiquidityAdapter(chain="hedera_testnet", dex="hedera_hts", protocol_family="hedera_hts", position_type="v2")
         self.assertTrue(hts.supports_operation("claim_fees"))
+
+    def test_send_error_requires_estimate_bypass_detection(self) -> None:
+        self.assertTrue(cli._send_error_requires_estimate_bypass("Failed to estimate gas: execution reverted"))
+        self.assertTrue(cli._send_error_requires_estimate_bypass('error code 3: execution reverted: ds-math-sub-underflow'))
+        self.assertFalse(cli._send_error_requires_estimate_bypass("nonce too low"))
+
+    def test_cast_rpc_send_transaction_retries_with_gas_limit_after_estimate_failure(self) -> None:
+        tx_hash = "0x" + "ab" * 32
+        call_cmds: list[list[str]] = []
+
+        def _fake_run_subprocess(cmd, **kwargs):
+            call_cmds.append(list(cmd))
+            index = len(call_cmds)
+            if index == 1:
+                return mock.Mock(returncode=1, stdout="", stderr="Failed to estimate gas: execution reverted: ds-math-sub-underflow")
+            return mock.Mock(returncode=0, stdout=json.dumps({"transactionHash": tx_hash}), stderr="")
+
+        with mock.patch.object(cli, "_require_cast_bin", return_value="cast"), mock.patch.object(
+            cli, "_chain_rpc_candidates", return_value=["https://rpc.one"]
+        ), mock.patch.object(
+            cli, "_estimate_tx_fees", return_value={"mode": "legacy", "gasPrice": 1}
+        ), mock.patch.object(
+            cli, "_run_subprocess", side_effect=_fake_run_subprocess
+        ):
+            result = cli._cast_rpc_send_transaction(
+                "https://rpc.one",
+                {"from": "0x" + "11" * 20, "to": "0x" + "22" * 20, "data": "0xdeadbeef"},
+                private_key_hex="0x" + "33" * 32,
+                chain="ethereum_sepolia",
+            )
+
+        self.assertEqual(result, tx_hash)
+        send_cmds = [cmd for cmd in call_cmds if len(cmd) > 1 and cmd[1] == "send"]
+        self.assertEqual(len(send_cmds), 2)
+        self.assertNotIn("--gas-limit", send_cmds[0])
+        self.assertIn("--gas-limit", send_cmds[1])
+        gas_limit_index = send_cmds[1].index("--gas-limit")
+        self.assertEqual(send_cmds[1][gas_limit_index + 1], str(cli.DEFAULT_TX_ESTIMATE_BYPASS_GAS_LIMIT))
 
 
 if __name__ == "__main__":

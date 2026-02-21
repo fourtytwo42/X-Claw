@@ -2490,3 +2490,62 @@ DoD:
 - [x] CLI quote-add tests cover `ethereum_sepolia` alias success path and unknown-dex deterministic rejection.
 - [x] source-of-truth + roadmap + handoff artifacts updated in the same change.
 - [x] required gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, task-specific tests, `build`, `pm2 restart all`).
+
+## Slice 118 Follow-Up B: Sepolia Uniswap LP Add TransferFrom Determinism + Allowance Coverage
+Status: [x]
+Issue: #61
+
+Goal:
+- Prevent false LP add failures on `ethereum_sepolia` caused by allowance coverage drift between estimate and submit, and expose deterministic preflight diagnostics for router `TransferHelper::transferFrom` simulation reverts.
+
+DoD:
+- [x] runtime `amm_v2` add allowance step approves desired max units (`amountA`/`amountB`) rather than estimate-only units.
+- [x] router simulation `TransferHelper::transferFrom` reverts map to `liquidity_preflight_router_transfer_from_failed`.
+- [x] liquidity runtime tests cover desired-max allowance approval and specific transferFrom reason-code mapping.
+- [x] source-of-truth + roadmap + handoff artifacts updated in the same change.
+- [x] required gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, task-specific tests, `build`, `pm2 restart all`).
+
+## Slice 118 Follow-Up C: Sepolia LP Add RPC-Retry Preflight Stability
+Status: [~]
+Issue: #61
+
+Goal:
+- Reduce false `liquidity_preflight_router_transfer_from_failed` outcomes for `ethereum_sepolia` LP add when token probes are RPC-forbidden/unverifiable but alternate RPC simulation succeeds.
+
+DoD:
+- [x] runtime preflight retries router `addLiquidity` simulation across configured chain RPC candidates when initial failure is `TransferHelper::transferFrom` and probes are `rpc_forbidden_unverifiable`.
+- [x] retry success emits deterministic warning metadata (`liquidity_preflight_router_transfer_from_retry_success`) and continues execution.
+- [x] fail-closed behavior is preserved when all candidate RPC simulations fail.
+- [x] runtime tests cover alternate-RPC retry success path.
+- [x] source-of-truth + roadmap + handoff artifacts updated in the same change.
+- [x] required gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, task-specific tests, `build`, `pm2 restart all`).
+
+## Slice 118 Follow-Up D: Sepolia TransferFrom Unverifiable Opt-In Bypass
+Status: [x]
+Issue: #61
+
+Goal:
+- Provide a controlled operator override to unblock Sepolia LP add execution when transfer probes are RPC-forbidden/unverifiable and router simulation repeatedly fails with `TransferHelper::transferFrom` despite sufficient balance/allowance evidence.
+
+DoD:
+- [x] Runtime adds explicit env-gated bypass for `ethereum_sepolia` only: `XCLAW_LIQUIDITY_ALLOW_SEPOLIA_TRANSFERFROM_BYPASS=1`.
+- [x] Bypass applies only to `TransferHelper::transferFrom` failures under `rpc_forbidden_unverifiable` probes.
+- [x] Runtime surfaces deterministic warning metadata `liquidity_preflight_router_transfer_from_unverifiable_bypassed`.
+- [x] Runtime tests cover bypass enabled and disabled behavior.
+- [x] source-of-truth + roadmap + handoff artifacts updated in the same change.
+- [x] required gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, task-specific tests, `build`, `pm2 restart all`).
+
+## Slice 118 Follow-Up E: Sepolia Remove Gas-Estimate False-Negative Recovery
+Status: [x]
+Issue: #61
+
+Goal:
+- Eliminate false `liquidity_execution_failed` outcomes on `ethereum_sepolia` LP remove when RPC gas estimation reverts transiently (`Failed to estimate gas` / `ds-math-sub-underflow`) despite executable remove calldata.
+
+DoD:
+- [x] Runtime send path retries transaction submission across configured chain RPC candidates for retryable upstream/internal RPC failures (including code `19`).
+- [x] Runtime send path retries with explicit gas-limit fallback on estimate false-negative signatures for Sepolia chains (`XCLAW_TX_ESTIMATE_BYPASS_GAS_LIMIT`, default `900000`).
+- [x] Runtime tests cover estimate-failure detection and gas-limit retry behavior.
+- [x] closed-loop runtime evidence captured: `ethereum_sepolia` remove intent reaches terminal `filled` after approval (`liq_6103a859a56f70492b13`, tx `0x5d85ddf4ef65c50c332470255d353628aa4e7bf5b8216e06e53883ccb9169bc8`).
+- [x] source-of-truth + roadmap + handoff artifacts updated in the same change.
+- [x] required gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, task-specific tests, `build`, `pm2 restart all`).

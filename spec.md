@@ -1,5 +1,150 @@
 # Slice 95 Closure Spec: Hedera EVM Pair Discovery + HTS JDK Auto-Setup (2026-02-19)
 
+# Hotfix Spec: Sepolia Remove Gas-Estimate False-Negative Recovery (2026-02-21)
+
+## Goal
+1. Eliminate false LP-remove execution failures on `ethereum_sepolia` when RPC gas estimation reports transient reverts for otherwise executable transactions.
+2. Keep fail-closed behavior outside defined retry/bypass conditions.
+
+## Non-goals
+1. No API/schema/migration changes.
+2. No liquidity position math contract changes.
+3. No global gas-limit forcing for all chains/flows.
+
+## Locked scope
+1. `apps/agent-runtime/xclaw_agent/cli.py`
+2. `apps/agent-runtime/tests/test_liquidity_cli.py`
+3. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+4. `docs/XCLAW_BUILD_ROADMAP.md`
+5. `docs/XCLAW_SLICE_TRACKER.md`
+6. `spec.md`
+7. `tasks.md`
+8. `acceptance.md`
+
+## Acceptance checks
+- `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v`
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `pm2 restart all`
+
+# Hotfix Spec: Sepolia TransferFrom Unverifiable Opt-In Bypass (2026-02-21)
+
+## Goal
+1. Unblock Sepolia LP add execution in environments where preflight transfer probes are RPC-forbidden/unverifiable and router simulation false-negatives persist.
+2. Keep default fail-closed behavior, requiring explicit opt-in.
+
+## Non-goals
+1. No API/schema/migration changes.
+2. No global simulation bypass for other chains.
+3. No provider selection changes.
+
+## Locked scope
+1. `apps/agent-runtime/xclaw_agent/cli.py`
+2. `apps/agent-runtime/tests/test_liquidity_cli.py`
+3. `.env.local`
+4. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+5. `docs/XCLAW_BUILD_ROADMAP.md`
+6. `docs/XCLAW_SLICE_TRACKER.md`
+7. `spec.md`
+8. `tasks.md`
+9. `acceptance.md`
+
+## Acceptance checks
+- `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v`
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `pm2 restart all`
+
+# Hotfix Spec: Sepolia LP Add RPC-Retry Preflight Stability (2026-02-21)
+
+## Goal
+1. Reduce false Sepolia LP add preflight failures caused by single-endpoint RPC simulation anomalies.
+2. Preserve fail-closed behavior when all configured RPC simulation attempts fail.
+
+## Non-goals
+1. No API/schema/migration changes.
+2. No policy/approval workflow changes.
+3. No liquidity provider selection changes.
+
+## Locked scope
+1. `apps/agent-runtime/xclaw_agent/cli.py`
+2. `apps/agent-runtime/tests/test_liquidity_cli.py`
+3. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+4. `docs/XCLAW_BUILD_ROADMAP.md`
+5. `docs/XCLAW_SLICE_TRACKER.md`
+6. `spec.md`
+7. `tasks.md`
+8. `acceptance.md`
+
+## Acceptance checks
+- `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v`
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `pm2 restart all`
+
+# Hotfix Spec: Installer Hosted-Default API Base + Local Opt-In (2026-02-21)
+
+## Goal
+1. Keep installer-generated OpenClaw runtime API base hosted by default so non-local agents do not bind to localhost.
+2. Preserve local development path as explicit opt-in.
+
+## Non-goals
+1. No server API contract changes.
+2. No wallet/approval execution path changes.
+3. No schema/migration changes.
+
+## Locked scope
+1. `apps/network-web/src/app/skill-install.sh/route.ts`
+2. `apps/network-web/src/app/skill-install.ps1/route.ts`
+3. `skills/xclaw-agent/references/install-and-config.md`
+4. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+5. `spec.md`
+6. `tasks.md`
+7. `acceptance.md`
+
+## Acceptance checks
+- `npm run build`
+- `pm2 restart all`
+
+# Hotfix Spec: Sepolia Uniswap LP Add TransferFrom Determinism + Allowance Coverage (2026-02-21)
+
+## Goal
+1. Prevent LP add execution on `ethereum_sepolia` from failing due to allowance under-coverage between estimate and submit.
+2. Surface deterministic preflight reason code when router simulation reverts with `TransferHelper::transferFrom: transferFrom failed`.
+
+## Non-goals
+1. No API schema/migration changes.
+2. No liquidity provider selection changes.
+3. No UI redesign.
+
+## Locked scope
+1. `apps/agent-runtime/xclaw_agent/cli.py`
+2. `apps/agent-runtime/tests/test_liquidity_cli.py`
+3. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+4. `docs/XCLAW_BUILD_ROADMAP.md`
+5. `docs/XCLAW_SLICE_TRACKER.md`
+6. `spec.md`
+7. `tasks.md`
+8. `acceptance.md`
+
+## Acceptance checks
+- `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v`
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `pm2 restart all`
+
 ## Goal
 Close remaining Slice 95 blockers by:
 1. adding deterministic Hedera EVM pair discovery (`liquidity discover-pairs`) to eliminate blind quote retries,

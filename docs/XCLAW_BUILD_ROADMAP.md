@@ -4062,3 +4062,36 @@ Note:
   - [x] CLI `liquidity quote-add` covers `--dex uniswap` success on `ethereum_sepolia`.
 - [x] Canonical artifacts + handoff docs synchronized (`XCLAW_SOURCE_OF_TRUTH`, tracker, `spec.md`, `tasks.md`, `acceptance.md`).
 - [ ] Issue #61 follow-up evidence post + commit hash(es).
+
+### 118.3 Follow-Up B: Sepolia Uniswap LP Add TransferFrom Determinism + Allowance Coverage
+- [x] Update runtime v2 add execution allowance coverage to approve desired max units (not estimate-only units).
+- [x] Map router simulation `TransferHelper::transferFrom` revert signatures to deterministic `liquidity_preflight_router_transfer_from_failed`.
+- [x] Add/extend runtime tests:
+  - [x] v2 add execution approves desired max units.
+  - [x] preflight router transferFrom signature maps to specific reason code.
+- [x] Canonical artifacts + handoff docs synchronized (`XCLAW_SOURCE_OF_TRUTH`, tracker, `spec.md`, `tasks.md`, `acceptance.md`).
+- [ ] Issue #61 follow-up evidence post + commit hash(es).
+
+### 118.4 Follow-Up C: Sepolia LP Add RPC-Retry Preflight Stability
+- [x] Retry v2 add router simulation across configured chain RPC candidates when probes are `rpc_forbidden_unverifiable` and initial simulation fails with `TransferHelper::transferFrom`.
+- [x] Keep fail-closed behavior when retry simulations continue to fail.
+- [x] Emit deterministic preflight warning metadata (`liquidity_preflight_router_transfer_from_retry_success`) on retry recovery.
+- [x] Add runtime test coverage for alternate-RPC retry success path.
+- [x] Canonical artifacts + handoff docs synchronized (`XCLAW_SOURCE_OF_TRUTH`, tracker, `spec.md`, `tasks.md`, `acceptance.md`).
+- [ ] Issue #61 follow-up evidence post + commit hash(es).
+
+### 118.5 Follow-Up D: Sepolia TransferFrom Unverifiable Opt-In Bypass
+- [x] Add env-gated bypass for `ethereum_sepolia` transferFrom simulation failures under probe-unverifiable conditions (`XCLAW_LIQUIDITY_ALLOW_SEPOLIA_TRANSFERFROM_BYPASS=1`).
+- [x] Keep bypass scope narrow to `TransferHelper::transferFrom` signatures and preserve fail-closed behavior by default.
+- [x] Emit deterministic warning metadata (`liquidity_preflight_router_transfer_from_unverifiable_bypassed`) when bypass is active.
+- [x] Add runtime tests for bypass enabled/disabled behavior.
+- [x] Canonical artifacts + handoff docs synchronized (`XCLAW_SOURCE_OF_TRUTH`, tracker, `spec.md`, `tasks.md`, `acceptance.md`).
+- [ ] Issue #61 follow-up evidence post + commit hash(es).
+
+### 118.6 Follow-Up E: Sepolia Remove Gas-Estimate False-Negative Recovery
+- [x] Extend runtime `cast send` path to retry submission across chain RPC candidates for retryable upstream/internal RPC failures (including code `19` temporary errors).
+- [x] Add explicit gas-limit retry fallback for estimate false-negative signatures on `ethereum_sepolia`/`base_sepolia` (`XCLAW_TX_ESTIMATE_BYPASS_GAS_LIMIT`, default `900000`).
+- [x] Add runtime tests covering estimate-failure detection and gas-limit retry execution.
+- [x] Capture closed-loop Sepolia remove evidence (`liq_6103a859a56f70492b13` -> `filled`, tx `0x5d85ddf4ef65c50c332470255d353628aa4e7bf5b8216e06e53883ccb9169bc8`).
+- [x] Canonical artifacts + handoff docs synchronized (`XCLAW_SOURCE_OF_TRUTH`, tracker, `spec.md`, `tasks.md`, `acceptance.md`).
+- [ ] Issue #61 follow-up evidence post + commit hash(es).

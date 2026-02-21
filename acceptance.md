@@ -1,5 +1,158 @@
 # Hotfix Acceptance Evidence: Preserve Trade Approval History After Execution
 
+# Hotfix Acceptance Evidence: Sepolia Remove Gas-Estimate False-Negative Recovery
+
+Date (UTC): 2026-02-21
+Active slice context: `Slice 118` in progress (`Follow-Up E`).
+
+## Objective + Scope Lock
+- Objective:
+  - recover from transient RPC estimate/send false negatives on Sepolia LP remove flow,
+  - keep default fail-closed behavior outside scoped retry conditions.
+- Scope lock:
+  - `apps/agent-runtime/xclaw_agent/cli.py`
+  - `apps/agent-runtime/tests/test_liquidity_cli.py`
+  - `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - `docs/XCLAW_BUILD_ROADMAP.md`
+  - `docs/XCLAW_SLICE_TRACKER.md`
+  - `spec.md`, `tasks.md`, `acceptance.md`
+
+## Behavior Checks
+- [x] runtime retries send across configured chain RPC candidates on retryable upstream/internal failures (including temporary internal code `19`).
+- [x] runtime applies gas-limit retry fallback when send fails with estimate false-negative signatures (`Failed to estimate gas`, `ds-math-sub-underflow`) on Sepolia chains.
+- [x] runtime tests cover estimate-failure detection and gas-limit retry behavior.
+- [x] closed-loop Sepolia remove succeeded: `liq_6103a859a56f70492b13` terminal `filled`, tx `0x5d85ddf4ef65c50c332470255d353628aa4e7bf5b8216e06e53883ccb9169bc8`.
+
+## Required Validation Gates
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v`
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+
+# Hotfix Acceptance Evidence: Sepolia TransferFrom Unverifiable Opt-In Bypass
+
+Date (UTC): 2026-02-21
+Active slice context: `Slice 118` in progress (`Follow-Up D`).
+
+## Objective + Scope Lock
+- Objective:
+  - add a controlled, explicit override for Sepolia LP add preflight false-negatives,
+  - keep default fail-closed behavior unless opt-in env is enabled.
+- Scope lock:
+  - `apps/agent-runtime/xclaw_agent/cli.py`
+  - `apps/agent-runtime/tests/test_liquidity_cli.py`
+  - `.env.local`
+  - `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - `docs/XCLAW_BUILD_ROADMAP.md`
+  - `docs/XCLAW_SLICE_TRACKER.md`
+  - `spec.md`, `tasks.md`, `acceptance.md`
+
+## Behavior Checks
+- [x] Sepolia-only env flag `XCLAW_LIQUIDITY_ALLOW_SEPOLIA_TRANSFERFROM_BYPASS=1` enables preflight bypass only for `TransferHelper::transferFrom` failures under `rpc_forbidden_unverifiable` probes.
+- [x] Bypass emits deterministic warning metadata `liquidity_preflight_router_transfer_from_unverifiable_bypassed`.
+- [x] Disabled flag preserves fail-closed rejection.
+- [x] Runtime tests cover enabled/disabled behavior.
+
+## Required Validation Gates
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v`
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+
+# Hotfix Acceptance Evidence: Sepolia LP Add RPC-Retry Preflight Stability
+
+Date (UTC): 2026-02-21
+Active slice context: `Slice 118` in progress (`Follow-Up C`).
+
+## Objective + Scope Lock
+- Objective:
+  - reduce false `liquidity_preflight_router_transfer_from_failed` on Sepolia LP add when preflight probes are RPC-forbidden/unverifiable,
+  - retry simulation across configured RPC candidates before fail-closed rejection.
+- Scope lock:
+  - `apps/agent-runtime/xclaw_agent/cli.py`
+  - `apps/agent-runtime/tests/test_liquidity_cli.py`
+  - `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - `docs/XCLAW_BUILD_ROADMAP.md`
+  - `docs/XCLAW_SLICE_TRACKER.md`
+  - `spec.md`, `tasks.md`, `acceptance.md`
+
+## Behavior Checks
+- [x] runtime retries LP add simulation across configured RPC candidates for `TransferHelper::transferFrom` failures only when token probes are `rpc_forbidden_unverifiable`.
+- [x] retry success emits warning metadata `liquidity_preflight_router_transfer_from_retry_success` and avoids false preflight rejection.
+- [x] fail-closed behavior remains when retry attempts continue failing.
+- [x] runtime tests cover alternate-RPC retry success path.
+
+## Required Validation Gates
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v`
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+
+# Hotfix Acceptance Evidence: Installer Hosted-Default API Base + Local Opt-In
+
+Date (UTC): 2026-02-21
+Active slice context: `Slice 117 Hotfix G` installer contract addendum.
+
+## Objective + Scope Lock
+- Objective:
+  - default installer-generated API base to hosted `https://xclaw.trade/api/v1`,
+  - require explicit opt-in (`XCLAW_INSTALL_FORCE_LOCAL_API=1`) for local API base.
+- Scope lock:
+  - `apps/network-web/src/app/skill-install.sh/route.ts`
+  - `apps/network-web/src/app/skill-install.ps1/route.ts`
+  - `skills/xclaw-agent/references/install-and-config.md`
+  - `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - `spec.md`, `tasks.md`, `acceptance.md`
+
+## Behavior Checks
+- [x] Shell installer uses hosted canonical API base by default.
+- [x] PowerShell installer uses hosted canonical API base by default.
+- [x] Local API base remains available only when `XCLAW_INSTALL_FORCE_LOCAL_API=1`.
+
+## Required Validation Gates
+- [x] `npm run build`
+- [x] `pm2 restart all`
+
+# Hotfix Acceptance Evidence: Sepolia Uniswap LP Add TransferFrom Determinism + Allowance Coverage
+
+Date (UTC): 2026-02-21
+Active slice context: `Slice 118` in progress (`Follow-Up B`).
+
+## Objective + Scope Lock
+- Objective:
+  - prevent LP add allowance under-coverage between estimate and submit for `amm_v2` execution,
+  - map router `TransferHelper::transferFrom` simulation reverts to deterministic reason code.
+- Scope lock:
+  - `apps/agent-runtime/xclaw_agent/cli.py`
+  - `apps/agent-runtime/tests/test_liquidity_cli.py`
+  - `docs/XCLAW_SOURCE_OF_TRUTH.md`
+  - `docs/XCLAW_BUILD_ROADMAP.md`
+  - `docs/XCLAW_SLICE_TRACKER.md`
+  - `spec.md`, `tasks.md`, `acceptance.md`
+
+## Behavior Checks
+- [x] v2 add allowance approvals now cover desired max units (`amountA`/`amountB`) to avoid estimate-drift under-approval.
+- [x] router `TransferHelper::transferFrom` simulation failure maps to `liquidity_preflight_router_transfer_from_failed`.
+- [x] runtime tests cover both behaviors.
+
+## Required Validation Gates
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v`
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+
 Date (UTC): 2026-02-19
 Active slice context: `Slice 86` in progress (explicit user-reported approvals-history visibility hotfix)
 
