@@ -3440,3 +3440,8 @@ Ensure runtime never reports queued transfer approvals that are invisible in web
 ## Hotfix L extension (truthful decision copy + terminal trade follow-up)
 1. Telegram trade approval acknowledgement must be phrased as in-progress execution, not terminal success.
 2. Runtime `approvals decide-spot` must emit terminal Telegram follow-up message after resume result (`filled|failed|rejected|verification_timeout`).
+
+## Hotfix M extension (approval history terminal status truthfulness)
+1. `/agents/:id` approvals history must preserve terminal trade execution status and must not coerce terminal failures into `approved`.
+2. Management approvals inbox normalization must classify `failed|expired|verification_timeout` as rejected-bucket outcomes for filtering semantics.
+3. Failed terminal trade outcomes must remain visible under `Rejected/Denied` filter in management approvals UI.

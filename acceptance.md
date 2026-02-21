@@ -6366,3 +6366,33 @@ Active slice context: `Slice 117` in progress (issue `#60`).
 - [x] `npm run seed:verify`
 - [x] `npm run build`
 - [x] `pm2 restart all`
+
+---
+
+# Hotfix Acceptance Evidence: Slice 117 Hotfix M Approval History Terminal Status Truthfulness
+
+Date (UTC): 2026-02-21
+Active slice context: `Slice 117` in progress (issue `#60`).
+
+## Objective + Scope Lock
+- Objective: prevent failed trade executions from being displayed as approved in approvals surfaces.
+- Scope lock:
+  - `apps/network-web/src/app/agents/[agentId]/page.tsx`
+  - `apps/network-web/src/app/api/v1/management/approvals/inbox/route.ts`
+  - canonical docs/handoff artifacts.
+
+## Behavior Checks
+- [x] trade approval history preserves `failed` terminal status instead of coercing to `approved`.
+- [x] `Rejected/Denied` filter includes terminal trade failures.
+- [x] inbox status normalization maps `failed|expired|verification_timeout` into rejected bucket semantics.
+
+## Required Validation Gates
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+
+## Live Evidence
+- [x] `/api/v1/management/approvals/inbox` now returns failed terminal trades (`trd_fb0cd66ebc1ee854b697`, `trd_066bb705a938ce816f80`, `trd_28334a1f26552c87950a`) with `status: rejected` and subtitle suffix `(failed)`.

@@ -1629,11 +1629,15 @@ export default function AgentPublicProfilePage() {
       const tokenOut = normalizeTokenSelectionSymbol(tokenOutLabel, activeNativeSymbol);
       const normalized = String(item.status ?? '').trim().toLowerCase();
       const status =
-        normalized === 'rejected' || normalized === 'deny' || normalized === 'denied' || normalized === 'expired'
-          ? 'rejected'
-          : normalized === 'approval_pending' || normalized === 'pending'
-            ? 'pending'
-            : 'approved';
+        normalized === 'approval_pending' || normalized === 'pending'
+          ? 'pending'
+          : normalized === 'rejected' || normalized === 'deny' || normalized === 'denied'
+            ? 'rejected'
+            : normalized === 'failed' || normalized === 'expired' || normalized === 'verification_timeout'
+              ? 'failed'
+              : normalized === 'approved' || normalized === 'executing' || normalized === 'verifying' || normalized === 'filled'
+                ? normalized
+                : 'approved';
       rows.push({
         id: `trade-history-${item.trade_id}`,
         at: item.updated_at ?? item.created_at,
@@ -1744,7 +1748,15 @@ export default function AgentPublicProfilePage() {
     if (approvalStatusFilter === 'approved') {
       return tokenFiltered.filter((row) => row.status === 'approved');
     }
-    return tokenFiltered.filter((row) => row.status === 'rejected' || row.status === 'deny' || row.status === 'denied');
+    return tokenFiltered.filter(
+      (row) =>
+        row.status === 'rejected' ||
+        row.status === 'deny' ||
+        row.status === 'denied' ||
+        row.status === 'failed' ||
+        row.status === 'expired' ||
+        row.status === 'verification_timeout'
+    );
   }, [approvalHistoryItems, approvalStatusFilter, selectedWalletTokenSet]);
   const approvalHistoryTotalPages = approvalHistoryExpanded ? Math.max(1, Math.ceil(filteredApprovalHistory.length / 10)) : 1;
   const normalizedApprovalHistoryPage = Math.min(approvalHistoryPage, approvalHistoryTotalPages);

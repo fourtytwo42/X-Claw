@@ -41,10 +41,10 @@ function normalizeStatus(value: string): 'pending' | 'approved' | 'rejected' | n
   if (raw === 'approval_pending') {
     return 'pending';
   }
-  if (raw === 'approved' || raw === 'executing' || raw === 'verifying' || raw === 'filled' || raw === 'failed') {
+  if (raw === 'approved' || raw === 'executing' || raw === 'verifying' || raw === 'filled') {
     return 'approved';
   }
-  if (raw === 'rejected') {
+  if (raw === 'rejected' || raw === 'failed' || raw === 'deny' || raw === 'denied' || raw === 'expired' || raw === 'verification_timeout') {
     return 'rejected';
   }
   return null;

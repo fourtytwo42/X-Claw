@@ -3746,3 +3746,24 @@ Active slice context: `Slice 117` in progress.
 - [x] `npm run seed:verify`
 - [x] `npm run build`
 - [x] `pm2 restart all`
+
+---
+
+# Hotfix Tasks: Slice 117 Hotfix M Approval History Terminal Status Truthfulness
+
+Active slice context: `Slice 117` in progress.
+
+## 1) Implementation
+- [x] Preserve trade terminal status in `/agents/:id` approval history (`filled|failed|verification_timeout|expired`).
+- [x] Update approvals rejected filter to include terminal failure statuses.
+- [x] Update management approvals inbox status normalization so failed terminal trades are not bucketed as approved.
+- [x] Sync canonical docs + handoff artifacts.
+
+## 2) Validation
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+- [x] Live evidence: failed trade rows now map to rejected bucket semantics in management approvals inbox.

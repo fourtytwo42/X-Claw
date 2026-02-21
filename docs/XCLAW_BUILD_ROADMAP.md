@@ -3944,5 +3944,20 @@ Note:
   - [x] `npm run seed:load`
   - [x] `npm run seed:verify`
   - [x] `npm run build`
+- [x] `pm2 restart all`
+- [ ] Issue #60 evidence post + commit hash(es).
+
+### 117.16 Hotfix M: Approval History Terminal Status Truthfulness
+- [x] `/agents/:id` approval history no longer coerces failed/expired/verification-timeout trade outcomes into `approved`.
+- [x] approvals `Rejected/Denied` tab now includes failed terminal trade outcomes.
+- [x] `/api/v1/management/approvals/inbox` status normalization maps `failed|expired|verification_timeout` into rejected bucket semantics.
+- [x] canonical docs/handoff artifacts synchronized.
+- [x] Required gates run sequentially:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
   - [x] `pm2 restart all`
+- [x] Live evidence: failed trade approvals now map to rejected bucket semantics in `/api/v1/management/approvals/inbox` (no longer `approved`).
 - [ ] Issue #60 evidence post + commit hash(es).

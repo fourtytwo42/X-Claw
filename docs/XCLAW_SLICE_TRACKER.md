@@ -2397,3 +2397,17 @@ DoD:
 - [x] runtime decision path emits terminal trade follow-up message (`filled|failed|rejected|verification_timeout`).
 - [x] regression tests cover new copy contract + follow-up invocation.
 - [x] required gates rerun sequentially (`test_trade_path`, `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
+
+## Slice 117 Hotfix M: Approval History Terminal Status Truthfulness
+Status: [ ]
+Issue: #60
+
+Goal:
+- Ensure approvals panels show terminal trade execution failures as failed/rejected outcomes rather than successful approvals.
+
+DoD:
+- [x] `/agents/:id` approval history preserves trade terminal execution status (`filled`, `failed`, `verification_timeout`, `expired`) instead of collapsing to `approved`.
+- [x] management approvals inbox normalization maps terminal failures (`failed`, `verification_timeout`, `expired`) to rejected bucket semantics.
+- [x] approvals filter tabs keep failed terminal trades visible under `Rejected/Denied`.
+- [x] required gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
+- [x] live evidence recorded with failed terminal trades mapped to rejected bucket semantics (no longer `approved`) in management approvals inbox.
