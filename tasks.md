@@ -3767,3 +3767,23 @@ Active slice context: `Slice 117` in progress.
 - [x] `npm run build`
 - [x] `pm2 restart all`
 - [x] Live evidence: failed trade rows now map to rejected bucket semantics in management approvals inbox.
+
+---
+
+# Hotfix Tasks: Slice 117 Hotfix N Ethereum Sepolia Wallet Balance Sync Type-Stability
+
+Active slice context: `Slice 117` in progress.
+
+## 1) Implementation
+- [x] Split `chain_key` bind usage in management deposit dedupe SQL so cross-table inference cannot fail.
+- [x] Preserve existing dedupe behavior while removing bind-type ambiguity in `syncChainDeposits`.
+- [x] Sync canonical docs + handoff artifacts.
+
+## 2) Validation
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+- [x] Live evidence: `management/deposit` returns `syncStatus=ok` and non-zero `USDC` balance on `ethereum_sepolia` after filled swap.

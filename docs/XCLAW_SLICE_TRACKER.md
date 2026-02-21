@@ -2411,3 +2411,16 @@ DoD:
 - [x] approvals filter tabs keep failed terminal trades visible under `Rejected/Denied`.
 - [x] required gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
 - [x] live evidence recorded with failed terminal trades mapped to rejected bucket semantics (no longer `approved`) in management approvals inbox.
+
+## Slice 117 Hotfix N: Ethereum Sepolia Wallet Balance Sync Type-Stability
+Status: [ ]
+Issue: #60
+
+Goal:
+- Ensure canonical wallet balances continue syncing after filled Ethereum Sepolia swaps (no silent USDC omission in wallet panel).
+
+DoD:
+- [x] `/management/deposit` sync no longer degrades with PostgreSQL `inconsistent types deduced for parameter` errors during deposit-event dedupe checks.
+- [x] `wallet_balance_snapshots` update path continues for canonical tokens (`WETH`, `USDC`) on `ethereum_sepolia`.
+- [x] required gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
+- [x] live evidence recorded: `ethereum_sepolia` chain balances include non-zero `USDC` after filled swap.

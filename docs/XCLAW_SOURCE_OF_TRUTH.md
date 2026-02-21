@@ -941,6 +941,7 @@ This section supersedes any earlier conflicting statements in this file.
   - Token preapproval is evaluated on `tokenIn` only (chain-scoped).
 - Per-trade approval decisions require management cookie + CSRF only (Slice 36 removed step-up).
 - Approval history/tracking surfaces must preserve terminal trade execution outcomes (`filled`, `failed`, `verification_timeout`, `expired`) and must not collapse failed terminal outcomes into `approved`.
+- Management wallet balance sync must not degrade due SQL bind-type inference across cross-table dedupe checks; canonical token balances (for example `USDC` on `ethereum_sepolia`) must continue updating after filled swaps.
 - Pause/resume is user-controlled from management UI and requires base management auth only.
 - Pause halts all pending execution.
 - Resume requires fresh validation before execution.

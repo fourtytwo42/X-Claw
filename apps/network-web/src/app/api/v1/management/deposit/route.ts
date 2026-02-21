@@ -312,15 +312,15 @@ async function syncChainDeposits(agentId: string, chainKey: string, walletAddres
             where not exists (
               select 1
               from trades
-              where agent_id = $2
-                and chain_key = $3
+              where agent_id = $9
+                and chain_key = $10
                 and tx_hash is not null
-                and lower(tx_hash) = lower($6)
+                and lower(tx_hash) = lower($11)
             )
             on conflict (chain_key, tx_hash, log_index, token)
             do nothing
             `,
-            [makeId('dep'), agentId, chainKey, snapshotToken, amount, entry.transactionHash, logIndex, blockNumber]
+            [makeId('dep'), agentId, chainKey, snapshotToken, amount, entry.transactionHash, logIndex, blockNumber, agentId, chainKey, entry.transactionHash]
           );
         });
       }

@@ -3445,3 +3445,8 @@ Ensure runtime never reports queued transfer approvals that are invisible in web
 1. `/agents/:id` approvals history must preserve terminal trade execution status and must not coerce terminal failures into `approved`.
 2. Management approvals inbox normalization must classify `failed|expired|verification_timeout` as rejected-bucket outcomes for filtering semantics.
 3. Failed terminal trade outcomes must remain visible under `Rejected/Denied` filter in management approvals UI.
+
+## Hotfix N extension (ethereum sepolia wallet balance sync type-stability)
+1. Management deposit sync must avoid shared SQL bind positions that are inferred across heterogeneous table column contexts in dedupe subqueries.
+2. Deposit-event dedupe should use separate bind placeholders for mirrored `chain_key` comparisons to prevent runtime SQL type-inference failures.
+3. Wallet balance snapshots must continue updating canonical token balances after filled swaps even when transfer-log dedupe checks run.

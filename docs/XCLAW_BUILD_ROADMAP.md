@@ -3961,3 +3961,17 @@ Note:
   - [x] `pm2 restart all`
 - [x] Live evidence: failed trade approvals now map to rejected bucket semantics in `/api/v1/management/approvals/inbox` (no longer `approved`).
 - [ ] Issue #60 evidence post + commit hash(es).
+
+### 117.17 Hotfix N: Ethereum Sepolia Wallet Balance Sync Type-Stability
+- [x] `/api/v1/management/deposit` sync query no longer reuses a cross-table `chain_key` bind in a way that can trigger PostgreSQL type-inference conflicts.
+- [x] deposit-event dedupe subquery uses separate bind placeholders for `trades` comparisons, preventing PostgreSQL `inconsistent types deduced for parameter` runtime failures.
+- [x] canonical docs/handoff artifacts synchronized.
+- [x] Required gates run sequentially:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `pm2 restart all`
+- [x] Live evidence: `ethereum_sepolia` wallet balances include non-zero `USDC` after filled `WETH -> USDC` swap.
+- [ ] Issue #60 evidence post + commit hash(es).

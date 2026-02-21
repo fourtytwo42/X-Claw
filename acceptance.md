@@ -6396,3 +6396,31 @@ Active slice context: `Slice 117` in progress (issue `#60`).
 
 ## Live Evidence
 - [x] `/api/v1/management/approvals/inbox` now returns failed terminal trades (`trd_fb0cd66ebc1ee854b697`, `trd_066bb705a938ce816f80`, `trd_28334a1f26552c87950a`) with `status: rejected` and subtitle suffix `(failed)`.
+
+---
+
+# Hotfix Acceptance Evidence: Slice 117 Hotfix N Ethereum Sepolia Wallet Balance Sync Type-Stability
+
+Date (UTC): 2026-02-21
+Active slice context: `Slice 117` in progress (issue `#60`).
+
+## Objective + Scope Lock
+- Objective: fix Ethereum Sepolia wallet balance sync degradation that hid USDC after filled swaps.
+- Scope lock:
+  - `apps/network-web/src/app/api/v1/management/deposit/route.ts`
+  - canonical docs/handoff artifacts.
+
+## Behavior Checks
+- [x] deposit sync SQL no longer reuses `chain_key` bind across insert + dedupe subquery contexts.
+- [x] balance sync path continues canonical token snapshot updates while preserving dedupe filter behavior.
+
+## Required Validation Gates
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+
+## Live Evidence
+- [x] `/api/v1/management/deposit?agentId=ag_a123e3bc428c12675f93&chainKey=ethereum_sepolia` now returns `syncStatus: ok` with `USDC` balance `1942982452` (decimals `6`) and no SQL type-inference sync error.
