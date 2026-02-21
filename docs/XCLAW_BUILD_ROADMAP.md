@@ -3978,6 +3978,7 @@ Note:
 
 ### 117.18 Hotfix O: Hedera Swap Fee-Retry + Symbol Resolution
 - [x] runtime send path detects minimum gas-price rejection (`minimum gas price '...'`) and retries with an enforced minimum gas price floor.
+- [x] Hedera testnet legacy send path applies deterministic `2x` gas-price multiplier before retry/min-floor logic.
 - [x] regression test added for minimum-gas-price retry escalation.
 - [x] `config/chains/hedera_testnet.json` canonical tokens now include `USDC` (`0x0000000000000000000000000000000000001549`) for consistent symbol rendering.
 - [x] canonical docs/handoff artifacts synchronized.
@@ -3991,5 +3992,6 @@ Note:
   - [x] `pm2 restart all`
 - [x] Evidence:
   - [x] runtime regression enforces minimum-gas retry escalation on Hedera-style rejection.
+  - [x] runtime regression enforces Hedera testnet legacy gas-price doubling (`123 -> 246`) on first send.
   - [x] Hedera wallet activity/approvals now render `USDC` symbol instead of raw `0x0000...1549`.
 - [ ] Issue #60 evidence post + commit hash(es).

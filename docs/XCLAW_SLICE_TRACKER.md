@@ -2434,7 +2434,9 @@ Goal:
 
 DoD:
 - [x] runtime cast-send retry path parses minimum gas-price rejection and retries with at-least-minimum gas price.
+- [x] Hedera testnet legacy-fee send path doubles estimated gas price (`2x`) before minimum-floor enforcement.
 - [x] regression test covers minimum gas-price retry escalation behavior.
 - [x] Hedera testnet canonical token map includes `USDC` address used by swap intents for UI/runtime symbol resolution.
 - [x] required gates rerun sequentially (`test_trade_path`, `db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
 - [x] evidence recorded for Hedera token labels (`USDC` symbol resolution restored in approvals/inbox for `trd_170515b0fe88313c6136`); minimum-gas retry path covered by runtime regression.
+- [x] runtime regression validates Hedera testnet legacy send uses doubled gas-price (`123 -> 246`) before submission.

@@ -943,6 +943,7 @@ This section supersedes any earlier conflicting statements in this file.
 - Approval history/tracking surfaces must preserve terminal trade execution outcomes (`filled`, `failed`, `verification_timeout`, `expired`) and must not collapse failed terminal outcomes into `approved`.
 - Management wallet balance sync must not degrade due SQL bind-type inference across cross-table dedupe checks; canonical token balances (for example `USDC` on `ethereum_sepolia`) must continue updating after filled swaps.
 - Hedera trade execution must adapt gas-price retries when RPC returns a minimum gas-price rejection (`minimum gas price ...`) so approved swaps do not fail due stale fee defaults.
+- Hedera testnet legacy-fee send path applies a deterministic `2x` gas-price multiplier before minimum-floor retry enforcement to reduce first-attempt underbid failures.
 - Hedera canonical token registry must include stablecoin addresses used in trade intents (for example testnet `USDC`) so activity/approval rows resolve symbols instead of raw addresses.
 - Pause/resume is user-controlled from management UI and requires base management auth only.
 - Pause halts all pending execution.

@@ -3796,7 +3796,9 @@ Active slice context: `Slice 117` in progress.
 
 ## 1) Implementation
 - [x] Add minimum-gas-price parsing for send failures and carry enforced gas-price floor across retries.
+- [x] Add deterministic `2x` legacy gas-price multiplier for `hedera_testnet` send path.
 - [x] Add runtime regression test for minimum gas-price retry behavior.
+- [x] Add runtime regression test covering Hedera testnet doubled gas-price submission.
 - [x] Add Hedera testnet canonical `USDC` mapping for symbol resolution.
 - [x] Sync canonical docs + handoff artifacts.
 

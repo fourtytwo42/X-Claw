@@ -3453,5 +3453,6 @@ Ensure runtime never reports queued transfer approvals that are invisible in web
 
 ## Hotfix O extension (hedera swap fee-retry + symbol resolution)
 1. Runtime send retry path must parse RPC minimum-gas rejections and raise retry gas price to at least the required minimum on subsequent attempts.
-2. Hedera canonical token map must include stable tokens used by trade intents so symbol rendering remains deterministic in approvals/wallet activity.
-3. Hedera trade UX must not report a successful fill when execution status is failed due gas-floor underbid.
+2. Hedera testnet legacy-fee sends must apply deterministic `2x` gas-price multiplier prior to min-gas-floor enforcement.
+3. Hedera canonical token map must include stable tokens used by trade intents so symbol rendering remains deterministic in approvals/wallet activity.
+4. Hedera trade UX must not report a successful fill when execution status is failed due gas-floor underbid.

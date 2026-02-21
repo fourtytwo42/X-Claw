@@ -9033,6 +9033,13 @@ def _retryable_send_error(stderr: str) -> bool:
     return any(fragment in normalized for fragment in retryable_fragments)
 
 
+def _legacy_gas_price_multiplier(chain: str | None) -> int:
+    # Hedera testnet requires a consistently higher legacy gas price floor.
+    if str(chain or "").strip().lower() == "hedera_testnet":
+        return 2
+    return 1
+
+
 def _parse_min_gas_price_wei_from_error(stderr: str) -> int | None:
     normalized = str(stderr or "")
     match = re.search(r"minimum gas price '([0-9]+)'", normalized, flags=re.IGNORECASE)
@@ -9467,6 +9474,7 @@ def _cast_rpc_send_transaction(
                 send_cmd.extend(["--max-fee-per-gas", str(max_fee), "--priority-gas-price", str(max_priority)])
             else:
                 gas_price = int(fee_plan.get("gasPrice", 0))
+                gas_price *= _legacy_gas_price_multiplier(chain)
                 if forced_legacy_gas_price_wei is not None:
                     gas_price = max(gas_price, forced_legacy_gas_price_wei)
                 if gas_price <= 0:

@@ -200,6 +200,35 @@ class TradePathRuntimeTests(unittest.TestCase):
         self.assertIn("--gas-price", second_cmd)
         self.assertIn("890000000000", second_cmd)
 
+    def test_cast_send_doubles_legacy_gas_price_on_hedera_testnet(self) -> None:
+        tx_obj = {
+            "from": "0x1111111111111111111111111111111111111111",
+            "to": "0x2222222222222222222222222222222222222222",
+            "data": "0xdeadbeef",
+        }
+        send_cmds: list[list[str]] = []
+
+        def fake_run(cmd: list[str], text: bool = True, capture_output: bool = True, **kwargs):  # type: ignore[override]
+            if cmd[1] == "send":
+                send_cmds.append(cmd)
+                return mock.Mock(returncode=0, stdout='{"transactionHash":"0x' + "ab" * 32 + '"}', stderr="")
+            raise AssertionError(f"Unexpected command {cmd}")
+
+        with mock.patch.dict(cli.os.environ, {"XCLAW_TX_FEE_MODE": "legacy"}, clear=False), mock.patch.object(
+            cli, "_require_cast_bin", return_value="cast"
+        ), mock.patch.object(
+            cli.subprocess, "run", side_effect=fake_run
+        ), mock.patch.object(
+            cli, "_estimate_tx_fees", return_value={"mode": "legacy", "gasPrice": 123}
+        ):
+            tx_hash = cli._cast_rpc_send_transaction("https://rpc.example", tx_obj, "0x" + "33" * 32, chain="hedera_testnet")
+
+        self.assertEqual(tx_hash, "0x" + "ab" * 32)
+        self.assertEqual(len(send_cmds), 1)
+        send_cmd = send_cmds[0]
+        self.assertIn("--gas-price", send_cmd)
+        self.assertIn("246", send_cmd)
+
     def test_estimate_tx_fees_eip1559_happy_path(self) -> None:
         with mock.patch.dict(
             cli.os.environ,

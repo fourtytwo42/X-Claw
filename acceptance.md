@@ -6442,6 +6442,7 @@ Active slice context: `Slice 117` in progress (issue `#60`).
 
 ## Behavior Checks
 - [x] runtime send retries now parse minimum gas-price requirement and elevate retry `--gas-price` to that minimum.
+- [x] Hedera testnet legacy send path doubles estimated gas price before submission (`--gas-price` multiplier `2x`).
 - [x] Hedera testnet canonical token map resolves USDC symbol for `0x0000000000000000000000000000000000001549`.
 
 ## Required Validation Gates
@@ -6455,4 +6456,5 @@ Active slice context: `Slice 117` in progress (issue `#60`).
 
 ## Live Evidence
 - [x] Runtime regression `test_cast_send_retries_with_minimum_gas_price_from_rpc_error` confirms retry escalation from `30000000001` to required minimum `890000000000` gas price.
+- [x] Runtime regression `test_cast_send_doubles_legacy_gas_price_on_hedera_testnet` confirms Hedera first-send legacy gas-price doubling (`123 -> 246`).
 - [x] `/api/v1/management/agent-state?agentId=ag_a123e3bc428c12675f93&chainKey=hedera_testnet` includes `chainTokens` entry `USDC -> 0x000...1549`, and `/api/v1/management/approvals/inbox` row for `trd_170515b0fe88313c6136` now renders title `USDC -> SAUCE` (not raw address).
