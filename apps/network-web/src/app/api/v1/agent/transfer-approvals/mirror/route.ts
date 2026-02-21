@@ -4,6 +4,11 @@ import { authenticateAgentByToken } from '@/lib/agent-auth';
 import { dbQuery } from '@/lib/db';
 import { errorResponse, internalErrorResponse, successResponse } from '@/lib/errors';
 import { parseJsonBody } from '@/lib/http';
+import {
+  buildWebTransferResultProdMessage,
+  dispatchNonTelegramAgentProd,
+  isTransferTerminalStatus
+} from '@/lib/non-telegram-agent-prod';
 import { getRequestId } from '@/lib/request-id';
 import { isTransferMirrorSchemaUnavailableError, transferMirrorSchemaErrorDetails } from '@/lib/transfer-mirror-schema';
 import { validatePayload } from '@/lib/validation';
@@ -200,6 +205,45 @@ export async function POST(req: NextRequest) {
       ]
     );
 
+    const terminalStatusNow = isTransferTerminalStatus(body.status);
+    const wasTerminal = isTransferTerminalStatus(priorStatus);
+    const terminalDispatchQueued = terminalStatusNow && !wasTerminal;
+    if (terminalStatusNow && !wasTerminal) {
+      setImmediate(() => {
+        void (async () => {
+          const agentProdTerminal = await dispatchNonTelegramAgentProd({
+            forceDispatch: true,
+            allowTelegramLastChannel: true,
+            message: buildWebTransferResultProdMessage({
+              status: body.status,
+              approvalId: body.approvalId,
+              chainKey: body.chainKey,
+              txHash: body.txHash ?? null,
+              source: 'agent_transfer_mirror_terminal',
+              reasonMessage: body.reasonMessage ?? null
+            })
+          });
+          console.info('[agent.transfer_approvals.mirror] terminal prod dispatch', {
+            requestId,
+            approvalId: body.approvalId,
+            chainKey: body.chainKey,
+            status: body.status,
+            priorStatus,
+            agentProdTerminal
+          });
+        })().catch((dispatchError) => {
+          console.error('[agent.transfer_approvals.mirror] terminal prod dispatch failed', {
+            requestId,
+            approvalId: body.approvalId,
+            chainKey: body.chainKey,
+            status: body.status,
+            priorStatus,
+            error: String((dispatchError as Error)?.message || dispatchError)
+          });
+        });
+      });
+    }
+
     return successResponse(
       {
         ok: true,
@@ -208,8 +252,8 @@ export async function POST(req: NextRequest) {
         priorStatus,
         agentProdTerminal: {
           attempted: false,
-          skipped: true,
-          reason: 'agent_canonical_terminal_delivery'
+          skipped: !terminalDispatchQueued,
+          reason: terminalDispatchQueued ? 'queued_async' : 'not_terminal_transition'
         }
       },
       200,

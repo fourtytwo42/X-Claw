@@ -6259,3 +6259,49 @@ Active slice context: `Slice 117` in progress (issue `#60`).
   - response: `ok=true`, `status=approved`, `appliedVia=agent_runtime_inbox_queue`, `decisionInbox.status=pending`.
 - [x] transfer lifecycle convergence observed:
   - `xfr_972249e7d6e889bbe488` reached terminal `filled` after approve.
+
+---
+
+# Hotfix Acceptance Evidence: Slice 117 Hotfix J Immediate Telegram Prompt Cleanup + Terminal Transfer Prod
+
+Date (UTC): 2026-02-21
+Active slice context: `Slice 117` in progress (issue `#60`).
+
+## Objective + Scope Lock
+- Objective: remove stale Telegram approval buttons immediately after web decisions and send a terminal transfer follow-up prompt when tx reaches terminal status.
+- Scope lock:
+  - `apps/network-web/src/lib/transfer-recovery.ts`
+  - `apps/network-web/src/app/api/v1/management/transfer-approvals/decision/route.ts`
+  - `apps/network-web/src/app/api/v1/agent/transfer-approvals/mirror/route.ts`
+  - `apps/network-web/src/lib/non-telegram-agent-prod.ts`
+  - canonical docs/handoff artifacts.
+
+## Behavior Checks
+- [x] web transfer approve triggers immediate runtime transfer prompt cleanup attempt.
+- [x] web transfer deny triggers immediate runtime transfer prompt cleanup attempt.
+- [x] transfer mirror terminal transition queues one transfer terminal prod dispatch with tx context.
+
+## Required Validation Gates
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+- [x] live transfer decision + terminal follow-up confirmation.
+
+## Live Evidence
+- [x] web approve immediate cleanup result:
+  - approval: `xfr_b48703b524ea5f46d33a`
+  - `promptCleanup.code=buttons_cleared`
+  - `promptCleanup.messageId=1911`
+- [x] terminal transfer convergence:
+  - approval: `xfr_b48703b524ea5f46d33a`
+  - terminal status: `filled`
+  - tx hash: `0x7ac9c41d0a840205ef24cb9c4fc1498971eb1d9f55214ad213adfd03b3f7ab7c`
+- [x] terminal prod dispatch observed in PM2 logs:
+  - `[agent.transfer_approvals.mirror] terminal prod dispatch`
+  - `[non_tg_prod] dispatched`
+- [x] browser verifier pass:
+  - selector: `approval-row-transfer-xfr_ui_1771632662476_jzafc0md`
+  - artifact dir: `/tmp/xclaw-ui-verify-xfr_ui_1771632662476_jzafc0md`

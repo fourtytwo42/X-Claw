@@ -4652,6 +4652,7 @@ Supersession note (Slice 117 Hotfix D):
 - Terminal prompt cleanup convergence:
   - server-side terminal sweeper fallback may trigger runtime `approvals clear-prompt` for terminal transfer approvals (`filled|failed|rejected`),
   - cleanup is best-effort/idempotent; missing prompt metadata is non-fatal,
+  - management web transfer decisions (`approve|deny`) must trigger runtime transfer prompt cleanup immediately (short-timeout best effort) so Telegram approval buttons are removed without waiting for sweep cadence,
   - UI must keep terminal transfer approvals non-actionable regardless of cleanup attempt result.
 
 ### Slice 117 Hotfix G Addendum: Installer + Run-Loop Wiring Hardening (Fail-Closed)
@@ -4684,3 +4685,5 @@ Supersession note (Slice 117 Hotfix D):
 - Degraded preflight fallback: if readiness remains missing (`runtime_readiness_missing`) after lookup/fallback, approve must queue decision with audit warning (`runtime_signing_preflight_degraded`) instead of hard-blocking; hard-block remains only for explicit signer-unavailable readiness reasons.
 - Heartbeat updates must not clobber runtime readiness state with null fields:
   - if heartbeat payload omits readiness fields, existing readiness map remains unchanged.
+- Transfer terminal convergence notifications:
+  - when transfer mirror status transitions into terminal (`filled|failed|rejected`), server must dispatch a one-time prod instruction to the active channel context (Telegram-allowed) so owner receives transaction outcome follow-up.

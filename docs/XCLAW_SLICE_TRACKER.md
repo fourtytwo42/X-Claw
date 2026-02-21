@@ -2355,3 +2355,18 @@ DoD:
 - [x] degraded readiness preflight queue path emits audit trace (`runtime_signing_preflight_degraded`) for observability.
 - [x] required gates pass: `db:parity`, seed gates, `build`, `pm2 restart all`, UI verifier.
 - [x] live production-path approval no longer returns false `runtime_signing_unavailable` for readiness-missing snapshots.
+
+## Slice 117 Hotfix J: Immediate Prompt Convergence + Terminal Transfer Follow-Up
+Status: [ ]
+Issue: #60
+
+Goal:
+- Remove stale Telegram transfer approval buttons immediately after web decisions and ensure terminal transfer outcome follow-up is pushed once tx reaches terminal state.
+
+DoD:
+- [x] web transfer decision route triggers immediate runtime transfer prompt cleanup attempt for both approve and deny.
+- [x] transfer decision response/audit payload includes immediate cleanup result when available.
+- [x] transfer mirror route dispatches one terminal transfer-result prod notification on first transition to `filled|failed|rejected`.
+- [x] terminal transfer-result dispatch allows Telegram last-channel delivery.
+- [x] required gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, `build`, `pm2 restart all`).
+- [x] live verification evidence recorded for immediate button convergence + terminal follow-up notification.

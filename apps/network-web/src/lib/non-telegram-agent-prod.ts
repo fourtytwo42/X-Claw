@@ -21,6 +21,7 @@ export type NonTelegramAgentProdDispatchResult = {
 type NonTelegramAgentProdInput = {
   message: string;
   allowTelegramLastChannel?: boolean;
+  forceDispatch?: boolean;
 };
 
 const TRADE_TERMINAL_STATUSES = new Set(['filled', 'failed', 'rejected']);
@@ -340,7 +341,7 @@ export function buildWebTransferResultProdMessage(input: {
 
 export async function dispatchNonTelegramAgentProd(input: NonTelegramAgentProdInput): Promise<NonTelegramAgentProdDispatchResult> {
   const head = String(input.message ?? '').split('\n')[0] ?? '';
-  if (agentCanonicalConfirmationMode()) {
+  if (agentCanonicalConfirmationMode() && input.forceDispatch !== true) {
     console.info('[non_tg_prod] skipped agent_canonical_mode', { head });
     return { attempted: false, skipped: true, reason: 'agent_canonical_mode' };
   }

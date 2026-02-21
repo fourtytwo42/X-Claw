@@ -3683,3 +3683,25 @@ Active slice context: `Slice 117` in progress.
 - [x] `pm2 restart all`
 - [x] `npm run verify:ui:agent-approvals`
 - [x] Live prod-path approve regression check via `POST /api/v1/management/transfer-approvals/decision` no longer returns `runtime_signing_unavailable` for readiness-missing snapshots.
+
+---
+
+# Hotfix Tasks: Slice 117 Hotfix J Immediate Telegram Prompt Cleanup + Terminal Transfer Prod
+
+Active slice context: `Slice 117` in progress.
+
+## 1) Implementation
+- [x] Transfer decision route now triggers immediate runtime `approvals clear-prompt` for transfer approvals after both approve and deny decisions.
+- [x] Transfer decision responses/audit payloads now include immediate prompt cleanup result payload instead of pending-only placeholder.
+- [x] Transfer mirror route now dispatches one terminal transfer result prod on first transition to terminal status (`filled|failed|rejected`).
+- [x] Terminal transfer prod dispatch bypasses canonical guard for this explicit terminal follow-up path.
+- [x] Canonical docs/handoff artifacts synchronized.
+
+## 2) Validation
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+- [x] Live transfer approval + terminal follow-up behavior check on `xclaw.trade`.

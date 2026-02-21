@@ -10,6 +10,7 @@ import {
   dispatchNonTelegramAgentProd
 } from '@/lib/non-telegram-agent-prod';
 import { getRequestId } from '@/lib/request-id';
+import { invokeTransferPromptCleanupNow } from '@/lib/transfer-recovery';
 import { validatePayload } from '@/lib/validation';
 
 export const runtime = 'nodejs';
@@ -268,6 +269,18 @@ export async function POST(req: NextRequest) {
       `,
       [decisionId, body.approvalId, body.agentId, chainKey, body.decision, body.reasonMessage ?? null]
     );
+    const promptCleanupNow = invokeTransferPromptCleanupNow({
+      agentId: body.agentId,
+      chainKey,
+      approvalId: body.approvalId
+    });
+    const promptCleanup = (promptCleanupNow.payload?.promptCleanup && typeof promptCleanupNow.payload.promptCleanup === 'object')
+      ? (promptCleanupNow.payload.promptCleanup as Record<string, unknown>)
+      : {
+          ok: false,
+          code: promptCleanupNow.code === 'runtime_cleanup_applied' ? 'runtime_cleanup_applied' : 'agent_runtime_cleanup_pending',
+          runtimeExitStatus: promptCleanupNow.runtimeExitStatus ?? null
+        };
 
     if (body.decision === 'deny') {
       const fallbackReason = body.reasonMessage?.trim() || 'Rejected by owner.';
@@ -355,10 +368,7 @@ export async function POST(req: NextRequest) {
               decisionId,
               status: 'pending'
             },
-            promptCleanup: {
-              ok: false,
-              code: 'agent_runtime_cleanup_pending'
-            },
+            promptCleanup,
             reasonMessage: body.reasonMessage ?? null
           }),
           req.headers.get('user-agent')
@@ -377,10 +387,7 @@ export async function POST(req: NextRequest) {
             decisionId,
             status: 'pending'
           },
-          promptCleanup: {
-            ok: false,
-            code: 'agent_runtime_cleanup_pending'
-          },
+          promptCleanup,
           agentProdTerminal: {
             attempted: false,
             skipped: true,
@@ -475,10 +482,7 @@ export async function POST(req: NextRequest) {
             decisionId,
             status: 'pending'
           },
-          promptCleanup: {
-            ok: false,
-            code: 'agent_runtime_cleanup_pending'
-          },
+          promptCleanup,
           reasonMessage: body.reasonMessage ?? null
         }),
         req.headers.get('user-agent')
@@ -497,10 +501,7 @@ export async function POST(req: NextRequest) {
           decisionId,
           status: 'pending'
         },
-        promptCleanup: {
-          ok: false,
-          code: 'agent_runtime_cleanup_pending'
-        },
+        promptCleanup,
         agentProdTerminal: {
           attempted: false,
           skipped: true,

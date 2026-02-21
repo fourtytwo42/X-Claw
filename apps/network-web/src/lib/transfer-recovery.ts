@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 
 import { dbQuery } from '@/lib/db';
 
@@ -146,4 +146,54 @@ export async function kickTerminalTransferPromptCleanup(agentId: string, chainKe
   } finally {
     CLEANUP_SWEEP_STATE.running = false;
   }
+}
+
+export function invokeTransferPromptCleanupNow(input: {
+  agentId: string;
+  chainKey: string;
+  approvalId: string;
+}): { ok: boolean; code: string; runtimeExitStatus?: number | null; stderrSummary?: string; payload?: Record<string, unknown> } {
+  const runtimeBin = resolveRuntimeBin();
+  const runtimeArgs = [
+    'approvals',
+    'clear-prompt',
+    '--subject-type',
+    'transfer',
+    '--subject-id',
+    input.approvalId,
+    '--chain',
+    input.chainKey,
+    '--json'
+  ];
+  const child = spawnSync(runtimeBin, runtimeArgs, {
+    encoding: 'utf8',
+    timeout: 2500,
+    env: {
+      ...process.env,
+      XCLAW_AGENT_ID: input.agentId,
+      XCLAW_DEFAULT_CHAIN: input.chainKey
+    }
+  });
+  const stderr = String(child.stderr ?? '').trim();
+  const stdout = String(child.stdout ?? '').trim();
+  let payload: Record<string, unknown> | undefined;
+  if (stdout.length > 0) {
+    const lines = stdout.split(/\r?\n/).map((line) => line.trim()).filter((line) => line.length > 0);
+    if (lines.length > 0) {
+      try {
+        const parsed = JSON.parse(lines[lines.length - 1]);
+        if (parsed && typeof parsed === 'object') {
+          payload = parsed as Record<string, unknown>;
+        }
+      } catch {}
+    }
+  }
+  const ok = child.status === 0 && Boolean(payload?.ok);
+  return {
+    ok,
+    code: ok ? 'runtime_cleanup_applied' : 'runtime_cleanup_failed',
+    runtimeExitStatus: child.status,
+    stderrSummary: stderr.slice(0, 500),
+    payload
+  };
 }

@@ -3901,3 +3901,18 @@ Note:
   - [x] `pm2 restart all`
   - [x] `npm run verify:ui:agent-approvals`
 - [ ] Issue #60 evidence post + commit hash(es).
+
+### 117.13 Hotfix J: Immediate Telegram Prompt Cleanup + Terminal Transfer Prod
+- [x] transfer decision route runs immediate runtime `approvals clear-prompt` for transfer approvals after approve/deny decisions.
+- [x] transfer decision response/audit now reports immediate prompt cleanup result payload when available.
+- [x] transfer mirror route dispatches transfer terminal result prod message on first transition to `filled|failed|rejected`.
+- [x] transfer terminal prod dispatch allows Telegram last-channel delivery and bypasses canonical dispatch guard for this explicit terminal outcome follow-up.
+- [x] Required gates run sequentially:
+  - [x] `npm run db:parity`
+  - [x] `npm run seed:reset`
+  - [x] `npm run seed:load`
+  - [x] `npm run seed:verify`
+  - [x] `npm run build`
+  - [x] `pm2 restart all`
+- [x] Live evidence: Telegram buttons removed immediately after web decision and terminal transfer follow-up message delivered with tx context.
+- [ ] Issue #60 evidence post + commit hash(es).

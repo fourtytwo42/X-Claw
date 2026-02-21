@@ -1430,7 +1430,7 @@ paths:
           $ref: '#/components/responses/ErrorResponse'
   /api/v1/management/transfer-approvals/decision:
     post:
-      summary: Apply approve/deny decision to one mirrored transfer approval.
+      summary: Apply approve/deny decision to one mirrored transfer approval (includes immediate best-effort transfer prompt cleanup trigger).
       security:
         - managementCookie: []
       parameters:
@@ -1445,7 +1445,7 @@ paths:
         '200':
           description: Transfer deny accepted and applied immediately.
         '202':
-          description: Transfer approve accepted and queued in runtime decision inbox.
+          description: Transfer approve accepted and queued in runtime decision inbox (prompt cleanup attempt is executed immediately; terminal execution remains asynchronous in agent runtime).
         '400':
           $ref: '#/components/responses/ErrorResponse'
         '401':

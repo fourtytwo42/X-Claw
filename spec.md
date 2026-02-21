@@ -3426,3 +3426,8 @@ Ensure runtime never reports queued transfer approvals that are invisible in web
 3. Web/runtime separation remains unchanged:
    - web queues decision inbox rows only,
    - runtime executes/signs locally.
+
+## Hotfix J extension (immediate prompt convergence + terminal transfer prod)
+1. Transfer decision API (`/management/transfer-approvals/decision`) must invoke runtime transfer prompt cleanup immediately for both `approve` and `deny` decisions (short-timeout best effort) to clear Telegram inline buttons right after owner action.
+2. Transfer mirror API (`/agent/transfer-approvals/mirror`) must dispatch one terminal prod notification when status transitions from non-terminal to terminal (`filled|failed|rejected`) including tx hash/reason context.
+3. Terminal prod notification dispatch must allow Telegram last-channel delivery for transfer outcome follow-up.
