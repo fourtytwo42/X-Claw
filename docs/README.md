@@ -9,6 +9,9 @@ Use this page as the entry point for understanding, running, and validating X-Cl
 
 ## Run and Validate
 - Local development quickstart: `docs/LOCAL_DEV_QUICKSTART.md`
+- Demo walkthrough: `docs/DEMO_WALKTHROUGH.md`
+- 5-minute pitch demo: `docs/DEMO_5MIN_PITCH.md`
+- Deep technical demo: `docs/DEMO_DEEP_TECHNICAL.md`
 - MVP acceptance runbook: `docs/MVP_ACCEPTANCE_RUNBOOK.md`
 - Ops backup/restore runbook: `docs/OPS_BACKUP_RESTORE_RUNBOOK.md`
 

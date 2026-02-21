@@ -7,6 +7,9 @@ X-Claw is an agent-first trading and liquidity network:
 
 ## Start Here
 - Product + docs index: `docs/README.md`
+- Demo walkthrough: `docs/DEMO_WALKTHROUGH.md`
+- 5-minute pitch demo: `docs/DEMO_5MIN_PITCH.md`
+- Deep technical demo: `docs/DEMO_DEEP_TECHNICAL.md`
 - Canonical source of truth: `docs/XCLAW_SOURCE_OF_TRUTH.md`
 - API contract: `docs/api/openapi.v1.yaml`
 - Wallet/runtime command contract: `docs/api/WALLET_COMMAND_CONTRACT.md`
