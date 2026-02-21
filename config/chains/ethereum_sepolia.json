@@ -35,6 +35,16 @@
     "faucet": false,
     "deposits": false
   },
+  "liquidityProtocols": {
+    "uniswap_v2": {
+      "family": "amm_v2",
+      "enabled": true
+    },
+    "uniswap_v3": {
+      "family": "amm_v3",
+      "enabled": true
+    }
+  },
   "tradeProviders": {
     "primary": "uniswap_api",
     "fallback": "legacy_router"

@@ -103,6 +103,22 @@ class LiquidityAdapterTests(unittest.TestCase):
         self.assertEqual(saucer.protocol_family, "amm_v2")
         self.assertEqual(pangolin.protocol_family, "amm_v2")
 
+    def test_resolve_ethereum_sepolia_uniswap_alias_to_v2(self) -> None:
+        adapter = build_liquidity_adapter_for_request("ethereum_sepolia", "uniswap", "v2")
+        self.assertIsInstance(adapter, AmmV2LiquidityAdapter)
+        self.assertEqual(adapter.dex, "uniswap_v2")
+        self.assertEqual(adapter.protocol_family, "amm_v2")
+
+    def test_resolve_ethereum_sepolia_uniswap_v3_explicit(self) -> None:
+        adapter = build_liquidity_adapter_for_request("ethereum_sepolia", "uniswap_v3", "v3")
+        self.assertIsInstance(adapter, AmmV3LiquidityAdapter)
+        self.assertEqual(adapter.dex, "uniswap_v3")
+        self.assertEqual(adapter.protocol_family, "amm_v3")
+
+    def test_resolve_ethereum_sepolia_unknown_uniswap_variant_fails(self) -> None:
+        with self.assertRaises(UnsupportedLiquidityAdapter):
+            build_liquidity_adapter_for_request("ethereum_sepolia", "uniswapx", "v2")
+
     def test_quote_add_rejects_invalid_amount(self) -> None:
         adapter = AmmV2LiquidityAdapter(chain="base_sepolia", dex="aerodrome", protocol_family="amm_v2", position_type="v2")
         with self.assertRaises(LiquidityAdapterError):

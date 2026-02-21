@@ -1184,18 +1184,33 @@ export default function AgentPublicProfilePage() {
     if (management.phase !== 'ready') {
       return [];
     }
-    return (management.data.liquidityPositions ?? []).filter((row) => row.chain_key === activeChainKey);
+    const toNumber = (value: string): number => {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : 0;
+    };
+    return (management.data.liquidityPositions ?? []).filter(
+      (row) =>
+        row.chain_key === activeChainKey &&
+        row.status === 'active' &&
+        (toNumber(row.current_a) > 0 || toNumber(row.current_b) > 0)
+    );
   }, [management, activeChainKey]);
+  const walletHoldings = useMemo(() => {
+    if (liquidityPositions.length > 0) {
+      return holdings;
+    }
+    return holdings.filter((holding) => !holding.token.trim().toUpperCase().startsWith('SSLP-'));
+  }, [holdings, liquidityPositions]);
   const withdrawAssetOptions = useMemo(() => {
     const nativeHolding =
-      holdings.find((holding) => {
+      walletHoldings.find((holding) => {
         const symbol = holding.token.trim().toUpperCase();
         return symbol === activeNativeSymbol.toUpperCase() || symbol === 'NATIVE';
       }) ?? null;
     const nativeBalance = nativeHolding ? formatUnitsTruncated(nativeHolding.amountRaw, activeNativeDecimals, 6) : '0';
     const opts: Array<{ label: string; value: string }> = [{ label: `${activeChainLabel} ${activeNativeSymbol} (${nativeBalance})`, value: 'NATIVE' }];
     const seen = new Set<string>(['NATIVE']);
-    for (const holding of holdings) {
+    for (const holding of walletHoldings) {
       const symbol = normalizeTokenSelectionSymbol(holding.token, activeNativeSymbol);
       if (!symbol || symbol === activeNativeSymbol.toUpperCase() || symbol === 'NATIVE') {
         continue;
@@ -1206,17 +1221,17 @@ export default function AgentPublicProfilePage() {
       }
     }
     return opts;
-  }, [holdings, activeChainLabel, activeNativeDecimals, activeNativeSymbol]);
+  }, [walletHoldings, activeChainLabel, activeNativeDecimals, activeNativeSymbol]);
 
   const withdrawSelectedHolding = useMemo(() => {
     if (withdrawAsset === 'NATIVE') {
-      return holdings.find((holding) => {
+      return walletHoldings.find((holding) => {
         const symbol = holding.token.trim().toUpperCase();
         return symbol === activeNativeSymbol.toUpperCase() || symbol === 'NATIVE';
       }) ?? null;
     }
-    return holdings.find((holding) => holding.token.trim().toUpperCase() === withdrawAsset.trim().toUpperCase()) ?? null;
-  }, [holdings, withdrawAsset, activeNativeSymbol]);
+    return walletHoldings.find((holding) => holding.token.trim().toUpperCase() === withdrawAsset.trim().toUpperCase()) ?? null;
+  }, [walletHoldings, withdrawAsset, activeNativeSymbol]);
 
   const withdrawMaxAmount = useMemo(() => {
     if (!withdrawSelectedHolding) {
@@ -1252,14 +1267,14 @@ export default function AgentPublicProfilePage() {
         }
       }
     }
-    for (const holding of holdings) {
+    for (const holding of walletHoldings) {
       const symbol = normalizeTokenSelectionSymbol(holding.token, activeNativeSymbol);
       if (symbol && !map.has(symbol)) {
         map.set(symbol, holding.decimals);
       }
     }
     return map;
-  }, [activeNativeDecimals, activeNativeSymbol, holdings, management]);
+  }, [activeNativeDecimals, activeNativeSymbol, walletHoldings, management]);
 
   const explorerTxBaseUrl = useMemo(() => {
     const base = activeDepositChain?.explorerBaseUrl ?? null;
@@ -1924,18 +1939,18 @@ export default function AgentPublicProfilePage() {
     }
     return base;
   };
-  const walletTotalPages = walletExpanded ? Math.max(1, Math.ceil(holdings.length / 10)) : 1;
+  const walletTotalPages = walletExpanded ? Math.max(1, Math.ceil(walletHoldings.length / 10)) : 1;
   const normalizedWalletPage = Math.min(walletPage, walletTotalPages);
   const visibleWalletHoldings = useMemo(() => {
     if (!walletExpanded) {
-      return holdings.slice(0, 3);
+      return walletHoldings.slice(0, 3);
     }
     const start = (normalizedWalletPage - 1) * 10;
-    return holdings.slice(start, start + 10);
-  }, [holdings, normalizedWalletPage, walletExpanded]);
+    return walletHoldings.slice(start, start + 10);
+  }, [walletHoldings, normalizedWalletPage, walletExpanded]);
   useEffect(() => {
     setWalletPage(1);
-  }, [walletExpanded, holdings.length]);
+  }, [walletExpanded, walletHoldings.length]);
 
   useEffect(() => {
     setWalletActivityPage(1);
@@ -2258,7 +2273,7 @@ export default function AgentPublicProfilePage() {
               <span className={styles.muted}>{selectedTokenSummary}</span>
             </div>
             {!isOwner ? <p className={styles.muted}>View-only mode: approval controls are read-only.</p> : null}
-            {holdings.length === 0 ? <p className={styles.muted}>No balances detected for this chain.</p> : null}
+            {walletHoldings.length === 0 ? <p className={styles.muted}>No balances detected for this chain.</p> : null}
             <p className={styles.muted}>Select a token to filter activity and approvals. Hold Ctrl/Cmd to select more than one.</p>
             {visibleWalletHoldings.map((holding) => (
               <div
@@ -2320,12 +2335,12 @@ export default function AgentPublicProfilePage() {
                 </div>
               </div>
             ))}
-            {holdings.length > 3 ? (
+            {walletHoldings.length > 3 ? (
               <div className={styles.paginationRow}>
                 <button type="button" onClick={() => setWalletExpanded((current) => !current)}>
                   {walletExpanded ? 'Show less' : 'Show more'}
                 </button>
-                {walletExpanded && holdings.length > 10 ? (
+                {walletExpanded && walletHoldings.length > 10 ? (
                   <div className={styles.paginationControls}>
                     <button
                       type="button"

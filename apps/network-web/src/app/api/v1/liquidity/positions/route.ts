@@ -9,6 +9,15 @@ import { getRequestId } from '@/lib/request-id';
 export const runtime = 'nodejs';
 
 const STALE_MS = 60 * 1000;
+const PLACEHOLDER_TOKENS = new Set(['', 'POSITION', 'TOKEN', 'UNKNOWN', 'N/A', 'NA', '?']);
+
+function isPlaceholderToken(value: string | null | undefined): boolean {
+  return PLACEHOLDER_TOKENS.has(String(value ?? '').trim().toUpperCase());
+}
+
+function isHexAddress(value: string | null | undefined): boolean {
+  return /^0x[a-fA-F0-9]{40}$/.test(String(value ?? '').trim());
+}
 
 export async function GET(req: NextRequest) {
   const requestId = getRequestId(req);
@@ -99,20 +108,58 @@ export async function GET(req: NextRequest) {
       [auth.agentId, chainKey]
     );
 
+    const unresolvedPositionIds = result.rows
+      .filter((row) => isPlaceholderToken(row.token_a) || isPlaceholderToken(row.token_b))
+      .map((row) => row.position_id);
+
+    const fallbackByPositionId = new Map<string, { token_a: string; token_b: string }>();
+    if (unresolvedPositionIds.length > 0) {
+      const fallback = await dbQuery<{
+        position_ref: string;
+        token_a: string;
+        token_b: string;
+      }>(
+        `
+        select distinct on (position_ref)
+          position_ref,
+          token_a,
+          token_b
+        from liquidity_intents
+        where agent_id = $1
+          and chain_key = $2
+          and position_ref = any($3::text[])
+          and action_type in ('add', 'increase')
+          and token_a ~* '^0x[0-9a-f]{40}$'
+          and token_b ~* '^0x[0-9a-f]{40}$'
+        order by position_ref, created_at desc
+        `,
+        [auth.agentId, chainKey, unresolvedPositionIds]
+      );
+      for (const row of fallback.rows) {
+        fallbackByPositionId.set(row.position_ref, { token_a: row.token_a, token_b: row.token_b });
+      }
+    }
+
     const now = Date.now();
     return successResponse(
       {
         ok: true,
         agentId: auth.agentId,
         chainKey,
-        items: result.rows.map((row) => ({
+        items: result.rows.map((row) => {
+          const fallback = fallbackByPositionId.get(row.position_id);
+          const tokenA = isPlaceholderToken(row.token_a) && fallback ? fallback.token_a : row.token_a;
+          const tokenB = isPlaceholderToken(row.token_b) && fallback ? fallback.token_b : row.token_b;
+          const poolRef =
+            row.pool_ref === 'POSITION/POSITION' && isHexAddress(tokenA) && isHexAddress(tokenB) ? `${tokenA}/${tokenB}` : row.pool_ref;
+          return {
           positionId: row.position_id,
           chainKey: row.chain_key,
           dex: row.dex_key,
           positionType: row.position_type,
-          pool: row.pool_ref,
-          tokenA: row.token_a,
-          tokenB: row.token_b,
+          pool: poolRef,
+          tokenA,
+          tokenB,
           depositedA: row.deposited_a,
           depositedB: row.deposited_b,
           currentA: row.current_a,
@@ -126,7 +173,8 @@ export async function GET(req: NextRequest) {
           explorerUrl: row.explorer_url,
           lastUpdatedAt: row.updated_at,
           stale: now - new Date(row.last_synced_at).getTime() > STALE_MS,
-        })),
+          };
+        }),
       },
       200,
       requestId

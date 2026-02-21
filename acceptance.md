@@ -6528,3 +6528,35 @@ Issue: `#61`
 
 ## Task-Specific Evidence
 - [x] `XCLAW_UI_VERIFY_AGENT_ID=ag_slice7 XCLAW_UI_VERIFY_AGENT_API_KEY=slice7_token_abc12345 XCLAW_UI_VERIFY_BOOTSTRAP_TOKEN_FILE=/home/hendo420/.xclaw-secrets/management/ag_slice7-bootstrap-token.json npm run verify:ui:agent-approvals` -> pass (`ok: true`, approval row rendered under management session).
+
+---
+
+# Slice 118 Follow-Up A Acceptance Evidence: Ethereum Sepolia Uniswap LP Adapter Enablement
+
+Date (UTC): 2026-02-21
+Issue: `#61`
+
+## Objective + Scope Lock
+- Objective: remove deterministic `unsupported_liquidity_adapter` failures for `ethereum_sepolia` LP requests using operator alias `--dex uniswap`, while preserving fail-closed unknown-dex behavior.
+- Scope lock:
+  - `config/chains/ethereum_sepolia.json`
+  - `apps/agent-runtime/xclaw_agent/liquidity_adapter.py`
+  - `apps/agent-runtime/tests/test_liquidity_adapter.py`
+  - `apps/agent-runtime/tests/test_liquidity_cli.py`
+  - canonical docs/handoff artifacts (`docs/XCLAW_SOURCE_OF_TRUTH.md`, `docs/XCLAW_SLICE_TRACKER.md`, `docs/XCLAW_BUILD_ROADMAP.md`, `spec.md`, `tasks.md`, `acceptance.md`).
+
+## Behavior Checks
+- [x] `ethereum_sepolia` defines `liquidityProtocols` entries for `uniswap_v2` and `uniswap_v3`.
+- [x] runtime alias normalization resolves `uniswap|uni` to canonical `uniswap_v2` before adapter selection.
+- [x] explicit `uniswap_v2`/`uniswap_v3` behavior remains unchanged.
+- [x] unknown dex values remain deterministic `unsupported_liquidity_adapter`.
+
+## Required Validation Gates
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_liquidity_adapter.py -v` -> pass (`Ran 18 tests`, `OK`).
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v` -> pass (`Ran 48 tests`, `OK`).
+- [x] `npm run db:parity` -> pass (`ok: true`).
+- [x] `npm run seed:reset` -> pass (`ok: true`).
+- [x] `npm run seed:load` -> pass (`ok: true`).
+- [x] `npm run seed:verify` -> pass (`ok: true`).
+- [x] `npm run build` -> pass (Next.js production build succeeded).
+- [x] `pm2 restart all` -> pass (`xclaw-web` online).

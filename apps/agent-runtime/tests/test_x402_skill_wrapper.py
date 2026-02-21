@@ -131,6 +131,35 @@ class X402SkillWrapperTests(unittest.TestCase):
         self.assertEqual(code, 0)
         run_mock.assert_called_once_with(["x402", "networks", "--json"])
 
+    def test_liquidity_positions_status_shorthand_routes_to_status_filter(self) -> None:
+        with mock.patch.dict("os.environ", self._ENV, clear=False):
+            with mock.patch.object(skill, "_resolve_active_chain", return_value="base_sepolia"), mock.patch.object(
+                skill, "_run_agent", return_value=0
+            ) as run_mock:
+                code = skill.main(["xclaw_agent_skill.py", "liquidity-positions", "active"])
+        self.assertEqual(code, 0)
+        run_mock.assert_called_once_with(["liquidity", "positions", "--chain", "base_sepolia", "--status", "active", "--json"])
+
+    def test_liquidity_positions_with_dex_and_status_keeps_both_filters(self) -> None:
+        with mock.patch.dict("os.environ", self._ENV, clear=False):
+            with mock.patch.object(skill, "_resolve_active_chain", return_value="base_sepolia"), mock.patch.object(
+                skill, "_run_agent", return_value=0
+            ) as run_mock:
+                code = skill.main(["xclaw_agent_skill.py", "liquidity-positions", "saucerswap", "active"])
+        self.assertEqual(code, 0)
+        run_mock.assert_called_once_with(
+            ["liquidity", "positions", "--chain", "base_sepolia", "--dex", "saucerswap", "--status", "active", "--json"]
+        )
+
+    def test_liquidity_positions_open_alias_routes_to_active_status(self) -> None:
+        with mock.patch.dict("os.environ", self._ENV, clear=False):
+            with mock.patch.object(skill, "_resolve_active_chain", return_value="base_sepolia"), mock.patch.object(
+                skill, "_run_agent", return_value=0
+            ) as run_mock:
+                code = skill.main(["xclaw_agent_skill.py", "liquidity-positions", "open"])
+        self.assertEqual(code, 0)
+        run_mock.assert_called_once_with(["liquidity", "positions", "--chain", "base_sepolia", "--status", "active", "--json"])
+
     def test_version_emits_skill_metadata_without_runtime_call(self) -> None:
         expected = {
             "ok": True,
@@ -148,7 +177,9 @@ class X402SkillWrapperTests(unittest.TestCase):
 
     def test_tracked_list_delegates_to_runtime(self) -> None:
         with mock.patch.dict("os.environ", self._ENV, clear=False):
-            with mock.patch.object(skill, "_run_agent", return_value=0) as run_mock:
+            with mock.patch.object(skill, "_resolve_active_chain", return_value="base_sepolia"), mock.patch.object(
+                skill, "_run_agent", return_value=0
+            ) as run_mock:
                 code = skill.main(["xclaw_agent_skill.py", "tracked-list"])
         self.assertEqual(code, 0)
         run_mock.assert_called_once_with(["tracked", "list", "--chain", "base_sepolia", "--json"])
@@ -176,7 +207,9 @@ class X402SkillWrapperTests(unittest.TestCase):
 
     def test_tracked_trades_with_agent_and_limit(self) -> None:
         with mock.patch.dict("os.environ", self._ENV, clear=False):
-            with mock.patch.object(skill, "_run_agent", return_value=0) as run_mock:
+            with mock.patch.object(skill, "_resolve_active_chain", return_value="base_sepolia"), mock.patch.object(
+                skill, "_run_agent", return_value=0
+            ) as run_mock:
                 code = skill.main(["xclaw_agent_skill.py", "tracked-trades", "ag_test", "15"])
         self.assertEqual(code, 0)
         run_mock.assert_called_once_with(["tracked", "trades", "--chain", "base_sepolia", "--json", "--agent", "ag_test", "--limit", "15"])
@@ -199,7 +232,9 @@ class X402SkillWrapperTests(unittest.TestCase):
 
     def test_wallet_send_token_accepts_symbol_and_delegates(self) -> None:
         with mock.patch.dict("os.environ", self._ENV, clear=False):
-            with mock.patch.object(skill, "_run_agent", return_value=0) as run_mock:
+            with mock.patch.object(skill, "_resolve_active_chain", return_value="base_sepolia"), mock.patch.object(
+                skill, "_run_agent", return_value=0
+            ) as run_mock:
                 code = skill.main(
                     [
                         "xclaw_agent_skill.py",

@@ -3858,3 +3858,27 @@ Active slice context: `Slice 118`.
 - [x] task-specific verification for inbox + agent-state liquidity rows
 - [x] `npm run build`
 - [x] `pm2 restart all`
+
+---
+
+# Slice Tasks: Slice 118 Follow-Up A Ethereum Sepolia Uniswap LP Adapter Enablement (Issue #61)
+
+Active slice context: `Slice 118`.
+
+## 1) Implementation
+- [x] Add `liquidityProtocols` map to `config/chains/ethereum_sepolia.json` (`uniswap_v2`, `uniswap_v3`).
+- [x] Add deterministic dex alias normalization in runtime liquidity adapter resolution (`uniswap|uni -> uniswap_v2`).
+- [x] Preserve fail-closed unknown-dex behavior (`unsupported_liquidity_adapter`).
+- [x] Add adapter tests for Sepolia alias success + explicit v3 + unknown-dex rejection.
+- [x] Add CLI quote-add tests for Sepolia alias success + unknown-dex deterministic rejection.
+- [x] Sync canonical/handoff docs (`source-of-truth`, tracker, roadmap, `spec.md`, `acceptance.md`).
+
+## 2) Validation
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_liquidity_adapter.py -v`
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v`
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`

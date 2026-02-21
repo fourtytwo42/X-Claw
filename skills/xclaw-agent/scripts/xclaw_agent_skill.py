@@ -1114,10 +1114,17 @@ def main(argv: List[str]) -> int:
 
     if cmd == "liquidity-positions":
         args = ["liquidity", "positions", "--chain", chain]
-        if len(argv) >= 3 and argv[2].strip().lower() != "all":
-            args.extend(["--dex", argv[2].strip().lower()])
-        if len(argv) >= 4 and argv[3].strip():
-            args.extend(["--status", argv[3].strip().lower()])
+        status_terms = {"active", "inactive", "closed", "all", "pending", "approved", "rejected", "failed", "filled", "verifying", "executing", "open", "opened", "live"}
+        status_aliases = {"open": "active", "opened": "active", "live": "active"}
+        first_opt = argv[2].strip().lower() if len(argv) >= 3 else ""
+        second_opt = argv[3].strip().lower() if len(argv) >= 4 else ""
+        if first_opt and first_opt != "all":
+            if first_opt in status_terms and not second_opt:
+                args.extend(["--status", status_aliases.get(first_opt, first_opt)])
+            else:
+                args.extend(["--dex", first_opt])
+        if second_opt:
+            args.extend(["--status", status_aliases.get(second_opt, second_opt)])
         args.append("--json")
         return _run_agent(args)
 

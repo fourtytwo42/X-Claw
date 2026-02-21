@@ -3468,3 +3468,18 @@ Ensure runtime never reports queued transfer approvals that are invisible in web
 3. `GET /api/v1/management/approvals/inbox` must support `liquidity` row kind and `types=...liquidity...` filtering with deterministic status normalization.
 4. `/agents/:id` wallet activity and approval history modules must render liquidity pending + terminal lifecycle rows with owner approve/reject controls for pending entries only.
 5. `/approvals` must expose liquidity filter rows and decision actions; allowlist decision remains trade-only.
+
+## Slice 118 Follow-Up A spec (ethereum sepolia uniswap LP adapter enablement)
+1. Objective:
+- `xclaw-agent liquidity add/quote-add --chain ethereum_sepolia --dex uniswap ...` must resolve adapter routing and avoid deterministic `unsupported_liquidity_adapter` failures caused by config key mismatch.
+2. Chain config contract:
+- `config/chains/ethereum_sepolia.json` must define `liquidityProtocols` with:
+  - `uniswap_v2` (`family=amm_v2`, enabled),
+  - `uniswap_v3` (`family=amm_v3`, enabled).
+3. Runtime alias normalization:
+- liquidity adapter selection must normalize operator aliases before protocol lookup:
+  - `uniswap -> uniswap_v2`,
+  - `uni -> uniswap_v2`.
+4. Compatibility constraints:
+- explicit `uniswap_v2` / `uniswap_v3` behavior remains unchanged.
+- unsupported dex values must remain fail-closed (`unsupported_liquidity_adapter`).

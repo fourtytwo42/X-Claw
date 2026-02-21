@@ -39,6 +39,49 @@ class LiquidityCliTests(unittest.TestCase):
         self.assertEqual(code, 2)
         self.assertEqual(payload.get("code"), "unsupported_liquidity_adapter")
 
+    def test_quote_add_ethereum_sepolia_uniswap_alias_resolves(self) -> None:
+        args = argparse.Namespace(
+            chain="ethereum_sepolia",
+            dex="uniswap",
+            token_a="WETH",
+            token_b="USDC",
+            amount_a="0.1",
+            amount_b="300",
+            position_type="v2",
+            slippage_bps=100,
+            json=True,
+        )
+        token_meta = {"symbol": "TOK", "decimals": 18}
+        with mock.patch.object(cli, "assert_chain_capability"), mock.patch.object(
+            cli, "_resolve_token_address", side_effect=["0x" + "11" * 20, "0x" + "22" * 20]
+        ), mock.patch.object(
+            cli, "_fetch_erc20_metadata", side_effect=[token_meta, token_meta]
+        ), mock.patch.object(
+            cli, "_router_get_amount_out", return_value=10**18
+        ):
+            code, payload = self._run(lambda: cli.cmd_liquidity_quote_add(args))
+
+        self.assertEqual(code, 0)
+        self.assertEqual(payload.get("adapterFamily"), "amm_v2")
+        self.assertEqual(payload.get("dex"), "uniswap")
+
+    def test_quote_add_ethereum_sepolia_unknown_dex_rejected(self) -> None:
+        args = argparse.Namespace(
+            chain="ethereum_sepolia",
+            dex="uniswapx",
+            token_a="WETH",
+            token_b="USDC",
+            amount_a="0.1",
+            amount_b="300",
+            position_type="v2",
+            slippage_bps=100,
+            json=True,
+        )
+        with mock.patch.object(cli, "assert_chain_capability"):
+            code, payload = self._run(lambda: cli.cmd_liquidity_quote_add(args))
+        self.assertEqual(code, 2)
+        self.assertEqual(payload.get("code"), "unsupported_liquidity_adapter")
+
     def test_quote_add_fails_closed_when_hedera_sdk_missing(self) -> None:
         args = argparse.Namespace(
             chain="hedera_testnet",
@@ -242,6 +285,51 @@ class LiquidityCliTests(unittest.TestCase):
         self.assertEqual(payload.get("status"), "filled")
         self.assertEqual(payload.get("txHash"), "0xabc")
         self.assertTrue(mocked_inline.called)
+
+    def test_approvals_decide_liquidity_converges_when_missing_from_pending_scope(self) -> None:
+        args = argparse.Namespace(
+            intent_id="liq_1",
+            decision="approve",
+            reason_message="",
+            source="telegram",
+            chain="hedera_testnet",
+            json=True,
+        )
+
+        with mock.patch.object(
+            cli,
+            "_read_liquidity_intent",
+            side_effect=cli.WalletStoreError("Liquidity intent 'liq_1' was not found in pending scope for chain 'hedera_testnet'."),
+        ):
+            code, payload = self._run(lambda: cli.cmd_approvals_decide_liquidity(args))
+
+        self.assertEqual(code, 0)
+        self.assertTrue(payload.get("ok"))
+        self.assertEqual(payload.get("subjectType"), "liquidity")
+        self.assertEqual(payload.get("subjectId"), "liq_1")
+        self.assertEqual(payload.get("status"), "converged_unknown")
+        self.assertTrue(payload.get("converged"))
+
+    def test_approvals_decide_liquidity_missing_pending_scope_non_telegram_fails(self) -> None:
+        args = argparse.Namespace(
+            intent_id="liq_1",
+            decision="approve",
+            reason_message="",
+            source="web",
+            chain="hedera_testnet",
+            json=True,
+        )
+
+        with mock.patch.object(
+            cli,
+            "_read_liquidity_intent",
+            side_effect=cli.WalletStoreError("Liquidity intent 'liq_1' was not found in pending scope for chain 'hedera_testnet'."),
+        ):
+            code, payload = self._run(lambda: cli.cmd_approvals_decide_liquidity(args))
+
+        self.assertEqual(code, 1)
+        self.assertFalse(payload.get("ok"))
+        self.assertEqual(payload.get("code"), "liquidity_decision_failed")
 
     def test_liquidity_discover_pairs_returns_ranked_candidates(self) -> None:
         args = argparse.Namespace(
@@ -450,6 +538,93 @@ class LiquidityCliTests(unittest.TestCase):
         self.assertEqual(mocked_allowance.call_args.kwargs.get("token_address"), lp_token)
         self.assertEqual(out.get("txHash"), "0xabc")
         self.assertEqual(out.get("positionId"), pair)
+
+    def test_execute_liquidity_v2_remove_zero_lp_balance_is_deterministic(self) -> None:
+        adapter = mock.Mock()
+        adapter.protocol_family = "amm_v2"
+        adapter.dex = "saucerswap"
+        adapter.quote_remove.return_value = {"ok": True}
+        with mock.patch.object(
+            cli, "build_liquidity_adapter_for_request", return_value=adapter
+        ), mock.patch.object(
+            cli,
+            "_read_liquidity_position",
+            return_value={"tokenA": "0x" + "11" * 20, "tokenB": "0x" + "22" * 20},
+        ), mock.patch.object(
+            cli, "_resolve_token_address", side_effect=lambda _chain, token: token
+        ), mock.patch.object(
+            cli, "_require_chain_contract_address", return_value="0x" + "44" * 20
+        ), mock.patch.object(
+            cli,
+            "_compute_v2_remove_liquidity_units",
+            return_value={
+                "pair": "0x" + "bb" * 20,
+                "lpToken": "0x" + "99" * 20,
+                "walletAddress": "0x" + "33" * 20,
+                "lpBalance": 0,
+                "liquidityUnits": 0,
+            },
+        ), mock.patch.object(
+            cli, "_execution_wallet", return_value=("0x" + "33" * 20, "11" * 32)
+        ):
+            with self.assertRaises(cli.LiquidityExecutionError) as ctx:
+                cli._execute_liquidity_v2_remove(
+                    {
+                        "dex": "saucerswap",
+                        "positionType": "v2",
+                        "positionRef": "0x" + "aa" * 20,
+                        "amountA": "100",
+                        "slippageBps": 100,
+                    },
+                    "hedera_testnet",
+                )
+        self.assertEqual(ctx.exception.reason_code, "liquidity_preflight_zero_lp_balance")
+        self.assertEqual((ctx.exception.details or {}).get("lpBalance"), "0")
+
+    def test_liquidity_remove_blocks_zero_lp_balance_before_proposal(self) -> None:
+        args = argparse.Namespace(
+            chain="hedera_testnet",
+            dex="saucerswap",
+            position_id="0x" + "aa" * 20,
+            token_a="",
+            token_b="",
+            percent=100,
+            slippage_bps=100,
+            position_type="v2",
+            json=True,
+        )
+        adapter = mock.Mock()
+        adapter.dex = "saucerswap"
+        adapter.protocol_family = "amm_v2"
+        adapter.quote_remove.return_value = {"simulation": {"minAmountA": "1", "minAmountB": "1"}}
+        with mock.patch.object(cli, "assert_chain_capability"), mock.patch.object(
+            cli, "build_liquidity_adapter_for_request", return_value=adapter
+        ), mock.patch.object(
+            cli, "_liquidity_provider_settings", return_value=("legacy_router", {"provider": "legacy_router"})
+        ), mock.patch.object(
+            cli, "_resolve_agent_id_or_fail", return_value="agt_1"
+        ), mock.patch.object(
+            cli, "_resolve_liquidity_remove_tokens", return_value=("0x" + "11" * 20, "0x" + "22" * 20)
+        ), mock.patch.object(
+            cli, "_token_symbol_for_display", side_effect=["USDC", "SAUCE"]
+        ), mock.patch.object(
+            cli,
+            "_compute_v2_remove_liquidity_units",
+            return_value={
+                "pair": "0x" + "bb" * 20,
+                "lpToken": "0x" + "99" * 20,
+                "walletAddress": "0x" + "33" * 20,
+                "lpBalance": 0,
+                "liquidityUnits": 0,
+            },
+        ), mock.patch.object(
+            cli, "_api_request"
+        ) as mocked_api:
+            code, payload = self._run(lambda: cli.cmd_liquidity_remove(args))
+        self.assertEqual(code, 1)
+        self.assertEqual(payload.get("code"), "liquidity_preflight_zero_lp_balance")
+        self.assertEqual((payload.get("details") or {}).get("lpBalance"), "0")
+        mocked_api.assert_not_called()
 
     def test_liquidity_execute_hts_missing_dependency_fails_closed(self) -> None:
         args = argparse.Namespace(intent="liq_1", chain="hedera_testnet", json=True)
@@ -790,6 +965,167 @@ class LiquidityCliTests(unittest.TestCase):
         ):
             resolved = cli._resolve_token_address("hedera_testnet", "0x" + "11" * 20)
         self.assertEqual(resolved.lower(), "0x" + "22" * 20)
+
+    def test_resolve_liquidity_remove_tokens_falls_back_to_pair_contract_when_snapshot_has_placeholders(self) -> None:
+        position_id = "0x" + "aa" * 20
+        with mock.patch.object(
+            cli,
+            "_read_liquidity_position",
+            return_value={"tokenA": "POSITION", "tokenB": "POSITION"},
+        ), mock.patch.object(
+            cli,
+            "_resolve_pair_tokens_from_contract",
+            return_value=("0x" + "11" * 20, "0x" + "22" * 20),
+        ), mock.patch.object(
+            cli,
+            "_resolve_token_address",
+            side_effect=lambda _chain, token: str(token),
+        ):
+            token_a, token_b = cli._resolve_liquidity_remove_tokens("hedera_testnet", position_id, "", "")
+        self.assertEqual(token_a, "0x" + "11" * 20)
+        self.assertEqual(token_b, "0x" + "22" * 20)
+
+    def test_liquidity_remove_pending_message_uses_resolved_pair_symbols(self) -> None:
+        args = argparse.Namespace(
+            chain="hedera_testnet",
+            dex="saucerswap",
+            position_id="0x" + "aa" * 20,
+            percent=100,
+            slippage_bps=100,
+            position_type="v2",
+            token_a=None,
+            token_b=None,
+            json=True,
+        )
+        with mock.patch.object(cli, "assert_chain_capability"), mock.patch.object(
+            cli, "_liquidity_provider_settings", return_value=("legacy_router", "legacy_router")
+        ), mock.patch.object(
+            cli, "build_liquidity_adapter_for_request"
+        ) as mocked_adapter_builder, mock.patch.object(
+            cli, "_resolve_agent_id_or_fail", return_value="agt_1"
+        ), mock.patch.object(
+            cli,
+            "_resolve_liquidity_remove_tokens",
+            return_value=("0x" + "11" * 20, "0x" + "22" * 20),
+        ), mock.patch.object(
+            cli,
+            "_token_symbol_for_display",
+            side_effect=lambda _chain, token: "USDC" if str(token).endswith("11" * 20) else "SAUCE",
+        ), mock.patch.object(
+            cli,
+            "_compute_v2_remove_liquidity_units",
+            return_value={
+                "pair": "0x" + "bb" * 20,
+                "lpToken": "0x" + "99" * 20,
+                "walletAddress": "0x" + "33" * 20,
+                "lpBalance": 100000,
+                "liquidityUnits": 100000,
+            },
+        ), mock.patch.object(
+            cli,
+            "_api_request",
+            return_value=(200, {"liquidityIntentId": "liq_1", "status": "approval_pending"}),
+        ), mock.patch.object(
+            cli,
+            "_maybe_send_telegram_liquidity_approval_prompt",
+        ):
+            mocked_adapter = mock.Mock()
+            mocked_adapter.dex = "saucerswap"
+            mocked_adapter.protocol_family = "amm_v2"
+            mocked_adapter.quote_remove.return_value = {"simulation": {}}
+            mocked_adapter_builder.return_value = mocked_adapter
+            code, payload = self._run(lambda: cli.cmd_liquidity_remove(args))
+
+        self.assertEqual(code, 1)
+        self.assertEqual(payload.get("code"), "approval_required")
+        details = payload.get("details") or {}
+        queued = str(details.get("queuedMessage") or "")
+        self.assertIn("Pair: USDC/SAUCE", queued)
+
+    def test_resolve_liquidity_remove_tokens_uses_snapshot_pool_when_position_id_not_pair(self) -> None:
+        position_id = "0x" + "aa" * 32
+        pool = "0x" + "bb" * 20
+        with mock.patch.object(
+            cli,
+            "_read_liquidity_position",
+            return_value={"tokenA": "POSITION", "tokenB": "POSITION", "pool": pool},
+        ), mock.patch.object(
+            cli,
+            "_resolve_pair_tokens_from_contract",
+            return_value=("0x" + "11" * 20, "0x" + "22" * 20),
+        ), mock.patch.object(
+            cli,
+            "_resolve_token_address",
+            side_effect=lambda _chain, token: str(token),
+        ):
+            token_a, token_b = cli._resolve_liquidity_remove_tokens("hedera_testnet", position_id, "", "")
+        self.assertEqual(token_a, "0x" + "11" * 20)
+        self.assertEqual(token_b, "0x" + "22" * 20)
+
+    def test_liquidity_positions_normalizes_placeholder_pair_with_pool_symbols(self) -> None:
+        args = argparse.Namespace(chain="hedera_testnet", dex=None, status=None, json=True)
+        with mock.patch.object(cli, "assert_chain_capability"), mock.patch.object(
+            cli, "_resolve_agent_id_or_fail", return_value="agt_1"
+        ), mock.patch.object(
+            cli,
+            "_api_request",
+            return_value=(
+                200,
+                {
+                    "items": [
+                        {
+                            "positionId": "0x" + "aa" * 32,
+                            "pool": "0x" + "bb" * 20,
+                            "tokenA": "POSITION",
+                            "tokenB": "POSITION",
+                            "dex": "saucerswap",
+                            "status": "active",
+                        }
+                    ]
+                },
+            ),
+        ), mock.patch.object(
+            cli,
+            "_resolve_pair_tokens_from_contract",
+            return_value=("0x" + "11" * 20, "0x" + "22" * 20),
+        ), mock.patch.object(
+            cli,
+            "_token_symbol_for_display",
+            side_effect=lambda _chain, token: "USDC" if str(token).endswith("11" * 20) else "SAUCE",
+        ):
+            code, payload = self._run(lambda: cli.cmd_liquidity_positions(args))
+
+        self.assertEqual(code, 0)
+        positions = payload.get("positions") or []
+        self.assertEqual(len(positions), 1)
+        row = positions[0]
+        self.assertEqual(row.get("tokenASymbol"), "USDC")
+        self.assertEqual(row.get("tokenBSymbol"), "SAUCE")
+        self.assertEqual(row.get("pairDisplay"), "USDC/SAUCE")
+
+    def test_liquidity_positions_open_status_alias_maps_to_active(self) -> None:
+        args = argparse.Namespace(chain="hedera_testnet", dex=None, status="open", json=True)
+        with mock.patch.object(cli, "assert_chain_capability"), mock.patch.object(
+            cli, "_resolve_agent_id_or_fail", return_value="agt_1"
+        ), mock.patch.object(
+            cli,
+            "_api_request",
+            return_value=(
+                200,
+                {
+                    "items": [
+                        {"positionId": "p1", "dex": "saucerswap", "status": "active", "tokenA": "USDC", "tokenB": "SAUCE"},
+                        {"positionId": "p2", "dex": "saucerswap", "status": "closed", "tokenA": "USDC", "tokenB": "SAUCE"},
+                    ]
+                },
+            ),
+        ), mock.patch.object(
+            cli, "_token_symbol_for_display", side_effect=lambda _chain, token: str(token)
+        ):
+            code, payload = self._run(lambda: cli.cmd_liquidity_positions(args))
+        self.assertEqual(code, 0)
+        self.assertEqual(payload.get("status"), "active")
+        self.assertEqual(payload.get("count"), 1)
 
     def test_hedera_hts_readiness_reports_missing_components(self) -> None:
         missing_run = mock.Mock(returncode=1, stdout="", stderr="missing")

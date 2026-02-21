@@ -698,6 +698,8 @@ export async function GET(req: NextRequest) {
         from liquidity_position_snapshots
         where agent_id = $1
           and chain_key = $2
+          and status = 'active'
+          and (current_a > 0::numeric or current_b > 0::numeric)
         order by updated_at desc
         limit 100
         `,

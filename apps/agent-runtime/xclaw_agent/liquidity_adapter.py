@@ -8,6 +8,11 @@ from typing import Any
 
 from xclaw_agent.chains import get_chain
 
+_DEX_ALIASES: dict[str, str] = {
+    "uniswap": "uniswap_v2",
+    "uni": "uniswap_v2",
+}
+
 
 class LiquidityAdapterError(Exception):
     pass
@@ -316,6 +321,7 @@ def _protocols_for_chain(chain: str) -> dict[str, dict[str, Any]]:
 def _resolve_protocol(chain: str, dex: str, position_type: str) -> tuple[str, str]:
     protocols = _protocols_for_chain(chain)
     requested_dex = str(dex or "").strip().lower()
+    requested_dex = _DEX_ALIASES.get(requested_dex, requested_dex)
     requested_position = str(position_type or "v2").strip().lower()
 
     if requested_position not in {"v2", "v3"}:

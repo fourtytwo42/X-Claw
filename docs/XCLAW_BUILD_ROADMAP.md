@@ -4048,3 +4048,17 @@ Note:
   - [x] `npm run build`
   - [x] `pm2 restart all`
 - [x] Issue #61 evidence post + commit hash(es).
+
+### 118.2 Follow-Up A: Ethereum Sepolia Uniswap LP Adapter Enablement
+- [x] Add `liquidityProtocols` to `config/chains/ethereum_sepolia.json`:
+  - [x] `uniswap_v2` -> `amm_v2` (enabled)
+  - [x] `uniswap_v3` -> `amm_v3` (enabled)
+- [x] Normalize runtime dex aliases before adapter lookup:
+  - [x] `uniswap` -> `uniswap_v2`
+  - [x] `uni` -> `uniswap_v2`
+- [x] Preserve deterministic fail-closed behavior for unknown dex values (`unsupported_liquidity_adapter`).
+- [x] Add/extend runtime tests:
+  - [x] adapter resolution covers `ethereum_sepolia` alias success + explicit v3 + unknown-dex rejection.
+  - [x] CLI `liquidity quote-add` covers `--dex uniswap` success on `ethereum_sepolia`.
+- [x] Canonical artifacts + handoff docs synchronized (`XCLAW_SOURCE_OF_TRUTH`, tracker, `spec.md`, `tasks.md`, `acceptance.md`).
+- [ ] Issue #61 follow-up evidence post + commit hash(es).

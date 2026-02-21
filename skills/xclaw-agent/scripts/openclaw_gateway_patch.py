@@ -65,7 +65,7 @@ QUEUED_BUTTONS_MARKER_V3 = "xclaw: telegram queued approval buttons v3"
 QUEUED_BUTTONS_MARKER_V4 = "xclaw: telegram queued approval buttons v4"
 LEGACY_DM_SENTINEL = 'Allow in DMs even when inlineButtonsScope is "allowlist", gated by chatId == senderId.'
 # Bump when patch semantics change so we invalidate the cached "already patched" fast-path.
-STATE_SCHEMA_VERSION = 61
+STATE_SCHEMA_VERSION = 62
 STATE_DIR = Path.home() / ".openclaw" / "xclaw"
 STATE_FILE = STATE_DIR / "openclaw_patch_state.json"
 LOCK_FILE = STATE_DIR / "openclaw_patch.lock"
@@ -78,6 +78,15 @@ LEGACY_SOURCE_SNIPPET_RE = re.compile(
 CANONICAL_BLOCK_START = "// X-Claw Telegram approvals:"
 PAGINATION_ANCHOR = "const paginationMatch = data.match(/^commands_page_"
 REPO_RUNTIME_BIN = (Path(__file__).resolve().parents[3] / "apps" / "agent-runtime" / "bin" / "xclaw-agent").as_posix()
+LEGACY_LIQUIDITY_DECIDE_RE = re.compile(
+    r'\["approvals",\s*"decide-liquidity",\s*"--intent-id",\s*subjectId,\s*"--decision",\s*decision,\s*"--chain",\s*chainKey,\s*'
+    r'"--source",\s*"telegram",\s*"--idempotency-key",\s*`tg-cb-\$\{callback\.id\}`,\s*"--decision-at",\s*atIso,\s*'
+    r'"--reason-message",\s*action\s*===\s*"r"\s*\?\s*"Denied via Telegram"\s*:\s*"",\s*"--json"\]'
+)
+CANONICAL_LIQUIDITY_DECIDE_ARGS = (
+    '["approvals", "decide-liquidity", "--intent-id", subjectId, "--decision", decision, "--chain", chainKey, '
+    '"--source", "telegram", "--reason-message", action === "r" ? "Denied via Telegram" : "", "--json"]'
+)
 
 
 def _utc_now() -> str:
@@ -295,6 +304,13 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
             if block_end > sentinel_idx:
                 raw = raw[:line_start] + "\n" + raw[block_end:]
                 normalized = True
+
+    # Upgrade path: legacy Telegram liquidity callback command included unsupported flags
+    # for `approvals decide-liquidity` (`--idempotency-key`, `--decision-at`).
+    raw2, n_legacy_liq = LEGACY_LIQUIDITY_DECIDE_RE.subn(CANONICAL_LIQUIDITY_DECIDE_ARGS, raw)
+    if n_legacy_liq:
+        raw = raw2
+        normalized = True
 
     # Upgrade path: if an older canonical block exists, replace it with the current canonical block.
     # This lets us ship UX tweaks (e.g. remove keyboard immediately) without telling users to reinstall OpenClaw.
@@ -738,7 +754,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         '\t\t\t\t\t\t\tconst cmdArgs = parts[0] === "xpol"\n'
         '\t\t\t\t\t\t\t\t? ["approvals", "decide-policy", "--approval-id", subjectId, "--decision", decision, "--chain", chainKey, "--source", "telegram", "--idempotency-key", `tg-cb-${callback.id}`, "--decision-at", atIso, "--reason-message", action === "r" ? "Denied via Telegram" : "", "--json"]\n'
         '\t\t\t\t\t\t\t\t: (parts[0] === "xliq"\n'
-        '\t\t\t\t\t\t\t\t\t? ["approvals", "decide-liquidity", "--intent-id", subjectId, "--decision", decision, "--chain", chainKey, "--source", "telegram", "--idempotency-key", `tg-cb-${callback.id}`, "--decision-at", atIso, "--reason-message", action === "r" ? "Denied via Telegram" : "", "--json"]\n'
+        '\t\t\t\t\t\t\t\t\t? ["approvals", "decide-liquidity", "--intent-id", subjectId, "--decision", decision, "--chain", chainKey, "--source", "telegram", "--reason-message", action === "r" ? "Denied via Telegram" : "", "--json"]\n'
         '\t\t\t\t\t\t\t\t\t: ["approvals", "decide-spot", "--trade-id", subjectId, "--decision", decision, "--chain", chainKey, "--source", "telegram", "--idempotency-key", `tg-cb-${callback.id}`, "--decision-at", atIso, "--reason-message", action === "r" ? "Denied via Telegram" : "", "--json"]);\n'
         '\t\t\t\t\t\t\tconst childEnv = { ...process.env, ...Object.fromEntries(Object.entries(env || {}).map(([k, v]) => [String(k), String(v)])) };\n'
         '\t\t\t\t\t\t\tconst child = childMod.spawn(runtimeBin, cmdArgs, { stdio: ["ignore", "pipe", "pipe"], env: childEnv });\n'

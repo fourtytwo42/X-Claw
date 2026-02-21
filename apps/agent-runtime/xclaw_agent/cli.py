@@ -3453,8 +3453,8 @@ def _maybe_send_telegram_liquidity_approval_prompt(flow: dict[str, Any]) -> None
 
     action = str(flow.get("action") or "remove").strip().lower()
     dex = str(flow.get("dex") or "unknown").strip().lower() or "unknown"
-    token_a = str(flow.get("tokenA") or "POSITION").strip() or "POSITION"
-    token_b = str(flow.get("tokenB") or "POSITION").strip() or "POSITION"
+    token_a = str(flow.get("tokenASymbol") or _token_symbol_for_display(chain, str(flow.get("tokenA") or "")) or "TOKEN").strip() or "TOKEN"
+    token_b = str(flow.get("tokenBSymbol") or _token_symbol_for_display(chain, str(flow.get("tokenB") or "")) or "TOKEN").strip() or "TOKEN"
     amount_a = str(flow.get("amountA") or "").strip()
     amount_b = str(flow.get("amountB") or "").strip()
     position_id = str(flow.get("positionId") or "").strip()
@@ -4756,6 +4756,28 @@ def cmd_approvals_decide_liquidity(args: argparse.Namespace) -> int:
             execute_payload.setdefault("decision", decision)
             execute_payload.setdefault("source", source)
         return emit(execute_payload) if isinstance(execute_payload, dict) else execute_code
+    except WalletStoreError as exc:
+        message = str(exc)
+        # Convergence fallback: callback retries can race with fast terminal transitions
+        # and remove the intent from the non-terminal pending scope.
+        if source == "telegram" and "was not found in pending scope" in message:
+            return ok(
+                "Liquidity decision converged outside pending scope.",
+                subjectType="liquidity",
+                subjectId=liquidity_intent_id,
+                decision=decision,
+                source=source,
+                chain=chain,
+                status="converged_unknown",
+                converged=True,
+            )
+        return fail(
+            "liquidity_decision_failed",
+            message,
+            "Inspect liquidity decision path and retry.",
+            {"liquidityIntentId": liquidity_intent_id, "chain": chain},
+            exit_code=1,
+        )
     except Exception as exc:
         return fail(
             "liquidity_decision_failed",
@@ -6154,39 +6176,41 @@ def _execute_liquidity_v2_remove(intent: dict[str, Any], chain: str) -> dict[str
         else:
             raise
     if snapshot is not None:
-        token_a = _resolve_token_address(chain, str(snapshot.get("tokenA") or intent.get("tokenA") or ""))
-        token_b = _resolve_token_address(chain, str(snapshot.get("tokenB") or intent.get("tokenB") or ""))
+        token_a_hint = str(snapshot.get("tokenA") or intent.get("tokenA") or "").strip()
+        token_b_hint = str(snapshot.get("tokenB") or intent.get("tokenB") or "").strip()
+        if is_hex_address(position_id) and (_is_placeholder_liquidity_token(token_a_hint) or _is_placeholder_liquidity_token(token_b_hint)):
+            token_a, token_b = _resolve_liquidity_remove_tokens(chain, position_id, token_a_hint, token_b_hint)
+        else:
+            token_a = _resolve_token_address(chain, token_a_hint)
+            token_b = _resolve_token_address(chain, token_b_hint)
     elif pair_from_position:
-        token_a = _parse_address_from_cast_output(_cast_call_stdout(chain, pair_from_position, "token0()(address)"))
-        token_b = _parse_address_from_cast_output(_cast_call_stdout(chain, pair_from_position, "token1()(address)"))
+        token_a, token_b = _resolve_pair_tokens_from_contract(chain, pair_from_position)
     else:
         raise WalletStoreError(f"Unable to resolve liquidity position '{position_id}'.")
     adapter.quote_remove({"positionId": position_id, "percent": percent, "slippageBps": slippage_bps})
 
     router = _require_chain_contract_address(chain, "router")
-    if pair_from_position:
-        factory = _resolve_factory_from_router(chain, router)
-        pair = pair_from_position
-    else:
-        factory = _resolve_factory_from_router(chain, router)
-        pair = _resolve_pair_from_factory(chain, factory, token_a, token_b)
-
-    lp_token = pair
-    if chain.startswith("hedera"):
-        try:
-            lp_token_out = _cast_call_stdout(chain, pair, "lpToken()(address)")
-            lp_token_candidate = _parse_address_from_cast_output(lp_token_out)
-            if is_hex_address(lp_token_candidate):
-                lp_token = lp_token_candidate
-        except Exception:
-            lp_token = pair
-
+    pair_lookup_id = pair_from_position or position_id
+    remove_context = _compute_v2_remove_liquidity_units(chain, pair_lookup_id, token_a, token_b, percent)
+    pair = str(remove_context.get("pair") or "").strip()
+    lp_token = str(remove_context.get("lpToken") or "").strip()
+    lp_balance = int(remove_context.get("lpBalance") or 0)
+    liquidity_units = int(remove_context.get("liquidityUnits") or 0)
+    wallet_address = str(remove_context.get("walletAddress") or "").strip()
     store = load_wallet_store()
-    wallet_address, private_key_hex = _execution_wallet(store, chain)
-    lp_balance = int(_fetch_token_balance_wei(chain, wallet_address, lp_token))
-    liquidity_units = (lp_balance * percent) // 100
+    _, private_key_hex = _execution_wallet(store, chain)
     if liquidity_units <= 0:
-        raise WalletStoreError("Computed LP liquidity amount is zero; increase percent or ensure position has liquidity.")
+        raise LiquidityExecutionError(
+            "liquidity_preflight_zero_lp_balance",
+            "Computed LP liquidity amount is zero; position has no removable LP token balance.",
+            details={
+                "positionId": position_id,
+                "pair": pair.lower() if pair else pair,
+                "lpToken": lp_token.lower() if lp_token else lp_token,
+                "lpBalance": str(lp_balance),
+                "percent": percent,
+            },
+        )
     min_a_units, min_b_units = _estimate_remove_amount_out_min(
         chain=chain,
         pair=pair,
@@ -6555,6 +6579,104 @@ def _resolve_token_address(chain: str, token_or_symbol: str) -> str:
             {"chain": chain, "tokenSymbol": symbol, "choices": deduped},
         )
     raise WalletStoreError("token must be a 0x address, canonical token symbol, or uniquely tracked token symbol for the active chain.")
+
+
+def _is_placeholder_liquidity_token(value: str) -> bool:
+    raw = str(value or "").strip()
+    if not raw:
+        return True
+    return raw.upper() in {"POSITION", "TOKEN", "UNKNOWN", "N/A", "NA", "?"}
+
+
+def _resolve_pair_tokens_from_contract(chain: str, pair_address: str) -> tuple[str, str]:
+    token_a = _parse_address_from_cast_output(_cast_call_stdout(chain, pair_address, "token0()(address)"))
+    token_b = _parse_address_from_cast_output(_cast_call_stdout(chain, pair_address, "token1()(address)"))
+    if not is_hex_address(token_a) or not is_hex_address(token_b):
+        raise WalletStoreError(f"Failed to resolve token0/token1 for pair '{pair_address}'.")
+    return token_a, token_b
+
+
+def _resolve_liquidity_remove_tokens(chain: str, position_id: str, token_a_hint: str, token_b_hint: str) -> tuple[str, str]:
+    token_a = str(token_a_hint or "").strip()
+    token_b = str(token_b_hint or "").strip()
+
+    snapshot: dict[str, Any] | None = None
+    if _is_placeholder_liquidity_token(token_a) or _is_placeholder_liquidity_token(token_b):
+        try:
+            snapshot = _read_liquidity_position(chain, position_id)
+        except WalletStoreError:
+            snapshot = None
+
+    if snapshot is not None:
+        if _is_placeholder_liquidity_token(token_a):
+            token_a = str(snapshot.get("tokenA") or "").strip()
+        if _is_placeholder_liquidity_token(token_b):
+            token_b = str(snapshot.get("tokenB") or "").strip()
+        if _is_placeholder_liquidity_token(token_a) or _is_placeholder_liquidity_token(token_b):
+            pair_ref = str(
+                snapshot.get("pool")
+                or snapshot.get("poolRef")
+                or snapshot.get("pair")
+                or snapshot.get("positionRef")
+                or ""
+            ).strip()
+            if is_hex_address(pair_ref):
+                pair_token_a, pair_token_b = _resolve_pair_tokens_from_contract(chain, pair_ref)
+                if _is_placeholder_liquidity_token(token_a):
+                    token_a = pair_token_a
+                if _is_placeholder_liquidity_token(token_b):
+                    token_b = pair_token_b
+
+    if (_is_placeholder_liquidity_token(token_a) or _is_placeholder_liquidity_token(token_b)) and is_hex_address(position_id):
+        pair_token_a, pair_token_b = _resolve_pair_tokens_from_contract(chain, position_id)
+        if _is_placeholder_liquidity_token(token_a):
+            token_a = pair_token_a
+        if _is_placeholder_liquidity_token(token_b):
+            token_b = pair_token_b
+
+    if _is_placeholder_liquidity_token(token_a) or _is_placeholder_liquidity_token(token_b):
+        raise WalletStoreError(
+            f"Unable to resolve liquidity token pair for position '{position_id}'. "
+            "Provide --token-a/--token-b explicitly or refresh liquidity snapshots."
+        )
+
+    return _resolve_token_address(chain, token_a), _resolve_token_address(chain, token_b)
+
+
+def _resolve_v2_remove_pair_and_lp_token(chain: str, position_id: str, token_a: str, token_b: str) -> tuple[str, str]:
+    router = _require_chain_contract_address(chain, "router")
+    factory = _resolve_factory_from_router(chain, router)
+    pair = position_id if is_hex_address(position_id) else _resolve_pair_from_factory(chain, factory, token_a, token_b)
+    lp_token = pair
+    if chain.startswith("hedera"):
+        try:
+            lp_token_out = _cast_call_stdout(chain, pair, "lpToken()(address)")
+            lp_token_candidate = _parse_address_from_cast_output(lp_token_out)
+            if is_hex_address(lp_token_candidate):
+                lp_token = lp_token_candidate
+        except Exception:
+            lp_token = pair
+    return pair, lp_token
+
+
+def _compute_v2_remove_liquidity_units(
+    chain: str,
+    position_id: str,
+    token_a: str,
+    token_b: str,
+    percent: int,
+) -> dict[str, Any]:
+    pair, lp_token = _resolve_v2_remove_pair_and_lp_token(chain, position_id, token_a, token_b)
+    wallet_address = _wallet_address_for_chain(chain)
+    lp_balance = int(_fetch_token_balance_wei(chain, wallet_address, lp_token))
+    liquidity_units = (lp_balance * percent) // 100
+    return {
+        "pair": pair,
+        "lpToken": lp_token,
+        "walletAddress": wallet_address,
+        "lpBalance": lp_balance,
+        "liquidityUnits": liquidity_units,
+    }
 
 
 def _token_symbol_for_display(chain: str, token_or_symbol: str) -> str:
@@ -7170,6 +7292,39 @@ def cmd_liquidity_remove(args: argparse.Namespace) -> int:
                 }
             )
         preflight = adapter_preflight
+        resolved_token_a, resolved_token_b = _resolve_liquidity_remove_tokens(
+            chain,
+            position_id,
+            str(args.token_a or "").strip(),
+            str(args.token_b or "").strip(),
+        )
+        display_token_a = _token_symbol_for_display(chain, resolved_token_a) or resolved_token_a
+        display_token_b = _token_symbol_for_display(chain, resolved_token_b) or resolved_token_b
+        if adapter_family == "amm_v2":
+            remove_context = _compute_v2_remove_liquidity_units(
+                chain=chain,
+                position_id=position_id,
+                token_a=resolved_token_a,
+                token_b=resolved_token_b,
+                percent=percent,
+            )
+            liquidity_units = int(remove_context.get("liquidityUnits") or 0)
+            if liquidity_units <= 0:
+                return fail(
+                    "liquidity_preflight_zero_lp_balance",
+                    "Position has no removable LP token balance for the requested percent.",
+                    "Refresh liquidity positions or choose a position with non-zero LP balance.",
+                    {
+                        "chain": chain,
+                        "dex": adapter_dex,
+                        "positionId": position_id,
+                        "pair": str(remove_context.get("pair") or "").lower(),
+                        "lpToken": str(remove_context.get("lpToken") or "").lower(),
+                        "lpBalance": str(remove_context.get("lpBalance") or "0"),
+                        "percent": percent,
+                    },
+                    exit_code=1,
+                )
         payload = {
             "schemaVersion": 1,
             "agentId": agent_id,
@@ -7177,8 +7332,8 @@ def cmd_liquidity_remove(args: argparse.Namespace) -> int:
             "dex": adapter_dex,
             "action": "remove",
             "positionType": position_type,
-            "tokenA": str(args.token_a or "POSITION").strip(),
-            "tokenB": str(args.token_b or "POSITION").strip(),
+            "tokenA": resolved_token_a,
+            "tokenB": resolved_token_b,
             "amountA": str(percent),
             "amountB": "0",
             "positionId": position_id,
@@ -7186,6 +7341,8 @@ def cmd_liquidity_remove(args: argparse.Namespace) -> int:
             "details": {
                 "percent": percent,
                 "adapterFamily": adapter_family,
+                "tokenASymbol": display_token_a,
+                "tokenBSymbol": display_token_b,
                 "preflight": preflight.get("simulation", {}) if isinstance(preflight, dict) else {},
                 "providerRequested": provider_requested,
                 "source": "runtime_liquidity_remove",
@@ -7208,8 +7365,10 @@ def cmd_liquidity_remove(args: argparse.Namespace) -> int:
                 "chainKey": chain,
                 "dex": adapter_dex,
                 "action": "remove",
-                "tokenA": str(args.token_a or "POSITION").strip(),
-                "tokenB": str(args.token_b or "POSITION").strip(),
+                "tokenA": resolved_token_a,
+                "tokenB": resolved_token_b,
+                "tokenASymbol": display_token_a,
+                "tokenBSymbol": display_token_b,
                 "positionId": position_id,
                 "percent": percent,
                 "amountA": str(percent),
@@ -7222,7 +7381,7 @@ def cmd_liquidity_remove(args: argparse.Namespace) -> int:
             queued_message = (
                 "Approval required (liquidity)\n\n"
                 "Request: Remove liquidity\n"
-                f"Pair: {str(args.token_a or 'POSITION').strip()}/{str(args.token_b or 'POSITION').strip()}\n"
+                f"Pair: {display_token_a}/{display_token_b}\n"
                 f"Position ID: `{position_id}`\n"
                 f"Percent: {percent}%\n"
                 f"Chain: `{chain}`\n"
@@ -7239,6 +7398,10 @@ def cmd_liquidity_remove(args: argparse.Namespace) -> int:
                     "liquidityIntentId": liquidity_intent_id,
                     "chain": chain,
                     "dex": adapter_dex,
+                    "tokenA": resolved_token_a,
+                    "tokenB": resolved_token_b,
+                    "tokenASymbol": display_token_a,
+                    "tokenBSymbol": display_token_b,
                     "status": status,
                     "queuedMessage": queued_message,
                     "nextAction": "Post queuedMessage verbatim to the user in the active chat.",
@@ -8016,6 +8179,12 @@ def cmd_liquidity_positions(args: argparse.Namespace) -> int:
     chain = str(args.chain or "").strip()
     dex = str(args.dex or "").strip().lower()
     status_filter = str(args.status or "").strip().lower()
+    status_aliases = {
+        "open": "active",
+        "opened": "active",
+        "live": "active",
+    }
+    status_filter = status_aliases.get(status_filter, status_filter)
     try:
         assert_chain_capability(chain, "liquidity")
         agent_id = _resolve_agent_id_or_fail(chain)
@@ -8034,6 +8203,35 @@ def cmd_liquidity_positions(args: argparse.Namespace) -> int:
         items = body.get("items")
         if not isinstance(items, list):
             items = []
+        normalized_items: list[dict[str, Any]] = []
+        for row in items:
+            if not isinstance(row, dict):
+                continue
+            item = dict(row)
+            token_a_raw = str(item.get("tokenA") or "").strip()
+            token_b_raw = str(item.get("tokenB") or "").strip()
+            token_a = token_a_raw
+            token_b = token_b_raw
+            if _is_placeholder_liquidity_token(token_a_raw) or _is_placeholder_liquidity_token(token_b_raw):
+                pair_ref = str(item.get("pool") or item.get("poolRef") or item.get("pair") or "").strip()
+                if is_hex_address(pair_ref):
+                    try:
+                        pair_token_a, pair_token_b = _resolve_pair_tokens_from_contract(chain, pair_ref)
+                        if _is_placeholder_liquidity_token(token_a_raw):
+                            token_a = pair_token_a
+                        if _is_placeholder_liquidity_token(token_b_raw):
+                            token_b = pair_token_b
+                    except Exception:
+                        pass
+            token_a_symbol = _token_symbol_for_display(chain, token_a) or token_a
+            token_b_symbol = _token_symbol_for_display(chain, token_b) or token_b
+            item["tokenA"] = token_a
+            item["tokenB"] = token_b
+            item["tokenASymbol"] = token_a_symbol
+            item["tokenBSymbol"] = token_b_symbol
+            item["pairDisplay"] = f"{token_a_symbol}/{token_b_symbol}"
+            normalized_items.append(item)
+        items = normalized_items
         if dex:
             items = [row for row in items if str((row or {}).get("dex") or "").strip().lower() == dex]
         if status_filter:

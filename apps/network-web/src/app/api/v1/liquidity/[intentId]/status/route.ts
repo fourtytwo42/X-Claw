@@ -174,45 +174,83 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ intentId: 
 
       if (nextStatus === 'filled') {
         const positionId = String(body.positionId || current.details?.positionId || current.liquidity_intent_id).trim();
-        await client.query(
-          `
-          insert into liquidity_position_snapshots (
-            snapshot_id, agent_id, chain_key, dex_key, position_id, position_type, pool_ref,
-            token_a, token_b, deposited_a, deposited_b, current_a, current_b, status, last_synced_at, created_at, updated_at
-          ) values (
-            $1, $2, $3, $4, $5, $6, $7,
-            $8, $9, $10::numeric, $11::numeric, $12::numeric, $13::numeric, 'active', now(), now(), now()
-          )
-          on conflict (agent_id, chain_key, position_id) do update set
-            dex_key = excluded.dex_key,
-            position_type = excluded.position_type,
-            pool_ref = excluded.pool_ref,
-            token_a = excluded.token_a,
-            token_b = excluded.token_b,
-            deposited_a = excluded.deposited_a,
-            deposited_b = excluded.deposited_b,
-            current_a = excluded.current_a,
-            current_b = excluded.current_b,
-            status = 'active',
-            last_synced_at = now(),
-            updated_at = now()
-          `,
-          [
-            makeId('lps'),
-            current.agent_id,
-            current.chain_key,
-            current.dex_key,
-            positionId,
-            current.position_type,
-            `${current.token_a ?? 'tokenA'}/${current.token_b ?? 'tokenB'}`,
-            current.token_a ?? '',
-            current.token_b ?? '',
-            current.amount_a ?? '0',
-            current.amount_b ?? '0',
-            current.amount_a ?? '0',
-            current.amount_b ?? '0',
-          ]
-        );
+        if (current.action_type === 'remove') {
+          const percentRaw = Number.parseFloat(String(current.amount_a ?? '0'));
+          const percent = Number.isFinite(percentRaw) ? Math.max(0, Math.min(100, percentRaw)) : 0;
+          if (percent >= 100) {
+            await client.query(
+              `
+              update liquidity_position_snapshots
+              set
+                status = 'closed',
+                current_a = 0,
+                current_b = 0,
+                last_synced_at = now(),
+                updated_at = now()
+              where agent_id = $1
+                and chain_key = $2
+                and position_id = $3
+              `,
+              [current.agent_id, current.chain_key, positionId]
+            );
+          } else if (percent > 0) {
+            await client.query(
+              `
+              update liquidity_position_snapshots
+              set
+                current_a = greatest(0, current_a * ((100 - $4::numeric) / 100)),
+                current_b = greatest(0, current_b * ((100 - $4::numeric) / 100)),
+                status = 'active',
+                last_synced_at = now(),
+                updated_at = now()
+              where agent_id = $1
+                and chain_key = $2
+                and position_id = $3
+              `,
+              [current.agent_id, current.chain_key, positionId, String(percent)]
+            );
+          }
+        } else {
+          await client.query(
+            `
+            insert into liquidity_position_snapshots (
+              snapshot_id, agent_id, chain_key, dex_key, position_id, position_type, pool_ref,
+              token_a, token_b, deposited_a, deposited_b, current_a, current_b, status, last_synced_at, created_at, updated_at
+            ) values (
+              $1, $2, $3, $4, $5, $6, $7,
+              $8, $9, $10::numeric, $11::numeric, $12::numeric, $13::numeric, 'active', now(), now(), now()
+            )
+            on conflict (agent_id, chain_key, position_id) do update set
+              dex_key = excluded.dex_key,
+              position_type = excluded.position_type,
+              pool_ref = excluded.pool_ref,
+              token_a = excluded.token_a,
+              token_b = excluded.token_b,
+              deposited_a = excluded.deposited_a,
+              deposited_b = excluded.deposited_b,
+              current_a = excluded.current_a,
+              current_b = excluded.current_b,
+              status = 'active',
+              last_synced_at = now(),
+              updated_at = now()
+            `,
+            [
+              makeId('lps'),
+              current.agent_id,
+              current.chain_key,
+              current.dex_key,
+              positionId,
+              current.position_type,
+              `${current.token_a ?? 'tokenA'}/${current.token_b ?? 'tokenB'}`,
+              current.token_a ?? '',
+              current.token_b ?? '',
+              current.amount_a ?? '0',
+              current.amount_b ?? '0',
+              current.amount_a ?? '0',
+              current.amount_b ?? '0',
+            ]
+          );
+        }
 
         const feeEvents = Array.isArray(body.details?.feeEvents) ? (body.details?.feeEvents as LiquidityFeeEventInput[]) : [];
         for (const event of feeEvents) {

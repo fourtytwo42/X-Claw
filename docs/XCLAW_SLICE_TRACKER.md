@@ -2475,3 +2475,18 @@ DoD:
 - [x] handoff artifacts updated in same change (`spec.md`, `tasks.md`, `acceptance.md`).
 - [x] required gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, task-specific tests, `build`, `pm2 restart all`).
 - [x] issue #61 updated with verification evidence + commit hash(es).
+
+## Slice 118 Follow-Up A: Ethereum Sepolia Uniswap LP Adapter Enablement
+Status: [x]
+Issue: #61
+
+Goal:
+- Remove deterministic `unsupported_liquidity_adapter` for `ethereum_sepolia` LP add requests that use operator alias `--dex uniswap`, while preserving fail-closed behavior for unsupported dex values.
+
+DoD:
+- [x] `config/chains/ethereum_sepolia.json` includes `liquidityProtocols` entries for `uniswap_v2` (`amm_v2`) and `uniswap_v3` (`amm_v3`).
+- [x] runtime liquidity adapter resolver normalizes aliases (`uniswap|uni -> uniswap_v2`) before config lookup.
+- [x] adapter tests cover alias success, explicit `uniswap_v3`, and unknown-dex fail-closed behavior.
+- [x] CLI quote-add tests cover `ethereum_sepolia` alias success path and unknown-dex deterministic rejection.
+- [x] source-of-truth + roadmap + handoff artifacts updated in the same change.
+- [x] required gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, task-specific tests, `build`, `pm2 restart all`).

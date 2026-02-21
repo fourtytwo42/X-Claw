@@ -1285,9 +1285,17 @@ Delegated runtime CLI commands that must exist:
 
 Liquidity adapter execution contract:
 - Runtime routes liquidity commands by `(chain, dex, position_type)` using chain-config `liquidityProtocols`.
+- Runtime normalizes operator dex aliases before protocol resolution: `uniswap` and `uni` map to canonical `uniswap_v2`.
+- `ethereum_sepolia` must define liquidity protocol keys for adapter routing (`uniswap_v2`=`amm_v2`, `uniswap_v3`=`amm_v3`), alongside existing Uniswap provider settings.
 - `liquidity add/remove` must run adapter preflight quote simulation before proposal submission.
 - `liquidity add/remove` auto-executes when resulting intent status is `approved` (no extra manual execute step in normal flow).
 - `liquidity add/remove` returning `status=approval_pending` must produce deterministic pending payload (`liquidityIntentId`, `status`, `queuedMessage`) and runtime must best-effort send Telegram Approve/Deny prompt when `lastChannel == telegram`.
+- `liquidity remove` must resolve pair tokens from canonical position snapshot data or on-chain pair contract fallback (`token0/token1`) before proposal/approval messaging; placeholder pair labels (for example `POSITION/POSITION`) are non-canonical.
+- `liquidity positions` runtime output must normalize placeholder token fields using snapshot/pair fallback and expose symbol-level pair display (`tokenASymbol`, `tokenBSymbol`, `pairDisplay`) for agent-facing summaries.
+- `liquidity positions` status filtering must accept user-language aliases (`open|opened|live`) and normalize them to canonical `active` status.
+- `/api/v1/liquidity/positions` must backfill placeholder snapshot tokens from latest canonical liquidity intent provenance for the same `position_ref` when snapshot token fields are placeholders, so downstream runtime/skill flows remain executable and symbol-truthful.
+- Management `agent-state` liquidityPositions feed is ownership-scoped: return only `status='active'` rows with positive current underlying (closed/non-owned rows are hidden from the default Liquidity Positions panel).
+- Wallet holdings panel should hide `SSLP-*` LP symbols when no active liquidity positions exist on the selected chain.
 - Telegram liquidity callback format is locked: `xliq|a|<liquidityIntentId>|<chainKey>` approve and `xliq|r|<liquidityIntentId>|<chainKey>` deny.
 - Management liquidity approvals must auto-queue runtime continuation: `xclaw-agent liquidity execute --intent <id> --chain <chain_key> --json`.
 - `liquidity quote-add` uses EVM router quote + ERC20 metadata only for `amm_v2` / `amm_v3` families.
@@ -1298,7 +1306,13 @@ Liquidity adapter execution contract:
 - `amm_v2` add execution must run deterministic pre-submit checks (wallet token/native balance, pair reserves, router simulation) and emit explicit preflight reason codes (`liquidity_preflight_*`) when blocked.
 - Hedera EVM `amm_v2` add supports opt-in simulation bypass for known false-positive simulation signatures when `XCLAW_LIQUIDITY_ALLOW_SIMULATION_BYPASS=1`; bypass metadata must be returned in preflight details.
 - `liquidity remove` execution derives token pair and LP amount from stored position snapshot + on-chain LP balance percent; when snapshot is unavailable and `positionRef` is a pair address, runtime may resolve `token0/token1` directly from pair.
+- `liquidity remove` must preflight computed LP units before proposal and execution; when computed units are zero, runtime must fail deterministically with `liquidity_preflight_zero_lp_balance` (no approval queue for proposal path).
 - Hedera pair remove path must resolve LP token via `pair.lpToken()` when available (fallback to pair contract token model otherwise).
+- Liquidity status writer must treat `remove` intents as percent-based, not token-underlying amounts: on `filled remove`, snapshot current balances are reduced/closed without overwriting deposited/current with intent `amount_a/amount_b` (`100/0` must never become POSITION underlying).
+- Snapshot sync must heal placeholder liquidity rows by backfilling token/pool from canonical add provenance and auto-close active rows when a canonical `filled remove` at `100%` exists for that `position_ref`.
+- Snapshot sync must also auto-close active rows when canonical remove execution fails with zero-LP signatures for the same `position_ref` (wallet holds no removable LP balance), covering both deterministic `reason_code=liquidity_preflight_zero_lp_balance` and legacy `liquidity_execution_failed` zero-LP reason messages.
+- For v2 snapshots, zero-LP reconciliation must support pair-level matching fallback (`token_a/token_b`, order-insensitive) when historical remove intents use non-canonical `position_ref` identifiers.
+- For Hedera SaucerSwap v2 snapshots, sync must reconcile against mirrored LP wallet balances (`wallet_balance_snapshots` SSLP symbols) and auto-close `active` rows when LP mirror balance is zero.
 - Unsupported adapter combinations must return `unsupported_liquidity_adapter`.
 - Hedera HTS-native liquidity paths use plugin bridge module `xclaw_agent.hedera_hts_plugin:execute_liquidity` by default (override with `XCLAW_HEDERA_HTS_PLUGIN`) and dispatch to a bridge command via:
   - env override `XCLAW_HEDERA_HTS_BRIDGE_CMD`, or
@@ -2801,6 +2815,7 @@ Supersession note (Slice 117 Hotfix D):
    - Reliability requirement:
      - policy (`xpol`) and transfer (`xfer`) callbacks must emit immediate visible confirmation (`Approved/Denied ...`), including converged terminal `409`,
      - liquidity (`xliq`) callbacks must emit immediate visible confirmation (`Approved/Denied ...`) and keep callback handling LLM-free via runtime `approvals decide-liquidity`,
+     - liquidity callback retries that race with fast terminal transitions (`filled|failed|rejected|expired|verification_timeout`) must converge as non-fatal success (no user-facing `liquidity_decision_failed` noise when intent has already left pending scope),
      - trade approve (`xappr approve`) must not emit an intermediate `Approved trade ...` message; approval is confirmed by the final trade-result message after auto-resume.
    - Single-trigger spot flow requirement (Telegram-focused): for `trade spot` approvals (`xappr approve`), the system must auto-resume execution without requiring a second user message.
    - Final-result requirement: after auto-resume execution, the system must emit a deterministic final result message in the same chat (status + tradeId + chain + tx hash when available).
