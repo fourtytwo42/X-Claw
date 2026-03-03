@@ -3,6 +3,8 @@ import { NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
 
+const DEFAULT_REPO_URL = 'https://github.com/fourtytwo42/X-Claw';
+
 function resolvePublicBaseUrl(req: NextRequest): string {
   const configured = process.env.XCLAW_PUBLIC_BASE_URL?.trim();
   if (configured) {
@@ -40,7 +42,7 @@ fi
 
 export XCLAW_WORKDIR="\${XCLAW_WORKDIR:-$HOME/xclaw}"
 export XCLAW_REPO_REF="\${XCLAW_REPO_REF:-main}"
-export XCLAW_REPO_URL="\${XCLAW_REPO_URL:-https://github.com/fourtytwo42/ETHDenver2026}"
+export XCLAW_REPO_URL="\${XCLAW_REPO_URL:-${DEFAULT_REPO_URL}}"
 export XCLAW_INSTALL_ORIGIN="${origin}"
 export XCLAW_INSTALL_FORCE_LOCAL_API="\${XCLAW_INSTALL_FORCE_LOCAL_API:-0}"
 if [ "$XCLAW_INSTALL_FORCE_LOCAL_API" = "1" ]; then
@@ -411,12 +413,13 @@ if [ -d "$XCLAW_WORKDIR/.git" ]; then
   git pull --ff-only
 elif [ ! -e "$XCLAW_WORKDIR" ]; then
   archive_base="$(echo "$XCLAW_REPO_URL" | sed -E 's#https?://github.com/##' | sed -E 's#\\.git$##')"
+  repo_archive_prefix="$(basename "$archive_base")"
   archive_url="https://codeload.github.com/$archive_base/tar.gz/refs/heads/$XCLAW_REPO_REF"
   echo "[xclaw] downloading source archive: $archive_url"
   curl -fsSL "$archive_url" -o "$tmp_dir/repo.tar.gz"
   tar -xzf "$tmp_dir/repo.tar.gz" -C "$tmp_dir"
 
-  src_dir="$(find "$tmp_dir" -mindepth 1 -maxdepth 1 -type d -name 'ETHDenver2026-*' | head -n1)"
+  src_dir="$(find "$tmp_dir" -mindepth 1 -maxdepth 1 -type d -name "$repo_archive_prefix-*" | head -n1)"
   if [ -z "$src_dir" ]; then
     echo "[xclaw] unable to find extracted repository directory"
     exit 1
@@ -427,12 +430,13 @@ elif [ ! -e "$XCLAW_WORKDIR" ]; then
 else
   echo "[xclaw] existing non-git directory at $XCLAW_WORKDIR"
   archive_base="$(echo "$XCLAW_REPO_URL" | sed -E 's#https?://github.com/##' | sed -E 's#\\.git$##')"
+  repo_archive_prefix="$(basename "$archive_base")"
   archive_url="https://codeload.github.com/$archive_base/tar.gz/refs/heads/$XCLAW_REPO_REF"
   echo "[xclaw] downloading source archive for in-place update: $archive_url"
   curl -fsSL "$archive_url" -o "$tmp_dir/repo.tar.gz"
   tar -xzf "$tmp_dir/repo.tar.gz" -C "$tmp_dir"
 
-  src_dir="$(find "$tmp_dir" -mindepth 1 -maxdepth 1 -type d -name 'ETHDenver2026-*' | head -n1)"
+  src_dir="$(find "$tmp_dir" -mindepth 1 -maxdepth 1 -type d -name "$repo_archive_prefix-*" | head -n1)"
   if [ -z "$src_dir" ]; then
     echo "[xclaw] unable to find extracted repository directory"
     exit 1

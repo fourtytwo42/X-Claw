@@ -3,6 +3,8 @@ import { NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
 
+const DEFAULT_REPO_URL = 'https://github.com/fourtytwo42/X-Claw';
+
 function resolvePublicBaseUrl(req: NextRequest): string {
   const configured = process.env.XCLAW_PUBLIC_BASE_URL?.trim();
   if (configured) {
@@ -23,7 +25,7 @@ Write-Host "[xclaw] bootstrap start"
 
 if (-not $env:XCLAW_WORKDIR) { $env:XCLAW_WORKDIR = Join-Path $HOME "xclaw" }
 if (-not $env:XCLAW_REPO_REF) { $env:XCLAW_REPO_REF = "main" }
-if (-not $env:XCLAW_REPO_URL) { $env:XCLAW_REPO_URL = "https://github.com/fourtytwo42/ETHDenver2026" }
+if (-not $env:XCLAW_REPO_URL) { $env:XCLAW_REPO_URL = "${DEFAULT_REPO_URL}" }
 $env:XCLAW_INSTALL_ORIGIN = "${origin}"
 if (-not $env:XCLAW_INSTALL_FORCE_LOCAL_API) { $env:XCLAW_INSTALL_FORCE_LOCAL_API = "0" }
 if ($env:XCLAW_INSTALL_FORCE_LOCAL_API -eq "1") {
@@ -435,7 +437,8 @@ try {
     Invoke-WebRequest -Uri $archiveUrl -OutFile $zipPath
     Expand-Archive -Path $zipPath -DestinationPath $tmpRoot -Force
 
-    $srcDir = Get-ChildItem -Path $tmpRoot -Directory | Where-Object { $_.Name -like "ETHDenver2026-*" } | Select-Object -First 1
+    $repoArchivePrefix = Split-Path -Path $archiveBase -Leaf
+    $srcDir = Get-ChildItem -Path $tmpRoot -Directory | Where-Object { $_.Name -like "$repoArchivePrefix-*" } | Select-Object -First 1
     if (-not $srcDir) {
       throw "Unable to find extracted repository directory."
     }
