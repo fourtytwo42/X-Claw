@@ -55,7 +55,7 @@ class DexAdapter:
         return Decimal(amount_out_units) / (Decimal(10) ** Decimal(token_in_decimals))
 
 
-class UniswapV2RouterAdapter(DexAdapter):
+class AmmV2RouterAdapter(DexAdapter):
     pass
 
 
@@ -72,7 +72,7 @@ def build_dex_adapter(chain: str, cast_bin: str, rpc_url: str, router_address: s
             rpc_url=rpc_url,
             router_address=router_address,
         )
-    return UniswapV2RouterAdapter(
+    return AmmV2RouterAdapter(
         chain=chain,
         cast_bin=cast_bin,
         rpc_url=rpc_url,

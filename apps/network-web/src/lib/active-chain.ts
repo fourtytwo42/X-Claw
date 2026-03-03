@@ -23,8 +23,6 @@ const FALLBACK_CHAIN = 'base_sepolia';
 const FALLBACK_REGISTRY: ChainDescriptor[] = [
   { chainKey: 'base_mainnet', displayName: 'Base Mainnet', nativeCurrency: { symbol: 'ETH', decimals: 18 } },
   { chainKey: 'base_sepolia', displayName: 'Base Sepolia', nativeCurrency: { symbol: 'ETH', decimals: 18 } },
-  { chainKey: 'hedera_mainnet', displayName: 'Hedera Mainnet', nativeCurrency: { symbol: 'HBAR', decimals: 8 } },
-  { chainKey: 'hedera_testnet', displayName: 'Hedera Testnet', nativeCurrency: { symbol: 'HBAR', decimals: 8 } },
   { chainKey: 'ethereum', displayName: 'Ethereum', nativeCurrency: { symbol: 'ETH', decimals: 18 } },
   { chainKey: 'ethereum_sepolia', displayName: 'Ethereum Sepolia', nativeCurrency: { symbol: 'ETH', decimals: 18 } },
   { chainKey: 'kite_ai_mainnet', displayName: 'KiteAI Mainnet', nativeCurrency: { symbol: 'KITE', decimals: 18 } },
@@ -39,10 +37,6 @@ function fallbackNativeDecimalsFor(chainKey: string, nativeSymbol: string): numb
   const fromChain = FALLBACK_REGISTRY.find((row) => row.chainKey === chainKey)?.nativeCurrency?.decimals;
   if (typeof fromChain === 'number' && Number.isFinite(fromChain) && fromChain > 0) {
     return Math.floor(fromChain);
-  }
-  const upperSymbol = nativeSymbol.trim().toUpperCase();
-  if (upperSymbol === 'HBAR') {
-    return 8;
   }
   return 18;
 }
@@ -101,9 +95,6 @@ export function nativeSymbolForChainKey(chainKey: ChainKey): string {
 }
 
 export function nativeDecimalsForChainKey(chainKey: ChainKey): number {
-  if (chainKey.startsWith('hedera_')) {
-    return 18;
-  }
   const registry = loadRegistryFromStorage();
   const found = registry.find((row) => row.chainKey === chainKey);
   const symbol = found?.nativeCurrency?.symbol ?? '';

@@ -2549,3 +2549,18 @@ DoD:
 - [x] closed-loop runtime evidence captured: `ethereum_sepolia` remove intent reaches terminal `filled` after approval (`liq_6103a859a56f70492b13`, tx `0x5d85ddf4ef65c50c332470255d353628aa4e7bf5b8216e06e53883ccb9169bc8`).
 - [x] source-of-truth + roadmap + handoff artifacts updated in the same change.
 - [x] required gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, task-specific tests, `build`, `pm2 restart all`).
+
+## Slice 119: EVM-Only Exchange-Agnostic Execution Refactor
+Status: [~]
+
+Goal:
+- Remove active non-EVM/Hedera support and make generic EVM router-adapter execution canonical while preserving compatibility route/CLI surface.
+
+DoD:
+- [x] Hedera chain configs removed from active repo support.
+- [x] chain/public schemas limited to `family=evm`.
+- [x] canonical generic trade routes exist.
+- [x] compatibility Uniswap trade routes delegate to generic handlers.
+- [x] active server execution path does not require `XCLAW_UNISWAP_API_KEY`.
+- [x] chain configs include canonical `execution.trade` / `execution.liquidity`.
+- [~] remaining installer/docs/runtime-test Hedera references removed.

@@ -23,12 +23,6 @@ type RpcLog = {
   data: string;
 };
 
-type HederaDiscoveredToken = {
-  symbol: string;
-  balance: string;
-  decimals: number;
-};
-
 type DepositSyncResult = {
   syncStatus: 'ok' | 'degraded';
   syncDetail: string | null;
@@ -51,116 +45,10 @@ function topicAddress(address: string): string {
   return `0x${'0'.repeat(24)}${address.toLowerCase().slice(2)}`;
 }
 
-function isHederaChain(chainKey: string): boolean {
-  return chainKey.startsWith('hedera_');
-}
-
 function nativeAtomicDecimalsForBalance(chainKey: string, token: string): number | null {
-  const normalizedToken = String(token ?? '').trim().toUpperCase();
-  if (chainKey.startsWith('hedera_') && (normalizedToken === 'NATIVE' || normalizedToken === 'HBAR')) {
-    return 18;
-  }
+  void chainKey;
+  void token;
   return null;
-}
-
-function chainEnvSuffix(chainKey: string): string {
-  return chainKey.replace(/[^a-zA-Z0-9]/g, '_').toUpperCase();
-}
-
-function hederaMirrorApiBase(chainKey: string): string {
-  const scoped = process.env[`XCLAW_HEDERA_MIRROR_API_URL_${chainEnvSuffix(chainKey)}`]?.trim();
-  if (scoped) {
-    return scoped.replace(/\/+$/, '');
-  }
-  const shared = process.env.XCLAW_HEDERA_MIRROR_API_URL?.trim();
-  if (shared) {
-    return shared.replace(/\/+$/, '');
-  }
-  if (chainKey === 'hedera_mainnet') {
-    return 'https://mainnet-public.mirrornode.hedera.com/api/v1';
-  }
-  return 'https://testnet.mirrornode.hedera.com/api/v1';
-}
-
-async function hederaDiscoverWalletTokens(chainKey: string, walletAddress: string): Promise<HederaDiscoveredToken[]> {
-  const base = hederaMirrorApiBase(chainKey);
-  let nextUrl = `${base}/accounts/${walletAddress}/tokens?limit=100`;
-  const visited = new Set<string>();
-  const out = new Map<string, HederaDiscoveredToken>();
-
-  while (nextUrl && !visited.has(nextUrl) && visited.size < 20) {
-    visited.add(nextUrl);
-    const res = await fetchWithTimeout(
-      nextUrl,
-      {
-        method: 'GET',
-        headers: {
-          accept: 'application/json',
-          'user-agent': 'xclaw-web/1.0 (+https://xclaw.trade)',
-        },
-        cache: 'no-store',
-      },
-      upstreamFetchTimeoutMs(),
-    );
-    if (!res.ok) {
-      throw new Error(`Hedera mirror tokens request failed with HTTP ${res.status}`);
-    }
-    const page = (await res.json()) as {
-      tokens?: Array<{ token_id?: string; balance?: number | string }>;
-      links?: { next?: string | null };
-    };
-    const rows = Array.isArray(page.tokens) ? page.tokens : [];
-    for (const row of rows) {
-      const tokenId = String(row.token_id ?? '').trim();
-      if (!tokenId) {
-        continue;
-      }
-      let balanceUnits = BigInt(0);
-      try {
-        balanceUnits = BigInt(String(row.balance ?? '0'));
-      } catch {
-        continue;
-      }
-      if (balanceUnits <= BigInt(0)) {
-        continue;
-      }
-      const metaRes = await fetchWithTimeout(
-        `${base}/tokens/${tokenId}`,
-        {
-          method: 'GET',
-          headers: {
-            accept: 'application/json',
-            'user-agent': 'xclaw-web/1.0 (+https://xclaw.trade)',
-          },
-          cache: 'no-store',
-        },
-        upstreamFetchTimeoutMs(),
-      );
-      if (!metaRes.ok) {
-        continue;
-      }
-      const meta = (await metaRes.json()) as { symbol?: string | null; decimals?: number | string | null };
-      const symbol = String(meta.symbol ?? tokenId).trim().toUpperCase();
-      if (!symbol) {
-        continue;
-      }
-      let decimals = 0;
-      try {
-        decimals = Number.parseInt(String(meta.decimals ?? '0'), 10);
-      } catch {
-        decimals = 0;
-      }
-      out.set(symbol, {
-        symbol,
-        balance: balanceUnits.toString(),
-        decimals: Number.isFinite(decimals) && decimals >= 0 ? decimals : 0,
-      });
-    }
-    const rawNext = String(page.links?.next ?? '').trim();
-    nextUrl = rawNext ? new URL(rawNext, `${base}/`).toString() : '';
-  }
-
-  return Array.from(out.values());
 }
 
 async function rpcRequest(rpcUrl: string, method: string, params: unknown[]): Promise<unknown> {
@@ -321,32 +209,6 @@ async function syncChainDeposits(agentId: string, chainKey: string, walletAddres
             do nothing
             `,
             [makeId('dep'), agentId, chainKey, snapshotToken, amount, entry.transactionHash, logIndex, blockNumber, agentId, chainKey, entry.transactionHash]
-          );
-        });
-      }
-    }
-
-    if (isHederaChain(chainKey)) {
-      const discovered = await hederaDiscoverWalletTokens(chainKey, walletAddress);
-      for (const token of discovered) {
-        discoveredTokenDecimals.set(token.symbol, token.decimals);
-        await withTransaction(async (client) => {
-          await client.query(
-            `
-            insert into wallet_balance_snapshots (
-              snapshot_id, agent_id, chain_key, token, balance, block_number, observed_at, created_at,
-              observed_by, observation_source, watcher_run_id
-            ) values ($1, $2, $3, $4, $5, $6, now(), now(), 'legacy_server_poller', 'rpc_log', 'server_poller_dual_run')
-            on conflict (agent_id, chain_key, token)
-            do update set
-              balance = excluded.balance,
-              block_number = excluded.block_number,
-              observed_at = now(),
-              observed_by = excluded.observed_by,
-              observation_source = excluded.observation_source,
-              watcher_run_id = excluded.watcher_run_id
-            `,
-            [makeId('wbs'), agentId, chainKey, token.symbol, token.balance, Number(latestBlock)]
           );
         });
       }

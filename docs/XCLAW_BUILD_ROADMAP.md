@@ -4095,3 +4095,12 @@ Note:
 - [x] Capture closed-loop Sepolia remove evidence (`liq_6103a859a56f70492b13` -> `filled`, tx `0x5d85ddf4ef65c50c332470255d353628aa4e7bf5b8216e06e53883ccb9169bc8`).
 - [x] Canonical artifacts + handoff docs synchronized (`XCLAW_SOURCE_OF_TRUTH`, tracker, `spec.md`, `tasks.md`, `acceptance.md`).
 - [ ] Issue #61 follow-up evidence post + commit hash(es).
+
+## 19) Slice 119: EVM-Only Exchange-Agnostic Execution Refactor
+
+- [x] Remove active Hedera chain configs and runtime bridge/plugin artifacts.
+- [x] Add canonical generic trade routes and preserve Uniswap-named trade routes as compatibility aliases.
+- [x] Add canonical `execution.trade` / `execution.liquidity` config shape to active EVM chain configs.
+- [x] Normalize shared/public chain contracts to `family=evm`.
+- [x] Remove active server dependency on `XCLAW_UNISWAP_API_KEY`.
+- [~] Remove remaining Hedera-specific installer/docs/test references.

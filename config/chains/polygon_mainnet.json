@@ -90,5 +90,33 @@
   "tradeOperations": {
     "legacyEnabled": true,
     "adapter": "legacy_router"
+  },
+  "execution": {
+    "trade": {
+      "defaultProvider": "router_adapter",
+      "adapters": {
+        "default": {
+          "adapterKey": "uniswap_v2",
+          "family": "amm_v2",
+          "router": "0xedf6066a2b290C185783862C7F4776A2C8077AD1",
+          "factory": "0x9e5A52f57b3038F1B8EeE45F28b3C1967e22799C",
+          "quoter": "",
+          "positionManager": ""
+        }
+      }
+    },
+    "liquidity": {
+      "defaultProvider": "router_adapter",
+      "adapters": {
+        "default": {
+          "adapterKey": "uniswap_v2",
+          "family": "amm_v2",
+          "router": "0xedf6066a2b290C185783862C7F4776A2C8077AD1",
+          "factory": "0x9e5A52f57b3038F1B8EeE45F28b3C1967e22799C",
+          "quoter": "",
+          "positionManager": ""
+        }
+      }
+    }
   }
 }

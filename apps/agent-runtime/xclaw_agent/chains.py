@@ -38,6 +38,9 @@ def list_chains(include_disabled: bool = False) -> list[dict[str, Any]]:
         chain_key = str(cfg.get("chainKey") or "").strip()
         if not chain_key:
             continue
+        family = str(cfg.get("family") or "evm").strip().lower() or "evm"
+        if family != "evm":
+            continue
         if not include_disabled and not _is_enabled(cfg):
             continue
         rows.append(cfg)
@@ -84,4 +87,3 @@ def assert_capability(chain: str, capability: CapabilityKey) -> None:
     assert_chain_supported(chain)
     if not chain_capability(chain, capability):
         raise ChainRegistryError(f"Chain '{chain}' does not support capability '{capability}'.")
-

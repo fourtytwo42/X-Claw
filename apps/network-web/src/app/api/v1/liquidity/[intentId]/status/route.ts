@@ -18,11 +18,13 @@ type LiquidityStatusBody = {
   txHash?: string;
   positionId?: string;
   amountOut?: string | number;
-  providerRequested?: 'uniswap_api' | 'legacy_router';
-  providerUsed?: 'uniswap_api' | 'legacy_router';
+  providerRequested?: 'router_adapter' | 'quote_only' | 'none';
+  providerUsed?: 'router_adapter' | 'none';
   fallbackUsed?: boolean;
   fallbackReason?: { code: string; message: string };
-  uniswapLpOperation?: 'approve' | 'create' | 'increase' | 'decrease' | 'claim' | 'migrate' | 'claim_rewards';
+  liquidityOperation?: 'approve' | 'create' | 'increase' | 'decrease' | 'claim' | 'migrate' | 'claim_rewards';
+  executionFamily?: string;
+  executionAdapter?: string;
   details?: Record<string, unknown>;
 };
 
@@ -142,8 +144,14 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ intentId: 
       if (body.fallbackReason) {
         detailsPatch.fallbackReason = body.fallbackReason;
       }
-      if (body.uniswapLpOperation) {
-        detailsPatch.uniswapLpOperation = body.uniswapLpOperation;
+      if (body.liquidityOperation) {
+        detailsPatch.liquidityOperation = body.liquidityOperation;
+      }
+      if (body.executionFamily) {
+        detailsPatch.executionFamily = body.executionFamily;
+      }
+      if (body.executionAdapter) {
+        detailsPatch.executionAdapter = body.executionAdapter;
       }
 
       await client.query(

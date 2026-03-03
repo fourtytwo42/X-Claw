@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
       return errorResponse(
         error.status,
         {
-          code: error.code as 'uniswap_upstream_error',
+          code: 'unsupported_execution_adapter',
           message: error.message,
           actionHint: 'Retry with legacy fallback if this persists.',
           details: error.details,

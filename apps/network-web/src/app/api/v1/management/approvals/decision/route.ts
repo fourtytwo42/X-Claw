@@ -141,7 +141,7 @@ function runtimeSpawnEnv(req: NextRequest, agentId: string, chainKey: string): N
       env.XCLAW_WALLET_PASSPHRASE = passphrase;
     }
   }
-  for (const key of ['XCLAW_LIQUIDITY_ALLOW_SEPOLIA_TRANSFERFROM_BYPASS', 'XCLAW_UNISWAP_API_KEY']) {
+  for (const key of ['XCLAW_LIQUIDITY_ALLOW_SEPOLIA_TRANSFERFROM_BYPASS']) {
     if ((env[key] ?? '').trim()) {
       continue;
     }

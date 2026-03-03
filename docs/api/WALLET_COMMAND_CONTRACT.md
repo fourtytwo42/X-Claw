@@ -40,7 +40,7 @@ Notes:
 - explicit `--chain` remains authoritative for chain-scoped commands.
 - chain inference for omitted chain uses runtime/web-synced default chain (`state.json.defaultChain`) first, then `XCLAW_DEFAULT_CHAIN` env fallback.
 - `wallet-send` uses base-unit amount for deterministic automation.
-- Supported chain keys for this contract are config-driven (`config/chains/*.json` where `enabled=true`). Current visible examples include `base_mainnet`, `base_sepolia`, `ethereum`, `ethereum_sepolia`, `hedera_mainnet`, `hedera_testnet`, `kite_ai_mainnet`, `kite_ai_testnet`, `adi_mainnet`, `adi_testnet`, `og_mainnet`, and `og_testnet`.
+- Supported chain keys for this contract are config-driven EVM chains (`config/chains/*.json` where `enabled=true` and `family=evm`). Current visible examples include `base_mainnet`, `base_sepolia`, `ethereum`, `ethereum_sepolia`, `kite_ai_mainnet`, `kite_ai_testnet`, `adi_mainnet`, `adi_testnet`, `og_mainnet`, and `og_testnet`.
 
 ## 2) Delegated Runtime Commands
 

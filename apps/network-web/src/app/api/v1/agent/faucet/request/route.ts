@@ -32,12 +32,7 @@ const BASE_DRIP_STABLE_WEI = '20000000000000000000000'; // 20000 USDC
 const KITE_DRIP_NATIVE_WEI = '50000000000000000'; // 0.05 KITE
 const KITE_DRIP_WRAPPED_WEI = '50000000000000000'; // 0.05 WKITE
 const KITE_DRIP_STABLE_WEI = '100000000000000000'; // 0.10 USDT
-const HEDERA_DRIP_NATIVE_WEI = '5000000000000000000'; // 5.0 HBAR (wei-scaled)
-const HEDERA_DRIP_WRAPPED_WEI = '500000000'; // 5.0 WHBAR (8 decimals)
-const HEDERA_DRIP_STABLE_WEI = '10000000'; // 10.0 stable (6 decimals expected)
-
 const GAS_BUFFER_MULTIPLIER_BPS = 12000; // 1.2x
-const HEDERA_MIN_GAS_PRICE_WEI_DEFAULT = '900000000000'; // 900 gwei
 
 const ERC20_ABI = [
   'function balanceOf(address owner) view returns (uint256)',
@@ -81,10 +76,6 @@ function resolveChainScopedEnv(prefix: string, chainKey: string): string {
   return (process.env[prefix] || '').trim();
 }
 
-function isHederaChain(chainKey: string): boolean {
-  return chainKey.startsWith('hedera_');
-}
-
 function parsePositiveWei(value: string, field: string): bigint {
   try {
     const parsed = BigInt(String(value || '').trim());
@@ -101,12 +92,6 @@ function parsePositiveWei(value: string, field: string): bigint {
       details: { field, value },
     });
   }
-}
-
-function resolveHederaMinGasPriceWei(chainKey: string): bigint {
-  const configured =
-    resolveChainScopedEnv('XCLAW_TESTNET_FAUCET_MIN_GAS_PRICE_WEI', chainKey) || HEDERA_MIN_GAS_PRICE_WEI_DEFAULT;
-  return parsePositiveWei(configured, `XCLAW_TESTNET_FAUCET_MIN_GAS_PRICE_WEI_${toEnvSuffix(chainKey)}`);
 }
 
 function parseRequestedAssets(raw: FaucetAssetKey[] | undefined): FaucetAssetKey[] {
@@ -150,26 +135,7 @@ function buildFeeOverrides(
   attempt: number
 ): { gasPrice: bigint } | { maxFeePerGas: bigint; maxPriorityFeePerGas: bigint } {
   const bumpGwei = BigInt(1_000_000_000) * BigInt(attempt);
-  if (isHederaChain(chainKey)) {
-    const configuredGasPrice = resolveChainScopedEnv('XCLAW_TESTNET_FAUCET_GAS_PRICE_WEI', chainKey);
-    const minGasPrice = resolveHederaMinGasPriceWei(chainKey);
-    const proposedBase = configuredGasPrice ? parsePositiveWei(configuredGasPrice, `XCLAW_TESTNET_FAUCET_GAS_PRICE_WEI_${toEnvSuffix(chainKey)}`) : feeData.gasPrice ?? minGasPrice;
-    if (proposedBase < minGasPrice) {
-      throw new FaucetRouteError({
-        status: 503,
-        code: 'faucet_fee_too_low_for_chain',
-        message: `Configured faucet gas price is below Hedera minimum floor for ${chainKey}.`,
-        actionHint: `Set XCLAW_TESTNET_FAUCET_GAS_PRICE_WEI_${toEnvSuffix(chainKey)} >= ${minGasPrice.toString()}.`,
-        details: {
-          chainKey,
-          requiredMinGasPriceWei: minGasPrice.toString(),
-          proposedGasPriceWei: proposedBase.toString(),
-        },
-      });
-    }
-    const gasPrice = (proposedBase < minGasPrice ? minGasPrice : proposedBase) + bumpGwei;
-    return { gasPrice };
-  }
+  void chainKey;
   const basePriority = feeData.maxPriorityFeePerGas ?? BigInt(1_000_000_000);
   const maxPriorityFeePerGas = basePriority + bumpGwei;
   const baseMaxFee = feeData.maxFeePerGas ?? feeData.gasPrice ?? BigInt(2_000_000_000);
@@ -185,11 +151,11 @@ function resolveWrappedToken(chainKey: string): { symbol: string; address: strin
   }
   const cfg = getChainConfig(chainKey);
   const tokens = cfg?.canonicalTokens || {};
-  const wrapped = (tokens.WETH || tokens.WKITE || tokens.WHBAR || '').trim();
+  const wrapped = (tokens.WETH || tokens.WKITE || '').trim();
   if (!wrapped) {
     return null;
   }
-  const symbol = (tokens.WETH ? 'WETH' : tokens.WKITE ? 'WKITE' : 'WHBAR') as string;
+  const symbol = (tokens.WETH ? 'WETH' : 'WKITE') as string;
   return { symbol, address: wrapped };
 }
 
@@ -239,13 +205,6 @@ function resolveDripAmounts(chainKey: string): { nativeWei: string; wrappedWei: 
       nativeWei: KITE_DRIP_NATIVE_WEI,
       wrappedWei: KITE_DRIP_WRAPPED_WEI,
       stableWei: KITE_DRIP_STABLE_WEI,
-    };
-  }
-  if (chainKey === 'hedera_testnet') {
-    return {
-      nativeWei: HEDERA_DRIP_NATIVE_WEI,
-      wrappedWei: HEDERA_DRIP_WRAPPED_WEI,
-      stableWei: HEDERA_DRIP_STABLE_WEI,
     };
   }
   return {
@@ -404,7 +363,7 @@ export async function POST(req: NextRequest) {
 
     const wrappedToken = requestedAssets.includes('wrapped') ? resolveWrappedToken(chainKey) : null;
     const stableToken = requestedAssets.includes('stable') ? resolveStableToken(chainKey) : null;
-    const wrappedNativeHelper = isHederaChain(chainKey) ? resolveWrappedNativeHelper(chainKey) : null;
+    const wrappedNativeHelper = null;
 
     if (requestedAssets.includes('wrapped') && !wrappedToken) {
       return errorResponse(
@@ -495,49 +454,13 @@ export async function POST(req: NextRequest) {
         const wrappedBal = (await wrapped.balanceOf(signer.address)) as bigint;
         if (wrappedBal < dripWrapped) {
           wrappedAutoWrapDeficit = dripWrapped - wrappedBal;
-          if (!isHederaChain(chainKey)) {
-            throw new FaucetRouteError({
-              status: 503,
-              code: 'faucet_wrapped_insufficient',
-              message: 'Faucet wrapped-token balance is insufficient.',
-              actionHint: `Top up faucet ${wrappedToken?.symbol || 'wrapped'} balance and retry.`,
-              details: { tokenAddress: wrappedToken?.address, requiredWei: dripWrapped.toString(), balanceWei: wrappedBal.toString() },
-            });
-          }
-          if (!wrappedNativeHelper || !wrappedNativeHelperContract) {
-            throw new FaucetRouteError({
-              status: 503,
-              code: 'faucet_wrapped_autowrap_failed',
-              message: 'Wrapped token balance is insufficient and no wrapped-native helper is configured.',
-              actionHint: `Set XCLAW_TESTNET_FAUCET_WRAPPED_NATIVE_HELPER_${toEnvSuffix(chainKey)} or coreContracts.wrappedNativeHelper.`,
-              details: {
-                chainKey,
-                helperAddress: wrappedNativeHelper,
-                requiredWei: dripWrapped.toString(),
-                balanceWei: wrappedBal.toString(),
-                deficitWei: wrappedAutoWrapDeficit.toString(),
-              },
-            });
-          }
-          try {
-            wrappedAutoWrapEstimate = await signer.estimateGas(
-              await wrappedNativeHelperContract.deposit.populateTransaction({ value: wrappedAutoWrapDeficit })
-            );
-          } catch (error) {
-            throw new FaucetRouteError({
-              status: 503,
-              code: 'faucet_wrapped_autowrap_failed',
-              message: error instanceof Error ? error.message : 'Auto-wrap preflight failed.',
-              actionHint: 'Verify wrapped-native helper contract and faucet signer permissions, then retry.',
-              details: {
-                chainKey,
-                helperAddress: wrappedNativeHelper,
-                requiredWei: dripWrapped.toString(),
-                balanceWei: wrappedBal.toString(),
-                deficitWei: wrappedAutoWrapDeficit.toString(),
-              },
-            });
-          }
+          throw new FaucetRouteError({
+            status: 503,
+            code: 'faucet_wrapped_insufficient',
+            message: 'Faucet wrapped-token balance is insufficient.',
+            actionHint: `Top up faucet ${wrappedToken?.symbol || 'wrapped'} balance and retry.`,
+            details: { tokenAddress: wrappedToken?.address, requiredWei: dripWrapped.toString(), balanceWei: wrappedBal.toString() },
+          });
         }
       }
       if (stable) {

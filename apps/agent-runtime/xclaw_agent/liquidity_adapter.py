@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import importlib
-import os
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from typing import Any
@@ -19,10 +17,6 @@ class LiquidityAdapterError(Exception):
 
 
 class UnsupportedLiquidityAdapter(LiquidityAdapterError):
-    pass
-
-
-class HederaSdkUnavailable(LiquidityAdapterError):
     pass
 
 
@@ -130,131 +124,6 @@ class AmmV3LiquidityAdapter(LiquidityAdapter):
     pass
 
 
-class HederaHtsLiquidityAdapter(LiquidityAdapter):
-    @staticmethod
-    def ensure_sdk() -> None:
-        try:
-            __import__("hedera")
-        except Exception as exc:  # pragma: no cover - dependency optional by design
-            raise HederaSdkUnavailable(
-                "Hedera SDK module is not installed. Install Hedera SDK extras to enable HTS-native liquidity paths."
-            ) from exc
-
-    def quote_add(self, payload: dict[str, Any]) -> dict[str, Any]:
-        self.ensure_sdk()
-        return super().quote_add(payload)
-
-    def quote_remove(self, payload: dict[str, Any]) -> dict[str, Any]:
-        self.ensure_sdk()
-        return super().quote_remove(payload)
-
-    @staticmethod
-    def _resolve_plugin_callable() -> Any:
-        spec = str(os.environ.get("XCLAW_HEDERA_HTS_PLUGIN") or "").strip()
-        if spec:
-            module_name, _, attr_name = spec.partition(":")
-            module_name = module_name.strip()
-            attr_name = attr_name.strip() or "execute_liquidity"
-        else:
-            module_name = "xclaw_agent.hedera_hts_plugin"
-            attr_name = "execute_liquidity"
-        if not module_name:
-            raise HederaSdkUnavailable(
-                "Hedera HTS plugin path is empty. Set XCLAW_HEDERA_HTS_PLUGIN=<module>:<callable>."
-            )
-        try:
-            module = importlib.import_module(module_name)
-        except Exception as exc:
-            raise HederaSdkUnavailable(
-                "Hedera HTS plugin bridge is not installed. "
-                "Set XCLAW_HEDERA_HTS_PLUGIN=<module>:<callable> or install xclaw_agent.hedera_hts_plugin."
-            ) from exc
-        fn = getattr(module, attr_name, None)
-        if not callable(fn):
-            raise HederaSdkUnavailable(
-                f"Hedera HTS plugin callable '{module_name}:{attr_name}' is unavailable."
-            )
-        return fn
-
-    def _execute_with_plugin(self, action: str, payload: dict[str, Any], preflight: dict[str, Any]) -> dict[str, Any]:
-        fn = self._resolve_plugin_callable()
-        base = {
-            "action": action,
-            "chain": self.chain,
-            "dex": self.dex,
-            "positionType": self.position_type,
-            "payload": payload,
-        }
-        try:
-            try:
-                out = fn(
-                    action=action,
-                    chain=self.chain,
-                    dex=self.dex,
-                    position_type=self.position_type,
-                    payload=payload,
-                )
-            except TypeError:
-                out = fn(base)
-        except HederaSdkUnavailable:
-            raise
-        except Exception as exc:
-            raise LiquidityAdapterError(f"HTS plugin execution failed: {exc}") from exc
-        if not isinstance(out, dict):
-            raise LiquidityAdapterError("HTS plugin must return a JSON object.")
-        tx_hash = str(out.get("txHash") or "").strip()
-        if not tx_hash:
-            raise LiquidityAdapterError("HTS plugin response is missing txHash.")
-        response: dict[str, Any] = {
-            "ok": True,
-            "family": self.protocol_family,
-            "positionType": self.position_type,
-            "dex": self.dex,
-            "action": action,
-            "txHash": tx_hash,
-            "preflight": preflight,
-        }
-        if out.get("positionId") is not None:
-            response["positionId"] = out.get("positionId")
-        if isinstance(out.get("details"), dict):
-            response["details"] = out.get("details")
-        return response
-
-    def add(self, payload: dict[str, Any]) -> dict[str, Any]:
-        self.ensure_sdk()
-        quote = self.quote_add(payload)
-        return self._execute_with_plugin("add", payload, quote.get("simulation", {}))
-
-    def remove(self, payload: dict[str, Any]) -> dict[str, Any]:
-        self.ensure_sdk()
-        quote = self.quote_remove(payload)
-        return self._execute_with_plugin("remove", payload, quote.get("simulation", {}))
-
-    def claim_fees(self, payload: dict[str, Any]) -> dict[str, Any]:
-        self.ensure_sdk()
-        request = dict(payload or {})
-        _require_non_empty(request.get("positionId"), "positionId")
-        return self._execute_with_plugin("claim_fees", request, {})
-
-    def claim_rewards(self, payload: dict[str, Any]) -> dict[str, Any]:
-        self.ensure_sdk()
-        request = dict(payload or {})
-        _require_non_empty(request.get("positionId"), "positionId")
-        return self._execute_with_plugin("claim_rewards", request, {})
-
-    def supports_operation(self, operation: str) -> bool:
-        op = str(operation or "").strip().lower()
-        if op in {"claim_fees", "claim_rewards"}:
-            return True
-        return super().supports_operation(op)
-
-    def supports_reward_claim(self) -> bool:
-        return True
-
-    def reward_contract_required(self) -> bool:
-        return False
-
-
 def _require_non_empty(value: Any, field_name: str) -> str:
     text = str(value or "").strip()
     if not text:
@@ -305,6 +174,21 @@ def _protocols_for_chain(chain: str) -> dict[str, dict[str, Any]]:
     if not cfg:
         raise UnsupportedLiquidityAdapter(f"Unsupported chain '{chain}' for liquidity adapter selection.")
     payload = cfg.get("liquidityProtocols")
+    if (not isinstance(payload, dict) or not payload) and isinstance(cfg.get("execution"), dict):
+        execution = cfg.get("execution") or {}
+        liquidity = execution.get("liquidity") if isinstance(execution, dict) else {}
+        adapters = liquidity.get("adapters") if isinstance(liquidity, dict) else {}
+        translated: dict[str, dict[str, Any]] = {}
+        if isinstance(adapters, dict):
+            for key, value in adapters.items():
+                if not isinstance(value, dict):
+                    continue
+                adapter_key = str(value.get("adapterKey") or key).strip().lower() or str(key).strip().lower()
+                translated[adapter_key] = {
+                    "enabled": True,
+                    "family": str(value.get("family") or "amm_v2").strip().lower() or "amm_v2",
+                }
+        payload = translated
     if not isinstance(payload, dict) or not payload:
         raise UnsupportedLiquidityAdapter(f"Chain '{chain}' does not define liquidity protocols.")
 
@@ -360,13 +244,6 @@ def build_liquidity_adapter(chain: str, dex: str, protocol_family: str, position
 
     if normalized == "amm_v3":
         return AmmV3LiquidityAdapter(
-            chain=chain,
-            dex=normalized_dex,
-            protocol_family=normalized,
-            position_type=normalized_position,
-        )
-    if normalized == "hedera_hts":
-        return HederaHtsLiquidityAdapter(
             chain=chain,
             dex=normalized_dex,
             protocol_family=normalized,

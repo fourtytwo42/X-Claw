@@ -3,7 +3,7 @@ import path from 'node:path';
 
 export type ChainConfig = {
   chainKey: string;
-  family?: 'evm' | string;
+  family?: 'evm';
   enabled?: boolean;
   uiVisible?: boolean;
   chainId?: number;
@@ -19,8 +19,12 @@ export type ChainConfig = {
     fallback?: string | null;
   };
   coreContracts?: {
+    dex?: string;
+    dexRouter?: string;
+    factory?: string;
     router?: string;
     quoter?: string;
+    nonfungiblePositionManager?: string;
     wrappedNativeHelper?: string;
   };
   capabilities?: {
@@ -32,19 +36,35 @@ export type ChainConfig = {
     faucet?: boolean;
     deposits?: boolean;
   };
-  tradeProviders?: {
-    primary?: 'uniswap_api' | 'legacy_router' | string;
-    fallback?: 'legacy_router' | 'none' | string;
-  };
-  liquidityProviders?: {
-    primary?: 'uniswap_api' | 'legacy_router' | string;
-    fallback?: 'legacy_router' | 'none' | string;
-  };
-  uniswapApi?: {
-    enabled?: boolean;
-    liquidityEnabled?: boolean;
-    migrateEnabled?: boolean;
-    claimRewardsEnabled?: boolean;
+  execution?: {
+    trade?: {
+      defaultProvider?: 'router_adapter' | 'quote_only' | 'none';
+      adapters?: Record<
+        string,
+        {
+          adapterKey?: string;
+          family?: 'amm_v2' | 'amm_v3' | string;
+          router?: string;
+          factory?: string;
+          quoter?: string;
+          positionManager?: string;
+        }
+      >;
+    };
+    liquidity?: {
+      defaultProvider?: 'router_adapter' | 'quote_only' | 'none';
+      adapters?: Record<
+        string,
+        {
+          adapterKey?: string;
+          family?: 'amm_v2' | 'amm_v3' | string;
+          router?: string;
+          factory?: string;
+          quoter?: string;
+          positionManager?: string;
+        }
+      >;
+    };
   };
   marketData?: {
     dexscreenerChainId?: string;
@@ -81,7 +101,7 @@ function isChainEnabled(cfg: ChainConfig): boolean {
 }
 
 export function listEnabledChains(): ChainConfig[] {
-  return readChainConfigs().filter(isChainEnabled);
+  return readChainConfigs().filter((cfg) => isChainEnabled(cfg) && (cfg.family ?? 'evm') === 'evm');
 }
 
 export function listVisibleEnabledChains(): ChainConfig[] {
@@ -155,9 +175,6 @@ export function chainNativeSymbol(chainKey: string): string {
 // Native EVM balances/amounts are expressed in wei-like base units.
 // Hedera EVM also reports native value in 18-decimal wei-equivalent units.
 export function chainNativeAtomicDecimals(chainKey: string): number {
-  if (chainKey.startsWith('hedera_')) {
-    return 18;
-  }
   const decimals = getChainConfig(chainKey)?.nativeCurrency?.decimals;
   if (typeof decimals === 'number' && Number.isFinite(decimals) && decimals > 0) {
     return Math.floor(decimals);

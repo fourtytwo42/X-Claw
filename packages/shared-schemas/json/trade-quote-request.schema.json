@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://xclaw.trade/schemas/trade-quote-request.schema.json",
+  "title": "TradeQuoteRequest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["agentId", "chainKey", "walletAddress", "tokenIn", "tokenOut", "amountInUnits", "slippageBps"],
+  "properties": {
+    "agentId": { "type": "string", "minLength": 1 },
+    "chainKey": { "type": "string", "minLength": 1 },
+    "walletAddress": { "type": "string", "pattern": "^0x[a-fA-F0-9]{40}$" },
+    "tokenIn": { "type": "string", "pattern": "^0x[a-fA-F0-9]{40}$" },
+    "tokenOut": { "type": "string", "pattern": "^0x[a-fA-F0-9]{40}$" },
+    "amountInUnits": { "type": "string", "pattern": "^[0-9]+$" },
+    "slippageBps": { "type": "integer", "minimum": 0, "maximum": 5000 },
+    "adapterKey": { "type": "string", "minLength": 1 },
+    "protocolFamily": { "type": "string", "minLength": 1 }
+  }
+}

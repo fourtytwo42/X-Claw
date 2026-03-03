@@ -26,11 +26,13 @@ type TradeStatusRequest = {
   txHash?: string | null;
   mockReceiptId?: string | null;
   errorMessage?: string | null;
-  providerRequested?: 'uniswap_api' | 'legacy_router' | null;
-  providerUsed?: 'uniswap_api' | 'legacy_router' | null;
+  providerRequested?: 'router_adapter' | 'quote_only' | 'none' | null;
+  providerUsed?: 'router_adapter' | 'none' | null;
   fallbackUsed?: boolean | null;
   fallbackReason?: { code: string; message: string } | null;
-  uniswapRouteType?: string | null;
+  executionFamily?: string | null;
+  executionAdapter?: string | null;
+  routeKind?: string | null;
   observedBy?: 'agent_watcher' | 'legacy_server_poller' | null;
   observationSource?: 'rpc_receipt' | 'rpc_log' | 'local_send_result' | 'reorg_reconciliation' | null;
   confirmationCount?: number | null;
@@ -222,7 +224,9 @@ export async function POST(
             providerUsed: body.providerUsed ?? null,
             fallbackUsed: body.fallbackUsed ?? null,
             fallbackReason: body.fallbackReason ?? null,
-            uniswapRouteType: body.uniswapRouteType ?? null,
+            executionFamily: body.executionFamily ?? null,
+            executionAdapter: body.executionAdapter ?? null,
+            routeKind: body.routeKind ?? null,
             observedBy: body.observedBy ?? null,
             observationSource: body.observationSource ?? null,
             confirmationCount: body.confirmationCount ?? null,

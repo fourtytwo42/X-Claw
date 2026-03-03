@@ -6735,3 +6735,35 @@ Issue: `#61`
 - [x] `npm run seed:verify` -> pass (`ok: true`).
 - [x] `npm run build` -> pass (Next.js production build succeeded).
 - [x] `pm2 restart all` -> pass (`xclaw-web` online).
+
+---
+
+# Slice 119 Acceptance Evidence: EVM-Only Exchange-Agnostic Execution Refactor
+
+Date (UTC): 2026-03-03
+
+## Objective + Scope Lock
+- Objective: remove active Hedera/non-EVM support and replace active Uniswap-specific server execution with generic EVM router-adapter contracts while preserving compatibility routes.
+- Scope lock:
+  - `config/chains/*.json`
+  - `apps/network-web/src/lib/{chains,env,errors,evm-router-execution,uniswap-proxy,uniswap-lp-proxy}.ts`
+  - `apps/network-web/src/app/api/v1/agent/trade/*`
+  - `apps/network-web/src/app/api/v1/agent/liquidity/*`
+  - `apps/network-web/src/app/api/v1/agent/faucet/request/route.ts`
+  - `apps/network-web/src/app/api/v1/management/deposit/route.ts`
+  - `apps/agent-runtime/xclaw_agent/{chains,cli,dex_adapter,liquidity_adapter}.py`
+
+## Behavior Checks
+- [x] public/shared chain contracts now expose `family=evm` only.
+- [x] generic trade routes exist and compatibility Uniswap trade routes delegate to them.
+- [x] active server env no longer requires `XCLAW_UNISWAP_API_KEY` for trade route execution.
+- [x] Hedera chain configs and runtime bridge/plugin files are removed from active repo support.
+- [x] runtime provider metadata normalizes to router-adapter vocabulary.
+
+## Required Validation Gates
+- [ ] `npm run db:parity`
+- [ ] `npm run seed:reset`
+- [ ] `npm run seed:load`
+- [ ] `npm run seed:verify`
+- [ ] `npm run build`
+- [ ] `pm2 restart all`

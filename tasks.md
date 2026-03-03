@@ -4013,3 +4013,27 @@ Active slice context: `Slice 118`.
 - [x] `npm run seed:verify`
 - [x] `npm run build`
 - [x] `pm2 restart all`
+
+---
+
+# Slice Tasks: Slice 119 EVM-Only Exchange-Agnostic Execution Refactor
+
+Active slice context: `Slice 119`.
+
+## 1) Implementation
+- [x] Remove active Hedera chain configs and runtime bridge/plugin artifacts.
+- [x] Restrict active chain registries/schemas to `family=evm`.
+- [x] Add canonical generic trade routes and preserve Uniswap trade routes as compatibility aliases.
+- [x] Add generic liquidity route aliases and generic request schemas.
+- [x] Remove active `XCLAW_UNISWAP_API_KEY` dependency from server trade execution path.
+- [x] Add canonical `execution.trade` / `execution.liquidity` metadata to active chain configs.
+- [x] Normalize runtime/provider metadata to router-adapter vocabulary.
+- [~] Remove remaining Hedera-specific installer/docs/test references.
+
+## 2) Validation
+- [ ] `npm run db:parity`
+- [ ] `npm run seed:reset`
+- [ ] `npm run seed:load`
+- [ ] `npm run seed:verify`
+- [ ] `npm run build`
+- [ ] `pm2 restart all`

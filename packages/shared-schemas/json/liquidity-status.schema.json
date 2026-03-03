@@ -30,8 +30,8 @@
         { "type": "number", "minimum": 0 }
       ]
     },
-    "providerRequested": { "type": "string", "enum": ["uniswap_api", "legacy_router"] },
-    "providerUsed": { "type": "string", "enum": ["uniswap_api", "legacy_router"] },
+    "providerRequested": { "type": "string", "enum": ["router_adapter", "quote_only", "none"] },
+    "providerUsed": { "type": "string", "enum": ["router_adapter", "none"] },
     "fallbackUsed": { "type": "boolean" },
     "fallbackReason": {
       "type": "object",
@@ -42,7 +42,9 @@
       },
       "additionalProperties": false
     },
-    "uniswapLpOperation": { "type": "string", "enum": ["approve", "create", "increase", "decrease", "claim", "migrate", "claim_rewards"] },
+    "liquidityOperation": { "type": "string", "enum": ["approve", "create", "increase", "decrease", "claim", "migrate", "claim_rewards"] },
+    "executionFamily": { "type": "string", "maxLength": 64 },
+    "executionAdapter": { "type": "string", "maxLength": 64 },
     "details": { "type": "object" }
   },
   "additionalProperties": false

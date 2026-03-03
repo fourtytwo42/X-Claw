@@ -13,7 +13,7 @@
         "additionalProperties": false,
         "required": ["chainKey", "displayName", "faucetConfigured", "supportedAssets", "native", "missingConfig"],
         "properties": {
-          "chainKey": { "type": "string", "enum": ["base_sepolia", "kite_ai_testnet", "hedera_testnet"] },
+          "chainKey": { "type": "string", "enum": ["base_sepolia", "kite_ai_testnet"] },
           "displayName": { "type": "string", "minLength": 1 },
           "chainId": { "type": ["integer", "null"] },
           "faucetConfigured": { "type": "boolean" },

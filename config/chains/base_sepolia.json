@@ -115,5 +115,49 @@
   "tradeOperations": {
     "legacyEnabled": true,
     "adapter": "uniswap_fork"
+  },
+  "execution": {
+    "trade": {
+      "defaultProvider": "router_adapter",
+      "adapters": {
+        "default": {
+          "adapterKey": "uniswap_fork",
+          "family": "amm_v2",
+          "router": "0xA55c52512d02bA2BAfF5e6DD89be8Cf991C9E918",
+          "factory": "0xf5C44221f5dDc473dE38bfE2490259D2987030F8",
+          "quoter": "0x8c78091AD62C71Ede974460d0Ee2125A917105F3",
+          "positionManager": ""
+        }
+      }
+    },
+    "liquidity": {
+      "defaultProvider": "router_adapter",
+      "adapters": {
+        "uniswap_v2": {
+          "adapterKey": "uniswap_v2",
+          "family": "amm_v2",
+          "router": "0xA55c52512d02bA2BAfF5e6DD89be8Cf991C9E918",
+          "factory": "0xf5C44221f5dDc473dE38bfE2490259D2987030F8",
+          "quoter": "0x8c78091AD62C71Ede974460d0Ee2125A917105F3",
+          "positionManager": ""
+        },
+        "uniswap_v3": {
+          "adapterKey": "uniswap_v3",
+          "family": "amm_v3",
+          "router": "0xA55c52512d02bA2BAfF5e6DD89be8Cf991C9E918",
+          "factory": "0xf5C44221f5dDc473dE38bfE2490259D2987030F8",
+          "quoter": "0x8c78091AD62C71Ede974460d0Ee2125A917105F3",
+          "positionManager": ""
+        },
+        "aerodrome": {
+          "adapterKey": "aerodrome",
+          "family": "amm_v2",
+          "router": "0xA55c52512d02bA2BAfF5e6DD89be8Cf991C9E918",
+          "factory": "0xf5C44221f5dDc473dE38bfE2490259D2987030F8",
+          "quoter": "0x8c78091AD62C71Ede974460d0Ee2125A917105F3",
+          "positionManager": ""
+        }
+      }
+    }
   }
 }

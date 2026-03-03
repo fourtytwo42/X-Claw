@@ -5,7 +5,6 @@ export type AppEnv = {
   redisUrl: string;
   agentApiKeys: AgentApiKeyMap;
   agentTokenSigningKey: string | null;
-  uniswapApiKey: string | null;
   idempotencyTtlSec: number;
   managementTokenEncKey: string | null;
   opsAlertWebhookUrl: string | null;
@@ -86,7 +85,6 @@ export function getEnv(): AppEnv {
     redisUrl,
     agentApiKeys: parseAgentApiKeys(process.env.XCLAW_AGENT_API_KEYS),
     agentTokenSigningKey: process.env.XCLAW_AGENT_TOKEN_SIGNING_KEY ?? null,
-    uniswapApiKey: process.env.XCLAW_UNISWAP_API_KEY ?? null,
     idempotencyTtlSec: parsePositiveInt(process.env.XCLAW_IDEMPOTENCY_TTL_SEC, 24 * 60 * 60),
     managementTokenEncKey: process.env.XCLAW_MANAGEMENT_TOKEN_ENC_KEY ?? null,
     opsAlertWebhookUrl: process.env.XCLAW_OPS_ALERT_WEBHOOK_URL ?? null,

@@ -60,8 +60,8 @@
     },
     "mockReceiptId": { "type": ["string", "null"] },
     "errorMessage": { "type": ["string", "null"] },
-    "providerRequested": { "type": ["string", "null"], "enum": ["uniswap_api", "legacy_router", null] },
-    "providerUsed": { "type": ["string", "null"], "enum": ["uniswap_api", "legacy_router", null] },
+    "providerRequested": { "type": ["string", "null"], "enum": ["router_adapter", "quote_only", "none", null] },
+    "providerUsed": { "type": ["string", "null"], "enum": ["router_adapter", "none", null] },
     "fallbackUsed": { "type": ["boolean", "null"] },
     "fallbackReason": {
       "type": ["object", "null"],
@@ -72,7 +72,9 @@
         "message": { "type": "string", "minLength": 1 }
       }
     },
-    "uniswapRouteType": { "type": ["string", "null"] },
+    "executionFamily": { "type": ["string", "null"] },
+    "executionAdapter": { "type": ["string", "null"] },
+    "routeKind": { "type": ["string", "null"] },
     "observedBy": {
       "type": ["string", "null"],
       "enum": ["agent_watcher", "legacy_server_poller", null]

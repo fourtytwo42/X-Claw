@@ -8307,7 +8307,7 @@ def cmd_liquidity_positions(args: argparse.Namespace) -> int:
 
 def _resolve_operation_provider(chain: str, operation: str, primary: str, fallback: str) -> tuple[str, str]:
     resolved_primary = str(primary or "").strip().lower() or "legacy_router"
-    resolved_fallback = str(fallback or "").strip().lower() or "legacy_router"
+    resolved_fallback = str(fallback or "").strip().lower() or "none"
     op = str(operation or "").strip().lower()
     if op.startswith("trade") and resolved_fallback == "legacy_router" and not _chain_trade_legacy_enabled(chain):
         resolved_fallback = "none"
@@ -8340,26 +8340,25 @@ def _execute_with_fallback(
 
 def _trade_provider_settings(chain: str) -> tuple[str, str]:
     cfg = _load_chain_config(chain)
-    providers = cfg.get("tradeProviders")
-    if isinstance(providers, dict):
-        primary = str(providers.get("primary") or "").strip().lower()
-        fallback = str(providers.get("fallback") or "").strip().lower()
-        if primary in {"uniswap_api", "legacy_router"}:
-            return _resolve_operation_provider(chain, "trade", primary, fallback or "legacy_router")
+    execution = cfg.get("execution")
+    if isinstance(execution, dict):
+        trade_cfg = execution.get("trade")
+        if isinstance(trade_cfg, dict):
+            default_provider = str(trade_cfg.get("defaultProvider") or "").strip().lower()
+            if default_provider in {"router_adapter", "quote_only", "none"}:
+                return _resolve_operation_provider(chain, "trade", "legacy_router", "none")
     return _resolve_operation_provider(chain, "trade", "legacy_router", "legacy_router")
 
 
 def _liquidity_provider_settings(chain: str) -> tuple[str, str]:
     cfg = _load_chain_config(chain)
-    providers = cfg.get("liquidityProviders")
-    if isinstance(providers, dict):
-        primary = str(providers.get("primary") or "").strip().lower()
-        fallback = str(providers.get("fallback") or "").strip().lower()
-        if primary in {"uniswap_api", "legacy_router"}:
-            return _resolve_operation_provider(chain, "liquidity", primary, fallback or "legacy_router")
-    uniswap_cfg = cfg.get("uniswapApi")
-    if isinstance(uniswap_cfg, dict) and bool(uniswap_cfg.get("liquidityEnabled")):
-        return _resolve_operation_provider(chain, "liquidity", "uniswap_api", "legacy_router")
+    execution = cfg.get("execution")
+    if isinstance(execution, dict):
+        liquidity_cfg = execution.get("liquidity")
+        if isinstance(liquidity_cfg, dict):
+            default_provider = str(liquidity_cfg.get("defaultProvider") or "").strip().lower()
+            if default_provider in {"router_adapter", "quote_only", "none"}:
+                return _resolve_operation_provider(chain, "liquidity", "legacy_router", "none")
     return _resolve_operation_provider(chain, "liquidity", "legacy_router", "legacy_router")
 
 
@@ -8395,12 +8394,14 @@ def _build_provider_meta(
     fallback_reason: dict[str, str] | None,
     uniswap_route_type: str | None,
 ) -> dict[str, Any]:
+    normalized_requested = "router_adapter" if provider_requested in {"legacy_router", "uniswap_api"} else provider_requested
+    normalized_used = "router_adapter" if provider_used in {"legacy_router", "uniswap_api"} else provider_used
     return {
-        "providerRequested": provider_requested,
-        "providerUsed": provider_used,
+        "providerRequested": normalized_requested,
+        "providerUsed": normalized_used,
         "fallbackUsed": bool(fallback_used),
         "fallbackReason": fallback_reason if fallback_used and isinstance(fallback_reason, dict) else None,
-        "uniswapRouteType": (str(uniswap_route_type or "").strip().upper() or None),
+        "routeKind": (str(uniswap_route_type or "").strip().upper() or None),
     }
 
 
@@ -8411,12 +8412,14 @@ def _build_liquidity_provider_meta(
     fallback_reason: dict[str, str] | None,
     uniswap_lp_operation: str | None,
 ) -> dict[str, Any]:
+    normalized_requested = "router_adapter" if provider_requested in {"legacy_router", "uniswap_api"} else provider_requested
+    normalized_used = "router_adapter" if provider_used in {"legacy_router", "uniswap_api"} else provider_used
     return {
-        "providerRequested": provider_requested,
-        "providerUsed": provider_used,
+        "providerRequested": normalized_requested,
+        "providerUsed": normalized_used,
         "fallbackUsed": bool(fallback_used),
         "fallbackReason": fallback_reason if fallback_used and isinstance(fallback_reason, dict) else None,
-        "uniswapLpOperation": (str(uniswap_lp_operation or "").strip().lower() or None),
+        "liquidityOperation": (str(uniswap_lp_operation or "").strip().lower() or None),
     }
 
 
@@ -8425,7 +8428,7 @@ def _legacy_liquidity_provider_available(chain: str, dex: str, position_type: st
         adapter = build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type=position_type)
     except Exception:
         return False
-    return adapter.protocol_family in {"amm_v2", "hedera_hts"}
+    return adapter.protocol_family in {"amm_v2"}
 
 
 def _liquidity_operation_entry(chain: str, operation: str) -> dict[str, Any]:

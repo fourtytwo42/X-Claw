@@ -91,5 +91,41 @@
   "tradeOperations": {
     "legacyEnabled": true,
     "adapter": "tesseract_univ2"
+  },
+  "execution": {
+    "trade": {
+      "defaultProvider": "router_adapter",
+      "adapters": {
+        "default": {
+          "adapterKey": "tesseract_univ2",
+          "family": "amm_v2",
+          "router": "0x402f35e11cC6E89E80EFF4205956716aCd94be04",
+          "factory": "0x147f235Dde1adcB00Ef8E2D10D98fEd9a091284D",
+          "quoter": "",
+          "positionManager": ""
+        }
+      }
+    },
+    "liquidity": {
+      "defaultProvider": "router_adapter",
+      "adapters": {
+        "tesseract_univ2": {
+          "adapterKey": "tesseract_univ2",
+          "family": "amm_v2",
+          "router": "0x402f35e11cC6E89E80EFF4205956716aCd94be04",
+          "factory": "0x147f235Dde1adcB00Ef8E2D10D98fEd9a091284D",
+          "quoter": "",
+          "positionManager": ""
+        },
+        "tesseract_univ3": {
+          "adapterKey": "tesseract_univ3",
+          "family": "amm_v3",
+          "router": "0x402f35e11cC6E89E80EFF4205956716aCd94be04",
+          "factory": "0x147f235Dde1adcB00Ef8E2D10D98fEd9a091284D",
+          "quoter": "",
+          "positionManager": ""
+        }
+      }
+    }
   }
 }

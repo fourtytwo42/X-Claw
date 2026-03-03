@@ -59,5 +59,33 @@
   "tradeOperations": {
     "legacyEnabled": false,
     "adapter": "none"
+  },
+  "execution": {
+    "trade": {
+      "defaultProvider": "router_adapter",
+      "adapters": {
+        "default": {
+          "adapterKey": "adapter_pending",
+          "family": "amm_v2",
+          "router": "",
+          "factory": "",
+          "quoter": "",
+          "positionManager": ""
+        }
+      }
+    },
+    "liquidity": {
+      "defaultProvider": "router_adapter",
+      "adapters": {
+        "default": {
+          "adapterKey": "adapter_pending",
+          "family": "amm_v2",
+          "router": "",
+          "factory": "",
+          "quoter": "",
+          "positionManager": ""
+        }
+      }
+    }
   }
 }

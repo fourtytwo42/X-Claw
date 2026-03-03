@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
       return errorResponse(
         400,
         {
-          code: 'uniswap_claim_rewards_not_supported_on_chain',
+          code: 'unsupported_liquidity_operation',
           message: `Chain '${body.chainKey}' is not enabled for Uniswap LP claim-rewards.`,
           actionHint: 'Use ethereum_sepolia or a chain with claim-rewards enabled.',
           details: { chainKey: body.chainKey },
@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
       return errorResponse(
         error.status,
         {
-          code: error.code as 'uniswap_upstream_error',
+          code: 'unsupported_execution_adapter',
           message: error.message,
           actionHint: 'Retry with legacy fallback if this persists.',
           details: error.details,

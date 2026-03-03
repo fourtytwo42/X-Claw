@@ -37,9 +37,6 @@ function normalizeTokenKey(value: string): string {
 
 function nativeAtomicDecimalsForBalance(chainKey: string, token: string): number | null {
   const normalizedToken = String(token ?? '').trim().toUpperCase();
-  if (chainKey.startsWith('hedera_') && (normalizedToken === 'NATIVE' || normalizedToken === 'HBAR')) {
-    return 18;
-  }
   return null;
 }
 
