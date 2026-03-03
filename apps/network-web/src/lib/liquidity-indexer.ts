@@ -239,55 +239,6 @@ export async function maybeSyncLiquiditySnapshots(
       const existingValue = parseNumeric(row.position_value_usd);
       const positionValueUsd = existingValue > 0 ? existingValue : currentBasis;
       const unrealizedPnlUsd = positionValueUsd - depositedBasis;
-      const tokenASymbol = symbolByAddress.get(String(row.token_a ?? '').trim().toLowerCase()) ?? '';
-      const tokenBSymbol = symbolByAddress.get(String(row.token_b ?? '').trim().toLowerCase()) ?? '';
-      const lpMirrorCandidates =
-        tokenASymbol && tokenBSymbol
-          ? [`SSLP-${tokenASymbol}-${tokenBSymbol}`, `SSLP-${tokenBSymbol}-${tokenASymbol}`]
-          : [];
-      let closeForZeroLpMirror = false;
-      if (
-        row.status === 'active' &&
-        chainKey === 'hedera_testnet' &&
-        String(row.dex_key ?? '').trim().toLowerCase() === 'saucerswap' &&
-        lpMirrorCandidates.length > 0
-      ) {
-        const lpMirror = await dbQuery<{ balance: string }>(
-          `
-          select balance::text
-          from wallet_balance_snapshots
-          where agent_id = $1
-            and chain_key = $2
-            and upper(token) = any($3::text[])
-          limit 1
-          `,
-          [agentId, chainKey, lpMirrorCandidates]
-        );
-        if ((lpMirror.rowCount ?? 0) > 0 && parseNumeric(lpMirror.rows[0]?.balance) <= 0) {
-          closeForZeroLpMirror = true;
-        }
-      }
-      if (closeForZeroLpMirror) {
-        await dbQuery(
-          `
-          update liquidity_position_snapshots
-          set
-            status = 'closed',
-            current_a = 0,
-            current_b = 0,
-            position_value_usd = 0,
-            unrealized_pnl_usd = 0,
-            last_synced_at = now(),
-            updated_at = now()
-          where agent_id = $1
-            and chain_key = $2
-            and position_id = $3
-          `,
-          [agentId, chainKey, row.position_id]
-        );
-        updates += 1;
-        continue;
-      }
       await dbQuery(
         `
         update liquidity_position_snapshots

@@ -139,8 +139,6 @@ const FIXED_CHAIN_COLORS: Record<string, string> = {
   base_mainnet: '#1d4ed8',
   ethereum: '#2563eb',
   ethereum_sepolia: '#0ea5e9',
-  hedera_mainnet: '#111827',
-  hedera_testnet: '#4b5563',
   hardhat_local: '#f59e0b',
   kite_ai_mainnet: '#f97316',
   kite_ai_testnet: '#22c55e',

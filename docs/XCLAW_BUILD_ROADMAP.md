@@ -4104,3 +4104,25 @@ Note:
 - [x] Normalize shared/public chain contracts to `family=evm`.
 - [x] Remove active server dependency on `XCLAW_UNISWAP_API_KEY`.
 - [~] Remove remaining Hedera-specific installer/docs/test references.
+## 120) Slice 120: Active Path Hedera Cleanup
+
+- [ ] Remove Hedera bootstrap/install logic from hosted installer.
+- [ ] Remove remaining Hedera runtime/web branches from active codepaths.
+- [ ] Rebuild and verify no active-path Hedera refs remain.
+
+## 121) Slice 121: Canonical Contract Closeout
+
+- [ ] Add canonical generic trade/liquidity routes to OpenAPI.
+- [ ] Mark `/uniswap/*` routes as compatibility aliases.
+- [ ] Replace old provider and metadata vocabulary with generic execution metadata in docs/contracts.
+
+## 122) Slice 122: Harness/Test Realignment
+
+- [ ] Remove Hedera from wallet-approval matrix/harness assumptions.
+- [ ] Remove `uniswap_proxy_not_configured` environment assertions.
+- [ ] Realign touched tests to the EVM-only router-adapter model.
+
+## 123) Slice 123: Skill/Reference Cleanup
+
+- [ ] Update skill docs and infra defaults to EVM-only behavior.
+- [ ] Validate touched references after build/restart.

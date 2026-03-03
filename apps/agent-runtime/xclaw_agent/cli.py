@@ -53,7 +53,6 @@ from xclaw_agent.x402_runtime import X402RuntimeError
 from xclaw_agent.dex_adapter import build_dex_adapter, DexAdapterError
 from xclaw_agent.liquidity_adapter import (
     build_liquidity_adapter_for_request,
-    HederaSdkUnavailable,
     LiquidityAdapterError,
     UnsupportedLiquidityOperation,
     UnsupportedLiquidityAdapter,
@@ -6025,27 +6024,11 @@ def _preflight_liquidity_v2_add_execution(
             and probe_unverifiable
             and "transferhelper::transferfrom: transferfrom failed" in msg_lower
         )
-        allow_bypass = (
-            chain.startswith("hedera")
-            and (
-                str(os.environ.get("XCLAW_LIQUIDITY_ALLOW_SIMULATION_BYPASS") or "").strip() == "1"
-                or probe_unverifiable
-            )
-            and (
-                "safe token transfer failed" in msg_lower
-                or "sender account is a smart contract" in msg_lower
-            )
-        )
         if simulation_warning is not None:
             pass
         elif allow_sepolia_transferfrom_bypass:
             simulation_warning = {
                 "code": "liquidity_preflight_router_transfer_from_unverifiable_bypassed",
-                "message": str(exc)[:500],
-            }
-        elif allow_bypass:
-            simulation_warning = {
-                "code": "liquidity_preflight_router_revert_bypassed",
                 "message": str(exc)[:500],
             }
         else:
@@ -6697,16 +6680,7 @@ def _resolve_v2_remove_pair_and_lp_token(chain: str, position_id: str, token_a: 
     router = _require_chain_contract_address(chain, "router")
     factory = _resolve_factory_from_router(chain, router)
     pair = position_id if is_hex_address(position_id) else _resolve_pair_from_factory(chain, factory, token_a, token_b)
-    lp_token = pair
-    if chain.startswith("hedera"):
-        try:
-            lp_token_out = _cast_call_stdout(chain, pair, "lpToken()(address)")
-            lp_token_candidate = _parse_address_from_cast_output(lp_token_out)
-            if is_hex_address(lp_token_candidate):
-                lp_token = lp_token_candidate
-        except Exception:
-            lp_token = pair
-    return pair, lp_token
+    return pair, pair
 
 
 def _compute_v2_remove_liquidity_units(
@@ -7021,29 +6995,6 @@ def cmd_liquidity_quote_add(args: argparse.Namespace) -> int:
                 "slippageBps": slippage_bps,
             }
         )
-        if adapter.protocol_family == "hedera_hts":
-            # HTS-native quotes are adapter-preflight only; they must not require EVM router/token metadata.
-            return ok(
-                "Liquidity add quote ready.",
-                chain=chain,
-                dex=dex,
-                positionType=position_type,
-                tokenA=token_a,
-                tokenB=token_b,
-                amountA=_decimal_text(amount_a_h),
-                amountB=_decimal_text(amount_b_h),
-                quoteAmountB=None,
-                minAmountB=preflight.get("simulation", {}).get("minAmountB"),
-                slippageBps=slippage_bps,
-                tokenASymbol=_token_symbol_for_display(chain, token_a),
-                tokenBSymbol=_token_symbol_for_display(chain, token_b),
-                tokenADecimals=None,
-                tokenBDecimals=None,
-                adapterFamily=adapter.protocol_family,
-                preflight=preflight.get("simulation", {}),
-                simulationOnly=True,
-                note="HTS-native quote path uses adapter preflight and does not require EVM router metadata.",
-            )
         token_a_meta = _fetch_erc20_metadata(chain, token_a)
         token_b_meta = _fetch_erc20_metadata(chain, token_b)
         token_a_decimals = int(token_a_meta.get("decimals", 18))
@@ -7080,14 +7031,6 @@ def cmd_liquidity_quote_add(args: argparse.Namespace) -> int:
             str(exc),
             "Choose a supported chain/dex/position-type combination and retry.",
             {"chain": chain, "dex": dex, "positionType": str(args.position_type or "v2")},
-            exit_code=2,
-        )
-    except HederaSdkUnavailable as exc:
-        return fail(
-            "missing_dependency",
-            str(exc),
-            "Install Hedera SDK extras before using HTS-native liquidity flows.",
-            {"chain": chain, "dex": dex},
             exit_code=2,
         )
     except LiquidityAdapterError as exc:
@@ -7137,14 +7080,6 @@ def cmd_liquidity_quote_remove(args: argparse.Namespace) -> int:
             {"chain": chain, "dex": dex, "positionType": str(args.position_type or "v2")},
             exit_code=2,
         )
-    except HederaSdkUnavailable as exc:
-        return fail(
-            "missing_dependency",
-            str(exc),
-            "Install Hedera SDK extras before using HTS-native liquidity flows.",
-            {"chain": chain, "dex": dex},
-            exit_code=2,
-        )
     except LiquidityAdapterError as exc:
         return fail("liquidity_preflight_failed", str(exc), "Fix the request payload and retry.", {"chain": chain, "dex": dex}, exit_code=2)
     except Exception as exc:
@@ -7190,7 +7125,6 @@ def cmd_liquidity_add(args: argparse.Namespace) -> int:
             adapter_dex = adapter.dex
         agent_id = _resolve_agent_id_or_fail(chain)
         preflight = adapter_preflight
-        is_hts_native = bool(adapter is not None and adapter.protocol_family == "hedera_hts")
         payload = {
             "schemaVersion": 1,
             "agentId": agent_id,
@@ -7204,9 +7138,8 @@ def cmd_liquidity_add(args: argparse.Namespace) -> int:
             "amountB": _decimal_text(amount_b_h),
             "slippageBps": slippage_bps,
             "details": {
-                "v3Range": None if is_hts_native else (str(args.v3_range or "").strip() or None),
+                "v3Range": str(args.v3_range or "").strip() or None,
                 "adapterFamily": adapter_family,
-                "htsNative": is_hts_native,
                 "preflight": preflight.get("simulation", {}) if isinstance(preflight, dict) else {},
                 "providerRequested": provider_requested,
                 "source": "runtime_liquidity_add",
@@ -7290,14 +7223,6 @@ def cmd_liquidity_add(args: argparse.Namespace) -> int:
             str(exc),
             "Choose a supported chain/dex/position-type combination and retry.",
             {"chain": chain, "dex": dex, "positionType": str(args.position_type or "v2")},
-            exit_code=2,
-        )
-    except HederaSdkUnavailable as exc:
-        return fail(
-            "missing_dependency",
-            str(exc),
-            "Install Hedera SDK extras before using HTS-native liquidity flows.",
-            {"chain": chain, "dex": dex},
             exit_code=2,
         )
     except LiquidityAdapterError as exc:
@@ -7489,14 +7414,6 @@ def cmd_liquidity_remove(args: argparse.Namespace) -> int:
             str(exc),
             "Choose a supported chain/dex/position-type combination and retry.",
             {"chain": chain, "dex": dex, "positionType": str(args.position_type or "v2")},
-            exit_code=2,
-        )
-    except HederaSdkUnavailable as exc:
-        return fail(
-            "missing_dependency",
-            str(exc),
-            "Install Hedera SDK extras before using HTS-native liquidity flows.",
-            {"chain": chain, "dex": dex},
             exit_code=2,
         )
     except LiquidityAdapterError as exc:
@@ -7991,34 +7908,8 @@ def cmd_liquidity_execute(args: argparse.Namespace) -> int:
             adapter = build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type=position_type)
             if adapter.protocol_family == "amm_v3":
                 raise WalletStoreError("unsupported_liquidity_execution_family: Liquidity execution for v3 positions is not enabled in legacy path.")
-            if adapter.protocol_family not in {"amm_v2", "hedera_hts"}:
+            if adapter.protocol_family != "amm_v2":
                 raise WalletStoreError(f"unsupported_liquidity_execution_family: Unsupported liquidity execution family '{adapter.protocol_family}'.")
-            if adapter.protocol_family == "hedera_hts":
-                if action == "add":
-                    return (
-                        adapter.add(
-                            {
-                                "tokenA": str(intent.get("tokenA") or ""),
-                                "tokenB": str(intent.get("tokenB") or ""),
-                                "amountA": str(intent.get("amountA") or ""),
-                                "amountB": str(intent.get("amountB") or ""),
-                                "slippageBps": int(intent.get("slippageBps") or 100),
-                            }
-                        ),
-                        adapter.protocol_family,
-                    )
-                if action == "remove":
-                    return (
-                        adapter.remove(
-                            {
-                                "positionId": str(intent.get("positionRef") or ""),
-                                "percent": int(Decimal(str(intent.get("amountA") or "100")).to_integral_value(rounding=ROUND_DOWN)),
-                                "slippageBps": int(intent.get("slippageBps") or 100),
-                            }
-                        ),
-                        adapter.protocol_family,
-                    )
-                raise WalletStoreError(f"Unsupported liquidity action '{action}'.")
             if action == "add":
                 return _execute_liquidity_v2_add(intent, chain), adapter.protocol_family
             if action == "remove":
@@ -8031,15 +7922,15 @@ def cmd_liquidity_execute(args: argparse.Namespace) -> int:
                 return fail(
                     "unsupported_liquidity_execution_family",
                     "Liquidity execution for v3 positions is not enabled in this slice.",
-                    "Use v2 or hedera_hts execution paths.",
+                    "Use a v2 execution path.",
                     {"liquidityIntentId": liquidity_intent_id, "chain": chain, "dex": dex, "positionType": position_type},
                     exit_code=2,
                 )
-            if direct_adapter.protocol_family not in {"amm_v2", "hedera_hts"}:
+            if direct_adapter.protocol_family != "amm_v2":
                 return fail(
                     "unsupported_liquidity_execution_family",
                     f"Unsupported liquidity execution family '{direct_adapter.protocol_family}'.",
-                    "Use v2 or hedera_hts execution paths.",
+                    "Use a v2 execution path.",
                     {"liquidityIntentId": liquidity_intent_id, "chain": chain, "dex": dex, "adapterFamily": direct_adapter.protocol_family},
                     exit_code=2,
                 )
@@ -8132,13 +8023,6 @@ def cmd_liquidity_execute(args: argparse.Namespace) -> int:
             uniswapLpOperation=uniswap_lp_operation,
             **builder_meta,
         )
-    except HederaSdkUnavailable as exc:
-        if transition_state == "executing":
-            try:
-                _post_liquidity_status(liquidity_intent_id, "failed", {"reasonCode": "missing_dependency", "reasonMessage": str(exc), "txHash": last_tx_hash})
-            except Exception:
-                pass
-        return fail("missing_dependency", str(exc), "Install Hedera SDK/plugin bridge and retry.", {"liquidityIntentId": liquidity_intent_id, "chain": chain}, exit_code=2)
     except SubprocessTimeout as exc:
         if transition_state == "verifying":
             try:
@@ -9552,9 +9436,6 @@ def _tx_estimate_bypass_gas_limit(chain: str | None) -> int | None:
 
 
 def _legacy_gas_price_multiplier(chain: str | None) -> int:
-    # Hedera testnet requires a consistently higher legacy gas price floor.
-    if str(chain or "").strip().lower() == "hedera_testnet":
-        return 2
     return 1
 
 
@@ -11149,32 +11030,8 @@ def _canonical_token_map(chain: str) -> dict[str, str]:
     return out
 
 
-def _is_hedera_chain(chain: str) -> bool:
-    if chain.startswith("hedera"):
-        return True
-    try:
-        cfg = _load_chain_config(chain)
-    except Exception:
-        return False
-    family = str(cfg.get("family") or "").strip().lower()
-    return family == "hedera"
-
-
 def _chain_env_suffix(chain: str) -> str:
     return re.sub(r"[^A-Za-z0-9]", "_", str(chain or "").strip()).upper()
-
-
-def _hedera_mirror_api_base(chain: str) -> str:
-    env_key = f"XCLAW_HEDERA_MIRROR_API_URL_{_chain_env_suffix(chain)}"
-    scoped = str(os.environ.get(env_key) or "").strip().rstrip("/")
-    if scoped:
-        return scoped
-    default_env = str(os.environ.get("XCLAW_HEDERA_MIRROR_API_URL") or "").strip().rstrip("/")
-    if default_env:
-        return default_env
-    if chain.endswith("mainnet"):
-        return "https://mainnet-public.mirrornode.hedera.com/api/v1"
-    return "https://testnet.mirrornode.hedera.com/api/v1"
 
 
 def _http_get_json_object(url: str, *, timeout_sec: float = 20.0) -> dict[str, Any]:
@@ -11201,91 +11058,6 @@ def _http_get_json_object(url: str, *, timeout_sec: float = 20.0) -> dict[str, A
     if not isinstance(parsed, dict):
         raise WalletStoreError(f"JSON response from {url} is not an object.")
     return parsed
-
-
-def _hedera_entity_id_to_evm_address(entity_id: str) -> str:
-    parts = str(entity_id or "").strip().split(".")
-    if len(parts) != 3:
-        raise WalletStoreError(f"Invalid Hedera entity id '{entity_id}'.")
-    try:
-        shard = int(parts[0], 10)
-        realm = int(parts[1], 10)
-        num = int(parts[2], 10)
-    except Exception as exc:
-        raise WalletStoreError(f"Invalid Hedera entity id '{entity_id}'.") from exc
-    if shard < 0 or realm < 0 or num < 0:
-        raise WalletStoreError(f"Invalid Hedera entity id '{entity_id}'.")
-    if shard > 0xFFFFFFFF or realm > 0xFFFFFFFFFFFFFFFF or num > 0xFFFFFFFFFFFFFFFF:
-        raise WalletStoreError(f"Hedera entity id '{entity_id}' is out of range.")
-    packed = shard.to_bytes(4, "big") + realm.to_bytes(8, "big") + num.to_bytes(8, "big")
-    return "0x" + packed.hex()
-
-
-def _discover_hedera_wallet_tokens(chain: str, address: str) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    base = _hedera_mirror_api_base(chain)
-    next_url = f"{base}/accounts/{address}/tokens?limit=100"
-    discovered: list[dict[str, Any]] = []
-    errors: list[dict[str, Any]] = []
-    token_meta_cache: dict[str, dict[str, Any]] = {}
-    visited = 0
-
-    while next_url and visited < 20:
-        visited += 1
-        page = _http_get_json_object(next_url)
-        rows = page.get("tokens")
-        if not isinstance(rows, list):
-            break
-        for row in rows:
-            if not isinstance(row, dict):
-                continue
-            token_id = str(row.get("token_id") or "").strip()
-            if not token_id:
-                continue
-            try:
-                balance_units = int(str(row.get("balance") or "0"))
-            except Exception:
-                errors.append({"tokenId": token_id, "message": "Invalid token balance in Hedera mirror response."})
-                continue
-            if balance_units <= 0:
-                continue
-            try:
-                token_address = _hedera_entity_id_to_evm_address(token_id)
-            except WalletStoreError as exc:
-                errors.append({"tokenId": token_id, "message": str(exc)})
-                continue
-
-            meta = token_meta_cache.get(token_id)
-            if meta is None:
-                try:
-                    meta = _http_get_json_object(f"{base}/tokens/{token_id}")
-                except Exception as exc:
-                    meta = {}
-                    errors.append({"tokenId": token_id, "token": token_address, "message": str(exc)})
-                token_meta_cache[token_id] = meta
-
-            symbol = str(meta.get("symbol") or token_id).strip() or token_id
-            decimals_raw = meta.get("decimals", row.get("decimals", 0))
-            try:
-                decimals = int(str(decimals_raw))
-            except Exception:
-                decimals = 0
-            discovered.append(
-                {
-                    "symbol": symbol,
-                    "token": token_address.lower(),
-                    "balanceWei": str(balance_units),
-                    "balance": _format_units(balance_units, decimals),
-                    "balancePretty": _format_units_pretty(balance_units, decimals),
-                    "decimals": decimals,
-                    "tokenId": token_id,
-                }
-            )
-        links = page.get("links")
-        raw_next = ""
-        if isinstance(links, dict):
-            raw_next = str(links.get("next") or "").strip()
-        next_url = urllib.parse.urljoin(base + "/", raw_next) if raw_next else ""
-    return discovered, errors
 
 
 def _canonical_token_address_aliases(chain: str) -> dict[str, str]:
@@ -11424,18 +11196,6 @@ def _fetch_wallet_holdings(chain: str) -> dict[str, Any]:
             known_tokens.add(token_address)
         except Exception as exc:
             token_errors.append({"source": "tracked", "token": token_address, "message": str(exc)})
-    if _is_hedera_chain(chain):
-        try:
-            discovered, discover_errors = _discover_hedera_wallet_tokens(chain, address)
-            for item in discovered:
-                token_addr = str(item.get("token") or "").lower()
-                if token_addr and token_addr not in known_tokens:
-                    token_balances.append(item)
-                    known_tokens.add(token_addr)
-            token_errors.extend(discover_errors)
-        except Exception as exc:
-            token_errors.append({"source": "hedera_mirror", "message": str(exc)})
-
     return {
         "address": address,
         "native": {
@@ -12008,91 +11768,6 @@ def cmd_limit_orders_run_loop(args: argparse.Namespace) -> int:
         return ok("Limit-order loop interrupted.", chain=args.chain, iterations=completed, interrupted=True, totals=totals, lastRun=last_run)
 
 
-def _hedera_hts_readiness() -> dict[str, Any]:
-    runtime_python = (os.environ.get("XCLAW_AGENT_PYTHON_BIN") or sys.executable or "python3").strip()
-    bridge_cmd = str(os.environ.get("XCLAW_HEDERA_HTS_BRIDGE_CMD") or "").strip()
-    bridge_source = "env" if bridge_cmd else "default"
-    default_bridge = pathlib.Path(__file__).resolve().parent / "bridges" / "hedera_hts_bridge.py"
-    bridge_configured = bool(bridge_cmd) or default_bridge.exists()
-    runtime_root = pathlib.Path(__file__).resolve().parents[1]
-    py_env = os.environ.copy()
-    existing_path = str(py_env.get("PYTHONPATH") or "").strip()
-    py_env["PYTHONPATH"] = (
-        f"{runtime_root}:{existing_path}" if existing_path else str(runtime_root)
-    )
-
-    java_available = shutil.which("java") is not None
-    javac_available = shutil.which("javac") is not None
-    hedera_importable = False
-    plugin_importable = False
-    plugin_callable = False
-
-    try:
-        hedera_probe = subprocess.run(
-            [runtime_python, "-c", "import hedera"],
-            timeout=10,
-            env=py_env,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        hedera_importable = hedera_probe.returncode == 0
-    except Exception:
-        hedera_importable = False
-
-    try:
-        plugin_probe = subprocess.run(
-            [
-                runtime_python,
-                "-c",
-                "import importlib; m=importlib.import_module('xclaw_agent.hedera_hts_plugin'); "
-                "print(1 if callable(getattr(m,'execute_liquidity',None)) else 0)",
-            ],
-            timeout=10,
-            env=py_env,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        plugin_importable = plugin_probe.returncode == 0
-        plugin_callable = plugin_importable and (plugin_probe.stdout or "").strip().endswith("1")
-    except Exception:
-        plugin_importable = False
-        plugin_callable = False
-
-    checks = {
-        "javaAvailable": java_available,
-        "javacAvailable": javac_available,
-        "pythonBin": runtime_python,
-        "hederaImportable": hedera_importable,
-        "pluginImportable": plugin_importable,
-        "pluginCallable": plugin_callable,
-        "bridgeCommandConfigured": bridge_configured,
-        "bridgeCommandSource": bridge_source,
-    }
-    ready = all(
-        [
-            java_available,
-            javac_available,
-            hedera_importable,
-            plugin_callable,
-            bridge_configured,
-        ]
-    )
-    missing: list[str] = []
-    if not java_available:
-        missing.append("java")
-    if not javac_available:
-        missing.append("javac")
-    if not hedera_importable:
-        missing.append("hedera_sdk_py")
-    if not plugin_callable:
-        missing.append("xclaw_agent.hedera_hts_plugin:execute_liquidity")
-    if not bridge_configured:
-        missing.append("XCLAW_HEDERA_HTS_BRIDGE_CMD")
-    return {"ready": ready, "checks": checks, "missing": missing}
-
-
 def cmd_wallet_health(args: argparse.Namespace) -> int:
     chk = require_json_flag(args)
     if chk is not None:
@@ -12158,10 +11833,6 @@ def cmd_wallet_health(args: argparse.Namespace) -> int:
     elif not integrity_checked:
         next_action = "Integrity check skipped (no passphrase provided). If available, set XCLAW_WALLET_PASSPHRASE to enable deeper verification; do not share it."
 
-    hts_readiness: dict[str, Any] | None = None
-    if chain.startswith("hedera"):
-        hts_readiness = _hedera_hts_readiness()
-
     return ok(
         "Wallet health checked.",
         chain=chain,
@@ -12171,7 +11842,6 @@ def cmd_wallet_health(args: argparse.Namespace) -> int:
         metadataValid=metadata_valid,
         filePermissionsSafe=permission_safe,
         integrityChecked=integrity_checked,
-        htsReadiness=hts_readiness,
         actionHint=next_action,
         nextAction=next_action,
         timestamp=utc_now(),

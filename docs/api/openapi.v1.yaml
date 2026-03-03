@@ -353,8 +353,8 @@ paths:
           $ref: '#/components/responses/ErrorResponse'
   /api/v1/agent/trade/uniswap/quote:
     post:
-      summary: Request Uniswap quote via server-side proxy (agent-auth).
-      description: Uses server-held `XCLAW_UNISWAP_API_KEY`; runtime never sends Uniswap API keys.
+      summary: Compatibility alias for generic EVM trade quote (agent-auth).
+      description: Deprecated compatibility route. Canonical path is `/api/v1/agent/trade/quote`.
       security:
         - agentBearer: []
       requestBody:
@@ -372,10 +372,30 @@ paths:
           $ref: '#/components/responses/ErrorResponse'
         '503':
           $ref: '#/components/responses/ErrorResponse'
+  /api/v1/agent/trade/quote:
+    post:
+      summary: Request generic EVM router-adapter trade quote (agent-auth).
+      security:
+        - agentBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TradeQuoteRequest'
+      responses:
+        '200':
+          description: Trade quote resolved.
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/ErrorResponse'
   /api/v1/agent/trade/uniswap/build:
     post:
-      summary: Build Uniswap approval/swap transactions via server-side proxy (agent-auth).
-      description: Returns executable tx payload(s) for runtime signing and submission.
+      summary: Compatibility alias for generic EVM trade build (agent-auth).
+      description: Deprecated compatibility route. Canonical path is `/api/v1/agent/trade/build`.
       security:
         - agentBearer: []
       requestBody:
@@ -393,9 +413,30 @@ paths:
           $ref: '#/components/responses/ErrorResponse'
         '503':
           $ref: '#/components/responses/ErrorResponse'
+  /api/v1/agent/trade/build:
+    post:
+      summary: Build generic EVM router-adapter approval/swap transactions (agent-auth).
+      description: Returns executable tx payload(s) for runtime signing and submission.
+      security:
+        - agentBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TradeBuildRequest'
+      responses:
+        '200':
+          description: Trade tx payload(s) returned.
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/ErrorResponse'
   /api/v1/agent/liquidity/uniswap/approve:
     post:
-      summary: Build Uniswap LP approval transactions via server-side proxy (agent-auth).
+      summary: Compatibility alias for generic liquidity approve (agent-auth).
       security:
         - agentBearer: []
       requestBody:
@@ -415,7 +456,7 @@ paths:
           $ref: '#/components/responses/ErrorResponse'
   /api/v1/agent/liquidity/uniswap/create:
     post:
-      summary: Build Uniswap LP create-position transactions via server-side proxy (agent-auth).
+      summary: Compatibility alias for generic liquidity create (agent-auth).
       security:
         - agentBearer: []
       requestBody:
@@ -435,7 +476,7 @@ paths:
           $ref: '#/components/responses/ErrorResponse'
   /api/v1/agent/liquidity/uniswap/increase:
     post:
-      summary: Build Uniswap LP increase-position transactions via server-side proxy (agent-auth).
+      summary: Compatibility alias for generic liquidity increase (agent-auth).
       security:
         - agentBearer: []
       requestBody:
@@ -455,7 +496,7 @@ paths:
           $ref: '#/components/responses/ErrorResponse'
   /api/v1/agent/liquidity/uniswap/decrease:
     post:
-      summary: Build Uniswap LP decrease-position transactions via server-side proxy (agent-auth).
+      summary: Compatibility alias for generic liquidity decrease (agent-auth).
       security:
         - agentBearer: []
       requestBody:
@@ -475,7 +516,7 @@ paths:
           $ref: '#/components/responses/ErrorResponse'
   /api/v1/agent/liquidity/uniswap/claim-fees:
     post:
-      summary: Build Uniswap LP claim-fees transactions via server-side proxy (agent-auth).
+      summary: Compatibility alias for generic liquidity claim-fees (agent-auth).
       security:
         - agentBearer: []
       requestBody:
@@ -495,7 +536,7 @@ paths:
           $ref: '#/components/responses/ErrorResponse'
   /api/v1/agent/liquidity/uniswap/migrate:
     post:
-      summary: Build Uniswap LP migrate transactions via server-side proxy (agent-auth).
+      summary: Compatibility alias for generic liquidity migrate (agent-auth).
       security:
         - agentBearer: []
       requestBody:
@@ -515,7 +556,7 @@ paths:
           $ref: '#/components/responses/ErrorResponse'
   /api/v1/agent/liquidity/uniswap/claim-rewards:
     post:
-      summary: Build Uniswap LP claim-rewards transactions via server-side proxy (agent-auth).
+      summary: Compatibility alias for generic liquidity claim-rewards (agent-auth).
       security:
         - agentBearer: []
       requestBody:
@@ -527,6 +568,146 @@ paths:
       responses:
         '200':
           description: Uniswap LP claim-rewards transaction payload(s) returned.
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/ErrorResponse'
+  /api/v1/agent/liquidity/approve:
+    post:
+      summary: Build generic liquidity approve transactions (agent-auth).
+      security:
+        - agentBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LiquidityApproveRequest'
+      responses:
+        '200':
+          description: Liquidity approval transaction payload(s) returned.
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/ErrorResponse'
+  /api/v1/agent/liquidity/create:
+    post:
+      summary: Build generic liquidity create-position transactions (agent-auth).
+      security:
+        - agentBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LiquidityCreateRequest'
+      responses:
+        '200':
+          description: Liquidity create transaction payload(s) returned.
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/ErrorResponse'
+  /api/v1/agent/liquidity/increase:
+    post:
+      summary: Build generic liquidity increase-position transactions (agent-auth).
+      security:
+        - agentBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LiquidityIncreaseRequest'
+      responses:
+        '200':
+          description: Liquidity increase transaction payload(s) returned.
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/ErrorResponse'
+  /api/v1/agent/liquidity/decrease:
+    post:
+      summary: Build generic liquidity decrease-position transactions (agent-auth).
+      security:
+        - agentBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LiquidityDecreaseRequest'
+      responses:
+        '200':
+          description: Liquidity decrease transaction payload(s) returned.
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/ErrorResponse'
+  /api/v1/agent/liquidity/claim-fees:
+    post:
+      summary: Build generic liquidity claim-fees transactions (agent-auth).
+      security:
+        - agentBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LiquidityClaimFeesRequest'
+      responses:
+        '200':
+          description: Liquidity claim-fees transaction payload(s) returned.
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/ErrorResponse'
+  /api/v1/agent/liquidity/migrate:
+    post:
+      summary: Build generic liquidity migrate transactions (agent-auth).
+      security:
+        - agentBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LiquidityMigrateRequest'
+      responses:
+        '200':
+          description: Liquidity migrate transaction payload(s) returned.
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/ErrorResponse'
+  /api/v1/agent/liquidity/claim-rewards:
+    post:
+      summary: Build generic liquidity claim-rewards transactions (agent-auth).
+      security:
+        - agentBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LiquidityClaimRewardsRequest'
+      responses:
+        '200':
+          description: Liquidity claim-rewards transaction payload(s) returned.
         '400':
           $ref: '#/components/responses/ErrorResponse'
         '401':
@@ -3001,11 +3182,11 @@ components:
         providerRequested:
           type: string
           nullable: true
-          enum: [uniswap_api, legacy_router, null]
+          enum: [router_adapter, quote_only, none, null]
         providerUsed:
           type: string
           nullable: true
-          enum: [uniswap_api, legacy_router, null]
+          enum: [router_adapter, none, null]
         fallbackUsed:
           type: boolean
           nullable: true
@@ -3017,7 +3198,14 @@ components:
               type: string
             message:
               type: string
-        uniswapRouteType:
+        executionFamily:
+          type: string
+          nullable: true
+          enum: [amm_v2, amm_v3, null]
+        executionAdapter:
+          type: string
+          nullable: true
+        routeKind:
           type: string
           nullable: true
         observedBy:
@@ -3066,6 +3254,15 @@ components:
           type: integer
           minimum: 0
           maximum: 5000
+        adapterKey:
+          type: string
+          nullable: true
+        protocolFamily:
+          type: string
+          nullable: true
+    TradeQuoteRequest:
+      allOf:
+        - $ref: '#/components/schemas/UniswapQuoteRequest'
     UniswapBuildRequest:
       type: object
       required: [agentId, chainKey, walletAddress, quote]
@@ -3079,6 +3276,15 @@ components:
           pattern: '^0x[a-fA-F0-9]{40}$'
         quote:
           type: object
+        adapterKey:
+          type: string
+          nullable: true
+        protocolFamily:
+          type: string
+          nullable: true
+    TradeBuildRequest:
+      allOf:
+        - $ref: '#/components/schemas/UniswapBuildRequest'
     UniswapLpApproveRequest:
       type: object
       required: [agentId, chainKey, walletAddress, request]
@@ -3092,6 +3298,9 @@ components:
           pattern: '^0x[a-fA-F0-9]{40}$'
         request:
           type: object
+    LiquidityApproveRequest:
+      allOf:
+        - $ref: '#/components/schemas/UniswapLpApproveRequest'
     UniswapLpCreateRequest:
       type: object
       required: [agentId, chainKey, walletAddress, request]
@@ -3105,6 +3314,9 @@ components:
           pattern: '^0x[a-fA-F0-9]{40}$'
         request:
           type: object
+    LiquidityCreateRequest:
+      allOf:
+        - $ref: '#/components/schemas/UniswapLpCreateRequest'
     UniswapLpIncreaseRequest:
       type: object
       required: [agentId, chainKey, walletAddress, request]
@@ -3118,6 +3330,9 @@ components:
           pattern: '^0x[a-fA-F0-9]{40}$'
         request:
           type: object
+    LiquidityIncreaseRequest:
+      allOf:
+        - $ref: '#/components/schemas/UniswapLpIncreaseRequest'
     UniswapLpDecreaseRequest:
       type: object
       required: [agentId, chainKey, walletAddress, request]
@@ -3131,6 +3346,9 @@ components:
           pattern: '^0x[a-fA-F0-9]{40}$'
         request:
           type: object
+    LiquidityDecreaseRequest:
+      allOf:
+        - $ref: '#/components/schemas/UniswapLpDecreaseRequest'
     UniswapLpClaimFeesRequest:
       type: object
       required: [agentId, chainKey, walletAddress, request]
@@ -3144,6 +3362,9 @@ components:
           pattern: '^0x[a-fA-F0-9]{40}$'
         request:
           type: object
+    LiquidityClaimFeesRequest:
+      allOf:
+        - $ref: '#/components/schemas/UniswapLpClaimFeesRequest'
     UniswapLpMigrateRequest:
       type: object
       required: [agentId, chainKey, walletAddress, request]
@@ -3157,6 +3378,9 @@ components:
           pattern: '^0x[a-fA-F0-9]{40}$'
         request:
           type: object
+    LiquidityMigrateRequest:
+      allOf:
+        - $ref: '#/components/schemas/UniswapLpMigrateRequest'
     UniswapLpClaimRewardsRequest:
       type: object
       required: [agentId, chainKey, walletAddress, request]
@@ -3170,6 +3394,9 @@ components:
           pattern: '^0x[a-fA-F0-9]{40}$'
         request:
           type: object
+    LiquidityClaimRewardsRequest:
+      allOf:
+        - $ref: '#/components/schemas/UniswapLpClaimRewardsRequest'
     LiquidityProposedRequest:
       type: object
       required: [schemaVersion, agentId, chainKey, dex, action, positionType, tokenA, tokenB, amountA, amountB, slippageBps]
@@ -3226,11 +3453,11 @@ components:
         providerRequested:
           type: string
           nullable: true
-          enum: [uniswap_api, legacy_router, null]
+          enum: [router_adapter, quote_only, none, null]
         providerUsed:
           type: string
           nullable: true
-          enum: [uniswap_api, legacy_router, null]
+          enum: [router_adapter, none, null]
         fallbackUsed:
           type: boolean
           nullable: true
@@ -3242,10 +3469,17 @@ components:
               type: string
             message:
               type: string
-        uniswapLpOperation:
+        executionFamily:
           type: string
           nullable: true
-          enum: [approve, create, increase, decrease, claim, migrate, claim_rewards, null]
+          enum: [amm_v2, amm_v3, null]
+        executionAdapter:
+          type: string
+          nullable: true
+        liquidityOperation:
+          type: string
+          nullable: true
+          enum: [approve, create, increase, decrease, claim_fees, migrate, claim_rewards, add, remove, null]
         details:
           type: object
     EventIngestRequest:

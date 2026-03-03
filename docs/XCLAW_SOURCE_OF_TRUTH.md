@@ -956,9 +956,7 @@ This section supersedes any earlier conflicting statements in this file.
 - Per-trade approval decisions require management cookie + CSRF only (Slice 36 removed step-up).
 - Approval history/tracking surfaces must preserve terminal trade execution outcomes (`filled`, `failed`, `verification_timeout`, `expired`) and must not collapse failed terminal outcomes into `approved`.
 - Management wallet balance sync must not degrade due SQL bind-type inference across cross-table dedupe checks; canonical token balances (for example `USDC` on `ethereum_sepolia`) must continue updating after filled swaps.
-- Hedera trade execution must adapt gas-price retries when RPC returns a minimum gas-price rejection (`minimum gas price ...`) so approved swaps do not fail due stale fee defaults.
-- Hedera testnet legacy-fee send path applies a deterministic `2x` gas-price multiplier before minimum-floor retry enforcement to reduce first-attempt underbid failures.
-- Hedera canonical token registry must include stablecoin addresses used in trade intents (for example testnet `USDC`) so activity/approval rows resolve symbols instead of raw addresses.
+- Active product scope is EVM-only; non-EVM chain handling must not influence runtime trade execution, fee planning, or symbol resolution behavior.
 - Pause/resume is user-controlled from management UI and requires base management auth only.
 - Pause halts all pending execution.
 - Resume requires fresh validation before execution.
@@ -1248,7 +1246,7 @@ Additional locked reliability requirements for skill/runtime usage:
 - Dexscreener research commands in the skill wrapper must query Dexscreener REST directly from agent runtime and must not depend on Node/server proxy paths.
 - `dexscreener-top` output contract is normalized: `priceUsd` as decimal string with 8 fractional digits; USD aggregates (`liquidityUsd`, `volumeH24Usd`, `marketCapUsd`, `fdvUsd`) as decimal strings with 2 fractional digits.
 - `token-research` is the preferred one-shot research command for small models and must return top-by-liquidity shortlist plus primary-token drilldown pairs in a single response.
-- Hedera chain behavior: `wallet-balance` must merge mirror-node discovered token holdings (non-zero balances for the wallet account) into `tokens[]` so owned tokens are visible even when not present in chain canonical token map.
+- `wallet-balance` must remain EVM-native: holdings are sourced from canonical tokens and tracked ERC-20 addresses only.
 - `faucet-request` rate-limit failures should surface machine-readable retry timing when available (`retryAfterSec` from server details).
 - `trade-spot` gas output should include both exact numeric ETH (`totalGasCostEthExact`) and display-friendly pretty form (`totalGasCostEthPretty`), while keeping backward-compatible `totalGasCostEth`.
 - chain inference for omitted chain uses runtime/web-synced default chain (`state.json.defaultChain`) first, then `XCLAW_DEFAULT_CHAIN` env fallback.
@@ -1313,31 +1311,24 @@ Liquidity adapter execution contract:
 - Telegram liquidity callback format is locked: `xliq|a|<liquidityIntentId>|<chainKey>` approve and `xliq|r|<liquidityIntentId>|<chainKey>` deny.
 - Management liquidity approvals must auto-queue runtime continuation: `xclaw-agent liquidity execute --intent <id> --chain <chain_key> --json`.
 - `liquidity quote-add` uses EVM router quote + ERC20 metadata only for `amm_v2` / `amm_v3` families.
-- `liquidity quote-add` for `hedera_hts` is router-independent and must execute adapter preflight without requiring `coreContracts.router`/ERC20 metadata.
 - `liquidity discover-pairs` must scan v2 DEX factory pairs (`allPairsLength/allPairs`) and return ranked reserve-filtered candidates with deterministic failures `liquidity_pair_discovery_failed` / `liquidity_no_viable_pair`.
-- `liquidity execute/resume` runtime execution scope for Slice 95 is limited to `amm_v2` and `hedera_hts`; `amm_v3` execution must fail with `unsupported_liquidity_execution_family`.
+- `liquidity execute/resume` runtime execution scope is EVM-only and router-adapter-driven; unsupported execution families must fail with `unsupported_liquidity_execution_family`.
 - Runtime liquidity execution must persist lifecycle transitions through `/api/v1/liquidity/{intentId}/status`: `approved -> executing -> verifying -> filled|failed|verification_timeout` with `txHash` when available.
 - `amm_v2` add execution must run deterministic pre-submit checks (wallet token/native balance, pair reserves, router simulation) and emit explicit preflight reason codes (`liquidity_preflight_*`) when blocked.
 - `amm_v2` add execution must ensure ERC20 allowances cover desired add inputs (`amountA`/`amountB`) so reserve drift cannot under-approve between estimate and submit.
 - Router simulation failures containing `TransferHelper::transferFrom: transferFrom failed` must map to deterministic preflight reason code `liquidity_preflight_router_transfer_from_failed`.
 - If `amm_v2` add preflight probes are RPC-forbidden/unverifiable and router simulation hits `TransferHelper::transferFrom: transferFrom failed`, runtime must retry simulation across configured chain RPC candidates before failing closed.
 - For `ethereum_sepolia` only, runtime may opt-in bypass of the above unverifiable transferFrom simulation failure when `XCLAW_LIQUIDITY_ALLOW_SEPOLIA_TRANSFERFROM_BYPASS=1`, surfacing warning code `liquidity_preflight_router_transfer_from_unverifiable_bypassed`.
-- Hedera EVM `amm_v2` add supports opt-in simulation bypass for known false-positive simulation signatures when `XCLAW_LIQUIDITY_ALLOW_SIMULATION_BYPASS=1`; bypass metadata must be returned in preflight details.
 - `liquidity remove` execution derives token pair and LP amount from stored position snapshot + on-chain LP balance percent; when snapshot is unavailable and `positionRef` is a pair address, runtime may resolve `token0/token1` directly from pair.
 - `liquidity remove` must preflight computed LP units before proposal and execution; when computed units are zero, runtime must fail deterministically with `liquidity_preflight_zero_lp_balance` (no approval queue for proposal path).
 - Runtime transaction submission must recover from retryable RPC send failures by retrying across configured chain RPC candidates; retryable classes include temporary upstream/internal errors (for example RPC code `19`).
 - On `ethereum_sepolia` and `base_sepolia`, when `cast send` fails with gas-estimation false-negative signatures (`Failed to estimate gas`, including `ds-math-sub-underflow` estimate-time reverts), runtime may retry submit with explicit gas limit (`XCLAW_TX_ESTIMATE_BYPASS_GAS_LIMIT`, default `900000`) before failing.
-- Hedera pair remove path must resolve LP token via `pair.lpToken()` when available (fallback to pair contract token model otherwise).
 - Liquidity status writer must treat `remove` intents as percent-based, not token-underlying amounts: on `filled remove`, snapshot current balances are reduced/closed without overwriting deposited/current with intent `amount_a/amount_b` (`100/0` must never become POSITION underlying).
 - Snapshot sync must heal placeholder liquidity rows by backfilling token/pool from canonical add provenance and auto-close active rows when a canonical `filled remove` at `100%` exists for that `position_ref`.
 - Snapshot sync must also auto-close active rows when canonical remove execution fails with zero-LP signatures for the same `position_ref` (wallet holds no removable LP balance), covering both deterministic `reason_code=liquidity_preflight_zero_lp_balance` and legacy `liquidity_execution_failed` zero-LP reason messages.
 - For v2 snapshots, zero-LP reconciliation must support pair-level matching fallback (`token_a/token_b`, order-insensitive) when historical remove intents use non-canonical `position_ref` identifiers.
-- For Hedera SaucerSwap v2 snapshots, sync must reconcile against mirrored LP wallet balances (`wallet_balance_snapshots` SSLP symbols) and auto-close `active` rows when LP mirror balance is zero.
 - Unsupported adapter combinations must return `unsupported_liquidity_adapter`.
-- Hedera HTS-native liquidity paths use plugin bridge module `xclaw_agent.hedera_hts_plugin:execute_liquidity` by default (override with `XCLAW_HEDERA_HTS_PLUGIN`) and dispatch to a bridge command via:
-  - env override `XCLAW_HEDERA_HTS_BRIDGE_CMD`, or
-  - default in-repo command `XCLAW_AGENT_PYTHON_BIN <repo>/apps/agent-runtime/xclaw_agent/bridges/hedera_hts_bridge.py` when env override is absent.
-- Missing SDK/bridge prerequisites must fail closed with `missing_dependency`.
+- Missing execution adapter prerequisites must fail closed with deterministic generic error codes.
 
 Skill exposure constraint:
 - Limit-order commands remain runtime-capable but are not exposed through `xclaw_agent_skill.py` command surface.
@@ -1353,7 +1344,7 @@ Configured under `skills.entries.xclaw-agent.env` in `~/.openclaw/openclaw.json`
 
 Optional non-interactive wallet automation env:
 - `XCLAW_WALLET_PASSPHRASE` (enables non-interactive `wallet-sign-challenge`)
-- Management approval runtime dispatch (`/api/v1/management/approvals/decision`) must hydrate missing env from skill config before spawning `xclaw-agent` for liquidity execution, including `XCLAW_WALLET_PASSPHRASE`, `XCLAW_LIQUIDITY_ALLOW_SEPOLIA_TRANSFERFROM_BYPASS`, and `XCLAW_UNISWAP_API_KEY`.
+- Management approval runtime dispatch (`/api/v1/management/approvals/decision`) must hydrate missing env from skill config before spawning `xclaw-agent` for liquidity execution, including `XCLAW_WALLET_PASSPHRASE` and `XCLAW_LIQUIDITY_ALLOW_SEPOLIA_TRANSFERFROM_BYPASS`.
 - `XCLAW_AGENT_PYTHON_BIN` (optional absolute interpreter path used by `xclaw-agent`; installer sets this automatically when a fallback runtime venv is needed)
 - Base builder attribution env for Base-chain trade/send execution:
   - `XCLAW_BUILDER_CODE_BASE`
@@ -1376,8 +1367,7 @@ Runtime binary requirements for skill operation:
 - Hosted installers must ensure runtime Python dependencies from `apps/agent-runtime/requirements.txt` are installed for the same interpreter used to run `xclaw-agent`/setup (`python3 -m pip` or `python -m pip`), including pip bootstrap when missing (`ensurepip`, then `get-pip.py` fallback).
 - Linux/macOS installer must detect PEP 668 `externally-managed-environment` pip failures and automatically pivot to a user-local fallback venv (`~/.xclaw-agent/runtime-venv`) before continuing dependency install.
 - Linux/macOS installer should attempt automatic `python3-venv` / `python3-pip` provisioning when running with sudo on apt-based systems before failing for missing venv/pip primitives.
-- Hosted installer should install `hedera-sdk-py` in the same runtime interpreter by default so HTS-native paths work out-of-the-box when environment allows dependency install.
-- Linux/macOS installer should attempt JDK provisioning on apt-based systems (`default-jdk-headless`, fallback `default-jdk`) when Hedera SDK import fails, then verify `javac` and `java -version` before concluding HTS-native readiness.
+- Hosted installer is EVM-only and must not provision non-EVM SDKs or JDK prerequisites.
 - Linux/macOS installer must be sudo-aware: when invoked via `sudo` from a non-root account, installation/configuration targets the original user home/context (not `/root`) and ownership of touched user artifacts is corrected before exit.
 - Setup script must ensure a default local wallet policy exists at `~/.xclaw-agent/policy.json` when missing (do not overwrite existing policy).
 - Setup script must install an OS-native `xclaw-agent` launcher (POSIX shell wrapper on Linux/macOS, `.cmd` launcher on Windows) without introducing Node/npm requirements for skill invocation.
@@ -4116,12 +4106,12 @@ Supersession note (Slice 117 Hotfix D):
 - `https://raw.githubusercontent.com/ethereum-lists/chains/master/_data/chains/eip155-2366.json`
 - Live RPC chain-id verification evidence is required in config `sources.rpcVerification` for each normalized chain.
 
-## 81) Slice 100 Uniswap Proxy-First Trade Execution Contract (Locked)
+## 81) Slice 100 Uniswap Proxy-First Trade Execution Contract (Superseded by Slice 119)
 
-1. Security boundary:
-- Uniswap API key is server-only (`XCLAW_UNISWAP_API_KEY`).
-- Runtime/skill/web-client never require or store Uniswap API keys in agent-local config.
-- Runtime reaches Uniswap only through authenticated X-Claw API proxy routes.
+1. Superseded architecture note:
+- Historical Uniswap-proxy behavior is no longer canonical.
+- Canonical trade execution is EVM-only and router-adapter-driven.
+- Runtime/skill/web-client do not depend on a server-held Uniswap API key.
 
 2. Provider orchestration:
 - Runtime trade execution provider selection is chain-config-driven:
@@ -4167,12 +4157,11 @@ Supersession note (Slice 117 Hotfix D):
   - `npm run build`
   - `pm2 restart all`
 
-## 82) Slice 102 Uniswap LP Core Execution Contract (Locked)
+## 82) Slice 102 Uniswap LP Core Execution Contract (Superseded by Slice 119)
 
-1. Security boundary:
-- Uniswap API key remains server-only (`XCLAW_UNISWAP_API_KEY`).
-- Agent runtime/skill/web clients must never store or transmit the Uniswap API key.
-- Runtime can only access Uniswap LP operations through authenticated X-Claw proxy routes.
+1. Superseded architecture note:
+- Historical Uniswap LP proxy behavior is retained only as compatibility routing.
+- Canonical liquidity execution is EVM-only and router-adapter-driven.
 
 2. LP proxy API surface (agent-auth):
 - `POST /api/v1/agent/liquidity/uniswap/approve`
@@ -4219,7 +4208,7 @@ Supersession note (Slice 117 Hotfix D):
   - `base_mainnet`, `avalanche_mainnet`, `op_mainnet`, `arbitrum_mainnet`,
   - `zksync_mainnet`, `monad_mainnet`.
 
-## 83) Slice 103 Uniswap LP Completion Contract (Locked)
+## 83) Slice 103 Uniswap LP Completion Contract (Superseded by Slice 119)
 
 1. Scope completion:
 - Add remaining Uniswap LP operations:
@@ -4267,7 +4256,7 @@ Supersession note (Slice 117 Hotfix D):
   - `uniswapLpOperation` (`migrate|claim_rewards`)
 - Liquidity status schema enum supports these new operation values for persisted details payloads.
 
-## 84) Slice 104 LP Operation Promotion Contract (Locked)
+## 84) Slice 104 LP Operation Promotion Contract (Superseded by Slice 119)
 
 1. Scope:
 - Promote already-implemented Uniswap LP operations `migrate` and `claim_rewards` from Sepolia to the full repo target chain set.

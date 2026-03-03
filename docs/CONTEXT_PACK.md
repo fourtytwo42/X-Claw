@@ -1351,16 +1351,14 @@ Issue mapping: `#32`
 - Invalid `chainKey` returns deterministic `payload_invalid` error.
 - Dexscreener failures are soft and do not break dashboard shell rendering.
 
-## Slice 100 Context Pack (2026-02-20): Uniswap Proxy-First Execution
+## Slice 100 Context Pack (2026-02-20): Uniswap Proxy-First Execution (Superseded by Slice 119)
 
 ### Objective
 Implement Uniswap API integration as server-side proxy execution for runtime trade commands with deterministic fallback to legacy router path.
 
 ### Constraints
+- Historical note only. Active execution is EVM-only and router-adapter-driven.
 - Runtime/skill wallet remains source-of-truth execution authority.
-- Uniswap API key remains server-only (`XCLAW_UNISWAP_API_KEY`).
-- Unsupported chains stay legacy-only.
-- Supported-chain Uniswap failures auto-fallback to legacy when available.
 
 ### Decision locks
 - Provider precedence: `uniswap_api` -> `legacy_router`.
@@ -1374,16 +1372,14 @@ Implement Uniswap API integration as server-side proxy execution for runtime tra
 - Chain config rollout: requested Uniswap-supported chain set in `config/chains/`
 - Contracts/docs: `openapi.v1.yaml`, shared schemas, source-of-truth, tracker, roadmap, handoff artifacts.
 
-## Slice 102 Context Pack (2026-02-20): Uniswap LP Core (Proxy-First + Fallback)
+## Slice 102 Context Pack (2026-02-20): Uniswap LP Core (Proxy-First + Fallback, Superseded by Slice 119)
 
 ### Objective
 Extend Uniswap proxy-first execution to LP core operations (`approve/create/increase/decrease/claim-fees`) on repo-supported Uniswap chains while retaining legacy liquidity fallback when available.
 
 ### Constraints
-- Uniswap API key remains server-only (`XCLAW_UNISWAP_API_KEY`).
+- Historical note only. Active liquidity execution is EVM-only and router-adapter-driven.
 - Runtime/skill wallet remains execution/signing source of truth.
-- Fallback on any Uniswap LP proxy error; fail closed if neither provider can execute.
-- Scope excludes `migrate` and `claim_rewards`.
 
 ### Decision locks
 - LP provider precedence: `uniswap_api` -> `legacy_router`.

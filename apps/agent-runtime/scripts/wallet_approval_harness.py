@@ -157,17 +157,6 @@ def _extract_liquidity_intent_id(payload: dict[str, Any]) -> str:
     return ""
 
 
-def _payload_contains_uniswap_proxy_missing(payload: dict[str, Any]) -> bool:
-    details = payload.get("details")
-    if not isinstance(details, dict):
-        return False
-    fallback_reason = details.get("fallbackReason")
-    if not isinstance(fallback_reason, dict):
-        return False
-    message = str(fallback_reason.get("message") or "").lower()
-    return "uniswap_proxy_not_configured" in message
-
-
 def _within_tolerance(before: Decimal, after: Decimal, bps: int, floor: Decimal) -> tuple[bool, Decimal, Decimal]:
     delta = abs(after - before)
     pct_window = abs(before) * Decimal(bps) / Decimal(10000)
@@ -297,10 +286,6 @@ class WalletApprovalHarness:
         }
         if self.wallet_passphrase:
             env["XCLAW_WALLET_PASSPHRASE"] = self.wallet_passphrase
-        if str(self.chain).strip().lower().startswith("hedera"):
-            # Hedera RPC enforces a high minimum gas price floor; keep harness txs above floor by default.
-            env.setdefault("XCLAW_TX_FEE_MODE", "legacy")
-            env.setdefault("XCLAW_TX_GAS_PRICE_GWEI", "900")
         proc = subprocess.run(cmd, text=True, capture_output=True, timeout=timeout, env=env)
         out = (proc.stdout or "").strip()
         payload: dict[str, Any] = {}
@@ -929,7 +914,7 @@ class WalletApprovalHarness:
 
     def _attempt_faucet_topup(self, *, require_native_topup: bool = False) -> None:
         chain_normalized = str(self.chain).strip().lower()
-        if chain_normalized not in {"base_sepolia", "hedera_testnet"}:
+        if chain_normalized != "base_sepolia":
             return
         if not self._has_chain_capability("faucet"):
             return
@@ -941,10 +926,7 @@ class WalletApprovalHarness:
             bal = self._balance_snapshot()
             if require_native_topup and bal.get("NATIVE", Decimal("0")) > baseline_native:
                 return
-            if chain_normalized == "hedera_testnet":
-                if bal.get("SAUCE", Decimal("0")) > 0 or bal.get("WHBAR", Decimal("0")) > 0:
-                    return
-            elif bal.get("USDC", Decimal("0")) > 0 or bal.get("WETH", Decimal("0")) > 0:
+            if bal.get("USDC", Decimal("0")) > 0 or bal.get("WETH", Decimal("0")) > 0:
                 return
             time.sleep(8)
 
@@ -1104,149 +1086,20 @@ class WalletApprovalHarness:
             time.sleep(4)
 
     def _bootstrap_hedera_testnet_funding(self) -> None:
-        if str(self.chain).strip().lower() != "hedera_testnet":
-            return
-        self._ensure_local_wallet_policy_chain_enabled()
-        bal = self._balance_snapshot()
-        sauce = bal.get("SAUCE", Decimal("0"))
-        whbar = bal.get("WHBAR", Decimal("0"))
-        native = bal.get("NATIVE", Decimal("0"))
-        if sauce > 0 or whbar > 0:
-            return
-        if native <= 0:
-            raise HarnessError(
-                "No usable native HBAR balance detected for Hedera bootstrap.",
-                code="scenario_funding_missing",
-                category="preflight_failure",
-                details={"chain": self.chain, "nativeWei": str(native)},
-            )
-
-        self._post_permissions_update(
-            {
-                "agentId": self.agent_id,
-                "chainKey": self.chain,
-                "transferApprovalMode": "auto",
-                "nativeTransferPreapproved": True,
-                "allowedTransferTokens": [],
-                "outboundTransfersEnabled": True,
-                "outboundMode": "allow_all",
-                "outboundWhitelistAddresses": [],
-            }
-        )
-
-        c_wrap, p_wrap, _, e_wrap = self._runtime(
-            ["wallet", "wrap-native", "--chain", self.chain, "--amount", "0.5"],
-            timeout=240,
-        )
-        if c_wrap != 0 or not bool(p_wrap.get("ok")):
-            raise HarnessError(f"hbar->whbar bootstrap wrap failed: {p_wrap} stderr={e_wrap}")
-
-        for _i in range(6):
-            bal = self._balance_snapshot()
-            if bal.get("WHBAR", Decimal("0")) > 0:
-                break
-            time.sleep(4)
-        bal = self._balance_snapshot()
-        if bal.get("WHBAR", Decimal("0")) <= 0:
-            raise HarnessError(
-                "Hedera bootstrap did not produce WHBAR balance.",
-                code="scenario_funding_missing",
-                category="preflight_failure",
-                details={"chain": self.chain, "whbarWei": str(bal.get("WHBAR", Decimal("0")))},
-            )
-
-        self._post_permissions_update({"agentId": self.agent_id, "chainKey": self.chain, "tradeApprovalMode": "auto"})
-        c_trade, p_trade, _, e_trade = self._runtime(
-            [
-                "trade",
-                "spot",
-                "--chain",
-                self.chain,
-                "--token-in",
-                "WHBAR",
-                "--token-out",
-                "SAUCE",
-                "--amount-in",
-                "0.01",
-                "--slippage-bps",
-                "150",
-            ],
-            timeout=300,
-        )
-        pending_codes = {"approval_required", "approval_pending"}
-        status = str(p_trade.get("status") or "").strip().lower()
-        if c_trade != 0 and str(p_trade.get("code") or "") not in pending_codes:
-            raise HarnessError(f"whbar->sauce bootstrap trade failed: {p_trade} stderr={e_trade}")
-        trade_id = _extract_trade_id(p_trade)
-        if trade_id:
-            self.created_trade_ids.append(trade_id)
-        if (c_trade != 0 or status == "approval_pending") and str(p_trade.get("code") or "") in pending_codes:
-            if not trade_id:
-                raise HarnessError(f"bootstrap trade missing tradeId for approval flow: {p_trade}")
-            _ = self._management_post_with_retry(
-                "/management/approvals/decision",
-                {"agentId": self.agent_id, "tradeId": trade_id, "decision": "approve"},
-                label="bootstrap_trade_decision_approve_hedera",
-            )
-            code, resume_payload, _, resume_stderr = self._runtime(
-                ["approvals", "resume-spot", "--trade-id", trade_id, "--chain", self.chain], timeout=420
-            )
-            if code != 0 or not bool(resume_payload.get("ok")):
-                raise HarnessError(f"bootstrap trade resume failed: {resume_payload} stderr={resume_stderr}")
-            terminal = self._wait_for_trade_status(trade_id, {"filled", "failed", "rejected"}, timeout_sec=420)
-            if str(terminal.get("status") or "").strip().lower() != "filled":
-                raise HarnessError(f"bootstrap trade terminal status expected filled, got {terminal}")
-
-        for _i in range(6):
-            bal = self._balance_snapshot()
-            if bal.get("SAUCE", Decimal("0")) > 0 or bal.get("WHBAR", Decimal("0")) > 0:
-                return
-            time.sleep(4)
+        return
 
     def _prepare_trade_pair_and_amounts(self) -> None:
         chain_normalized = str(self.chain).strip().lower()
         bal = self._balance_snapshot()
         usdc = bal.get("USDC", Decimal("0"))
         weth = bal.get("WETH", Decimal("0"))
-        sauce = bal.get("SAUCE", Decimal("0"))
-        whbar = bal.get("WHBAR", Decimal("0"))
         if usdc <= 0 and weth <= 0:
             self._attempt_faucet_topup()
             self._bootstrap_ethereum_sepolia_funding()
-            self._bootstrap_hedera_testnet_funding()
             self._bootstrap_hardhat_local_token_funding()
             bal = self._balance_snapshot()
             usdc = bal.get("USDC", Decimal("0"))
             weth = bal.get("WETH", Decimal("0"))
-            sauce = bal.get("SAUCE", Decimal("0"))
-            whbar = bal.get("WHBAR", Decimal("0"))
-
-        if chain_normalized == "hedera_testnet":
-            native = bal.get("NATIVE", Decimal("0"))
-            native_floor_wei = Decimal("5000000000000000000")  # 5 HBAR safety floor for multi-scenario runs
-            if native < native_floor_wei:
-                self._attempt_faucet_topup(require_native_topup=True)
-                bal = self._balance_snapshot()
-                sauce = bal.get("SAUCE", Decimal("0"))
-                whbar = bal.get("WHBAR", Decimal("0"))
-            # Prefer WHBAR -> SAUCE on Hedera: this path has been consistently executable
-            # in low-fund live runs, while SAUCE->WHBAR can intermittently fail pre-send.
-            if whbar > 0:
-                self.trade_token_in = "WHBAR"
-                self.trade_token_out = "SAUCE"
-            else:
-                self.trade_token_in = "SAUCE"
-                self.trade_token_out = "WHBAR"
-            self.trade_amounts = {
-                "pending_approve": "0.01",
-                "reject": "0.008",
-                "dedupe": "0.006",
-                "global_auto": "0.004",
-                "allowlist": "0.005",
-                "rebalance": "0.003",
-            }
-            if sauce > 0 or whbar > 0:
-                return
 
         if usdc > 0:
             self.trade_token_in = "USDC"
@@ -1316,12 +1169,6 @@ class WalletApprovalHarness:
             ["approvals", "resume-spot", "--trade-id", trade_id, "--chain", self.chain], timeout=420
         )
         if code != 0 or not bool(resume_payload.get("ok")):
-            if str(self.chain).strip().lower() == "ethereum_sepolia" and _payload_contains_uniswap_proxy_missing(resume_payload):
-                return {
-                    "tradeId": trade_id,
-                    "assertedExecutionEnvironmentCode": "uniswap_proxy_not_configured",
-                    "status": "environment_limited",
-                }
             raise HarnessError(f"trade resume failed: {resume_payload} stderr={resume_stderr}")
 
         terminal = self._wait_for_trade_status(trade_id, {"filled", "failed", "rejected"}, timeout_sec=420)
@@ -1423,12 +1270,6 @@ class WalletApprovalHarness:
             self._trade_args(self.trade_amounts["global_auto"])
         )
         if c_auto != 0:
-            if str(self.chain).strip().lower() == "ethereum_sepolia" and _payload_contains_uniswap_proxy_missing(p_auto):
-                return {
-                    "assertedExecutionEnvironmentCode": "uniswap_proxy_not_configured",
-                    "stage": "global_auto",
-                    "status": "environment_limited",
-                }
             raise HarnessError(f"global auto trade failed: {p_auto} stderr={err_auto}")
 
         # per-trade + allowlist via approve-allowlist-token
@@ -1460,13 +1301,6 @@ class WalletApprovalHarness:
             ["approvals", "resume-spot", "--trade-id", trade_id, "--chain", self.chain], timeout=420
         )
         if code != 0 or not bool(resume_payload.get("ok")):
-            if str(self.chain).strip().lower() == "ethereum_sepolia" and _payload_contains_uniswap_proxy_missing(resume_payload):
-                return {
-                    "tradeId": trade_id,
-                    "assertedExecutionEnvironmentCode": "uniswap_proxy_not_configured",
-                    "stage": "allowlist_resume",
-                    "status": "environment_limited",
-                }
             raise HarnessError(f"allowlist resume failed: {resume_payload} stderr={resume_err}")
 
         state = self._management_state()
@@ -1713,8 +1547,6 @@ class WalletApprovalHarness:
         after = self._balance_snapshot()
         bps = int(self.args.balance_tolerance_bps)
         native_floor_native = Decimal(str(self.args.balance_tolerance_floor_native))
-        if str(self.chain).strip().lower().startswith("hedera") and native_floor_native < Decimal("5"):
-            native_floor_native = Decimal("5")
         native_floor_wei = Decimal("1000000000000000000") * native_floor_native
         stable_floor_wei = Decimal("1000000000000000000") * Decimal(str(self.args.balance_tolerance_floor_stable))
 

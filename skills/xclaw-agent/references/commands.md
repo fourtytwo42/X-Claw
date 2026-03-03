@@ -64,7 +64,7 @@ This reference defines the expected command surface for the Python-first skill w
 - `wallet-wrap-native <amount>`
 - `wallet-create`
 
-`wallet-balance` returns native chain balance plus token balances (`tokens[]`) from canonical tokens, tracked tokens, and Hedera mirror discovery.
+`wallet-balance` returns native chain balance plus token balances (`tokens[]`) from canonical tokens and tracked EVM tokens.
 `dexscreener-search` and `dexscreener-token-pairs` fetch market research data directly from Dexscreener REST (`api.dexscreener.com`) from skill runtime, not via xclaw-agent server routes.
 `dexscreener-top` is a skill-side ranking helper: liquidity-desc order with normalized decimal-string output (`priceUsd` 8dp; USD metrics 2dp).
 `token-research` orchestrates search + ranking + primary token drilldown and returns one compact research payload for chat-first model usage.
@@ -108,7 +108,7 @@ Underlying runtime delegation (performed by wrapper):
 - `xclaw-agent management-link --ttl-seconds <seconds> --json`
 - `xclaw-agent faucet-request --chain <chain_key> --json`
 - `xclaw-agent faucet-request --chain <chain_key> [--asset <native|wrapped|stable>]... --json`
-  - skill-wrapper aliases: `hbar|eth|kite -> native`, `whbar|weth|wkite -> wrapped`, `usdc|usdt -> stable`
+  - skill-wrapper aliases: `eth|kite -> native`, `weth|wkite -> wrapped`, `usdc|usdt -> stable`
   - skill-wrapper behavior: if only `native` is requested, it omits asset flags so faucet defaults to all assets.
 - `xclaw-agent faucet-networks --json`
 - `xclaw-agent chains --json`
@@ -138,8 +138,7 @@ Underlying runtime delegation (performed by wrapper):
 - `xclaw-agent wallet create --chain <chain_key> --json`
 
 Installer/bootstrap note:
-- Hosted installer (`/skill-install.sh`) creates/binds default-chain wallet and auto-attempts `hedera_testnet` bind using the same portable wallet key. Registration upsert includes both chain wallet rows when auth context is present.
-- Installer optional Hedera warmup emits deterministic diagnostics (`faucetCode`, `faucetMessage`, `actionHint`, optional `requestId`) plus exact rerun command when warmup is non-fatal.
+- Hosted installer (`/skill-install.sh`) creates/binds the default-chain EVM wallet/runtime and persists the generic router-adapter env expected by the runtime.
 
 ## Output Requirements
 

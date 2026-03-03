@@ -372,7 +372,7 @@ class WalletApprovalHarnessUnitTests(unittest.TestCase):
             out = runner._scenario_x402_or_capability_assertion()
         self.assertEqual(out.get("assertedUnsupportedCode"), "unsupported_chain_capability")
 
-    def test_trade_pending_approve_asserts_uniswap_proxy_missing_on_ethereum(self) -> None:
+    def test_trade_pending_approve_raises_when_resume_fails(self) -> None:
         args = self._args()
         args.chain = "ethereum_sepolia"
         runner = harness.WalletApprovalHarness(args)
@@ -386,21 +386,17 @@ class WalletApprovalHarnessUnitTests(unittest.TestCase):
                     {
                         "ok": False,
                         "code": "trade_execute_failed",
-                        "details": {
-                            "fallbackReason": {
-                                "message": "uniswap_proxy_not_configured: XCLAW_UNISWAP_API_KEY is not configured on server runtime."
-                            }
-                        },
+                        "details": {"fallbackReason": {"message": "unsupported_execution_adapter: no router adapter available"}},
                     },
                     "",
                     "",
                 ),
             ],
         ), mock.patch.object(runner, "_management_post_with_retry", return_value={"ok": True}):
-            out = runner._scenario_trade_pending_approve()
-        self.assertEqual(out.get("assertedExecutionEnvironmentCode"), "uniswap_proxy_not_configured")
+            with self.assertRaises(harness.HarnessError):
+                runner._scenario_trade_pending_approve()
 
-    def test_global_and_allowlist_asserts_uniswap_proxy_missing_on_ethereum(self) -> None:
+    def test_global_and_allowlist_raises_when_auto_trade_fails(self) -> None:
         args = self._args()
         args.chain = "ethereum_sepolia"
         runner = harness.WalletApprovalHarness(args)
@@ -412,19 +408,14 @@ class WalletApprovalHarnessUnitTests(unittest.TestCase):
                 {
                     "ok": False,
                     "code": "trade_spot_failed",
-                    "details": {
-                        "fallbackReason": {
-                            "message": "uniswap_proxy_not_configured: XCLAW_UNISWAP_API_KEY is not configured on server runtime."
-                        }
-                    },
+                    "details": {"fallbackReason": {"message": "unsupported_execution_adapter: no router adapter available"}},
                 },
                 "",
                 "",
             ),
         ):
-            out = runner._scenario_global_and_allowlist()
-        self.assertEqual(out.get("assertedExecutionEnvironmentCode"), "uniswap_proxy_not_configured")
-        self.assertEqual(out.get("stage"), "global_auto")
+            with self.assertRaises(harness.HarnessError):
+                runner._scenario_global_and_allowlist()
 
     def test_bootstrap_hardhat_local_token_funding_success(self) -> None:
         args = self._args()
@@ -527,7 +518,7 @@ class WalletApprovalHarnessUnitTests(unittest.TestCase):
 
     def test_wait_for_trade_status_uses_receipt_fallback_for_verifying_trade(self) -> None:
         args = self._args()
-        args.chain = "hedera_testnet"
+        args.chain = "ethereum_sepolia"
         runner = harness.WalletApprovalHarness(args)
         with mock.patch.object(
             runner,
@@ -545,7 +536,7 @@ class WalletApprovalHarnessUnitTests(unittest.TestCase):
 
     def test_wait_for_trade_status_raises_when_receipt_fallback_not_available(self) -> None:
         args = self._args()
-        args.chain = "hedera_testnet"
+        args.chain = "ethereum_sepolia"
         runner = harness.WalletApprovalHarness(args)
         with mock.patch.object(
             runner,
@@ -560,35 +551,33 @@ class WalletApprovalHarnessUnitTests(unittest.TestCase):
             with self.assertRaises(harness.HarnessError):
                 runner._wait_for_trade_status("trd_2", {"filled", "failed"}, timeout_sec=3)
 
-    def test_prepare_trade_pair_prefers_whbar_over_sauce_on_hedera(self) -> None:
+    def test_prepare_trade_pair_prefers_usdc_over_weth_when_available(self) -> None:
         args = self._args()
-        args.chain = "hedera_testnet"
+        args.chain = "base_sepolia"
         runner = harness.WalletApprovalHarness(args)
         with mock.patch.object(
             runner,
             "_balance_snapshot",
             return_value={
-                "USDC": Decimal("0"),
-                "WETH": Decimal("0"),
-                "SAUCE": Decimal("20000000"),
-                "WHBAR": Decimal("900000000"),
+                "USDC": Decimal("20000000"),
+                "WETH": Decimal("900000000"),
             },
         ):
             runner._prepare_trade_pair_and_amounts()
-        self.assertEqual(runner.trade_token_in, "WHBAR")
-        self.assertEqual(runner.trade_token_out, "SAUCE")
+        self.assertEqual(runner.trade_token_in, "USDC")
+        self.assertEqual(runner.trade_token_out, "WETH")
 
-    def test_prepare_trade_pair_requests_faucet_when_hedera_native_low(self) -> None:
+    def test_prepare_trade_pair_requests_faucet_when_native_low_and_assets_missing(self) -> None:
         args = self._args()
-        args.chain = "hedera_testnet"
+        args.chain = "base_sepolia"
         runner = harness.WalletApprovalHarness(args)
         with mock.patch.object(
             runner,
             "_balance_snapshot",
             side_effect=[
-                {"NATIVE": Decimal("1000000000000000000"), "USDC": Decimal("0"), "WETH": Decimal("0"), "SAUCE": Decimal("0"), "WHBAR": Decimal("1")},
-                {"NATIVE": Decimal("6000000000000000000"), "USDC": Decimal("0"), "WETH": Decimal("0"), "SAUCE": Decimal("0"), "WHBAR": Decimal("1")},
-                {"NATIVE": Decimal("6000000000000000000"), "USDC": Decimal("0"), "WETH": Decimal("0"), "SAUCE": Decimal("0"), "WHBAR": Decimal("1")},
+                {"NATIVE": Decimal("0"), "USDC": Decimal("0"), "WETH": Decimal("0")},
+                {"NATIVE": Decimal("2"), "USDC": Decimal("10"), "WETH": Decimal("0")},
+                {"NATIVE": Decimal("2"), "USDC": Decimal("10"), "WETH": Decimal("0")},
             ],
         ), mock.patch.object(runner, "_attempt_faucet_topup") as faucet_mock:
             runner._prepare_trade_pair_and_amounts()

@@ -4,7 +4,7 @@ const BASE_URL = process.env.XCLAW_E2E_BASE_URL || 'http://127.0.0.1:3000';
 const API_BASE = `${BASE_URL.replace(/\/$/, '')}/api/v1`;
 const AGENT_ID = process.env.XCLAW_E2E_AGENT_ID || 'ag_slice7';
 const AGENT_API_KEY = process.env.XCLAW_E2E_AGENT_API_KEY || 'slice7_token_abc12345';
-const CHAIN_KEY = process.env.XCLAW_E2E_CHAIN_KEY || 'hedera_testnet';
+const CHAIN_KEY = process.env.XCLAW_E2E_CHAIN_KEY || 'base_sepolia';
 const TOKEN_ADDRESS = (process.env.XCLAW_E2E_TRACKED_TOKEN || '0x0000000000000000000000000000000000001549').toLowerCase();
 
 const state = { passed: 0, failed: 0, checks: [] };

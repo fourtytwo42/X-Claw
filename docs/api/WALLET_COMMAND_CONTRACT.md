@@ -187,7 +187,6 @@ Current behavior in `apps/agent-runtime/xclaw_agent/cli.py`:
 8. `wallet-balance` returns combined holdings for wallet address and chain RPC:
    - native balance fields (`balanceWei`, `balanceEth`, `symbol`, `decimals`),
    - token holdings in `tokens[]` include only non-zero balances (canonical + tracked + discovered),
-   - Hedera chains additionally include discovered token holdings from mirror-node account token relationships (non-zero balances) merged into `tokens[]`,
    - token query/discovery failures in `tokenErrors[]` without failing native balance fetch.
 9. `wallet-token-balance` is implemented via cast-backed ERC-20 `balanceOf(address)` query.
 10. `wallet-wrap-native` is implemented as config-driven cross-chain behavior:
@@ -210,13 +209,10 @@ Current behavior in `apps/agent-runtime/xclaw_agent/cli.py`:
    - rollback kill-switch `XCLAW_TX_FEE_MODE=legacy` restores legacy fixed `gasPrice` sender behavior.
 17. Liquidity commands enforce adapter preflight before API proposal submission:
    - unsupported chain/dex/position combinations fail with `unsupported_liquidity_adapter`,
-   - HTS-native Hedera paths fail closed with `missing_dependency` when SDK/plugin bridge is unavailable,
-   - HTS plugin bridge defaults to `xclaw_agent.hedera_hts_plugin:execute_liquidity` and resolves bridge command from `XCLAW_HEDERA_HTS_BRIDGE_CMD` or fallback in-repo bridge (`XCLAW_AGENT_PYTHON_BIN .../xclaw_agent/bridges/hedera_hts_bridge.py`),
-   - `liquidity execute/resume` supports `amm_v2` + `hedera_hts` in Slice 95 and rejects `amm_v3` with `unsupported_liquidity_execution_family`,
+   - `liquidity execute/resume` supports router-adapter EVM families and rejects unsupported execution families with `unsupported_liquidity_execution_family`,
    - non-actionable statuses fail with `liquidity_not_actionable`,
    - v2 add execution emits deterministic preflight reject reasons (`liquidity_preflight_*`) before submit,
-   - Hedera EVM v2 add supports opt-in simulation bypass for known false-positive signatures when `XCLAW_LIQUIDITY_ALLOW_SIMULATION_BYPASS=1` (preflight must include `simulationWarning` metadata),
-   - v2 remove accepts pair-address `positionRef` fallback when snapshot rows are unavailable and resolves Hedera LP token via `pair.lpToken()` when present,
+   - v2 remove accepts pair-address `positionRef` fallback when snapshot rows are unavailable,
    - runtime execution/verification failures return deterministic `liquidity_execution_failed` / `liquidity_verification_failed`.
 18. Hosted installer (`/skill-install.sh`) wallet bootstrap behavior:
    - creates/binds wallet on `XCLAW_DEFAULT_CHAIN`,
@@ -254,7 +250,7 @@ The following non-wallet commands are part of the same Python-first wrapper cont
 2. `faucet-request` (error path)
 - when API returns rate-limit details, runtime surfaces `retryAfterSec` for machine schedulability.
 - supports chain-aware selectable assets via `--asset native|wrapped|stable` and returns resolved `requestedAssets`/`fulfilledAssets`.
-- Hedera faucet failures must preserve deterministic server codes in runtime output (`faucet_config_invalid`, `faucet_fee_too_low_for_chain`, `faucet_native_insufficient`, `faucet_wrapped_insufficient`, `faucet_wrapped_autowrap_failed`, `faucet_stable_insufficient`, `faucet_send_preflight_failed`, `faucet_rpc_unavailable`, `faucet_recipient_not_eligible`) with `requestId` passthrough for diagnostics.
+- Faucet failures must preserve deterministic server codes in runtime output (`faucet_config_invalid`, `faucet_native_insufficient`, `faucet_wrapped_insufficient`, `faucet_wrapped_autowrap_failed`, `faucet_stable_insufficient`, `faucet_send_preflight_failed`, `faucet_rpc_unavailable`, `faucet_recipient_not_eligible`) with `requestId` passthrough for diagnostics.
 - Successful faucet responses include recipient provenance fields (`recipientAddress`, `faucetAddress`) for immediate verification.
 
 3. `faucet-networks`

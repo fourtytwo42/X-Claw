@@ -6767,3 +6767,29 @@ Date (UTC): 2026-03-03
 - [ ] `npm run seed:verify`
 - [ ] `npm run build`
 - [ ] `pm2 restart all`
+# Slice 120-123 Acceptance Evidence: EVM-Only Cleanup + Contract Closeout
+
+Date (UTC): 2026-03-03
+Active slice context: `Slice 120 -> Slice 123`.
+
+## Objective + Scope Lock
+- Objective:
+  - remove remaining Hedera and Uniswap-proxy leftovers from active runtime/web/install paths,
+  - align canonical docs/contracts to the generic EVM router-adapter surface,
+  - realign harness/skill/infra defaults to EVM-only behavior.
+
+## Behavior Checks
+- [ ] active installer/runtime/web files no longer reference Hedera paths or env.
+- [ ] OpenAPI exposes canonical generic trade/liquidity routes and marks `/uniswap/*` as compatibility aliases.
+- [ ] source-of-truth, wallet contract, and skill docs no longer describe active Hedera support or server-held Uniswap API-key dependency as canonical behavior.
+- [ ] wallet-approval harness no longer special-cases `uniswap_proxy_not_configured`.
+- [ ] infra contract-test defaults target an active EVM test chain.
+
+## Required Validation Gates
+- [ ] `npm run db:parity`
+- [ ] `npm run seed:reset`
+- [ ] `npm run seed:load`
+- [ ] `npm run seed:verify`
+- [ ] task-specific Python/unit checks for touched files
+- [ ] `npm run build`
+- [ ] `pm2 restart all`

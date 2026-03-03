@@ -4037,3 +4037,32 @@ Active slice context: `Slice 119`.
 - [ ] `npm run seed:verify`
 - [ ] `npm run build`
 - [ ] `pm2 restart all`
+# Slice 120-123 Tasks: EVM-Only Cleanup + Contract Closeout (2026-03-03)
+
+Active slice context: `Slice 120 -> Slice 123`.
+
+## 1) Slice 120 active-path cleanup
+- [ ] Remove Hedera installer/bootstrap logic from `apps/network-web/src/app/skill-install.sh/route.ts`.
+- [ ] Remove Hedera-specific runtime branches from `apps/agent-runtime/xclaw_agent/cli.py`.
+- [ ] Remove Hedera-specific liquidity snapshot/indexer behavior.
+- [ ] Remove Hedera dashboard color mappings.
+
+## 2) Slice 121 contract/docs canonicalization
+- [ ] Add canonical generic trade/liquidity routes to `docs/api/openapi.v1.yaml`.
+- [ ] Update provider metadata fields to `router_adapter|quote_only|none` and generic `routeKind` / `liquidityOperation`.
+- [ ] Update source-of-truth, wallet contract, and context pack to EVM-only wording.
+
+## 3) Slice 122-123 harness/tests/skill cleanup
+- [ ] Remove Hedera from wallet approval chain matrix and harness assumptions.
+- [ ] Remove `uniswap_proxy_not_configured` expectations from harness/tests.
+- [ ] Update skill docs to describe EVM-only wallet/runtime behavior.
+- [ ] Switch infra contract-test defaults to an active EVM test chain.
+
+## 4) Validation
+- [ ] `npm run db:parity`
+- [ ] `npm run seed:reset`
+- [ ] `npm run seed:load`
+- [ ] `npm run seed:verify`
+- [ ] task-specific Python/unit checks for touched files
+- [ ] `npm run build`
+- [ ] `pm2 restart all`

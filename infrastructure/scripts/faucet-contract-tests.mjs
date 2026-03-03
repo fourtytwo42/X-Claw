@@ -8,7 +8,7 @@ const AGENT_ID = process.env.XCLAW_E2E_AGENT_ID || '';
 const AGENT_API_KEY = process.env.XCLAW_E2E_AGENT_API_KEY || '';
 const SELF_AGENT_ID = process.env.XCLAW_E2E_SELF_FAUCET_AGENT_ID || '';
 const SELF_AGENT_API_KEY = process.env.XCLAW_E2E_SELF_FAUCET_AGENT_API_KEY || '';
-const CHAIN_KEY = process.env.XCLAW_E2E_CHAIN_KEY || 'hedera_testnet';
+const CHAIN_KEY = process.env.XCLAW_E2E_CHAIN_KEY || 'base_sepolia';
 
 const state = { passed: 0, failed: 0, checks: [] };
 
@@ -98,10 +98,10 @@ async function main() {
       routePath: '/agent/faucet/networks',
     });
     expect(nonDemoNetworks.status === 200, 'non_demo_networks_status_200', nonDemoNetworks);
-    const hederaNetwork = Array.isArray(nonDemoNetworks.body?.networks)
+    const configuredNetwork = Array.isArray(nonDemoNetworks.body?.networks)
       ? nonDemoNetworks.body.networks.find((entry) => entry?.chainKey === CHAIN_KEY)
       : null;
-    expect(Boolean(hederaNetwork), 'hedera_network_present', { chainKey: CHAIN_KEY });
+    expect(Boolean(configuredNetwork), 'configured_network_present', { chainKey: CHAIN_KEY });
 
     const nonDemoFaucet = await requestAgent({
       agentId: AGENT_ID,

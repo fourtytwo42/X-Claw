@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-"""Slice 117 chain-matrix runner for wallet approval harness.
+"""Slice 120 chain-matrix runner for wallet approval harness.
 
 Execution order is strict:
 1) hardhat_local (smoke)
 2) base_sepolia (full)
 3) ethereum_sepolia (full)
-4) hedera_testnet (full)
 """
 
 from __future__ import annotations
@@ -19,7 +18,7 @@ import sys
 import time
 from typing import Any
 
-CHAIN_ORDER = ["hardhat_local", "base_sepolia", "ethereum_sepolia", "hedera_testnet"]
+CHAIN_ORDER = ["hardhat_local", "base_sepolia", "ethereum_sepolia"]
 
 
 def _now_iso() -> str:
@@ -130,12 +129,10 @@ def main(argv: list[str] | None = None) -> int:
     hardhat_report = reports_dir / "xclaw-slice117-hardhat-smoke.json"
     base_report = reports_dir / "xclaw-slice117-base-full.json"
     eth_report = reports_dir / "xclaw-slice117-ethereum-sepolia-full.json"
-    hedera_report = reports_dir / "xclaw-slice117-hedera-testnet-full.json"
     report_map = {
         "hardhat_local": hardhat_report,
         "base_sepolia": base_report,
         "ethereum_sepolia": eth_report,
-        "hedera_testnet": hedera_report,
     }
 
     steps: list[dict[str, Any]] = []

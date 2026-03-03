@@ -2564,3 +2564,30 @@ DoD:
 - [x] active server execution path does not require `XCLAW_UNISWAP_API_KEY`.
 - [x] chain configs include canonical `execution.trade` / `execution.liquidity`.
 - [~] remaining installer/docs/runtime-test Hedera references removed.
+## Slice 120: Active Path Hedera Cleanup
+
+Status: in progress
+
+- Goal: remove remaining Hedera references from active installer/runtime/web paths after Slice 119 EVM-only execution refactor.
+- Supersedes active-path remnants left behind by Slices 92, 95, 100, 102, 103, 104, 105, 106, 109, 110, 113, and 114.
+- DoD:
+  - no Hedera refs remain in active installer/runtime/web files touched by this slice,
+  - build stays green.
+
+## Slice 121: Canonical Contract Closeout
+
+Status: in progress
+
+- Goal: make OpenAPI and canonical docs reflect the generic EVM router-adapter model and mark `/uniswap/*` as compatibility aliases only.
+
+## Slice 122: Harness/Test Realignment
+
+Status: in progress
+
+- Goal: remove Hedera and `uniswap_proxy_not_configured` assumptions from active harness/test defaults.
+
+## Slice 123: Skill/Reference Cleanup
+
+Status: in progress
+
+- Goal: align operator-facing skill docs and infra defaults to the EVM-only runtime surface.

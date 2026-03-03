@@ -51,13 +51,13 @@ class WalletApprovalChainMatrixTests(unittest.TestCase):
             with mock.patch.object(runner_mod.subprocess, "run", side_effect=fake_run):
                 rc = runner_mod.main(self._argv(tmpdir))
             self.assertEqual(rc, 0)
-            self.assertEqual(chains, ["hardhat_local", "base_sepolia", "ethereum_sepolia", "hedera_testnet"])
+            self.assertEqual(chains, ["hardhat_local", "base_sepolia", "ethereum_sepolia"])
 
             matrix = json.loads(pathlib.Path(tmpdir, "matrix.json").read_text(encoding="utf-8"))
             self.assertTrue(matrix.get("ok"))
             self.assertEqual(
                 [s.get("chain") for s in matrix.get("steps", [])],
-                ["hardhat_local", "base_sepolia", "ethereum_sepolia", "hedera_testnet"],
+                ["hardhat_local", "base_sepolia", "ethereum_sepolia"],
             )
 
     def test_stops_on_first_failure(self) -> None:
@@ -88,18 +88,18 @@ class WalletApprovalChainMatrixTests(unittest.TestCase):
             self.assertEqual(matrix.get("failedAt"), "base_sepolia")
             self.assertEqual(len(matrix.get("steps", [])), 2)
 
-    def test_can_resume_from_hedera(self) -> None:
+    def test_can_resume_from_ethereum_sepolia(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             pathlib.Path(tmpdir, "bootstrap.json").write_text(json.dumps({"token": "t"}), encoding="utf-8")
             chains, fake_run = self._mock_subprocess()
-            argv = self._argv(tmpdir) + ["--start-chain", "hedera_testnet"]
+            argv = self._argv(tmpdir) + ["--start-chain", "ethereum_sepolia"]
             with mock.patch.object(runner_mod.subprocess, "run", side_effect=fake_run):
                 rc = runner_mod.main(argv)
             self.assertEqual(rc, 0)
-            self.assertEqual(chains, ["hedera_testnet"])
+            self.assertEqual(chains, ["ethereum_sepolia"])
             matrix = json.loads(pathlib.Path(tmpdir, "matrix.json").read_text(encoding="utf-8"))
             self.assertTrue(matrix.get("ok"))
-            self.assertEqual([s.get("chain") for s in matrix.get("steps", [])], ["hedera_testnet"])
+            self.assertEqual([s.get("chain") for s in matrix.get("steps", [])], ["ethereum_sepolia"])
 
 
 if __name__ == "__main__":

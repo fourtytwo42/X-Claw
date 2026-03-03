@@ -3662,3 +3662,47 @@ Ensure runtime never reports queued transfer approvals that are invisible in web
 4. Compatibility constraints:
 - explicit `uniswap_v2` / `uniswap_v3` behavior remains unchanged.
 - unsupported dex values must remain fail-closed (`unsupported_liquidity_adapter`).
+# Slice 120-123 Spec: EVM-Only Cleanup + Contract Closeout (2026-03-03)
+
+## Goal
+1. Remove the remaining Hedera and server-side Uniswap proxy assumptions from active installer/runtime/web codepaths.
+2. Align canonical docs/contracts with the generic EVM router-adapter model.
+3. Realign tests, harnesses, infra scripts, and skill docs to the EVM-only product surface.
+
+## Non-goals
+1. No non-EVM support.
+2. No new aggregator dependencies.
+3. No removal of compatibility `/uniswap/*` routes in this slice.
+
+## Locked scope
+1. `apps/network-web/src/app/skill-install.sh/route.ts`
+2. `apps/agent-runtime/xclaw_agent/cli.py`
+3. `apps/network-web/src/lib/liquidity-indexer.ts`
+4. `apps/network-web/src/app/dashboard/page.tsx`
+5. `docs/api/openapi.v1.yaml`
+6. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+7. `docs/api/WALLET_COMMAND_CONTRACT.md`
+8. `docs/CONTEXT_PACK.md`
+9. `apps/agent-runtime/scripts/wallet_approval_chain_matrix.py`
+10. `apps/agent-runtime/scripts/wallet_approval_harness.py`
+11. `apps/agent-runtime/tests/test_wallet_approval_chain_matrix.py`
+12. `apps/agent-runtime/tests/test_wallet_approval_harness.py`
+13. `skills/xclaw-agent/SKILL.md`
+14. `skills/xclaw-agent/references/commands.md`
+15. `infrastructure/scripts/faucet-contract-tests.mjs`
+16. `infrastructure/scripts/tokens-mirror-contract-tests.mjs`
+17. `spec.md`
+18. `tasks.md`
+19. `acceptance.md`
+
+## Acceptance checks
+- active-path grep shows no Hedera refs in installer/runtime/web files touched by this slice
+- canonical OpenAPI/docs describe generic EVM routes/metadata and compatibility aliases
+- harness/skill/infra defaults no longer assume Hedera or `XCLAW_UNISWAP_API_KEY`
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- task-specific Python/unit checks for touched files
+- `npm run build`
+- `pm2 restart all`
