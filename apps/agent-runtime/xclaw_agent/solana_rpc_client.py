@@ -36,26 +36,12 @@ def _resolve_env(prefix: str, chain_key: str) -> str:
 
 
 def _provider_for_chain(chain_key: str) -> str:
-    provider = _resolve_env("XCLAW_SOLANA_RPC_PROVIDER", chain_key).lower()
-    if provider in {"tatum", "standard"}:
-        return provider
+    # Public/direct RPC remains primary. Paid/provider fallback is server-proxied.
     return "standard"
 
 
 def _headers_for_chain(chain_key: str, provider: str) -> dict[str, str]:
-    headers: dict[str, str] = {"content-type": "application/json"}
-    if provider != "tatum":
-        return headers
-    api_key = _resolve_env("XCLAW_SOLANA_RPC_API_KEY", chain_key)
-    if not api_key:
-        raise SolanaRpcClientError(
-            "chain_config_invalid",
-            "Tatum Solana RPC provider requires API key.",
-            {"chain": chain_key, "missingEnv": f"XCLAW_SOLANA_RPC_API_KEY_{_env_suffix(chain_key)}"},
-        )
-    headers["x-api-key"] = api_key
-    headers["accept"] = "application/json"
-    return headers
+    return {"content-type": "application/json"}
 
 
 def rpc_candidates(chain_key: str) -> list[str]:
@@ -92,7 +78,14 @@ def select_rpc_endpoint(chain_key: str) -> SolanaRpcRequest:
     headers = _headers_for_chain(chain_key, provider)
     for endpoint in rpc_candidates(chain_key):
         try:
-            rpc_post("getLatestBlockhash", [{"commitment": "confirmed"}], chain_key=chain_key, rpc_url=endpoint, timeout_sec=2.5)
+            rpc_post(
+                "getLatestBlockhash",
+                [{"commitment": "confirmed"}],
+                chain_key=chain_key,
+                rpc_url=endpoint,
+                timeout_sec=2.5,
+                allow_proxy_fallback=False,
+            )
             return SolanaRpcRequest(endpoint=endpoint, headers=headers, provider=provider)
         except SolanaRpcClientError:
             continue
@@ -111,6 +104,7 @@ def rpc_post(
     chain_key: str | None = None,
     rpc_url: str | None = None,
     timeout_sec: float = 20.0,
+    allow_proxy_fallback: bool = True,
 ) -> Any:
     selected_chain = str(chain_key or "").strip()
     if rpc_url:
@@ -163,6 +157,82 @@ def rpc_post(
             continue
         return parsed["result"]
 
+    # Server-side paid fallback: keeps provider API keys off skill/openclaw runtime hosts.
+    if allow_proxy_fallback and selected_chain:
+        try:
+            return _rpc_post_via_server_proxy(selected_chain, method, params, timeout_sec=timeout_sec)
+        except SolanaRpcClientError as exc:
+            last_error = exc
+
     if last_error:
         raise last_error
     raise SolanaRpcClientError("rpc_unavailable", f"Solana RPC {method} failed.", {"method": method})
+
+
+def _rpc_post_via_server_proxy(chain_key: str, method: str, params: list[Any], *, timeout_sec: float) -> Any:
+    base_url = str(os.getenv("XCLAW_API_BASE_URL", "") or "").strip().rstrip("/")
+    api_key = str(os.getenv("XCLAW_AGENT_API_KEY", "") or "").strip()
+    if not base_url or not api_key:
+        raise SolanaRpcClientError(
+            "rpc_unavailable",
+            "Server-side Solana RPC fallback is unavailable (missing API context).",
+            {"chain": chain_key, "missingEnv": ["XCLAW_API_BASE_URL", "XCLAW_AGENT_API_KEY"]},
+        )
+
+    url = f"{base_url}/agent/solana/rpc"
+    payload = json.dumps(
+        {"schemaVersion": 1, "chainKey": chain_key, "method": method, "params": params},
+        separators=(",", ":"),
+    ).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=payload,
+        headers={
+            "content-type": "application/json",
+            "authorization": f"Bearer {api_key}",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
+            parsed = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        raw = exc.read().decode("utf-8", errors="replace")
+        parsed: dict[str, Any] = {}
+        try:
+            payload_json = json.loads(raw or "{}")
+            if isinstance(payload_json, dict):
+                parsed = payload_json
+        except Exception:
+            parsed = {}
+        raise SolanaRpcClientError(
+            str(parsed.get("code") or "rpc_unavailable"),
+            str(parsed.get("message") or f"Solana fallback proxy returned HTTP {exc.code}."),
+            {
+                "chain": chain_key,
+                "method": method,
+                "status": int(exc.code),
+                "provider": "tatum_fallback",
+                "details": parsed.get("details"),
+            },
+        ) from exc
+    except Exception as exc:
+        raise SolanaRpcClientError(
+            "rpc_unavailable",
+            "Solana fallback proxy request failed.",
+            {"chain": chain_key, "method": method, "provider": "tatum_fallback", "error": str(exc)},
+        ) from exc
+
+    if not isinstance(parsed, dict) or parsed.get("ok") is not True:
+        raise SolanaRpcClientError(
+            "rpc_unavailable",
+            "Solana fallback proxy returned malformed payload.",
+            {"chain": chain_key, "method": method, "provider": "tatum_fallback"},
+        )
+    if "result" not in parsed:
+        raise SolanaRpcClientError(
+            "rpc_unavailable",
+            "Solana fallback proxy response missing result.",
+            {"chain": chain_key, "method": method, "provider": "tatum_fallback"},
+        )
+    return parsed.get("result")

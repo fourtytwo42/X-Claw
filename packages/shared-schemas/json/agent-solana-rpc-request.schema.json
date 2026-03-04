@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.xclaw.trade/agent-solana-rpc-request.schema.json",
+  "title": "AgentSolanaRpcRequest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "chainKey", "method", "params"],
+  "properties": {
+    "schemaVersion": { "type": "integer", "const": 1 },
+    "chainKey": { "type": "string", "minLength": 1 },
+    "method": {
+      "type": "string",
+      "enum": [
+        "getLatestBlockhash",
+        "getBalance",
+        "getTokenAccountsByOwner",
+        "getSignatureStatuses",
+        "sendTransaction",
+        "getTokenSupply",
+        "getAccountInfo"
+      ]
+    },
+    "params": {
+      "type": "array"
+    }
+  }
+}

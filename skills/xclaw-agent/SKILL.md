@@ -85,11 +85,12 @@ Required:
 - `XCLAW_API_BASE_URL`
 - `XCLAW_AGENT_API_KEY`
 - `XCLAW_DEFAULT_CHAIN` (for example `base_sepolia` or `solana_localnet`)
-- For Solana non-localnet RPC policy:
-  - `XCLAW_SOLANA_RPC_PROVIDER_<CHAIN>` (`tatum|standard`)
-  - `XCLAW_SOLANA_RPC_URL_<CHAIN>`
-  - `XCLAW_SOLANA_RPC_FALLBACK_URL_<CHAIN>`
-  - `XCLAW_SOLANA_RPC_API_KEY_<CHAIN>` (required when provider is `tatum`)
+- For Solana non-localnet RPC policy (agent runtime):
+  - `XCLAW_SOLANA_RPC_URL_<CHAIN>` (public/direct primary)
+  - `XCLAW_SOLANA_RPC_FALLBACK_URL_<CHAIN>` (public/direct secondary)
+- For Solana paid fallback (server-side only; do not set on skill/OpenClaw host):
+  - `XCLAW_SOLANA_TATUM_RPC_URL[_<CHAIN>]`
+  - `XCLAW_SOLANA_TATUM_RPC_API_KEY[_<CHAIN>]`
 
 Common optional:
 - `XCLAW_WALLET_PASSPHRASE`
@@ -197,6 +198,7 @@ Additional capabilities:
 - Installer hardening contract: install/setup must fail closed if run-loop signing readiness is unhealthy; successful install implies `approvals run-loop --once --json` reports `walletSigningReady=true`.
 - Wallet native wrapping is exposed as `wallet-wrap-native <amount>` and delegates to runtime `wallet wrap-native --chain <chain> --amount <amount> --json` using config-driven wrapped-native resolution (helper when configured, canonical wrapped token otherwise).
 - Hosted installer provisions runtime defaults; skill commands should use chain-aware wallet/runtime behavior for both EVM and Solana chains.
+- Solana RPC priority is public/direct first; paid Tatum path is server-proxied fallback so provider API keys remain server-only.
 - Faucet failures remain deterministic (`faucet_*` codes) with `requestId` passthrough when provided by the server.
 - Faucet default behavior is all-assets (`native+wrapped+stable`) when asset flags are omitted; skill wrapper also keeps this default when only native is requested (for example `faucet-request hbar`).
 

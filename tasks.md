@@ -1,3 +1,15 @@
+# Slice 206-208 Tasks: Solana RPC Fallback Hardening (2026-03-04)
+
+- [x] Add additive agent-auth fallback route `POST /api/v1/agent/solana/rpc` with allowlisted methods.
+- [x] Move paid fallback credentials to server-only env contract (`XCLAW_SOLANA_TATUM_RPC_URL/API_KEY`).
+- [x] Update runtime Solana RPC client to use direct public endpoints first and proxy fallback second.
+- [x] Add runtime unit tests for proxy fallback behavior and direct-only failure path.
+- [x] Update OpenAPI + shared schema for agent fallback route.
+- [x] Update skill docs to remove Tatum API key requirement from agent/OpenClaw runtime env.
+- [x] Extend contract script coverage for new fallback route/schema artifacts.
+- [x] Run sequential validations + grep proofs.
+- [ ] Post issue evidence (mapped issue linkage).
+
 # Slice 201-205 Tasks: Skill Parity Closeout for Withdraw Queue/Status (2026-03-04)
 
 - [x] Add additive agent-auth route `GET /api/v1/agent/withdraws` (chain-scoped withdraw queue/history).

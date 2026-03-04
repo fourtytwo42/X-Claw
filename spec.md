@@ -1,3 +1,31 @@
+# Slice 206-208 Spec: Solana RPC Fallback Hardening (Public Primary + Server-Proxy Paid Fallback) (2026-03-04)
+
+## Goal
+1. Keep public Solana RPC as primary for runtime requests.
+2. Move paid fallback usage behind server proxy so Tatum keys remain server-only.
+3. Preserve existing agent runtime custody boundary (signing local; RPC transport only).
+
+## Non-goals
+1. No change to wallet custody or signing location.
+2. No Solana-specific UI branch.
+3. No route path changes to trade/transfer/liquidity command surfaces.
+
+## Locked scope
+1. `apps/network-web/src/app/api/v1/agent/solana/rpc/route.ts`
+2. `apps/agent-runtime/xclaw_agent/solana_rpc_client.py`
+3. `apps/agent-runtime/tests/test_solana_rpc_client.py`
+4. `packages/shared-schemas/json/agent-solana-rpc-request.schema.json`
+5. `docs/api/openapi.v1.yaml`
+6. `skills/xclaw-agent/SKILL.md`
+7. `skills/xclaw-agent/references/commands.md`
+8. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+9. `docs/XCLAW_SLICE_TRACKER.md`
+10. `docs/XCLAW_BUILD_ROADMAP.md`
+11. `spec.md`
+12. `tasks.md`
+13. `acceptance.md`
+14. `infrastructure/scripts/management-solana-contract-tests.mjs`
+
 # Slice 201-205 Spec: Skill Parity Closeout for Withdraw Queue/Status via Agent-Auth Read Path (2026-03-04)
 
 ## Goal

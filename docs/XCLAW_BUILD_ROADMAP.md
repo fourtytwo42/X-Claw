@@ -11,6 +11,14 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 
 ---
 
+## 0.17) Slice 206-208 Solana RPC Fallback Hardening
+
+- [~] Add additive agent-auth Solana RPC fallback route (`POST /api/v1/agent/solana/rpc`) for server-side paid provider use.
+- [~] Keep runtime RPC priority as public/direct first, server-proxied paid fallback second.
+- [~] Remove paid provider API key requirements from skill/OpenClaw env contract.
+- [~] Sync OpenAPI + shared schema for fallback route request contract.
+- [ ] Sequential validation + PM2 restart + issue evidence capture.
+
 ## 0.16) Slice 201-205 Skill Parity Closeout for Withdraw Queue/Status
 
 - [~] Add additive agent-auth withdraw read route (`GET /api/v1/agent/withdraws`) with chain-scoped queue/history contract.

@@ -1,3 +1,37 @@
+# Slice 206-208 Acceptance Evidence: Solana RPC Fallback Hardening
+
+Date (UTC): 2026-03-04  
+Active slice context: `Slice 206 -> Slice 208`.
+
+### Objective + Scope Lock
+- Objective:
+  - keep public Solana RPC as runtime primary,
+  - move paid fallback through server proxy so API keys stay server-only.
+
+### Behavior Checks
+- [x] additive route exists: `POST /api/v1/agent/solana/rpc`.
+- [x] runtime Solana RPC client attempts direct candidates first, then proxy fallback.
+- [x] skill docs no longer require Tatum API key env on agent/OpenClaw host.
+- [x] OpenAPI + schema contract include fallback route request/response.
+
+### Required Validation Gates
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_solana_rpc_client.py -v` -> PASS (`Ran 4 tests`, `OK`)
+- [x] `npm run test:management:solana:contract` -> PASS (`ok: true`, `passed: 21`, `failed: 0`)
+- [x] `npm run db:parity` -> PASS (`ok: true`)
+- [x] `npm run seed:reset` -> PASS
+- [x] `npm run seed:load` -> PASS
+- [x] `npm run seed:verify` -> PASS
+- [x] `npm run build` -> PASS
+- [x] `pm2 restart all` -> PASS (`xclaw-web online`)
+
+### Required Grep Proofs
+- [x] no Tatum API key env requirement remains in skill docs.
+  - `rg -n "XCLAW_SOLANA_RPC_API_KEY_<CHAIN>|XCLAW_SOLANA_RPC_PROVIDER_<CHAIN>" skills/xclaw-agent/SKILL.md skills/xclaw-agent/references/commands.md` -> no matches
+- [x] runtime Solana RPC fallback path references server proxy route.
+  - `solana_rpc_client.py` includes `_rpc_post_via_server_proxy(...)` and URL `${XCLAW_API_BASE_URL}/agent/solana/rpc`
+- [x] new server fallback route uses allowlisted methods only.
+  - `apps/network-web/src/app/api/v1/agent/solana/rpc/route.ts` defines `ALLOWED_METHODS` and validates `method` against it.
+
 # Slice 201-205 Acceptance Evidence: Skill Parity Closeout for Withdraw Queue/Status
 
 Date (UTC): 2026-03-04  

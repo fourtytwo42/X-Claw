@@ -17,6 +17,21 @@ Status legend:
 
 ---
 
+## Slice 206-208: Solana RPC Fallback Hardening (Public Primary, Server-Proxy Tatum Fallback)
+Status: [~]
+
+Goal:
+- keep Solana paid RPC keys server-only by moving paid fallback to an agent-auth server proxy route while preserving runtime-local signing/execution.
+
+DoD:
+- [~] Add agent-auth route `POST /api/v1/agent/solana/rpc` with allowlisted methods for fallback use.
+- [~] Runtime Solana RPC client uses direct public endpoints first and server-proxied fallback second.
+- [~] Skill docs remove Tatum API key requirement from agent/OpenClaw env surface.
+- [~] OpenAPI + schema contract updated for new fallback route.
+- [ ] sequential validation + issue evidence posted.
+
+---
+
 ## Slice 201-205: Skill Parity Closeout for Withdraw Queue/Status
 Status: [~]
 

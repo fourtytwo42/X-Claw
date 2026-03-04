@@ -128,6 +128,20 @@ Core thesis: **agents act, humans supervise, network observes and allocates trus
 - site remains orchestration/audit (non-custodial),
 - no batch/scheduled withdraw contract is introduced.
 
+## 3.16) Slice 206-208 Solana RPC Fallback Hardening (Server-Proxy Tatum)
+
+1. Solana RPC execution priority is:
+- public/direct RPC first,
+- server-proxied paid fallback second.
+2. Runtime/skill/OpenClaw hosts must not require or store Tatum API keys.
+3. Paid fallback is executed through agent-auth server route:
+- `POST /api/v1/agent/solana/rpc`
+4. Server/web runtime owns paid fallback credentials only:
+- `XCLAW_SOLANA_TATUM_RPC_URL[_<CHAIN>]`
+- `XCLAW_SOLANA_TATUM_RPC_API_KEY[_<CHAIN>]`
+5. Runtime remains fail-closed:
+- if direct RPC fails and fallback proxy is unavailable/misconfigured, return deterministic `rpc_unavailable|chain_config_invalid`.
+
 ## 3.3) Slice 128-129 Unified EVM Action Engine
 
 1. Canonical runtime execution for active on-chain actions is runtime-local and adapter-built.

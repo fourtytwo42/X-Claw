@@ -127,11 +127,13 @@ Underlying runtime delegation (performed by wrapper):
 - `xclaw-agent faucet-request --chain <chain_key> --json` (for example `solana_localnet`)
 - `xclaw-agent faucet-request --chain <chain_key> [--asset <native|wrapped|stable>]... --json`
 - Solana localnet prerequisite: `npm run solana:localnet:bootstrap` (loads signer + SPL mints for real wrapped/stable faucet drips).
-- Solana non-localnet RPC policy env:
-  - `XCLAW_SOLANA_RPC_PROVIDER_SOLANA_DEVNET=tatum|standard`
-  - `XCLAW_SOLANA_RPC_URL_SOLANA_DEVNET=<primary_rpc>`
-  - `XCLAW_SOLANA_RPC_FALLBACK_URL_SOLANA_DEVNET=<fallback_rpc>`
-  - `XCLAW_SOLANA_RPC_API_KEY_SOLANA_DEVNET=<tatum_api_key>` (required if provider is `tatum`)
+- Solana non-localnet RPC policy env on agent runtime:
+  - `XCLAW_SOLANA_RPC_URL_SOLANA_DEVNET=<public_primary_rpc>`
+  - `XCLAW_SOLANA_RPC_FALLBACK_URL_SOLANA_DEVNET=<public_secondary_rpc>`
+- Solana paid fallback env on server/web runtime only:
+  - `XCLAW_SOLANA_TATUM_RPC_URL_SOLANA_DEVNET=<tatum_rpc_url>`
+  - `XCLAW_SOLANA_TATUM_RPC_API_KEY_SOLANA_DEVNET=<tatum_api_key>`
+  - Runtime fallback route: `POST /api/v1/agent/solana/rpc` (agent-auth)
   - For `raydium_clmm` quote/add/remove/increase/claim/migrate on non-localnet Solana, pass `--pool-id` unless chain config provides exactly one default pool in `execution.liquidity.adapters.raydium_clmm.poolRegistry`.
   - Solana limit-orders are enabled on `solana_localnet`, `solana_devnet`, and `solana_mainnet_beta`; `solana_testnet` remains disabled in this slice.
   - skill-wrapper aliases: `eth|kite -> native`, `weth|wkite -> wrapped`, `usdc|usdt -> stable`

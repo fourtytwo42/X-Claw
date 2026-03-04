@@ -280,6 +280,30 @@ paths:
                 $ref: '#/components/schemas/AgentWithdrawsResponse'
         '401':
           $ref: '#/components/responses/ErrorResponse'
+  /api/v1/agent/solana/rpc:
+    post:
+      summary: Execute allowlisted Solana JSON-RPC methods via server-side Tatum fallback (agent-auth).
+      security:
+        - agentBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentSolanaRpcRequest'
+      responses:
+        '200':
+          description: Solana RPC result from server-side fallback provider.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentSolanaRpcResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '502':
+          $ref: '#/components/responses/ErrorResponse'
   /api/v1/agent/x402/outbound/proposed:
     post:
       summary: Mirror runtime-proposed outbound x402 payment intent (agent-auth).
@@ -3864,6 +3888,37 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ManagementWithdrawItem'
+    AgentSolanaRpcRequest:
+      type: object
+      required: [schemaVersion, chainKey, method, params]
+      properties:
+        schemaVersion:
+          type: integer
+          enum: [1]
+        chainKey:
+          type: string
+        method:
+          type: string
+          enum: [getLatestBlockhash, getBalance, getTokenAccountsByOwner, getSignatureStatuses, sendTransaction, getTokenSupply, getAccountInfo]
+        params:
+          type: array
+          items: {}
+    AgentSolanaRpcResponse:
+      type: object
+      required: [ok, chainKey, method, providerUsed, result]
+      properties:
+        ok:
+          type: boolean
+          const: true
+        chainKey:
+          type: string
+        method:
+          type: string
+        providerUsed:
+          type: string
+          enum: [tatum_fallback]
+        result:
+          nullable: true
     AgentX402OutboundProposedRequest:
       type: object
       required: [schemaVersion, paymentId, approvalId, networkKey, facilitatorKey, status, assetKind, amountAtomic, url, createdAt, updatedAt]

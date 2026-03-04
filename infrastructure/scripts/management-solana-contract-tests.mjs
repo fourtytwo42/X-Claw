@@ -67,6 +67,16 @@ async function main() {
   expect(agentWithdrawsSchema?.required?.includes('queue'), 'agent_withdraws_schema_queue_required');
   expect(agentWithdrawsSchema?.required?.includes('history'), 'agent_withdraws_schema_history_required');
 
+  const solanaRpcRoute = readText('apps/network-web/src/app/api/v1/agent/solana/rpc/route.ts');
+  expect(solanaRpcRoute.includes('ALLOWED_METHODS'), 'agent_solana_rpc_route_allowlist_present');
+  expect(solanaRpcRoute.includes('XCLAW_SOLANA_TATUM_RPC_API_KEY'), 'agent_solana_rpc_route_server_key_env');
+
+  const solanaRpcSchema = readJson('packages/shared-schemas/json/agent-solana-rpc-request.schema.json');
+  expect(Array.isArray(solanaRpcSchema?.properties?.method?.enum), 'agent_solana_rpc_schema_method_enum');
+
+  const skillDoc = readText('skills/xclaw-agent/SKILL.md');
+  expect(!skillDoc.includes('XCLAW_SOLANA_RPC_API_KEY_<CHAIN>'), 'skill_doc_no_agent_tatum_key_requirement');
+
   const ok = state.failed === 0;
   console.log(JSON.stringify({ ok, passed: state.passed, failed: state.failed, checks: state.checks }, null, 2));
   if (!ok) {
