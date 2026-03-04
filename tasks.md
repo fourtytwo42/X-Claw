@@ -1,23 +1,20 @@
-# Slice 128 Tasks: Unified EVM Action Engine (Phase 1) (2026-03-04)
+# Slice 129 Tasks: Unified Advanced LP Execution (2026-03-04)
 
-Active slice context: `Slice 128`.
+Active slice context: `Slice 129`.
 
 ## 1) Scope lock
-- [x] Limit scope to phase-1 unified local execution for spot swaps and AMM v2 liquidity add/remove.
-- [x] Preserve `/uniswap/*` and advanced LP compatibility paths.
+- [x] Limit scope to advanced concentrated-liquidity execution unification plus config/runtime cleanup.
+- [x] Preserve `/uniswap/*` HTTP compatibility aliases.
 
 ## 2) Implementation
-- [x] Add shared action-plan contracts and `EvmActionExecutor`.
-- [x] Add AMM v2 trade adapter planner and AMM v2 liquidity add/remove planners.
-- [x] Rewire `trade spot` and `trade execute` to local adapter-built execution.
-- [x] Rewire AMM v2 `liquidity add` / `liquidity remove` to the shared executor.
-- [x] Normalize phase-1 runtime provider metadata to `router_adapter`.
-- [x] Remove stale `tradeProviders` / `liquidityProviders` from active chain configs.
-- [x] Add executor-focused regression coverage and update touched trade/liquidity tests.
+- [x] Replace the concentrated-liquidity planner stub with `position_manager_v3` local plan builders.
+- [x] Rewire `liquidity increase`, `liquidity claim-fees`, `liquidity claim-rewards`, and `liquidity migrate` to local adapter-built execution.
+- [x] Remove `_execute_uniswap_liquidity_intent` and remaining active LP proxy branches from `cli.py`.
+- [x] Remove active runtime reads of `tradeOperations`, `liquidityOperations`, and `uniswapApi`.
+- [x] Update active chain configs to express concentrated-liquidity support via `execution.liquidity.adapters.*`.
+- [x] Add regression coverage for local advanced-LP planning and fail-closed config errors.
 
 ## 3) Validation
-- [x] `python3 -m unittest apps/agent-runtime/tests/test_evm_action_executor.py -v`
-- [x] `python3 -m unittest apps/agent-runtime/tests/test_dex_adapter.py -v`
 - [x] `python3 -m unittest apps/agent-runtime/tests/test_liquidity_adapter.py -v`
 - [x] `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v`
 - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`

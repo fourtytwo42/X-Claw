@@ -26,7 +26,7 @@ class LiquidityAdapterTests(unittest.TestCase):
     def test_build_selects_v3_adapter(self) -> None:
         adapter = build_liquidity_adapter("base_sepolia", "uniswap_v3", "amm_v3", position_type="v3")
         self.assertIsInstance(adapter, AmmV3LiquidityAdapter)
-        self.assertEqual(adapter.position_type, "v3")
+        self.assertEqual(adapter.protocol_family, "position_manager_v3")
 
     def test_build_rejects_unknown_family(self) -> None:
         with self.assertRaises(UnsupportedLiquidityAdapter):
@@ -40,7 +40,7 @@ class LiquidityAdapterTests(unittest.TestCase):
     def test_resolve_v3_without_explicit_dex(self) -> None:
         adapter = build_liquidity_adapter_for_request("base_sepolia", "", "v3")
         self.assertIsInstance(adapter, AmmV3LiquidityAdapter)
-        self.assertEqual(adapter.protocol_family, "amm_v3")
+        self.assertEqual(adapter.protocol_family, "position_manager_v3")
 
     def test_resolve_rejects_v3_on_v2_only_adapter(self) -> None:
         with self.assertRaises(UnsupportedLiquidityAdapter):
@@ -69,6 +69,69 @@ class LiquidityAdapterTests(unittest.TestCase):
         adapter = AmmV2LiquidityAdapter(chain="base_sepolia", dex="aerodrome", protocol_family="amm_v2", position_type="v2")
         with self.assertRaises(UnsupportedLiquidityOperation):
             adapter.claim_fees({"positionId": "pos_1"})
+
+    def test_v3_build_increase_plan_uses_position_manager_family(self) -> None:
+        adapter = AmmV3LiquidityAdapter(
+            chain="ethereum_sepolia",
+            dex="uniswap_v3",
+            protocol_family="position_manager_v3",
+            position_type="v3",
+            position_manager="0x" + "44" * 20,
+            capabilities={"increase": True},
+            operations={"increase": {"method": "increaseLiquidity"}},
+        )
+        plan = adapter.build_increase_plan(
+            {
+                "positionId": "123",
+                "tokenA": "0x" + "11" * 20,
+                "tokenB": "0x" + "22" * 20,
+                "amountAUnits": "100",
+                "amountBUnits": "200",
+                "minAmountAUnits": "99",
+                "minAmountBUnits": "198",
+                "deadline": "123456",
+            },
+            "0x" + "33" * 20,
+            build_calldata=lambda signature, args: f"{signature}:{args[0]}",
+        )
+        self.assertEqual(plan.execution_family, "position_manager_v3")
+        self.assertEqual(plan.execution_adapter, "uniswap_v3")
+        self.assertEqual(plan.route_kind, "position_manager")
+        self.assertEqual(len(plan.approvals), 2)
+
+    def test_v3_claim_rewards_requires_reward_contracts(self) -> None:
+        adapter = AmmV3LiquidityAdapter(
+            chain="ethereum_sepolia",
+            dex="uniswap_v3",
+            protocol_family="position_manager_v3",
+            position_type="v3",
+            position_manager="0x" + "44" * 20,
+            capabilities={"claimRewards": True},
+            operations={"claimRewards": {"method": "claimRewards(uint256,address[])", "rewardContracts": []}},
+        )
+        with self.assertRaises(ValueError):
+            adapter.build_claim_rewards_plan(
+                {"positionId": "123"},
+                "0x" + "33" * 20,
+                build_calldata=lambda signature, args: f"{signature}:{args}",
+            )
+
+    def test_v3_migrate_requires_target_or_calls(self) -> None:
+        adapter = AmmV3LiquidityAdapter(
+            chain="ethereum_sepolia",
+            dex="uniswap_v3",
+            protocol_family="position_manager_v3",
+            position_type="v3",
+            position_manager="0x" + "44" * 20,
+            capabilities={"migrate": True},
+            operations={"migrate": {"method": "multicall", "targetAdapterKey": "uniswap_v3"}},
+        )
+        with self.assertRaises(ValueError):
+            adapter.build_migrate_plan(
+                {"positionId": "123"},
+                "0x" + "33" * 20,
+                build_calldata=lambda signature, args: f"{signature}:{args}",
+            )
 
 
 if __name__ == "__main__":

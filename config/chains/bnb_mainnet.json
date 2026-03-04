@@ -36,15 +36,6 @@
     "faucet": false,
     "deposits": false
   },
-  "uniswapApi": {
-    "enabled": true,
-    "liquidityEnabled": true,
-    "migrateEnabled": true,
-    "claimRewardsEnabled": true
-  },
-  "marketData": {
-    "dexscreenerChainId": "bsc"
-  },
   "updatedAt": "2026-02-20T23:55:00.000Z",
   "version": 1,
   "sources": {
@@ -66,21 +57,6 @@
       "router.factory() 0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24 -> 0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6",
       "eth_chainId https://bsc-dataseed.binance.org -> expected 0x38"
     ]
-  },
-  "liquidityOperations": {
-    "claimFees": {
-      "legacyEnabled": false,
-      "adapter": "none"
-    },
-    "claimRewards": {
-      "legacyEnabled": false,
-      "adapter": "none",
-      "rewardContracts": []
-    }
-  },
-  "tradeOperations": {
-    "legacyEnabled": true,
-    "adapter": "legacy_router"
   },
   "execution": {
     "trade": {

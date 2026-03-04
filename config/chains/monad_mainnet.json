@@ -35,15 +35,6 @@
     "faucet": false,
     "deposits": false
   },
-  "uniswapApi": {
-    "enabled": true,
-    "liquidityEnabled": true,
-    "migrateEnabled": true,
-    "claimRewardsEnabled": true
-  },
-  "marketData": {
-    "dexscreenerChainId": "monad"
-  },
   "updatedAt": "2026-02-20T23:55:00.000Z",
   "version": 1,
   "sources": {
@@ -65,21 +56,6 @@
       "router.factory() 0x4b2ab38dbf28d31d467aa8993f6c2585981d6804 -> 0x182a927119d56008d921126764bf884221b10f59",
       "eth_chainId https://monad.drpc.org -> expected 0x8f"
     ]
-  },
-  "liquidityOperations": {
-    "claimFees": {
-      "legacyEnabled": false,
-      "adapter": "none"
-    },
-    "claimRewards": {
-      "legacyEnabled": false,
-      "adapter": "none",
-      "rewardContracts": []
-    }
-  },
-  "tradeOperations": {
-    "legacyEnabled": true,
-    "adapter": "legacy_router"
   },
   "execution": {
     "trade": {

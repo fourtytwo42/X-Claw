@@ -77,21 +77,6 @@
       "router": true
     }
   },
-  "liquidityOperations": {
-    "claimFees": {
-      "legacyEnabled": false,
-      "adapter": "none"
-    },
-    "claimRewards": {
-      "legacyEnabled": false,
-      "adapter": "none",
-      "rewardContracts": []
-    }
-  },
-  "tradeOperations": {
-    "legacyEnabled": true,
-    "adapter": "tesseract_univ2"
-  },
   "execution": {
     "trade": {
       "defaultProvider": "router_adapter",
@@ -119,11 +104,20 @@
         },
         "tesseract_univ3": {
           "adapterKey": "tesseract_univ3",
-          "family": "amm_v3",
+          "family": "position_manager_v3",
           "router": "0x402f35e11cC6E89E80EFF4205956716aCd94be04",
           "factory": "0x147f235Dde1adcB00Ef8E2D10D98fEd9a091284D",
           "quoter": "",
-          "positionManager": ""
+          "positionManager": "",
+          "capabilities": {
+            "add": false,
+            "remove": false,
+            "increase": false,
+            "claimFees": false,
+            "claimRewards": false,
+            "migrate": false
+          },
+          "operations": {}
         }
       }
     }

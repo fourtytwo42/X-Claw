@@ -34,15 +34,6 @@
     "faucet": false,
     "deposits": false
   },
-  "uniswapApi": {
-    "enabled": true,
-    "liquidityEnabled": true,
-    "migrateEnabled": true,
-    "claimRewardsEnabled": true
-  },
-  "marketData": {
-    "dexscreenerChainId": "unichain"
-  },
   "updatedAt": "2026-02-20T23:55:00.000Z",
   "version": 1,
   "sources": {
@@ -64,21 +55,6 @@
       "eth_chainId https://unichain-rpc.publicnode.com -> expected 0x82",
       "router.factory() 0x284f11109359a7e1306c3e447ef14d38400063ff -> 0x1f98400000000000000000000000000000000002"
     ]
-  },
-  "liquidityOperations": {
-    "claimFees": {
-      "legacyEnabled": false,
-      "adapter": "none"
-    },
-    "claimRewards": {
-      "legacyEnabled": false,
-      "adapter": "none",
-      "rewardContracts": []
-    }
-  },
-  "tradeOperations": {
-    "legacyEnabled": true,
-    "adapter": "legacy_router"
   },
   "execution": {
     "trade": {

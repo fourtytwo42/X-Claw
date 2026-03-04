@@ -27,21 +27,6 @@
   },
   "updatedAt": "2026-02-20T00:00:00.000Z",
   "version": 1,
-  "liquidityOperations": {
-    "claimFees": {
-      "legacyEnabled": false,
-      "adapter": "none"
-    },
-    "claimRewards": {
-      "legacyEnabled": false,
-      "adapter": "none",
-      "rewardContracts": []
-    }
-  },
-  "tradeOperations": {
-    "legacyEnabled": false,
-    "adapter": "none"
-  },
   "execution": {
     "trade": {
       "defaultProvider": "router_adapter",

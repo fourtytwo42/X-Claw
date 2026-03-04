@@ -42,7 +42,7 @@
       },
       "additionalProperties": false
     },
-    "liquidityOperation": { "type": "string", "enum": ["approve", "create", "increase", "decrease", "claim", "migrate", "claim_rewards"] },
+    "liquidityOperation": { "type": "string", "enum": ["approve", "create", "add", "remove", "increase", "decrease", "claim_fees", "migrate", "claim_rewards"] },
     "executionFamily": { "type": "string", "maxLength": 64 },
     "executionAdapter": { "type": "string", "maxLength": 64 },
     "details": { "type": "object" }

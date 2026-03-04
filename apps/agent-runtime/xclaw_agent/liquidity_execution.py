@@ -32,6 +32,58 @@ def build_liquidity_remove_plan(
     return adapter.build_remove_plan(request, wallet_address, build_calldata=build_calldata)
 
 
+def build_liquidity_increase_plan(
+    *,
+    chain: str,
+    dex: str,
+    position_type: str,
+    request: dict[str, Any],
+    wallet_address: str,
+    build_calldata: Callable[[str, list[object]], str],
+):
+    adapter = build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type=position_type)
+    return adapter.build_increase_plan(request, wallet_address, build_calldata=build_calldata)
+
+
+def build_liquidity_claim_fees_plan(
+    *,
+    chain: str,
+    dex: str,
+    position_type: str,
+    request: dict[str, Any],
+    wallet_address: str,
+    build_calldata: Callable[[str, list[object]], str],
+):
+    adapter = build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type=position_type)
+    return adapter.build_claim_fees_plan(request, wallet_address, build_calldata=build_calldata)
+
+
+def build_liquidity_claim_rewards_plan(
+    *,
+    chain: str,
+    dex: str,
+    position_type: str,
+    request: dict[str, Any],
+    wallet_address: str,
+    build_calldata: Callable[[str, list[object]], str],
+):
+    adapter = build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type=position_type)
+    return adapter.build_claim_rewards_plan(request, wallet_address, build_calldata=build_calldata)
+
+
+def build_liquidity_migrate_plan(
+    *,
+    chain: str,
+    dex: str,
+    position_type: str,
+    request: dict[str, Any],
+    wallet_address: str,
+    build_calldata: Callable[[str, list[object]], str],
+):
+    adapter = build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type=position_type)
+    return adapter.build_migrate_plan(request, wallet_address, build_calldata=build_calldata)
+
+
 def execute_liquidity_plan(
     *,
     executor: EvmActionExecutor,

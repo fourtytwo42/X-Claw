@@ -45,12 +45,6 @@
       "enabled": true
     }
   },
-  "uniswapApi": {
-    "enabled": true,
-    "liquidityEnabled": true,
-    "migrateEnabled": true,
-    "claimRewardsEnabled": true
-  },
   "updatedAt": "2026-02-20T10:00:00.000Z",
   "version": 1,
   "sources": {
@@ -67,21 +61,6 @@
   },
   "marketData": {
     "dexscreenerChainId": "ethereum"
-  },
-  "liquidityOperations": {
-    "claimFees": {
-      "legacyEnabled": false,
-      "adapter": "none"
-    },
-    "claimRewards": {
-      "legacyEnabled": false,
-      "adapter": "none",
-      "rewardContracts": []
-    }
-  },
-  "tradeOperations": {
-    "legacyEnabled": true,
-    "adapter": "legacy_router"
   },
   "execution": {
     "trade": {
@@ -110,11 +89,41 @@
         },
         "uniswap_v3": {
           "adapterKey": "uniswap_v3",
-          "family": "amm_v3",
+          "family": "position_manager_v3",
           "router": "0xeE567Fe1712Faf6149d80dA1E6934E354124CfE3",
           "factory": "0xF62c03E08ada871A0bEb309762E260a7a6a880E6",
           "quoter": "",
-          "positionManager": ""
+          "positionManager": "0xeE567Fe1712Faf6149d80dA1E6934E354124CfE3",
+          "capabilities": {
+            "add": true,
+            "remove": true,
+            "increase": true,
+            "claimFees": true,
+            "claimRewards": false,
+            "migrate": true
+          },
+          "operations": {
+            "add": {
+              "method": "mint"
+            },
+            "increase": {
+              "method": "increaseLiquidity"
+            },
+            "decrease": {
+              "method": "decreaseLiquidity"
+            },
+            "claimFees": {
+              "method": "collect"
+            },
+            "claimRewards": {
+              "method": "claimRewards(uint256,address[])",
+              "rewardContracts": []
+            },
+            "migrate": {
+              "method": "multicall",
+              "targetAdapterKey": "uniswap_v3"
+            }
+          }
         }
       }
     }

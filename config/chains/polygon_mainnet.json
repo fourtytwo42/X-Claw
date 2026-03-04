@@ -36,15 +36,6 @@
     "faucet": false,
     "deposits": false
   },
-  "uniswapApi": {
-    "enabled": true,
-    "liquidityEnabled": true,
-    "migrateEnabled": true,
-    "claimRewardsEnabled": true
-  },
-  "marketData": {
-    "dexscreenerChainId": "polygon"
-  },
   "updatedAt": "2026-02-20T23:55:00.000Z",
   "version": 1,
   "sources": {
@@ -67,21 +58,6 @@
       "eth_chainId https://polygon-bor-rpc.publicnode.com -> expected 0x89",
       "router.factory() 0xedf6066a2b290C185783862C7F4776A2C8077AD1 -> 0x9e5A52f57b3038F1B8EeE45F28b3C1967e22799C"
     ]
-  },
-  "liquidityOperations": {
-    "claimFees": {
-      "legacyEnabled": false,
-      "adapter": "none"
-    },
-    "claimRewards": {
-      "legacyEnabled": false,
-      "adapter": "none",
-      "rewardContracts": []
-    }
-  },
-  "tradeOperations": {
-    "legacyEnabled": true,
-    "adapter": "legacy_router"
   },
   "execution": {
     "trade": {

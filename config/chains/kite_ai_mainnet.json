@@ -45,21 +45,6 @@
     "verifiedViaRpc": true,
     "verifiedChainIdHex": "0x93e"
   },
-  "liquidityOperations": {
-    "claimFees": {
-      "legacyEnabled": false,
-      "adapter": "none"
-    },
-    "claimRewards": {
-      "legacyEnabled": false,
-      "adapter": "none",
-      "rewardContracts": []
-    }
-  },
-  "tradeOperations": {
-    "legacyEnabled": false,
-    "adapter": "none"
-  },
   "execution": {
     "trade": {
       "defaultProvider": "router_adapter",

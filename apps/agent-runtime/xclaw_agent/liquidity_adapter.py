@@ -36,6 +36,9 @@ class LiquidityAdapter:
     router: str = ""
     factory: str = ""
     quoter: str = ""
+    position_manager: str = ""
+    capabilities: dict[str, bool] | None = None
+    operations: dict[str, dict[str, Any]] | None = None
 
     def quote_add(self, payload: dict[str, Any]) -> dict[str, Any]:
         amount_a = _require_positive_decimal(payload.get("amountA"), "amountA")
@@ -139,6 +142,42 @@ class LiquidityAdapter:
     ) -> EvmActionPlan:
         raise UnsupportedLiquidityOperation("unsupported_liquidity_execution_family")
 
+    def build_increase_plan(
+        self,
+        payload: dict[str, Any],
+        wallet_address: str,
+        *,
+        build_calldata: callable,
+    ) -> EvmActionPlan:
+        raise UnsupportedLiquidityOperation("unsupported_liquidity_execution_family")
+
+    def build_claim_fees_plan(
+        self,
+        payload: dict[str, Any],
+        wallet_address: str,
+        *,
+        build_calldata: callable,
+    ) -> EvmActionPlan:
+        raise UnsupportedLiquidityOperation("unsupported_liquidity_execution_family")
+
+    def build_claim_rewards_plan(
+        self,
+        payload: dict[str, Any],
+        wallet_address: str,
+        *,
+        build_calldata: callable,
+    ) -> EvmActionPlan:
+        raise UnsupportedLiquidityOperation("unsupported_liquidity_execution_family")
+
+    def build_migrate_plan(
+        self,
+        payload: dict[str, Any],
+        wallet_address: str,
+        *,
+        build_calldata: callable,
+    ) -> EvmActionPlan:
+        raise UnsupportedLiquidityOperation("unsupported_liquidity_execution_family")
+
 
 class AmmV2LiquidityAdapter(LiquidityAdapter):
     def build_add_plan(
@@ -182,7 +221,67 @@ class AmmV3LiquidityAdapter(LiquidityAdapter):
             router=self.router,
             factory=self.factory,
             quoter=self.quoter,
+            position_manager=self.position_manager,
+            capabilities=dict(self.capabilities or {}),
+            operations=dict(self.operations or {}),
         )
+
+    def supports_operation(self, operation: str) -> bool:
+        return self._planner().supports_operation(operation)
+
+    def build_increase_plan(
+        self,
+        payload: dict[str, Any],
+        wallet_address: str,
+        *,
+        build_calldata: callable,
+    ) -> EvmActionPlan:
+        return self._planner().build_increase_plan(payload, wallet_address, build_calldata=build_calldata)
+
+    def build_claim_fees_plan(
+        self,
+        payload: dict[str, Any],
+        wallet_address: str,
+        *,
+        build_calldata: callable,
+    ) -> EvmActionPlan:
+        return self._planner().build_claim_fees_plan(payload, wallet_address, build_calldata=build_calldata)
+
+    def build_claim_rewards_plan(
+        self,
+        payload: dict[str, Any],
+        wallet_address: str,
+        *,
+        build_calldata: callable,
+    ) -> EvmActionPlan:
+        return self._planner().build_claim_rewards_plan(payload, wallet_address, build_calldata=build_calldata)
+
+    def build_migrate_plan(
+        self,
+        payload: dict[str, Any],
+        wallet_address: str,
+        *,
+        build_calldata: callable,
+    ) -> EvmActionPlan:
+        return self._planner().build_migrate_plan(payload, wallet_address, build_calldata=build_calldata)
+
+    def build_remove_plan(
+        self,
+        payload: dict[str, Any],
+        wallet_address: str,
+        *,
+        build_calldata: callable,
+    ) -> EvmActionPlan:
+        return self._planner().build_remove_plan(payload, wallet_address, build_calldata=build_calldata)
+
+    def build_add_plan(
+        self,
+        payload: dict[str, Any],
+        wallet_address: str,
+        *,
+        build_calldata: callable,
+    ) -> EvmActionPlan:
+        return self._planner().build_add_plan(payload, wallet_address, build_calldata=build_calldata)
 
 
 def _require_non_empty(value: Any, field_name: str) -> str:
@@ -235,25 +334,37 @@ def _protocols_for_chain(chain: str) -> dict[str, dict[str, Any]]:
     if not cfg:
         raise UnsupportedLiquidityAdapter(f"Unsupported chain '{chain}' for liquidity adapter selection.")
     payload = cfg.get("liquidityProtocols")
-    if (not isinstance(payload, dict) or not payload) and isinstance(cfg.get("execution"), dict):
-        execution = cfg.get("execution") or {}
-        liquidity = execution.get("liquidity") if isinstance(execution, dict) else {}
-        adapters = liquidity.get("adapters") if isinstance(liquidity, dict) else {}
-        translated: dict[str, dict[str, Any]] = {}
-        if isinstance(adapters, dict):
-            for key, value in adapters.items():
-                if not isinstance(value, dict):
-                    continue
-                adapter_key = str(value.get("adapterKey") or key).strip().lower() or str(key).strip().lower()
-                translated[adapter_key] = {
-                    "enabled": True,
-                    "family": str(value.get("family") or "amm_v2").strip().lower() or "amm_v2",
-                    "router": str(value.get("router") or "").strip(),
-                    "factory": str(value.get("factory") or "").strip(),
-                    "quoter": str(value.get("quoter") or "").strip(),
+    base_protocols: dict[str, dict[str, Any]] = {}
+    if isinstance(payload, dict):
+        for key, value in payload.items():
+            if not isinstance(value, dict):
+                continue
+            base_protocols[str(key).strip().lower()] = dict(value)
+
+    execution = cfg.get("execution") or {}
+    liquidity = execution.get("liquidity") if isinstance(execution, dict) else {}
+    adapters = liquidity.get("adapters") if isinstance(liquidity, dict) else {}
+    if isinstance(adapters, dict):
+        for key, value in adapters.items():
+            if not isinstance(value, dict):
+                continue
+            adapter_key = str(value.get("adapterKey") or key).strip().lower() or str(key).strip().lower()
+            merged = dict(base_protocols.get(adapter_key, {}))
+            merged.update(
+                {
+                    "enabled": value.get("enabled", merged.get("enabled", True)),
+                    "family": str(value.get("family") or merged.get("family") or "amm_v2").strip().lower() or "amm_v2",
+                    "router": str(value.get("router") or merged.get("router") or "").strip(),
+                    "factory": str(value.get("factory") or merged.get("factory") or "").strip(),
+                    "quoter": str(value.get("quoter") or merged.get("quoter") or "").strip(),
+                    "positionManager": str(value.get("positionManager") or merged.get("positionManager") or "").strip(),
+                    "capabilities": value.get("capabilities") if isinstance(value.get("capabilities"), dict) else merged.get("capabilities") or {},
+                    "operations": value.get("operations") if isinstance(value.get("operations"), dict) else merged.get("operations") or {},
                 }
-        payload = translated
-    if not isinstance(payload, dict) or not payload:
+            )
+            base_protocols[adapter_key] = merged
+    payload = base_protocols
+    if not payload:
         raise UnsupportedLiquidityAdapter(f"Chain '{chain}' does not define liquidity protocols.")
 
     out: dict[str, dict[str, Any]] = {}
@@ -282,18 +393,18 @@ def _resolve_protocol(chain: str, dex: str, position_type: str) -> tuple[str, st
                 f"Liquidity adapter '{requested_dex}' is not enabled for chain '{chain}'."
             )
         family = str(matched.get("family") or "").strip().lower() or "amm_v2"
-        if requested_position == "v3" and family != "amm_v3":
+        if requested_position == "v3" and family not in {"amm_v3", "position_manager_v3"}:
             raise UnsupportedLiquidityAdapter(
                 f"Adapter '{requested_dex}' on chain '{chain}' does not support v3 positions."
             )
         return requested_dex, family
 
-    desired_family = "amm_v3" if requested_position == "v3" else "amm_v2"
+    desired_family = {"amm_v3", "position_manager_v3"} if requested_position == "v3" else {"amm_v2"}
     for key, entry in protocols.items():
         if entry.get("enabled", True) is False:
             continue
         family = str(entry.get("family") or "").strip().lower() or "amm_v2"
-        if family == desired_family:
+        if family in desired_family:
             return key, family
 
     raise UnsupportedLiquidityAdapter(
@@ -310,16 +421,22 @@ def build_liquidity_adapter(chain: str, dex: str, protocol_family: str, position
     router = str(protocol_entry.get("router") or "").strip()
     factory = str(protocol_entry.get("factory") or "").strip()
     quoter = str(protocol_entry.get("quoter") or "").strip()
+    position_manager = str(protocol_entry.get("positionManager") or "").strip()
+    capabilities = protocol_entry.get("capabilities")
+    operations = protocol_entry.get("operations")
 
-    if normalized == "amm_v3":
+    if normalized in {"amm_v3", "position_manager_v3"}:
         return AmmV3LiquidityAdapter(
             chain=chain,
             dex=normalized_dex,
-            protocol_family=normalized,
+            protocol_family="position_manager_v3",
             position_type=normalized_position,
             router=router,
             factory=factory,
             quoter=quoter,
+            position_manager=position_manager,
+            capabilities=dict(capabilities) if isinstance(capabilities, dict) else {},
+            operations=dict(operations) if isinstance(operations, dict) else {},
         )
     if normalized == "amm_v2":
         return AmmV2LiquidityAdapter(
@@ -330,6 +447,8 @@ def build_liquidity_adapter(chain: str, dex: str, protocol_family: str, position
             router=router,
             factory=factory,
             quoter=quoter,
+            capabilities=dict(capabilities) if isinstance(capabilities, dict) else {},
+            operations=dict(operations) if isinstance(operations, dict) else {},
         )
 
     raise UnsupportedLiquidityAdapter(

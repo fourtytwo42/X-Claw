@@ -4156,3 +4156,12 @@ Note:
 - [x] Normalize phase-1 runtime metadata to `router_adapter` and generic execution fields.
 - [x] Remove stale `tradeProviders` / `liquidityProviders` from active chain configs.
 - [x] Add/refresh runtime unit coverage for the new executor path.
+
+## 129) Slice 129: Unified Advanced LP Execution
+
+- [x] Replace AMM v3 stub planner with concentrated-liquidity local plan builders.
+- [x] Route `liquidity increase`, `liquidity claim-fees`, `liquidity claim-rewards`, and `liquidity migrate` through the shared executor.
+- [x] Remove `_execute_uniswap_liquidity_intent` and remaining active `uniswap_api` liquidity execution branches from `cli.py`.
+- [x] Retire active `tradeOperations`, `liquidityOperations`, and `uniswapApi` chain config reads.
+- [x] Promote concentrated-liquidity execution metadata to `position_manager_v3`.
+- [x] Sync source-of-truth, OpenAPI/schema, and handoff artifacts in the same slice.

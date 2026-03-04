@@ -101,21 +101,6 @@
   "marketData": {
     "dexscreenerChainId": "base"
   },
-  "liquidityOperations": {
-    "claimFees": {
-      "legacyEnabled": false,
-      "adapter": "none"
-    },
-    "claimRewards": {
-      "legacyEnabled": false,
-      "adapter": "none",
-      "rewardContracts": []
-    }
-  },
-  "tradeOperations": {
-    "legacyEnabled": true,
-    "adapter": "uniswap_fork"
-  },
   "execution": {
     "trade": {
       "defaultProvider": "router_adapter",
@@ -143,11 +128,41 @@
         },
         "uniswap_v3": {
           "adapterKey": "uniswap_v3",
-          "family": "amm_v3",
+          "family": "position_manager_v3",
           "router": "0xA55c52512d02bA2BAfF5e6DD89be8Cf991C9E918",
           "factory": "0xf5C44221f5dDc473dE38bfE2490259D2987030F8",
           "quoter": "0x8c78091AD62C71Ede974460d0Ee2125A917105F3",
-          "positionManager": ""
+          "positionManager": "0xA55c52512d02bA2BAfF5e6DD89be8Cf991C9E918",
+          "capabilities": {
+            "add": true,
+            "remove": true,
+            "increase": true,
+            "claimFees": true,
+            "claimRewards": false,
+            "migrate": true
+          },
+          "operations": {
+            "add": {
+              "method": "mint"
+            },
+            "increase": {
+              "method": "increaseLiquidity"
+            },
+            "decrease": {
+              "method": "decreaseLiquidity"
+            },
+            "claimFees": {
+              "method": "collect"
+            },
+            "claimRewards": {
+              "method": "claimRewards(uint256,address[])",
+              "rewardContracts": []
+            },
+            "migrate": {
+              "method": "multicall",
+              "targetAdapterKey": "uniswap_v3"
+            }
+          }
         },
         "aerodrome": {
           "adapterKey": "aerodrome",

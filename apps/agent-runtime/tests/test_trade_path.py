@@ -3304,24 +3304,11 @@ class TradePathRuntimeTests(unittest.TestCase):
         self.assertEqual(payload.get("providerUsed"), "router_adapter")
         self.assertEqual(payload.get("fallbackUsed"), False)
 
-    def test_liquidity_provider_settings_prefers_chain_config(self) -> None:
+    def test_liquidity_provider_settings_prefers_execution_default(self) -> None:
         with mock.patch.object(
             cli,
             "_load_chain_config",
-            return_value={
-                "liquidityProviders": {"primary": "uniswap_api", "fallback": "legacy_router"},
-                "uniswapApi": {"enabled": True, "liquidityEnabled": True},
-            },
-        ):
-            primary, fallback = cli._liquidity_provider_settings("ethereum_sepolia")
-        self.assertEqual(primary, "router_adapter")
-        self.assertEqual(fallback, "none")
-
-    def test_liquidity_provider_settings_uniswap_flag_defaults_to_uniswap(self) -> None:
-        with mock.patch.object(
-            cli,
-            "_load_chain_config",
-            return_value={"uniswapApi": {"enabled": True, "liquidityEnabled": True}},
+            return_value={"execution": {"liquidity": {"defaultProvider": "router_adapter"}}},
         ):
             primary, fallback = cli._liquidity_provider_settings("ethereum_sepolia")
         self.assertEqual(primary, "router_adapter")
@@ -3329,40 +3316,33 @@ class TradePathRuntimeTests(unittest.TestCase):
 
     def test_liquidity_provider_meta_contains_expected_fields(self) -> None:
         meta = cli._build_liquidity_provider_meta(
-            provider_requested="uniswap_api",
-            provider_used="legacy_router",
+            provider_requested="router_adapter",
+            provider_used="router_adapter",
             fallback_used=True,
-            fallback_reason={"code": "uniswap_lp_failed", "message": "boom"},
-            uniswap_lp_operation="decrease",
+            fallback_reason={"code": "rpc_retry", "message": "boom"},
+            liquidity_operation="decrease",
         )
         self.assertEqual(meta.get("providerRequested"), "router_adapter")
         self.assertEqual(meta.get("providerUsed"), "router_adapter")
         self.assertTrue(meta.get("fallbackUsed"))
-        self.assertEqual(meta.get("fallbackReason"), {"code": "uniswap_lp_failed", "message": "boom"})
+        self.assertEqual(meta.get("fallbackReason"), {"code": "rpc_retry", "message": "boom"})
         self.assertEqual(meta.get("liquidityOperation"), "decrease")
 
-    def test_trade_provider_settings_uses_chain_config_for_promoted_v2_fallback(self) -> None:
+    def test_trade_provider_settings_uses_execution_default(self) -> None:
         with mock.patch.object(
             cli,
             "_load_chain_config",
-            return_value={
-                "tradeProviders": {"primary": "uniswap_api", "fallback": "legacy_router"},
-                "tradeOperations": {"legacyEnabled": True, "adapter": "legacy_router"},
-                "coreContracts": {"router": "0x" + "11" * 20},
-            },
+            return_value={"execution": {"trade": {"defaultProvider": "router_adapter"}}},
         ):
             primary, fallback = cli._trade_provider_settings("base_mainnet")
         self.assertEqual(primary, "router_adapter")
         self.assertEqual(fallback, "none")
 
-    def test_trade_provider_settings_keeps_fallback_disabled_when_legacy_not_enabled(self) -> None:
+    def test_trade_provider_settings_defaults_to_router_adapter(self) -> None:
         with mock.patch.object(
             cli,
             "_load_chain_config",
-            return_value={
-                "tradeProviders": {"primary": "uniswap_api", "fallback": "legacy_router"},
-                "tradeOperations": {"legacyEnabled": False, "adapter": "none"},
-            },
+            return_value={},
         ):
             primary, fallback = cli._trade_provider_settings("zksync_mainnet")
         self.assertEqual(primary, "router_adapter")

@@ -2631,3 +2631,18 @@ DoD:
 - [x] stale `tradeProviders` / `liquidityProviders` removed from active chain configs.
 - [x] runtime tests cover shared executor and updated trade/liquidity paths.
 - [x] source-of-truth + roadmap + handoff artifacts updated in the same change.
+
+## Slice 129: Unified Advanced LP Execution
+Status: [x]
+Issue: #62
+
+Goal:
+- move advanced concentrated-liquidity execution onto the same runtime-local action-plan engine and retire remaining compatibility-only `uniswap_api` runtime branches/config readers.
+
+DoD:
+- [x] advanced LP commands (`increase`, `claim-fees`, `claim-rewards`, `migrate`) build local action plans and execute through `EvmActionExecutor`.
+- [x] `cmd_liquidity_execute` no longer branches on `uniswap_api`.
+- [x] `_execute_uniswap_liquidity_intent` and related LP proxy helpers are removed from active runtime execution.
+- [x] active chain configs no longer contain `tradeOperations`, `liquidityOperations`, or `uniswapApi`.
+- [x] concentrated-liquidity execution uses canonical `position_manager_v3` metadata and config shape.
+- [x] runtime tests + canonical artifacts updated in the same change.

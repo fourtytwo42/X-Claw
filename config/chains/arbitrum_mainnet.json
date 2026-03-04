@@ -35,15 +35,6 @@
     "faucet": false,
     "deposits": false
   },
-  "uniswapApi": {
-    "enabled": true,
-    "liquidityEnabled": true,
-    "migrateEnabled": true,
-    "claimRewardsEnabled": true
-  },
-  "marketData": {
-    "dexscreenerChainId": "arbitrum"
-  },
   "updatedAt": "2026-02-20T23:55:00.000Z",
   "version": 1,
   "sources": {
@@ -65,21 +56,6 @@
       "router.factory() 0x4752ba5dbc23f44d87826276bf6fd6b1c372ad24 -> 0xf1D7CC64Fb4452F05c498126312eBE29f30Fbcf9",
       "eth_chainId https://arb1.arbitrum.io/rpc -> expected 0xa4b1"
     ]
-  },
-  "liquidityOperations": {
-    "claimFees": {
-      "legacyEnabled": false,
-      "adapter": "none"
-    },
-    "claimRewards": {
-      "legacyEnabled": false,
-      "adapter": "none",
-      "rewardContracts": []
-    }
-  },
-  "tradeOperations": {
-    "legacyEnabled": true,
-    "adapter": "legacy_router"
   },
   "execution": {
     "trade": {

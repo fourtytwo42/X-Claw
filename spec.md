@@ -1,42 +1,36 @@
-# Slice 128 Spec: Unified EVM Action Engine (Phase 1) (2026-03-04)
+# Slice 129 Spec: Unified Advanced LP Execution (2026-03-04)
 
 ## Goal
-1. Move phase-1 EVM trade and AMM v2 liquidity execution onto one runtime-local action engine.
-2. Remove phase-1 runtime dependence on proxy-built trade transactions and provider-era control flow.
-3. Keep advanced LP compatibility routes/paths intact while phase-1 actions become canonical local adapter execution.
+1. Move advanced concentrated-liquidity execution onto the runtime-local EVM action engine.
+2. Remove the remaining compatibility-only `uniswap_api` liquidity branches from the runtime.
+3. Retire `tradeOperations`, `liquidityOperations`, and `uniswapApi` in favor of `execution.*` metadata only.
 
 ## Non-goals
 1. No removal of `/uniswap/*` compatibility routes in this slice.
-2. No full AMM v3/increase/migrate/claim unification yet.
-3. No non-EVM support.
+2. No non-EVM support.
+3. No removal of historical compatibility records beyond explicit superseded labeling.
 
 ## Locked scope
 1. `apps/agent-runtime/xclaw_agent/execution_contracts.py`
-2. `apps/agent-runtime/xclaw_agent/evm_action_executor.py`
-3. `apps/agent-runtime/xclaw_agent/trade_execution.py`
-4. `apps/agent-runtime/xclaw_agent/liquidity_execution.py`
-5. `apps/agent-runtime/xclaw_agent/trade_adapters/amm_v2.py`
-6. `apps/agent-runtime/xclaw_agent/liquidity_adapters/amm_v2.py`
-7. `apps/agent-runtime/xclaw_agent/liquidity_adapters/amm_v3.py`
-8. `apps/agent-runtime/xclaw_agent/dex_adapter.py`
-9. `apps/agent-runtime/xclaw_agent/liquidity_adapter.py`
-10. `apps/agent-runtime/xclaw_agent/cli.py`
-11. `apps/agent-runtime/tests/test_evm_action_executor.py`
-12. `apps/agent-runtime/tests/test_trade_path.py`
-13. `apps/agent-runtime/tests/test_liquidity_cli.py`
-14. `apps/agent-runtime/tests/test_liquidity_adapter.py`
-15. `config/chains/*.json`
-16. `docs/XCLAW_SOURCE_OF_TRUTH.md`
-17. `docs/XCLAW_SLICE_TRACKER.md`
-18. `docs/XCLAW_BUILD_ROADMAP.md`
-19. `docs/api/openapi.v1.yaml`
-20. `spec.md`
-21. `tasks.md`
-22. `acceptance.md`
+2. `apps/agent-runtime/xclaw_agent/liquidity_execution.py`
+3. `apps/agent-runtime/xclaw_agent/liquidity_adapters/amm_v3.py`
+4. `apps/agent-runtime/xclaw_agent/liquidity_adapter.py`
+5. `apps/agent-runtime/xclaw_agent/cli.py`
+6. `apps/agent-runtime/tests/test_trade_path.py`
+7. `apps/agent-runtime/tests/test_liquidity_cli.py`
+8. `apps/agent-runtime/tests/test_liquidity_adapter.py`
+9. `apps/network-web/src/lib/chains.ts`
+10. `packages/shared-schemas/json/liquidity-status.schema.json`
+11. `config/chains/*.json`
+12. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+13. `docs/XCLAW_SLICE_TRACKER.md`
+14. `docs/XCLAW_BUILD_ROADMAP.md`
+15. `docs/api/openapi.v1.yaml`
+16. `spec.md`
+17. `tasks.md`
+18. `acceptance.md`
 
 ## Acceptance checks
-- `python3 -m unittest apps/agent-runtime/tests/test_evm_action_executor.py -v`
-- `python3 -m unittest apps/agent-runtime/tests/test_dex_adapter.py -v`
 - `python3 -m unittest apps/agent-runtime/tests/test_liquidity_adapter.py -v`
 - `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v`
 - `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`

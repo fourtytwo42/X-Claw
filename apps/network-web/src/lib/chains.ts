@@ -43,11 +43,20 @@ export type ChainConfig = {
         string,
         {
           adapterKey?: string;
-          family?: 'amm_v2' | 'amm_v3' | string;
+          family?: 'amm_v2' | 'amm_v3' | 'position_manager_v3' | string;
           router?: string;
           factory?: string;
           quoter?: string;
           positionManager?: string;
+          capabilities?: {
+            add?: boolean;
+            remove?: boolean;
+            increase?: boolean;
+            claimFees?: boolean;
+            claimRewards?: boolean;
+            migrate?: boolean;
+          };
+          operations?: Record<string, Record<string, unknown>>;
         }
       >;
     };
@@ -57,11 +66,20 @@ export type ChainConfig = {
         string,
         {
           adapterKey?: string;
-          family?: 'amm_v2' | 'amm_v3' | string;
+          family?: 'amm_v2' | 'amm_v3' | 'position_manager_v3' | string;
           router?: string;
           factory?: string;
           quoter?: string;
           positionManager?: string;
+          capabilities?: {
+            add?: boolean;
+            remove?: boolean;
+            increase?: boolean;
+            claimFees?: boolean;
+            claimRewards?: boolean;
+            migrate?: boolean;
+          };
+          operations?: Record<string, Record<string, unknown>>;
         }
       >;
     };
