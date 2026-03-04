@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.xclaw.trade/management-withdraw-item.schema.json",
+  "title": "ManagementWithdrawItem",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "approvalId",
+    "requestKind",
+    "chainKey",
+    "status",
+    "transferType",
+    "destination",
+    "amountWei",
+    "createdAt"
+  ],
+  "properties": {
+    "approvalId": { "type": "string", "minLength": 1 },
+    "decisionId": { "type": ["string", "null"] },
+    "requestKind": { "type": "string", "enum": ["withdraw"] },
+    "chainKey": { "type": "string", "minLength": 1 },
+    "status": { "type": "string", "enum": ["queued", "pending", "executing", "verifying", "filled", "failed"] },
+    "transferType": { "type": "string", "enum": ["native", "token"] },
+    "tokenAddress": {
+      "type": ["string", "null"],
+      "anyOf": [
+        { "type": "null" },
+        { "pattern": "^0x[a-fA-F0-9]{40}$" },
+        { "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,64}$" }
+      ]
+    },
+    "tokenSymbol": { "type": ["string", "null"] },
+    "destination": {
+      "type": "string",
+      "anyOf": [
+        { "pattern": "^0x[a-fA-F0-9]{40}$" },
+        { "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,64}$" }
+      ]
+    },
+    "amountWei": { "type": "string", "pattern": "^[0-9]+$" },
+    "txHash": {
+      "type": ["string", "null"],
+      "anyOf": [
+        { "type": "null" },
+        { "pattern": "^0x[a-fA-F0-9]{64}$" },
+        { "pattern": "^[1-9A-HJ-NP-Za-km-z]{64,128}$" }
+      ]
+    },
+    "reasonCode": { "type": ["string", "null"] },
+    "reasonMessage": { "type": ["string", "null"] },
+    "executionMode": { "type": ["string", "null"], "enum": ["normal", "policy_override", null] },
+    "confirmations": { "type": ["integer", "null"], "minimum": 0 },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "decidedAt": { "type": ["string", "null"], "format": "date-time" },
+    "terminalAt": { "type": ["string", "null"], "format": "date-time" }
+  }
+}

@@ -23,6 +23,7 @@ import {
   type DepositPayload,
   type ManagementStatePayload,
   type TradePayload,
+  type WithdrawsPayload,
   tokenSymbolByAddress
 } from '@/lib/agent-page-view-model';
 import { formatUsd, formatUtc, shortenAddress } from '@/lib/public-format';
@@ -538,6 +539,7 @@ export default function AgentPublicProfilePage() {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
   const [depositData, setDepositData] = useState<DepositPayload | null>(null);
+  const [withdrawsData, setWithdrawsData] = useState<WithdrawsPayload | null>(null);
   const [x402Payments, setX402Payments] = useState<X402PaymentsPayload | null>(null);
   const [x402ReceiveLink, setX402ReceiveLink] = useState<X402ReceiveLinkPayload | null>(null);
   const [vaultAddressCopied, setVaultAddressCopied] = useState(false);
@@ -839,6 +841,7 @@ export default function AgentPublicProfilePage() {
       setError(debugMessage);
       setManagement({ phase: 'unauthorized' });
       setDepositData(null);
+      setWithdrawsData(null);
       setX402Payments(null);
       setX402ReceiveLink(null);
       return;
@@ -884,13 +887,15 @@ export default function AgentPublicProfilePage() {
       }
     }
 
-    const [depositPayload, x402PaymentsPayload, x402ReceivePayload] = await Promise.all([
+    const [depositPayload, withdrawsPayload, x402PaymentsPayload, x402ReceivePayload] = await Promise.all([
       managementGet(`/api/v1/management/deposit?agentId=${encodeURIComponent(agentId)}&chainKey=${encodeURIComponent(activeChainKey)}`),
+      managementGet(`/api/v1/management/withdraws?agentId=${encodeURIComponent(agentId)}&chainKey=${encodeURIComponent(activeChainKey)}`),
       managementGet(`/api/v1/management/x402/payments?agentId=${encodeURIComponent(agentId)}&chainKey=${encodeURIComponent(activeChainKey)}`),
       managementGet(`/api/v1/management/x402/receive-link?agentId=${encodeURIComponent(agentId)}&chainKey=${encodeURIComponent(activeChainKey)}`)
     ]);
 
     setDepositData(depositPayload as DepositPayload);
+    setWithdrawsData(withdrawsPayload as WithdrawsPayload);
     setX402Payments(x402PaymentsPayload as X402PaymentsPayload);
     setX402ReceiveLink(x402ReceivePayload as X402ReceiveLinkPayload);
   }, [activeChainKey, agentId, bootstrapToken]);
@@ -1883,6 +1888,22 @@ export default function AgentPublicProfilePage() {
     const start = (normalizedApprovalHistoryPage - 1) * 10;
     return filteredApprovalHistory.slice(start, start + 10);
   }, [approvalHistoryExpanded, filteredApprovalHistory, normalizedApprovalHistoryPage]);
+  const withdrawRows = useMemo(() => {
+    const queue = (withdrawsData?.queue ?? []).map((item) => ({ ...item, _sourceRank: 0 }));
+    const history = (withdrawsData?.history ?? []).map((item) => ({ ...item, _sourceRank: 1 }));
+    const byApproval = new Map<string, (typeof queue)[number]>();
+    for (const row of [...queue, ...history]) {
+      const current = byApproval.get(row.approvalId);
+      const currentAt = Number(new Date(current?.terminalAt ?? current?.decidedAt ?? current?.createdAt ?? 0));
+      const nextAt = Number(new Date(row.terminalAt ?? row.decidedAt ?? row.createdAt));
+      if (!current || nextAt >= currentAt || row._sourceRank < current._sourceRank) {
+        byApproval.set(row.approvalId, row);
+      }
+    }
+    return Array.from(byApproval.values()).sort(
+      (a, b) => Number(new Date(b.terminalAt ?? b.decidedAt ?? b.createdAt)) - Number(new Date(a.terminalAt ?? a.decidedAt ?? a.createdAt))
+    );
+  }, [withdrawsData]);
   const auditEntries = management.phase === 'ready' ? management.data.auditLog : [];
   const auditTotalPages = auditExpanded ? Math.max(1, Math.ceil(auditEntries.length / 10)) : 1;
   const normalizedAuditPage = Math.min(auditPage, auditTotalPages);
@@ -2519,6 +2540,57 @@ export default function AgentPublicProfilePage() {
               </div>
             ) : null}
           </article>
+
+            <article className={`${styles.card} ${styles.walletCard}`}>
+              <div className={`${styles.cardHeader} ${styles.walletCardHeader}`}>
+                <h3>Withdraw Queue & History</h3>
+                <div className={styles.inlineActions}>
+                  <span>{withdrawRows.length}</span>
+                </div>
+              </div>
+              {withdrawRows.length === 0 ? <p className={styles.muted}>No withdraw requests for this chain.</p> : null}
+              {withdrawRows.map((row) => {
+                const tokenLabel =
+                  row.transferType === 'native' ? `${activeChainLabel} ${activeNativeSymbol}` : row.tokenSymbol ?? 'Token';
+                const tokenDecimals =
+                  row.transferType === 'native'
+                    ? activeNativeDecimals
+                    : (tokenDecimalsBySymbol.get(normalizeTokenSelectionSymbol(row.tokenSymbol, activeNativeSymbol)) ?? 18);
+                const amount = formatHumanAmount(row.amountWei, tokenLabel, tokenDecimals);
+                const at = row.terminalAt ?? row.decidedAt ?? row.createdAt;
+                const txLabel = row.txHash ? shortenHex(row.txHash, 10, 8) : null;
+                const txExplorerUrl = row.txHash ? toTxExplorerUrl(row.txHash) : null;
+                return (
+                  <div key={`withdraw-${row.approvalId}`} className={styles.listRow}>
+                    <div>
+                      <div className={styles.listTitle}>{tokenLabel} withdraw</div>
+                      <div className={styles.muted}>
+                        To: {shortenAddress(row.destination)}; Amount: {amount}; Approval: {row.approvalId}
+                        {row.decisionId ? `; Decision: ${row.decisionId}` : ''}
+                      </div>
+                      {row.reasonMessage ? <div className={styles.muted}>Reason: {row.reasonMessage}</div> : null}
+                      {row.txHash ? (
+                        <div className={styles.muted}>
+                          Tx:{' '}
+                          {txExplorerUrl ? (
+                            <a href={txExplorerUrl} target="_blank" rel="noreferrer" className={styles.inlineLink}>
+                              {txLabel}
+                            </a>
+                          ) : (
+                            txLabel
+                          )}
+                          {row.confirmations !== null ? `; Confirmations: ${row.confirmations}` : ''}
+                        </div>
+                      ) : null}
+                    </div>
+                    <div className={styles.listMeta}>
+                      <span className={styles.statusChip}>{displayStatusLabel(row.status)}</span>
+                      <span>{formatUtc(at)} UTC</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </article>
 
             <article className={`${styles.card} ${styles.walletCard}`}>
               <div className={`${styles.cardHeader} ${styles.walletCardHeader}`}>

@@ -18,6 +18,7 @@
     "approvalId": { "type": "string", "minLength": 1 },
     "chainKey": { "type": "string", "minLength": 1 },
     "approvalSource": { "type": "string", "enum": ["transfer", "x402"] },
+    "requestKind": { "type": "string", "enum": ["transfer", "withdraw", "x402"] },
     "status": {
       "type": "string",
       "enum": ["proposed", "approval_pending", "approved", "rejected", "executing", "filled", "failed"]

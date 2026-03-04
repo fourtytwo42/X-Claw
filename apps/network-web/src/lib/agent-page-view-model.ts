@@ -366,6 +366,52 @@ export type DepositPayload = {
   }>;
 };
 
+export type WithdrawsPayload = {
+  ok: boolean;
+  agentId: string;
+  chainKey: string;
+  queue: Array<{
+    approvalId: string;
+    decisionId: string | null;
+    requestKind: 'withdraw';
+    chainKey: string;
+    status: 'queued' | 'pending' | 'executing' | 'verifying' | 'filled' | 'failed';
+    transferType: 'native' | 'token';
+    tokenAddress: string | null;
+    tokenSymbol: string | null;
+    destination: string;
+    amountWei: string;
+    txHash: string | null;
+    reasonCode: string | null;
+    reasonMessage: string | null;
+    executionMode: 'normal' | 'policy_override' | null;
+    confirmations: number | null;
+    createdAt: string;
+    decidedAt: string | null;
+    terminalAt: string | null;
+  }>;
+  history: Array<{
+    approvalId: string;
+    decisionId: string | null;
+    requestKind: 'withdraw';
+    chainKey: string;
+    status: 'queued' | 'pending' | 'executing' | 'verifying' | 'filled' | 'failed';
+    transferType: 'native' | 'token';
+    tokenAddress: string | null;
+    tokenSymbol: string | null;
+    destination: string;
+    amountWei: string;
+    txHash: string | null;
+    reasonCode: string | null;
+    reasonMessage: string | null;
+    executionMode: 'normal' | 'policy_override' | null;
+    confirmations: number | null;
+    createdAt: string;
+    decidedAt: string | null;
+    terminalAt: string | null;
+  }>;
+};
+
 export type LimitOrderItem = {
   orderId: string;
   agentId: string;

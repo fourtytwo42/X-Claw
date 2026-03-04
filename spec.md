@@ -1,4 +1,41 @@
-# Slice 189-194 Spec: Solana Mainnet Enablement + Burn-In Gates (2026-03-04)
+# Slice 195-200 Spec: Canonical Artifact Cleanup + Integrated Withdraw Queue/Status (2026-03-04)
+
+## Goal
+1. Separate active canonical contract language from superseded/historical narrative sections.
+2. Add a dedicated withdraw queue/history read model and integrated panel on the existing chain-scoped agent page.
+3. Keep existing withdraw submit route path stable while preserving runtime-local execution flow.
+
+## Non-goals
+1. No separate Solana-only or standalone withdraw UI.
+2. No route path changes for existing management withdraw submit/destination endpoints.
+3. No custody boundary changes (server remains non-signing).
+
+## Locked scope
+1. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+2. `docs/XCLAW_SLICE_TRACKER.md`
+3. `docs/XCLAW_BUILD_ROADMAP.md`
+4. `docs/history/XCLAW_SOURCE_OF_TRUTH_HISTORY.md`
+5. `docs/history/XCLAW_SLICE_TRACKER_HISTORY.md`
+6. `docs/history/XCLAW_BUILD_ROADMAP_HISTORY.md`
+7. `infrastructure/migrations/0029_slice198_withdraw_status_projection.sql`
+8. `apps/network-web/src/app/api/v1/management/withdraw/route.ts`
+9. `apps/network-web/src/app/api/v1/management/withdraws/route.ts`
+10. `apps/network-web/src/app/api/v1/management/transfer-approvals/route.ts`
+11. `apps/network-web/src/app/api/v1/management/agent-state/route.ts`
+12. `apps/network-web/src/app/api/v1/management/transfer-approvals/decision/route.ts`
+13. `apps/network-web/src/app/api/v1/agent/transfer-approvals/mirror/route.ts`
+14. `apps/network-web/src/app/agents/[agentId]/page.tsx`
+15. `apps/network-web/src/lib/agent-page-view-model.ts`
+16. `apps/network-web/src/lib/transfer-mirror-schema.ts`
+17. `packages/shared-schemas/json/management-withdraw-response.schema.json`
+18. `packages/shared-schemas/json/management-withdraw-item.schema.json`
+19. `packages/shared-schemas/json/management-withdraw-list-response.schema.json`
+20. `packages/shared-schemas/json/agent-transfer-approvals-mirror-request.schema.json`
+21. `docs/api/openapi.v1.yaml`
+22. `tasks.md`
+23. `acceptance.md`
+
+# Slice 189-194 Spec: Solana Mainnet Enablement + Burn-In Gates (2026-03-04, historical)
 
 ## Goal
 1. Promote deferred Solana mainnet capabilities in a staged, reversible rollout.

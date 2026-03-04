@@ -50,6 +50,7 @@ type AgentTransferApprovalsMirrorRequest = {
   updatedAt: string;
   decidedAt?: string | null;
   terminalAt?: string | null;
+  requestKind?: 'transfer' | 'withdraw' | 'x402';
 };
 
 export async function POST(req: NextRequest) {
@@ -116,6 +117,7 @@ export async function POST(req: NextRequest) {
         approval_id,
         agent_id,
         chain_key,
+        request_kind,
         status,
         transfer_type,
         approval_source,
@@ -147,10 +149,11 @@ export async function POST(req: NextRequest) {
         decided_at,
         terminal_at
       ) values (
-        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10::numeric, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23::numeric, $24, $25, $26, $27, $28::timestamptz, $29, $30::timestamptz, $31::timestamptz, $32::timestamptz, $33::timestamptz
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::numeric, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24::numeric, $25, $26, $27, $28, $29::timestamptz, $30, $31::timestamptz, $32::timestamptz, $33::timestamptz, $34::timestamptz
       )
       on conflict (approval_id)
       do update set
+        request_kind = agent_transfer_approval_mirror.request_kind,
         status = excluded.status,
         transfer_type = excluded.transfer_type,
         approval_source = excluded.approval_source,
@@ -185,6 +188,7 @@ export async function POST(req: NextRequest) {
         body.approvalId,
         auth.agentId,
         body.chainKey,
+        body.requestKind ?? (body.approvalSource === 'x402' ? 'x402' : 'transfer'),
         body.status,
         body.transferType,
         body.approvalSource ?? 'transfer',

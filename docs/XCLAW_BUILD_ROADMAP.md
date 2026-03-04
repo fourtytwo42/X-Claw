@@ -11,6 +11,21 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 
 ---
 
+## 0.15) Slice 195-200 Canonical Cleanup + Withdraw Queue/Status Module
+
+- [x] Add active/historical canonical boundary rules and archive pointers.
+- [x] Add `docs/history/*` companion files for source-of-truth/tracker/roadmap historical context.
+- [x] Add additive management withdraw read route (`GET /api/v1/management/withdraws`) with chain-scoped queue/history contract.
+- [x] Add explicit transfer mirror/inbox classification field (`request_kind`) with `withdraw` writes from management withdraw flow.
+- [x] Add dedicated withdraw queue/history section on existing agent page (same chain selector, no Solana-only UI path).
+- [x] Keep route/path stability for existing withdraw submit route (`POST /api/v1/management/withdraw`).
+- [ ] Sequential validation + PM2 restart + issue evidence capture.
+
+## Historical archives
+- `docs/history/XCLAW_SOURCE_OF_TRUTH_HISTORY.md`
+- `docs/history/XCLAW_SLICE_TRACKER_HISTORY.md`
+- `docs/history/XCLAW_BUILD_ROADMAP_HISTORY.md`
+
 ## 0.5) Slice 133-138 Dual-Family Program (EVM + Solana)
 
 - [~] Canonical contract reversal from EVM-only to dual-family runtime support.

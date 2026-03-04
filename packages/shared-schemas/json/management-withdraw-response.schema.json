@@ -4,7 +4,7 @@
   "title": "ManagementWithdrawResponse",
   "type": "object",
   "additionalProperties": false,
-  "required": ["ok", "withdrawRequestId", "approvalId", "decisionId", "status", "executionMode"],
+  "required": ["ok", "withdrawRequestId", "approvalId", "decisionId", "status", "executionMode", "requestKind"],
   "properties": {
     "ok": { "type": "boolean", "const": true },
     "withdrawRequestId": { "type": "string", "minLength": 1 },
@@ -12,6 +12,7 @@
     "decisionId": { "type": "string", "minLength": 1 },
     "status": { "type": "string", "enum": ["queued"] },
     "executionMode": { "type": "string", "enum": ["policy_override"] },
+    "requestKind": { "type": "string", "enum": ["withdraw"] },
     "chainKey": { "type": "string", "minLength": 1 },
     "transferType": { "type": "string", "enum": ["native", "token"] },
     "tokenAddress": {

@@ -1,4 +1,18 @@
-# Slice 189-194 Tasks: Solana Mainnet Enablement + Burn-In Gates (2026-03-04)
+# Slice 195-200 Tasks: Canonical Cleanup + Integrated Withdraw Queue/Status (2026-03-04)
+
+- [x] Add active-vs-historical contract boundary language to canonical docs.
+- [x] Add historical companion docs under `docs/history/*` and cross-link from active docs.
+- [x] Add additive migration with `request_kind` classification for transfer mirror + decision inbox.
+- [x] Write `request_kind='withdraw'` in `/api/v1/management/withdraw` enqueue path.
+- [x] Add `GET /api/v1/management/withdraws` (chain-scoped withdraw queue/history endpoint).
+- [x] Add withdraw read schemas (`management-withdraw-item`, `management-withdraw-list-response`) and extend withdraw submit response schema.
+- [x] Update transfer mirror upsert path to preserve existing `request_kind` and classify x402/transfer defaults.
+- [x] Exclude withdraw rows from generic transfer approvals queue/history routes to avoid duplicate visibility surfaces.
+- [x] Integrate dedicated Withdraw Queue & History section on existing `/agents/[agentId]` page with chain-scoped rendering.
+- [x] Update OpenAPI for new withdraw list route + schema components.
+- [ ] Run sequential validations + grep proofs + issue evidence post.
+
+# Slice 189-194 Tasks: Solana Mainnet Enablement + Burn-In Gates (2026-03-04, historical)
 
 - [x] Update canonical docs/contracts with Solana mainnet burn-in rollout and rollback posture.
 - [x] Add reusable `solana_mainnet_beta` burn-in snapshot helper with phase gates (`burnin_ready|burnin_hold|burnin_blocked`).

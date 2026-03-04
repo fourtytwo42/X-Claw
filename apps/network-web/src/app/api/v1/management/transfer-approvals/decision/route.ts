@@ -264,10 +264,18 @@ export async function POST(req: NextRequest) {
     await dbQuery(
       `
       insert into agent_transfer_decision_inbox (
-        decision_id, approval_id, agent_id, chain_key, decision, reason_message, source, status, created_at
-      ) values ($1, $2, $3, $4, $5, $6, 'web', 'pending', now())
+        decision_id, approval_id, agent_id, chain_key, request_kind, decision, reason_message, source, status, created_at
+      ) values ($1, $2, $3, $4, $5, $6, $7, 'web', 'pending', now())
       `,
-      [decisionId, body.approvalId, body.agentId, chainKey, body.decision, body.reasonMessage ?? null]
+      [
+        decisionId,
+        body.approvalId,
+        body.agentId,
+        chainKey,
+        approvalSource === 'x402' ? 'x402' : 'transfer',
+        body.decision,
+        body.reasonMessage ?? null
+      ]
     );
     const promptCleanupNow = invokeTransferPromptCleanupNow({
       agentId: body.agentId,

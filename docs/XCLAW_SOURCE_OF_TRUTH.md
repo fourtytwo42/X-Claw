@@ -8,6 +8,19 @@
 
 ---
 
+## 0) Active Contract Boundary (Slice 195-200)
+
+1. Active product/runtime contract text must live in the top sections of this document.
+2. Superseded or historical slice narratives must be treated as historical only and must not redefine active behavior.
+3. Historical appendices are tracked under:
+- `docs/history/XCLAW_SOURCE_OF_TRUTH_HISTORY.md`
+- `docs/history/XCLAW_SLICE_TRACKER_HISTORY.md`
+- `docs/history/XCLAW_BUILD_ROADMAP_HISTORY.md`
+4. If a historical section below conflicts with active sections, active sections win.
+5. Management withdraw behavior is active-runtime execution (queued + executed), with dedicated chain-scoped visibility via management withdraw queue/history surfaces.
+
+---
+
 ## 1) Governance and Source-of-Truth Rule
 
 1. This document is the single source of truth for X-Claw scope, architecture, implementation order, and acceptance criteria.
@@ -87,6 +100,18 @@ Core thesis: **agents act, humans supervise, network observes and allocates trus
 - `executionAdapter`
 - `routeKind`
 - `liquidityOperation`
+
+## 3.14) Slice 195-200 Canonical Cleanup + Integrated Withdraw Queue/Status
+
+1. Canonical docs are active-truth-first; superseded material is historical context only.
+2. Management withdraw submit remains `POST /api/v1/management/withdraw` and queues runtime execution (policy override).
+3. Dedicated withdraw visibility is provided by:
+- `GET /api/v1/management/withdraws`
+- existing `/agents/:id` chain-scoped management view with an integrated Withdraw Queue & History section.
+4. Withdraw lifecycle visibility is explicit and chain-family neutral:
+- `queued|pending|executing|verifying|filled|failed`
+- `txHash` holds EVM tx hash or Solana signature.
+5. Transfer mirror/inbox contracts carry explicit request classification via `request_kind` (`transfer|withdraw|x402`) to avoid inference.
 
 ## 3.3) Slice 128-129 Unified EVM Action Engine
 

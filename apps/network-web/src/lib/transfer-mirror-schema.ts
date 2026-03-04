@@ -11,6 +11,7 @@ const TRANSFER_MIRROR_SCHEMA_MARKERS = [
   'policy_block_reason_message',
   'execution_mode',
   'approval_source',
+  'request_kind',
   'observed_by',
   'observation_source',
   'watcher_run_id'

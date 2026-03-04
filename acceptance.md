@@ -1,4 +1,36 @@
-# Slice 189-194 Acceptance Evidence: Solana Mainnet Enablement + Burn-In Gates
+# Slice 195-200 Acceptance Evidence: Canonical Cleanup + Integrated Withdraw Queue/Status
+
+Date (UTC): 2026-03-04  
+Active slice context: `Slice 195 -> Slice 200`.
+
+### Objective + Scope Lock
+- Objective:
+  - separate active canonical contract text from superseded history references,
+  - provide dedicated withdraw queue/history visibility in existing chain-scoped management UI.
+
+### Behavior Checks
+- [x] `GET /api/v1/management/withdraws` exists and is chain-scoped.
+- [x] management withdraw enqueue writes explicit `request_kind='withdraw'`.
+- [x] transfer mirror + decision inbox have explicit `request_kind` contract.
+- [x] `/agents/[agentId]` shows dedicated Withdraw Queue & History section without introducing chain-specific UI branches.
+- [x] canonical docs include active/historical boundary + historical companion archive links.
+
+### Required Validation Gates
+- [ ] targeted Next/API tests for withdraw enqueue + withdraw list route
+- [ ] targeted UI tests for withdraw panel render
+- [ ] `npm run db:parity`
+- [ ] `npm run seed:reset`
+- [ ] `npm run seed:load`
+- [ ] `npm run seed:verify`
+- [ ] `npm run build`
+- [ ] `pm2 restart all`
+
+### Required Grep Proofs
+- [ ] no active canonical docs present superseded behavior as current contract.
+- [ ] withdraw queue/history classification is explicit (`request_kind=withdraw`) in active codepaths.
+- [ ] no Solana-only UI branch introduced for withdraw visibility.
+
+# Slice 189-194 Acceptance Evidence: Solana Mainnet Enablement + Burn-In Gates (historical)
 
 Date (UTC): 2026-03-04
 Active slice context: `Slice 189 -> Slice 194`.

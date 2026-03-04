@@ -17,6 +17,24 @@ Status legend:
 
 ---
 
+## Slice 195-200: Canonical Cleanup + Integrated Withdraw Queue/Status
+Status: [x]
+
+Goal:
+- Separate active canonical truth from superseded narrative content and add dedicated withdraw queue/history visibility in the existing chain-scoped agent page.
+
+DoD:
+- [x] Active canonical docs include explicit active/historical boundary and archive pointers.
+- [x] Historical companion docs created under `docs/history/*`.
+- [x] Additive withdraw read endpoint added: `GET /api/v1/management/withdraws`.
+- [x] `request_kind` classification added to transfer mirror/inbox contracts with explicit `withdraw` writes.
+- [x] Agent page includes dedicated Withdraw Queue & History section scoped by existing chain selector.
+- [x] Transfer approval queue/history views exclude `request_kind=withdraw` rows to avoid duplicate surfaces.
+- [x] Schemas/OpenAPI updated for withdraw list/read contracts.
+- [ ] full sequential validation + issue evidence posted.
+
+---
+
 ## Slice 133-138: Dual-Family Runtime (EVM + Solana)
 Status: [~]
 

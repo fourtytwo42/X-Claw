@@ -247,6 +247,7 @@ export async function POST(req: NextRequest) {
             approval_id,
             agent_id,
             chain_key,
+            request_kind,
             status,
             transfer_type,
             approval_source,
@@ -265,7 +266,7 @@ export async function POST(req: NextRequest) {
             updated_at,
             decided_at
           ) values (
-            $1, $2, $3, 'approved', $4, 'transfer', $5, $6, $7, $8::numeric, null, null, null, true, null, null, 'policy_override', now(), now(), now()
+            $1, $2, $3, 'withdraw', 'approved', $4, 'transfer', $5, $6, $7, $8::numeric, null, null, null, true, null, null, 'policy_override', now(), now(), now()
           )
           on conflict (approval_id)
           do update set
@@ -279,8 +280,8 @@ export async function POST(req: NextRequest) {
         await client.query(
           `
           insert into agent_transfer_decision_inbox (
-            decision_id, approval_id, agent_id, chain_key, decision, reason_message, decision_payload, source, status, created_at
-          ) values ($1, $2, $3, $4, 'approve', null, $5::jsonb, 'web', 'pending', now())
+            decision_id, approval_id, agent_id, chain_key, request_kind, decision, reason_message, decision_payload, source, status, created_at
+          ) values ($1, $2, $3, $4, 'withdraw', 'approve', null, $5::jsonb, 'web', 'pending', now())
           `,
           [decisionId, approvalId, body.agentId, body.chainKey, JSON.stringify(decisionPayload)]
         );
@@ -353,7 +354,8 @@ export async function POST(req: NextRequest) {
         amountWei,
         destination: decisionPayload.toAddress,
         status: 'queued',
-        executionMode: 'policy_override'
+        executionMode: 'policy_override',
+        requestKind: 'withdraw'
       },
       200,
       requestId

@@ -414,6 +414,7 @@ export async function GET(req: NextRequest) {
         from agent_transfer_approval_mirror
         where agent_id = $1
           and chain_key = $2
+          and coalesce(request_kind, 'transfer') <> 'withdraw'
           and status = 'approval_pending'
         order by created_at asc
         limit 50
@@ -466,6 +467,7 @@ export async function GET(req: NextRequest) {
         from agent_transfer_approval_mirror
         where agent_id = $1
           and chain_key = $2
+          and coalesce(request_kind, 'transfer') <> 'withdraw'
         order by created_at desc
         limit 50
         `,
