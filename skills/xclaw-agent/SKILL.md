@@ -143,6 +143,12 @@ Common optional:
 - `liquidity-claim-rewards <dex> <position_id> [reward_token]`
 - `liquidity-migrate <dex> <position_id> <from_protocol> <to_protocol> [slippage_bps] [request_json]`
 - `liquidity-positions <dex|all> [status]`
+- `limit-orders-create <buy|sell> <token_in> <token_out> <amount_in> <limit_price> <slippage_bps> [chain_key]`
+- `limit-orders-list [status|chain_key] [limit|chain_key]`
+- `limit-orders-cancel <order_id> [chain_key]`
+- `limit-orders-sync [chain_key]`
+- `limit-orders-run-once [chain_key] [sync]`
+- `limit-orders-run-loop <chain_key> <iterations> <interval_sec> [sync]`
 - `wallet-send <to> <amount_wei>`
 - `wallet-send-token <token_or_symbol> <to> <amount_wei>`
 - `transfer-policy-get`
@@ -177,6 +183,7 @@ Additional capabilities:
 - `dexscreener-top` sorts by liquidity descending and emits normalized decimal strings (`priceUsd` 8dp, USD metrics 2dp).
 - `token-research` is the preferred one-shot flow for small models: top-by-liquidity shortlist plus primary-token drilldown pairs in one response.
 - Transfer/trade policy is owner-controlled and may force approval.
+- Solana limit-orders parity is enabled on `solana_localnet` and `solana_devnet`; `solana_mainnet_beta` and `solana_testnet` remain capability-gated off for limit orders.
 - Runtime chain inference priority is: runtime/web-synced default chain (`state.json.defaultChain`) first, then env fallback (`XCLAW_DEFAULT_CHAIN`); explicit chain argument remains authoritative.
 - Runtime-canonical decision mode flag: `XCLAW_RUNTIME_CANONICAL_APPROVAL_DECISIONS=1`
   - Web management approvals route owner decisions through runtime `approvals decide-*` commands.

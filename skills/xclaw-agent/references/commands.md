@@ -19,6 +19,12 @@ This reference defines the expected command surface for the Python-first skill w
 - `liquidity-positions <dex|all> [status]`
 - `liquidity-quote-add <dex> <token_a> <token_b> <amount_a> <amount_b> <slippage_bps> [v2|v3] [pool_id]`
 - `liquidity-quote-remove <dex> <position_id> [percent] [v2|v3] [pool_id]`
+- `limit-orders-create <buy|sell> <token_in> <token_out> <amount_in> <limit_price> <slippage_bps> [chain_key]`
+- `limit-orders-list [status|chain_key] [limit|chain_key]`
+- `limit-orders-cancel <order_id> [chain_key]`
+- `limit-orders-sync [chain_key]`
+- `limit-orders-run-once [chain_key] [sync]`
+- `limit-orders-run-loop <chain_key> <iterations> <interval_sec> [sync]`
 - `trade-decide <trade_id> <approve|reject>` (runtime-canonical spot approval decision path)
 - `transfer-resume <approval_id>` (internal auto-resume path for single-trigger transfer approvals)
 - `transfer-decide <approval_id> <approve|deny>` (internal callback decision command)
@@ -82,6 +88,12 @@ Underlying runtime delegation (performed by wrapper):
 - `xclaw-agent liquidity positions --chain <chain_key> [--dex <dex>] [--status <status>] --json`
 - `xclaw-agent liquidity quote-add --chain <chain_key> --dex <dex> --token-a <token_or_symbol> --token-b <token_or_symbol> --amount-a <amount_a> --amount-b <amount_b> [--position-type <v2|v3>] [--pool-id <pool_pubkey>] [--slippage-bps <bps>] --json`
 - `xclaw-agent liquidity quote-remove --chain <chain_key> --dex <dex> --position-id <position_id> [--percent <1-100>] [--position-type <v2|v3>] [--pool-id <pool_pubkey>] --json`
+- `xclaw-agent limit-orders create --chain <chain_key> --mode real --side <buy|sell> --token-in <token_or_symbol> --token-out <token_or_symbol> --amount-in <amount_in> --limit-price <price> --slippage-bps <bps> [--expires-at <iso8601>] --json`
+- `xclaw-agent limit-orders list --chain <chain_key> [--status <open|triggered|filled|failed|cancelled|expired>] [--limit <1-200>] --json`
+- `xclaw-agent limit-orders cancel --order-id <order_id> --chain <chain_key> --json`
+- `xclaw-agent limit-orders sync --chain <chain_key> --json`
+- `xclaw-agent limit-orders run-once --chain <chain_key> [--sync] --json`
+- `xclaw-agent limit-orders run-loop --chain <chain_key> --iterations <n> --interval-sec <n> [--sync] --json`
 - `xclaw-agent liquidity increase --chain <chain_key> --dex <dex> --position-id <position_id> --token-a <token_or_symbol> --token-b <token_or_symbol> --amount-a <amount_a> --amount-b <amount_b> [--slippage-bps <bps>] --json`
 - `xclaw-agent liquidity claim-fees --chain <chain_key> --dex <dex> --position-id <position_id> [--collect-as-weth] --json`
 - `xclaw-agent liquidity claim-rewards --chain <chain_key> --dex <dex> --position-id <position_id> [--reward-token <token_or_symbol>] [--request-json <json>] --json`
@@ -119,6 +131,7 @@ Underlying runtime delegation (performed by wrapper):
   - `XCLAW_SOLANA_RPC_FALLBACK_URL_SOLANA_DEVNET=<fallback_rpc>`
   - `XCLAW_SOLANA_RPC_API_KEY_SOLANA_DEVNET=<tatum_api_key>` (required if provider is `tatum`)
   - For `raydium_clmm` quote/add/remove/increase/claim/migrate on non-localnet Solana, pass `--pool-id` unless chain config provides exactly one default pool in `execution.liquidity.adapters.raydium_clmm.poolRegistry`.
+  - Solana limit-orders are enabled on `solana_localnet` and `solana_devnet`; `solana_mainnet_beta` and `solana_testnet` remain disabled in this slice.
   - skill-wrapper aliases: `eth|kite -> native`, `weth|wkite -> wrapped`, `usdc|usdt -> stable`
   - skill-wrapper behavior: if only `native` is requested, it omits asset flags so faucet defaults to all assets.
 - `xclaw-agent faucet-networks --json`

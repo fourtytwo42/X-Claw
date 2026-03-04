@@ -129,6 +129,23 @@ DoD:
 
 ---
 
+## Slice 177-182: Solana Limit-Orders Parity (`create|list|cancel|run`)
+Status: [~]
+
+Goal:
+- Enable Solana limit-order parity on localnet/devnet using the existing runtime lifecycle and family-neutral contracts.
+
+DoD:
+- [~] canonical docs/contracts updated to include Solana limit-order parity scope and deferred chains.
+- [~] Solana chain capability flags updated (`solana_localnet` + `solana_devnet` enabled; mainnet/testnet deferred).
+- [~] limit-order schemas/openapi updated for family-neutral token ids and tx ids.
+- [~] runtime limit-order quote/fill paths dispatch by family (EVM + Solana).
+- [~] skill wrapper exposes limit-order create/list/cancel/sync/run commands.
+- [~] runtime + skill + API contract tests updated for Solana limit-order flows.
+- [ ] full sequential validation + grep proofs + issue evidence posted.
+
+---
+
 ## Slice 01: Environment + Toolchain Baseline
 Status: [x]
 

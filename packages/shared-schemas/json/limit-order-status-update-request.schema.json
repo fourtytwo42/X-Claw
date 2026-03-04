@@ -9,7 +9,7 @@
     "triggerAt": { "type": "string", "format": "date-time" },
     "reasonCode": { "type": "string", "maxLength": 64 },
     "reasonMessage": { "type": "string", "maxLength": 500 },
-    "txHash": { "type": "string", "pattern": "^0x[a-fA-F0-9]{64}$" },
+    "txHash": { "type": "string", "pattern": "^(0x[a-fA-F0-9]{64}|[1-9A-HJ-NP-Za-km-z]{32,88})$" },
     "mockReceiptId": { "type": "string", "maxLength": 128 }
   }
 }

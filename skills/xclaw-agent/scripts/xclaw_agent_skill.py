@@ -1192,6 +1192,109 @@ def main(argv: List[str]) -> int:
             ]
         )
 
+    if cmd == "limit-orders-create":
+        if len(argv) < 8:
+            return _err(
+                "usage",
+                "limit-orders-create requires <buy|sell> <token_in> <token_out> <amount_in> <limit_price> <slippage_bps>.",
+                "usage: limit-orders-create <buy|sell> <token_in> <token_out> <amount_in> <limit_price> <slippage_bps> [chain_key]",
+                exit_code=2,
+            )
+        side = str(argv[2] or "").strip().lower()
+        if side not in {"buy", "sell"}:
+            return _err("invalid_input", "side must be buy or sell.", exit_code=2)
+        target_chain = str(argv[8]).strip() if len(argv) >= 9 and str(argv[8]).strip() else chain
+        if not _is_uint_string(str(argv[7]).strip()):
+            return _err("invalid_input", "slippage_bps must be an integer.", exit_code=2)
+        return _run_agent(
+            [
+                "limit-orders",
+                "create",
+                "--chain",
+                target_chain,
+                "--mode",
+                "real",
+                "--side",
+                side,
+                "--token-in",
+                str(argv[3]).strip(),
+                "--token-out",
+                str(argv[4]).strip(),
+                "--amount-in",
+                str(argv[5]).strip(),
+                "--limit-price",
+                str(argv[6]).strip(),
+                "--slippage-bps",
+                str(argv[7]).strip(),
+                "--json",
+            ]
+        )
+
+    if cmd == "limit-orders-list":
+        args = ["limit-orders", "list", "--chain", chain]
+        if len(argv) >= 3 and str(argv[2]).strip():
+            status = str(argv[2]).strip().lower()
+            if status in {"open", "triggered", "filled", "failed", "cancelled", "expired"}:
+                args.extend(["--status", status])
+            elif _is_uint_string(status):
+                args.extend(["--limit", status])
+            else:
+                args = ["limit-orders", "list", "--chain", status]
+        if len(argv) >= 4 and str(argv[3]).strip():
+            candidate = str(argv[3]).strip()
+            if _is_uint_string(candidate):
+                args.extend(["--limit", candidate])
+            else:
+                args = ["limit-orders", "list", "--chain", candidate]
+        args.append("--json")
+        return _run_agent(args)
+
+    if cmd == "limit-orders-cancel":
+        if len(argv) < 3:
+            return _err("usage", "limit-orders-cancel requires <order_id>.", "usage: limit-orders-cancel <order_id> [chain_key]", exit_code=2)
+        target_chain = str(argv[3]).strip() if len(argv) >= 4 and str(argv[3]).strip() else chain
+        return _run_agent(["limit-orders", "cancel", "--order-id", str(argv[2]).strip(), "--chain", target_chain, "--json"])
+
+    if cmd == "limit-orders-sync":
+        target_chain = str(argv[2]).strip() if len(argv) >= 3 and str(argv[2]).strip() else chain
+        return _run_agent(["limit-orders", "sync", "--chain", target_chain, "--json"])
+
+    if cmd == "limit-orders-run-once":
+        target_chain = str(argv[2]).strip() if len(argv) >= 3 and str(argv[2]).strip() else chain
+        args = ["limit-orders", "run-once", "--chain", target_chain]
+        if len(argv) >= 4 and str(argv[3]).strip().lower() in {"sync", "--sync", "1", "true"}:
+            args.append("--sync")
+        args.append("--json")
+        return _run_agent(args)
+
+    if cmd == "limit-orders-run-loop":
+        if len(argv) < 5:
+            return _err(
+                "usage",
+                "limit-orders-run-loop requires <chain_key> <iterations> <interval_sec>.",
+                "usage: limit-orders-run-loop <chain_key> <iterations> <interval_sec> [sync]",
+                exit_code=2,
+            )
+        target_chain = str(argv[2]).strip()
+        iterations = str(argv[3]).strip()
+        interval_sec = str(argv[4]).strip()
+        if not _is_uint_string(iterations) or not _is_uint_string(interval_sec):
+            return _err("invalid_input", "iterations and interval_sec must be integers.", exit_code=2)
+        args = [
+            "limit-orders",
+            "run-loop",
+            "--chain",
+            target_chain,
+            "--iterations",
+            iterations,
+            "--interval-sec",
+            interval_sec,
+        ]
+        if len(argv) >= 6 and str(argv[5]).strip().lower() in {"sync", "--sync", "1", "true"}:
+            args.append("--sync")
+        args.append("--json")
+        return _run_agent(args)
+
     if cmd == "transfer-resume":
         if len(argv) < 3:
             return _err("usage", "transfer-resume requires <approval_id>", "usage: transfer-resume <approval_id>", exit_code=2)

@@ -73,6 +73,15 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 - [~] Update OpenAPI/schema/skill docs for advanced Solana LP metadata and examples.
 - [ ] Sequential validation + PM2 restart + issue evidence capture.
 
+## 0.12) Slice 177-182 Solana Limit-Orders Parity Program
+
+- [~] Canonicalize Solana limit-order parity scope (`create/list/cancel/sync/run`) with deferred mainnet/testnet posture.
+- [~] Enable `limitOrders` capability on `solana_localnet` + `solana_devnet`; keep `solana_mainnet_beta` + `solana_testnet` disabled.
+- [~] Generalize limit-order schemas/OpenAPI (`tokenIn/tokenOut` family-neutral, `txHash` family-neutral).
+- [~] Refactor runtime limit-order quote/fill path to family dispatch (EVM + Solana).
+- [~] Expose limit-order command surface in skill wrapper and operator docs.
+- [ ] Sequential validation + PM2 restart + issue evidence capture.
+
 ---
 
 ## 0) Program Control and Working Rules

@@ -974,11 +974,51 @@ class X402SkillWrapperTests(unittest.TestCase):
         self.assertIsInstance(extracted, dict)
         self.assertEqual(extracted.get("code"), "approval_required")
 
-    def test_limit_orders_are_not_exposed_in_skill_wrapper(self) -> None:
-        code, payload = self._capture(["xclaw_agent_skill.py", "limit-orders-list"])
-        self.assertEqual(code, 2)
-        self.assertIsInstance(payload, dict)
-        self.assertEqual(payload.get("code"), "unknown_command")
+    def test_limit_orders_create_routes_to_runtime(self) -> None:
+        with mock.patch.object(skill, "_run_agent", return_value=0) as run_mock:
+            code = skill.main(
+                [
+                    "xclaw_agent_skill.py",
+                    "limit-orders-create",
+                    "buy",
+                    "So11111111111111111111111111111111111111112",
+                    "DezXAZ8z7PnrnRJjz3A8C5W97R6A6nhz6M8mM4fowwWf",
+                    "10",
+                    "0.95",
+                    "200",
+                    "solana_devnet",
+                ]
+            )
+        self.assertEqual(code, 0)
+        run_mock.assert_called_once_with(
+            [
+                "limit-orders",
+                "create",
+                "--chain",
+                "solana_devnet",
+                "--mode",
+                "real",
+                "--side",
+                "buy",
+                "--token-in",
+                "So11111111111111111111111111111111111111112",
+                "--token-out",
+                "DezXAZ8z7PnrnRJjz3A8C5W97R6A6nhz6M8mM4fowwWf",
+                "--amount-in",
+                "10",
+                "--limit-price",
+                "0.95",
+                "--slippage-bps",
+                "200",
+                "--json",
+            ]
+        )
+
+    def test_limit_orders_run_once_routes_to_runtime(self) -> None:
+        with mock.patch.object(skill, "_run_agent", return_value=0) as run_mock:
+            code = skill.main(["xclaw_agent_skill.py", "limit-orders-run-once", "solana_localnet", "sync"])
+        self.assertEqual(code, 0)
+        run_mock.assert_called_once_with(["limit-orders", "run-once", "--chain", "solana_localnet", "--sync", "--json"])
 
 if __name__ == "__main__":
     unittest.main()

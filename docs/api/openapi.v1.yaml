@@ -3249,10 +3249,10 @@ components:
           pattern: '^0x[a-fA-F0-9]{40}$'
         tokenIn:
           type: string
-          pattern: '^0x[a-fA-F0-9]{40}$'
+          pattern: '^(0x[a-fA-F0-9]{40}|[1-9A-HJ-NP-Za-km-z]{32,44})$'
         tokenOut:
           type: string
-          pattern: '^0x[a-fA-F0-9]{40}$'
+          pattern: '^(0x[a-fA-F0-9]{40}|[1-9A-HJ-NP-Za-km-z]{32,44})$'
         amountInUnits:
           type: string
           pattern: '^[0-9]+$'
@@ -4258,10 +4258,10 @@ components:
           enum: [buy, sell]
         tokenIn:
           type: string
-          pattern: '^0x[a-fA-F0-9]{40}$'
+          pattern: '^(0x[a-fA-F0-9]{40}|[1-9A-HJ-NP-Za-km-z]{32,44})$'
         tokenOut:
           type: string
-          pattern: '^0x[a-fA-F0-9]{40}$'
+          pattern: '^(0x[a-fA-F0-9]{40}|[1-9A-HJ-NP-Za-km-z]{32,44})$'
         amountIn:
           type: string
         limitPrice:
@@ -4505,7 +4505,7 @@ components:
           type: string
         txHash:
           type: string
-          pattern: '^0x[a-fA-F0-9]{64}$'
+          pattern: '^(0x[a-fA-F0-9]{64}|[1-9A-HJ-NP-Za-km-z]{32,88})$'
         mockReceiptId:
           type: string
     ManagementSessionSelectRequest:

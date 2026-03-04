@@ -1,3 +1,14 @@
+# Slice 177-182 Tasks: Solana Limit-Orders Parity (2026-03-04)
+
+- [x] Update canonical docs/contracts for Solana limit-order parity scope and deferred mainnet/testnet posture.
+- [x] Enable `capabilities.limitOrders=true` on `solana_localnet` + `solana_devnet`; keep `solana_mainnet_beta` + `solana_testnet` disabled.
+- [x] Generalize limit-order schemas + OpenAPI component contracts for family-neutral token identifiers and tx ids.
+- [x] Refactor runtime limit-order quote/fill path to family dispatch (`_quote_limit_order_price`, Solana local/dev execution branches).
+- [x] Remove runtime create-path hex-only token guard for limit orders.
+- [x] Expose skill wrapper limit-order command surface (create/list/cancel/sync/run-once/run-loop).
+- [x] Update skill operator docs for Solana limit-order usage.
+- [ ] Run sequential validations + grep proofs + issue evidence post.
+
 # Slice 133-138 Tasks: Dual-Family Runtime (EVM + Solana) (2026-03-04)
 
 ## Slice 170-176 Tasks: Solana Advanced LP Parity (2026-03-04)

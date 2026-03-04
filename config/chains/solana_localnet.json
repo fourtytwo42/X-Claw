@@ -22,7 +22,7 @@
     "wallet": true,
     "trade": true,
     "liquidity": true,
-    "limitOrders": false,
+    "limitOrders": true,
     "x402": true,
     "faucet": true,
     "deposits": true

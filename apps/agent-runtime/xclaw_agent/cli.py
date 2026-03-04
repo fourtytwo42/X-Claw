@@ -99,6 +99,7 @@ from xclaw_agent.solana_raydium_clmm import (
 )
 from xclaw_agent.solana_rpc_client import (
     SolanaRpcClientError,
+    rpc_post as solana_rpc_post,
     select_rpc_endpoint as solana_select_rpc_endpoint,
 )
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
@@ -6960,6 +6961,78 @@ def _quote_router_price(chain: str, token_in: str, token_out: str) -> Decimal:
         raise WalletStoreError(str(exc)) from exc
 
 
+_BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+
+
+def _is_valid_limit_order_token(chain: str, token_address: str) -> bool:
+    if _is_solana_chain(chain):
+        return is_solana_address(token_address)
+    return is_hex_address(token_address)
+
+
+def _limit_order_token_format_hint(chain: str) -> str:
+    if _is_solana_chain(chain):
+        return "Use canonical symbols or Solana mint base58 addresses."
+    return "Use symbols like WETH/USDC or 0x addresses."
+
+
+def _deterministic_base58_id(seed: str, length: int = 64) -> str:
+    if length < 16:
+        length = 16
+    digest = hashlib.sha256(str(seed).encode("utf-8")).digest()
+    value = int.from_bytes(digest, "big")
+    chars: list[str] = []
+    while value > 0:
+        value, remainder = divmod(value, len(_BASE58_ALPHABET))
+        chars.append(_BASE58_ALPHABET[remainder])
+    if not chars:
+        chars = ["1"]
+    text = "".join(reversed(chars))
+    if len(text) < length:
+        text = (text * ((length // len(text)) + 1))[:length]
+    return text[:length]
+
+
+def _solana_mint_decimals(chain: str, mint: str) -> int:
+    result = solana_rpc_post("getTokenSupply", [mint, {"commitment": "confirmed"}], chain_key=chain, timeout_sec=10.0)
+    value = result.get("value") if isinstance(result, dict) else {}
+    decimals = (value or {}).get("decimals") if isinstance(value, dict) else None
+    try:
+        parsed = int(decimals)
+    except Exception as exc:
+        raise WalletStoreError(f"chain_config_invalid: invalid Solana mint decimals for '{mint}'.") from exc
+    if parsed < 0 or parsed > 18:
+        raise WalletStoreError(f"chain_config_invalid: unsupported Solana mint decimals for '{mint}': {parsed}.")
+    return parsed
+
+
+def _solana_local_price_token_in_per_one_token_out(token_in: str, token_out: str) -> Decimal:
+    seed = f"{token_in.lower()}->{token_out.lower()}"
+    digest = hashlib.sha256(seed.encode("utf-8")).digest()
+    basis = int.from_bytes(digest[:4], "big")
+    # Deterministic bounded range [0.5, 50.0) for localnet simulation.
+    scaled = (basis % 49500) + 500
+    return (Decimal(scaled) / Decimal(1000)).quantize(Decimal("0.000001"))
+
+
+def _quote_limit_order_price(chain: str, token_in: str, token_out: str) -> Decimal:
+    if not _is_solana_chain(chain):
+        return _quote_router_price(chain, token_in, token_out)
+    if chain == "solana_localnet":
+        return _solana_local_price_token_in_per_one_token_out(token_in, token_out)
+    token_out_decimals = _solana_mint_decimals(chain, token_out)
+    token_in_decimals = _solana_mint_decimals(chain, token_in)
+    one_token_out_units = str(10**token_out_decimals)
+    quote = solana_jupiter_quote(
+        chain_key=chain,
+        input_mint=token_out,
+        output_mint=token_in,
+        amount_units=one_token_out_units,
+        slippage_bps=100,
+    )
+    return Decimal(int(quote.amount_out_units)) / (Decimal(10) ** Decimal(token_in_decimals))
+
+
 def _limit_order_triggered(side: str, current_price: Decimal, limit_price: Decimal) -> bool:
     if side == "buy":
         return current_price <= limit_price
@@ -12532,6 +12605,92 @@ def _sync_limit_orders(chain: str) -> tuple[int, int]:
 
 
 def _execute_limit_order_real(order: dict[str, Any], chain: str) -> str:
+    if _is_solana_chain(chain):
+        return _execute_limit_order_real_solana(order, chain)
+    return _execute_limit_order_real_evm(order, chain)
+
+
+def _execute_limit_order_real_solana(order: dict[str, Any], chain: str) -> str:
+    try:
+        store = load_wallet_store()
+        wallet_address, private_key_bytes, key_scheme = _execution_wallet_secret(store, chain)
+        if key_scheme != "solana_ed25519":
+            raise WalletStoreError(f"Wallet keyScheme '{key_scheme}' is not compatible with Solana execution on chain '{chain}'.")
+
+        token_in = str(order.get("tokenIn") or "")
+        token_out = str(order.get("tokenOut") or "")
+        if not is_solana_address(token_in) or not is_solana_address(token_out):
+            raise WalletStoreError("invalid_input: Solana limit-order tokenIn/tokenOut must be mint addresses.")
+
+        token_in_decimals = _solana_mint_decimals(chain, token_in)
+        token_out_decimals = _solana_mint_decimals(chain, token_out)
+        amount_human = str(order.get("amountIn") or "0")
+        amount_in_units = _to_units_uint(amount_human, token_in_decimals)
+        amount_in_int = int(amount_in_units)
+        if amount_in_int <= 0:
+            raise WalletStoreError("invalid_input: amountIn must be greater than zero.")
+        state, day_key, current_spend, _ = _enforce_spend_preconditions(chain, amount_in_int, enforce_native_cap=False)
+        projected_spend_usd = _to_non_negative_decimal(amount_human)
+        cap_state, _, current_spend_usd, current_filled_trades, _ = _enforce_trade_caps(chain, projected_spend_usd, 1)
+
+        slippage_bps_raw = order.get("slippageBps")
+        try:
+            slippage_bps = int(slippage_bps_raw if slippage_bps_raw is not None else 100)
+        except Exception:
+            slippage_bps = 100
+        if slippage_bps < 0 or slippage_bps > 5000:
+            raise WalletStoreError("invalid_input: slippageBps must be between 0 and 5000.")
+
+        signature: str
+        if chain == "solana_localnet":
+            price = _solana_local_price_token_in_per_one_token_out(token_in, token_out)
+            amount_in_human = Decimal(amount_human)
+            if price <= 0:
+                raise WalletStoreError("chain_config_invalid: local Solana quote price is not positive.")
+            amount_out_human = amount_in_human / price
+            if amount_out_human <= 0:
+                raise WalletStoreError("transaction_failed: local Solana quote produced zero output.")
+            _to_units_uint(str(amount_out_human), token_out_decimals)
+            signature = _deterministic_base58_id(f"{order.get('orderId') or ''}:{wallet_address}:{amount_in_units}:{utc_now()}", 64)
+        else:
+            quote = solana_jupiter_quote(
+                chain_key=chain,
+                input_mint=token_in,
+                output_mint=token_out,
+                amount_units=amount_in_units,
+                slippage_bps=slippage_bps,
+            )
+            tx = solana_jupiter_execute_swap(
+                chain_key=chain,
+                rpc_url=_chain_rpc_url(chain),
+                private_key_bytes=private_key_bytes,
+                quote_payload=quote.quote_payload,
+                user_address=wallet_address,
+            )
+            signature = str(tx.get("signature") or "").strip()
+        if not signature:
+            raise WalletStoreError("transaction_failed: Solana swap execution did not return a signature.")
+
+        _record_spend(state, chain, day_key, current_spend + amount_in_int)
+        _record_trade_cap_ledger(
+            cap_state,
+            chain,
+            day_key,
+            current_spend_usd + projected_spend_usd,
+            current_filled_trades + 1,
+        )
+        try:
+            _post_trade_usage(chain, day_key, projected_spend_usd, 1)
+        except Exception:
+            pass
+        return signature
+    except SolanaRuntimeError as exc:
+        raise WalletStoreError(f"{exc.code}: {exc}") from exc
+    except SolanaRpcClientError as exc:
+        raise WalletStoreError(f"{exc.code}: {exc}") from exc
+
+
+def _execute_limit_order_real_evm(order: dict[str, Any], chain: str) -> str:
     store = load_wallet_store()
     wallet_address, private_key_hex = _execution_wallet(store, chain)
     cast_bin = _require_cast_bin()
@@ -12630,8 +12789,14 @@ def cmd_limit_orders_create(args: argparse.Namespace) -> int:
             )
         token_in = _resolve_token_address(args.chain, args.token_in)
         token_out = _resolve_token_address(args.chain, args.token_out)
-        if not is_hex_address(token_in) or not is_hex_address(token_out):
-            return fail("invalid_input", "token-in and token-out must be valid 0x addresses (or canonical symbols).", "Use symbols like WETH/USDC or 0x addresses.", {"tokenIn": args.token_in, "tokenOut": args.token_out}, exit_code=2)
+        if not _is_valid_limit_order_token(args.chain, token_in) or not _is_valid_limit_order_token(args.chain, token_out):
+            return fail(
+                "invalid_input",
+                "token-in and token-out must be valid addresses for the selected chain (or canonical symbols).",
+                _limit_order_token_format_hint(args.chain),
+                {"tokenIn": args.token_in, "tokenOut": args.token_out, "chain": args.chain},
+                exit_code=2,
+            )
         payload = {
             "schemaVersion": 1,
             "agentId": _resolve_agent_id(_resolve_api_key()),
@@ -12804,7 +12969,7 @@ def cmd_limit_orders_run_once(args: argparse.Namespace) -> int:
                 )
                 skipped += 1
                 continue
-            current_price = _quote_router_price(chain, str(order.get("tokenIn")), str(order.get("tokenOut")))
+            current_price = _quote_limit_order_price(chain, str(order.get("tokenIn")), str(order.get("tokenOut")))
             if not _limit_order_triggered(side, current_price, limit_price):
                 skipped += 1
                 continue
@@ -12827,14 +12992,29 @@ def cmd_limit_orders_run_once(args: argparse.Namespace) -> int:
                     },
                 )
             except WalletStoreError as exc:
+                reason_code = "rpc_unavailable"
+                message_text = str(exc)
+                code_match = re.match(r"^([a-z0-9_]+):\s*", message_text.strip().lower())
+                if code_match:
+                    candidate = code_match.group(1)
+                    if candidate in {
+                        "unsupported_chain_capability",
+                        "invalid_input",
+                        "rpc_unavailable",
+                        "transaction_failed",
+                        "slippage_exceeded",
+                        "unsupported_execution_adapter",
+                        "chain_config_invalid",
+                    }:
+                        reason_code = candidate
                 _post_limit_order_status(
                     order_id,
                     {
                         "status": "failed",
                         "triggerPrice": str(current_price),
                         "triggerAt": utc_now(),
-                        "reasonCode": "rpc_unavailable",
-                        "reasonMessage": str(exc),
+                        "reasonCode": reason_code,
+                        "reasonMessage": message_text,
                     },
                 )
 

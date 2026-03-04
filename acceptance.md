@@ -1,3 +1,35 @@
+# Slice 177-182 Acceptance Evidence: Solana Limit-Orders Parity
+
+Date (UTC): 2026-03-04
+Active slice context: `Slice 177 -> Slice 182`.
+
+### Objective + Scope Lock
+- Objective:
+  - enable Solana limit-orders parity on `solana_localnet` + `solana_devnet`,
+  - keep public routes and status envelope stable while widening token/tx formats to family-neutral values.
+
+### Behavior Checks
+- [x] Solana `limitOrders` capability enabled on localnet/devnet and deferred on mainnet/testnet.
+- [x] limit-order schemas/openapi accept Solana mint and signature formats.
+- [x] runtime limit-order quote/fill path dispatches by chain family.
+- [x] skill wrapper exposes limit-order create/list/cancel/sync/run command surface.
+
+### Required Validation Gates
+- [ ] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- [ ] `python3 -m unittest apps/agent-runtime/tests/test_x402_skill_wrapper.py -v`
+- [ ] targeted Next/API limit-order contract tests
+- [ ] `npm run db:parity`
+- [ ] `npm run seed:reset`
+- [ ] `npm run seed:load`
+- [ ] `npm run seed:verify`
+- [ ] `npm run build`
+- [ ] `pm2 restart all`
+
+### Grep Proofs
+- [ ] no hex-only `tokenIn/tokenOut` pattern remains in active limit-order schemas.
+- [ ] no hex-only `txHash` pattern remains in limit-order status schema contract.
+- [ ] runtime limit-order quote/execution path is family-dispatched (not EVM-only).
+
 # Slice 133-138 Acceptance Evidence: Dual-Family Runtime (EVM + Solana)
 
 ## Slice 170-176 Acceptance Evidence: Solana Advanced LP Parity

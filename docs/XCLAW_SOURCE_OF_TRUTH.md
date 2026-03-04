@@ -242,6 +242,33 @@ and fail closed for unsupported execution families.
 - `tx_receipt_timeout`
 6. Prior statements that Solana CLMM supports only add/remove are superseded history and not current canonical behavior.
 
+## 3.11) Slice 177-182 Solana Limit-Orders Parity (2026-03-04)
+
+1. Limit-order lifecycle remains canonical and unchanged for all families:
+- `open -> triggered -> filled|failed|expired` (with `cancelled` via cancel route).
+2. Solana limit-order rollout scope for this slice:
+- enabled: `solana_localnet`, `solana_devnet`
+- deferred: `solana_mainnet_beta`, `solana_testnet`
+3. Runtime limit-order quote/fill is chain-family-dispatched:
+- EVM path keeps router quote + EVM swap execution.
+- Solana path uses runtime-local quote/fill (`solana_localnet` deterministic local quote/execution; non-localnet Solana via Jupiter quote/execute).
+4. Public route paths remain unchanged:
+- `POST /api/v1/limit-orders`
+- `GET /api/v1/limit-orders`
+- `POST /api/v1/limit-orders/{orderId}/cancel`
+- `POST /api/v1/limit-orders/{orderId}/status`
+- management equivalents remain path-stable.
+5. Contract generalization for limit orders:
+- `tokenIn` / `tokenOut` are family-neutral token identifiers (EVM hex or Solana mint base58).
+- `txHash` field name is retained for compatibility; value is family-neutral tx id (`0x...` hash or Solana signature).
+6. Skill wrapper command surface now includes limit-orders parity commands:
+- `limit-orders-create`
+- `limit-orders-list`
+- `limit-orders-cancel`
+- `limit-orders-sync`
+- `limit-orders-run-once`
+- `limit-orders-run-loop`
+
 ---
 
 ## 4) Scope

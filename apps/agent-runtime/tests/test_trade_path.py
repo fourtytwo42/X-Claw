@@ -2221,6 +2221,63 @@ class TradePathRuntimeTests(unittest.TestCase):
         sent = captured.get("payload") or {}
         self.assertNotIn("expiresAt", sent)
 
+    def test_limit_orders_create_accepts_solana_mints(self) -> None:
+        args = argparse.Namespace(
+            chain="solana_devnet",
+            mode="real",
+            side="buy",
+            token_in="SOL",
+            token_out="USDC",
+            amount_in="5",
+            limit_price="1.25",
+            slippage_bps="150",
+            expires_at=None,
+            json=True,
+        )
+
+        captured: dict = {}
+
+        def fake_api_request(method: str, path: str, payload: dict | None = None, include_idempotency: bool = False):
+            captured["method"] = method
+            captured["path"] = path
+            captured["payload"] = payload
+            return 200, {"orderId": "lmt_sol_1", "status": "open"}
+
+        with mock.patch.object(
+            cli,
+            "_resolve_token_address",
+            side_effect=["So11111111111111111111111111111111111111112", "DezXAZ8z7PnrnRJjz3A8C5W97R6A6nhz6M8mM4fowwWf"],
+        ), mock.patch.object(cli, "_resolve_api_key", return_value="xak1.ag_1.sig.payload"), mock.patch.object(
+            cli, "_resolve_agent_id", return_value="ag_1"
+        ), mock.patch.object(cli, "_api_request", side_effect=fake_api_request):
+            payload = self._run_and_parse_stdout(lambda: cli.cmd_limit_orders_create(args))
+
+        self.assertTrue(payload.get("ok"))
+        sent = captured.get("payload") or {}
+        self.assertEqual(sent.get("tokenIn"), "So11111111111111111111111111111111111111112")
+        self.assertEqual(sent.get("tokenOut"), "DezXAZ8z7PnrnRJjz3A8C5W97R6A6nhz6M8mM4fowwWf")
+
+    def test_limit_orders_create_rejects_invalid_solana_token(self) -> None:
+        args = argparse.Namespace(
+            chain="solana_devnet",
+            mode="real",
+            side="buy",
+            token_in="SOL",
+            token_out="USDC",
+            amount_in="5",
+            limit_price="1.25",
+            slippage_bps="150",
+            expires_at=None,
+            json=True,
+        )
+        with mock.patch.object(cli, "_resolve_token_address", side_effect=["not_a_mint", "also_not_a_mint"]):
+            buf = io.StringIO()
+            with redirect_stdout(buf):
+                code = cli.cmd_limit_orders_create(args)
+        self.assertEqual(code, 2)
+        out = json.loads(buf.getvalue().strip())
+        self.assertEqual(out.get("code"), "invalid_input")
+
     def test_limit_orders_create_surfaces_api_details(self) -> None:
         args = argparse.Namespace(
             chain="base_sepolia",
@@ -2259,6 +2316,40 @@ class TradePathRuntimeTests(unittest.TestCase):
         details = out.get("details") or {}
         self.assertEqual(details.get("requestId"), "req_123")
         self.assertIn("apiDetails", details)
+
+    def test_limit_orders_run_once_solana_success_posts_signature_hash(self) -> None:
+        args = argparse.Namespace(chain="solana_devnet", json=True, sync=False)
+        store = {
+            "version": 1,
+            "orders": [
+                {
+                    "orderId": "lmt_sol_1",
+                    "chainKey": "solana_devnet",
+                    "status": "open",
+                    "side": "buy",
+                    "mode": "real",
+                    "tokenIn": "So11111111111111111111111111111111111111112",
+                    "tokenOut": "DezXAZ8z7PnrnRJjz3A8C5W97R6A6nhz6M8mM4fowwWf",
+                    "amountIn": "1",
+                    "limitPrice": "2",
+                    "slippageBps": 100,
+                }
+            ],
+        }
+        status_payloads: list[dict[str, str]] = []
+        with mock.patch.object(cli, "_replay_limit_order_outbox", return_value=(0, 0)), mock.patch.object(
+            cli, "load_limit_order_store", return_value=store
+        ), mock.patch.object(cli, "_quote_limit_order_price", return_value=Decimal("1")), mock.patch.object(
+            cli, "_execute_limit_order_real", return_value="3x8qkNq3gFmX8nEo6S4R8rM2nV4jD7yP1wzN6Q5uR2mL"
+        ), mock.patch.object(
+            cli,
+            "_post_limit_order_status",
+            side_effect=lambda order_id, payload, queue_on_failure=True: status_payloads.append(payload),
+        ):
+            code = cli.cmd_limit_orders_run_once(args)
+        self.assertEqual(code, 0)
+        self.assertEqual([str(item.get("status")) for item in status_payloads], ["triggered", "filled"])
+        self.assertEqual(str((status_payloads[-1] or {}).get("txHash")), "3x8qkNq3gFmX8nEo6S4R8rM2nV4jD7yP1wzN6Q5uR2mL")
 
     def test_profile_set_name_success(self) -> None:
         args = argparse.Namespace(name="harvey-ops", chain="hardhat_local", json=True)
@@ -3141,7 +3232,7 @@ class TradePathRuntimeTests(unittest.TestCase):
         statuses: list[dict[str, str]] = []
         with mock.patch.object(cli, "_replay_limit_order_outbox", return_value=(0, 0)), mock.patch.object(
             cli, "load_limit_order_store", return_value=store
-        ), mock.patch.object(cli, "_quote_router_price", return_value=Decimal("10")), mock.patch.object(
+        ), mock.patch.object(cli, "_quote_limit_order_price", return_value=Decimal("10")), mock.patch.object(
             cli,
             "_post_limit_order_status",
             side_effect=lambda order_id, payload, queue_on_failure=True: statuses.append({"orderId": order_id, "status": str(payload.get("status"))}),
@@ -3171,7 +3262,7 @@ class TradePathRuntimeTests(unittest.TestCase):
         statuses: list[str] = []
         with mock.patch.object(cli, "_replay_limit_order_outbox", return_value=(0, 0)), mock.patch.object(
             cli, "load_limit_order_store", return_value=store
-        ), mock.patch.object(cli, "_quote_router_price", return_value=Decimal("2")), mock.patch.object(
+        ), mock.patch.object(cli, "_quote_limit_order_price", return_value=Decimal("2")), mock.patch.object(
             cli, "_execute_limit_order_real", side_effect=cli.WalletStoreError("rpc down")
         ), mock.patch.object(
             cli,

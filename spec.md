@@ -1,3 +1,47 @@
+# Slice 177-182 Spec: Solana Limit-Orders Parity (2026-03-04)
+
+## Goal
+1. Enable Solana limit-order parity for `create/list/cancel/sync/run` on `solana_localnet` + `solana_devnet`.
+2. Keep route paths and top-level payload keys stable while generalizing token/tx formats to family-neutral values.
+3. Preserve runtime-local execution + audit lifecycle contract (`open -> triggered -> filled|failed|expired`).
+
+## Non-goals
+1. No Solana limit-orders enablement on `solana_mainnet_beta` or `solana_testnet`.
+2. No route path changes.
+3. No management withdraw execution changes (remains audit-only).
+
+## Locked scope
+1. `apps/agent-runtime/xclaw_agent/cli.py`
+2. `apps/agent-runtime/tests/test_trade_path.py`
+3. `skills/xclaw-agent/scripts/xclaw_agent_skill.py`
+4. `apps/agent-runtime/tests/test_x402_skill_wrapper.py`
+5. `apps/network-web/src/app/api/v1/limit-orders/*`
+6. `apps/network-web/src/app/api/v1/management/limit-orders/*`
+7. `packages/shared-schemas/json/agent-limit-order-create-request.schema.json`
+8. `packages/shared-schemas/json/management-limit-order-create-request.schema.json`
+9. `packages/shared-schemas/json/limit-order.schema.json`
+10. `packages/shared-schemas/json/limit-order-status-update-request.schema.json`
+11. `config/chains/solana_localnet.json`
+12. `config/chains/solana_devnet.json`
+13. `docs/api/openapi.v1.yaml`
+14. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+15. `docs/XCLAW_SLICE_TRACKER.md`
+16. `docs/XCLAW_BUILD_ROADMAP.md`
+17. `spec.md`
+18. `tasks.md`
+19. `acceptance.md`
+
+## Acceptance checks
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- `python3 -m unittest apps/agent-runtime/tests/test_x402_skill_wrapper.py -v`
+- targeted Next/API limit-order contract tests
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `pm2 restart all`
+
 # Slice 133-138 Spec: Dual-Family Runtime (EVM + Solana) (2026-03-04)
 
 ## Slice 164-169 Extension (2026-03-04)
