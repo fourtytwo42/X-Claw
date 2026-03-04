@@ -18,14 +18,39 @@ if str(RUNTIME_ROOT) not in sys.path:
 from xclaw_agent import x402_policy, x402_runtime, x402_state  # noqa: E402
 
 
-class _OkHandler(BaseHTTPRequestHandler):
+class _ChallengeHandler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):  # noqa: A003
         return
 
     def do_GET(self):  # noqa: N802
+        self.send_response(402)
+        self.send_header("Content-Type", "application/json")
+        body = json.dumps(
+            {
+                "code": "payment_required",
+                "details": {
+                    "paymentId": "xpm_test",
+                    "networkKey": "base_sepolia",
+                    "facilitatorKey": "cdp",
+                    "assetKind": "native",
+                    "amountAtomic": "3",
+                    "recipientAddress": "0x1111111111111111111111111111111111111111",
+                },
+            }
+        ).encode("utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_POST(self):  # noqa: N802
+        tx_id = self.headers.get("X-Tx-Id")
+        if not tx_id:
+            self.send_response(400)
+            self.end_headers()
+            return
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
-        body = b'{"ok":true}'
+        body = b'{"ok":true,"code":"payment_settled"}'
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
@@ -73,6 +98,7 @@ class X402RuntimeTests(unittest.TestCase):
                     facilitator="cdp",
                     amount_atomic="1",
                     memo="test",
+                    settle_payment=lambda _req: {"txId": "0x" + "1" * 64},
                 )
                 self.assertTrue(result.get("ok"))
                 self.assertEqual(result.get("code"), "approval_required")
@@ -100,6 +126,7 @@ class X402RuntimeTests(unittest.TestCase):
                     network="base_sepolia",
                     facilitator="cdp",
                     amount_atomic="2",
+                    settle_payment=lambda _req: {"txId": "0x" + "2" * 64},
                 )
                 approval_id = str((created.get("approval") or {}).get("approvalId"))
                 decided = x402_runtime.pay_decide(approval_id, "deny", "owner denied")
@@ -127,7 +154,7 @@ class X402RuntimeTests(unittest.TestCase):
                 port = int(sock.getsockname()[1])
                 sock.close()
 
-                server = ThreadingHTTPServer(("127.0.0.1", port), _OkHandler)
+                server = ThreadingHTTPServer(("127.0.0.1", port), _ChallengeHandler)
                 thread = threading.Thread(target=server.serve_forever, daemon=True)
                 thread.start()
                 try:
@@ -136,15 +163,16 @@ class X402RuntimeTests(unittest.TestCase):
                         network="base_sepolia",
                         facilitator="cdp",
                         amount_atomic="3",
+                        settle_payment=lambda _req: {"txId": "0x" + "3" * 64},
                     )
                 finally:
                     server.shutdown()
                     server.server_close()
 
                 self.assertTrue(result.get("ok"))
-                self.assertIn(result.get("code"), {"ok", "payment_failed"})
+                self.assertEqual(result.get("code"), "ok")
                 approval = result.get("approval") or {}
-                self.assertIn(approval.get("status"), {"filled", "failed"})
+                self.assertEqual(approval.get("status"), "filled")
 
     def test_unsupported_network_rejected(self) -> None:
         with self.assertRaises(x402_runtime.X402RuntimeError):

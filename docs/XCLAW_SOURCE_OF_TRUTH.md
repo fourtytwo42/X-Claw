@@ -188,6 +188,26 @@ and fail closed for unsupported execution families.
 - deferred: `solana_mainnet_beta`, `solana_testnet`
 6. Management deposit sync must fail closed with deterministic degraded sync state for malformed or unavailable Solana RPC responses; route stability is preserved (no unhandled 500 for sync faults).
 
+## 3.9) Slice 164-169 Solana-Native x402 Parity (2026-03-04)
+
+1. x402 settlement is runtime-local and chain-native for both families:
+- EVM and Solana payments settle via runtime wallet signing/sending before hosted endpoint acknowledgement.
+- Hosted endpoints must not mark settlement `filled` from header presence alone.
+2. Canonical x402 asset model is `native|token`; `erc20` remains accepted as compatibility input alias.
+3. x402 settlement transaction identifier remains under field name `txHash` for compatibility, but value is family-neutral:
+- EVM: `0x...`
+- Solana: base58 signature.
+4. Hosted x402 settlement contract:
+- challenge step requires `X-Payment`,
+- settlement step requires canonical `X-Tx-Id` (compatibility `X-Tx-Hash` accepted),
+- server verifies settlement by chain family before writing terminal `filled`.
+5. Solana x402 rollout scope for this slice:
+- enabled: `solana_localnet`, `solana_devnet`
+- deferred: `solana_mainnet_beta`, `solana_testnet`.
+6. Security baseline for this slice:
+- no secrets in docs/config artifacts,
+- chain verification failures fail closed with deterministic error codes (`x402_settlement_proof_invalid`, `rpc_unavailable`).
+
 ---
 
 ## 4) Scope

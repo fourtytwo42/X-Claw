@@ -2536,7 +2536,7 @@ def _mirror_x402_outbound(flow: dict[str, Any]) -> None:
             "networkKey": network,
             "facilitatorKey": facilitator,
             "status": str(flow.get("status") or "approval_pending"),
-            "assetKind": str(flow.get("assetKind") or "native"),
+            "assetKind": "token" if str(flow.get("assetKind") or "").strip().lower() in {"erc20", "token"} else "native",
             "assetAddress": flow.get("assetAddress"),
             "assetSymbol": flow.get("assetSymbol"),
             "amountAtomic": amount_atomic,
@@ -2562,10 +2562,10 @@ def _mirror_x402_outbound(flow: dict[str, Any]) -> None:
             "chainKey": network,
             "approvalSource": "x402",
             "status": str(flow.get("status") or "approval_pending"),
-            "transferType": "native",
-            "tokenAddress": None,
+            "transferType": "token" if str(flow.get("assetKind") or "").strip().lower() in {"erc20", "token"} else "native",
+            "tokenAddress": flow.get("assetAddress"),
             "tokenSymbol": str(flow.get("assetSymbol") or "X402"),
-            "toAddress": "0x0000000000000000000000000000000000000000",
+            "toAddress": str(flow.get("toAddress") or flow.get("recipientAddress") or ("11111111111111111111111111111111" if network.startswith("solana_") else "0x0000000000000000000000000000000000000000")),
             "amountWei": amount_atomic,
             "txHash": flow.get("txHash"),
             "reasonCode": flow.get("reasonCode"),
@@ -2577,7 +2577,7 @@ def _mirror_x402_outbound(flow: dict[str, Any]) -> None:
             "x402Url": url,
             "x402NetworkKey": network,
             "x402FacilitatorKey": facilitator,
-            "x402AssetKind": str(flow.get("assetKind") or "native"),
+            "x402AssetKind": "token" if str(flow.get("assetKind") or "").strip().lower() in {"erc20", "token"} else "native",
             "x402AssetAddress": flow.get("assetAddress"),
             "x402AmountAtomic": amount_atomic,
             "x402PaymentId": payment_id,
@@ -2595,6 +2595,106 @@ def _mirror_x402_outbound(flow: dict[str, Any]) -> None:
         )
     except Exception:
         pass
+
+
+def _x402_settlement_amount_units(chain: str, asset_kind: str, amount_atomic: str, asset_address: str | None) -> int:
+    kind = str(asset_kind or "native").strip().lower()
+    amount_text = str(amount_atomic or "").strip()
+    if not amount_text:
+        raise WalletStoreError("x402 settlement amount is missing.")
+    if kind == "native":
+        decimals = 9 if _is_solana_chain(chain) else 18
+        return int(_to_units_uint(amount_text, decimals))
+    if _is_solana_chain(chain):
+        if not re.fullmatch(r"[0-9]+", amount_text):
+            raise WalletStoreError("Solana token x402 settlement requires integer atomic units.")
+        return int(amount_text)
+    token = str(asset_address or "").strip().lower()
+    if not is_hex_address(token):
+        raise WalletStoreError("EVM token x402 settlement requires token address.")
+    meta = _fetch_erc20_metadata(chain, token)
+    decimals = int(meta.get("decimals", 18))
+    return int(_to_units_uint(amount_text, decimals))
+
+
+def _x402_wait_evm_receipt_success(chain: str, tx_hash: str) -> None:
+    cast_bin = _require_cast_bin()
+    rpc_url = _chain_rpc_url(chain)
+    receipt_proc = _run_subprocess(
+        [cast_bin, "receipt", "--json", "--rpc-url", rpc_url, tx_hash],
+        timeout_sec=_cast_receipt_timeout_sec(),
+        kind="cast_receipt",
+    )
+    if receipt_proc.returncode != 0:
+        stderr = (receipt_proc.stderr or "").strip()
+        stdout = (receipt_proc.stdout or "").strip()
+        raise WalletStoreError(stderr or stdout or "cast receipt failed for x402 settlement tx.")
+    payload = json.loads((receipt_proc.stdout or "{}").strip() or "{}")
+    status = str(payload.get("status", "0x0")).lower()
+    if status not in {"0x1", "1"}:
+        raise WalletStoreError(f"x402 settlement transaction failed on-chain with status '{status}'.")
+
+
+def _execute_x402_settlement(request: dict[str, Any]) -> dict[str, Any]:
+    chain = str(request.get("network") or "").strip()
+    if not chain:
+        raise WalletStoreError("x402 settlement request is missing network.")
+    store = load_wallet_store()
+    rpc_url = _chain_rpc_url(chain)
+    recipient = str(request.get("recipientAddress") or "").strip()
+    if _is_solana_chain(chain):
+        if not is_solana_address(recipient):
+            raise WalletStoreError("Solana x402 settlement recipient is invalid.")
+        wallet_address, private_key_bytes = _execution_wallet_solana_secret(store, chain)
+        asset_kind = str(request.get("assetKind") or "native").strip().lower()
+        amount_units = _x402_settlement_amount_units(chain, asset_kind, str(request.get("amountAtomic") or ""), str(request.get("assetAddress") or "") or None)
+        if asset_kind == "native":
+            signature = solana_send_native_transfer(rpc_url, private_key_bytes, recipient, amount_units)
+            return {"txId": signature, "family": "solana", "fromAddress": wallet_address, "toAddress": recipient, "assetKind": "native"}
+        mint = str(request.get("assetAddress") or "").strip()
+        if not is_solana_address(mint):
+            raise WalletStoreError("Solana x402 token settlement requires valid mint address.")
+        result = solana_send_spl_transfer(rpc_url, private_key_bytes, recipient, mint, amount_units)
+        signature = str(result.get("signature") or "").strip()
+        if not signature:
+            raise WalletStoreError("Solana x402 token settlement returned empty signature.")
+        return {
+            "txId": signature,
+            "family": "solana",
+            "fromAddress": wallet_address,
+            "toAddress": recipient,
+            "assetKind": "token",
+            "assetAddress": mint,
+            "details": result,
+        }
+
+    if not is_hex_address(recipient):
+        raise WalletStoreError("EVM x402 settlement recipient is invalid.")
+    wallet_address, private_key_hex = _execution_wallet(store, chain)
+    asset_kind = str(request.get("assetKind") or "native").strip().lower()
+    amount_units = _x402_settlement_amount_units(chain, asset_kind, str(request.get("amountAtomic") or ""), str(request.get("assetAddress") or "") or None)
+    if asset_kind == "native":
+        tx_hash = _cast_rpc_send_transaction(
+            rpc_url,
+            {"from": wallet_address, "to": recipient, "value": hex(int(amount_units))},
+            private_key_hex,
+            chain=chain,
+        )
+        _x402_wait_evm_receipt_success(chain, tx_hash)
+        return {"txId": tx_hash, "family": "evm", "fromAddress": wallet_address, "toAddress": recipient, "assetKind": "native"}
+
+    token = str(request.get("assetAddress") or "").strip().lower()
+    if not is_hex_address(token):
+        raise WalletStoreError("EVM x402 token settlement requires token address.")
+    data = _cast_calldata("transfer(address,uint256)(bool)", [recipient, str(int(amount_units))])
+    tx_hash = _cast_rpc_send_transaction(
+        rpc_url,
+        {"from": wallet_address, "to": token, "data": data},
+        private_key_hex,
+        chain=chain,
+    )
+    _x402_wait_evm_receipt_success(chain, tx_hash)
+    return {"txId": tx_hash, "family": "evm", "fromAddress": wallet_address, "toAddress": recipient, "assetKind": "token", "assetAddress": token}
 
 
 def _transfer_requires_approval(chain: str, transfer_type: str, token_address: str | None) -> tuple[bool, dict[str, Any]]:
@@ -13392,16 +13492,17 @@ def cmd_x402_receive_request(args: argparse.Namespace) -> int:
     if amount <= 0:
         return fail("invalid_input", "amount_atomic must be > 0.", "Use values like 0.01 or 1.", exit_code=2)
 
-    asset_kind = str(args.asset_kind or "native").strip().lower()
-    if asset_kind not in {"native", "erc20"}:
-        return fail("invalid_input", "asset_kind must be native|erc20.", "Use --asset-kind native or --asset-kind erc20.", exit_code=2)
+    asset_kind_raw = str(args.asset_kind or "native").strip().lower()
+    if asset_kind_raw not in {"native", "token", "erc20"}:
+        return fail("invalid_input", "asset_kind must be native|token.", "Use --asset-kind native or --asset-kind token.", exit_code=2)
+    asset_kind = "token" if asset_kind_raw in {"token", "erc20"} else "native"
     asset_symbol = str(args.asset_symbol or "").strip()
-    asset_address = str(args.asset_address or "").strip().lower() or None
-    if asset_kind == "erc20" and not asset_symbol and not asset_address:
+    asset_address = str(args.asset_address or "").strip() or None
+    if asset_kind == "token" and not asset_symbol and not asset_address:
         return fail(
             "invalid_input",
-            "ERC-20 receive requests require asset symbol or asset address.",
-            "Set --asset-symbol (USDC|WETH|WKITE|USDT) or --asset-address 0x....",
+            "Token receive requests require asset symbol or asset address.",
+            "Set --asset-symbol (USDC|WETH|WKITE|USDT) or --asset-address <token-address>.",
             exit_code=2,
         )
 
@@ -13462,6 +13563,7 @@ def cmd_x402_pay(args: argparse.Namespace) -> int:
             facilitator=str(args.facilitator or "").strip(),
             amount_atomic=str(args.amount_atomic or "").strip(),
             memo=str(args.memo or "").strip() or None,
+            settle_payment=_execute_x402_settlement,
         )
         if not bool(payload.get("ok", False)):
             emit(payload)
@@ -13484,7 +13586,7 @@ def cmd_x402_pay_resume(args: argparse.Namespace) -> int:
     if not approval_id:
         return fail("invalid_input", "approval_id is required.", "Provide --approval-id xfr_... and retry.", exit_code=2)
     try:
-        payload = x402_pay_resume(approval_id)
+        payload = x402_pay_resume(approval_id, settle_payment=_execute_x402_settlement)
         if isinstance(payload, dict):
             _mirror_x402_outbound(payload)
         return ok("x402 payment resume processed.", approval=payload)
@@ -13505,7 +13607,12 @@ def cmd_x402_pay_decide(args: argparse.Namespace) -> int:
     if decision not in {"approve", "deny"}:
         return fail("invalid_input", "decision must be approve|deny.", "Use --decision approve or --decision deny.", exit_code=2)
     try:
-        payload = x402_pay_decide(approval_id, decision, str(args.reason_message or "").strip() or None)
+        payload = x402_pay_decide(
+            approval_id,
+            decision,
+            str(args.reason_message or "").strip() or None,
+            settle_payment=_execute_x402_settlement,
+        )
         if isinstance(payload, dict):
             _mirror_x402_outbound(payload)
         return ok("x402 payment decision applied.", approval=payload)
@@ -13946,7 +14053,7 @@ def build_parser() -> argparse.ArgumentParser:
     x402_receive_request.add_argument("--network", required=True)
     x402_receive_request.add_argument("--facilitator", required=True)
     x402_receive_request.add_argument("--amount-atomic", required=True)
-    x402_receive_request.add_argument("--asset-kind", default="native", choices=["native", "erc20"])
+    x402_receive_request.add_argument("--asset-kind", default="native", choices=["native", "token", "erc20"])
     x402_receive_request.add_argument("--asset-address")
     x402_receive_request.add_argument("--asset-symbol")
     x402_receive_request.add_argument("--resource-description")

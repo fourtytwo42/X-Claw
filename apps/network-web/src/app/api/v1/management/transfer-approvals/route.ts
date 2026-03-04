@@ -60,7 +60,7 @@ export async function GET(req: NextRequest) {
         x402_url: string | null;
         x402_network_key: string | null;
         x402_facilitator_key: string | null;
-        x402_asset_kind: 'native' | 'erc20' | null;
+        x402_asset_kind: 'native' | 'token' | 'erc20' | null;
         x402_asset_address: string | null;
         x402_amount_atomic: string | null;
         x402_payment_id: string | null;
@@ -117,7 +117,7 @@ export async function GET(req: NextRequest) {
         x402_url: string | null;
         x402_network_key: string | null;
         x402_facilitator_key: string | null;
-        x402_asset_kind: 'native' | 'erc20' | null;
+        x402_asset_kind: 'native' | 'token' | 'erc20' | null;
         x402_asset_address: string | null;
         x402_amount_atomic: string | null;
         x402_payment_id: string | null;

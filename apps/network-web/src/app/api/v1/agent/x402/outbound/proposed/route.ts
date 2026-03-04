@@ -16,7 +16,7 @@ type AgentX402OutboundProposedRequest = {
   networkKey: string;
   facilitatorKey: string;
   status: 'proposed' | 'approval_pending' | 'approved' | 'executing' | 'filled' | 'failed' | 'rejected';
-  assetKind: 'native' | 'erc20';
+  assetKind: 'native' | 'token' | 'erc20';
   assetAddress?: string | null;
   assetSymbol?: string | null;
   amountAtomic: string;

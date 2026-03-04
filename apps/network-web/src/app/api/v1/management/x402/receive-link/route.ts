@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
       payment_id: string;
       network_key: string;
       facilitator_key: string;
-      asset_kind: 'native' | 'erc20';
+      asset_kind: 'native' | 'erc20' | 'token';
       asset_address: string | null;
       asset_symbol: string | null;
       amount_atomic: string;
@@ -99,7 +99,7 @@ export async function GET(req: NextRequest) {
           facilitatorKey,
           assetKind: 'native',
           assetAddress: null,
-          assetSymbol: chainKey === 'kite_ai_testnet' ? 'KITE' : 'ETH',
+          assetSymbol: chainKey.startsWith('solana_') ? 'SOL' : chainKey === 'kite_ai_testnet' ? 'KITE' : 'ETH',
           amountAtomic: '0',
           paymentUrl: '',
           resourceDescription: null,
@@ -119,8 +119,9 @@ export async function GET(req: NextRequest) {
     const resourceDescription = active.rows[0].resource_description;
     const assetKind = active.rows[0].asset_kind;
     const assetAddress = active.rows[0].asset_address;
-    const assetSymbol = (active.rows[0].asset_symbol ?? (chainKey === 'kite_ai_testnet' ? 'KITE' : 'ETH')) as
+    const assetSymbol = (active.rows[0].asset_symbol ?? (chainKey.startsWith('solana_') ? 'SOL' : chainKey === 'kite_ai_testnet' ? 'KITE' : 'ETH')) as
       | 'ETH'
+      | 'SOL'
       | 'KITE'
       | 'USDC'
       | 'WETH'

@@ -25,12 +25,26 @@
       "type": "string",
       "enum": ["proposed", "approval_pending", "approved", "executing", "filled", "failed", "rejected"]
     },
-    "assetKind": { "type": "string", "enum": ["native", "erc20"] },
-    "assetAddress": { "type": ["string", "null"], "pattern": "^0x[a-fA-F0-9]{40}$" },
+    "assetKind": { "type": "string", "enum": ["native", "token", "erc20"] },
+    "assetAddress": {
+      "type": ["string", "null"],
+      "anyOf": [
+        { "type": "null" },
+        { "pattern": "^0x[a-fA-F0-9]{40}$" },
+        { "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,64}$" }
+      ]
+    },
     "assetSymbol": { "type": ["string", "null"] },
     "amountAtomic": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?$" },
     "url": { "type": "string", "format": "uri" },
-    "txHash": { "type": ["string", "null"], "pattern": "^0x[a-fA-F0-9]{64}$" },
+    "txHash": {
+      "type": ["string", "null"],
+      "anyOf": [
+        { "type": "null" },
+        { "pattern": "^0x[a-fA-F0-9]{64}$" },
+        { "pattern": "^[1-9A-HJ-NP-Za-km-z]{64,128}$" }
+      ]
+    },
     "reasonCode": { "type": ["string", "null"] },
     "reasonMessage": { "type": ["string", "null"] },
     "createdAt": { "type": "string", "format": "date-time" },

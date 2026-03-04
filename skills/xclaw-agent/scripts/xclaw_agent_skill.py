@@ -366,8 +366,10 @@ def _build_hosted_x402_receive_args(
     facilitator = values.get("facilitator", os.environ.get("XCLAW_X402_DEFAULT_FACILITATOR", "cdp")).strip()
     amount = values.get("amount_atomic", os.environ.get("XCLAW_X402_DEFAULT_AMOUNT_ATOMIC", "0.01")).strip()
     asset_kind = values.get("asset_kind", os.environ.get("XCLAW_X402_DEFAULT_ASSET_KIND", "native")).strip().lower()
-    if asset_kind not in {"native", "erc20"}:
+    if asset_kind not in {"native", "token", "erc20"}:
         asset_kind = "native"
+    if asset_kind == "erc20":
+        asset_kind = "token"
     args = [
         "x402",
         "receive-request",
@@ -421,7 +423,7 @@ def _parse_request_x402_payment_args(raw_args: list[str]) -> tuple[Optional[dict
                     "message": "request-x402-payment rejects positional text; use explicit --resource-description and other flags.",
                     "action_hint": (
                         "usage: request-x402-payment [--network <key>] [--facilitator <key>] [--amount-atomic <value>] "
-                        "[--asset-kind <native|erc20>] [--asset-symbol <symbol>] [--asset-address <0x...>] "
+                        "[--asset-kind <native|token>] [--asset-symbol <symbol>] [--asset-address <token-address>] "
                         "[--resource-description <text>]"
                     ),
                 },
@@ -435,7 +437,7 @@ def _parse_request_x402_payment_args(raw_args: list[str]) -> tuple[Optional[dict
                     "message": f"request-x402-payment does not support flag: {key}",
                     "action_hint": (
                         "usage: request-x402-payment [--network <key>] [--facilitator <key>] [--amount-atomic <value>] "
-                        "[--asset-kind <native|erc20>] [--asset-symbol <symbol>] [--asset-address <0x...>] "
+                        "[--asset-kind <native|token>] [--asset-symbol <symbol>] [--asset-address <token-address>] "
                         "[--resource-description <text>]"
                     ),
                 },
@@ -463,14 +465,14 @@ def _parse_request_x402_payment_args(raw_args: list[str]) -> tuple[Optional[dict
             )
         if key == "--resource-description":
             overrides["resource_description"] = value
-        elif key == "--asset-kind" and value.lower() not in {"native", "erc20"}:
+        elif key == "--asset-kind" and value.lower() not in {"native", "token", "erc20"}:
             return (
                 None,
                 2,
                 {
                     "code": "invalid_input",
-                    "message": "request-x402-payment --asset-kind must be native or erc20.",
-                    "action_hint": "usage: request-x402-payment --asset-kind <native|erc20>",
+                    "message": "request-x402-payment --asset-kind must be native or token.",
+                    "action_hint": "usage: request-x402-payment --asset-kind <native|token>",
                 },
             )
         mapped_key = key[2:].replace("-", "_")

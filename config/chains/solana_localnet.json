@@ -23,7 +23,7 @@
     "trade": true,
     "liquidity": true,
     "limitOrders": false,
-    "x402": false,
+    "x402": true,
     "faucet": true,
     "deposits": true
   },

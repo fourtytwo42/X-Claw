@@ -8,12 +8,30 @@
     "status": { "type": "string", "enum": ["proposed", "approval_pending", "approved", "rejected", "executing", "filled", "failed"] },
     "network": { "type": "string" },
     "facilitator": { "type": "string" },
+    "assetKind": { "type": ["string", "null"], "enum": ["native", "token", "erc20", null] },
+    "assetAddress": {
+      "type": ["string", "null"],
+      "anyOf": [
+        { "type": "null" },
+        { "pattern": "^0x[a-fA-F0-9]{40}$" },
+        { "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,64}$" }
+      ]
+    },
+    "assetSymbol": { "type": ["string", "null"] },
     "url": { "type": "string" },
     "amountAtomic": { "type": "string" },
     "memo": { "type": ["string", "null"] },
     "resourceDescription": { "type": ["string", "null"], "maxLength": 280 },
     "reasonCode": { "type": ["string", "null"] },
     "reasonMessage": { "type": ["string", "null"] },
+    "txHash": {
+      "type": ["string", "null"],
+      "anyOf": [
+        { "type": "null" },
+        { "pattern": "^0x[a-fA-F0-9]{64}$" },
+        { "pattern": "^[1-9A-HJ-NP-Za-km-z]{64,128}$" }
+      ]
+    },
     "createdAt": { "type": "string" },
     "updatedAt": { "type": "string" },
     "terminalAt": { "type": ["string", "null"] }

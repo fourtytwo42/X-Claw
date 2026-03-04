@@ -96,6 +96,22 @@ DoD:
 
 ---
 
+## Slice 164-169: Solana-Native x402 Parity (Localnet/Devnet First)
+Status: [~]
+
+Goal:
+- Make x402 settlement family-aware and chain-native (EVM + Solana), replacing header-only simulated settlement behavior.
+
+DoD:
+- [~] canonical x402 asset contract updated to `native|token` with compatibility alias `erc20`.
+- [~] `solana_localnet` + `solana_devnet` have `capabilities.x402=true`; `solana_mainnet_beta` + `solana_testnet` remain deferred.
+- [~] runtime x402 pay flow executes local on-chain settlement and submits proof via hosted pay endpoints.
+- [~] hosted pay endpoints verify chain tx proof by family before setting status `filled`.
+- [~] schemas/openapi/skill docs are updated for family-neutral asset address + tx id.
+- [ ] full sequential validation + grep proofs + issue evidence posted.
+
+---
+
 ## Slice 01: Environment + Toolchain Baseline
 Status: [x]
 

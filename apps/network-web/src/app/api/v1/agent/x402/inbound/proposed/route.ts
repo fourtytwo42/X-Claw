@@ -18,13 +18,17 @@ async function ensureX402ResourceDescriptionColumn(): Promise<void> {
     alter table if exists agent_x402_payment_mirror
     add column if not exists resource_description text
   `);
+  await dbQuery(`
+    alter table if exists agent_x402_payment_mirror
+    add column if not exists recipient_address varchar(128)
+  `);
 }
 
 type AgentX402InboundProposedRequest = {
   schemaVersion: 1;
   networkKey: string;
   facilitatorKey: string;
-  assetKind: 'native' | 'erc20';
+  assetKind: 'native' | 'token' | 'erc20';
   assetAddress?: string | null;
   assetSymbol?: string | null;
   amountAtomic: string;
@@ -32,9 +36,9 @@ type AgentX402InboundProposedRequest = {
 };
 
 type ResolvedAsset = {
-  assetKind: 'native' | 'erc20';
+  assetKind: 'native' | 'token';
   assetAddress: string | null;
-  assetSymbol: 'ETH' | 'KITE' | 'USDC' | 'WETH' | 'WKITE' | 'USDT';
+  assetSymbol: string;
 };
 
 function parseAmountAtomic(value: unknown): string | null {
@@ -80,11 +84,13 @@ function resolveSupportedAsset(
   if (!config) {
     return null;
   }
+  const isSolana = String(config.family || '').toLowerCase() === 'solana';
   const canonicalTokens = config.canonicalTokens ?? {};
-  const assetKind = assetKindRaw === 'erc20' ? 'erc20' : 'native';
+  const normalizedKind = String(assetKindRaw ?? '').trim().toLowerCase();
+  const assetKind: 'native' | 'token' = normalizedKind === 'token' || normalizedKind === 'erc20' ? 'token' : 'native';
   const symbol = String(assetSymbolRaw ?? '').trim().toUpperCase();
   if (assetKind === 'native') {
-    const nativeSymbol = chainKey === 'kite_ai_testnet' ? 'KITE' : 'ETH';
+    const nativeSymbol = String(config.nativeCurrency?.symbol || '').trim().toUpperCase() || (chainKey === 'kite_ai_testnet' ? 'KITE' : chainKey.startsWith('solana_') ? 'SOL' : 'ETH');
     return { assetKind: 'native', assetAddress: null, assetSymbol: nativeSymbol };
   }
 
@@ -94,19 +100,19 @@ function resolveSupportedAsset(
       continue;
     }
     const normalized = tokenSymbol.trim().toUpperCase();
-    if (normalized === 'USDC' || normalized === 'WETH' || normalized === 'WKITE' || normalized === 'USDT') {
-      bySymbol.set(normalized, tokenAddress.toLowerCase());
+    if (normalized !== 'ETH' && normalized !== 'SOL' && normalized !== 'KITE') {
+      bySymbol.set(normalized, isSolana ? tokenAddress.trim() : tokenAddress.toLowerCase());
     }
   }
 
-  const requestedAddress = String(assetAddressRaw ?? '').trim().toLowerCase();
+  const requestedAddress = isSolana ? String(assetAddressRaw ?? '').trim() : String(assetAddressRaw ?? '').trim().toLowerCase();
   if (symbol && bySymbol.has(symbol)) {
-    return { assetKind: 'erc20', assetAddress: bySymbol.get(symbol) ?? null, assetSymbol: symbol as ResolvedAsset['assetSymbol'] };
+    return { assetKind: 'token', assetAddress: bySymbol.get(symbol) ?? null, assetSymbol: symbol as ResolvedAsset['assetSymbol'] };
   }
   if (requestedAddress) {
     for (const [knownSymbol, knownAddress] of bySymbol.entries()) {
       if (knownAddress === requestedAddress) {
-        return { assetKind: 'erc20', assetAddress: knownAddress, assetSymbol: knownSymbol as 'USDC' | 'WETH' };
+        return { assetKind: 'token', assetAddress: knownAddress, assetSymbol: knownSymbol };
       }
     }
   }
@@ -141,6 +147,19 @@ export async function POST(req: NextRequest) {
     }
 
     const body = validated.data;
+    const chainConfig = getChainConfig(body.networkKey);
+    if (!chainConfig || chainConfig.enabled === false || chainConfig.capabilities?.x402 !== true) {
+      return errorResponse(
+        400,
+        {
+          code: 'unsupported_chain_capability',
+          message: `Chain '${body.networkKey}' is not enabled for x402.`,
+          actionHint: 'Use a chain with capabilities.x402=true (for this slice: solana_localnet, solana_devnet, base_sepolia/base, kite_ai_testnet).'
+        },
+        requestId
+      );
+    }
+
     const amountAtomic = parseAmountAtomic(body.amountAtomic);
     if (!amountAtomic) {
       return errorResponse(
@@ -173,14 +192,23 @@ export async function POST(req: NextRequest) {
         {
           code: 'payload_invalid',
           message: 'Unsupported x402 asset for selected chain.',
-          actionHint:
-            body.networkKey === 'kite_ai_testnet'
-              ? 'Use KITE, WKITE, or USDT on Kite AI Testnet.'
-              : 'Use ETH, USDC, or WETH on supported chain configuration.'
+          actionHint: 'Use a canonical native asset or canonical token symbol/address configured for the selected chain.'
         },
         requestId
       );
     }
+
+    const recipientWallet = await dbQuery<{ address: string }>(
+      `
+      select address
+      from agent_wallets
+      where agent_id = $1
+        and chain_key = $2
+      limit 1
+      `,
+      [auth.agentId, body.networkKey]
+    );
+    const recipientAddress = recipientWallet.rows[0]?.address ?? null;
 
     const paymentId = makeId('xpm');
     const linkToken = crypto.randomBytes(10).toString('hex');
@@ -200,13 +228,14 @@ export async function POST(req: NextRequest) {
         amount_atomic,
         resource_description,
         payment_url,
+        recipient_address,
         link_token,
         expires_at,
         created_at,
         updated_at,
         terminal_at
       ) values (
-        $1, $2, 'inbound', 'proposed', $3, $4, $5, $6, $7, $8::numeric, $9, $10, $11, null, now(), now(), null
+        $1, $2, 'inbound', 'proposed', $3, $4, $5, $6, $7, $8::numeric, $9, $10, $11, $12, null, now(), now(), null
       )
       `,
       [
@@ -220,6 +249,7 @@ export async function POST(req: NextRequest) {
         amountAtomic,
         resourceDescription,
         paymentUrl,
+        recipientAddress,
         linkToken
       ]
     );
@@ -235,6 +265,7 @@ export async function POST(req: NextRequest) {
         assetAddress: resolvedAsset.assetAddress,
         assetSymbol: resolvedAsset.assetSymbol,
         amountAtomic,
+        recipientAddress,
         resourceDescription,
         paymentUrl,
         linkToken,

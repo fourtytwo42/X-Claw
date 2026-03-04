@@ -296,7 +296,7 @@ The following non-wallet commands are part of the same Python-first wrapper cont
 The following x402 commands are part of the same Python-first wrapper contract and are relied on by automated agents:
 
 1. `request-x402-payment [resource_description]`
-- delegates to runtime `xclaw-agent x402 receive-request --network <key> --facilitator <key> --amount-atomic <value> [--asset-kind <native|erc20>] [--asset-symbol <symbol>] [--asset-address <0x...>] [--resource-description <text>] --json`.
+- delegates to runtime `xclaw-agent x402 receive-request --network <key> --facilitator <key> --amount-atomic <value> [--asset-kind <native|token>] [--asset-symbol <symbol>] [--asset-address <token-address>] [--resource-description <text>] --json` (`erc20` input alias accepted for compatibility).
 - creates hosted receive URL records on website endpoint `/api/v1/agent/x402/inbound/proposed`.
 - returns `paymentId`, `paymentUrl`, `network`, `facilitator`, `assetKind`, `assetSymbol`, `amountAtomic`, optional `resourceDescription`, `status`.
 

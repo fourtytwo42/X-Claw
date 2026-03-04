@@ -13,8 +13,15 @@
     "schemaVersion": { "type": "integer", "const": 1 },
     "networkKey": { "type": "string", "minLength": 1 },
     "facilitatorKey": { "type": "string", "minLength": 1 },
-    "assetKind": { "type": "string", "enum": ["native", "erc20"] },
-    "assetAddress": { "type": ["string", "null"], "pattern": "^0x[a-fA-F0-9]{40}$" },
+    "assetKind": { "type": "string", "enum": ["native", "token", "erc20"] },
+    "assetAddress": {
+      "type": ["string", "null"],
+      "anyOf": [
+        { "type": "null" },
+        { "pattern": "^0x[a-fA-F0-9]{40}$" },
+        { "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,64}$" }
+      ]
+    },
     "assetSymbol": { "type": ["string", "null"], "maxLength": 16 },
     "amountAtomic": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?$" },
     "resourceDescription": { "type": ["string", "null"], "maxLength": 280 }

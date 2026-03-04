@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
         status: string;
         network_key: string;
         facilitator_key: string;
-        asset_kind: 'native' | 'erc20';
+        asset_kind: 'native' | 'erc20' | 'token';
         asset_address: string | null;
         asset_symbol: string | null;
         amount_atomic: string;
@@ -103,7 +103,7 @@ export async function GET(req: NextRequest) {
         status: string;
         network_key: string;
         facilitator_key: string;
-        asset_kind: 'native' | 'erc20';
+        asset_kind: 'native' | 'erc20' | 'token';
         asset_address: string | null;
         asset_symbol: string | null;
         amount_atomic: string;

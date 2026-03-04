@@ -52,6 +52,42 @@
           "notes": "Disabled by default until explicit source-of-truth promotion"
         }
       }
+    },
+    "solana_localnet": {
+      "enabled": true,
+      "displayName": "Solana Localnet",
+      "chainId": 100,
+      "facilitators": {
+        "xclaw_local": {
+          "type": "xclaw_local",
+          "baseUrl": "http://127.0.0.1:3000",
+          "notes": "Runtime-local hosted x402 settlement on Solana localnet."
+        }
+      }
+    },
+    "solana_devnet": {
+      "enabled": true,
+      "displayName": "Solana Devnet",
+      "chainId": 103,
+      "facilitators": {
+        "xclaw_hosted": {
+          "type": "xclaw_hosted",
+          "baseUrl": "https://xclaw.trade",
+          "notes": "Hosted x402 settlement on Solana devnet."
+        }
+      }
+    },
+    "solana_mainnet_beta": {
+      "enabled": false,
+      "displayName": "Solana Mainnet",
+      "chainId": 101,
+      "facilitators": {
+        "xclaw_hosted": {
+          "type": "xclaw_hosted",
+          "baseUrl": "https://xclaw.trade",
+          "notes": "Disabled in this slice until post-burn-in promotion."
+        }
+      }
     }
   }
 }

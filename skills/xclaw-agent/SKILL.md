@@ -162,6 +162,8 @@ Additional capabilities:
 - tracked/social: `chat-poll`, `chat-post`, `tracked-list`, `tracked-trades`, `username-set`
 - liquidity simulation: `liquidity-quote-add`, `liquidity-quote-remove`
 - x402: `request-x402-payment`, `x402-pay`, `x402-pay-resume`, `x402-pay-decide`, `x402-policy-get`, `x402-policy-set`, `x402-networks`
+  - canonical receive args: `--asset-kind <native|token>` (`erc20` alias still accepted for compatibility)
+  - Solana-native x402 is enabled on `solana_localnet` and `solana_devnet`
 
 ## Operational Notes
 

@@ -1689,7 +1689,7 @@ paths:
           required: false
           schema:
             type: string
-            enum: [native, erc20]
+            enum: [native, token, erc20]
             default: native
         - name: assetAddress
           in: query
@@ -1736,7 +1736,7 @@ paths:
                   type: string
                 assetKind:
                   type: string
-                  enum: [native, erc20]
+                  enum: [native, token, erc20]
                 assetAddress:
                   type: string
                   nullable: true
@@ -1780,6 +1780,7 @@ paths:
   /api/v1/x402/pay/{agentId}:
     get:
       summary: Hosted x402 pay endpoint compatibility path (works only when one active inbound request exists).
+      description: Runtime first fetches 402 challenge, then settles by submitting `X-Payment` plus canonical `X-Tx-Id` (compatibility `X-Tx-Hash` still accepted).
       parameters:
         - name: agentId
           in: path
@@ -1793,6 +1794,7 @@ paths:
           description: Payment required challenge.
     post:
       summary: Hosted x402 pay endpoint compatibility path (works only when one active inbound request exists).
+      description: Runtime first fetches 402 challenge, then settles by submitting `X-Payment` plus canonical `X-Tx-Id` (compatibility `X-Tx-Hash` still accepted).
       parameters:
         - name: agentId
           in: path
@@ -1807,6 +1809,7 @@ paths:
   /api/v1/x402/pay/{agentId}/{linkToken}:
     get:
       summary: Hosted x402 pay endpoint (canonical tokenized challenge/settlement).
+      description: Runtime-local on-chain settlement is verified by chain family before payment status moves to `filled`.
       parameters:
         - name: agentId
           in: path
@@ -1825,6 +1828,7 @@ paths:
           description: Payment required challenge.
     post:
       summary: Hosted x402 pay endpoint (legacy tokenized challenge/settlement).
+      description: Runtime-local on-chain settlement is verified by chain family before payment status moves to `filled`.
       parameters:
         - name: agentId
           in: path
@@ -3665,7 +3669,7 @@ components:
           nullable: true
         x402AssetKind:
           type: string
-          enum: [native, erc20]
+          enum: [native, token, erc20]
           nullable: true
         x402AssetAddress:
           type: string
@@ -3784,7 +3788,7 @@ components:
           enum: [proposed, approval_pending, approved, executing, filled, failed, rejected]
         assetKind:
           type: string
-          enum: [native, erc20]
+          enum: [native, token, erc20]
         assetAddress:
           type: string
           nullable: true
@@ -3835,7 +3839,7 @@ components:
           enum: [proposed, executing, filled, failed, expired]
         assetKind:
           type: string
-          enum: [native, erc20]
+          enum: [native, token, erc20]
         assetAddress:
           type: string
           nullable: true
@@ -3887,7 +3891,7 @@ components:
           type: string
         assetKind:
           type: string
-          enum: [native, erc20]
+          enum: [native, token, erc20]
         assetAddress:
           type: string
           nullable: true

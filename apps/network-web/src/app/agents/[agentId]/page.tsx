@@ -69,7 +69,7 @@ type X402PaymentRow = {
   status: string;
   network_key: string;
   facilitator_key: string;
-  asset_kind: 'native' | 'erc20';
+  asset_kind: 'native' | 'token' | 'erc20';
   asset_address: string | null;
   asset_symbol: string | null;
   amount_atomic: string;
@@ -99,7 +99,7 @@ type X402ReceiveLinkPayload = {
   paymentId: string;
   networkKey: string;
   facilitatorKey: string;
-  assetKind: 'native' | 'erc20';
+  assetKind: 'native' | 'token' | 'erc20';
   assetAddress: string | null;
   amountAtomic: string;
   resourceDescription?: string | null;
@@ -1340,7 +1340,7 @@ export default function AgentPublicProfilePage() {
   );
 
   const formatX402AtomicAmount = useCallback(
-    (amountAtomic: string | null | undefined, assetKind: 'native' | 'erc20', assetSymbol: string | null | undefined) => {
+    (amountAtomic: string | null | undefined, assetKind: 'native' | 'token' | 'erc20', assetSymbol: string | null | undefined) => {
       const symbol = assetKind === 'native' ? activeNativeSymbol : normalizeTokenSelectionSymbol(assetSymbol, activeNativeSymbol) || 'TOKEN';
       const tokenLabel = assetKind === 'native' ? `${activeChainLabel} ${activeNativeSymbol}` : symbol;
       const decimals = assetKind === 'native' ? activeNativeDecimals : tokenDecimalsBySymbol.get(symbol);

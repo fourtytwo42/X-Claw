@@ -15,7 +15,7 @@ type AgentX402InboundMirrorRequest = {
   networkKey: string;
   facilitatorKey: string;
   status: 'proposed' | 'executing' | 'filled' | 'failed' | 'expired';
-  assetKind: 'native' | 'erc20';
+  assetKind: 'native' | 'token' | 'erc20';
   assetAddress?: string | null;
   assetSymbol?: string | null;
   amountAtomic: string;

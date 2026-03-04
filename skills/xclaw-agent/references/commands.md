@@ -44,7 +44,7 @@ This reference defines the expected command surface for the Python-first skill w
 - `default-chain-get`
 - `default-chain-set <chain_key>`
 - `request-x402-payment`
-- `request-x402-payment [--network <network>] [--facilitator <facilitator>] [--amount-atomic <amount_atomic>] [--asset-kind <native|erc20>] [--asset-symbol <symbol>] [--asset-address <0x...>] [--resource-description <text>]`
+- `request-x402-payment [--network <network>] [--facilitator <facilitator>] [--amount-atomic <amount_atomic>] [--asset-kind <native|token>] [--asset-symbol <symbol>] [--asset-address <token-address>] [--resource-description <text>]`
 - `x402-pay <url> <network> <facilitator> <amount_atomic>`
 - `x402-pay-resume <approval_id>`
 - `x402-pay-decide <approval_id> <approve|deny>`
@@ -122,7 +122,7 @@ Underlying runtime delegation (performed by wrapper):
 - `xclaw-agent chains --include-disabled --json`
 - `xclaw-agent default-chain get --json`
 - `xclaw-agent default-chain set --chain <chain_key> --json`
-- `xclaw-agent x402 receive-request --network <network> --facilitator <facilitator> --amount-atomic <amount_atomic> [--asset-kind <native|erc20>] [--asset-symbol <symbol>] [--asset-address <0x...>] [--resource-description <text>] --json`
+- `xclaw-agent x402 receive-request --network <network> --facilitator <facilitator> --amount-atomic <amount_atomic> [--asset-kind <native|token>] [--asset-symbol <symbol>] [--asset-address <token-address>] [--resource-description <text>] --json`
 - `xclaw-agent x402 pay --url <url> --network <network> --facilitator <facilitator> --amount-atomic <amount_atomic> --json`
 - `xclaw-agent x402 pay-resume --approval-id <xfr_id> --json`
 - `xclaw-agent x402 pay-decide --approval-id <xfr_id> --decision <approve|deny> --json`

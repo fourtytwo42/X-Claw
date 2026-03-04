@@ -55,6 +55,15 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 - [~] Make management transfer-confirmation resolvers + agent-page tx explorer formatting family-aware.
 - [ ] Sequential validation + PM2 restart + issue evidence capture.
 
+## 0.10) Slice 164-169 Solana-Native x402 Parity Program
+
+- [~] Canonicalize x402 asset contract to `native|token` while keeping compatibility alias `erc20`.
+- [~] Enable x402 capability on `solana_localnet` + `solana_devnet`; keep `solana_mainnet_beta` + `solana_testnet` deferred.
+- [~] Replace runtime x402 simulated settle flow with chain-native wallet settlement and hosted proof submission.
+- [~] Add family-aware hosted settlement verification (`evm` receipt + `solana` signature status) before marking `filled`.
+- [~] Update schemas/openapi/skill docs for family-neutral asset address + tx id contracts.
+- [ ] Sequential validation + PM2 restart + issue evidence capture.
+
 ---
 
 ## 0) Program Control and Working Rules

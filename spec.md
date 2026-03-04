@@ -1,5 +1,11 @@
 # Slice 133-138 Spec: Dual-Family Runtime (EVM + Solana) (2026-03-04)
 
+## Slice 164-169 Extension (2026-03-04)
+1. Promote x402 asset contract to canonical `native|token` with compatibility alias `erc20`.
+2. Keep x402 public route paths stable while requiring family-aware settlement verification before status `filled`.
+3. Enable Solana x402 on `solana_localnet` + `solana_devnet`; keep `solana_mainnet_beta` + `solana_testnet` deferred.
+4. Keep response field name `txHash`, but allow family-neutral values (`0x...` hash or Solana signature).
+
 ## Slice 159-163 Extension (2026-03-04)
 1. Add management deposit + transfer-confirmation family dispatch for `evm|solana`.
 2. Generalize management deposit/withdraw contract fields from EVM-hex-only to family-neutral address/tx identifiers.

@@ -1,5 +1,34 @@
 # Slice 133-138 Acceptance Evidence: Dual-Family Runtime (EVM + Solana)
 
+## Slice 164-169 Acceptance Evidence: Solana-Native x402 Parity
+
+Date (UTC): 2026-03-04
+Active slice context: `Slice 164 -> Slice 169`.
+
+### Objective + Scope Lock
+- Objective:
+  - replace simulated x402 settle behavior with runtime-local chain settlement plus hosted proof verification,
+  - keep public route names stable while making x402 contracts family-neutral for Solana.
+
+### Behavior Checks
+- [x] canonical x402 contract uses `assetKind=native|token` with `erc20` compatibility alias.
+- [x] Solana x402 capability is enabled on `solana_localnet` + `solana_devnet`; mainnet/testnet remain deferred.
+- [x] runtime x402 pay flow performs challenge-read -> local settlement -> hosted settle submission.
+- [x] hosted x402 routes require tx id proof and verify by chain family before setting `filled`.
+- [x] x402 schemas accept family-neutral token address and tx id values.
+- [x] skill x402 command surfaces accept `--asset-kind native|token` (alias `erc20` retained).
+
+### Required Validation Gates
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_x402_runtime.py -v` -> PASS (`Ran 31 tests`, `OK`)
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_x402_skill_wrapper.py -v` -> PASS (`Ran 55 tests`, `OK`)
+- [x] targeted Next/API x402 contract tests (`npm run test:x402:solana:contract`) -> PASS (`ok: true`, `count: 14`)
+- [x] `npm run db:parity` -> PASS (`ok: true`, includes `0027_slice164_x402_token_family.sql`)
+- [x] `npm run seed:reset` -> PASS
+- [x] `npm run seed:load` -> PASS
+- [x] `npm run seed:verify` -> PASS
+- [x] `npm run build` -> PASS
+- [x] `pm2 restart all` -> PASS (`xclaw-web online`)
+
 ## Slice 159-163 Acceptance Evidence: Solana Deposits + Management Parity
 
 Date (UTC): 2026-03-04

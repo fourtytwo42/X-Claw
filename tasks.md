@@ -1,5 +1,15 @@
 # Slice 133-138 Tasks: Dual-Family Runtime (EVM + Solana) (2026-03-04)
 
+## Slice 164-169 Tasks: Solana-Native x402 Parity (2026-03-04)
+- [x] Update canonical docs/contracts for x402 `native|token` contract and family-neutral tx id semantics.
+- [x] Enable Solana x402 capability on `solana_localnet` + `solana_devnet`; keep mainnet/testnet deferred.
+- [x] Add Solana x402 networks in `config/x402/networks.json` with localnet/devnet enabled and mainnet disabled.
+- [x] Generalize x402 schemas + OpenAPI enums for token-kind aliasing and family-neutral tx/address formats.
+- [x] Replace runtime x402 header-only settlement with challenge -> local chain settlement -> hosted proof submission flow.
+- [x] Add server-side family-aware settlement verification before marking hosted x402 payments `filled`.
+- [x] Update skill parser/docs from `native|erc20` to `native|token` (keep `erc20` compatibility alias).
+- [x] Run sequential validations and capture grep proofs/evidence.
+
 ## Slice 159-163 Tasks: Solana Deposits + Management Parity (2026-03-04)
 - [x] Update canonical docs/contracts for family-aware management deposit semantics and audit-only withdraw posture.
 - [x] Generalize management deposit/withdraw schemas to allow Solana address/signature values.

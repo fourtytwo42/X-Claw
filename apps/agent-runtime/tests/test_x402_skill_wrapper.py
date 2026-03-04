@@ -91,7 +91,7 @@ class X402SkillWrapperTests(unittest.TestCase):
                     "--amount-atomic",
                     "5000000",
                     "--asset-kind",
-                    "erc20",
+                    "token",
                     "--asset-symbol",
                     "USDC",
                     "--resource-description",
@@ -110,12 +110,49 @@ class X402SkillWrapperTests(unittest.TestCase):
                 "--amount-atomic",
                 "5000000",
                 "--asset-kind",
-                "erc20",
+                "token",
                 "--json",
                 "--asset-symbol",
                 "USDC",
                 "--resource-description",
                 "Invoice #42",
+            ]
+        )
+
+    def test_request_x402_payment_supports_solana_token_address(self) -> None:
+        with mock.patch.object(skill, "_run_agent", return_value=0) as run_mock:
+            code = skill.main(
+                [
+                    "xclaw_agent_skill.py",
+                    "request-x402-payment",
+                    "--network",
+                    "solana_devnet",
+                    "--facilitator",
+                    "xclaw_hosted",
+                    "--amount-atomic",
+                    "1000000",
+                    "--asset-kind",
+                    "token",
+                    "--asset-address",
+                    "So11111111111111111111111111111111111111112",
+                ]
+            )
+        self.assertEqual(code, 0)
+        run_mock.assert_called_once_with(
+            [
+                "x402",
+                "receive-request",
+                "--network",
+                "solana_devnet",
+                "--facilitator",
+                "xclaw_hosted",
+                "--amount-atomic",
+                "1000000",
+                "--asset-kind",
+                "token",
+                "--json",
+                "--asset-address",
+                "So11111111111111111111111111111111111111112",
             ]
         )
 

@@ -37,7 +37,7 @@ type AgentTransferApprovalsMirrorRequest = {
   x402Url?: string | null;
   x402NetworkKey?: string | null;
   x402FacilitatorKey?: string | null;
-  x402AssetKind?: 'native' | 'erc20' | null;
+  x402AssetKind?: 'native' | 'token' | 'erc20' | null;
   x402AssetAddress?: string | null;
   x402AmountAtomic?: string | null;
   x402PaymentId?: string | null;
