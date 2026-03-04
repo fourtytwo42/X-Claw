@@ -4106,23 +4106,43 @@ Note:
 - [~] Remove remaining Hedera-specific installer/docs/test references.
 ## 120) Slice 120: Active Path Hedera Cleanup
 
-- [ ] Remove Hedera bootstrap/install logic from hosted installer.
-- [ ] Remove remaining Hedera runtime/web branches from active codepaths.
-- [ ] Rebuild and verify no active-path Hedera refs remain.
+- [x] Remove Hedera bootstrap/install logic from hosted installer.
+- [x] Remove remaining Hedera runtime/web branches from active codepaths.
+- [x] Rebuild and verify no active-path Hedera refs remain.
 
 ## 121) Slice 121: Canonical Contract Closeout
 
-- [ ] Add canonical generic trade/liquidity routes to OpenAPI.
-- [ ] Mark `/uniswap/*` routes as compatibility aliases.
-- [ ] Replace old provider and metadata vocabulary with generic execution metadata in docs/contracts.
+- [x] Add canonical generic trade/liquidity routes to OpenAPI.
+- [x] Mark `/uniswap/*` routes as compatibility aliases.
+- [x] Replace old provider and metadata vocabulary with generic execution metadata in docs/contracts.
 
 ## 122) Slice 122: Harness/Test Realignment
 
-- [ ] Remove Hedera from wallet-approval matrix/harness assumptions.
-- [ ] Remove `uniswap_proxy_not_configured` environment assertions.
-- [ ] Realign touched tests to the EVM-only router-adapter model.
+- [x] Remove Hedera from wallet-approval matrix/harness assumptions.
+- [x] Remove `uniswap_proxy_not_configured` environment assertions.
+- [x] Realign touched tests to the EVM-only router-adapter model.
 
 ## 123) Slice 123: Skill/Reference Cleanup
 
-- [ ] Update skill docs and infra defaults to EVM-only behavior.
-- [ ] Validate touched references after build/restart.
+- [x] Update skill docs and infra defaults to EVM-only behavior.
+- [x] Validate touched references after build/restart.
+
+## 124) Slice 124: Residual Active-Adjacent Cleanup
+
+- [x] Remove dormant Hedera helper/comment residue from the wallet-approval harness.
+- [x] Restrict skill-wrapper chain parsing/examples to active EVM chains.
+
+## 125) Slice 125: Runtime Test Realignment
+
+- [x] Replace stale Hedera/HTS runtime tests with EVM-only router-adapter coverage.
+- [x] Keep negative-path coverage for unsupported adapters and preflight failures.
+
+## 126) Slice 126: Canonical Docs Final Truth Pass
+
+- [x] Mark legacy Hedera/Uniswap-primary sections as superseded historical records.
+- [x] Reassert EVM-only canonical metadata and route posture at the top of authoritative docs.
+
+## 127) Slice 127: Historical Artifact and Contract Hygiene
+
+- [x] Preserve historical migration evidence without rewriting applied migrations.
+- [x] Update handoff artifacts to reflect Slice 124-127 completion and required validation gates.

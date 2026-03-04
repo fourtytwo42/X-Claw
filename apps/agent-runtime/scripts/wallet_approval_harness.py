@@ -525,7 +525,6 @@ class WalletApprovalHarness:
                     fallback["statusSource"] = "tx_receipt_fallback"
                     return fallback
             time.sleep(2)
-        # Hedera can lag in server-side status convergence while tx receipt is already final.
         # For harness determinism, accept on-chain success as terminal "filled" when requested.
         if "filled" in allowed and str(last.get("status") or "").strip().lower() == "verifying":
             tx_hash = str(last.get("txHash") or "").strip()
@@ -1084,9 +1083,6 @@ class WalletApprovalHarness:
             if bal.get("USDC", Decimal("0")) > 0 or bal.get("WETH", Decimal("0")) > 0:
                 return
             time.sleep(4)
-
-    def _bootstrap_hedera_testnet_funding(self) -> None:
-        return
 
     def _prepare_trade_pair_and_amounts(self) -> None:
         chain_normalized = str(self.chain).strip().lower()

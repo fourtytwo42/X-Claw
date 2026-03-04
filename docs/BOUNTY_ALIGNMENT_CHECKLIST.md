@@ -4,6 +4,10 @@ Last updated: 2026-02-19
 Owner: X-Claw team
 Purpose: Single checklist to track whether the current build is submission-ready for target ETHDenver bounties.
 
+Current scope note (2026-03-03):
+- Active product scope is EVM-only.
+- Hedera bounty material below is preserved as historical submission tracking and is no longer current delivery scope.
+
 ---
 
 ## How To Use

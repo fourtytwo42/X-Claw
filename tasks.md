@@ -1,3 +1,33 @@
+# Slice 124-127 Tasks: Final EVM-Only Closeout (2026-03-03)
+
+Active slice context: `Slice 124 -> Slice 127`.
+
+## 1) Scope lock
+- [x] Restrict scope to final EVM-only closeout across harnesses, stale runtime tests, canonical docs, and handoff artifacts.
+- [x] Preserve compatibility `/uniswap/*` routes and truthful historical records.
+
+## 2) Implementation
+- [x] Remove residual Hedera helper/comment residue from `wallet_approval_harness.py`.
+- [x] Restrict skill-wrapper chain parsing/examples to active EVM chains.
+- [x] Replace stale Hedera/HTS runtime tests with EVM-only router-adapter coverage.
+- [x] Update runtime metadata assertions from `uniswapRouteType` / `uniswapLpOperation` to `routeKind` / `liquidityOperation` where touched.
+- [x] Reassert EVM-only truth at the top of canonical docs and label older Hedera/Uniswap-primary content as superseded history.
+- [x] Update handoff artifacts for Slice 124-127 completion.
+
+## 3) Validation
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_liquidity_adapter.py -v`
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v`
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_wallet_core.py -v`
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_auth_recover_cli.py -v`
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_x402_skill_wrapper.py -v`
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+
 # Slice 95 Tasks: Hedera EVM Pair Discovery + HTS JDK Auto-Setup (2026-02-19)
 
 # Hotfix Tasks: Liquidity Approval Runtime Env Hydration Parity (2026-02-21)

@@ -1,5 +1,19 @@
 # X-Claw Context Pack
 
+## Current Canonical Context (2026-03-03)
+
+- Active X-Claw delivery scope is EVM-only.
+- Hedera/HTS bridge and plugin material below is preserved as superseded slice history, not current runtime scope.
+- Canonical execution vocabulary is router-adapter based:
+  - `providerRequested`
+  - `providerUsed`
+  - `fallbackUsed`
+  - `fallbackReason`
+  - `executionFamily`
+  - `executionAdapter`
+  - `routeKind`
+  - `liquidityOperation`
+
 ## Hotfix Context: Capability-Gated Telegram Patch + Management-Link Fallback
 
 Issue mapping: `#35` (approvals/install reliability track)

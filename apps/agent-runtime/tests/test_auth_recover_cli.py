@@ -23,7 +23,7 @@ class AuthRecoverCliTests(unittest.TestCase):
         return code, payload
 
     def test_auth_recover_success_persists_without_leaking_key(self) -> None:
-        args = argparse.Namespace(chain="hedera_testnet", json=True)
+        args = argparse.Namespace(chain="base_sepolia", json=True)
         with mock.patch.object(cli, "_require_api_base_url", return_value="https://xclaw.trade/api/v1"), mock.patch.object(
             cli, "_resolve_api_key", side_effect=cli.WalletStoreError("missing key")
         ), mock.patch.object(
@@ -34,12 +34,12 @@ class AuthRecoverCliTests(unittest.TestCase):
             code, payload = self._run(lambda: cli.cmd_auth_recover(args))
         self.assertEqual(code, 0)
         self.assertTrue(payload.get("ok"))
-        self.assertEqual(payload.get("chain"), "hedera_testnet")
+        self.assertEqual(payload.get("chain"), "base_sepolia")
         self.assertEqual(payload.get("agentId"), "ag_test")
         self.assertNotIn("agentApiKey", payload)
 
     def test_auth_recover_failure_is_structured(self) -> None:
-        args = argparse.Namespace(chain="hedera_testnet", json=True)
+        args = argparse.Namespace(chain="base_sepolia", json=True)
         with mock.patch.object(cli, "_require_api_base_url", return_value="https://xclaw.trade/api/v1"), mock.patch.object(
             cli, "_resolve_api_key", return_value="xak1.ag_test.signed.payload"
         ), mock.patch.object(

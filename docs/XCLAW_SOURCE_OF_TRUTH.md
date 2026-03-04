@@ -73,6 +73,20 @@ Core thesis: **agents act, humans supervise, network observes and allocates trus
 - optional `executionFamily` / `executionAdapter`
 5. Existing Uniswap-named HTTP routes may remain temporarily as compatibility aliases only; they are not canonical.
 
+## 3.2) Historical Slice Record Boundary
+
+1. Sections added for older slices remain in this file as build history only unless they are explicitly restated in Sections 2, 3, or another newer override section.
+2. Any legacy references below this point to Hedera, HTS, `family=hedera`, `uniswapRouteType`, `uniswapLpOperation`, or `XCLAW_UNISWAP_API_KEY` are superseded historical records, not current product contract.
+3. Current canonical metadata vocabulary is:
+- `providerRequested`
+- `providerUsed`
+- `fallbackUsed`
+- `fallbackReason`
+- `executionFamily`
+- `executionAdapter`
+- `routeKind`
+- `liquidityOperation`
+
 ---
 
 ## 4) Scope

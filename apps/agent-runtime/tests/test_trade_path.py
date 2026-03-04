@@ -62,7 +62,11 @@ class TradePathRuntimeTests(unittest.TestCase):
                 return mock.Mock(returncode=0, stdout='{"transactionHash":"0x' + "ab" * 32 + '"}', stderr="")
             raise AssertionError(f"Unexpected command {cmd}")
 
-        with mock.patch.dict(cli.os.environ, {"XCLAW_TX_FEE_MODE": "legacy"}, clear=False), mock.patch.object(
+        with mock.patch.dict(
+            cli.os.environ,
+            {"XCLAW_TX_FEE_MODE": "legacy", "XCLAW_BUILDER_CODE_BASE_SEPOLIA": "builder-test"},
+            clear=False,
+        ), mock.patch.object(
             cli, "_require_cast_bin", return_value="cast"
         ), mock.patch.object(
             cli.subprocess, "run", side_effect=fake_run
@@ -200,7 +204,7 @@ class TradePathRuntimeTests(unittest.TestCase):
         self.assertIn("--gas-price", second_cmd)
         self.assertIn("890000000000", second_cmd)
 
-    def test_cast_send_doubles_legacy_gas_price_on_hedera_testnet(self) -> None:
+    def test_cast_send_uses_legacy_gas_price_without_chain_specific_multiplier(self) -> None:
         tx_obj = {
             "from": "0x1111111111111111111111111111111111111111",
             "to": "0x2222222222222222222222222222222222222222",
@@ -220,14 +224,16 @@ class TradePathRuntimeTests(unittest.TestCase):
             cli.subprocess, "run", side_effect=fake_run
         ), mock.patch.object(
             cli, "_estimate_tx_fees", return_value={"mode": "legacy", "gasPrice": 123}
+        ), mock.patch.object(
+            cli, "_apply_builder_code_suffix_if_needed", return_value=("0xdeadbeef", cli._default_builder_attribution("base_sepolia"))
         ):
-            tx_hash = cli._cast_rpc_send_transaction("https://rpc.example", tx_obj, "0x" + "33" * 32, chain="hedera_testnet")
+            tx_hash = cli._cast_rpc_send_transaction("https://rpc.example", tx_obj, "0x" + "33" * 32, chain="base_sepolia")
 
         self.assertEqual(tx_hash, "0x" + "ab" * 32)
         self.assertEqual(len(send_cmds), 1)
         send_cmd = send_cmds[0]
         self.assertIn("--gas-price", send_cmd)
-        self.assertIn("246", send_cmd)
+        self.assertIn("123", send_cmd)
 
     def test_estimate_tx_fees_eip1559_happy_path(self) -> None:
         with mock.patch.dict(
@@ -2570,7 +2576,7 @@ class TradePathRuntimeTests(unittest.TestCase):
         args = argparse.Namespace(
             trade_id="trd_1",
             decision="approve",
-            chain="hedera_testnet",
+            chain="base_sepolia",
             source="telegram",
             idempotency_key="tg-cb-999",
             decision_at="2026-02-21T01:18:40Z",
@@ -2578,7 +2584,7 @@ class TradePathRuntimeTests(unittest.TestCase):
             json=True,
         )
         with mock.patch.object(
-            cli, "_read_trade_details", return_value={"tradeId": "trd_1", "status": "approval_pending", "chainKey": "hedera_testnet"}
+            cli, "_read_trade_details", return_value={"tradeId": "trd_1", "status": "approval_pending", "chainKey": "base_sepolia"}
         ), mock.patch.object(
             cli, "_post_trade_status"
         ), mock.patch.object(
@@ -3208,7 +3214,7 @@ class TradePathRuntimeTests(unittest.TestCase):
         self.assertTrue(payload.get("ok"))
         self.assertEqual(payload.get("providerUsed"), "uniswap_api")
         self.assertEqual(payload.get("fallbackUsed"), False)
-        self.assertEqual(payload.get("uniswapRouteType"), "CLASSIC")
+        self.assertEqual(payload.get("routeKind"), "CLASSIC")
         self.assertIn("builderCodeChainEligible", payload)
         self.assertIn("builderCodeApplied", payload)
         self.assertIn("builderCodeSkippedReason", payload)
@@ -3269,7 +3275,7 @@ class TradePathRuntimeTests(unittest.TestCase):
             },
         ):
             primary, fallback = cli._liquidity_provider_settings("ethereum_sepolia")
-        self.assertEqual(primary, "uniswap_api")
+        self.assertEqual(primary, "legacy_router")
         self.assertEqual(fallback, "legacy_router")
 
     def test_liquidity_provider_settings_uniswap_flag_defaults_to_uniswap(self) -> None:
@@ -3279,7 +3285,7 @@ class TradePathRuntimeTests(unittest.TestCase):
             return_value={"uniswapApi": {"enabled": True, "liquidityEnabled": True}},
         ):
             primary, fallback = cli._liquidity_provider_settings("ethereum_sepolia")
-        self.assertEqual(primary, "uniswap_api")
+        self.assertEqual(primary, "legacy_router")
         self.assertEqual(fallback, "legacy_router")
 
     def test_liquidity_provider_meta_contains_expected_fields(self) -> None:
@@ -3290,11 +3296,11 @@ class TradePathRuntimeTests(unittest.TestCase):
             fallback_reason={"code": "uniswap_lp_failed", "message": "boom"},
             uniswap_lp_operation="decrease",
         )
-        self.assertEqual(meta.get("providerRequested"), "uniswap_api")
-        self.assertEqual(meta.get("providerUsed"), "legacy_router")
+        self.assertEqual(meta.get("providerRequested"), "router_adapter")
+        self.assertEqual(meta.get("providerUsed"), "router_adapter")
         self.assertTrue(meta.get("fallbackUsed"))
         self.assertEqual(meta.get("fallbackReason"), {"code": "uniswap_lp_failed", "message": "boom"})
-        self.assertEqual(meta.get("uniswapLpOperation"), "decrease")
+        self.assertEqual(meta.get("liquidityOperation"), "decrease")
 
     def test_trade_provider_settings_uses_chain_config_for_promoted_v2_fallback(self) -> None:
         with mock.patch.object(
@@ -3307,7 +3313,7 @@ class TradePathRuntimeTests(unittest.TestCase):
             },
         ):
             primary, fallback = cli._trade_provider_settings("base_mainnet")
-        self.assertEqual(primary, "uniswap_api")
+        self.assertEqual(primary, "legacy_router")
         self.assertEqual(fallback, "legacy_router")
 
     def test_trade_provider_settings_keeps_fallback_disabled_when_legacy_not_enabled(self) -> None:
@@ -3320,7 +3326,7 @@ class TradePathRuntimeTests(unittest.TestCase):
             },
         ):
             primary, fallback = cli._trade_provider_settings("zksync_mainnet")
-        self.assertEqual(primary, "uniswap_api")
+        self.assertEqual(primary, "legacy_router")
         self.assertEqual(fallback, "none")
 
 

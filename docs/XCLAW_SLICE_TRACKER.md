@@ -2551,7 +2551,7 @@ DoD:
 - [x] required gates rerun sequentially (`db:parity`, `seed:reset`, `seed:load`, `seed:verify`, task-specific tests, `build`, `pm2 restart all`).
 
 ## Slice 119: EVM-Only Exchange-Agnostic Execution Refactor
-Status: [~]
+Status: [x]
 
 Goal:
 - Remove active non-EVM/Hedera support and make generic EVM router-adapter execution canonical while preserving compatibility route/CLI surface.
@@ -2563,10 +2563,10 @@ DoD:
 - [x] compatibility Uniswap trade routes delegate to generic handlers.
 - [x] active server execution path does not require `XCLAW_UNISWAP_API_KEY`.
 - [x] chain configs include canonical `execution.trade` / `execution.liquidity`.
-- [~] remaining installer/docs/runtime-test Hedera references removed.
+- [x] remaining installer/docs/runtime-test Hedera references removed or explicitly marked superseded history.
 ## Slice 120: Active Path Hedera Cleanup
 
-Status: in progress
+Status: completed
 
 - Goal: remove remaining Hedera references from active installer/runtime/web paths after Slice 119 EVM-only execution refactor.
 - Supersedes active-path remnants left behind by Slices 92, 95, 100, 102, 103, 104, 105, 106, 109, 110, 113, and 114.
@@ -2576,18 +2576,42 @@ Status: in progress
 
 ## Slice 121: Canonical Contract Closeout
 
-Status: in progress
+Status: completed
 
 - Goal: make OpenAPI and canonical docs reflect the generic EVM router-adapter model and mark `/uniswap/*` as compatibility aliases only.
 
 ## Slice 122: Harness/Test Realignment
 
-Status: in progress
+Status: completed
 
 - Goal: remove Hedera and `uniswap_proxy_not_configured` assumptions from active harness/test defaults.
 
 ## Slice 123: Skill/Reference Cleanup
 
-Status: in progress
+Status: completed
 
 - Goal: align operator-facing skill docs and infra defaults to the EVM-only runtime surface.
+
+## Slice 124: Residual Active-Adjacent Cleanup
+
+Status: completed
+
+- Goal: remove the last active-adjacent Hedera assumptions from harnesses and skill-wrapper parsing.
+
+## Slice 125: Runtime Test Realignment
+
+Status: completed
+
+- Goal: replace stale Hedera/HTS runtime tests with EVM-only router-adapter coverage.
+
+## Slice 126: Canonical Docs Final Truth Pass
+
+Status: completed
+
+- Goal: keep canonical docs EVM-only while preserving older slice material as explicitly superseded history.
+
+## Slice 127: Historical Artifact and Contract Hygiene
+
+Status: completed
+
+- Goal: preserve truthful history while aligning active contracts, schemas, and handoff artifacts to the EVM-only model.

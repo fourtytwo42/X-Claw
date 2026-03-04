@@ -201,9 +201,9 @@ class X402SkillWrapperTests(unittest.TestCase):
         self.assertEqual(resolved, "ethereum_sepolia")
 
     def test_resolve_active_chain_falls_back_to_env_without_api_context(self) -> None:
-        with mock.patch.dict("os.environ", {"XCLAW_DEFAULT_CHAIN": "hedera_testnet"}, clear=False):
+        with mock.patch.dict("os.environ", {"XCLAW_DEFAULT_CHAIN": "base_sepolia"}, clear=False):
             resolved = skill._resolve_active_chain()
-        self.assertEqual(resolved, "hedera_testnet")
+        self.assertEqual(resolved, "base_sepolia")
 
     def test_tracked_trades_with_agent_and_limit(self) -> None:
         with mock.patch.dict("os.environ", self._ENV, clear=False):
@@ -312,26 +312,26 @@ class X402SkillWrapperTests(unittest.TestCase):
         )
 
     def test_wallet_create_delegates_to_runtime(self) -> None:
-        with mock.patch.dict("os.environ", {"XCLAW_DEFAULT_CHAIN": "hedera_testnet"}, clear=False):
+        with mock.patch.dict("os.environ", {"XCLAW_DEFAULT_CHAIN": "base_sepolia"}, clear=False):
             with mock.patch.object(skill, "_run_agent", return_value=0) as run_mock:
                 code = skill.main(["xclaw_agent_skill.py", "wallet-create"])
         self.assertEqual(code, 0)
-        run_mock.assert_called_once_with(["wallet", "create", "--chain", "hedera_testnet", "--json"])
+        run_mock.assert_called_once_with(["wallet", "create", "--chain", "base_sepolia", "--json"])
 
     def test_wallet_wrap_native_delegates_to_runtime(self) -> None:
-        with mock.patch.dict("os.environ", {"XCLAW_DEFAULT_CHAIN": "hedera_testnet"}, clear=False):
+        with mock.patch.dict("os.environ", {"XCLAW_DEFAULT_CHAIN": "base_sepolia"}, clear=False):
             with mock.patch.object(skill, "_run_agent", return_value=0) as run_mock:
                 code = skill.main(["xclaw_agent_skill.py", "wallet-wrap-native", "1"])
         self.assertEqual(code, 0)
-        run_mock.assert_called_once_with(["wallet", "wrap-native", "--amount", "1", "--chain", "hedera_testnet", "--json"])
+        run_mock.assert_called_once_with(["wallet", "wrap-native", "--amount", "1", "--chain", "base_sepolia", "--json"])
 
     def test_wallet_track_token_delegates_to_runtime(self) -> None:
-        with mock.patch.dict("os.environ", {"XCLAW_DEFAULT_CHAIN": "hedera_testnet"}, clear=False):
+        with mock.patch.dict("os.environ", {"XCLAW_DEFAULT_CHAIN": "base_sepolia"}, clear=False):
             with mock.patch.object(skill, "_run_agent", return_value=0) as run_mock:
                 code = skill.main(["xclaw_agent_skill.py", "wallet-track-token", "0x0000000000000000000000000000000000001549"])
         self.assertEqual(code, 0)
         run_mock.assert_called_once_with(
-            ["wallet", "track-token", "--token", "0x0000000000000000000000000000000000001549", "--chain", "hedera_testnet", "--json"]
+            ["wallet", "track-token", "--token", "0x0000000000000000000000000000000000001549", "--chain", "base_sepolia", "--json"]
         )
 
     def test_wallet_balance_allows_explicit_chain_override(self) -> None:
@@ -372,20 +372,20 @@ class X402SkillWrapperTests(unittest.TestCase):
         )
 
     def test_wallet_untrack_token_delegates_to_runtime(self) -> None:
-        with mock.patch.dict("os.environ", {"XCLAW_DEFAULT_CHAIN": "hedera_testnet"}, clear=False):
+        with mock.patch.dict("os.environ", {"XCLAW_DEFAULT_CHAIN": "base_sepolia"}, clear=False):
             with mock.patch.object(skill, "_run_agent", return_value=0) as run_mock:
                 code = skill.main(["xclaw_agent_skill.py", "wallet-untrack-token", "0x0000000000000000000000000000000000001549"])
         self.assertEqual(code, 0)
         run_mock.assert_called_once_with(
-            ["wallet", "untrack-token", "--token", "0x0000000000000000000000000000000000001549", "--chain", "hedera_testnet", "--json"]
+            ["wallet", "untrack-token", "--token", "0x0000000000000000000000000000000000001549", "--chain", "base_sepolia", "--json"]
         )
 
     def test_wallet_tracked_tokens_delegates_to_runtime(self) -> None:
-        with mock.patch.dict("os.environ", {"XCLAW_DEFAULT_CHAIN": "hedera_testnet"}, clear=False):
+        with mock.patch.dict("os.environ", {"XCLAW_DEFAULT_CHAIN": "base_sepolia"}, clear=False):
             with mock.patch.object(skill, "_run_agent", return_value=0) as run_mock:
                 code = skill.main(["xclaw_agent_skill.py", "wallet-tracked-tokens"])
         self.assertEqual(code, 0)
-        run_mock.assert_called_once_with(["wallet", "tracked-tokens", "--chain", "hedera_testnet", "--json"])
+        run_mock.assert_called_once_with(["wallet", "tracked-tokens", "--chain", "base_sepolia", "--json"])
 
     def test_wallet_track_token_requires_address(self) -> None:
         with mock.patch.dict("os.environ", self._ENV, clear=False):
@@ -570,29 +570,29 @@ class X402SkillWrapperTests(unittest.TestCase):
         env = {
             "XCLAW_API_BASE_URL": "https://xclaw.trade/api/v1",
             "XCLAW_AGENT_API_KEY": "test-key",
-            "XCLAW_DEFAULT_CHAIN": "hedera_testnet",
+            "XCLAW_DEFAULT_CHAIN": "base_sepolia",
         }
         with mock.patch.dict("os.environ", env, clear=False):
-            with mock.patch.object(skill, "_resolve_active_chain", return_value="hedera_testnet"), mock.patch.object(
+            with mock.patch.object(skill, "_resolve_active_chain", return_value="base_sepolia"), mock.patch.object(
                 skill, "_run_agent", return_value=0
             ) as run_mock:
                 code = skill.main(["xclaw_agent_skill.py", "faucet-request", "native"])
         self.assertEqual(code, 0)
-        run_mock.assert_called_once_with(["faucet-request", "--chain", "hedera_testnet", "--json"])
+        run_mock.assert_called_once_with(["faucet-request", "--chain", "base_sepolia", "--json"])
 
     def test_faucet_request_hbar_alias_uses_all_asset_default(self) -> None:
         env = {
             "XCLAW_API_BASE_URL": "https://xclaw.trade/api/v1",
             "XCLAW_AGENT_API_KEY": "test-key",
-            "XCLAW_DEFAULT_CHAIN": "hedera_testnet",
+            "XCLAW_DEFAULT_CHAIN": "base_sepolia",
         }
         with mock.patch.dict("os.environ", env, clear=False):
-            with mock.patch.object(skill, "_resolve_active_chain", return_value="hedera_testnet"), mock.patch.object(
+            with mock.patch.object(skill, "_resolve_active_chain", return_value="base_sepolia"), mock.patch.object(
                 skill, "_run_agent", return_value=0
             ) as run_mock:
                 code = skill.main(["xclaw_agent_skill.py", "faucet-request", "hbar"])
         self.assertEqual(code, 0)
-        run_mock.assert_called_once_with(["faucet-request", "--chain", "hedera_testnet", "--json"])
+        run_mock.assert_called_once_with(["faucet-request", "--chain", "base_sepolia", "--json"])
 
     def test_faucet_request_chain_and_specific_asset_preserved(self) -> None:
         env = {
@@ -602,37 +602,37 @@ class X402SkillWrapperTests(unittest.TestCase):
         }
         with mock.patch.dict("os.environ", env, clear=False):
             with mock.patch.object(skill, "_run_agent", return_value=0) as run_mock:
-                code = skill.main(["xclaw_agent_skill.py", "faucet-request", "hedera_testnet", "stable"])
+                code = skill.main(["xclaw_agent_skill.py", "faucet-request", "base_sepolia", "stable"])
         self.assertEqual(code, 0)
-        run_mock.assert_called_once_with(["faucet-request", "--chain", "hedera_testnet", "--asset", "stable", "--json"])
+        run_mock.assert_called_once_with(["faucet-request", "--chain", "base_sepolia", "--asset", "stable", "--json"])
 
     def test_auth_recover_delegates_to_runtime(self) -> None:
         env = {
             "XCLAW_API_BASE_URL": "https://xclaw.trade/api/v1",
-            "XCLAW_DEFAULT_CHAIN": "hedera_testnet",
+            "XCLAW_DEFAULT_CHAIN": "base_sepolia",
             "XCLAW_AGENT_ID": "ag_demo",
         }
         with mock.patch.dict("os.environ", env, clear=False):
-            with mock.patch.object(skill, "_resolve_active_chain", return_value="hedera_testnet"), mock.patch.object(
+            with mock.patch.object(skill, "_resolve_active_chain", return_value="base_sepolia"), mock.patch.object(
                 skill, "_run_agent", return_value=0
             ) as run_mock:
                 code = skill.main(["xclaw_agent_skill.py", "auth-recover"])
         self.assertEqual(code, 0)
-        run_mock.assert_called_once_with(["auth", "recover", "--chain", "hedera_testnet", "--json"])
+        run_mock.assert_called_once_with(["auth", "recover", "--chain", "base_sepolia", "--json"])
 
     def test_agent_register_delegates_to_profile_set_name(self) -> None:
         env = {
             "XCLAW_API_BASE_URL": "https://xclaw.trade/api/v1",
-            "XCLAW_DEFAULT_CHAIN": "hedera_testnet",
+            "XCLAW_DEFAULT_CHAIN": "base_sepolia",
             "XCLAW_AGENT_API_KEY": "test-key",
         }
         with mock.patch.dict("os.environ", env, clear=False):
-            with mock.patch.object(skill, "_resolve_active_chain", return_value="hedera_testnet"), mock.patch.object(
+            with mock.patch.object(skill, "_resolve_active_chain", return_value="base_sepolia"), mock.patch.object(
                 skill, "_run_agent", return_value=0
             ) as run_mock:
                 code = skill.main(["xclaw_agent_skill.py", "agent-register", "Slice95Runner"])
         self.assertEqual(code, 0)
-        run_mock.assert_called_once_with(["profile", "set-name", "--name", "Slice95Runner", "--chain", "hedera_testnet", "--json"])
+        run_mock.assert_called_once_with(["profile", "set-name", "--name", "Slice95Runner", "--chain", "base_sepolia", "--json"])
 
     def test_wallet_send_token_rejects_empty_token(self) -> None:
         with mock.patch.dict("os.environ", self._ENV, clear=False):

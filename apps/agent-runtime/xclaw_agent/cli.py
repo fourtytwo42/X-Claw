@@ -7489,7 +7489,7 @@ def cmd_liquidity_increase(args: argparse.Namespace) -> int:
             providerUsed="uniswap_api",
             fallbackUsed=False,
             fallbackReason=None,
-            uniswapLpOperation="increase",
+            liquidityOperation="increase",
             **builder_meta,
         )
     except ChainRegistryError as exc:
@@ -7551,7 +7551,7 @@ def cmd_liquidity_claim_fees(args: argparse.Namespace) -> int:
             )
             if not claim_hashes_local:
                 raise WalletStoreError("uniswap_payload_invalid: claim produced no executable transactions.")
-            return {"operationTxHashes": claim_hashes_local, "uniswapLpOperation": "claim"}
+            return {"operationTxHashes": claim_hashes_local, "liquidityOperation": "claim_fees"}
 
         def _fallback_claim() -> dict[str, Any]:
             legacy_result = _execute_legacy_liquidity_operation(
@@ -7573,7 +7573,7 @@ def cmd_liquidity_claim_fees(args: argparse.Namespace) -> int:
             fallback_reason_code="uniswap_claim_fees_failed",
         )
         claim_hashes = list(exec_result.get("operationTxHashes") or [])
-        uniswap_operation = str(exec_result.get("uniswapLpOperation") or "").strip().lower() or None
+        uniswap_operation = str(exec_result.get("liquidityOperation") or "").strip().lower() or None
 
         tx_hash = str(claim_hashes[-1] or "").strip()
         if not tx_hash:
@@ -7590,7 +7590,7 @@ def cmd_liquidity_claim_fees(args: argparse.Namespace) -> int:
             providerUsed=provider_used,
             fallbackUsed=fallback_used,
             fallbackReason=fallback_reason,
-            uniswapLpOperation=uniswap_operation,
+            liquidityOperation=uniswap_operation,
             **builder_meta,
         )
     except ChainRegistryError as exc:
@@ -7699,7 +7699,7 @@ def cmd_liquidity_migrate(args: argparse.Namespace) -> int:
             providerUsed=provider_used,
             fallbackUsed=fallback_used,
             fallbackReason=fallback_reason,
-            uniswapLpOperation="migrate",
+            liquidityOperation="migrate",
             fromProtocol=from_protocol,
             toProtocol=to_protocol,
             **builder_meta,
@@ -7785,7 +7785,7 @@ def cmd_liquidity_claim_rewards(args: argparse.Namespace) -> int:
             )
             if not claim_hashes_local:
                 raise WalletStoreError("uniswap_payload_invalid: claim-rewards produced no executable transactions.")
-            return {"operationTxHashes": claim_hashes_local, "uniswapLpOperation": "claim_rewards"}
+            return {"operationTxHashes": claim_hashes_local, "liquidityOperation": "claim_rewards"}
 
         def _fallback_claim() -> dict[str, Any]:
             legacy_result = _execute_legacy_liquidity_operation(
@@ -7807,7 +7807,7 @@ def cmd_liquidity_claim_rewards(args: argparse.Namespace) -> int:
             fallback_reason_code="uniswap_claim_rewards_failed",
         )
         claim_hashes = list(exec_result.get("operationTxHashes") or [])
-        uniswap_operation = str(exec_result.get("uniswapLpOperation") or "").strip().lower() or None
+        uniswap_operation = str(exec_result.get("liquidityOperation") or "").strip().lower() or None
 
         tx_hash = str(claim_hashes[-1] or "").strip()
         if not tx_hash:
@@ -7824,7 +7824,7 @@ def cmd_liquidity_claim_rewards(args: argparse.Namespace) -> int:
             providerUsed=provider_used,
             fallbackUsed=fallback_used,
             fallbackReason=fallback_reason,
-            uniswapLpOperation=uniswap_operation,
+            liquidityOperation=uniswap_operation,
             **builder_meta,
         )
     except ChainRegistryError as exc:
@@ -7945,7 +7945,7 @@ def cmd_liquidity_execute(args: argparse.Namespace) -> int:
                 execution = _execute_uniswap_liquidity_intent(intent, chain, wallet_address, private_key_hex)
                 adapter_family = "uniswap_api"
                 provider_used = "uniswap_api"
-                uniswap_lp_operation = str(execution.get("uniswapLpOperation") or "").strip().lower() or None
+                uniswap_lp_operation = str(execution.get("liquidityOperation") or "").strip().lower() or None
             except Exception as exc:
                 if _legacy_liquidity_provider_available(chain, dex, position_type):
                     fallback_used = True
@@ -8020,7 +8020,7 @@ def cmd_liquidity_execute(args: argparse.Namespace) -> int:
             providerUsed=provider_used,
             fallbackUsed=fallback_used,
             fallbackReason=fallback_reason,
-            uniswapLpOperation=uniswap_lp_operation,
+            liquidityOperation=uniswap_lp_operation,
             **builder_meta,
         )
     except SubprocessTimeout as exc:
@@ -8669,7 +8669,7 @@ def _execute_uniswap_liquidity_intent(intent: dict[str, Any], chain: str, wallet
                 "request": request_payload,
                 **_builder_output_from_hashes(chain, [*approve_hashes, *create_hashes]),
             },
-            "uniswapLpOperation": "create",
+            "liquidityOperation": "create",
         }
     if action == "remove":
         request_payload = _build_uniswap_lp_decrease_request(intent)
@@ -8694,7 +8694,7 @@ def _execute_uniswap_liquidity_intent(intent: dict[str, Any], chain: str, wallet
                 "request": request_payload,
                 **_builder_output_from_hashes(chain, [*approve_hashes, *decrease_hashes]),
             },
-            "uniswapLpOperation": "decrease",
+            "liquidityOperation": "decrease",
         }
     raise WalletStoreError(f"Unsupported liquidity action '{action}'.")
 
@@ -9242,7 +9242,7 @@ def cmd_trade_spot(args: argparse.Namespace) -> int:
             providerUsed=provider_used,
             fallbackUsed=fallback_used,
             fallbackReason=fallback_reason,
-            uniswapRouteType=uniswap_route_type,
+            routeKind=uniswap_route_type,
             **builder_meta,
         )
     except SubprocessTimeout as exc:
@@ -9254,7 +9254,7 @@ def cmd_trade_spot(args: argparse.Namespace) -> int:
             "providerUsed": provider_used,
             "fallbackUsed": fallback_used,
             "fallbackReason": fallback_reason,
-            "uniswapRouteType": uniswap_route_type,
+            "routeKind": uniswap_route_type,
         }
         if last_tx_hash:
             details["txHash"] = last_tx_hash
@@ -9332,7 +9332,7 @@ def cmd_trade_spot(args: argparse.Namespace) -> int:
                 "providerUsed": provider_used,
                 "fallbackUsed": fallback_used,
                 "fallbackReason": fallback_reason,
-                "uniswapRouteType": uniswap_route_type,
+                "routeKind": uniswap_route_type,
             },
             exit_code=1,
         )
@@ -9351,7 +9351,7 @@ def cmd_trade_spot(args: argparse.Namespace) -> int:
                 "providerUsed": provider_used,
                 "fallbackUsed": fallback_used,
                 "fallbackReason": fallback_reason,
-                "uniswapRouteType": uniswap_route_type,
+                "routeKind": uniswap_route_type,
             },
             exit_code=1,
         )
@@ -10326,7 +10326,7 @@ def cmd_trade_execute(args: argparse.Namespace) -> int:
             providerUsed=provider_used,
             fallbackUsed=fallback_used,
             fallbackReason=fallback_reason,
-            uniswapRouteType=uniswap_route_type,
+            routeKind=uniswap_route_type,
             report=report_result,
             actionHint="Execution is in verifying state; watcher will publish terminal filled/failed status.",
             **builder_meta,
@@ -10371,7 +10371,7 @@ def cmd_trade_execute(args: argparse.Namespace) -> int:
                 "providerUsed": provider_used,
                 "fallbackUsed": fallback_used,
                 "fallbackReason": fallback_reason,
-                "uniswapRouteType": uniswap_route_type,
+                "routeKind": uniswap_route_type,
             },
             exit_code=1,
         )
@@ -10387,7 +10387,7 @@ def cmd_trade_execute(args: argparse.Namespace) -> int:
                 "providerUsed": provider_used,
                 "fallbackUsed": fallback_used,
                 "fallbackReason": fallback_reason,
-                "uniswapRouteType": uniswap_route_type,
+                "routeKind": uniswap_route_type,
             },
             exit_code=1,
         )

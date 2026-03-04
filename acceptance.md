@@ -6726,6 +6726,38 @@ Issue: `#61`
 - [x] explicit `uniswap_v2`/`uniswap_v3` behavior remains unchanged.
 - [x] unknown dex values remain deterministic `unsupported_liquidity_adapter`.
 
+## Slice 124-127 Acceptance Evidence: Final EVM-Only Closeout
+
+Date (UTC): 2026-03-03
+Active slice context: `Slice 124 -> Slice 127`.
+
+### Objective + Scope Lock
+- Objective:
+  - remove the last active-adjacent Hedera assumptions from harnesses and skill parsing,
+  - replace stale Hedera/HTS runtime tests with EVM-only coverage,
+  - reassert the EVM-only canonical contract while keeping historical records explicit.
+
+### Behavior Checks
+- [x] `wallet_approval_harness.py` and `xclaw_agent_skill.py` contain no Hedera references.
+- [x] Touched runtime tests contain no Hedera-only adapter/plugin imports or chain assumptions.
+- [x] Touched runtime metadata assertions use `routeKind` / `liquidityOperation`.
+- [x] Canonical docs state that legacy Hedera/Uniswap-primary material is superseded history, not current truth.
+- [x] Active web/runtime comments no longer describe Hedera as active behavior.
+
+### Required Validation Gates
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_liquidity_adapter.py -v` -> pass (`Ran 11 tests`, `OK`).
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v` -> pass (`Ran 10 tests`, `OK`).
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> pass (`Ran 128 tests`, `OK`).
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_wallet_core.py -v` -> pass (`Ran 12 tests`, `OK`).
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_auth_recover_cli.py -v` -> pass (`Ran 2 tests`, `OK`).
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_x402_skill_wrapper.py -v` -> pass (`Ran 55 tests`, `OK`).
+- [x] `npm run db:parity` -> pass (`ok: true`).
+- [x] `npm run seed:reset` -> pass (`ok: true`).
+- [x] `npm run seed:load` -> pass (`ok: true`).
+- [x] `npm run seed:verify` -> pass (`ok: true`).
+- [x] `npm run build` -> pass (Next.js production build succeeded).
+- [x] `pm2 restart all` -> pass (`xclaw-web` online).
+
 ## Required Validation Gates
 - [x] `python3 -m unittest apps/agent-runtime/tests/test_liquidity_adapter.py -v` -> pass (`Ran 18 tests`, `OK`).
 - [x] `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v` -> pass (`Ran 48 tests`, `OK`).

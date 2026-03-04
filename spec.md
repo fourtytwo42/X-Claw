@@ -1,3 +1,49 @@
+# Slice 124-127 Spec: Final EVM-Only Closeout (2026-03-03)
+
+## Goal
+1. Remove the final active-adjacent Hedera assumptions from harnesses, skill-wrapper parsing, and runtime tests.
+2. Reassert the canonical EVM-only router-adapter contract across current docs and handoff artifacts.
+3. Preserve historical migration and slice evidence without presenting superseded Hedera/Uniswap-primary behavior as current truth.
+
+## Non-goals
+1. No removal of compatibility `/uniswap/*` routes in this slice.
+2. No rewrite of historical migrations or bounty history beyond explicit superseded-scope notes.
+3. No new chain onboarding or non-EVM abstractions.
+
+## Locked scope
+1. `apps/agent-runtime/scripts/wallet_approval_harness.py`
+2. `skills/xclaw-agent/scripts/xclaw_agent_skill.py`
+3. `apps/agent-runtime/tests/test_liquidity_adapter.py`
+4. `apps/agent-runtime/tests/test_liquidity_cli.py`
+5. `apps/agent-runtime/tests/test_trade_path.py`
+6. `apps/agent-runtime/tests/test_wallet_core.py`
+7. `apps/agent-runtime/tests/test_auth_recover_cli.py`
+8. `apps/agent-runtime/tests/test_x402_skill_wrapper.py`
+9. `apps/agent-runtime/xclaw_agent/cli.py`
+10. `apps/network-web/src/lib/chains.ts`
+11. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+12. `docs/CONTEXT_PACK.md`
+13. `docs/XCLAW_SLICE_TRACKER.md`
+14. `docs/XCLAW_BUILD_ROADMAP.md`
+15. `docs/BOUNTY_ALIGNMENT_CHECKLIST.md`
+16. `spec.md`
+17. `tasks.md`
+18. `acceptance.md`
+
+## Acceptance checks
+- `python3 -m unittest apps/agent-runtime/tests/test_liquidity_adapter.py -v`
+- `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v`
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- `python3 -m unittest apps/agent-runtime/tests/test_wallet_core.py -v`
+- `python3 -m unittest apps/agent-runtime/tests/test_auth_recover_cli.py -v`
+- `python3 -m unittest apps/agent-runtime/tests/test_x402_skill_wrapper.py -v`
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `pm2 restart all`
+
 # Slice 95 Closure Spec: Hedera EVM Pair Discovery + HTS JDK Auto-Setup (2026-02-19)
 
 # Hotfix Spec: Liquidity Approval Runtime Env Hydration Parity (2026-02-21)
