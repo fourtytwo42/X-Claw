@@ -22,6 +22,33 @@
           "chainKey": { "type": "string", "minLength": 1 },
           "decision": { "type": "string", "enum": ["approve", "deny"] },
           "reasonMessage": { "type": ["string", "null"] },
+          "decisionPayload": {
+            "type": ["object", "null"],
+            "additionalProperties": true,
+            "properties": {
+              "kind": { "type": "string", "enum": ["management_withdraw_v1"] },
+              "chainKey": { "type": "string", "minLength": 1 },
+              "transferType": { "type": "string", "enum": ["native", "token"] },
+              "toAddress": {
+                "type": "string",
+                "anyOf": [
+                  { "pattern": "^0x[a-fA-F0-9]{40}$" },
+                  { "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,64}$" }
+                ]
+              },
+              "amountWei": { "type": "string", "pattern": "^[0-9]+$" },
+              "tokenAddress": {
+                "type": ["string", "null"],
+                "anyOf": [
+                  { "type": "null" },
+                  { "pattern": "^0x[a-fA-F0-9]{40}$" },
+                  { "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,64}$" }
+                ]
+              },
+              "tokenSymbol": { "type": ["string", "null"] },
+              "tokenDecimals": { "type": ["integer", "null"], "minimum": 0, "maximum": 255 }
+            }
+          },
           "source": { "type": "string", "minLength": 1 },
           "createdAt": { "type": "string", "format": "date-time" }
         }

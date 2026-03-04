@@ -45,11 +45,12 @@ export async function GET(req: NextRequest) {
       chain_key: string;
       decision: 'approve' | 'deny';
       reason_message: string | null;
+      decision_payload: Record<string, unknown> | null;
       source: string;
       created_at: string;
     }>(
       `
-      select decision_id, approval_id, chain_key, decision, reason_message, source, created_at
+      select decision_id, approval_id, chain_key, decision, reason_message, decision_payload, source, created_at
       from agent_transfer_decision_inbox
       where agent_id = $1
         and status = 'pending'
@@ -72,6 +73,10 @@ export async function GET(req: NextRequest) {
           chainKey: row.chain_key,
           decision: row.decision,
           reasonMessage: row.reason_message,
+          decisionPayload:
+            row.decision_payload && typeof row.decision_payload === 'object' && !Array.isArray(row.decision_payload)
+              ? row.decision_payload
+              : null,
           source: row.source,
           createdAt: row.created_at
         }))

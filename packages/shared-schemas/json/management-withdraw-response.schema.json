@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.xclaw.trade/management-withdraw-response.schema.json",
+  "title": "ManagementWithdrawResponse",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["ok", "withdrawRequestId", "approvalId", "decisionId", "status", "executionMode"],
+  "properties": {
+    "ok": { "type": "boolean", "const": true },
+    "withdrawRequestId": { "type": "string", "minLength": 1 },
+    "approvalId": { "type": "string", "minLength": 1 },
+    "decisionId": { "type": "string", "minLength": 1 },
+    "status": { "type": "string", "enum": ["queued"] },
+    "executionMode": { "type": "string", "enum": ["policy_override"] },
+    "chainKey": { "type": "string", "minLength": 1 },
+    "transferType": { "type": "string", "enum": ["native", "token"] },
+    "tokenAddress": {
+      "type": ["string", "null"],
+      "anyOf": [
+        { "type": "null" },
+        { "pattern": "^0x[a-fA-F0-9]{40}$" },
+        { "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,64}$" }
+      ]
+    },
+    "tokenSymbol": { "type": ["string", "null"] },
+    "tokenDecimals": { "type": ["integer", "null"], "minimum": 0, "maximum": 255 },
+    "amountWei": { "type": "string", "pattern": "^[0-9]+$" },
+    "destination": {
+      "type": "string",
+      "anyOf": [
+        { "pattern": "^0x[a-fA-F0-9]{40}$" },
+        { "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,64}$" }
+      ]
+    }
+  }
+}

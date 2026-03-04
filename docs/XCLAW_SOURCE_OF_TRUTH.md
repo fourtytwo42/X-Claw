@@ -181,8 +181,10 @@ and fail closed for unsupported execution families.
 - EVM: hex tx hash (`0x...`)
 - Solana: signature string.
 3. Management deposit addresses and withdraw destinations are family-neutral strings; they are no longer EVM-hex-only contract values.
-4. Withdraw request behavior is unchanged in this slice:
-- management withdraw routes remain audit-accepted request records (no server-side on-chain execution).
+4. Management withdraw behavior is runtime-executed via transfer pipeline:
+- `POST /api/v1/management/withdraw` queues an executable transfer decision payload for runtime.
+- runtime executes with owner-initiated `executionMode=policy_override`.
+- terminal status and `txHash`/signature appear in existing transfer history/read models.
 5. Solana deposit rollout scope in this slice is:
 - enabled: `solana_localnet`, `solana_devnet`
 - deferred: `solana_mainnet_beta`, `solana_testnet`
@@ -268,6 +270,18 @@ and fail closed for unsupported execution families.
 - `limit-orders-sync`
 - `limit-orders-run-once`
 - `limit-orders-run-loop`
+
+## 3.12) Slice 183-188 Management Withdraw Execution Parity (2026-03-04)
+
+1. `POST /api/v1/management/withdraw` remains path-stable but is no longer audit-only.
+2. Management withdraw now queues runtime-executable transfer work by writing:
+- an approved row in `agent_transfer_approval_mirror`,
+- a pending approve row in `agent_transfer_decision_inbox` with `decision_payload.kind=management_withdraw_v1`.
+3. Runtime transfer decision processing must hydrate missing local transfer flow from `decisionPayload` when provided and execute through existing transfer lifecycle.
+4. Withdraw execution remains runtime-local custody:
+- no server-side signing,
+- no private key material leaves runtime.
+5. Owner-initiated withdraws run as `executionMode=policy_override` and keep canonical transfer status vocabulary (`approved -> executing -> filled|failed`) with family-neutral tx id value in `txHash`.
 
 ---
 

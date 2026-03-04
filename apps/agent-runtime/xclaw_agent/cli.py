@@ -2783,8 +2783,9 @@ def _execute_pending_transfer_flow(flow: dict[str, Any]) -> dict[str, Any]:
     outbound_eval = _evaluate_outbound_transfer_policy(chain, to_address)
     policy_blocked_now = not bool(outbound_eval.get("allowed"))
     policy_blocked_at_create = bool(flow.get("policyBlockedAtCreate", False))
-    execution_mode = "normal"
-    if policy_blocked_now:
+    force_policy_override = bool(flow.get("forcePolicyOverride", False))
+    execution_mode = "policy_override" if force_policy_override else "normal"
+    if not force_policy_override and policy_blocked_now:
         if not policy_blocked_at_create:
             return {
                 "ok": False,
@@ -2822,6 +2823,7 @@ def _execute_pending_transfer_flow(flow: dict[str, Any]) -> dict[str, Any]:
             "policyBlockReasonCode": flow.get("policyBlockReasonCode") or outbound_eval.get("policyBlockReasonCode"),
             "policyBlockReasonMessage": flow.get("policyBlockReasonMessage") or outbound_eval.get("policyBlockReasonMessage"),
             "executionMode": execution_mode,
+            "forcePolicyOverride": force_policy_override,
         }
 
         store = load_wallet_store()
@@ -4118,7 +4120,17 @@ def _fetch_transfer_decision_inbox(chain: str, limit: int = 20) -> list[dict[str
     rows = body.get("decisions")
     if not isinstance(rows, list):
         return []
-    return [row for row in rows if isinstance(row, dict)]
+    out: list[dict[str, Any]] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        decision_payload = row.get("decisionPayload")
+        if decision_payload is not None and not isinstance(decision_payload, dict):
+            decision_payload = None
+        normalized = dict(row)
+        normalized["decisionPayload"] = decision_payload
+        out.append(normalized)
+    return out
 
 
 def _ack_transfer_decision_inbox(
@@ -4145,11 +4157,13 @@ def _run_decide_transfer_inline(
     chain: str,
     source: str,
     reason_message: str | None,
+    decision_payload: dict[str, Any] | None = None,
 ) -> tuple[int, dict[str, Any]]:
     nested = argparse.Namespace(
         approval_id=approval_id,
         decision=decision,
         reason_message=reason_message,
+        decision_payload=decision_payload,
         source=source,
         idempotency_key=None,
         decision_at=None,
@@ -4310,6 +4324,7 @@ def cmd_approvals_sync(args: argparse.Namespace) -> int:
                 chain=decision_chain,
                 source=source,
                 reason_message=reason_message,
+                decision_payload=row.get("decisionPayload") if isinstance(row.get("decisionPayload"), dict) else None,
             )
             payload_code = str(payload.get("code") or "").strip() or ("ok" if code == 0 else "runtime_decision_failed")
             payload_message = str(payload.get("message") or "").strip() or (
@@ -5052,6 +5067,78 @@ def cmd_approvals_decide_policy(args: argparse.Namespace) -> int:
     )
 
 
+def _hydrate_transfer_flow_from_decision_payload(
+    approval_id: str,
+    chain: str,
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    kind = str(payload.get("kind") or "").strip().lower()
+    if kind != "management_withdraw_v1":
+        raise WalletStoreError("unsupported decision payload kind.")
+    payload_chain = str(payload.get("chainKey") or "").strip()
+    if payload_chain != chain:
+        raise WalletStoreError("decision payload chainKey mismatch.")
+    transfer_type = str(payload.get("transferType") or "").strip().lower()
+    if transfer_type not in {"native", "token"}:
+        raise WalletStoreError("decision payload transferType must be native|token.")
+    to_address = str(payload.get("toAddress") or "").strip()
+    if _is_solana_chain(chain):
+        if not is_solana_address(to_address):
+            raise WalletStoreError("decision payload toAddress is invalid for Solana.")
+    elif not is_hex_address(to_address):
+        raise WalletStoreError("decision payload toAddress is invalid for EVM.")
+
+    amount_wei = str(payload.get("amountWei") or "").strip()
+    if not re.fullmatch(r"[0-9]+", amount_wei):
+        raise WalletStoreError("decision payload amountWei must be uint.")
+
+    token_address: str | None = None
+    token_symbol: str | None = None
+    token_decimals: int | None = None
+    if transfer_type == "token":
+        token_address_raw = str(payload.get("tokenAddress") or "").strip()
+        if _is_solana_chain(chain):
+            if not is_solana_address(token_address_raw):
+                raise WalletStoreError("decision payload tokenAddress is invalid for Solana.")
+        elif not is_hex_address(token_address_raw):
+            raise WalletStoreError("decision payload tokenAddress is invalid for EVM.")
+        token_address = token_address_raw if _is_solana_chain(chain) else token_address_raw.lower()
+        symbol_raw = str(payload.get("tokenSymbol") or "").strip()
+        token_symbol = symbol_raw or "TOKEN"
+        decimals_raw = payload.get("tokenDecimals")
+        try:
+            token_decimals = int(decimals_raw) if decimals_raw is not None else (9 if _is_solana_chain(chain) else 18)
+        except Exception:
+            token_decimals = 9 if _is_solana_chain(chain) else 18
+    else:
+        token_symbol = _native_symbol_for_chain(chain)
+        token_decimals = _native_decimals_for_chain(chain)
+
+    created_at = str(payload.get("createdAt") or "").strip() or utc_now()
+    now_iso = utc_now()
+    return {
+        "approvalId": approval_id,
+        "chainKey": chain,
+        "status": "approved",
+        "transferType": transfer_type,
+        "tokenAddress": token_address,
+        "tokenSymbol": token_symbol,
+        "tokenDecimals": token_decimals,
+        "toAddress": to_address if _is_solana_chain(chain) else to_address.lower(),
+        "amountWei": amount_wei,
+        "reasonCode": None,
+        "reasonMessage": None,
+        "createdAt": created_at,
+        "updatedAt": now_iso,
+        "decidedAt": now_iso,
+        "policyBlockedAtCreate": True,
+        "policyBlockReasonCode": None,
+        "policyBlockReasonMessage": None,
+        "executionMode": "policy_override",
+        "forcePolicyOverride": True,
+    }
+
+
 def cmd_approvals_decide_transfer(args: argparse.Namespace) -> int:
     chk = require_json_flag(args)
     if chk is not None:
@@ -5072,8 +5159,25 @@ def cmd_approvals_decide_transfer(args: argparse.Namespace) -> int:
 
     flow = _get_pending_transfer_flow(approval_id)
     if not flow:
+        decision_payload = getattr(args, "decision_payload", None)
+        if decision == "approve" and isinstance(decision_payload, dict):
+            try:
+                hydrate_chain = str(args.chain or decision_payload.get("chainKey") or "").strip()
+                if not hydrate_chain:
+                    raise WalletStoreError("decision payload chainKey is required.")
+                flow = _hydrate_transfer_flow_from_decision_payload(approval_id, hydrate_chain, decision_payload)
+                _record_pending_transfer_flow(approval_id, flow)
+                _mirror_transfer_approval(flow)
+            except WalletStoreError as exc:
+                return fail(
+                    "invalid_decision_payload",
+                    str(exc),
+                    "Resync transfer decisions and retry approve.",
+                    {"approvalId": approval_id},
+                    exit_code=1,
+                )
         x402_flow = x402_state.get_pending_pay_flow(approval_id)
-        if isinstance(x402_flow, dict):
+        if flow is None and isinstance(x402_flow, dict):
             try:
                 payload = x402_pay_decide(approval_id, decision, str(args.reason_message or "").strip() or None)
                 if isinstance(payload, dict):
@@ -5083,13 +5187,14 @@ def cmd_approvals_decide_transfer(args: argparse.Namespace) -> int:
                 return fail("x402_runtime_error", str(exc), "Use a valid pending x402 approval id and retry.", exit_code=1)
             except Exception as exc:
                 return fail("x402_runtime_error", str(exc), "Inspect runtime x402 pay decision flow and retry.", exit_code=1)
-        return fail(
-            "not_found",
-            "Transfer approval flow was not found.",
-            "Use a pending approval ID from the latest transfer request.",
-            {"approvalId": approval_id},
-            exit_code=1,
-        )
+        if flow is None:
+            return fail(
+                "not_found",
+                "Transfer approval flow was not found.",
+                "Use a pending approval ID from the latest transfer request.",
+                {"approvalId": approval_id},
+                exit_code=1,
+            )
     status = str(flow.get("status") or "")
     chain = str(args.chain or flow.get("chainKey") or "").strip()
     flow_transfer_type = str(flow.get("transferType") or "native").strip().lower()

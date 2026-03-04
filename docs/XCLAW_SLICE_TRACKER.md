@@ -84,7 +84,7 @@ DoD:
 Status: [~]
 
 Goal:
-- Make management deposit/transfer-confirmation surfaces chain-family aware (`evm|solana`) while keeping withdraw behavior audit-only.
+- Make management deposit/transfer-confirmation surfaces chain-family aware (`evm|solana`) with withdraw behavior in this slice limited to audit-only (historical scope, superseded by Slice 183-188).
 
 DoD:
 - [~] canonical docs/contracts updated for family-neutral management deposit address/tx id semantics.
@@ -143,6 +143,22 @@ DoD:
 - [~] skill wrapper exposes limit-order create/list/cancel/sync/run commands.
 - [~] runtime + skill + API contract tests updated for Solana limit-order flows.
 - [ ] full sequential validation + grep proofs + issue evidence posted.
+
+---
+
+## Slice 183-188: Management Withdraw Execution Parity (`evm|solana`)
+Status: [x]
+
+Goal:
+- Replace audit-only management withdraw with runtime-executed transfer pipeline while keeping route/UI surface stable.
+
+DoD:
+- [~] canonical docs/contracts updated to state withdraw execution is queued/runtime-executed (not audit-only).
+- [~] additive DB contract supports `agent_transfer_decision_inbox.decision_payload` for executable withdraw payloads.
+- [~] `POST /api/v1/management/withdraw` writes mirror + decision inbox payload and returns queued execution metadata.
+- [~] runtime transfer decision handling hydrates missing local flow from decision payload for approve decisions.
+- [~] existing management transfer history/read models render withdraw execution outcomes with family-neutral `txHash` values.
+- [x] full sequential validation + grep proofs + issue evidence posted.
 
 ---
 

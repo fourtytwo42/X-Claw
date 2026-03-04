@@ -1995,7 +1995,7 @@ paths:
   /api/v1/management/withdraw:
     post:
       summary: Submit withdraw request.
-      description: Records a management-audited withdraw request. This route does not execute an on-chain transfer in current contract.
+      description: Queues a runtime-executed owner withdraw via transfer decision inbox (management-audited + policy override mode).
       security:
         - managementCookie: []
       parameters:
@@ -2008,7 +2008,11 @@ paths:
               $ref: '#/components/schemas/ManagementWithdrawRequest'
       responses:
         '200':
-          description: Withdraw request accepted.
+          description: Withdraw request queued for runtime execution.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManagementWithdrawResponse'
   /api/v1/management/deposit:
     get:
       summary: Read agent deposit address, tracked balances, and confirmed deposits.
@@ -3745,6 +3749,31 @@ components:
               reasonMessage:
                 type: string
                 nullable: true
+              decisionPayload:
+                type: object
+                nullable: true
+                properties:
+                  kind:
+                    type: string
+                    enum: [management_withdraw_v1]
+                  chainKey:
+                    type: string
+                  transferType:
+                    type: string
+                    enum: [native, token]
+                  toAddress:
+                    type: string
+                  amountWei:
+                    type: string
+                  tokenAddress:
+                    type: string
+                    nullable: true
+                  tokenSymbol:
+                    type: string
+                    nullable: true
+                  tokenDecimals:
+                    type: integer
+                    nullable: true
               source:
                 type: string
               createdAt:
@@ -4237,7 +4266,49 @@ components:
           type: string
         asset:
           type: string
+        assetKind:
+          type: string
+          enum: [native, token, erc20]
+        tokenAddress:
+          type: string
+          nullable: true
         amount:
+          type: string
+        destination:
+          type: string
+    ManagementWithdrawResponse:
+      type: object
+      required: [ok, withdrawRequestId, approvalId, decisionId, status, executionMode, chainKey, transferType, amountWei, destination]
+      properties:
+        ok:
+          type: boolean
+        withdrawRequestId:
+          type: string
+        approvalId:
+          type: string
+        decisionId:
+          type: string
+        status:
+          type: string
+          enum: [queued]
+        executionMode:
+          type: string
+          enum: [policy_override]
+        chainKey:
+          type: string
+        transferType:
+          type: string
+          enum: [native, token]
+        tokenAddress:
+          type: string
+          nullable: true
+        tokenSymbol:
+          type: string
+          nullable: true
+        tokenDecimals:
+          type: integer
+          nullable: true
+        amountWei:
           type: string
         destination:
           type: string

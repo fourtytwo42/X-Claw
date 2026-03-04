@@ -1,3 +1,14 @@
+# Slice 183-188 Tasks: Management Withdraw Execution Parity (2026-03-04)
+
+- [x] Update canonical docs/contracts to state management withdraw is runtime-queued execution (not audit-only).
+- [x] Add additive migration for `agent_transfer_decision_inbox.decision_payload` with sentinel payload check.
+- [x] Extend management withdraw request schema and add withdraw queued response schema.
+- [x] Extend transfer decision inbox response schema/API to include optional `decisionPayload`.
+- [x] Refactor `/api/v1/management/withdraw` route to enqueue mirror + decision inbox payload and return queued metadata.
+- [x] Extend runtime transfer decision flow to hydrate missing local flow from `management_withdraw_v1` payload.
+- [x] Update management UI success message to show queued withdraw approval id.
+- [x] Run sequential validations + grep proofs + issue evidence post.
+
 # Slice 177-182 Tasks: Solana Limit-Orders Parity (2026-03-04)
 
 - [x] Update canonical docs/contracts for Solana limit-order parity scope and deferred mainnet/testnet posture.

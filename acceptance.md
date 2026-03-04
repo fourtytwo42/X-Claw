@@ -1,3 +1,36 @@
+# Slice 183-188 Acceptance Evidence: Management Withdraw Execution Parity
+
+Date (UTC): 2026-03-04
+Active slice context: `Slice 183 -> Slice 188`.
+
+### Objective + Scope Lock
+- Objective:
+  - convert `/api/v1/management/withdraw` from audit-only to queued runtime transfer execution,
+  - preserve existing withdraw button + transfer history read-model surface across `evm|solana`.
+
+### Behavior Checks
+- [x] management withdraw route now enqueues executable transfer decision payload with `approvalId` + `decisionId`.
+- [x] runtime transfer decision path hydrates missing local flow from `management_withdraw_v1` payload and executes.
+- [x] transfer inbox response schema/API include optional `decisionPayload`.
+- [x] management UI withdraw submit now surfaces queued approval id in toast feedback.
+
+### Required Validation Gates
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS (`Ran 132 tests`, `OK`)
+- [x] targeted Next/API checks for management withdraw + transfer decision inbox routes (`npm run test:management:solana:contract`) -> PASS (`ok: true`, `passed: 11`, `failed: 0`)
+- [x] `npm run db:parity` -> PASS (`ok: true`, includes `0028_slice183_management_withdraw_execution.sql`)
+- [x] `npm run seed:reset` -> PASS
+- [x] `npm run seed:load` -> PASS
+- [x] `npm run seed:verify` -> PASS
+- [x] `npm run build` -> PASS
+- [x] `pm2 restart all` -> PASS (`xclaw-web online`)
+
+### Grep Proofs
+- [x] no canonical docs still state active management withdraw behavior is audit-only.
+  - historical slice references still mention audit-only scope but are explicitly marked superseded by Slice 183-188.
+- [x] `/api/v1/management/withdraw` now writes executable transfer decision payload (not audit-only log only).
+- [x] runtime transfer decision flow contains payload hydration for missing local transfer flows.
+- [x] no secret material is stored in withdraw decision payload/audit records.
+
 # Slice 177-182 Acceptance Evidence: Solana Limit-Orders Parity
 
 Date (UTC): 2026-03-04

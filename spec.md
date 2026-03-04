@@ -1,3 +1,44 @@
+# Slice 183-188 Spec: Management Withdraw Execution Parity (2026-03-04)
+
+## Goal
+1. Convert management withdraw from audit-only accepted record to queued runtime-executed transfer flow.
+2. Preserve stable route/UI entrypoint (`POST /api/v1/management/withdraw` + existing withdraw button).
+3. Reuse existing transfer mirror/decision/runtime execution lifecycle for both `evm` and `solana`.
+
+## Non-goals
+1. No dedicated withdraw queue/status module in this slice.
+2. No server-side signing/custody.
+3. No route path changes.
+
+## Locked scope
+1. `infrastructure/migrations/0028_slice183_management_withdraw_execution.sql`
+2. `apps/network-web/src/app/api/v1/management/withdraw/route.ts`
+3. `apps/network-web/src/app/api/v1/agent/transfer-decisions/inbox/route.ts`
+4. `apps/network-web/src/lib/errors.ts`
+5. `apps/network-web/src/app/agents/[agentId]/page.tsx`
+6. `apps/agent-runtime/xclaw_agent/cli.py`
+7. `apps/agent-runtime/tests/test_trade_path.py`
+8. `packages/shared-schemas/json/management-withdraw-request.schema.json`
+9. `packages/shared-schemas/json/management-withdraw-response.schema.json`
+10. `packages/shared-schemas/json/agent-transfer-decisions-inbox-response.schema.json`
+11. `docs/api/openapi.v1.yaml`
+12. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+13. `docs/XCLAW_SLICE_TRACKER.md`
+14. `docs/XCLAW_BUILD_ROADMAP.md`
+15. `spec.md`
+16. `tasks.md`
+17. `acceptance.md`
+
+## Acceptance checks
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- targeted Next/API checks for `management/withdraw` + `agent/transfer-decisions/inbox`
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `pm2 restart all`
+
 # Slice 177-182 Spec: Solana Limit-Orders Parity (2026-03-04)
 
 ## Goal
@@ -8,7 +49,7 @@
 ## Non-goals
 1. No Solana limit-orders enablement on `solana_mainnet_beta` or `solana_testnet`.
 2. No route path changes.
-3. No management withdraw execution changes (remains audit-only).
+3. No management withdraw execution changes in this historical slice scope (superseded by Slice 183-188).
 
 ## Locked scope
 1. `apps/agent-runtime/xclaw_agent/cli.py`
@@ -59,7 +100,7 @@
 ## Slice 159-163 Extension (2026-03-04)
 1. Add management deposit + transfer-confirmation family dispatch for `evm|solana`.
 2. Generalize management deposit/withdraw contract fields from EVM-hex-only to family-neutral address/tx identifiers.
-3. Keep withdraw behavior audit-only accepted requests (no server-side on-chain withdraw execution).
+3. Keep withdraw behavior audit-only accepted requests in this historical slice scope (superseded by Slice 183-188).
 4. Enable Solana deposits on `solana_localnet` + `solana_devnet`; keep `solana_mainnet_beta` and `solana_testnet` deposits deferred.
 
 ## Slice 139-146 Extension (2026-03-04)

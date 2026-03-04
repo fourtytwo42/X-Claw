@@ -26,6 +26,8 @@ export type ApiErrorCode =
   | 'x402_settlement_proof_invalid'
   | 'transfer_mirror_unavailable'
   | 'runtime_signing_unavailable'
+  | 'token_resolution_failed'
+  | 'withdraw_queue_failed'
   | 'faucet_config_invalid'
   | 'faucet_fee_too_low_for_chain'
   | 'faucet_native_insufficient'

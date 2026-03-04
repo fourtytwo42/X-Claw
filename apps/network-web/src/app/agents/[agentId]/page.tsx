@@ -1021,11 +1021,11 @@ export default function AgentPublicProfilePage() {
     });
   }
 
-  async function runManagementAction(action: () => Promise<void>, successMessage: string, onSuccess?: () => void) {
+  async function runManagementAction(action: () => Promise<string | void>, successMessage: string, onSuccess?: () => void) {
     try {
-      await action();
+      const actionMessage = await action();
       onSuccess?.();
-      showToast(successMessage, 'success');
+      showToast(typeof actionMessage === 'string' && actionMessage.trim() ? actionMessage : successMessage, 'success');
       // Refresh in background so transient backend stalls do not freeze action UX.
       window.setTimeout(() => {
         void refreshAll({ showLoading: false });
@@ -2115,7 +2115,12 @@ export default function AgentPublicProfilePage() {
                       asset: withdrawAsset,
                       amount: withdrawAmount,
                       destination: withdrawDestination
-                    }).then(() => Promise.resolve()),
+                    }).then((result) => {
+                      const approvalId = String((result as { approvalId?: unknown } | null)?.approvalId ?? '').trim();
+                      return approvalId
+                        ? `Withdraw queued. Approval ID: ${approvalId}`
+                        : 'Withdraw queued.';
+                    }),
                   'Withdraw request submitted.'
                 )
               }

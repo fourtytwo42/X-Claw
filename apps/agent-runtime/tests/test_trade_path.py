@@ -1927,6 +1927,60 @@ class TradePathRuntimeTests(unittest.TestCase):
         self.assertEqual(approval.get("approvalId"), approval_id)
         self.assertEqual(approval.get("status"), "filled")
 
+    def test_approvals_decide_transfer_hydrates_management_withdraw_payload(self) -> None:
+        approval_id = "xfr_withdraw_hydrate"
+        args = argparse.Namespace(
+            approval_id=approval_id,
+            decision="approve",
+            reason_message=None,
+            chain="solana_devnet",
+            decision_payload={
+                "kind": "management_withdraw_v1",
+                "chainKey": "solana_devnet",
+                "transferType": "native",
+                "toAddress": "9xQeWvG816bUx9EPf4V6N6fQx6m8y6BLPAb9YSE3sJsi",
+                "amountWei": "1000000",
+                "tokenAddress": None,
+                "tokenSymbol": "SOL",
+                "tokenDecimals": 9,
+            },
+            json=True,
+        )
+        with mock.patch.object(
+            cli,
+            "_execute_pending_transfer_flow",
+            return_value={"ok": True, "code": "ok", "approvalId": approval_id, "status": "filled", "txHash": "3M9x9CeQxH5qHkW2D8t2Gyxvf8K8k2Rj2Y2o5x7QyA3z"},
+        ), mock.patch.object(cli, "_mirror_transfer_approval") as mirror_mock:
+            payload = self._run_and_parse_stdout(lambda: cli.cmd_approvals_decide_transfer(args))
+        self.assertTrue(payload.get("ok"))
+        self.assertEqual(payload.get("status"), "filled")
+        self.assertGreaterEqual(mirror_mock.call_count, 1)
+        hydrated = cli._get_pending_transfer_flow(approval_id)
+        self.assertIsNotNone(hydrated)
+        self.assertEqual(str((hydrated or {}).get("transferType")), "native")
+        self.assertEqual(str((hydrated or {}).get("executionMode")), "policy_override")
+
+    def test_approvals_decide_transfer_invalid_decision_payload_fails_closed(self) -> None:
+        approval_id = "xfr_withdraw_bad_payload"
+        args = argparse.Namespace(
+            approval_id=approval_id,
+            decision="approve",
+            reason_message=None,
+            chain="base_sepolia",
+            decision_payload={
+                "kind": "unknown_kind",
+                "chainKey": "base_sepolia",
+                "transferType": "native",
+                "toAddress": "0x" + "11" * 20,
+                "amountWei": "1",
+            },
+            json=True,
+        )
+        with mock.patch.object(cli.x402_state, "get_pending_pay_flow", return_value=None):
+            payload = self._run_and_parse_stdout(lambda: cli.cmd_approvals_decide_transfer(args))
+        self.assertFalse(payload.get("ok"))
+        self.assertEqual(payload.get("code"), "invalid_decision_payload")
+
     def test_approvals_resume_transfer_recovers_stale_executing_without_txhash(self) -> None:
         approval_id = "xfr_resume_stale"
         cli._record_pending_transfer_flow(

@@ -48,7 +48,7 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 
 ## 0.9) Slice 159-163 Solana Deposits + Management Parity Program
 
-- [~] Canonical contract update: management deposit/confirmation paths are family-aware (`evm|solana`), withdraw remains audit-only.
+- [~] Canonical contract update: management deposit/confirmation paths are family-aware (`evm|solana`), with withdraw audit-only in this slice scope (historical, superseded by Slice 183-188).
 - [~] Generalize management deposit/withdraw schemas from hex-only address/tx constraints to family-neutral contract.
 - [~] Enable `solana_devnet` deposits capability (keep localnet enabled; keep mainnet/testnet deferred).
 - [~] Refactor `/api/v1/management/deposit` sync to dispatch by chain family and degrade deterministically on Solana RPC faults.
@@ -81,6 +81,15 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 - [~] Refactor runtime limit-order quote/fill path to family dispatch (EVM + Solana).
 - [~] Expose limit-order command surface in skill wrapper and operator docs.
 - [ ] Sequential validation + PM2 restart + issue evidence capture.
+
+## 0.13) Slice 183-188 Management Withdraw Execution Parity Program
+
+- [~] Canonicalize management withdraw as queued runtime execution (not audit-only accepted record).
+- [~] Add inbox payload contract (`agent_transfer_decision_inbox.decision_payload`) for executable owner withdraws.
+- [~] Update `/api/v1/management/withdraw` to enqueue approved transfer mirror + pending decision inbox row.
+- [~] Extend runtime transfer decision flow to hydrate missing local flow from withdraw decision payload.
+- [~] Keep existing management transfer history surface as the withdraw execution read-model (no dedicated withdraw module in this slice).
+- [x] Sequential validation + PM2 restart + issue evidence capture.
 
 ---
 
