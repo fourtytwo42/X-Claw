@@ -84,7 +84,7 @@ Use this skill to run X-Claw commands safely through `scripts/xclaw_agent_skill.
 Required:
 - `XCLAW_API_BASE_URL`
 - `XCLAW_AGENT_API_KEY`
-- `XCLAW_DEFAULT_CHAIN` (for example `base_sepolia` or `solana_devnet`)
+- `XCLAW_DEFAULT_CHAIN` (for example `base_sepolia` or `solana_localnet`)
 
 Common optional:
 - `XCLAW_WALLET_PASSPHRASE`

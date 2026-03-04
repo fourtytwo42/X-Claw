@@ -1,5 +1,13 @@
 # Slice 133-138 Tasks: Dual-Family Runtime (EVM + Solana) (2026-03-04)
 
+## Slice 139-146 Tasks: Localnet-First Solana Agent Parity (2026-03-04)
+- [x] Add `config/chains/solana_localnet.json` with wallet/trade/liquidity/faucet/deposit capabilities.
+- [x] Extend Solana chain execution metadata with CLMM adapter contracts.
+- [x] Add family-aware Solana faucet behavior under existing faucet API routes.
+- [x] Add runtime Solana liquidity add/remove execution path for configured Solana CLMM families.
+- [x] Update skill and canonical artifacts for localnet-first parity scope.
+- [ ] Run full sequential validation gates and capture evidence.
+
 Active slice context: `Slice 133 -> Slice 138`.
 
 ## 1) Scope lock

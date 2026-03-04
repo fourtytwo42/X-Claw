@@ -10,6 +10,11 @@ export const runtime = 'nodejs';
 
 type FaucetAssetKey = 'native' | 'wrapped' | 'stable';
 
+function isLikelySolanaAddress(value: string): boolean {
+  const text = String(value || '').trim();
+  return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(text);
+}
+
 function toEnvSuffix(chainKey: string): string {
   return chainKey.replace(/[^a-zA-Z0-9]/g, '_').toUpperCase();
 }
@@ -24,32 +29,34 @@ function resolveChainScopedEnv(prefix: string, chainKey: string): string {
 }
 
 function resolveWrapped(chainKey: string): { symbol: string; address: string } | null {
+  const family = (getChainConfig(chainKey)?.family || 'evm').toLowerCase();
   const envAddress = resolveChainScopedEnv('XCLAW_TESTNET_FAUCET_WRAPPED_TOKEN_ADDRESS', chainKey);
   if (envAddress) {
     const envSymbol = resolveChainScopedEnv('XCLAW_TESTNET_FAUCET_WRAPPED_TOKEN_SYMBOL', chainKey) || 'WRAPPED';
-    if (!isAddress(envAddress)) {
+    if (family === 'solana' ? !isLikelySolanaAddress(envAddress) : !isAddress(envAddress)) {
       return null;
     }
     return { symbol: envSymbol, address: envAddress };
   }
   const cfg = getChainConfig(chainKey);
   const tokens = cfg?.canonicalTokens || {};
-  const address = (tokens.WETH || tokens.WKITE || tokens.WHBAR || '').trim();
+  const address = (tokens.WETH || tokens.WKITE || tokens.WHBAR || tokens.WSOL || '').trim();
   if (!address) {
     return null;
   }
-  const symbol = tokens.WETH ? 'WETH' : tokens.WKITE ? 'WKITE' : 'WHBAR';
-  if (!isAddress(address)) {
+  const symbol = tokens.WETH ? 'WETH' : tokens.WKITE ? 'WKITE' : tokens.WHBAR ? 'WHBAR' : 'WSOL';
+  if (family === 'solana' ? !isLikelySolanaAddress(address) : !isAddress(address)) {
     return null;
   }
   return { symbol, address };
 }
 
 function resolveStable(chainKey: string): { symbol: string; address: string } | null {
+  const family = (getChainConfig(chainKey)?.family || 'evm').toLowerCase();
   const envAddress = resolveChainScopedEnv('XCLAW_TESTNET_FAUCET_STABLE_TOKEN_ADDRESS', chainKey);
   if (envAddress) {
     const envSymbol = resolveChainScopedEnv('XCLAW_TESTNET_FAUCET_STABLE_TOKEN_SYMBOL', chainKey) || 'USDC';
-    if (!isAddress(envAddress)) {
+    if (family === 'solana' ? !isLikelySolanaAddress(envAddress) : !isAddress(envAddress)) {
       return null;
     }
     return { symbol: envSymbol, address: envAddress };
@@ -61,7 +68,7 @@ function resolveStable(chainKey: string): { symbol: string; address: string } | 
     return null;
   }
   const symbol = tokens.USDC ? 'USDC' : 'USDT';
-  if (!isAddress(address)) {
+  if (family === 'solana' ? !isLikelySolanaAddress(address) : !isAddress(address)) {
     return null;
   }
   return { symbol, address };
@@ -81,7 +88,11 @@ export async function GET(req: NextRequest) {
     const stable = resolveStable(chainKey);
     const nativeSymbol = cfg.nativeCurrency?.symbol?.trim() || 'ETH';
 
-    const configured = Boolean(resolveChainScopedEnv('XCLAW_TESTNET_FAUCET_PRIVATE_KEY', chainKey));
+    const family = String(cfg.family || 'evm').toLowerCase();
+    const configured =
+      family === 'solana'
+        ? Boolean(resolveChainScopedEnv('XCLAW_TESTNET_FAUCET_RPC_URL', chainKey) || cfg.rpc?.primary)
+        : Boolean(resolveChainScopedEnv('XCLAW_TESTNET_FAUCET_PRIVATE_KEY', chainKey));
 
     const supportedAssets: FaucetAssetKey[] = ['native'];
     if (wrapped) {

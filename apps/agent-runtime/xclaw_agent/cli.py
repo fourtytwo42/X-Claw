@@ -83,6 +83,11 @@ from xclaw_agent.solana_runtime import (
     send_spl_transfer as solana_send_spl_transfer,
     sign_message as solana_sign_message,
 )
+from xclaw_agent.solana_liquidity_local import (
+    create_position as solana_local_create_position,
+    quote_add as solana_local_quote_add,
+    remove_position as solana_local_remove_position,
+)
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 try:
     from argon2.low_level import Type, hash_secret_raw
@@ -6401,7 +6406,7 @@ def _read_v3_position_snapshot(chain: str, position_manager: str, position_id: s
 def _execute_liquidity_v3_add(intent: dict[str, Any], chain: str) -> dict[str, Any]:
     dex = str(intent.get("dex") or "").strip().lower()
     adapter = build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type="v3")
-    if adapter.protocol_family != "position_manager_v3":
+    if adapter.protocol_family not in {"position_manager_v3", "local_clmm", "raydium_clmm"}:
         raise WalletStoreError(
             f"unsupported_liquidity_execution_family: Liquidity intent execution requires position_manager_v3 for v3 add; got '{adapter.protocol_family}'."
         )
@@ -6421,6 +6426,40 @@ def _execute_liquidity_v3_add(intent: dict[str, Any], chain: str) -> dict[str, A
     slippage_bps = int(intent.get("slippageBps") or 100)
     if slippage_bps < 0 or slippage_bps > 5000:
         raise WalletStoreError("slippageBps must be between 0 and 5000 for liquidity execution.")
+    if _is_solana_chain(chain):
+        store = load_wallet_store()
+        wallet_address, _ = _execution_wallet(store, chain)
+        created = solana_local_create_position(
+            chain=chain,
+            dex=adapter.dex,
+            owner=wallet_address,
+            token_a=token_a,
+            token_b=token_b,
+            amount_a=_decimal_text(amount_a_h),
+            amount_b=_decimal_text(amount_b_h),
+            details=v3_details,
+        )
+        return {
+            "txHash": str(created.get("txHash") or ""),
+            "positionId": str(created.get("positionId") or ""),
+            "details": {
+                "adapterFamily": adapter.protocol_family,
+                "dex": adapter.dex,
+                "action": "add",
+                "executionFamily": "solana_clmm",
+                "executionAdapter": adapter.dex,
+                "routeKind": "local_position_manager",
+                "fee": fee,
+                "tickLower": tick_lower,
+                "tickUpper": tick_upper,
+                "amountA": _decimal_text(amount_a_h),
+                "amountB": _decimal_text(amount_b_h),
+                "slippageBps": slippage_bps,
+                "approveTxHashes": [],
+                "operationTxHashes": [str(created.get("txHash") or "")],
+                "simulationMode": True,
+            },
+        }
     token_a_meta = _fetch_erc20_metadata(chain, token_a)
     token_b_meta = _fetch_erc20_metadata(chain, token_b)
     amount_a_units = int(_to_units_uint(_decimal_text(amount_a_h), int(token_a_meta.get("decimals", 18))))
@@ -6485,7 +6524,7 @@ def _execute_liquidity_v3_add(intent: dict[str, Any], chain: str) -> dict[str, A
 def _execute_liquidity_v3_remove(intent: dict[str, Any], chain: str) -> dict[str, Any]:
     dex = str(intent.get("dex") or "").strip().lower()
     adapter = build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type="v3")
-    if adapter.protocol_family != "position_manager_v3":
+    if adapter.protocol_family not in {"position_manager_v3", "local_clmm", "raydium_clmm"}:
         raise WalletStoreError(
             f"unsupported_liquidity_execution_family: Liquidity intent execution requires position_manager_v3 for v3 remove; got '{adapter.protocol_family}'."
         )
@@ -6505,6 +6544,38 @@ def _execute_liquidity_v3_remove(intent: dict[str, Any], chain: str) -> dict[str
     v3_details = _v3_details_dict(details)
     min_a_units = str(v3_details.get("minAmountAUnits") or "0").strip() or "0"
     min_b_units = str(v3_details.get("minAmountBUnits") or "0").strip() or "0"
+    if _is_solana_chain(chain):
+        store = load_wallet_store()
+        wallet_address, _ = _execution_wallet(store, chain)
+        removed = solana_local_remove_position(
+            chain=chain,
+            dex=adapter.dex,
+            owner=wallet_address,
+            position_id=position_id,
+            percent=percent,
+        )
+        return {
+            "txHash": str(removed.get("txHash") or ""),
+            "positionId": position_id,
+            "details": {
+                "adapterFamily": adapter.protocol_family,
+                "dex": adapter.dex,
+                "action": "remove",
+                "executionFamily": "solana_clmm",
+                "executionAdapter": adapter.dex,
+                "routeKind": "local_position_manager",
+                "percent": percent,
+                "removedAmountA": removed.get("removedAmountA"),
+                "removedAmountB": removed.get("removedAmountB"),
+                "remainingAmountA": removed.get("remainingAmountA"),
+                "remainingAmountB": removed.get("remainingAmountB"),
+                "minAmountAUnits": min_a_units,
+                "minAmountBUnits": min_b_units,
+                "approveTxHashes": [],
+                "operationTxHashes": [str(removed.get("txHash") or "")],
+                "simulationMode": True,
+            },
+        }
     position_manager = str(adapter.position_manager or "").strip()
     if not position_manager:
         raise WalletStoreError("chain_config_invalid: missing positionManager for v3 remove execution.")
@@ -7286,7 +7357,8 @@ def cmd_liquidity_quote_add(args: argparse.Namespace) -> int:
     dex = str(args.dex or "").strip().lower()
     try:
         assert_chain_capability(chain, "liquidity")
-        position_type = str(args.position_type or "v2").strip().lower()
+        default_position_type = "v3" if _is_solana_chain(chain) else "v2"
+        position_type = str(args.position_type or default_position_type).strip().lower()
         adapter = build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type=position_type)
         token_a = _resolve_token_address(chain, args.token_a)
         token_b = _resolve_token_address(chain, args.token_b)
@@ -7299,8 +7371,11 @@ def cmd_liquidity_quote_add(args: argparse.Namespace) -> int:
             return fail("invalid_input", "slippage-bps must be between 0 and 5000.", "Use integer bps in range.", {"slippageBps": args.slippage_bps}, exit_code=2)
         v3_meta: dict[str, Any] = {}
         if position_type == "v3":
+            v3_range_text = str(args.v3_range or "").strip()
+            if not v3_range_text and _is_solana_chain(chain):
+                v3_range_text = "100:0:0"
             try:
-                fee, tick_lower, tick_upper = _parse_v3_range_text(str(args.v3_range or ""))
+                fee, tick_lower, tick_upper = _parse_v3_range_text(v3_range_text)
             except WalletStoreError as exc:
                 return fail("invalid_input", str(exc), "Provide --v3-range fee:tickLower:tickUpper.", {"chain": chain, "dex": dex}, exit_code=2)
             v3_meta = {
@@ -7318,6 +7393,32 @@ def cmd_liquidity_quote_add(args: argparse.Namespace) -> int:
                 "slippageBps": slippage_bps,
             }
         )
+        if _is_solana_chain(chain):
+            local_quote = solana_local_quote_add(
+                amount_a=_decimal_text(amount_a_h),
+                amount_b=_decimal_text(amount_b_h),
+                slippage_bps=slippage_bps,
+            )
+            return ok(
+                "Liquidity add quote ready.",
+                chain=chain,
+                dex=dex,
+                positionType=position_type,
+                tokenA=token_a,
+                tokenB=token_b,
+                amountA=_decimal_text(amount_a_h),
+                amountB=_decimal_text(amount_b_h),
+                quoteAmountB=local_quote.get("amountB"),
+                minAmountB=local_quote.get("minAmountB"),
+                slippageBps=slippage_bps,
+                tokenASymbol=None,
+                tokenBSymbol=None,
+                tokenADecimals=9,
+                tokenBDecimals=9,
+                adapterFamily=adapter.protocol_family,
+                preflight={**preflight.get("simulation", {}), **local_quote},
+                simulationOnly=True,
+            )
         token_a_meta = _fetch_erc20_metadata(chain, token_a)
         token_b_meta = _fetch_erc20_metadata(chain, token_b)
         token_a_decimals = int(token_a_meta.get("decimals", 18))
@@ -7372,7 +7473,8 @@ def cmd_liquidity_quote_remove(args: argparse.Namespace) -> int:
     dex = str(args.dex or "").strip().lower()
     try:
         assert_chain_capability(chain, "liquidity")
-        position_type = str(args.position_type or "v2").strip().lower()
+        default_position_type = "v3" if _is_solana_chain(chain) else "v2"
+        position_type = str(args.position_type or default_position_type).strip().lower()
         adapter = build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type=position_type)
         position_id = str(args.position_id or "").strip()
         if not position_id:
@@ -7417,7 +7519,8 @@ def cmd_liquidity_add(args: argparse.Namespace) -> int:
     dex = str(args.dex or "").strip().lower()
     try:
         assert_chain_capability(chain, "liquidity")
-        position_type = str(args.position_type or "v2").strip().lower()
+        default_position_type = "v3" if _is_solana_chain(chain) else "v2"
+        position_type = str(args.position_type or default_position_type).strip().lower()
         token_a = _resolve_token_address(chain, args.token_a)
         token_b = _resolve_token_address(chain, args.token_b)
         if token_a.lower() == token_b.lower():
@@ -7429,8 +7532,11 @@ def cmd_liquidity_add(args: argparse.Namespace) -> int:
             return fail("invalid_input", "slippage-bps must be between 0 and 5000.", "Use integer bps in range.", {"slippageBps": args.slippage_bps}, exit_code=2)
         v3_meta: dict[str, Any] = {}
         if position_type == "v3":
+            v3_range_text = str(args.v3_range or "").strip()
+            if not v3_range_text and _is_solana_chain(chain):
+                v3_range_text = "100:0:0"
             try:
-                fee, tick_lower, tick_upper = _parse_v3_range_text(str(args.v3_range or ""))
+                fee, tick_lower, tick_upper = _parse_v3_range_text(v3_range_text)
             except WalletStoreError as exc:
                 return fail("invalid_input", str(exc), "Provide --v3-range fee:tickLower:tickUpper.", {"chain": chain, "dex": dex}, exit_code=2)
             v3_meta = {"fee": fee, "tickLower": tick_lower, "tickUpper": tick_upper, "deadlineSec": 120}
@@ -7567,7 +7673,8 @@ def cmd_liquidity_remove(args: argparse.Namespace) -> int:
     dex = str(args.dex or "").strip().lower()
     try:
         assert_chain_capability(chain, "liquidity")
-        position_type = str(args.position_type or "v2").strip().lower()
+        default_position_type = "v3" if _is_solana_chain(chain) else "v2"
+        position_type = str(args.position_type or default_position_type).strip().lower()
         provider_requested, _ = _liquidity_provider_settings(chain)
         adapter = build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type=position_type)
         adapter_preflight: dict[str, Any] = {}
@@ -7591,7 +7698,20 @@ def cmd_liquidity_remove(args: argparse.Namespace) -> int:
             }
         )
         preflight = adapter_preflight
-        if adapter_family == "position_manager_v3":
+        if _is_solana_chain(chain):
+            token_a_in = str(args.token_a or "").strip()
+            token_b_in = str(args.token_b or "").strip()
+            if not token_a_in or not token_b_in:
+                return fail(
+                    "invalid_input",
+                    "token-a and token-b are required for Solana liquidity remove intents.",
+                    "Provide --token-a <mint> --token-b <mint> and retry.",
+                    {"chain": chain, "dex": adapter_dex, "positionId": position_id},
+                    exit_code=2,
+                )
+            resolved_token_a = _resolve_token_address(chain, token_a_in)
+            resolved_token_b = _resolve_token_address(chain, token_b_in)
+        elif adapter_family == "position_manager_v3":
             if not adapter.position_manager:
                 return fail(
                     "chain_config_invalid",
@@ -8327,7 +8447,7 @@ def cmd_liquidity_execute(args: argparse.Namespace) -> int:
             if action == "add":
                 if adapter.protocol_family == "amm_v2":
                     return _execute_liquidity_v2_add(intent, chain), adapter.protocol_family
-                if adapter.protocol_family == "position_manager_v3":
+                if adapter.protocol_family in {"position_manager_v3", "local_clmm", "raydium_clmm"}:
                     return _execute_liquidity_v3_add(intent, chain), adapter.protocol_family
                 raise WalletStoreError(
                     f"unsupported_liquidity_execution_family: Liquidity intent add requires supported local execution family, got '{adapter.protocol_family}'."
@@ -8335,7 +8455,7 @@ def cmd_liquidity_execute(args: argparse.Namespace) -> int:
             if action == "remove":
                 if adapter.protocol_family == "amm_v2":
                     return _execute_liquidity_v2_remove(intent, chain), adapter.protocol_family
-                if adapter.protocol_family == "position_manager_v3":
+                if adapter.protocol_family in {"position_manager_v3", "local_clmm", "raydium_clmm"}:
                     return _execute_liquidity_v3_remove(intent, chain), adapter.protocol_family
                 raise WalletStoreError(
                     f"unsupported_liquidity_execution_family: Liquidity intent remove requires supported local execution family, got '{adapter.protocol_family}'."

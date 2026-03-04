@@ -1,5 +1,30 @@
 # Slice 133-138 Acceptance Evidence: Dual-Family Runtime (EVM + Solana)
 
+## Slice 139-146 Acceptance Evidence: Localnet-First Solana Agent Parity
+
+Date (UTC): 2026-03-04
+Active slice context: `Slice 139 -> Slice 146`.
+
+### Objective + Scope Lock
+- Objective:
+  - add deterministic `solana_localnet` parity for faucet + liquidity add/remove flows,
+  - keep approval/audit lifecycle behavior aligned with EVM contract.
+
+### Behavior Checks
+- [x] `solana_localnet` chain is enabled and ui-visible.
+- [x] faucet routes are chain-family aware and include Solana localnet handling.
+- [x] runtime liquidity execute path supports Solana CLMM families for add/remove actions.
+- [x] canonical docs/tasks/tracker/roadmap updated in same change set.
+
+### Required Validation Gates
+- [ ] targeted Python/runtime tests
+- [ ] `npm run db:parity`
+- [ ] `npm run seed:reset`
+- [ ] `npm run seed:load`
+- [ ] `npm run seed:verify`
+- [ ] `npm run build`
+- [ ] `pm2 restart all`
+
 Date (UTC): 2026-03-04
 Active slice context: `Slice 133 -> Slice 138`.
 

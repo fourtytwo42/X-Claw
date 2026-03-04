@@ -35,6 +35,21 @@ DoD:
 
 ---
 
+## Slice 139-146: Localnet-First Full Solana Agent Parity
+Status: [~]
+
+Goal:
+- Make `solana_localnet` the default deterministic Solana test target and extend parity across faucet, liquidity add/remove, approvals, and audit trails.
+
+DoD:
+- [~] `solana_localnet` chain config added and visible.
+- [~] family-aware faucet routes support Solana localnet deterministic funding flow.
+- [~] runtime liquidity add/remove execute path supports Solana CLMM adapter families.
+- [~] skill/docs updated for localnet-first Solana workflows.
+- [ ] full sequential validations + evidence posted to mapped issue.
+
+---
+
 ## Slice 01: Environment + Toolchain Baseline
 Status: [x]
 

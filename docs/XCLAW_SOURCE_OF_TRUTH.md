@@ -138,6 +138,20 @@ and fail closed for unsupported execution families.
 - `routeKind`
 - `liquidityOperation`
 
+## 3.5) Slice 139-146 Localnet-First Solana Parity (2026-03-04)
+
+1. `solana_localnet` is a canonical supported chain key for deterministic CI/dev/external-agent testing.
+2. Localnet-first rule for Solana validation is canonical:
+- use `solana_localnet` before `solana_devnet`/`solana_testnet` evidence.
+3. Canonical faucet contract is family-aware under existing endpoints:
+- `POST /api/v1/agent/faucet/request`
+- `GET /api/v1/agent/faucet/networks`
+4. Solana faucet logic must be deterministic and capability-gated by chain config.
+5. Solana liquidity add/remove execution is allowed through configured Solana CLMM adapter families (`local_clmm`, `raydium_clmm`) with the same lifecycle/status envelope used by EVM intents.
+6. Approval and audit contracts remain canonical and chain-family-neutral:
+- `proposed -> approval_pending -> approved -> executing -> verifying -> filled|failed`
+- `providerRequested|providerUsed|executionFamily|executionAdapter|routeKind|liquidityOperation`
+
 ---
 
 ## 4) Scope

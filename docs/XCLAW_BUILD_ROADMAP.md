@@ -21,6 +21,15 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 - [~] Skill wrapper/docs updated for Solana chain examples and behavior.
 - [ ] Sequential validation + PM2 restart evidence captured.
 
+## 0.6) Slice 139-146 Localnet-First Solana Parity Program
+
+- [~] Add `solana_localnet` chain contract + UI visibility.
+- [~] Add Solana family handling to faucet request/networks routes.
+- [~] Implement localnet-first Solana liquidity add/remove runtime execution path.
+- [~] Keep approval/audit envelope chain-family-neutral for Solana actions.
+- [~] Update skills/docs/handoff artifacts to localnet-first Solana testing guidance.
+- [ ] Sequential validation + PM2 restart + issue evidence capture.
+
 ---
 
 ## 0) Program Control and Working Rules

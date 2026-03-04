@@ -40,7 +40,7 @@ Notes:
 - explicit `--chain` remains authoritative for chain-scoped commands.
 - chain inference for omitted chain uses runtime/web-synced default chain (`state.json.defaultChain`) first, then `XCLAW_DEFAULT_CHAIN` env fallback.
 - `wallet-send` uses base-unit amount for deterministic automation.
-- Supported chain keys for this contract are config-driven enabled chains (`config/chains/*.json` where `enabled=true` and `family in {evm, solana}`). Current visible examples include EVM chains plus `solana_devnet`, `solana_testnet`, and `solana_mainnet_beta`.
+- Supported chain keys for this contract are config-driven enabled chains (`config/chains/*.json` where `enabled=true` and `family in {evm, solana}`). Current visible examples include EVM chains plus `solana_localnet`, `solana_devnet`, `solana_testnet`, and `solana_mainnet_beta`.
 
 ## 2) Delegated Runtime Commands
 

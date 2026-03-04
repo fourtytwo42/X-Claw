@@ -106,7 +106,7 @@ Underlying runtime delegation (performed by wrapper):
 - `xclaw-agent profile set-name --name <name> --chain <chain_key> --json`
 - `xclaw-agent auth recover --chain <chain_key> --json`
 - `xclaw-agent management-link --ttl-seconds <seconds> --json`
-- `xclaw-agent faucet-request --chain <chain_key> --json`
+- `xclaw-agent faucet-request --chain <chain_key> --json` (for example `solana_localnet`)
 - `xclaw-agent faucet-request --chain <chain_key> [--asset <native|wrapped|stable>]... --json`
   - skill-wrapper aliases: `eth|kite -> native`, `weth|wkite -> wrapped`, `usdc|usdt -> stable`
   - skill-wrapper behavior: if only `native` is requested, it omits asset flags so faucet defaults to all assets.

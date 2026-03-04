@@ -284,6 +284,12 @@ class AmmV3LiquidityAdapter(LiquidityAdapter):
         return self._planner().build_add_plan(payload, wallet_address, build_calldata=build_calldata)
 
 
+class SolanaClmmLiquidityAdapter(LiquidityAdapter):
+    def supports_operation(self, operation: str) -> bool:
+        op = str(operation or "").strip().lower()
+        return op in {"add", "remove", "quote_add", "quote_remove", "position_fetch"}
+
+
 def _require_non_empty(value: Any, field_name: str) -> str:
     text = str(value or "").strip()
     if not text:
@@ -399,7 +405,7 @@ def _resolve_protocol(chain: str, dex: str, position_type: str) -> tuple[str, st
             )
         return requested_dex, family
 
-    desired_family = {"amm_v3", "position_manager_v3"} if requested_position == "v3" else {"amm_v2"}
+    desired_family = {"amm_v3", "position_manager_v3", "local_clmm", "raydium_clmm"} if requested_position == "v3" else {"amm_v2"}
     for key, entry in protocols.items():
         if entry.get("enabled", True) is False:
             continue
@@ -447,6 +453,19 @@ def build_liquidity_adapter(chain: str, dex: str, protocol_family: str, position
             router=router,
             factory=factory,
             quoter=quoter,
+            capabilities=dict(capabilities) if isinstance(capabilities, dict) else {},
+            operations=dict(operations) if isinstance(operations, dict) else {},
+        )
+    if normalized in {"local_clmm", "raydium_clmm"}:
+        return SolanaClmmLiquidityAdapter(
+            chain=chain,
+            dex=normalized_dex,
+            protocol_family=normalized,
+            position_type=normalized_position,
+            router=router,
+            factory=factory,
+            quoter=quoter,
+            position_manager=position_manager,
             capabilities=dict(capabilities) if isinstance(capabilities, dict) else {},
             operations=dict(operations) if isinstance(operations, dict) else {},
         )

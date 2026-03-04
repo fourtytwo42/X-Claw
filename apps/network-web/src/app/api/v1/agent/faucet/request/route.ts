@@ -40,6 +40,11 @@ const ERC20_ABI = [
 ];
 const WRAPPED_NATIVE_HELPER_ABI = ['function deposit() payable'];
 
+function isLikelySolanaAddress(value: string): boolean {
+  const text = String(value || '').trim();
+  return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(text);
+}
+
 type FaucetRouteErrorInput = {
   status: number;
   code: ApiErrorCode;
@@ -89,6 +94,41 @@ function parsePositiveWei(value: string, field: string): bigint {
       code: 'faucet_config_invalid',
       message: `Faucet configuration for ${field} is invalid.`,
       actionHint: `Set ${field} to a positive integer amount in wei units.`,
+      details: { field, value },
+    });
+  }
+}
+
+async function solanaRpcPost(rpcUrl: string, method: string, params: unknown[]): Promise<unknown> {
+  const resp = await fetch(rpcUrl, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+    cache: 'no-store',
+  });
+  if (!resp.ok) {
+    throw new Error(`solana_rpc_http_${resp.status}`);
+  }
+  const payload = (await resp.json()) as { result?: unknown; error?: { message?: string } };
+  if (payload?.error) {
+    throw new Error(String(payload.error.message || `solana_rpc_${method}_error`));
+  }
+  return payload?.result;
+}
+
+function parsePositiveAtomic(value: string, field: string): bigint {
+  try {
+    const parsed = BigInt(String(value || '').trim());
+    if (parsed <= BigInt(0)) {
+      throw new Error('non_positive');
+    }
+    return parsed;
+  } catch {
+    throw new FaucetRouteError({
+      status: 503,
+      code: 'faucet_config_invalid',
+      message: `Faucet configuration for ${field} is invalid.`,
+      actionHint: `Set ${field} to a positive integer atomic amount.`,
       details: { field, value },
     });
   }
@@ -320,6 +360,119 @@ export async function POST(req: NextRequest) {
 
     const recipient = walletResult.rows[0].address;
     const trimmedRecipient = recipient.trim();
+    const family = String(getChainConfig(chainKey)?.family || 'evm').toLowerCase();
+    if (family === 'solana') {
+      if (!isLikelySolanaAddress(trimmedRecipient)) {
+        return errorResponse(
+          400,
+          {
+            code: 'payload_invalid',
+            message: 'Agent wallet address is not a valid Solana address.',
+            actionHint: 'Re-register the agent wallet address and retry.'
+          },
+          requestId
+        );
+      }
+      const rpcUrl = resolveChainScopedEnv('XCLAW_TESTNET_FAUCET_RPC_URL', chainKey) || chainRpcUrl(chainKey);
+      if (!rpcUrl) {
+        return errorResponse(
+          503,
+          {
+            code: 'faucet_config_invalid',
+            message: 'Faucet RPC is not configured.',
+            actionHint: `Set XCLAW_TESTNET_FAUCET_RPC_URL_${toEnvSuffix(chainKey)} (or XCLAW_TESTNET_FAUCET_RPC_URL), or configure chain RPC.`
+          },
+          requestId
+        );
+      }
+      const limiter = await enforceAgentFaucetDailyRateLimit(requestId, auth.agentId, chainKey);
+      if (!limiter.ok) {
+        return limiter.response;
+      }
+      const nativeSymbol = getChainConfig(chainKey)?.nativeCurrency?.symbol?.trim() || 'SOL';
+      const nativeAmount = parsePositiveAtomic(
+        resolveChainScopedEnv('XCLAW_SOLANA_FAUCET_DRIP_NATIVE_UNITS', chainKey) || '1000000000',
+        `XCLAW_SOLANA_FAUCET_DRIP_NATIVE_UNITS_${toEnvSuffix(chainKey)}`
+      );
+      const wrappedAmount = parsePositiveAtomic(
+        resolveChainScopedEnv('XCLAW_SOLANA_FAUCET_DRIP_WRAPPED_UNITS', chainKey) || '1000000000',
+        `XCLAW_SOLANA_FAUCET_DRIP_WRAPPED_UNITS_${toEnvSuffix(chainKey)}`
+      );
+      const stableAmount = parsePositiveAtomic(
+        resolveChainScopedEnv('XCLAW_SOLANA_FAUCET_DRIP_STABLE_UNITS', chainKey) || '1000000000',
+        `XCLAW_SOLANA_FAUCET_DRIP_STABLE_UNITS_${toEnvSuffix(chainKey)}`
+      );
+
+      const txByAsset: Partial<Record<FaucetAssetKey, string>> = {};
+      const tokenDrips: Array<{ token: string; tokenAddress: string; amountWei: string; txHash: string }> = [];
+      try {
+        for (const asset of requestedAssets) {
+          const amount = asset === 'native' ? nativeAmount : asset === 'wrapped' ? wrappedAmount : stableAmount;
+          const signature = await solanaRpcPost(rpcUrl, 'requestAirdrop', [trimmedRecipient, Number(amount), { commitment: 'confirmed' }]);
+          const txHash = String(signature || '').trim();
+          if (!txHash) {
+            throw new Error('solana_airdrop_empty_signature');
+          }
+          txByAsset[asset] = txHash;
+          if (asset !== 'native') {
+            tokenDrips.push({
+              token: asset === 'wrapped' ? 'WSOL_ALIAS' : 'USDC_ALIAS',
+              tokenAddress: 'solana_native_alias',
+              amountWei: amount.toString(),
+              txHash,
+            });
+          }
+        }
+      } catch (sendError) {
+        await rollbackFaucetDailyLimit(auth.agentId, chainKey);
+        throw new FaucetRouteError({
+          status: 503,
+          code: 'faucet_rpc_unavailable',
+          message: sendError instanceof Error ? sendError.message : 'Solana faucet request failed.',
+          actionHint: 'Verify local Solana RPC/faucet availability and retry.',
+          details: { chainKey, rpcUrl, recipient: trimmedRecipient },
+        });
+      }
+
+      const fulfilledAssets = (Object.keys(txByAsset) as FaucetAssetKey[]).filter((asset) => Boolean(txByAsset[asset]));
+      if (fulfilledAssets.length === 0) {
+        await rollbackFaucetDailyLimit(auth.agentId, chainKey);
+        throw new FaucetRouteError({
+          status: 503,
+          code: 'faucet_send_preflight_failed',
+          message: 'Solana faucet request returned no signatures.',
+          actionHint: 'Verify local Solana faucet configuration and retry.',
+          details: { chainKey, recipient: trimmedRecipient },
+        });
+      }
+      return successResponse(
+        {
+          ok: true,
+          agentId: auth.agentId,
+          chainKey,
+          recipientAddress: trimmedRecipient,
+          faucetAddress: 'solana_localnet_airdrop',
+          amountWei: requestedAssets.includes('native') ? nativeAmount.toString() : '0',
+          to: trimmedRecipient,
+          txHash: txByAsset.native || txByAsset.wrapped || txByAsset.stable || '',
+          tokenDrips,
+          requestedAssets,
+          fulfilledAssets,
+          nativeSymbol,
+          assetPlan: {
+            native: requestedAssets.includes('native') ? { symbol: nativeSymbol, amountWei: nativeAmount.toString() } : null,
+            wrapped: requestedAssets.includes('wrapped')
+              ? { symbol: 'WSOL_ALIAS', tokenAddress: 'solana_native_alias', amountWei: wrappedAmount.toString() }
+              : null,
+            stable: requestedAssets.includes('stable')
+              ? { symbol: 'USDC_ALIAS', tokenAddress: 'solana_native_alias', amountWei: stableAmount.toString() }
+              : null,
+          },
+        },
+        200,
+        requestId
+      );
+    }
     if (!isAddress(trimmedRecipient)) {
       return errorResponse(
         400,

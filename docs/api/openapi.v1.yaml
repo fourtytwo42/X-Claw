@@ -4295,7 +4295,7 @@ components:
           type: string
         chainKey:
           type: string
-          enum: [base_sepolia, kite_ai_testnet]
+          enum: [base_sepolia, kite_ai_testnet, solana_localnet, solana_devnet, solana_testnet]
         assets:
           type: array
           uniqueItems: true
@@ -4394,7 +4394,7 @@ components:
             properties:
               chainKey:
                 type: string
-                enum: [base_sepolia, kite_ai_testnet]
+                enum: [base_sepolia, kite_ai_testnet, solana_localnet, solana_devnet, solana_testnet]
               displayName:
                 type: string
               chainId:

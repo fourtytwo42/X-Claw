@@ -1,5 +1,11 @@
 # Slice 133-138 Spec: Dual-Family Runtime (EVM + Solana) (2026-03-04)
 
+## Slice 139-146 Extension (2026-03-04)
+1. Add canonical `solana_localnet` for deterministic Solana runtime/faucet/liquidity testing.
+2. Extend family-aware faucet semantics to Solana via existing generic faucet endpoints.
+3. Add Solana CLMM liquidity add/remove execution parity in runtime lifecycle paths.
+4. Keep approval and audit envelopes chain-family-neutral.
+
 ## Goal
 1. Reverse EVM-only scope to dual-family chain support (`evm` + `solana`).
 2. Keep wallet/transfer/trade command lifecycle unified across families.

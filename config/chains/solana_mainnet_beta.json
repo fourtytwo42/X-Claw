@@ -22,7 +22,7 @@
   "capabilities": {
     "wallet": true,
     "trade": true,
-    "liquidity": false,
+    "liquidity": true,
     "limitOrders": false,
     "x402": false,
     "faucet": false,
@@ -43,8 +43,27 @@
       }
     },
     "liquidity": {
-      "defaultProvider": "none",
-      "adapters": {}
+      "defaultProvider": "router_adapter",
+      "adapters": {
+        "raydium_clmm": {
+          "adapterKey": "raydium_clmm",
+          "enabled": true,
+          "family": "raydium_clmm",
+          "positionManager": "raydium_clmm_program",
+          "capabilities": {
+            "add": true,
+            "remove": true,
+            "increase": false,
+            "claimFees": false,
+            "claimRewards": false,
+            "migrate": false
+          },
+          "operations": {
+            "add": { "method": "increase_liquidity" },
+            "remove": { "method": "decrease_liquidity" }
+          }
+        }
+      }
     }
   }
 }

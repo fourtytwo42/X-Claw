@@ -33,6 +33,7 @@ const FALLBACK_REGISTRY: ChainDescriptor[] = [
   { chainKey: 'og_testnet', displayName: '0G Galileo Testnet', nativeCurrency: { symbol: '0G', decimals: 18 } },
   { chainKey: 'solana_devnet', displayName: 'Solana Devnet', nativeCurrency: { symbol: 'SOL', decimals: 9 } },
   { chainKey: 'solana_testnet', displayName: 'Solana Testnet', nativeCurrency: { symbol: 'SOL', decimals: 9 } },
+  { chainKey: 'solana_localnet', displayName: 'Solana Localnet', nativeCurrency: { symbol: 'SOL', decimals: 9 } },
   { chainKey: 'solana_mainnet_beta', displayName: 'Solana Mainnet', nativeCurrency: { symbol: 'SOL', decimals: 9 } },
 ];
 

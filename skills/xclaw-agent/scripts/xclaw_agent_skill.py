@@ -1288,7 +1288,7 @@ def main(argv: List[str]) -> int:
         assets = argv[2:]
         if assets:
             first = str(assets[0] or "").strip().lower()
-            if first in {"base_sepolia", "kite_ai_testnet", "solana_devnet", "solana_testnet", "solana_mainnet_beta"}:
+            if first in {"base_sepolia", "kite_ai_testnet", "solana_localnet", "solana_devnet", "solana_testnet", "solana_mainnet_beta"}:
                 request_chain = first
                 assets = assets[1:]
         args = ["faucet-request", "--chain", request_chain]

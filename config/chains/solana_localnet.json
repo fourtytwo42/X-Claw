@@ -1,19 +1,19 @@
 {
-  "chainKey": "solana_devnet",
+  "chainKey": "solana_localnet",
   "family": "solana",
   "enabled": true,
   "uiVisible": true,
-  "chainId": 103,
-  "displayName": "Solana Devnet",
+  "chainId": 100,
+  "displayName": "Solana Localnet",
   "nativeCurrency": {
     "name": "Solana",
     "symbol": "SOL",
     "decimals": 9
   },
-  "explorerBaseUrl": "https://explorer.solana.com/?cluster=devnet",
+  "explorerBaseUrl": "http://127.0.0.1:8899",
   "rpc": {
-    "primary": "https://api.devnet.solana.com",
-    "fallback": "https://api.devnet.solana.com"
+    "primary": "http://127.0.0.1:8899",
+    "fallback": "http://127.0.0.1:8899"
   },
   "canonicalTokens": {
     "SOL": "So11111111111111111111111111111111111111112"
@@ -24,31 +24,28 @@
     "liquidity": true,
     "limitOrders": false,
     "x402": false,
-    "faucet": false,
-    "deposits": false
-  },
-  "marketData": {
-    "dexscreenerChainId": "solana"
+    "faucet": true,
+    "deposits": true
   },
   "execution": {
     "trade": {
       "defaultProvider": "router_adapter",
       "adapters": {
         "default": {
-          "adapterKey": "jupiter",
+          "adapterKey": "local_amm",
           "family": "solana_swap",
-          "router": "jupiter_v6"
+          "router": "local_amm"
         }
       }
     },
     "liquidity": {
       "defaultProvider": "router_adapter",
       "adapters": {
-        "raydium_clmm": {
-          "adapterKey": "raydium_clmm",
+        "local_clmm": {
+          "adapterKey": "local_clmm",
           "enabled": true,
-          "family": "raydium_clmm",
-          "positionManager": "raydium_clmm_program",
+          "family": "local_clmm",
+          "positionManager": "solana_local_clmm",
           "capabilities": {
             "add": true,
             "remove": true,
@@ -58,8 +55,8 @@
             "migrate": false
           },
           "operations": {
-            "add": { "method": "increase_liquidity" },
-            "remove": { "method": "decrease_liquidity" }
+            "add": { "method": "local_add" },
+            "remove": { "method": "local_remove" }
           }
         }
       }
