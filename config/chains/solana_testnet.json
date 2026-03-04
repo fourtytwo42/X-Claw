@@ -21,7 +21,7 @@
   "capabilities": {
     "wallet": true,
     "trade": true,
-    "liquidity": true,
+    "liquidity": false,
     "limitOrders": false,
     "x402": false,
     "faucet": false,
@@ -42,13 +42,17 @@
       }
     },
     "liquidity": {
-      "defaultProvider": "router_adapter",
+      "defaultProvider": "none",
       "adapters": {
         "raydium_clmm": {
           "adapterKey": "raydium_clmm",
-          "enabled": true,
+          "enabled": false,
           "family": "raydium_clmm",
           "positionManager": "raydium_clmm_program",
+          "programIds": {
+            "clmm": ""
+          },
+          "poolRegistry": {},
           "capabilities": {
             "add": true,
             "remove": true,
@@ -58,8 +62,20 @@
             "migrate": false
           },
           "operations": {
-            "add": { "method": "increase_liquidity" },
-            "remove": { "method": "decrease_liquidity" }
+            "add": {
+              "method": "increase_liquidity",
+              "accountsTemplate": [
+                { "pubkey": "$OWNER", "isSigner": true, "isWritable": true },
+                { "pubkey": "$POOL", "isSigner": false, "isWritable": true }
+              ]
+            },
+            "remove": {
+              "method": "decrease_liquidity",
+              "accountsTemplate": [
+                { "pubkey": "$OWNER", "isSigner": true, "isWritable": true },
+                { "pubkey": "$POOL", "isSigner": false, "isWritable": true }
+              ]
+            }
           }
         }
       }

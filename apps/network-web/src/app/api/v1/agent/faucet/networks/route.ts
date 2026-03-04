@@ -30,7 +30,9 @@ function resolveChainScopedEnv(prefix: string, chainKey: string): string {
 
 function resolveWrapped(chainKey: string): { symbol: string; address: string } | null {
   const family = (getChainConfig(chainKey)?.family || 'evm').toLowerCase();
-  const envAddress = resolveChainScopedEnv('XCLAW_TESTNET_FAUCET_WRAPPED_TOKEN_ADDRESS', chainKey);
+  const envAddress =
+    resolveChainScopedEnv('XCLAW_SOLANA_FAUCET_WRAPPED_MINT', chainKey) ||
+    resolveChainScopedEnv('XCLAW_TESTNET_FAUCET_WRAPPED_TOKEN_ADDRESS', chainKey);
   if (envAddress) {
     const envSymbol = resolveChainScopedEnv('XCLAW_TESTNET_FAUCET_WRAPPED_TOKEN_SYMBOL', chainKey) || 'WRAPPED';
     if (family === 'solana' ? !isLikelySolanaAddress(envAddress) : !isAddress(envAddress)) {
@@ -53,7 +55,9 @@ function resolveWrapped(chainKey: string): { symbol: string; address: string } |
 
 function resolveStable(chainKey: string): { symbol: string; address: string } | null {
   const family = (getChainConfig(chainKey)?.family || 'evm').toLowerCase();
-  const envAddress = resolveChainScopedEnv('XCLAW_TESTNET_FAUCET_STABLE_TOKEN_ADDRESS', chainKey);
+  const envAddress =
+    resolveChainScopedEnv('XCLAW_SOLANA_FAUCET_STABLE_MINT', chainKey) ||
+    resolveChainScopedEnv('XCLAW_TESTNET_FAUCET_STABLE_TOKEN_ADDRESS', chainKey);
   if (envAddress) {
     const envSymbol = resolveChainScopedEnv('XCLAW_TESTNET_FAUCET_STABLE_TOKEN_SYMBOL', chainKey) || 'USDC';
     if (family === 'solana' ? !isLikelySolanaAddress(envAddress) : !isAddress(envAddress)) {
@@ -91,7 +95,11 @@ export async function GET(req: NextRequest) {
     const family = String(cfg.family || 'evm').toLowerCase();
     const configured =
       family === 'solana'
-        ? Boolean(resolveChainScopedEnv('XCLAW_TESTNET_FAUCET_RPC_URL', chainKey) || cfg.rpc?.primary)
+        ? Boolean(
+            (resolveChainScopedEnv('XCLAW_SOLANA_FAUCET_SIGNER_SECRET', chainKey) ||
+              resolveChainScopedEnv('XCLAW_TESTNET_FAUCET_PRIVATE_KEY', chainKey)) &&
+              (resolveChainScopedEnv('XCLAW_TESTNET_FAUCET_RPC_URL', chainKey) || cfg.rpc?.primary)
+          )
         : Boolean(resolveChainScopedEnv('XCLAW_TESTNET_FAUCET_PRIVATE_KEY', chainKey));
 
     const supportedAssets: FaucetAssetKey[] = ['native'];

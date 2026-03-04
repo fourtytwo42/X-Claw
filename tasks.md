@@ -6,9 +6,25 @@
 - [x] Add family-aware Solana faucet behavior under existing faucet API routes.
 - [x] Add runtime Solana liquidity add/remove execution path for configured Solana CLMM families.
 - [x] Update skill and canonical artifacts for localnet-first parity scope.
-- [ ] Run full sequential validation gates and capture evidence.
+- [x] Run full sequential validation gates and capture evidence.
 
-Active slice context: `Slice 133 -> Slice 138`.
+## Slice 147-152 Tasks: Real SPL Faucet + Direct Raydium CLMM (2026-03-04)
+- [x] Add Solana JS dependency layer and faucet helper module (`@solana/web3.js`, `@solana/spl-token`).
+- [x] Replace Solana faucet alias responses with real signer + mint/ATA transfer flow.
+- [x] Add localnet bootstrap script for signer/mint provisioning.
+- [x] Add runtime direct Raydium instruction executor module and CLI routing for non-localnet Solana.
+- [x] Add adapter guardrails for `local_clmm` vs `raydium_clmm`.
+- [x] Run sequential validations and capture grep proofs.
+
+## Slice 153-158 Tasks: Tatum RPC + Planner-Based Raydium (2026-03-04)
+- [x] Add shared Solana RPC client with provider-aware header support and fallback endpoint selection.
+- [x] Route Solana runtime/Raydium RPC calls through shared Solana RPC client.
+- [x] Add Raydium planner module for pool resolution + account template expansion + instruction payload derivation.
+- [x] Remove runtime dependency on `instructionDataHex` for non-localnet Raydium add/remove paths.
+- [x] Replace chain config instruction blobs with `programIds/poolRegistry/accountsTemplate` metadata contract.
+- [x] Extend runtime tests for Solana RPC client and planner-integrated quote/adapter behavior.
+- [x] Run sequential validations and capture evidence.
+Active slice context: `Slice 153 -> Slice 158`.
 
 ## 1) Scope lock
 - [x] Reverse canonical scope to dual-family runtime (`evm`, `solana`).
@@ -25,13 +41,13 @@ Active slice context: `Slice 133 -> Slice 138`.
 - [x] Update shared schemas for dual-family trade payloads and public chains family enum.
 
 ## 3) Validation
-- [ ] targeted Python/runtime tests for Solana + EVM regression
-- [ ] `npm run db:parity`
-- [ ] `npm run seed:reset`
-- [ ] `npm run seed:load`
-- [ ] `npm run seed:verify`
-- [ ] `npm run build`
-- [ ] `pm2 restart all`
+- [x] targeted Python/runtime tests for Solana + EVM regression
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
 
 # Slice 130 Tasks: Concentrated-Liquidity Add/Remove + First-Class Migrate Planner (2026-03-04)
 

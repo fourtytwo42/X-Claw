@@ -10,6 +10,8 @@ import urllib.request
 from dataclasses import dataclass
 from typing import Any
 
+from xclaw_agent.solana_rpc_client import SolanaRpcClientError, rpc_post as solana_rpc_post
+
 try:
     from solders.hash import Hash
     from solders.keypair import Keypair
@@ -40,7 +42,7 @@ except Exception:  # pragma: no cover - runtime dependency gate
     get_associated_token_address = None  # type: ignore[assignment]
     transfer_checked = None  # type: ignore[assignment]
 
-SOLANA_CHAIN_KEYS = {"solana_devnet", "solana_testnet", "solana_mainnet_beta"}
+SOLANA_CHAIN_KEYS = {"solana_localnet", "solana_devnet", "solana_testnet", "solana_mainnet_beta"}
 
 
 class SolanaRuntimeError(Exception):
@@ -91,35 +93,11 @@ def is_solana_address(value: str) -> bool:
         return False
 
 
-def _rpc_post(rpc_url: str, method: str, params: list[Any]) -> Any:
-    payload = json.dumps({"jsonrpc": "2.0", "id": 1, "method": method, "params": params}).encode("utf-8")
-    req = urllib.request.Request(
-        rpc_url,
-        data=payload,
-        headers={"content-type": "application/json"},
-        method="POST",
-    )
+def _rpc_post(rpc_url: str, method: str, params: list[Any], *, chain_key: str | None = None) -> Any:
     try:
-        with urllib.request.urlopen(req, timeout=20) as resp:
-            parsed = json.loads(resp.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        raise SolanaRuntimeError(
-            "rpc_unavailable",
-            f"Solana RPC {method} failed with HTTP {exc.code}.",
-            {"method": method, "status": int(exc.code)},
-        ) from exc
-    except Exception as exc:
-        raise SolanaRuntimeError(
-            "rpc_unavailable",
-            f"Solana RPC {method} request failed.",
-            {"method": method, "error": str(exc)},
-        ) from exc
-    if isinstance(parsed, dict) and parsed.get("error"):
-        msg = str(parsed["error"].get("message") or f"RPC {method} returned an error.")
-        raise SolanaRuntimeError("rpc_unavailable", msg, {"method": method, "error": parsed.get("error")})
-    if not isinstance(parsed, dict) or "result" not in parsed:
-        raise SolanaRuntimeError("rpc_unavailable", f"Solana RPC {method} returned malformed payload.", {"method": method})
-    return parsed.get("result")
+        return solana_rpc_post(method, params, chain_key=chain_key, rpc_url=rpc_url, timeout_sec=20.0)
+    except SolanaRpcClientError as exc:
+        raise SolanaRuntimeError(exc.code, str(exc), dict(exc.details or {})) from exc
 
 
 def generate_wallet() -> dict[str, str]:

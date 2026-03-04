@@ -14,11 +14,11 @@ This reference defines the expected command surface for the Python-first skill w
 - `trade-exec <intent_id>`
 - `trade-spot <token_in> <token_out> <amount_in> <slippage_bps> [chain_key]` (`amount_in` uses chain base units for Solana; for EVM it accepts human units and `wei:<uint>` base-unit form)
 - `trade-resume <trade_id>` (internal auto-resume path for single-trigger Telegram spot approvals)
-- `liquidity-add <dex> <token_a> <token_b> <amount_a> <amount_b> <slippage_bps> [v2|v3] [v3_range]`
-- `liquidity-remove <dex> <position_id> [percent] [slippage_bps] [v2|v3]`
+- `liquidity-add <dex> <token_a> <token_b> <amount_a> <amount_b> <slippage_bps> [v2|v3] [v3_range] [pool_id]`
+- `liquidity-remove <dex> <position_id> [percent] [slippage_bps] [v2|v3] [pool_id]`
 - `liquidity-positions <dex|all> [status]`
-- `liquidity-quote-add <dex> <token_a> <token_b> <amount_a> <amount_b> <slippage_bps> [v2|v3]`
-- `liquidity-quote-remove <dex> <position_id> [percent] [v2|v3]`
+- `liquidity-quote-add <dex> <token_a> <token_b> <amount_a> <amount_b> <slippage_bps> [v2|v3] [pool_id]`
+- `liquidity-quote-remove <dex> <position_id> [percent] [v2|v3] [pool_id]`
 - `trade-decide <trade_id> <approve|reject>` (runtime-canonical spot approval decision path)
 - `transfer-resume <approval_id>` (internal auto-resume path for single-trigger transfer approvals)
 - `transfer-decide <approval_id> <approve|deny>` (internal callback decision command)
@@ -77,11 +77,11 @@ Underlying runtime delegation (performed by wrapper):
 - `xclaw-agent approvals check --intent <intent_id> --chain <chain_key> --json`
 - `xclaw-agent trade execute --intent <intent_id> --chain <chain_key> --json`
 - `xclaw-agent trade spot --chain <chain_key> --token-in <token_or_symbol> --token-out <token_or_symbol> --amount-in <amount_in> --slippage-bps <bps> --json`
-- `xclaw-agent liquidity add --chain <chain_key> --dex <dex> --token-a <token_or_symbol> --token-b <token_or_symbol> --amount-a <amount_a> --amount-b <amount_b> [--position-type <v2|v3>] [--v3-range <range>] [--slippage-bps <bps>] --json`
-- `xclaw-agent liquidity remove --chain <chain_key> --dex <dex> --position-id <position_id> [--percent <1-100>] [--slippage-bps <bps>] [--position-type <v2|v3>] --json`
+- `xclaw-agent liquidity add --chain <chain_key> --dex <dex> --token-a <token_or_symbol> --token-b <token_or_symbol> --amount-a <amount_a> --amount-b <amount_b> [--position-type <v2|v3>] [--v3-range <range>] [--pool-id <pool_pubkey>] [--slippage-bps <bps>] --json`
+- `xclaw-agent liquidity remove --chain <chain_key> --dex <dex> --position-id <position_id> [--percent <1-100>] [--slippage-bps <bps>] [--position-type <v2|v3>] [--pool-id <pool_pubkey>] --json`
 - `xclaw-agent liquidity positions --chain <chain_key> [--dex <dex>] [--status <status>] --json`
-- `xclaw-agent liquidity quote-add --chain <chain_key> --dex <dex> --token-a <token_or_symbol> --token-b <token_or_symbol> --amount-a <amount_a> --amount-b <amount_b> [--position-type <v2|v3>] [--slippage-bps <bps>] --json`
-- `xclaw-agent liquidity quote-remove --chain <chain_key> --dex <dex> --position-id <position_id> [--percent <1-100>] [--position-type <v2|v3>] --json`
+- `xclaw-agent liquidity quote-add --chain <chain_key> --dex <dex> --token-a <token_or_symbol> --token-b <token_or_symbol> --amount-a <amount_a> --amount-b <amount_b> [--position-type <v2|v3>] [--pool-id <pool_pubkey>] [--slippage-bps <bps>] --json`
+- `xclaw-agent liquidity quote-remove --chain <chain_key> --dex <dex> --position-id <position_id> [--percent <1-100>] [--position-type <v2|v3>] [--pool-id <pool_pubkey>] --json`
 - `xclaw-agent liquidity discover-pairs --chain <chain_key> --dex <dex> [--min-reserve <base_units>] [--limit <1-100>] [--scan-max <1-2000>] --json`
 - `xclaw-agent liquidity execute --intent <liquidity_intent_id> --chain <chain_key> --json`
 - `xclaw-agent liquidity resume --intent <liquidity_intent_id> --chain <chain_key> --json`
@@ -108,6 +108,13 @@ Underlying runtime delegation (performed by wrapper):
 - `xclaw-agent management-link --ttl-seconds <seconds> --json`
 - `xclaw-agent faucet-request --chain <chain_key> --json` (for example `solana_localnet`)
 - `xclaw-agent faucet-request --chain <chain_key> [--asset <native|wrapped|stable>]... --json`
+- Solana localnet prerequisite: `npm run solana:localnet:bootstrap` (loads signer + SPL mints for real wrapped/stable faucet drips).
+- Solana non-localnet RPC policy env:
+  - `XCLAW_SOLANA_RPC_PROVIDER_SOLANA_DEVNET=tatum|standard`
+  - `XCLAW_SOLANA_RPC_URL_SOLANA_DEVNET=<primary_rpc>`
+  - `XCLAW_SOLANA_RPC_FALLBACK_URL_SOLANA_DEVNET=<fallback_rpc>`
+  - `XCLAW_SOLANA_RPC_API_KEY_SOLANA_DEVNET=<tatum_api_key>` (required if provider is `tatum`)
+  - For `raydium_clmm` quote/add/remove on non-localnet Solana, pass `--pool-id` unless chain config provides exactly one default pool in `execution.liquidity.adapters.raydium_clmm.poolRegistry`.
   - skill-wrapper aliases: `eth|kite -> native`, `weth|wkite -> wrapped`, `usdc|usdt -> stable`
   - skill-wrapper behavior: if only `native` is requested, it omits asset flags so faucet defaults to all assets.
 - `xclaw-agent faucet-networks --json`

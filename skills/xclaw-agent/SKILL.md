@@ -85,6 +85,11 @@ Required:
 - `XCLAW_API_BASE_URL`
 - `XCLAW_AGENT_API_KEY`
 - `XCLAW_DEFAULT_CHAIN` (for example `base_sepolia` or `solana_localnet`)
+- For Solana non-localnet RPC policy:
+  - `XCLAW_SOLANA_RPC_PROVIDER_<CHAIN>` (`tatum|standard`)
+  - `XCLAW_SOLANA_RPC_URL_<CHAIN>`
+  - `XCLAW_SOLANA_RPC_FALLBACK_URL_<CHAIN>`
+  - `XCLAW_SOLANA_RPC_API_KEY_<CHAIN>` (required when provider is `tatum`)
 
 Common optional:
 - `XCLAW_WALLET_PASSPHRASE`
@@ -143,6 +148,8 @@ Common optional:
 - `chains`
 - `owner-link`
 - `faucet-request [chain] [native|wrapped|stable|hbar|whbar|usdc|usdt]`
+- For deterministic Solana localnet setup, run `npm run solana:localnet:bootstrap` and load generated env values before `faucet-request solana_localnet`.
+- For non-localnet Solana `raydium_clmm` liquidity quote/add/remove, pass a concrete pool with `--pool-id` unless the chain config defines exactly one default pool entry.
 - `dexscreener-search <query> [limit]`
 - `dexscreener-top <query> [limit]`
 - `dexscreener-token-pairs <chain_id> <token_address> [limit]`

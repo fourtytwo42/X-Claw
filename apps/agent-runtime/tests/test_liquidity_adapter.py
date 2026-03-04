@@ -55,6 +55,17 @@ class LiquidityAdapterTests(unittest.TestCase):
         self.assertIsInstance(adapter, AmmV2LiquidityAdapter)
         self.assertEqual(adapter.dex, "uniswap_v2")
 
+    def test_resolve_solana_raydium_clmm_v3(self) -> None:
+        adapter = build_liquidity_adapter_for_request("solana_devnet", "raydium_clmm", "v3")
+        self.assertEqual(adapter.protocol_family, "raydium_clmm")
+        self.assertEqual(adapter.dex, "raydium_clmm")
+        self.assertTrue(isinstance(adapter.adapter_metadata, dict))
+        self.assertTrue(bool((adapter.adapter_metadata or {}).get("programIds")))
+
+    def test_reject_local_clmm_on_non_localnet(self) -> None:
+        with self.assertRaises(UnsupportedLiquidityAdapter):
+            build_liquidity_adapter("solana_devnet", "local_clmm", "local_clmm", position_type="v3")
+
     def test_quote_add_rejects_invalid_amount(self) -> None:
         adapter = AmmV2LiquidityAdapter(chain="base_sepolia", dex="aerodrome", protocol_family="amm_v2", position_type="v2")
         with self.assertRaises(LiquidityAdapterError):

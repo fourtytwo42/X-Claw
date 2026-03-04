@@ -233,6 +233,41 @@ class LiquidityCliTests(unittest.TestCase):
         self.assertEqual(payload.get("status"), "filled")
         self.assertEqual(payload.get("adapterFamily"), "position_manager_v3")
 
+    def test_liquidity_quote_add_solana_raydium_uses_planner_quote(self) -> None:
+        args = argparse.Namespace(
+            chain="solana_devnet",
+            dex="raydium_clmm",
+            token_a="SOL",
+            token_b="USDC",
+            amount_a="1",
+            amount_b="2",
+            position_type="v3",
+            slippage_bps=100,
+            v3_range="100:-10:10",
+            json=True,
+        )
+        adapter = mock.Mock()
+        adapter.protocol_family = "raydium_clmm"
+        adapter.adapter_metadata = {
+            "poolRegistry": {
+                "default": {
+                    "poolId": "So11111111111111111111111111111111111111112",
+                }
+            }
+        }
+        adapter.quote_add.return_value = {"simulation": {}}
+        with mock.patch.object(cli, "assert_chain_capability"), mock.patch.object(
+            cli, "build_liquidity_adapter_for_request", return_value=adapter
+        ), mock.patch.object(
+            cli, "_resolve_token_address", side_effect=["So11111111111111111111111111111111111111112", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"]
+        ), mock.patch.object(
+            cli, "solana_raydium_quote_add", return_value={"amountB": "2", "minAmountB": "1.98", "poolId": "So11111111111111111111111111111111111111112"}
+        ):
+            code, payload = self._run(lambda: cli.cmd_liquidity_quote_add(args))
+        self.assertEqual(code, 0)
+        self.assertEqual(payload.get("adapterFamily"), "raydium_clmm")
+        self.assertEqual((payload.get("preflight") or {}).get("poolId"), "So11111111111111111111111111111111111111112")
+
     def test_liquidity_execute_supports_v3_remove_execution_family(self) -> None:
         args = argparse.Namespace(intent="liq_2", chain="base_sepolia", json=True)
         adapter = mock.Mock()

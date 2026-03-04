@@ -50,6 +50,36 @@ DoD:
 
 ---
 
+## Slice 147-152: Real SPL Faucet + Direct Raydium CLMM
+Status: [~]
+
+Goal:
+- Replace Solana faucet aliasing with real SPL mint/ATA transfers and introduce direct on-chain Raydium CLMM execution path for non-localnet Solana.
+
+DoD:
+- [~] no alias placeholders in active Solana faucet responses.
+- [~] localnet bootstrap script provisions signer + wrapped/stable mints.
+- [~] runtime splits `local_clmm` (localnet only) vs `raydium_clmm` (non-localnet direct path) with deterministic fail-closed guards.
+- [~] canonical artifacts and schema/OpenAPI examples aligned.
+- [ ] full sequential validation + issue evidence posted.
+
+---
+
+## Slice 153-158: Tatum Solana RPC + Planner-Based Raydium
+Status: [~]
+
+Goal:
+- move Solana runtime RPC transport to chain-aware `tatum|standard` provider contract and replace Raydium static instruction blobs with planner-derived execution plans.
+
+DoD:
+- [~] shared Solana RPC client resolves `tatum` headers + fallback endpoint selection.
+- [~] runtime no longer depends on `instructionDataHex` for non-localnet Raydium add/remove.
+- [~] Solana non-localnet Raydium quote/add/remove flows use planner-derived pool/account metadata.
+- [~] chain configs move from raw instruction blobs to `programIds/poolRegistry/accountsTemplate`.
+- [ ] full sequential validation + issue evidence posted.
+
+---
+
 ## Slice 01: Environment + Toolchain Baseline
 Status: [x]
 

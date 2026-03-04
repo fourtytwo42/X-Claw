@@ -39,6 +39,7 @@ class LiquidityAdapter:
     position_manager: str = ""
     capabilities: dict[str, bool] | None = None
     operations: dict[str, dict[str, Any]] | None = None
+    adapter_metadata: dict[str, Any] | None = None
 
     def quote_add(self, payload: dict[str, Any]) -> dict[str, Any]:
         amount_a = _require_positive_decimal(payload.get("amountA"), "amountA")
@@ -366,6 +367,8 @@ def _protocols_for_chain(chain: str) -> dict[str, dict[str, Any]]:
                     "positionManager": str(value.get("positionManager") or merged.get("positionManager") or "").strip(),
                     "capabilities": value.get("capabilities") if isinstance(value.get("capabilities"), dict) else merged.get("capabilities") or {},
                     "operations": value.get("operations") if isinstance(value.get("operations"), dict) else merged.get("operations") or {},
+                    "programIds": value.get("programIds") if isinstance(value.get("programIds"), dict) else merged.get("programIds") or {},
+                    "poolRegistry": value.get("poolRegistry") if isinstance(value.get("poolRegistry"), dict) else merged.get("poolRegistry") or {},
                 }
             )
             base_protocols[adapter_key] = merged
@@ -399,7 +402,7 @@ def _resolve_protocol(chain: str, dex: str, position_type: str) -> tuple[str, st
                 f"Liquidity adapter '{requested_dex}' is not enabled for chain '{chain}'."
             )
         family = str(matched.get("family") or "").strip().lower() or "amm_v2"
-        if requested_position == "v3" and family not in {"amm_v3", "position_manager_v3"}:
+        if requested_position == "v3" and family not in {"amm_v3", "position_manager_v3", "local_clmm", "raydium_clmm"}:
             raise UnsupportedLiquidityAdapter(
                 f"Adapter '{requested_dex}' on chain '{chain}' does not support v3 positions."
             )
@@ -443,6 +446,7 @@ def build_liquidity_adapter(chain: str, dex: str, protocol_family: str, position
             position_manager=position_manager,
             capabilities=dict(capabilities) if isinstance(capabilities, dict) else {},
             operations=dict(operations) if isinstance(operations, dict) else {},
+            adapter_metadata=dict(protocol_entry),
         )
     if normalized == "amm_v2":
         return AmmV2LiquidityAdapter(
@@ -455,8 +459,11 @@ def build_liquidity_adapter(chain: str, dex: str, protocol_family: str, position
             quoter=quoter,
             capabilities=dict(capabilities) if isinstance(capabilities, dict) else {},
             operations=dict(operations) if isinstance(operations, dict) else {},
+            adapter_metadata=dict(protocol_entry),
         )
     if normalized in {"local_clmm", "raydium_clmm"}:
+        if normalized == "local_clmm" and chain != "solana_localnet":
+            raise UnsupportedLiquidityAdapter("local_clmm adapter is restricted to solana_localnet.")
         return SolanaClmmLiquidityAdapter(
             chain=chain,
             dex=normalized_dex,
@@ -468,6 +475,7 @@ def build_liquidity_adapter(chain: str, dex: str, protocol_family: str, position
             position_manager=position_manager,
             capabilities=dict(capabilities) if isinstance(capabilities, dict) else {},
             operations=dict(operations) if isinstance(operations, dict) else {},
+            adapter_metadata=dict(protocol_entry),
         )
 
     raise UnsupportedLiquidityAdapter(

@@ -10,7 +10,17 @@ import { parseJsonBody } from '@/lib/http';
 import { enforceAgentFaucetDailyRateLimit } from '@/lib/rate-limit';
 import { getRedisClient } from '@/lib/redis';
 import { getRequestId } from '@/lib/request-id';
+import {
+  airdropNativeSol,
+  defaultNativeLamports,
+  dripSplToken,
+  isLikelySolanaAddress,
+  parsePositiveUnits,
+  parseSolanaSecret,
+  sendNativeSol,
+} from '@/lib/solana-faucet';
 import { validatePayload } from '@/lib/validation';
+import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 
 export const runtime = 'nodejs';
 
@@ -39,11 +49,6 @@ const ERC20_ABI = [
   'function transfer(address to, uint256 value) returns (bool)'
 ];
 const WRAPPED_NATIVE_HELPER_ABI = ['function deposit() payable'];
-
-function isLikelySolanaAddress(value: string): boolean {
-  const text = String(value || '').trim();
-  return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(text);
-}
 
 type FaucetRouteErrorInput = {
   status: number;
@@ -99,29 +104,9 @@ function parsePositiveWei(value: string, field: string): bigint {
   }
 }
 
-async function solanaRpcPost(rpcUrl: string, method: string, params: unknown[]): Promise<unknown> {
-  const resp = await fetch(rpcUrl, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
-    cache: 'no-store',
-  });
-  if (!resp.ok) {
-    throw new Error(`solana_rpc_http_${resp.status}`);
-  }
-  const payload = (await resp.json()) as { result?: unknown; error?: { message?: string } };
-  if (payload?.error) {
-    throw new Error(String(payload.error.message || `solana_rpc_${method}_error`));
-  }
-  return payload?.result;
-}
-
 function parsePositiveAtomic(value: string, field: string): bigint {
   try {
-    const parsed = BigInt(String(value || '').trim());
-    if (parsed <= BigInt(0)) {
-      throw new Error('non_positive');
-    }
+    const parsed = parsePositiveUnits(value, field);
     return parsed;
   } catch {
     throw new FaucetRouteError({
@@ -191,11 +176,11 @@ function resolveWrappedToken(chainKey: string): { symbol: string; address: strin
   }
   const cfg = getChainConfig(chainKey);
   const tokens = cfg?.canonicalTokens || {};
-  const wrapped = (tokens.WETH || tokens.WKITE || '').trim();
+  const wrapped = (tokens.WETH || tokens.WKITE || tokens.WSOL || '').trim();
   if (!wrapped) {
     return null;
   }
-  const symbol = (tokens.WETH ? 'WETH' : 'WKITE') as string;
+  const symbol = (tokens.WETH ? 'WETH' : tokens.WKITE ? 'WKITE' : 'WSOL') as string;
   return { symbol, address: wrapped };
 }
 
@@ -323,19 +308,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const faucetPrivateKey = resolveChainScopedEnv('XCLAW_TESTNET_FAUCET_PRIVATE_KEY', chainKey);
-    if (!faucetPrivateKey) {
-      return errorResponse(
-        503,
-        {
-          code: 'faucet_config_invalid',
-          message: 'Faucet is not configured.',
-          actionHint: `Set XCLAW_TESTNET_FAUCET_PRIVATE_KEY_${toEnvSuffix(chainKey)} (or XCLAW_TESTNET_FAUCET_PRIVATE_KEY).`
-        },
-        requestId
-      );
-    }
-
     const walletResult = await dbQuery<{ address: string }>(
       `
       select address
@@ -385,13 +357,55 @@ export async function POST(req: NextRequest) {
           requestId
         );
       }
+      const solanaSignerSecret =
+        resolveChainScopedEnv('XCLAW_SOLANA_FAUCET_SIGNER_SECRET', chainKey) ||
+        resolveChainScopedEnv('XCLAW_TESTNET_FAUCET_PRIVATE_KEY', chainKey);
+      if (!solanaSignerSecret) {
+        return errorResponse(
+          503,
+          {
+            code: 'faucet_config_invalid',
+            message: 'Solana faucet signer is not configured.',
+            actionHint: `Set XCLAW_SOLANA_FAUCET_SIGNER_SECRET_${toEnvSuffix(chainKey)} (or XCLAW_SOLANA_FAUCET_SIGNER_SECRET).`,
+          },
+          requestId
+        );
+      }
       const limiter = await enforceAgentFaucetDailyRateLimit(requestId, auth.agentId, chainKey);
       if (!limiter.ok) {
         return limiter.response;
       }
+      const wrappedMintAddress = resolveChainScopedEnv('XCLAW_SOLANA_FAUCET_WRAPPED_MINT', chainKey) || resolveWrappedToken(chainKey)?.address || '';
+      const stableMintAddress = resolveChainScopedEnv('XCLAW_SOLANA_FAUCET_STABLE_MINT', chainKey) || resolveStableToken(chainKey)?.address || '';
+      if (requestedAssets.includes('wrapped') && !isLikelySolanaAddress(wrappedMintAddress)) {
+        await rollbackFaucetDailyLimit(auth.agentId, chainKey);
+        return errorResponse(
+          503,
+          {
+            code: 'faucet_config_invalid',
+            message: 'Wrapped token mint is not configured for Solana faucet.',
+            actionHint: `Set XCLAW_SOLANA_FAUCET_WRAPPED_MINT_${toEnvSuffix(chainKey)} to a valid mint address.`,
+            details: { chainKey, wrappedMintAddress },
+          },
+          requestId
+        );
+      }
+      if (requestedAssets.includes('stable') && !isLikelySolanaAddress(stableMintAddress)) {
+        await rollbackFaucetDailyLimit(auth.agentId, chainKey);
+        return errorResponse(
+          503,
+          {
+            code: 'faucet_config_invalid',
+            message: 'Stable token mint is not configured for Solana faucet.',
+            actionHint: `Set XCLAW_SOLANA_FAUCET_STABLE_MINT_${toEnvSuffix(chainKey)} to a valid mint address.`,
+            details: { chainKey, stableMintAddress },
+          },
+          requestId
+        );
+      }
       const nativeSymbol = getChainConfig(chainKey)?.nativeCurrency?.symbol?.trim() || 'SOL';
       const nativeAmount = parsePositiveAtomic(
-        resolveChainScopedEnv('XCLAW_SOLANA_FAUCET_DRIP_NATIVE_UNITS', chainKey) || '1000000000',
+        resolveChainScopedEnv('XCLAW_SOLANA_FAUCET_DRIP_NATIVE_UNITS', chainKey) || defaultNativeLamports().toString(),
         `XCLAW_SOLANA_FAUCET_DRIP_NATIVE_UNITS_${toEnvSuffix(chainKey)}`
       );
       const wrappedAmount = parsePositiveAtomic(
@@ -405,19 +419,38 @@ export async function POST(req: NextRequest) {
 
       const txByAsset: Partial<Record<FaucetAssetKey, string>> = {};
       const tokenDrips: Array<{ token: string; tokenAddress: string; amountWei: string; txHash: string }> = [];
+      let faucetAddress = '';
       try {
+        const connection = new Connection(rpcUrl, 'confirmed');
+        const signer = Keypair.fromSecretKey(parseSolanaSecret(solanaSignerSecret));
+        faucetAddress = signer.publicKey.toBase58();
+        const recipientKey = new PublicKey(trimmedRecipient);
+        const localAirdropEnabled = resolveChainScopedEnv('XCLAW_SOLANA_LOCALNET_AIRDROP_FALLBACK', chainKey).toLowerCase() === 'true';
         for (const asset of requestedAssets) {
           const amount = asset === 'native' ? nativeAmount : asset === 'wrapped' ? wrappedAmount : stableAmount;
-          const signature = await solanaRpcPost(rpcUrl, 'requestAirdrop', [trimmedRecipient, Number(amount), { commitment: 'confirmed' }]);
-          const txHash = String(signature || '').trim();
+          let txHash = '';
+          if (asset === 'native') {
+            try {
+              txHash = await sendNativeSol(connection, signer, recipientKey, amount);
+            } catch (nativeError) {
+              if (localAirdropEnabled && chainKey === 'solana_localnet') {
+                txHash = await airdropNativeSol(connection, recipientKey, amount);
+              } else {
+                throw nativeError;
+              }
+            }
+          } else {
+            const mint = new PublicKey(asset === 'wrapped' ? wrappedMintAddress : stableMintAddress);
+            txHash = await dripSplToken(connection, signer, recipientKey, mint, amount);
+          }
           if (!txHash) {
             throw new Error('solana_airdrop_empty_signature');
           }
           txByAsset[asset] = txHash;
           if (asset !== 'native') {
             tokenDrips.push({
-              token: asset === 'wrapped' ? 'WSOL_ALIAS' : 'USDC_ALIAS',
-              tokenAddress: 'solana_native_alias',
+              token: asset === 'wrapped' ? 'WSOL' : 'USDC',
+              tokenAddress: asset === 'wrapped' ? wrappedMintAddress : stableMintAddress,
               amountWei: amount.toString(),
               txHash,
             });
@@ -451,7 +484,7 @@ export async function POST(req: NextRequest) {
           agentId: auth.agentId,
           chainKey,
           recipientAddress: trimmedRecipient,
-          faucetAddress: 'solana_localnet_airdrop',
+          faucetAddress,
           amountWei: requestedAssets.includes('native') ? nativeAmount.toString() : '0',
           to: trimmedRecipient,
           txHash: txByAsset.native || txByAsset.wrapped || txByAsset.stable || '',
@@ -462,14 +495,26 @@ export async function POST(req: NextRequest) {
           assetPlan: {
             native: requestedAssets.includes('native') ? { symbol: nativeSymbol, amountWei: nativeAmount.toString() } : null,
             wrapped: requestedAssets.includes('wrapped')
-              ? { symbol: 'WSOL_ALIAS', tokenAddress: 'solana_native_alias', amountWei: wrappedAmount.toString() }
+              ? { symbol: 'WSOL', tokenAddress: wrappedMintAddress, amountWei: wrappedAmount.toString() }
               : null,
             stable: requestedAssets.includes('stable')
-              ? { symbol: 'USDC_ALIAS', tokenAddress: 'solana_native_alias', amountWei: stableAmount.toString() }
+              ? { symbol: 'USDC', tokenAddress: stableMintAddress, amountWei: stableAmount.toString() }
               : null,
           },
         },
         200,
+        requestId
+      );
+    }
+    const faucetPrivateKey = resolveChainScopedEnv('XCLAW_TESTNET_FAUCET_PRIVATE_KEY', chainKey);
+    if (!faucetPrivateKey) {
+      return errorResponse(
+        503,
+        {
+          code: 'faucet_config_invalid',
+          message: 'Faucet is not configured.',
+          actionHint: `Set XCLAW_TESTNET_FAUCET_PRIVATE_KEY_${toEnvSuffix(chainKey)} (or XCLAW_TESTNET_FAUCET_PRIVATE_KEY).`
+        },
         requestId
       );
     }

@@ -6,6 +6,18 @@
 3. Add Solana CLMM liquidity add/remove execution parity in runtime lifecycle paths.
 4. Keep approval and audit envelopes chain-family-neutral.
 
+## Slice 147-152 Extension (2026-03-04)
+1. Replace Solana faucet alias assets with real SPL mint flows for `wrapped` and `stable`.
+2. Keep localnet deterministic bootstrap via script-generated signer/mints env contract.
+3. Add direct on-chain `raydium_clmm` runtime instruction path for non-localnet Solana liquidity add/remove.
+4. Keep `local_clmm` deterministic adapter restricted to `solana_localnet`.
+
+## Slice 153-158 Extension (2026-03-04)
+1. Add shared Solana RPC transport with chain-scoped provider policy (`tatum|standard`) and deterministic fallback behavior.
+2. Move non-localnet Raydium execution from static config instruction blobs to planner-derived payload/account plans.
+3. Require env-only API-key handling for Tatum and rotate any exposed keys before live usage.
+4. Keep localnet deterministic `local_clmm` path intact while non-localnet uses planner-driven `raydium_clmm`.
+
 ## Goal
 1. Reverse EVM-only scope to dual-family chain support (`evm` + `solana`).
 2. Keep wallet/transfer/trade command lifecycle unified across families.

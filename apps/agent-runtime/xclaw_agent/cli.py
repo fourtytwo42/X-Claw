@@ -88,6 +88,15 @@ from xclaw_agent.solana_liquidity_local import (
     quote_add as solana_local_quote_add,
     remove_position as solana_local_remove_position,
 )
+from xclaw_agent.solana_raydium_clmm import (
+    execute_instruction as solana_raydium_execute_instruction,
+    quote_add as solana_raydium_quote_add,
+    quote_remove as solana_raydium_quote_remove,
+)
+from xclaw_agent.solana_rpc_client import (
+    SolanaRpcClientError,
+    select_rpc_endpoint as solana_select_rpc_endpoint,
+)
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 try:
     from argon2.low_level import Type, hash_secret_raw
@@ -900,9 +909,13 @@ def _is_rpc_endpoint_healthy(rpc_url: str) -> bool:
 
 
 def _chain_rpc_url(chain: str) -> str:
-    candidates = _chain_rpc_candidates(chain)
     if _is_solana_chain(chain):
-        return candidates[0]
+        try:
+            selected = solana_select_rpc_endpoint(chain)
+            return selected.endpoint
+        except SolanaRpcClientError as exc:
+            raise WalletStoreError(f"{exc.code}: {exc}") from exc
+    candidates = _chain_rpc_candidates(chain)
     if len(candidates) == 1:
         return candidates[0]
     for candidate in candidates:
@@ -6408,12 +6421,13 @@ def _execute_liquidity_v3_add(intent: dict[str, Any], chain: str) -> dict[str, A
     adapter = build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type="v3")
     if adapter.protocol_family not in {"position_manager_v3", "local_clmm", "raydium_clmm"}:
         raise WalletStoreError(
-            f"unsupported_liquidity_execution_family: Liquidity intent execution requires position_manager_v3 for v3 add; got '{adapter.protocol_family}'."
+            f"unsupported_liquidity_execution_family: Liquidity intent execution requires a supported v3 execution family; got '{adapter.protocol_family}'."
         )
     if not adapter.supports_operation("add"):
         raise UnsupportedLiquidityOperation("unsupported_liquidity_operation")
     details = _intent_details_dict(intent)
     v3_details = _v3_details_dict(details)
+    pool_id = str(v3_details.get("poolId") or "").strip()
     fee = str(v3_details.get("fee") or "").strip()
     tick_lower = str(v3_details.get("tickLower") or "").strip()
     tick_upper = str(v3_details.get("tickUpper") or "").strip()
@@ -6428,38 +6442,93 @@ def _execute_liquidity_v3_add(intent: dict[str, Any], chain: str) -> dict[str, A
         raise WalletStoreError("slippageBps must be between 0 and 5000 for liquidity execution.")
     if _is_solana_chain(chain):
         store = load_wallet_store()
-        wallet_address, _ = _execution_wallet(store, chain)
-        created = solana_local_create_position(
-            chain=chain,
-            dex=adapter.dex,
-            owner=wallet_address,
-            token_a=token_a,
-            token_b=token_b,
-            amount_a=_decimal_text(amount_a_h),
-            amount_b=_decimal_text(amount_b_h),
-            details=v3_details,
+        wallet_address, secret = _execution_wallet_solana_secret(store, chain)
+        if adapter.protocol_family == "local_clmm":
+            if chain != "solana_localnet":
+                raise WalletStoreError("unsupported_liquidity_adapter: local_clmm adapter is only supported on solana_localnet.")
+            created = solana_local_create_position(
+                chain=chain,
+                dex=adapter.dex,
+                owner=wallet_address,
+                token_a=token_a,
+                token_b=token_b,
+                amount_a=_decimal_text(amount_a_h),
+                amount_b=_decimal_text(amount_b_h),
+                details=v3_details,
+            )
+            return {
+                "txHash": str(created.get("txHash") or ""),
+                "positionId": str(created.get("positionId") or ""),
+                "details": {
+                    "adapterFamily": adapter.protocol_family,
+                    "dex": adapter.dex,
+                    "action": "add",
+                    "executionFamily": "solana_clmm",
+                    "executionAdapter": adapter.dex,
+                    "routeKind": "adapter_default",
+                    "fee": fee,
+                    "tickLower": tick_lower,
+                    "tickUpper": tick_upper,
+                    "amountA": _decimal_text(amount_a_h),
+                    "amountB": _decimal_text(amount_b_h),
+                    "slippageBps": slippage_bps,
+                    "approveTxHashes": [],
+                    "operationTxHashes": [str(created.get("txHash") or "")],
+                    "simulationMode": True,
+                },
+            }
+        if adapter.protocol_family == "raydium_clmm":
+            if not pool_id:
+                raise WalletStoreError("invalid_input: Solana Raydium add requires v3.poolId in intent details.")
+            amount_a_units = int(_to_units_uint(_decimal_text(amount_a_h), 9))
+            amount_b_units = int(_to_units_uint(_decimal_text(amount_b_h), 9))
+            min_amount_a_units = (amount_a_units * max(0, 10000 - slippage_bps)) // 10000
+            min_amount_b_units = (amount_b_units * max(0, 10000 - slippage_bps)) // 10000
+            execution = solana_raydium_execute_instruction(
+                chain=chain,
+                rpc_url=_chain_rpc_url(chain),
+                private_key_bytes=secret,
+                owner=wallet_address,
+                adapter_metadata=dict(adapter.adapter_metadata or {}),
+                request={
+                    "poolId": pool_id,
+                    "tokenA": token_a,
+                    "tokenB": token_b,
+                    "fee": fee,
+                    "amountAUnits": str(amount_a_units),
+                    "amountBUnits": str(amount_b_units),
+                    "minAmountAUnits": str(min_amount_a_units),
+                    "minAmountBUnits": str(min_amount_b_units),
+                    "slippageBps": slippage_bps,
+                },
+                operation_key="add",
+            )
+            tx_hash = str(execution.tx_hash or "")
+            return {
+                "txHash": tx_hash,
+                "positionId": str(intent.get("positionId") or tx_hash),
+                "details": {
+                    "adapterFamily": adapter.protocol_family,
+                    "dex": adapter.dex,
+                    "action": "add",
+                    "executionFamily": "solana_clmm",
+                    "executionAdapter": adapter.dex,
+                    "routeKind": execution.route_kind,
+                    "fee": fee,
+                    "tickLower": tick_lower,
+                    "tickUpper": tick_upper,
+                    "poolId": pool_id,
+                    "amountA": _decimal_text(amount_a_h),
+                    "amountB": _decimal_text(amount_b_h),
+                    "slippageBps": slippage_bps,
+                    "approveTxHashes": [],
+                    "operationTxHashes": [tx_hash],
+                    **execution.details,
+                },
+            }
+        raise WalletStoreError(
+            f"unsupported_liquidity_execution_family: Solana v3 add does not support adapter family '{adapter.protocol_family}'."
         )
-        return {
-            "txHash": str(created.get("txHash") or ""),
-            "positionId": str(created.get("positionId") or ""),
-            "details": {
-                "adapterFamily": adapter.protocol_family,
-                "dex": adapter.dex,
-                "action": "add",
-                "executionFamily": "solana_clmm",
-                "executionAdapter": adapter.dex,
-                "routeKind": "local_position_manager",
-                "fee": fee,
-                "tickLower": tick_lower,
-                "tickUpper": tick_upper,
-                "amountA": _decimal_text(amount_a_h),
-                "amountB": _decimal_text(amount_b_h),
-                "slippageBps": slippage_bps,
-                "approveTxHashes": [],
-                "operationTxHashes": [str(created.get("txHash") or "")],
-                "simulationMode": True,
-            },
-        }
     token_a_meta = _fetch_erc20_metadata(chain, token_a)
     token_b_meta = _fetch_erc20_metadata(chain, token_b)
     amount_a_units = int(_to_units_uint(_decimal_text(amount_a_h), int(token_a_meta.get("decimals", 18))))
@@ -6526,7 +6595,7 @@ def _execute_liquidity_v3_remove(intent: dict[str, Any], chain: str) -> dict[str
     adapter = build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type="v3")
     if adapter.protocol_family not in {"position_manager_v3", "local_clmm", "raydium_clmm"}:
         raise WalletStoreError(
-            f"unsupported_liquidity_execution_family: Liquidity intent execution requires position_manager_v3 for v3 remove; got '{adapter.protocol_family}'."
+            f"unsupported_liquidity_execution_family: Liquidity intent execution requires a supported v3 execution family; got '{adapter.protocol_family}'."
         )
     if not adapter.supports_operation("remove"):
         raise UnsupportedLiquidityOperation("unsupported_liquidity_operation")
@@ -6542,40 +6611,87 @@ def _execute_liquidity_v3_remove(intent: dict[str, Any], chain: str) -> dict[str
         raise WalletStoreError("Remove intent percent must be between 1 and 100.")
     details = _intent_details_dict(intent)
     v3_details = _v3_details_dict(details)
+    pool_id = str(v3_details.get("poolId") or intent.get("poolId") or "").strip()
     min_a_units = str(v3_details.get("minAmountAUnits") or "0").strip() or "0"
     min_b_units = str(v3_details.get("minAmountBUnits") or "0").strip() or "0"
     if _is_solana_chain(chain):
         store = load_wallet_store()
-        wallet_address, _ = _execution_wallet(store, chain)
-        removed = solana_local_remove_position(
-            chain=chain,
-            dex=adapter.dex,
-            owner=wallet_address,
-            position_id=position_id,
-            percent=percent,
+        wallet_address, secret = _execution_wallet_solana_secret(store, chain)
+        if adapter.protocol_family == "local_clmm":
+            if chain != "solana_localnet":
+                raise WalletStoreError("unsupported_liquidity_adapter: local_clmm adapter is only supported on solana_localnet.")
+            removed = solana_local_remove_position(
+                chain=chain,
+                dex=adapter.dex,
+                owner=wallet_address,
+                position_id=position_id,
+                percent=percent,
+            )
+            return {
+                "txHash": str(removed.get("txHash") or ""),
+                "positionId": position_id,
+                "details": {
+                    "adapterFamily": adapter.protocol_family,
+                    "dex": adapter.dex,
+                    "action": "remove",
+                    "executionFamily": "solana_clmm",
+                    "executionAdapter": adapter.dex,
+                    "routeKind": "adapter_default",
+                    "percent": percent,
+                    "removedAmountA": removed.get("removedAmountA"),
+                    "removedAmountB": removed.get("removedAmountB"),
+                    "remainingAmountA": removed.get("remainingAmountA"),
+                    "remainingAmountB": removed.get("remainingAmountB"),
+                    "minAmountAUnits": min_a_units,
+                    "minAmountBUnits": min_b_units,
+                    "approveTxHashes": [],
+                    "operationTxHashes": [str(removed.get("txHash") or "")],
+                    "simulationMode": True,
+                },
+            }
+        if adapter.protocol_family == "raydium_clmm":
+            if not pool_id:
+                raise WalletStoreError("invalid_input: Solana Raydium remove requires v3.poolId in intent details.")
+            execution = solana_raydium_execute_instruction(
+                chain=chain,
+                rpc_url=_chain_rpc_url(chain),
+                private_key_bytes=secret,
+                owner=wallet_address,
+                adapter_metadata=dict(adapter.adapter_metadata or {}),
+                request={
+                    "poolId": pool_id,
+                    "positionId": position_id,
+                    "percent": percent,
+                    "tokenA": str(intent.get("tokenA") or ""),
+                    "tokenB": str(intent.get("tokenB") or ""),
+                    "minAmountAUnits": min_a_units,
+                    "minAmountBUnits": min_b_units,
+                },
+                operation_key="remove",
+            )
+            tx_hash = str(execution.tx_hash or "")
+            return {
+                "txHash": tx_hash,
+                "positionId": position_id,
+                "details": {
+                    "adapterFamily": adapter.protocol_family,
+                    "dex": adapter.dex,
+                    "action": "remove",
+                    "executionFamily": "solana_clmm",
+                    "executionAdapter": adapter.dex,
+                    "routeKind": execution.route_kind,
+                    "percent": percent,
+                    "poolId": pool_id,
+                    "minAmountAUnits": min_a_units,
+                    "minAmountBUnits": min_b_units,
+                    "approveTxHashes": [],
+                    "operationTxHashes": [tx_hash],
+                    **execution.details,
+                },
+            }
+        raise WalletStoreError(
+            f"unsupported_liquidity_execution_family: Solana v3 remove does not support adapter family '{adapter.protocol_family}'."
         )
-        return {
-            "txHash": str(removed.get("txHash") or ""),
-            "positionId": position_id,
-            "details": {
-                "adapterFamily": adapter.protocol_family,
-                "dex": adapter.dex,
-                "action": "remove",
-                "executionFamily": "solana_clmm",
-                "executionAdapter": adapter.dex,
-                "routeKind": "local_position_manager",
-                "percent": percent,
-                "removedAmountA": removed.get("removedAmountA"),
-                "removedAmountB": removed.get("removedAmountB"),
-                "remainingAmountA": removed.get("remainingAmountA"),
-                "remainingAmountB": removed.get("remainingAmountB"),
-                "minAmountAUnits": min_a_units,
-                "minAmountBUnits": min_b_units,
-                "approveTxHashes": [],
-                "operationTxHashes": [str(removed.get("txHash") or "")],
-                "simulationMode": True,
-            },
-        }
     position_manager = str(adapter.position_manager or "").strip()
     if not position_manager:
         raise WalletStoreError("chain_config_invalid: missing positionManager for v3 remove execution.")
@@ -7394,11 +7510,43 @@ def cmd_liquidity_quote_add(args: argparse.Namespace) -> int:
             }
         )
         if _is_solana_chain(chain):
-            local_quote = solana_local_quote_add(
-                amount_a=_decimal_text(amount_a_h),
-                amount_b=_decimal_text(amount_b_h),
-                slippage_bps=slippage_bps,
-            )
+            if adapter.protocol_family == "local_clmm":
+                local_quote = solana_local_quote_add(
+                    amount_a=_decimal_text(amount_a_h),
+                    amount_b=_decimal_text(amount_b_h),
+                    slippage_bps=slippage_bps,
+                )
+            elif adapter.protocol_family == "raydium_clmm":
+                pool_id = str(getattr(args, "pool_id", "") or "").strip()
+                if not pool_id:
+                    pool_registry = (adapter.adapter_metadata or {}).get("poolRegistry") if isinstance(adapter.adapter_metadata, dict) else {}
+                    if isinstance(pool_registry, dict) and len(pool_registry) == 1:
+                        only_entry = next(iter(pool_registry.values()))
+                        if isinstance(only_entry, dict):
+                            pool_id = str(only_entry.get("poolId") or "").strip()
+                if not pool_id:
+                    return fail(
+                        "invalid_input",
+                        "Raydium quote-add requires --pool-id when no single default pool is configured.",
+                        "Provide --pool-id for the target Raydium CLMM pool.",
+                        {"chain": chain, "dex": dex},
+                        exit_code=2,
+                    )
+                pool_registry = (adapter.adapter_metadata or {}).get("poolRegistry") if isinstance(adapter.adapter_metadata, dict) else {}
+                local_quote = solana_raydium_quote_add(
+                    amount_a=_decimal_text(amount_a_h),
+                    amount_b=_decimal_text(amount_b_h),
+                    slippage_bps=slippage_bps,
+                    pool_id=pool_id,
+                )
+            else:
+                return fail(
+                    "unsupported_liquidity_execution_family",
+                    f"Unsupported Solana liquidity adapter family '{adapter.protocol_family}' for quote-add.",
+                    "Use local_clmm or raydium_clmm adapter.",
+                    {"chain": chain, "dex": dex, "positionType": position_type},
+                    exit_code=2,
+                )
             return ok(
                 "Liquidity add quote ready.",
                 chain=chain,
@@ -7483,6 +7631,23 @@ def cmd_liquidity_quote_remove(args: argparse.Namespace) -> int:
         if percent < 1 or percent > 100:
             return fail("invalid_input", "percent must be between 1 and 100.", "Use --percent in [1..100].", {"percent": args.percent}, exit_code=2)
         preflight = adapter.quote_remove({"positionId": position_id, "percent": percent})
+        if _is_solana_chain(chain) and adapter.protocol_family == "raydium_clmm":
+            pool_id = str(getattr(args, "pool_id", "") or "").strip()
+            if not pool_id:
+                pool_registry = (adapter.adapter_metadata or {}).get("poolRegistry") if isinstance(adapter.adapter_metadata, dict) else {}
+                if isinstance(pool_registry, dict) and len(pool_registry) == 1:
+                    only_entry = next(iter(pool_registry.values()))
+                    if isinstance(only_entry, dict):
+                        pool_id = str(only_entry.get("poolId") or "").strip()
+            if not pool_id:
+                return fail(
+                    "invalid_input",
+                    "Raydium quote-remove requires --pool-id when no single default pool is configured.",
+                    "Provide --pool-id for the target Raydium CLMM pool.",
+                    {"chain": chain, "dex": dex, "positionId": position_id},
+                    exit_code=2,
+                )
+            preflight = {"simulation": solana_raydium_quote_remove(percent=percent, pool_id=pool_id)}
         return ok(
             "Liquidity remove quote ready.",
             chain=chain,
@@ -7554,6 +7719,23 @@ def cmd_liquidity_add(args: argparse.Namespace) -> int:
         )
         adapter_family = adapter.protocol_family
         adapter_dex = adapter.dex
+        if _is_solana_chain(chain) and adapter.protocol_family == "raydium_clmm":
+            pool_id = str(getattr(args, "pool_id", "") or "").strip()
+            if not pool_id:
+                pool_registry = (adapter.adapter_metadata or {}).get("poolRegistry") if isinstance(adapter.adapter_metadata, dict) else {}
+                if isinstance(pool_registry, dict) and len(pool_registry) == 1:
+                    only_entry = next(iter(pool_registry.values()))
+                    if isinstance(only_entry, dict):
+                        pool_id = str(only_entry.get("poolId") or "").strip()
+            if not pool_id:
+                return fail(
+                    "invalid_input",
+                    "Raydium liquidity add requires --pool-id when no single default pool is configured.",
+                    "Provide --pool-id for the target Raydium CLMM pool.",
+                    {"chain": chain, "dex": dex},
+                    exit_code=2,
+                )
+            v3_meta["poolId"] = pool_id
         agent_id = _resolve_agent_id_or_fail(chain)
         preflight = adapter_preflight
         payload = {
@@ -7777,6 +7959,7 @@ def cmd_liquidity_remove(args: argparse.Namespace) -> int:
                     "percent": percent,
                     "minAmountAUnits": "0",
                     "minAmountBUnits": "0",
+                    "poolId": str(getattr(args, "pool_id", "") or "").strip() or None,
                 }
                 if position_type == "v3"
                 else None,
@@ -9688,6 +9871,13 @@ def _execution_wallet_secret(store: dict[str, Any], chain: str) -> tuple[str, by
     passphrase = _require_wallet_passphrase_for_signing(chain)
     secret = _decrypt_private_key(wallet, passphrase)
     return address, secret, key_scheme
+
+
+def _execution_wallet_solana_secret(store: dict[str, Any], chain: str) -> tuple[str, bytes]:
+    address, secret, key_scheme = _execution_wallet_secret(store, chain)
+    if key_scheme != "solana_ed25519":
+        raise WalletStoreError(f"Wallet keyScheme '{key_scheme}' is not compatible with Solana execution on chain '{chain}'.")
+    return address, secret
 
 
 def _cast_calldata(signature: str, args: list[str]) -> str:
@@ -13546,6 +13736,7 @@ def build_parser() -> argparse.ArgumentParser:
     liquidity_add.add_argument("--amount-b", required=True)
     liquidity_add.add_argument("--position-type", default="v2", choices=["v2", "v3"])
     liquidity_add.add_argument("--v3-range")
+    liquidity_add.add_argument("--pool-id")
     liquidity_add.add_argument("--slippage-bps", default=100)
     liquidity_add.add_argument("--json", action="store_true")
     liquidity_add.set_defaults(func=cmd_liquidity_add)
@@ -13557,6 +13748,7 @@ def build_parser() -> argparse.ArgumentParser:
     liquidity_remove.add_argument("--percent", default=100)
     liquidity_remove.add_argument("--slippage-bps", default=100)
     liquidity_remove.add_argument("--position-type", default="v2", choices=["v2", "v3"])
+    liquidity_remove.add_argument("--pool-id")
     liquidity_remove.add_argument("--token-a")
     liquidity_remove.add_argument("--token-b")
     liquidity_remove.add_argument("--json", action="store_true")
@@ -13617,6 +13809,7 @@ def build_parser() -> argparse.ArgumentParser:
     liquidity_quote_add.add_argument("--amount-a", required=True)
     liquidity_quote_add.add_argument("--amount-b", required=True)
     liquidity_quote_add.add_argument("--position-type", default="v2", choices=["v2", "v3"])
+    liquidity_quote_add.add_argument("--pool-id")
     liquidity_quote_add.add_argument("--slippage-bps", default=100)
     liquidity_quote_add.add_argument("--json", action="store_true")
     liquidity_quote_add.set_defaults(func=cmd_liquidity_quote_add)
@@ -13627,6 +13820,7 @@ def build_parser() -> argparse.ArgumentParser:
     liquidity_quote_remove.add_argument("--position-id", required=True)
     liquidity_quote_remove.add_argument("--percent", default=100)
     liquidity_quote_remove.add_argument("--position-type", default="v2", choices=["v2", "v3"])
+    liquidity_quote_remove.add_argument("--pool-id")
     liquidity_quote_remove.add_argument("--json", action="store_true")
     liquidity_quote_remove.set_defaults(func=cmd_liquidity_quote_remove)
 

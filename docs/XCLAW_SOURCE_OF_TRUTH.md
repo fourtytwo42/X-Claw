@@ -152,6 +152,28 @@ and fail closed for unsupported execution families.
 - `proposed -> approval_pending -> approved -> executing -> verifying -> filled|failed`
 - `providerRequested|providerUsed|executionFamily|executionAdapter|routeKind|liquidityOperation`
 
+## 3.6) Slice 147-152 Real SPL Faucet + Direct Raydium CLMM (2026-03-04)
+
+1. Solana faucet assets `wrapped` and `stable` are real SPL mint flows (ATA + mint/transfer), not alias placeholders.
+2. `solana_localnet` keeps deterministic local testing behavior and supports optional native airdrop fallback when explicitly enabled by env.
+3. Solana non-localnet concentrated-liquidity execution family is `raydium_clmm` and is direct on-chain instruction submission from runtime (no API-assisted canonical builder).
+4. Runtime must fail closed with `chain_config_invalid` when required Raydium instruction metadata is missing.
+5. Alias placeholders (`WSOL_ALIAS`, `USDC_ALIAS`, `solana_native_alias`) are superseded history and not current canonical behavior.
+
+## 3.7) Slice 153-158 Tatum RPC + Raydium Planner Contract (2026-03-04)
+
+1. Solana non-localnet RPC policy is `tatum` primary with fallback RPC candidates; headers are runtime-resolved from env and never stored in chain config.
+2. Canonical Solana RPC env contract:
+- `XCLAW_SOLANA_RPC_PROVIDER_<CHAIN>` (`tatum|standard`)
+- `XCLAW_SOLANA_RPC_URL_<CHAIN>`
+- `XCLAW_SOLANA_RPC_FALLBACK_URL_<CHAIN>`
+- `XCLAW_SOLANA_RPC_API_KEY_<CHAIN>` (required for `tatum`)
+3. `raydium_clmm` non-localnet execution is planner-driven:
+- account metas and instruction payloads are derived from normalized request + pool registry metadata.
+- runtime must not require static `instructionDataHex` blobs in active chain configs.
+4. `solana_localnet` remains deterministic and continues to use `local_clmm`; non-localnet requests for `local_clmm` fail closed.
+5. Any leaked RPC API key is considered compromised and must be rotated before live usage.
+
 ---
 
 ## 4) Scope
@@ -1035,7 +1057,7 @@ This section supersedes any earlier conflicting statements in this file.
 - Per-trade approval decisions require management cookie + CSRF only (Slice 36 removed step-up).
 - Approval history/tracking surfaces must preserve terminal trade execution outcomes (`filled`, `failed`, `verification_timeout`, `expired`) and must not collapse failed terminal outcomes into `approved`.
 - Management wallet balance sync must not degrade due SQL bind-type inference across cross-table dedupe checks; canonical token balances (for example `USDC` on `ethereum_sepolia`) must continue updating after filled swaps.
-- Active product scope is EVM-only; non-EVM chain handling must not influence runtime trade execution, fee planning, or symbol resolution behavior.
+- Active product scope is dual-family (`evm`, `solana`); chain-family handling must remain capability-gated and deterministic for execution, fee planning, and symbol resolution behavior.
 - Pause/resume is user-controlled from management UI and requires base management auth only.
 - Pause halts all pending execution.
 - Resume requires fresh validation before execution.
@@ -1391,7 +1413,7 @@ Liquidity adapter execution contract:
 - Management liquidity approvals must auto-queue runtime continuation: `xclaw-agent liquidity execute --intent <id> --chain <chain_key> --json`.
 - `liquidity quote-add` uses EVM router quote + ERC20 metadata only for `amm_v2` / `amm_v3` families.
 - `liquidity discover-pairs` must scan v2 DEX factory pairs (`allPairsLength/allPairs`) and return ranked reserve-filtered candidates with deterministic failures `liquidity_pair_discovery_failed` / `liquidity_no_viable_pair`.
-- `liquidity execute/resume` runtime execution scope is EVM-only and router-adapter-driven; unsupported execution families must fail with `unsupported_liquidity_execution_family`.
+- `liquidity execute/resume` runtime execution scope is chain-family-aware and adapter-driven; unsupported execution families must fail with `unsupported_liquidity_execution_family`.
 - Runtime liquidity execution must persist lifecycle transitions through `/api/v1/liquidity/{intentId}/status`: `approved -> executing -> verifying -> filled|failed|verification_timeout` with `txHash` when available.
 - `amm_v2` add execution must run deterministic pre-submit checks (wallet token/native balance, pair reserves, router simulation) and emit explicit preflight reason codes (`liquidity_preflight_*`) when blocked.
 - `amm_v2` add execution must ensure ERC20 allowances cover desired add inputs (`amountA`/`amountB`) so reserve drift cannot under-approve between estimate and submit.
@@ -1446,7 +1468,7 @@ Runtime binary requirements for skill operation:
 - Hosted installers must ensure runtime Python dependencies from `apps/agent-runtime/requirements.txt` are installed for the same interpreter used to run `xclaw-agent`/setup (`python3 -m pip` or `python -m pip`), including pip bootstrap when missing (`ensurepip`, then `get-pip.py` fallback).
 - Linux/macOS installer must detect PEP 668 `externally-managed-environment` pip failures and automatically pivot to a user-local fallback venv (`~/.xclaw-agent/runtime-venv`) before continuing dependency install.
 - Linux/macOS installer should attempt automatic `python3-venv` / `python3-pip` provisioning when running with sudo on apt-based systems before failing for missing venv/pip primitives.
-- Hosted installer is EVM-only and must not provision non-EVM SDKs or JDK prerequisites.
+- Hosted installer is dual-family and must provision only the required runtime dependencies for configured enabled chain families.
 - Linux/macOS installer must be sudo-aware: when invoked via `sudo` from a non-root account, installation/configuration targets the original user home/context (not `/root`) and ownership of touched user artifacts is corrected before exit.
 - Setup script must ensure a default local wallet policy exists at `~/.xclaw-agent/policy.json` when missing (do not overwrite existing policy).
 - Setup script must install an OS-native `xclaw-agent` launcher (POSIX shell wrapper on Linux/macOS, `.cmd` launcher on Windows) without introducing Node/npm requirements for skill invocation.
@@ -4189,7 +4211,7 @@ Supersession note (Slice 117 Hotfix D):
 
 1. Superseded architecture note:
 - Historical Uniswap-proxy behavior is no longer canonical.
-- Canonical trade execution is EVM-only and router-adapter-driven.
+- Canonical trade execution is chain-family-aware and adapter-driven.
 - Runtime/skill/web-client do not depend on a server-held Uniswap API key.
 
 2. Provider orchestration:
@@ -4240,7 +4262,7 @@ Supersession note (Slice 117 Hotfix D):
 
 1. Superseded architecture note:
 - Historical Uniswap LP proxy behavior is retained only as compatibility routing.
-- Canonical liquidity execution is EVM-only and router-adapter-driven.
+- Canonical liquidity execution is chain-family-aware and adapter-driven.
 
 2. LP proxy API surface (agent-auth):
 - `POST /api/v1/agent/liquidity/uniswap/approve`

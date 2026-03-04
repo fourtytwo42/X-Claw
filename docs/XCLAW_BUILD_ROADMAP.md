@@ -30,6 +30,22 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 - [~] Update skills/docs/handoff artifacts to localnet-first Solana testing guidance.
 - [ ] Sequential validation + PM2 restart + issue evidence capture.
 
+## 0.7) Slice 147-152 SPL Faucet + Raydium Direct Program
+
+- [~] Replace Solana faucet alias behavior with real SPL mint/ATA transfer semantics.
+- [~] Add localnet Solana faucet bootstrap script for deterministic signer/mint provisioning.
+- [~] Add runtime Raydium direct on-chain instruction execution path for non-localnet Solana.
+- [~] Enforce adapter-family chain guards (`local_clmm` localnet-only; `raydium_clmm` non-localnet direct path).
+- [ ] Sequential validation + PM2 restart + issue evidence capture.
+
+## 0.8) Slice 153-158 Tatum RPC + Raydium Planner Program
+
+- [~] Add chain-aware Solana RPC client with `tatum` header support and fallback endpoint resolution.
+- [~] Route Solana runtime RPC calls through shared client for deterministic error mapping.
+- [~] Replace Raydium static `instructionDataHex` usage with planner-derived payload/account construction.
+- [~] Update Solana chain configs to `programIds/poolRegistry/accountsTemplate` contract.
+- [ ] Sequential validation + PM2 restart + issue evidence capture.
+
 ---
 
 ## 0) Program Control and Working Rules

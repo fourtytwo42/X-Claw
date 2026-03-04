@@ -17,13 +17,68 @@ Active slice context: `Slice 139 -> Slice 146`.
 - [x] canonical docs/tasks/tracker/roadmap updated in same change set.
 
 ### Required Validation Gates
-- [ ] targeted Python/runtime tests
-- [ ] `npm run db:parity`
-- [ ] `npm run seed:reset`
-- [ ] `npm run seed:load`
-- [ ] `npm run seed:verify`
-- [ ] `npm run build`
-- [ ] `pm2 restart all`
+- [x] targeted Python/runtime tests
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+
+## Slice 147-152 Acceptance Evidence: Real SPL Faucet + Direct Raydium CLMM
+
+Date (UTC): 2026-03-04
+Active slice context: `Slice 147 -> Slice 152`.
+
+### Objective + Scope Lock
+- Objective:
+  - replace Solana faucet aliasing with real SPL mint transfer semantics,
+  - add direct on-chain Raydium CLMM runtime add/remove path for non-localnet Solana.
+
+### Behavior Checks
+- [x] Solana faucet no longer emits alias placeholders in active response path.
+- [x] localnet bootstrap script generates signer/mint env artifact.
+- [x] runtime enforces adapter split (`local_clmm` localnet-only, `raydium_clmm` direct path).
+- [x] canonical artifacts updated in same change set.
+
+### Required Validation Gates
+- [x] targeted Python tests (liquidity adapter/cli/trade path/wallet core/skill wrapper)
+- [x] `npm run test:faucet:contract`
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+
+## Slice 153-158 Acceptance Evidence: Tatum RPC + Planner-Based Raydium
+
+Date (UTC): 2026-03-04
+Active slice context: `Slice 153 -> Slice 158`.
+
+### Objective + Scope Lock
+- Objective:
+  - make Solana non-localnet RPC transport provider-aware (`tatum` primary + fallback),
+  - remove static instruction-blob dependency from non-localnet `raydium_clmm` execution.
+
+### Behavior Checks
+- [x] shared Solana RPC client resolves provider headers and endpoint fallback.
+- [x] runtime Solana Raydium add/remove paths build instruction plans from adapter metadata + request fields.
+- [x] active non-localnet runtime path no longer reads `instructionDataHex`.
+- [x] localnet deterministic `local_clmm` behavior remains unchanged.
+
+### Required Validation Gates
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_solana_rpc_client.py -v`
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_liquidity_adapter.py -v`
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v`
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- [x] `npm run test:faucet:contract`
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
 
 Date (UTC): 2026-03-04
 Active slice context: `Slice 133 -> Slice 138`.

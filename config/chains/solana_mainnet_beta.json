@@ -50,6 +50,10 @@
           "enabled": true,
           "family": "raydium_clmm",
           "positionManager": "raydium_clmm_program",
+          "programIds": {
+            "clmm": "CAMMCzo5YL8w4VFF8KVHrK22GGUQw1pV9akxb8qzVD3"
+          },
+          "poolRegistry": {},
           "capabilities": {
             "add": true,
             "remove": true,
@@ -59,8 +63,22 @@
             "migrate": false
           },
           "operations": {
-            "add": { "method": "increase_liquidity" },
-            "remove": { "method": "decrease_liquidity" }
+            "add": {
+              "method": "increase_liquidity",
+              "discriminatorHex": "0x8fbe5adac41e33de",
+              "accountsTemplate": [
+                { "pubkey": "$OWNER", "isSigner": true, "isWritable": true },
+                { "pubkey": "$POOL", "isSigner": false, "isWritable": true }
+              ]
+            },
+            "remove": {
+              "method": "decrease_liquidity",
+              "discriminatorHex": "0xf223c68952e1f2b6",
+              "accountsTemplate": [
+                { "pubkey": "$OWNER", "isSigner": true, "isWritable": true },
+                { "pubkey": "$POOL", "isSigner": false, "isWritable": true }
+              ]
+            }
           }
         }
       }

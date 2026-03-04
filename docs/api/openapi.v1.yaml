@@ -3201,7 +3201,7 @@ components:
         executionFamily:
           type: string
           nullable: true
-          enum: [amm_v2, amm_v3, position_manager_v3, null]
+          enum: [amm_v2, amm_v3, position_manager_v3, solana_swap, null]
         executionAdapter:
           type: string
           nullable: true
@@ -3472,7 +3472,7 @@ components:
         executionFamily:
           type: string
           nullable: true
-          enum: [amm_v2, amm_v3, null]
+          enum: [amm_v2, amm_v3, position_manager_v3, solana_clmm, null]
         executionAdapter:
           type: string
           nullable: true

@@ -20,6 +20,7 @@
     "test:management:liquidity:decision": "node infrastructure/scripts/management-approvals-liquidity-tests.mjs",
     "test:faucet:contract": "node infrastructure/scripts/faucet-contract-tests.mjs",
     "test:tokens:mirror:contract": "node infrastructure/scripts/tokens-mirror-contract-tests.mjs",
+    "solana:localnet:bootstrap": "node infrastructure/scripts/solana-localnet-bootstrap.mjs",
     "test:perf:web": "node infrastructure/scripts/web-perf-tests.mjs",
     "ops:faucet:reset-rate-limit": "node infrastructure/scripts/faucet-rate-limit-reset.mjs",
     "ops:faucet:audit-mappings": "node infrastructure/scripts/faucet-audit-wallet-mappings.mjs",
@@ -31,7 +32,10 @@
     "ops:verify-static-assets": "bash infrastructure/scripts/ops/verify-static-assets.sh"
   },
   "dependencies": {
+    "@solana/spl-token": "0.4.8",
+    "@solana/web3.js": "1.98.4",
     "ajv": "8.17.1",
+    "bs58": "6.0.0",
     "next": "16.1.6",
     "pg": "8.13.3",
     "react": "19.2.3",
