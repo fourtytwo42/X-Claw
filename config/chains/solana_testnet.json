@@ -75,6 +75,36 @@
                 { "pubkey": "$OWNER", "isSigner": true, "isWritable": true },
                 { "pubkey": "$POOL", "isSigner": false, "isWritable": true }
               ]
+            },
+            "increase": {
+              "method": "increase_liquidity",
+              "accountsTemplate": [
+                { "pubkey": "$OWNER", "isSigner": true, "isWritable": true },
+                { "pubkey": "$POOL", "isSigner": false, "isWritable": true }
+              ]
+            },
+            "claimFees": {
+              "method": "collect_fees",
+              "accountsTemplate": [
+                { "pubkey": "$OWNER", "isSigner": true, "isWritable": true },
+                { "pubkey": "$POOL", "isSigner": false, "isWritable": true }
+              ]
+            },
+            "claimRewards": {
+              "method": "collect_rewards",
+              "rewardContracts": [],
+              "accountsTemplate": [
+                { "pubkey": "$OWNER", "isSigner": true, "isWritable": true },
+                { "pubkey": "$POOL", "isSigner": false, "isWritable": true }
+              ]
+            },
+            "migrate": {
+              "method": "migrate_position",
+              "targetAdapterKey": "",
+              "accountsTemplate": [
+                { "pubkey": "$OWNER", "isSigner": true, "isWritable": true },
+                { "pubkey": "$POOL", "isSigner": false, "isWritable": true }
+              ]
             }
           }
         }

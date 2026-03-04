@@ -288,7 +288,24 @@ class AmmV3LiquidityAdapter(LiquidityAdapter):
 class SolanaClmmLiquidityAdapter(LiquidityAdapter):
     def supports_operation(self, operation: str) -> bool:
         op = str(operation or "").strip().lower()
-        return op in {"add", "remove", "quote_add", "quote_remove", "position_fetch"}
+        capability_map = {
+            "add": "add",
+            "remove": "remove",
+            "increase": "increase",
+            "claim_fees": "claimFees",
+            "claim_rewards": "claimRewards",
+            "migrate": "migrate",
+            "quote_add": "add",
+            "quote_remove": "remove",
+            "position_fetch": "remove",
+        }
+        key = capability_map.get(op)
+        if not key:
+            return False
+        caps = dict(self.capabilities or {})
+        if key not in caps:
+            return op in {"add", "remove", "quote_add", "quote_remove", "position_fetch"}
+        return bool(caps.get(key))
 
 
 def _require_non_empty(value: Any, field_name: str) -> str:

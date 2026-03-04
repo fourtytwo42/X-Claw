@@ -49,14 +49,21 @@
           "capabilities": {
             "add": true,
             "remove": true,
-            "increase": false,
-            "claimFees": false,
-            "claimRewards": false,
-            "migrate": false
+            "increase": true,
+            "claimFees": true,
+            "claimRewards": true,
+            "migrate": true
           },
           "operations": {
             "add": { "method": "local_add" },
-            "remove": { "method": "local_remove" }
+            "remove": { "method": "local_remove" },
+            "increase": { "method": "local_increase" },
+            "claimFees": { "method": "local_claim_fees" },
+            "claimRewards": {
+              "method": "local_claim_rewards",
+              "rewardContracts": ["LOCAL_REWARD_PROGRAM"]
+            },
+            "migrate": { "method": "local_migrate", "targetAdapterKey": "local_clmm" }
           }
         }
       }

@@ -61,6 +61,17 @@ class LiquidityAdapterTests(unittest.TestCase):
         self.assertEqual(adapter.dex, "raydium_clmm")
         self.assertTrue(isinstance(adapter.adapter_metadata, dict))
         self.assertTrue(bool((adapter.adapter_metadata or {}).get("programIds")))
+        self.assertTrue(adapter.supports_operation("increase"))
+        self.assertTrue(adapter.supports_operation("claim_fees"))
+        self.assertTrue(adapter.supports_operation("claim_rewards"))
+        self.assertTrue(adapter.supports_operation("migrate"))
+
+    def test_solana_mainnet_advanced_ops_deferred(self) -> None:
+        adapter = build_liquidity_adapter_for_request("solana_mainnet_beta", "raydium_clmm", "v3")
+        self.assertFalse(adapter.supports_operation("increase"))
+        self.assertFalse(adapter.supports_operation("claim_fees"))
+        self.assertFalse(adapter.supports_operation("claim_rewards"))
+        self.assertFalse(adapter.supports_operation("migrate"))
 
     def test_reject_local_clmm_on_non_localnet(self) -> None:
         with self.assertRaises(UnsupportedLiquidityAdapter):

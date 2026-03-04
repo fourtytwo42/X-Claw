@@ -1,5 +1,14 @@
 # Slice 133-138 Tasks: Dual-Family Runtime (EVM + Solana) (2026-03-04)
 
+## Slice 170-176 Tasks: Solana Advanced LP Parity (2026-03-04)
+- [x] Update canonical docs/contracts for advanced Solana LP parity scope and deterministic error contract.
+- [x] Enable advanced LP capabilities for `solana_localnet` + `solana_devnet`; keep `solana_mainnet_beta` + `solana_testnet` deferred.
+- [x] Extend `local_clmm` + `raydium_clmm` runtime operation set to include `increase|claim_fees|claim_rewards|migrate`.
+- [x] Remove `position_manager_v3`-only command gates for advanced liquidity CLI and dispatch by family.
+- [x] Add advanced intent action support in `cmd_liquidity_execute/resume` for `increase|claim_fees|claim_rewards|migrate`.
+- [x] Sync OpenAPI/skill docs/examples for advanced Solana LP metadata semantics.
+- [x] Run sequential validations and capture grep proofs/evidence.
+
 ## Slice 164-169 Tasks: Solana-Native x402 Parity (2026-03-04)
 - [x] Update canonical docs/contracts for x402 `native|token` contract and family-neutral tx id semantics.
 - [x] Enable Solana x402 capability on `solana_localnet` + `solana_devnet`; keep mainnet/testnet deferred.

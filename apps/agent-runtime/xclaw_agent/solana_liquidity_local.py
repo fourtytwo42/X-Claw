@@ -136,3 +136,163 @@ def remove_position(
         "remainingAmountA": str(max(left_a, Decimal(0)).normalize()),
         "remainingAmountB": str(max(left_b, Decimal(0)).normalize()),
     }
+
+
+def increase_position(
+    *,
+    chain: str,
+    dex: str,
+    owner: str,
+    position_id: str,
+    amount_a: str,
+    amount_b: str,
+) -> dict[str, Any]:
+    add_a = _as_positive_decimal(amount_a, "amountA")
+    add_b = _as_positive_decimal(amount_b, "amountB")
+    state = _read_state()
+    positions = state.setdefault("positions", {})
+    entry = positions.get(position_id)
+    if not isinstance(entry, dict):
+        raise ValueError("position_not_found")
+    if str(entry.get("chain") or "") != chain or str(entry.get("dex") or "") != dex:
+        raise ValueError("position_not_found")
+    if str(entry.get("owner") or "").lower() != owner.lower():
+        raise ValueError("position_not_owned")
+
+    current_a = _as_positive_decimal(entry.get("amountA"), "amountA")
+    current_b = _as_positive_decimal(entry.get("amountB"), "amountB")
+    next_a = (current_a + add_a).normalize()
+    next_b = (current_b + add_b).normalize()
+    entry["amountA"] = str(next_a)
+    entry["amountB"] = str(next_b)
+    entry["updatedAtMs"] = _now_ms()
+    _write_state(state)
+    return {
+        "positionId": position_id,
+        "txHash": _make_sig("increase", position_id),
+        "amountAAdded": str(add_a.normalize()),
+        "amountBAdded": str(add_b.normalize()),
+        "amountATotal": str(next_a),
+        "amountBTotal": str(next_b),
+    }
+
+
+def claim_fees(
+    *,
+    chain: str,
+    dex: str,
+    owner: str,
+    position_id: str,
+) -> dict[str, Any]:
+    state = _read_state()
+    positions = state.setdefault("positions", {})
+    entry = positions.get(position_id)
+    if not isinstance(entry, dict):
+        raise ValueError("position_not_found")
+    if str(entry.get("chain") or "") != chain or str(entry.get("dex") or "") != dex:
+        raise ValueError("position_not_found")
+    if str(entry.get("owner") or "").lower() != owner.lower():
+        raise ValueError("position_not_owned")
+    amount_a = _as_positive_decimal(entry.get("amountA"), "amountA")
+    amount_b = _as_positive_decimal(entry.get("amountB"), "amountB")
+    # Deterministic localnet fee simulation: 0.30% of tracked position balances.
+    fee_a = (amount_a * Decimal("0.003")).normalize()
+    fee_b = (amount_b * Decimal("0.003")).normalize()
+    entry["updatedAtMs"] = _now_ms()
+    _write_state(state)
+    return {
+        "positionId": position_id,
+        "txHash": _make_sig("claim_fees", position_id),
+        "claimedFeeA": str(fee_a),
+        "claimedFeeB": str(fee_b),
+    }
+
+
+def claim_rewards(
+    *,
+    chain: str,
+    dex: str,
+    owner: str,
+    position_id: str,
+    reward_contracts: list[str] | None = None,
+) -> dict[str, Any]:
+    rewards = [str(item or "").strip() for item in (reward_contracts or []) if str(item or "").strip()]
+    if not rewards:
+        raise ValueError("claim_rewards_not_configured")
+    state = _read_state()
+    positions = state.setdefault("positions", {})
+    entry = positions.get(position_id)
+    if not isinstance(entry, dict):
+        raise ValueError("position_not_found")
+    if str(entry.get("chain") or "") != chain or str(entry.get("dex") or "") != dex:
+        raise ValueError("position_not_found")
+    if str(entry.get("owner") or "").lower() != owner.lower():
+        raise ValueError("position_not_owned")
+    amount_a = _as_positive_decimal(entry.get("amountA"), "amountA")
+    amount_b = _as_positive_decimal(entry.get("amountB"), "amountB")
+    reward_units = (amount_a + amount_b).quantize(Decimal("1"))
+    entry["updatedAtMs"] = _now_ms()
+    _write_state(state)
+    return {
+        "positionId": position_id,
+        "txHash": _make_sig("claim_rewards", position_id),
+        "rewardContracts": rewards,
+        "claimedRewardUnits": str(reward_units),
+    }
+
+
+def migrate_position(
+    *,
+    chain: str,
+    dex: str,
+    owner: str,
+    position_id: str,
+    target_dex: str | None = None,
+    recreate: bool = False,
+) -> dict[str, Any]:
+    state = _read_state()
+    positions = state.setdefault("positions", {})
+    entry = positions.get(position_id)
+    if not isinstance(entry, dict):
+        raise ValueError("position_not_found")
+    if str(entry.get("chain") or "") != chain or str(entry.get("dex") or "") != dex:
+        raise ValueError("position_not_found")
+    if str(entry.get("owner") or "").lower() != owner.lower():
+        raise ValueError("position_not_owned")
+
+    amount_a = _as_positive_decimal(entry.get("amountA"), "amountA")
+    amount_b = _as_positive_decimal(entry.get("amountB"), "amountB")
+    token_a = str(entry.get("tokenA") or "").strip()
+    token_b = str(entry.get("tokenB") or "").strip()
+    positions.pop(position_id, None)
+
+    migration_mode = "withdraw_only"
+    new_position_id: str | None = None
+    if recreate and target_dex:
+        migration_mode = "recreate"
+        new_position_id = f"solpos_{hashlib.sha1(f'{chain}:{target_dex}:{owner}:{token_a}:{token_b}:{_now_ms()}'.encode('utf-8')).hexdigest()[:18]}"
+        positions[new_position_id] = {
+            "chain": chain,
+            "dex": target_dex,
+            "owner": owner,
+            "tokenA": token_a,
+            "tokenB": token_b,
+            "amountA": str(amount_a.normalize()),
+            "amountB": str(amount_b.normalize()),
+            "createdAtMs": _now_ms(),
+            "updatedAtMs": _now_ms(),
+            "details": {
+                "migratedFromPositionId": position_id,
+                "migratedFromDex": dex,
+            },
+        }
+    _write_state(state)
+    return {
+        "positionId": position_id,
+        "targetPositionId": new_position_id,
+        "txHash": _make_sig("migrate", position_id),
+        "migrationMode": migration_mode,
+        "withdrawnAmountA": str(amount_a.normalize()),
+        "withdrawnAmountB": str(amount_b.normalize()),
+        "targetDex": target_dex or None,
+    }

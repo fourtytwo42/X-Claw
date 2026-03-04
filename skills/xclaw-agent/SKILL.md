@@ -138,6 +138,10 @@ Common optional:
 - `trade-spot <token_in> <token_out> <amount_in> <slippage_bps> [chain_key]`
 - `liquidity-add <dex> <token_a> <token_b> <amount_a> <amount_b> <slippage_bps> [v2|v3] [v3_range]`
 - `liquidity-remove <dex> <position_id> [percent] [slippage_bps] [v2|v3]`
+- `liquidity-increase <dex> <position_id> <token_a> <token_b> <amount_a> <amount_b> [slippage_bps]`
+- `liquidity-claim-fees <dex> <position_id>`
+- `liquidity-claim-rewards <dex> <position_id> [reward_token]`
+- `liquidity-migrate <dex> <position_id> <from_protocol> <to_protocol> [slippage_bps] [request_json]`
 - `liquidity-positions <dex|all> [status]`
 - `wallet-send <to> <amount_wei>`
 - `wallet-send-token <token_or_symbol> <to> <amount_wei>`
@@ -149,7 +153,7 @@ Common optional:
 - `owner-link`
 - `faucet-request [chain] [native|wrapped|stable|hbar|whbar|usdc|usdt]`
 - For deterministic Solana localnet setup, run `npm run solana:localnet:bootstrap` and load generated env values before `faucet-request solana_localnet`.
-- For non-localnet Solana `raydium_clmm` liquidity quote/add/remove, pass a concrete pool with `--pool-id` unless the chain config defines exactly one default pool entry.
+- For non-localnet Solana `raydium_clmm` advanced liquidity commands (quote/add/remove/increase/claim/migrate), pass a concrete pool with `--pool-id` unless the chain config defines exactly one default pool entry.
 - `dexscreener-search <query> [limit]`
 - `dexscreener-top <query> [limit]`
 - `dexscreener-token-pairs <chain_id> <token_address> [limit]`

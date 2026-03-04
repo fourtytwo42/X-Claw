@@ -208,6 +208,40 @@ and fail closed for unsupported execution families.
 - no secrets in docs/config artifacts,
 - chain verification failures fail closed with deterministic error codes (`x402_settlement_proof_invalid`, `rpc_unavailable`).
 
+## 3.10) Slice 170-176 Solana Advanced LP Parity (2026-03-04)
+
+1. Advanced Solana liquidity operations are canonical on:
+- enabled: `solana_localnet`, `solana_devnet`
+- deferred: `solana_mainnet_beta`, `solana_testnet`
+2. Canonical advanced operations for Solana CLMM adapters:
+- `increase`
+- `claim_fees`
+- `claim_rewards`
+- `migrate`
+- `resume` (through `liquidity execute/resume` action replay)
+3. Solana adapter execution families remain:
+- `local_clmm` for deterministic localnet execution.
+- `raydium_clmm` for direct on-chain non-localnet execution.
+4. Canonical metadata contract is unchanged and mandatory for advanced Solana LP:
+- `providerRequested`
+- `providerUsed`
+- `fallbackUsed`
+- `fallbackReason`
+- `executionFamily`
+- `executionAdapter`
+- `routeKind`
+- `liquidityOperation`
+5. Deterministic fail-closed error contract for advanced Solana LP includes:
+- `unsupported_liquidity_operation`
+- `chain_config_invalid`
+- `claim_rewards_not_configured`
+- `migration_target_not_configured`
+- `pool_not_found`
+- `rpc_unavailable`
+- `transaction_failed`
+- `tx_receipt_timeout`
+6. Prior statements that Solana CLMM supports only add/remove are superseded history and not current canonical behavior.
+
 ---
 
 ## 4) Scope

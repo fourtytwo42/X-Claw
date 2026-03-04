@@ -112,6 +112,23 @@ DoD:
 
 ---
 
+## Slice 170-176: Solana Advanced LP Parity (`increase|claim|migrate|resume`)
+Status: [~]
+
+Goal:
+- Close advanced Solana CLMM gaps by supporting `increase`, `claim-fees`, `claim-rewards`, and `migrate/resume` on the unified runtime flow.
+
+DoD:
+- [~] canonical artifacts updated to state Solana advanced LP parity scope and deterministic error contract.
+- [~] `solana_localnet` + `solana_devnet` advanced LP capabilities enabled in `execution.liquidity.adapters.*`.
+- [~] runtime Solana planners/executors support advanced operation set for `local_clmm` and `raydium_clmm`.
+- [~] `cmd_liquidity_increase|claim_fees|claim_rewards|migrate` are family-aware (`position_manager_v3|local_clmm|raydium_clmm`).
+- [~] `cmd_liquidity_execute/resume` can execute advanced intent actions (`increase|claim_fees|claim_rewards|migrate`) without EVM-only gating.
+- [~] docs/openapi/skill references updated for Solana advanced LP examples and metadata.
+- [ ] full sequential validation + grep proofs + issue evidence posted.
+
+---
+
 ## Slice 01: Environment + Toolchain Baseline
 Status: [x]
 

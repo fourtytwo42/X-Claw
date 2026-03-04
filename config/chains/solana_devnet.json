@@ -56,10 +56,10 @@
           "capabilities": {
             "add": true,
             "remove": true,
-            "increase": false,
-            "claimFees": false,
-            "claimRewards": false,
-            "migrate": false
+            "increase": true,
+            "claimFees": true,
+            "claimRewards": true,
+            "migrate": true
           },
           "operations": {
             "add": {
@@ -73,6 +73,36 @@
             "remove": {
               "method": "decrease_liquidity",
               "discriminatorHex": "0xf223c68952e1f2b6",
+              "accountsTemplate": [
+                { "pubkey": "$OWNER", "isSigner": true, "isWritable": true },
+                { "pubkey": "$POOL", "isSigner": false, "isWritable": true }
+              ]
+            },
+            "increase": {
+              "method": "increase_liquidity",
+              "accountsTemplate": [
+                { "pubkey": "$OWNER", "isSigner": true, "isWritable": true },
+                { "pubkey": "$POOL", "isSigner": false, "isWritable": true }
+              ]
+            },
+            "claimFees": {
+              "method": "collect_fees",
+              "accountsTemplate": [
+                { "pubkey": "$OWNER", "isSigner": true, "isWritable": true },
+                { "pubkey": "$POOL", "isSigner": false, "isWritable": true }
+              ]
+            },
+            "claimRewards": {
+              "method": "collect_rewards",
+              "rewardContracts": ["RAYDIUM_DEVNET_REWARD_PROGRAM"],
+              "accountsTemplate": [
+                { "pubkey": "$OWNER", "isSigner": true, "isWritable": true },
+                { "pubkey": "$POOL", "isSigner": false, "isWritable": true }
+              ]
+            },
+            "migrate": {
+              "method": "migrate_position",
+              "targetAdapterKey": "raydium_clmm",
               "accountsTemplate": [
                 { "pubkey": "$OWNER", "isSigner": true, "isWritable": true },
                 { "pubkey": "$POOL", "isSigner": false, "isWritable": true }

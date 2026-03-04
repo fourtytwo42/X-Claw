@@ -82,6 +82,10 @@ Underlying runtime delegation (performed by wrapper):
 - `xclaw-agent liquidity positions --chain <chain_key> [--dex <dex>] [--status <status>] --json`
 - `xclaw-agent liquidity quote-add --chain <chain_key> --dex <dex> --token-a <token_or_symbol> --token-b <token_or_symbol> --amount-a <amount_a> --amount-b <amount_b> [--position-type <v2|v3>] [--pool-id <pool_pubkey>] [--slippage-bps <bps>] --json`
 - `xclaw-agent liquidity quote-remove --chain <chain_key> --dex <dex> --position-id <position_id> [--percent <1-100>] [--position-type <v2|v3>] [--pool-id <pool_pubkey>] --json`
+- `xclaw-agent liquidity increase --chain <chain_key> --dex <dex> --position-id <position_id> --token-a <token_or_symbol> --token-b <token_or_symbol> --amount-a <amount_a> --amount-b <amount_b> [--slippage-bps <bps>] --json`
+- `xclaw-agent liquidity claim-fees --chain <chain_key> --dex <dex> --position-id <position_id> [--collect-as-weth] --json`
+- `xclaw-agent liquidity claim-rewards --chain <chain_key> --dex <dex> --position-id <position_id> [--reward-token <token_or_symbol>] [--request-json <json>] --json`
+- `xclaw-agent liquidity migrate --chain <chain_key> --dex <dex> --position-id <position_id> --from-protocol <V2|V3|V4> --to-protocol <V2|V3|V4> [--slippage-bps <bps>] [--request-json <json>] --json`
 - `xclaw-agent liquidity discover-pairs --chain <chain_key> --dex <dex> [--min-reserve <base_units>] [--limit <1-100>] [--scan-max <1-2000>] --json`
 - `xclaw-agent liquidity execute --intent <liquidity_intent_id> --chain <chain_key> --json`
 - `xclaw-agent liquidity resume --intent <liquidity_intent_id> --chain <chain_key> --json`
@@ -114,7 +118,7 @@ Underlying runtime delegation (performed by wrapper):
   - `XCLAW_SOLANA_RPC_URL_SOLANA_DEVNET=<primary_rpc>`
   - `XCLAW_SOLANA_RPC_FALLBACK_URL_SOLANA_DEVNET=<fallback_rpc>`
   - `XCLAW_SOLANA_RPC_API_KEY_SOLANA_DEVNET=<tatum_api_key>` (required if provider is `tatum`)
-  - For `raydium_clmm` quote/add/remove on non-localnet Solana, pass `--pool-id` unless chain config provides exactly one default pool in `execution.liquidity.adapters.raydium_clmm.poolRegistry`.
+  - For `raydium_clmm` quote/add/remove/increase/claim/migrate on non-localnet Solana, pass `--pool-id` unless chain config provides exactly one default pool in `execution.liquidity.adapters.raydium_clmm.poolRegistry`.
   - skill-wrapper aliases: `eth|kite -> native`, `weth|wkite -> wrapped`, `usdc|usdt -> stable`
   - skill-wrapper behavior: if only `native` is requested, it omits asset flags so faucet defaults to all assets.
 - `xclaw-agent faucet-networks --json`

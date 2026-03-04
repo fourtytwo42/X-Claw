@@ -151,25 +151,58 @@ def quote_remove(percent: int, *, pool_id: str) -> dict[str, Any]:
     return {"percent": percent, "poolId": pool_id}
 
 
-def _build_instruction_data(operation: dict[str, Any], request: dict[str, Any], operation_key: str) -> str:
-    discriminator_hex = str(operation.get("discriminatorHex") or "").strip().lower()
-    if not discriminator_hex.startswith("0x") or len(discriminator_hex) != 18:
-        raise SolanaRuntimeError(
-            "chain_config_invalid",
-            f"Raydium operation '{operation_key}' requires discriminatorHex as 8-byte hex (0x + 16 chars).",
-            {"operationKey": operation_key, "discriminatorHex": discriminator_hex or None},
-        )
-    prefix = bytes.fromhex(discriminator_hex[2:18])
+def _operation_entry(operations: dict[str, Any], key: str) -> dict[str, Any] | None:
+    entry = operations.get(key)
+    if isinstance(entry, dict):
+        return entry
+    if key == "claim_fees":
+        entry = operations.get("claimFees")
+    elif key == "claim_rewards":
+        entry = operations.get("claimRewards")
+    elif key == "remove":
+        entry = operations.get("decrease")
+    if isinstance(entry, dict):
+        return entry
+    return None
 
-    if operation_key == "add":
+
+def _resolve_discriminator_prefix(operation: dict[str, Any], operation_key: str) -> bytes:
+    discriminator_hex = str(operation.get("discriminatorHex") or "").strip().lower()
+    if discriminator_hex.startswith("0x") and len(discriminator_hex) == 18:
+        return bytes.fromhex(discriminator_hex[2:18])
+    method = str(operation.get("method") or "").strip()
+    if method:
+        return _anchor_discriminator(method)
+    raise SolanaRuntimeError(
+        "chain_config_invalid",
+        f"Raydium operation '{operation_key}' requires discriminatorHex or method.",
+        {"operationKey": operation_key},
+    )
+
+
+def _build_instruction_data(operation: dict[str, Any], request: dict[str, Any], operation_key: str) -> str:
+    prefix = _resolve_discriminator_prefix(operation, operation_key)
+
+    if operation_key in {"add", "increase"}:
         amount_a_units = _parse_u64(request.get("amountAUnits"), field="amountAUnits")
         amount_b_units = _parse_u64(request.get("amountBUnits"), field="amountBUnits")
         min_amount_a_units = _parse_u64(request.get("minAmountAUnits"), field="minAmountAUnits")
         min_amount_b_units = _parse_u64(request.get("minAmountBUnits"), field="minAmountBUnits")
         payload = struct.pack("<QQQQ", amount_a_units, amount_b_units, min_amount_a_units, min_amount_b_units)
+    elif operation_key == "remove":
+        liquidity_units = str(request.get("liquidityUnits") or "").strip()
+        if liquidity_units:
+            payload = struct.pack("<Q", _parse_u64(liquidity_units, field="liquidityUnits"))
+        else:
+            percent = _parse_u64(request.get("percent"), field="percent")
+            payload = struct.pack("<Q", percent)
+    elif operation_key in {"claim_fees", "claim_rewards"}:
+        token_id = str(request.get("positionId") or request.get("tokenId") or "").strip()
+        if not token_id:
+            raise SolanaRuntimeError("invalid_input", "positionId is required for claim operations.")
+        payload = struct.pack("<Q", _parse_u64(token_id, field="positionId"))
     else:
-        percent = _parse_u64(request.get("percent"), field="percent")
-        payload = struct.pack("<Q", percent)
+        payload = b""
     return "0x" + (prefix + payload).hex()
 
 
@@ -224,33 +257,78 @@ def build_execution_plan(
     operations = adapter_metadata.get("operations")
     if not isinstance(operations, dict):
         raise SolanaRuntimeError("chain_config_invalid", "Raydium adapter metadata missing operations.")
-    operation = operations.get(operation_key)
-    if not isinstance(operation, dict):
-        raise SolanaRuntimeError("unsupported_liquidity_operation", f"Raydium operation '{operation_key}' is not configured.")
-
     program_ids = adapter_metadata.get("programIds") if isinstance(adapter_metadata.get("programIds"), dict) else {}
-    program_id = str(operation.get("programId") or program_ids.get("clmm") or "").strip()
-    if not program_id:
-        raise SolanaRuntimeError("chain_config_invalid", f"Raydium {operation_key} is missing programId/programIds.clmm.")
     pool = _resolve_pool_ref(adapter_metadata, request)
-    _ensure_pool_exists(chain, rpc_url, pool, expected_owner_program=program_id)
+    route_kind = "pool_direct"
+    migration_mode = "single_step"
 
-    ix = SolanaInstructionPlan(
-        program_id=program_id,
-        accounts=_build_accounts(operation, owner=owner, pool=pool, request=request),
-        data_hex=_build_instruction_data(operation, request, operation_key),
-        operation_key=operation_key,
-        route_kind="pool_direct",
-    )
+    def _build_single(op_key: str, *, op_request: dict[str, Any] | None = None) -> SolanaInstructionPlan:
+        operation = _operation_entry(operations, op_key)
+        if not isinstance(operation, dict):
+            raise SolanaRuntimeError("unsupported_liquidity_operation", f"Raydium operation '{op_key}' is not configured.")
+        program_id = str(operation.get("programId") or program_ids.get("clmm") or "").strip()
+        if not program_id:
+            raise SolanaRuntimeError("chain_config_invalid", f"Raydium {op_key} is missing programId/programIds.clmm.")
+        _ensure_pool_exists(chain, rpc_url, pool, expected_owner_program=program_id)
+        req = dict(request)
+        if isinstance(op_request, dict):
+            req.update(op_request)
+        if op_key == "claim_rewards":
+            rewards = req.get("rewardContracts")
+            if not isinstance(rewards, list) or not [str(item or "").strip() for item in rewards if str(item or "").strip()]:
+                rewards = operation.get("rewardContracts")
+            normalized_rewards = [str(item or "").strip() for item in (rewards or []) if str(item or "").strip()]
+            if not normalized_rewards:
+                raise SolanaRuntimeError("claim_rewards_not_configured", "Raydium claim-rewards requires rewardContracts metadata.")
+            req["rewardContracts"] = normalized_rewards
+        return SolanaInstructionPlan(
+            program_id=program_id,
+            accounts=_build_accounts(operation, owner=owner, pool=pool, request=req),
+            data_hex=_build_instruction_data(operation, req, op_key),
+            operation_key=op_key,
+            route_kind="pool_direct",
+        )
+
+    instructions: list[SolanaInstructionPlan]
+    if operation_key == "migrate":
+        target_adapter_key = str(request.get("targetAdapterKey") or "").strip()
+        if not target_adapter_key:
+            migrate_cfg = _operation_entry(operations, "migrate") or {}
+            target_adapter_key = str(migrate_cfg.get("targetAdapterKey") or "").strip()
+        if not target_adapter_key:
+            raise SolanaRuntimeError("migration_target_not_configured", "Raydium migrate targetAdapterKey is not configured.")
+        instructions = [_build_single("remove"), _build_single("claim_fees")]
+        target_recreate = bool(request.get("targetRecreate"))
+        if target_recreate:
+            instructions.append(_build_single("increase"))
+            route_kind = "migration"
+            migration_mode = "decrease_collect_recreate"
+        else:
+            route_kind = "position_manager"
+            migration_mode = "withdraw_only"
+    else:
+        instructions = [_build_single(operation_key)]
+
+    for index, entry in enumerate(instructions):
+        instructions[index] = SolanaInstructionPlan(
+            program_id=entry.program_id,
+            accounts=entry.accounts,
+            data_hex=entry.data_hex,
+            operation_key=entry.operation_key,
+            route_kind=route_kind,
+        )
+
     return RaydiumExecutionPlan(
         pool=pool,
-        instructions=[ix],
+        instructions=instructions,
         details={
             "poolId": pool.pool_id,
             "tokenA": pool.token_a,
             "tokenB": pool.token_b,
             "feeBps": pool.fee_bps,
             "operationKey": operation_key,
+            "migrationMode": migration_mode if operation_key == "migrate" else None,
+            "instructionOps": [item.operation_key for item in instructions],
         },
     )
 

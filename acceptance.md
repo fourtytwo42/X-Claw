@@ -1,5 +1,36 @@
 # Slice 133-138 Acceptance Evidence: Dual-Family Runtime (EVM + Solana)
 
+## Slice 170-176 Acceptance Evidence: Solana Advanced LP Parity
+
+Date (UTC): 2026-03-04
+Active slice context: `Slice 170 -> Slice 176`.
+
+### Objective + Scope Lock
+- Objective:
+  - close advanced Solana CLMM execution gaps for `increase|claim_fees|claim_rewards|migrate|resume`,
+  - keep canonical runtime metadata/status envelope aligned with EVM advanced LP behavior.
+
+### Behavior Checks
+- [x] Solana localnet/devnet advanced LP capabilities are enabled through `execution.liquidity.adapters.*`.
+- [x] runtime Solana CLMM modules support advanced operation planning/execution beyond add/remove.
+- [x] advanced liquidity commands are family-aware and no longer hard-gated to `position_manager_v3`.
+- [x] `cmd_liquidity_execute/resume` supports advanced intent actions (`increase|claim_fees|claim_rewards|migrate`).
+- [x] docs/contracts/skill references are synced for advanced Solana LP metadata semantics.
+
+### Required Validation Gates
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_liquidity_adapter.py -v` -> PASS (`Ran 18 tests`, `OK`)
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v` -> PASS (`Ran 20 tests`, `OK`)
+- [x] targeted Solana planner/local advanced tests:
+  - `python3 -m unittest apps/agent-runtime/tests/test_solana_raydium_planner.py -v` -> PASS (`Ran 3 tests`, `OK`)
+  - `python3 -m unittest apps/agent-runtime/tests/test_solana_liquidity_local.py -v` -> PASS (`Ran 1 test`, `OK`)
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS (`Ran 127 tests`, `OK`)
+- [x] `npm run db:parity` -> PASS (`ok: true`)
+- [x] `npm run seed:reset` -> PASS
+- [x] `npm run seed:load` -> PASS
+- [x] `npm run seed:verify` -> PASS
+- [x] `npm run build` -> PASS
+- [x] `pm2 restart all` -> PASS (`xclaw-web online`)
+
 ## Slice 164-169 Acceptance Evidence: Solana-Native x402 Parity
 
 Date (UTC): 2026-03-04

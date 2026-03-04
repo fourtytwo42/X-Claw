@@ -431,6 +431,124 @@ class LiquidityCliTests(unittest.TestCase):
         self.assertEqual(payload.get("providerUsed"), "router_adapter")
         self.assertEqual(payload.get("executionFamily"), "position_manager_v3")
 
+    def test_liquidity_increase_solana_local_clmm(self) -> None:
+        args = argparse.Namespace(
+            chain="solana_localnet",
+            dex="local_clmm",
+            position_id="solpos_1",
+            token_a="SOL",
+            token_b="USDC",
+            amount_a="1",
+            amount_b="2",
+            slippage_bps=100,
+            json=True,
+        )
+        adapter = mock.Mock()
+        adapter.protocol_family = "local_clmm"
+        adapter.dex = "local_clmm"
+        adapter.supports_operation.return_value = True
+        with mock.patch.object(cli, "assert_chain_capability"), mock.patch.object(
+            cli, "build_liquidity_adapter_for_request", return_value=adapter
+        ), mock.patch.object(
+            cli, "_resolve_token_address", side_effect=["So11111111111111111111111111111111111111112", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"]
+        ), mock.patch.object(
+            cli, "load_wallet_store", return_value=object()
+        ), mock.patch.object(
+            cli, "_execution_wallet_solana_secret", return_value=("Owner1111111111111111111111111111111111", b"\x01" * 64)
+        ), mock.patch.object(
+            cli, "solana_local_increase_position", return_value={"txHash": "solsig_inc", "positionId": "solpos_1"}
+        ):
+            code, payload = self._run(lambda: cli.cmd_liquidity_increase(args))
+        self.assertEqual(code, 0)
+        self.assertEqual(payload.get("executionFamily"), "solana_clmm")
+        self.assertEqual(payload.get("executionAdapter"), "local_clmm")
+        self.assertEqual(payload.get("liquidityOperation"), "increase")
+
+    def test_liquidity_claim_rewards_solana_requires_reward_config(self) -> None:
+        args = argparse.Namespace(
+            chain="solana_devnet",
+            dex="raydium_clmm",
+            position_id="123",
+            reward_token="",
+            request_json="",
+            json=True,
+        )
+        adapter = mock.Mock()
+        adapter.protocol_family = "raydium_clmm"
+        adapter.dex = "raydium_clmm"
+        adapter.supports_operation.return_value = True
+        adapter.operations = {"claimRewards": {"rewardContracts": []}}
+        with mock.patch.object(cli, "assert_chain_capability"), mock.patch.object(
+            cli, "build_liquidity_adapter_for_request", return_value=adapter
+        ):
+            code, payload = self._run(lambda: cli.cmd_liquidity_claim_rewards(args))
+        self.assertEqual(code, 1)
+        self.assertEqual(payload.get("code"), "claim_rewards_not_configured")
+
+    def test_liquidity_migrate_solana_local_clmm(self) -> None:
+        args = argparse.Namespace(
+            chain="solana_localnet",
+            dex="local_clmm",
+            position_id="solpos_1",
+            from_protocol="V3",
+            to_protocol="V3",
+            slippage_bps=100,
+            request_json="",
+            json=True,
+        )
+        adapter = mock.Mock()
+        adapter.protocol_family = "local_clmm"
+        adapter.dex = "local_clmm"
+        adapter.supports_operation.return_value = True
+        adapter.operations = {"migrate": {"targetAdapterKey": "local_clmm"}}
+        with mock.patch.object(cli, "assert_chain_capability"), mock.patch.object(
+            cli, "build_liquidity_adapter_for_request", return_value=adapter
+        ), mock.patch.object(
+            cli, "load_wallet_store", return_value=object()
+        ), mock.patch.object(
+            cli, "_execution_wallet_solana_secret", return_value=("Owner1111111111111111111111111111111111", b"\x01" * 64)
+        ), mock.patch.object(
+            cli, "solana_local_migrate_position", return_value={"txHash": "solsig_mig", "migrationMode": "withdraw_only", "positionId": "solpos_1"}
+        ):
+            code, payload = self._run(lambda: cli.cmd_liquidity_migrate(args))
+        self.assertEqual(code, 0)
+        self.assertEqual(payload.get("executionFamily"), "solana_clmm")
+        self.assertEqual(payload.get("liquidityOperation"), "migrate")
+
+    def test_liquidity_execute_supports_advanced_intent_actions(self) -> None:
+        args = argparse.Namespace(intent="liq_advanced", chain="solana_localnet", json=True)
+        adapter = mock.Mock()
+        adapter.protocol_family = "local_clmm"
+        adapter.dex = "local_clmm"
+        with mock.patch.object(
+            cli,
+            "_read_liquidity_intent",
+            return_value={"liquidityIntentId": "liq_advanced", "status": "approved", "dex": "local_clmm", "positionType": "v3", "action": "increase"},
+        ), mock.patch.object(
+            cli, "build_liquidity_adapter_for_request", return_value=adapter
+        ), mock.patch.object(
+            cli, "_post_liquidity_status"
+        ), mock.patch.object(
+            cli,
+            "_execute_liquidity_advanced_intent",
+            return_value=(
+                {
+                    "txHash": "solsig_advanced",
+                    "positionId": "solpos_1",
+                    "executionFamily": "solana_clmm",
+                    "executionAdapter": "local_clmm",
+                    "routeKind": "adapter_default",
+                    "liquidityOperation": "increase",
+                    "details": {"operationTxHashes": ["solsig_advanced"]},
+                },
+                "local_clmm",
+            ),
+        ):
+            code, payload = self._run(lambda: cli.cmd_liquidity_execute(args))
+        self.assertEqual(code, 0)
+        self.assertEqual(payload.get("status"), "filled")
+        self.assertEqual(payload.get("adapterFamily"), "local_clmm")
+
     def test_estimate_add_amount_in_with_min_uses_pool_ratio(self) -> None:
         amount_a, amount_b, min_a, min_b = cli._estimate_add_amount_in_with_min(
             reserve_a=1_000,

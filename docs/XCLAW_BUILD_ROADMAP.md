@@ -64,6 +64,15 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 - [~] Update schemas/openapi/skill docs for family-neutral asset address + tx id contracts.
 - [ ] Sequential validation + PM2 restart + issue evidence capture.
 
+## 0.11) Slice 170-176 Solana Advanced LP Parity Program
+
+- [~] Canonicalize Solana advanced LP parity scope (`increase`, `claim-fees`, `claim-rewards`, `migrate`, `resume`) with deterministic error contract.
+- [~] Enable advanced LP capabilities for `solana_localnet` + `solana_devnet`; keep `solana_mainnet_beta` + `solana_testnet` deferred.
+- [~] Extend Solana CLMM runtime modules (`local_clmm`, `raydium_clmm`) to support advanced operation set.
+- [~] Remove `position_manager_v3`-only advanced command gates in runtime CLI and route advanced intents through family-dispatch execution.
+- [~] Update OpenAPI/schema/skill docs for advanced Solana LP metadata and examples.
+- [ ] Sequential validation + PM2 restart + issue evidence capture.
+
 ---
 
 ## 0) Program Control and Working Rules

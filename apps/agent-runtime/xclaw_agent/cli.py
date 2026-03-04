@@ -84,7 +84,11 @@ from xclaw_agent.solana_runtime import (
     sign_message as solana_sign_message,
 )
 from xclaw_agent.solana_liquidity_local import (
+    claim_fees as solana_local_claim_fees,
+    claim_rewards as solana_local_claim_rewards,
     create_position as solana_local_create_position,
+    increase_position as solana_local_increase_position,
+    migrate_position as solana_local_migrate_position,
     quote_add as solana_local_quote_add,
     remove_position as solana_local_remove_position,
 )
@@ -6527,7 +6531,7 @@ def _execute_liquidity_v3_add(intent: dict[str, Any], chain: str) -> dict[str, A
         raise UnsupportedLiquidityOperation("unsupported_liquidity_operation")
     details = _intent_details_dict(intent)
     v3_details = _v3_details_dict(details)
-    pool_id = str(v3_details.get("poolId") or "").strip()
+    pool_id = _resolve_raydium_pool_id(adapter, str(v3_details.get("poolId") or ""))
     fee = str(v3_details.get("fee") or "").strip()
     tick_lower = str(v3_details.get("tickLower") or "").strip()
     tick_upper = str(v3_details.get("tickUpper") or "").strip()
@@ -6711,7 +6715,7 @@ def _execute_liquidity_v3_remove(intent: dict[str, Any], chain: str) -> dict[str
         raise WalletStoreError("Remove intent percent must be between 1 and 100.")
     details = _intent_details_dict(intent)
     v3_details = _v3_details_dict(details)
-    pool_id = str(v3_details.get("poolId") or intent.get("poolId") or "").strip()
+    pool_id = _resolve_raydium_pool_id(adapter, str(v3_details.get("poolId") or intent.get("poolId") or ""))
     min_a_units = str(v3_details.get("minAmountAUnits") or "0").strip() or "0"
     min_b_units = str(v3_details.get("minAmountBUnits") or "0").strip() or "0"
     if _is_solana_chain(chain):
@@ -7404,6 +7408,18 @@ def _v3_details_dict(details: dict[str, Any]) -> dict[str, Any]:
     return {}
 
 
+def _resolve_raydium_pool_id(adapter: Any, explicit_pool_id: str) -> str:
+    pool_id = str(explicit_pool_id or "").strip()
+    if pool_id:
+        return pool_id
+    pool_registry = (adapter.adapter_metadata or {}).get("poolRegistry") if isinstance(adapter.adapter_metadata, dict) else {}
+    if isinstance(pool_registry, dict) and len(pool_registry) == 1:
+        only_entry = next(iter(pool_registry.values()))
+        if isinstance(only_entry, dict):
+            pool_id = str(only_entry.get("poolId") or "").strip()
+    return pool_id
+
+
 def _resolve_agent_id_or_fail(chain: str) -> str:
     api_key = _resolve_api_key()
     agent_id = _resolve_agent_id(api_key)
@@ -7617,13 +7633,7 @@ def cmd_liquidity_quote_add(args: argparse.Namespace) -> int:
                     slippage_bps=slippage_bps,
                 )
             elif adapter.protocol_family == "raydium_clmm":
-                pool_id = str(getattr(args, "pool_id", "") or "").strip()
-                if not pool_id:
-                    pool_registry = (adapter.adapter_metadata or {}).get("poolRegistry") if isinstance(adapter.adapter_metadata, dict) else {}
-                    if isinstance(pool_registry, dict) and len(pool_registry) == 1:
-                        only_entry = next(iter(pool_registry.values()))
-                        if isinstance(only_entry, dict):
-                            pool_id = str(only_entry.get("poolId") or "").strip()
+                pool_id = _resolve_raydium_pool_id(adapter, str(getattr(args, "pool_id", "") or ""))
                 if not pool_id:
                     return fail(
                         "invalid_input",
@@ -7632,7 +7642,6 @@ def cmd_liquidity_quote_add(args: argparse.Namespace) -> int:
                         {"chain": chain, "dex": dex},
                         exit_code=2,
                     )
-                pool_registry = (adapter.adapter_metadata or {}).get("poolRegistry") if isinstance(adapter.adapter_metadata, dict) else {}
                 local_quote = solana_raydium_quote_add(
                     amount_a=_decimal_text(amount_a_h),
                     amount_b=_decimal_text(amount_b_h),
@@ -7732,13 +7741,7 @@ def cmd_liquidity_quote_remove(args: argparse.Namespace) -> int:
             return fail("invalid_input", "percent must be between 1 and 100.", "Use --percent in [1..100].", {"percent": args.percent}, exit_code=2)
         preflight = adapter.quote_remove({"positionId": position_id, "percent": percent})
         if _is_solana_chain(chain) and adapter.protocol_family == "raydium_clmm":
-            pool_id = str(getattr(args, "pool_id", "") or "").strip()
-            if not pool_id:
-                pool_registry = (adapter.adapter_metadata or {}).get("poolRegistry") if isinstance(adapter.adapter_metadata, dict) else {}
-                if isinstance(pool_registry, dict) and len(pool_registry) == 1:
-                    only_entry = next(iter(pool_registry.values()))
-                    if isinstance(only_entry, dict):
-                        pool_id = str(only_entry.get("poolId") or "").strip()
+            pool_id = _resolve_raydium_pool_id(adapter, str(getattr(args, "pool_id", "") or ""))
             if not pool_id:
                 return fail(
                     "invalid_input",
@@ -7820,13 +7823,7 @@ def cmd_liquidity_add(args: argparse.Namespace) -> int:
         adapter_family = adapter.protocol_family
         adapter_dex = adapter.dex
         if _is_solana_chain(chain) and adapter.protocol_family == "raydium_clmm":
-            pool_id = str(getattr(args, "pool_id", "") or "").strip()
-            if not pool_id:
-                pool_registry = (adapter.adapter_metadata or {}).get("poolRegistry") if isinstance(adapter.adapter_metadata, dict) else {}
-                if isinstance(pool_registry, dict) and len(pool_registry) == 1:
-                    only_entry = next(iter(pool_registry.values()))
-                    if isinstance(only_entry, dict):
-                        pool_id = str(only_entry.get("poolId") or "").strip()
+            pool_id = _resolve_raydium_pool_id(adapter, str(getattr(args, "pool_id", "") or ""))
             if not pool_id:
                 return fail(
                     "invalid_input",
@@ -8186,11 +8183,11 @@ def cmd_liquidity_increase(args: argparse.Namespace) -> int:
 
         provider_requested, _ = _liquidity_provider_settings(chain)
         adapter = build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type="v3")
-        if adapter.protocol_family != "position_manager_v3":
+        if adapter.protocol_family not in {"position_manager_v3", "local_clmm", "raydium_clmm"}:
             return fail(
                 "unsupported_liquidity_execution_family",
                 f"Liquidity increase requires a concentrated-liquidity execution adapter, got '{adapter.protocol_family}'.",
-                "Use a chain/dex with `position_manager_v3` support and retry.",
+                "Use a chain/dex with advanced concentrated-liquidity support and retry.",
                 {"chain": chain, "dex": dex, "positionId": position_id},
                 exit_code=2,
             )
@@ -8202,15 +8199,131 @@ def cmd_liquidity_increase(args: argparse.Namespace) -> int:
                 {"chain": chain, "dex": adapter.dex, "positionId": position_id},
                 exit_code=2,
             )
-        store = load_wallet_store()
-        wallet_address, private_key_hex = _execution_wallet(store, chain)
         token_a = _resolve_token_address(chain, str(args.token_a or ""))
         token_b = _resolve_token_address(chain, str(args.token_b or ""))
+        amount_a_text = _decimal_text(_parse_positive_amount_text(str(args.amount_a), "amount-a"))
+        amount_b_text = _decimal_text(_parse_positive_amount_text(str(args.amount_b), "amount-b"))
+        deadline = str(int(datetime.now(timezone.utc).timestamp()) + 120)
+
+        if _is_solana_chain(chain) and adapter.protocol_family in {"local_clmm", "raydium_clmm"}:
+            store = load_wallet_store()
+            wallet_address, secret = _execution_wallet_solana_secret(store, chain)
+            amount_a_units = str(_to_units_uint(amount_a_text, 9))
+            amount_b_units = str(_to_units_uint(amount_b_text, 9))
+            min_a_units = str((int(amount_a_units) * max(0, 10000 - slippage_bps)) // 10000)
+            min_b_units = str((int(amount_b_units) * max(0, 10000 - slippage_bps)) // 10000)
+            if adapter.protocol_family == "local_clmm":
+                if chain != "solana_localnet":
+                    return fail(
+                        "unsupported_liquidity_adapter",
+                        "local_clmm adapter is only supported on solana_localnet.",
+                        "Switch to solana_localnet or use raydium_clmm.",
+                        {"chain": chain, "dex": dex, "positionId": position_id},
+                        exit_code=2,
+                    )
+                increased = solana_local_increase_position(
+                    chain=chain,
+                    dex=adapter.dex,
+                    owner=wallet_address,
+                    position_id=position_id,
+                    amount_a=amount_a_text,
+                    amount_b=amount_b_text,
+                )
+                tx_hash = str(increased.get("txHash") or "")
+                details = {
+                    "amountAUnits": amount_a_units,
+                    "amountBUnits": amount_b_units,
+                    "minAmountAUnits": min_a_units,
+                    "minAmountBUnits": min_b_units,
+                    "approveTxHashes": [],
+                    "operationTxHashes": [tx_hash] if tx_hash else [],
+                    "simulationMode": True,
+                    "routeKind": "adapter_default",
+                    **increased,
+                }
+                return ok(
+                    "Liquidity position increased.",
+                    chain=chain,
+                    dex=adapter.dex,
+                    positionId=position_id,
+                    txHash=tx_hash,
+                    approveTxHashes=[],
+                    operationTxHashes=[tx_hash] if tx_hash else [],
+                    providerRequested=provider_requested,
+                    providerUsed="router_adapter",
+                    fallbackUsed=False,
+                    fallbackReason=None,
+                    executionFamily="solana_clmm",
+                    executionAdapter=adapter.dex,
+                    routeKind="adapter_default",
+                    liquidityOperation="increase",
+                    details=details,
+                )
+
+            pool_id = _resolve_raydium_pool_id(adapter, "")
+            if not pool_id:
+                return fail(
+                    "invalid_input",
+                    "Raydium liquidity increase requires configured pool metadata.",
+                    "Provide pool metadata in chain config or include a single default pool.",
+                    {"chain": chain, "dex": dex, "positionId": position_id},
+                    exit_code=2,
+                )
+            execution = solana_raydium_execute_instruction(
+                chain=chain,
+                rpc_url=_chain_rpc_url(chain),
+                private_key_bytes=secret,
+                owner=wallet_address,
+                adapter_metadata=dict(adapter.adapter_metadata or {}),
+                request={
+                    "poolId": pool_id,
+                    "positionId": position_id,
+                    "tokenA": token_a,
+                    "tokenB": token_b,
+                    "amountAUnits": amount_a_units,
+                    "amountBUnits": amount_b_units,
+                    "minAmountAUnits": min_a_units,
+                    "minAmountBUnits": min_b_units,
+                    "slippageBps": slippage_bps,
+                },
+                operation_key="increase",
+            )
+            tx_hash = str(execution.tx_hash or "")
+            details = {
+                "poolId": pool_id,
+                "amountAUnits": amount_a_units,
+                "amountBUnits": amount_b_units,
+                "minAmountAUnits": min_a_units,
+                "minAmountBUnits": min_b_units,
+                "approveTxHashes": [],
+                "operationTxHashes": [tx_hash] if tx_hash else [],
+                **execution.details,
+            }
+            return ok(
+                "Liquidity position increased.",
+                chain=chain,
+                dex=adapter.dex,
+                positionId=position_id,
+                txHash=tx_hash,
+                approveTxHashes=[],
+                operationTxHashes=[tx_hash] if tx_hash else [],
+                providerRequested=provider_requested,
+                providerUsed="router_adapter",
+                fallbackUsed=False,
+                fallbackReason=None,
+                executionFamily="solana_clmm",
+                executionAdapter=adapter.dex,
+                routeKind=execution.route_kind,
+                liquidityOperation="increase",
+                details=details,
+            )
+
+        store = load_wallet_store()
+        wallet_address, private_key_hex = _execution_wallet(store, chain)
         token_a_meta = _fetch_erc20_metadata(chain, token_a)
         token_b_meta = _fetch_erc20_metadata(chain, token_b)
-        amount_a_units = str(_to_units_uint(str(args.amount_a), int(token_a_meta.get("decimals", 18))))
-        amount_b_units = str(_to_units_uint(str(args.amount_b), int(token_b_meta.get("decimals", 18))))
-        deadline = str(int(datetime.now(timezone.utc).timestamp()) + 120)
+        amount_a_units = str(_to_units_uint(amount_a_text, int(token_a_meta.get("decimals", 18))))
+        amount_b_units = str(_to_units_uint(amount_b_text, int(token_b_meta.get("decimals", 18))))
         min_a_units = str((int(amount_a_units) * max(0, 10000 - slippage_bps)) // 10000)
         min_b_units = str((int(amount_b_units) * max(0, 10000 - slippage_bps)) // 10000)
         plan = build_liquidity_increase_plan(
@@ -8308,11 +8421,11 @@ def cmd_liquidity_claim_fees(args: argparse.Namespace) -> int:
             return fail("invalid_input", "position-id is required.", "Provide --position-id and retry.", _claim_failure_details(), exit_code=2)
         provider_requested, _ = _liquidity_provider_settings(chain)
         adapter = build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type="v3")
-        if adapter.protocol_family != "position_manager_v3":
+        if adapter.protocol_family not in {"position_manager_v3", "local_clmm", "raydium_clmm"}:
             return fail(
                 "unsupported_liquidity_execution_family",
                 f"Liquidity claim-fees requires a concentrated-liquidity execution adapter, got '{adapter.protocol_family}'.",
-                "Use a chain/dex with `position_manager_v3` support and retry.",
+                "Use a chain/dex with advanced concentrated-liquidity support and retry.",
                 _claim_failure_details(),
                 exit_code=2,
             )
@@ -8324,6 +8437,94 @@ def cmd_liquidity_claim_fees(args: argparse.Namespace) -> int:
                 _claim_failure_details(),
                 exit_code=2,
             )
+        if _is_solana_chain(chain) and adapter.protocol_family in {"local_clmm", "raydium_clmm"}:
+            store = load_wallet_store()
+            wallet_address, secret = _execution_wallet_solana_secret(store, chain)
+            if adapter.protocol_family == "local_clmm":
+                if chain != "solana_localnet":
+                    return fail(
+                        "unsupported_liquidity_adapter",
+                        "local_clmm adapter is only supported on solana_localnet.",
+                        "Switch to solana_localnet or use raydium_clmm.",
+                        _claim_failure_details(),
+                        exit_code=2,
+                    )
+                claimed = solana_local_claim_fees(
+                    chain=chain,
+                    dex=adapter.dex,
+                    owner=wallet_address,
+                    position_id=position_id,
+                )
+                tx_hash = str(claimed.get("txHash") or "").strip()
+                details = {
+                    "approveTxHashes": [],
+                    "operationTxHashes": [tx_hash] if tx_hash else [],
+                    "routeKind": "adapter_default",
+                    "simulationMode": True,
+                    **claimed,
+                }
+                return ok(
+                    "Liquidity fees claimed.",
+                    chain=chain,
+                    dex=adapter.dex,
+                    positionId=position_id,
+                    txHash=tx_hash,
+                    approveTxHashes=[],
+                    operationTxHashes=[tx_hash] if tx_hash else [],
+                    providerRequested=provider_requested,
+                    providerUsed=provider_used,
+                    fallbackUsed=fallback_used,
+                    fallbackReason=fallback_reason,
+                    executionFamily="solana_clmm",
+                    executionAdapter=adapter.dex,
+                    routeKind="adapter_default",
+                    liquidityOperation="claim_fees",
+                    details=details,
+                )
+            pool_id = _resolve_raydium_pool_id(adapter, "")
+            if not pool_id:
+                return fail(
+                    "invalid_input",
+                    "Raydium claim-fees requires configured pool metadata.",
+                    "Provide pool metadata in chain config or include a single default pool.",
+                    _claim_failure_details(),
+                    exit_code=2,
+                )
+            execution = solana_raydium_execute_instruction(
+                chain=chain,
+                rpc_url=_chain_rpc_url(chain),
+                private_key_bytes=secret,
+                owner=wallet_address,
+                adapter_metadata=dict(adapter.adapter_metadata or {}),
+                request={"poolId": pool_id, "positionId": position_id, "tokenId": position_id},
+                operation_key="claim_fees",
+            )
+            tx_hash = str(execution.tx_hash or "").strip()
+            details = {
+                "poolId": pool_id,
+                "approveTxHashes": [],
+                "operationTxHashes": [tx_hash] if tx_hash else [],
+                **execution.details,
+            }
+            return ok(
+                "Liquidity fees claimed.",
+                chain=chain,
+                dex=adapter.dex,
+                positionId=position_id,
+                txHash=tx_hash,
+                approveTxHashes=[],
+                operationTxHashes=[tx_hash] if tx_hash else [],
+                providerRequested=provider_requested,
+                providerUsed=provider_used,
+                fallbackUsed=fallback_used,
+                fallbackReason=fallback_reason,
+                executionFamily="solana_clmm",
+                executionAdapter=adapter.dex,
+                routeKind=execution.route_kind,
+                liquidityOperation="claim_fees",
+                details=details,
+            )
+
         store = load_wallet_store()
         wallet_address, private_key_hex = _execution_wallet(store, chain)
         plan = build_liquidity_claim_fees_plan(
@@ -8418,11 +8619,11 @@ def cmd_liquidity_migrate(args: argparse.Namespace) -> int:
         fallback_used = False
         fallback_reason: dict[str, str] | None = None
         adapter = build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type="v3")
-        if adapter.protocol_family != "position_manager_v3":
+        if adapter.protocol_family not in {"position_manager_v3", "local_clmm", "raydium_clmm"}:
             return fail(
                 "unsupported_liquidity_execution_family",
                 f"Liquidity migrate requires a concentrated-liquidity execution adapter, got '{adapter.protocol_family}'.",
-                "Use a chain/dex with `position_manager_v3` support and retry.",
+                "Use a chain/dex with advanced concentrated-liquidity support and retry.",
                 {"chain": chain, "dex": dex, "positionId": position_id},
                 exit_code=2,
             )
@@ -8433,6 +8634,130 @@ def cmd_liquidity_migrate(args: argparse.Namespace) -> int:
                 "Choose a supported chain/dex combination and retry.",
                 {"chain": chain, "dex": adapter.dex, "positionId": position_id},
                 exit_code=2,
+            )
+
+        request_json = str(args.request_json or "").strip()
+        request_payload: dict[str, Any] = {}
+        if request_json:
+            extra = json.loads(request_json)
+            if not isinstance(extra, dict):
+                raise WalletStoreError("request-json must decode to an object.")
+            request_payload.update(extra)
+
+        if _is_solana_chain(chain) and adapter.protocol_family in {"local_clmm", "raydium_clmm"}:
+            store = load_wallet_store()
+            wallet_address, secret = _execution_wallet_solana_secret(store, chain)
+            target_adapter_key = str(
+                request_payload.get("targetAdapterKey")
+                or ((adapter.operations or {}).get("migrate") or {}).get("targetAdapterKey")
+                or ""
+            ).strip()
+            if not target_adapter_key:
+                return fail(
+                    "migration_target_not_configured",
+                    "Migration target adapter is not configured for this chain/dex.",
+                    "Add execution.liquidity adapter migrate target metadata and retry.",
+                    {"chain": chain, "dex": dex, "positionId": position_id},
+                    exit_code=2,
+                )
+            if adapter.protocol_family == "local_clmm":
+                if chain != "solana_localnet":
+                    return fail(
+                        "unsupported_liquidity_adapter",
+                        "local_clmm adapter is only supported on solana_localnet.",
+                        "Switch to solana_localnet or use raydium_clmm.",
+                        {"chain": chain, "dex": dex, "positionId": position_id},
+                        exit_code=2,
+                    )
+                migrated = solana_local_migrate_position(
+                    chain=chain,
+                    dex=adapter.dex,
+                    owner=wallet_address,
+                    position_id=position_id,
+                    target_dex=target_adapter_key,
+                    recreate=bool(request_payload.get("targetRecreate")),
+                )
+                tx_hash = str(migrated.get("txHash") or "").strip()
+                route_kind = "migration" if str(migrated.get("migrationMode") or "") == "recreate" else "position_manager"
+                details = {
+                    "targetAdapterKey": target_adapter_key,
+                    "approveTxHashes": [],
+                    "operationTxHashes": [tx_hash] if tx_hash else [],
+                    "routeKind": route_kind,
+                    "simulationMode": True,
+                    **migrated,
+                }
+                return ok(
+                    "Liquidity position migrated.",
+                    chain=chain,
+                    dex=adapter.dex,
+                    positionId=position_id,
+                    txHash=tx_hash,
+                    approveTxHashes=[],
+                    operationTxHashes=[tx_hash] if tx_hash else [],
+                    providerRequested=provider_requested,
+                    providerUsed="router_adapter",
+                    fallbackUsed=fallback_used,
+                    fallbackReason=fallback_reason,
+                    executionFamily="solana_clmm",
+                    executionAdapter=adapter.dex,
+                    routeKind=route_kind,
+                    liquidityOperation="migrate",
+                    fromProtocol=from_protocol,
+                    toProtocol=to_protocol,
+                    details=details,
+                )
+            pool_id = _resolve_raydium_pool_id(adapter, str(request_payload.get("poolId") or ""))
+            if not pool_id:
+                return fail(
+                    "invalid_input",
+                    "Raydium migrate requires configured pool metadata.",
+                    "Provide pool metadata in chain config or include a single default pool.",
+                    {"chain": chain, "dex": dex, "positionId": position_id},
+                    exit_code=2,
+                )
+            execution = solana_raydium_execute_instruction(
+                chain=chain,
+                rpc_url=_chain_rpc_url(chain),
+                private_key_bytes=secret,
+                owner=wallet_address,
+                adapter_metadata=dict(adapter.adapter_metadata or {}),
+                request={
+                    "poolId": pool_id,
+                    "positionId": position_id,
+                    "tokenId": position_id,
+                    "targetAdapterKey": target_adapter_key,
+                    "targetRecreate": bool(request_payload.get("targetRecreate")),
+                    **request_payload,
+                },
+                operation_key="migrate",
+            )
+            tx_hash = str(execution.tx_hash or "")
+            return ok(
+                "Liquidity position migrated.",
+                chain=chain,
+                dex=adapter.dex,
+                positionId=position_id,
+                txHash=tx_hash,
+                approveTxHashes=[],
+                operationTxHashes=[tx_hash] if tx_hash else [],
+                providerRequested=provider_requested,
+                providerUsed="router_adapter",
+                fallbackUsed=fallback_used,
+                fallbackReason=fallback_reason,
+                executionFamily="solana_clmm",
+                executionAdapter=adapter.dex,
+                routeKind=execution.route_kind,
+                liquidityOperation="migrate",
+                fromProtocol=from_protocol,
+                toProtocol=to_protocol,
+                details={
+                    "poolId": pool_id,
+                    "targetAdapterKey": target_adapter_key,
+                    "approveTxHashes": [],
+                    "operationTxHashes": [tx_hash] if tx_hash else [],
+                    **execution.details,
+                },
             )
 
         store = load_wallet_store()
@@ -8459,7 +8784,6 @@ def cmd_liquidity_migrate(args: argparse.Namespace) -> int:
             "minAmountBUnits": "0",
             "deadline": deadline,
         }
-        request_json = str(args.request_json or "").strip()
         if request_json:
             extra = json.loads(request_json)
             if not isinstance(extra, dict):
@@ -8570,11 +8894,11 @@ def cmd_liquidity_claim_rewards(args: argparse.Namespace) -> int:
         fallback_used = False
         fallback_reason = None
         adapter = build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type="v3")
-        if adapter.protocol_family != "position_manager_v3":
+        if adapter.protocol_family not in {"position_manager_v3", "local_clmm", "raydium_clmm"}:
             return fail(
                 "unsupported_liquidity_execution_family",
                 f"Liquidity claim-rewards requires a concentrated-liquidity execution adapter, got '{adapter.protocol_family}'.",
-                "Use a chain/dex with `position_manager_v3` support and retry.",
+                "Use a chain/dex with advanced concentrated-liquidity support and retry.",
                 _claim_failure_details(),
                 exit_code=2,
             )
@@ -8596,6 +8920,117 @@ def cmd_liquidity_claim_rewards(args: argparse.Namespace) -> int:
             if not isinstance(extra, dict):
                 raise WalletStoreError("request-json must decode to an object.")
             request_payload.update(extra)
+
+        if _is_solana_chain(chain) and adapter.protocol_family in {"local_clmm", "raydium_clmm"}:
+            reward_contracts: list[str] = []
+            reward_cfg = ((adapter.operations or {}).get("claimRewards") or {}) if isinstance(adapter.operations, dict) else {}
+            configured_rewards = reward_cfg.get("rewardContracts") if isinstance(reward_cfg, dict) else None
+            if isinstance(configured_rewards, list):
+                reward_contracts = [str(item or "").strip() for item in configured_rewards if str(item or "").strip()]
+            if reward_token:
+                reward_contracts = [str(_resolve_token_address(chain, reward_token))]
+            if not reward_contracts:
+                return fail(
+                    "claim_rewards_not_configured",
+                    "Reward contracts are not configured for this chain/dex.",
+                    "Add execution.liquidity adapter claimRewards.rewardContracts and retry.",
+                    _claim_failure_details(),
+                    exit_code=1,
+                )
+            store = load_wallet_store()
+            wallet_address, secret = _execution_wallet_solana_secret(store, chain)
+            if adapter.protocol_family == "local_clmm":
+                if chain != "solana_localnet":
+                    return fail(
+                        "unsupported_liquidity_adapter",
+                        "local_clmm adapter is only supported on solana_localnet.",
+                        "Switch to solana_localnet or use raydium_clmm.",
+                        _claim_failure_details(),
+                        exit_code=2,
+                    )
+                claimed = solana_local_claim_rewards(
+                    chain=chain,
+                    dex=adapter.dex,
+                    owner=wallet_address,
+                    position_id=position_id,
+                    reward_contracts=reward_contracts,
+                )
+                tx_hash = str(claimed.get("txHash") or "").strip()
+                details = {
+                    "rewardContracts": reward_contracts,
+                    "approveTxHashes": [],
+                    "operationTxHashes": [tx_hash] if tx_hash else [],
+                    "routeKind": "reward_claim",
+                    "simulationMode": True,
+                    **claimed,
+                }
+                return ok(
+                    "Liquidity rewards claimed.",
+                    chain=chain,
+                    dex=adapter.dex,
+                    positionId=position_id,
+                    txHash=tx_hash,
+                    approveTxHashes=[],
+                    operationTxHashes=[tx_hash] if tx_hash else [],
+                    providerRequested=provider_requested,
+                    providerUsed=provider_used,
+                    fallbackUsed=fallback_used,
+                    fallbackReason=fallback_reason,
+                    executionFamily="solana_clmm",
+                    executionAdapter=adapter.dex,
+                    routeKind="reward_claim",
+                    liquidityOperation="claim_rewards",
+                    details=details,
+                )
+            pool_id = _resolve_raydium_pool_id(adapter, "")
+            if not pool_id:
+                return fail(
+                    "invalid_input",
+                    "Raydium claim-rewards requires configured pool metadata.",
+                    "Provide pool metadata in chain config or include a single default pool.",
+                    _claim_failure_details(),
+                    exit_code=2,
+                )
+            execution = solana_raydium_execute_instruction(
+                chain=chain,
+                rpc_url=_chain_rpc_url(chain),
+                private_key_bytes=secret,
+                owner=wallet_address,
+                adapter_metadata=dict(adapter.adapter_metadata or {}),
+                request={
+                    "poolId": pool_id,
+                    "positionId": position_id,
+                    "tokenId": position_id,
+                    "rewardContracts": reward_contracts,
+                },
+                operation_key="claim_rewards",
+            )
+            tx_hash = str(execution.tx_hash or "").strip()
+            details = {
+                "poolId": pool_id,
+                "rewardContracts": reward_contracts,
+                "approveTxHashes": [],
+                "operationTxHashes": [tx_hash] if tx_hash else [],
+                **execution.details,
+            }
+            return ok(
+                "Liquidity rewards claimed.",
+                chain=chain,
+                dex=adapter.dex,
+                positionId=position_id,
+                txHash=tx_hash,
+                approveTxHashes=[],
+                operationTxHashes=[tx_hash] if tx_hash else [],
+                providerRequested=provider_requested,
+                providerUsed=provider_used,
+                fallbackUsed=fallback_used,
+                fallbackReason=fallback_reason,
+                executionFamily="solana_clmm",
+                executionAdapter=adapter.dex,
+                routeKind=execution.route_kind,
+                liquidityOperation="claim_rewards",
+                details=details,
+            )
 
         store = load_wallet_store()
         wallet_address, private_key_hex = _execution_wallet(store, chain)
@@ -8659,6 +9094,89 @@ def cmd_liquidity_claim_rewards(args: argparse.Namespace) -> int:
         return fail("liquidity_claim_rewards_failed", str(exc), "Verify local router-adapter claim-rewards configuration and retry.", _claim_failure_details(), exit_code=1)
     except Exception as exc:
         return fail("liquidity_claim_rewards_failed", str(exc), "Inspect runtime liquidity claim-rewards path and retry.", _claim_failure_details(), exit_code=1)
+
+
+def _invoke_liquidity_command_payload(command: Callable[[argparse.Namespace], int], args: argparse.Namespace) -> dict[str, Any]:
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        code = command(args)
+    raw = buf.getvalue().strip()
+    payload: dict[str, Any] = {}
+    if raw:
+        try:
+            decoded = json.loads(raw)
+            if isinstance(decoded, dict):
+                payload = decoded
+        except Exception:
+            payload = {"ok": False, "code": "liquidity_execute_parse_failed", "message": raw[:400]}
+    if code != 0:
+        error_code = str(payload.get("code") or "liquidity_execution_failed")
+        error_message = str(payload.get("message") or "Advanced liquidity command failed.")
+        raise WalletStoreError(f"{error_code}: {error_message}")
+    return payload
+
+
+def _execute_liquidity_advanced_intent(intent: dict[str, Any], chain: str, action: str) -> tuple[dict[str, Any], str]:
+    dex = str(intent.get("dex") or "").strip().lower()
+    adapter = build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type="v3")
+    details = _intent_details_dict(intent)
+    v3_details = _v3_details_dict(details)
+    position_id = str(intent.get("positionId") or intent.get("positionRef") or "").strip()
+    slippage_bps = int(intent.get("slippageBps") or details.get("slippageBps") or 100)
+
+    if action == "increase":
+        args = argparse.Namespace(
+            chain=chain,
+            dex=dex,
+            position_id=position_id,
+            token_a=str(intent.get("tokenA") or v3_details.get("tokenA") or ""),
+            token_b=str(intent.get("tokenB") or v3_details.get("tokenB") or ""),
+            amount_a=str(intent.get("amountA") or v3_details.get("amountA") or ""),
+            amount_b=str(intent.get("amountB") or v3_details.get("amountB") or ""),
+            slippage_bps=slippage_bps,
+            json=True,
+        )
+        payload = _invoke_liquidity_command_payload(cmd_liquidity_increase, args)
+        return payload, adapter.protocol_family
+
+    if action in {"claim_fees", "claim-fees"}:
+        args = argparse.Namespace(
+            chain=chain,
+            dex=dex,
+            position_id=position_id,
+            collect_as_weth=bool(details.get("collectAsWeth") or False),
+            json=True,
+        )
+        payload = _invoke_liquidity_command_payload(cmd_liquidity_claim_fees, args)
+        return payload, adapter.protocol_family
+
+    if action in {"claim_rewards", "claim-rewards"}:
+        args = argparse.Namespace(
+            chain=chain,
+            dex=dex,
+            position_id=position_id,
+            reward_token=str(details.get("rewardToken") or ""),
+            request_json=json.dumps(details.get("request") or {}) if isinstance(details.get("request"), dict) else None,
+            json=True,
+        )
+        payload = _invoke_liquidity_command_payload(cmd_liquidity_claim_rewards, args)
+        return payload, adapter.protocol_family
+
+    if action == "migrate":
+        args = argparse.Namespace(
+            chain=chain,
+            dex=dex,
+            position_id=position_id,
+            from_protocol=str(details.get("fromProtocol") or "V3"),
+            to_protocol=str(details.get("toProtocol") or "V3"),
+            slippage_bps=slippage_bps,
+            request_json=json.dumps(details.get("request") or {}) if isinstance(details.get("request"), dict) else None,
+            json=True,
+        )
+        payload = _invoke_liquidity_command_payload(cmd_liquidity_migrate, args)
+        return payload, adapter.protocol_family
+
+    raise WalletStoreError(f"Unsupported liquidity action '{action}'.")
 
 
 def _run_liquidity_execute_inline(liquidity_intent_id: str, chain: str) -> tuple[int, dict[str, Any]]:
@@ -8743,6 +9261,8 @@ def cmd_liquidity_execute(args: argparse.Namespace) -> int:
                 raise WalletStoreError(
                     f"unsupported_liquidity_execution_family: Liquidity intent remove requires supported local execution family, got '{adapter.protocol_family}'."
                 )
+            if action in {"increase", "claim_fees", "claim-fees", "claim_rewards", "claim-rewards", "migrate"}:
+                return _execute_liquidity_advanced_intent(intent, chain, action)
             raise WalletStoreError(f"Unsupported liquidity action '{action}'.")
 
         _post_liquidity_status(liquidity_intent_id, "executing")

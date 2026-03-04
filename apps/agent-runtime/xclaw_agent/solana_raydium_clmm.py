@@ -37,7 +37,7 @@ def execute_instruction(
     request: dict[str, Any],
     operation_key: str,
 ) -> Any:
-    if operation_key not in {"add", "remove"}:
+    if operation_key not in {"add", "remove", "increase", "claim_fees", "claim_rewards", "migrate"}:
         raise SolanaRuntimeError("unsupported_liquidity_operation", f"Unsupported Raydium operation '{operation_key}'.")
     plan = build_execution_plan(
         chain=chain,

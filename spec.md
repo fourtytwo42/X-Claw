@@ -6,6 +6,12 @@
 3. Enable Solana x402 on `solana_localnet` + `solana_devnet`; keep `solana_mainnet_beta` + `solana_testnet` deferred.
 4. Keep response field name `txHash`, but allow family-neutral values (`0x...` hash or Solana signature).
 
+## Slice 170-176 Extension (2026-03-04)
+1. Add Solana advanced LP execution parity for `increase`, `claim-fees`, `claim-rewards`, `migrate`, and `resume`.
+2. Enable advanced LP capabilities on `solana_localnet` + `solana_devnet`; keep `solana_mainnet_beta` + `solana_testnet` deferred.
+3. Extend `local_clmm` deterministic localnet execution to advanced operations and extend `raydium_clmm` direct on-chain planner execution to advanced operations.
+4. Preserve canonical status envelope and route path compatibility while removing `position_manager_v3`-only advanced command gating.
+
 ## Slice 159-163 Extension (2026-03-04)
 1. Add management deposit + transfer-confirmation family dispatch for `evm|solana`.
 2. Generalize management deposit/withdraw contract fields from EVM-hex-only to family-neutral address/tx identifiers.
