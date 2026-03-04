@@ -1,12 +1,12 @@
-# Slice 129 Acceptance Evidence: Unified Advanced LP Execution
+# Slice 130 Acceptance Evidence: Concentrated-Liquidity Add/Remove + First-Class Migrate Planner
 
 Date (UTC): 2026-03-04
-Active slice context: `Slice 129`.
+Active slice context: `Slice 130`.
 
 ## Objective + Scope Lock
 - Objective:
-  - move advanced concentrated-liquidity execution onto the runtime-local EVM action engine,
-  - remove the last active `uniswap_api` LP execution branches and old config contracts.
+  - close concentrated-liquidity intent execution gaps by enabling local v3 add/remove execution in `cmd_liquidity_execute`,
+  - replace migrate request-call-list dependency with adapter-planned local steps.
 - Scope lock:
   - `apps/agent-runtime/xclaw_agent/liquidity_execution.py`
   - `apps/agent-runtime/xclaw_agent/liquidity_adapters/amm_v3.py`
@@ -21,10 +21,10 @@ Active slice context: `Slice 129`.
   - canonical docs + handoff artifacts
 
 ## Behavior Checks
-- [x] advanced LP planner emits `executionFamily=position_manager_v3`.
-- [x] `liquidity increase`, `claim-fees`, `claim-rewards`, and `migrate` run through local action-plan execution.
-- [x] `cmd_liquidity_execute` contains no `uniswap_api` branch.
-- [x] active configs contain no `tradeOperations`, `liquidityOperations`, or `uniswapApi`.
+- [x] concentrated-liquidity add/remove intents execute locally through `position_manager_v3` in `cmd_liquidity_execute`.
+- [x] migrate planner builds deterministic local steps without requiring request `calls`.
+- [x] runtime no longer depends on `migrate_request_calls_required` or `migrate_request_calls_invalid`.
+- [x] canonical metadata remains `router_adapter` + `executionFamily`/`executionAdapter` + `routeKind` + `liquidityOperation`.
 
 ## Required Validation Gates
 - [x] `python3 -m unittest apps/agent-runtime/tests/test_liquidity_adapter.py -v`

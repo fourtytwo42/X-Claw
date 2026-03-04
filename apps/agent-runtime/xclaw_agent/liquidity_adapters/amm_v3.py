@@ -279,41 +279,100 @@ class AmmV3LiquidityExecutionAdapter:
         target_adapter_key = str(migrate_cfg.get("targetAdapterKey") or request.get("targetAdapterKey") or "").strip()
         if not target_adapter_key:
             raise ValueError("migration_target_not_configured")
-        calls = request.get("calls")
-        if not isinstance(calls, list) or len(calls) == 0:
-            raise ValueError("migrate_request_calls_required")
-        built_calls: list[EvmCall] = []
-        for index, item in enumerate(calls):
-            if not isinstance(item, dict):
-                raise ValueError("migrate_request_calls_invalid")
-            to_addr = str(item.get("to") or position_manager).strip()
-            data = str(item.get("data") or "").strip()
-            value_wei = str(item.get("value") or "0").strip() or "0"
-            label = str(item.get("label") or f"migrate_step_{index}").strip() or f"migrate_step_{index}"
-            built_calls.append(EvmCall(to=to_addr, data=data, value_wei=value_wei, label=label))
+        position_id = str(request.get("positionId") or request.get("positionRef") or request.get("tokenId") or "").strip()
+        liquidity_units = str(request.get("liquidityUnits") or "").strip()
+        if not position_id or not liquidity_units:
+            raise ValueError("chain_config_invalid")
+        min_amount0 = str(request.get("minAmountAUnits") or request.get("minAmount0") or "0").strip() or "0"
+        min_amount1 = str(request.get("minAmountBUnits") or request.get("minAmount1") or "0").strip() or "0"
+        deadline = str(request.get("deadline") or "").strip()
+        if not deadline:
+            raise ValueError("chain_config_invalid")
+
+        decrease_method = str((self.operations.get("decrease") or {}).get("method") or "decreaseLiquidity").strip() or "decreaseLiquidity"
+        collect_method = str((self.operations.get("claimFees") or {}).get("method") or "collect").strip() or "collect"
+        decrease_params = _tuple_text([position_id, liquidity_units, min_amount0, min_amount1, deadline])
+        collect_params = _tuple_text([position_id, wallet_address, MAX_UINT128, MAX_UINT128])
+        built_calls: list[EvmCall] = [
+            EvmCall(
+                to=position_manager,
+                data=build_calldata(f"{decrease_method}((uint256,uint128,uint256,uint256,uint256))", [decrease_params]),
+                value_wei="0",
+                label="migrate_decrease_liquidity_v3",
+            ),
+            EvmCall(
+                to=position_manager,
+                data=build_calldata(f"{collect_method}((uint256,address,uint128,uint128))", [collect_params]),
+                value_wei="0",
+                label="migrate_collect_v3",
+            ),
+        ]
+
+        migration_mode = "withdraw_only"
         approvals: list[ApprovalRequirement] = []
-        raw_approvals = request.get("approvals")
-        if isinstance(raw_approvals, list):
-            for item in raw_approvals:
-                if not isinstance(item, dict):
-                    continue
-                token = str(item.get("token") or "").strip()
-                spender = str(item.get("spender") or position_manager).strip()
-                required_units = int(str(item.get("requiredUnits") or "0").strip() or "0")
-                if token and required_units > 0:
-                    approvals.append(ApprovalRequirement(token=token, spender=spender, required_units=required_units))
+        token_a = str(request.get("tokenA") or "").strip()
+        token_b = str(request.get("tokenB") or "").strip()
+        amount_a_units = str(request.get("amountAUnits") or "").strip()
+        amount_b_units = str(request.get("amountBUnits") or "").strip()
+        fee = str(request.get("fee") or "").strip()
+        tick_lower = str(request.get("tickLower") or "").strip()
+        tick_upper = str(request.get("tickUpper") or "").strip()
+        recreate_deadline = str(request.get("recreateDeadline") or deadline).strip()
+        target_position_manager = str(request.get("targetPositionManager") or position_manager).strip()
+        target_add_method = str(request.get("targetAddMethod") or "mint").strip() or "mint"
+        if all([token_a, token_b, amount_a_units, amount_b_units, fee, tick_lower, tick_upper, recreate_deadline]):
+            min_a = str(request.get("recreateMinAmountAUnits") or request.get("minAmountAUnits") or "0").strip() or "0"
+            min_b = str(request.get("recreateMinAmountBUnits") or request.get("minAmountBUnits") or "0").strip() or "0"
+            mint_params = _tuple_text(
+                [
+                    token_a,
+                    token_b,
+                    fee,
+                    tick_lower,
+                    tick_upper,
+                    amount_a_units,
+                    amount_b_units,
+                    min_a,
+                    min_b,
+                    wallet_address,
+                    recreate_deadline,
+                ]
+            )
+            approvals.extend(
+                [
+                    ApprovalRequirement(token=token_a, spender=target_position_manager, required_units=int(amount_a_units)),
+                    ApprovalRequirement(token=token_b, spender=target_position_manager, required_units=int(amount_b_units)),
+                ]
+            )
+            built_calls.append(
+                EvmCall(
+                    to=target_position_manager,
+                    data=build_calldata(
+                        f"{target_add_method}((address,address,uint24,int24,int24,uint256,uint256,uint256,uint256,address,uint256))",
+                        [mint_params],
+                    ),
+                    value_wei="0",
+                    label="migrate_recreate_position_v3",
+                )
+            )
+            migration_mode = "recreate"
         return EvmActionPlan(
             operation_kind="liquidity_migrate_v3",
             chain=self.chain,
             execution_family="position_manager_v3",
             execution_adapter=self.adapter_key,
-            route_kind="migration",
+            route_kind="migration" if migration_mode == "recreate" else "position_manager",
             approvals=approvals,
             calls=built_calls,
             details={
-                "positionId": str(request.get("positionId") or request.get("positionRef") or "").strip(),
+                "positionId": position_id,
                 "migrationSourceAdapter": self.adapter_key,
                 "migrationTargetAdapter": target_adapter_key,
+                "migrationMode": migration_mode,
+                "liquidityDelta": liquidity_units,
+                "minAmount0": min_amount0,
+                "minAmount1": min_amount1,
+                "deadline": deadline,
                 "rewardContracts": [],
                 "recipient": wallet_address.lower(),
             },

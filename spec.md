@@ -1,14 +1,14 @@
-# Slice 129 Spec: Unified Advanced LP Execution (2026-03-04)
+# Slice 130 Spec: Concentrated-Liquidity Add/Remove + First-Class Migrate Planner (2026-03-04)
 
 ## Goal
-1. Move advanced concentrated-liquidity execution onto the runtime-local EVM action engine.
-2. Remove the remaining compatibility-only `uniswap_api` liquidity branches from the runtime.
-3. Retire `tradeOperations`, `liquidityOperations`, and `uniswapApi` in favor of `execution.*` metadata only.
+1. Route concentrated-liquidity add/remove intents through local `position_manager_v3` execution inside `cmd_liquidity_execute`.
+2. Replace migrate request-driven call lists with adapter-planned local migration steps.
+3. Keep canonical metadata and runtime-local execution semantics consistent with Slice 128-129.
 
 ## Non-goals
 1. No removal of `/uniswap/*` compatibility routes in this slice.
 2. No non-EVM support.
-3. No removal of historical compatibility records beyond explicit superseded labeling.
+3. No trade-path refactor beyond touched metadata consistency.
 
 ## Locked scope
 1. `apps/agent-runtime/xclaw_agent/execution_contracts.py`

@@ -2646,3 +2646,18 @@ DoD:
 - [x] active chain configs no longer contain `tradeOperations`, `liquidityOperations`, or `uniswapApi`.
 - [x] concentrated-liquidity execution uses canonical `position_manager_v3` metadata and config shape.
 - [x] runtime tests + canonical artifacts updated in the same change.
+
+## Slice 130: Concentrated-Liquidity Add/Remove + First-Class Migrate Planner
+Status: [x]
+Issue: #62
+
+Goal:
+- close remaining concentrated-liquidity execution gaps by routing v3 add/remove intents through local runtime execution and replacing migrate request-call lists with adapter-planned local steps.
+
+DoD:
+- [x] `cmd_liquidity_execute` supports local `position_manager_v3` add/remove execution paths.
+- [x] v3 add/remove intent payloads carry normalized v3 metadata needed for deterministic local execution.
+- [x] migrate planner no longer requires request `calls` input and derives deterministic local steps from normalized request + adapter metadata.
+- [x] runtime no longer emits/depends on `migrate_request_calls_required` or `migrate_request_calls_invalid`.
+- [x] runtime tests cover v3 add/remove execute paths, migrate no-call planning, and malformed v3 range fail-closed behavior.
+- [x] source-of-truth + roadmap + handoff artifacts updated in the same change.

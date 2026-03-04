@@ -6305,6 +6305,206 @@ def _execute_liquidity_v2_remove(intent: dict[str, Any], chain: str) -> dict[str
     }
 
 
+def _read_v3_position_snapshot(chain: str, position_manager: str, position_id: str) -> dict[str, Any]:
+    call_data = _cast_calldata("positions(uint256)((uint96,address,address,address,uint24,int24,int24,uint128,uint256,uint256,uint128,uint128))", [position_id])
+    rpc_result = _rpc_json_call(
+        _chain_rpc_url(chain),
+        "eth_call",
+        [{"to": position_manager, "data": call_data}, "latest"],
+    )
+    data_hex = str(rpc_result or "").strip().lower()
+    if not data_hex.startswith("0x"):
+        raise WalletStoreError("v3 position lookup returned malformed eth_call data.")
+    encoded = data_hex[2:]
+    if len(encoded) < 64 * 8:
+        raise WalletStoreError("v3 position lookup returned insufficient tuple data.")
+    words = [encoded[index : index + 64] for index in range(0, len(encoded), 64)]
+    if len(words) < 8:
+        raise WalletStoreError("v3 position lookup returned insufficient tuple words.")
+    token0_word = words[2]
+    token1_word = words[3]
+    token0 = "0x" + token0_word[-40:]
+    token1 = "0x" + token1_word[-40:]
+    liquidity_word = words[7]
+    try:
+        liquidity_units = int(liquidity_word, 16)
+    except Exception as exc:
+        raise WalletStoreError("v3 position liquidity decode failed.") from exc
+    return {
+        "token0": token0.lower(),
+        "token1": token1.lower(),
+        "liquidityUnits": str(max(0, liquidity_units)),
+    }
+
+
+def _execute_liquidity_v3_add(intent: dict[str, Any], chain: str) -> dict[str, Any]:
+    dex = str(intent.get("dex") or "").strip().lower()
+    adapter = build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type="v3")
+    if adapter.protocol_family != "position_manager_v3":
+        raise WalletStoreError(
+            f"unsupported_liquidity_execution_family: Liquidity intent execution requires position_manager_v3 for v3 add; got '{adapter.protocol_family}'."
+        )
+    if not adapter.supports_operation("add"):
+        raise UnsupportedLiquidityOperation("unsupported_liquidity_operation")
+    details = _intent_details_dict(intent)
+    v3_details = _v3_details_dict(details)
+    fee = str(v3_details.get("fee") or "").strip()
+    tick_lower = str(v3_details.get("tickLower") or "").strip()
+    tick_upper = str(v3_details.get("tickUpper") or "").strip()
+    if not fee or not tick_lower or not tick_upper:
+        raise WalletStoreError("invalid_input: v3 add intent is missing normalized v3 range metadata.")
+    token_a = _resolve_token_address(chain, str(intent.get("tokenA") or ""))
+    token_b = _resolve_token_address(chain, str(intent.get("tokenB") or ""))
+    amount_a_h = _parse_positive_amount_text(str(intent.get("amountA") or ""), "amountA")
+    amount_b_h = _parse_positive_amount_text(str(intent.get("amountB") or ""), "amountB")
+    slippage_bps = int(intent.get("slippageBps") or 100)
+    if slippage_bps < 0 or slippage_bps > 5000:
+        raise WalletStoreError("slippageBps must be between 0 and 5000 for liquidity execution.")
+    token_a_meta = _fetch_erc20_metadata(chain, token_a)
+    token_b_meta = _fetch_erc20_metadata(chain, token_b)
+    amount_a_units = int(_to_units_uint(_decimal_text(amount_a_h), int(token_a_meta.get("decimals", 18))))
+    amount_b_units = int(_to_units_uint(_decimal_text(amount_b_h), int(token_b_meta.get("decimals", 18))))
+    min_a_units = (amount_a_units * max(0, 10000 - slippage_bps)) // 10000
+    min_b_units = (amount_b_units * max(0, 10000 - slippage_bps)) // 10000
+    store = load_wallet_store()
+    wallet_address, private_key_hex = _execution_wallet(store, chain)
+    deadline_sec = int(v3_details.get("deadlineSec") or 120)
+    deadline = str(int(datetime.now(timezone.utc).timestamp()) + max(1, deadline_sec))
+    plan = build_liquidity_add_plan(
+        chain=chain,
+        dex=adapter.dex,
+        position_type="v3",
+        request={
+            "tokenA": token_a,
+            "tokenB": token_b,
+            "amountAUnits": str(amount_a_units),
+            "amountBUnits": str(amount_b_units),
+            "minAmountAUnits": str(min_a_units),
+            "minAmountBUnits": str(min_b_units),
+            "fee": fee,
+            "tickLower": tick_lower,
+            "tickUpper": tick_upper,
+            "deadline": deadline,
+        },
+        wallet_address=wallet_address,
+        build_calldata=_cast_calldata,
+    )
+    execution = execute_liquidity_plan(
+        executor=_router_action_executor(),
+        plan=plan,
+        wallet_address=wallet_address,
+        private_key_hex=private_key_hex,
+        wait_for_operation_receipts=False,
+        liquidity_operation="add",
+    )
+    tx_hash = str(execution.tx_hash or "")
+    return {
+        "txHash": tx_hash,
+        "positionId": str(intent.get("positionId") or tx_hash),
+        "details": {
+            "adapterFamily": adapter.protocol_family,
+            "dex": adapter.dex,
+            "action": "add",
+            "executionFamily": execution.execution_family,
+            "executionAdapter": execution.execution_adapter,
+            "routeKind": execution.route_kind,
+            "fee": fee,
+            "tickLower": tick_lower,
+            "tickUpper": tick_upper,
+            "amountAUnits": str(amount_a_units),
+            "amountBUnits": str(amount_b_units),
+            "minAmountAUnits": str(min_a_units),
+            "minAmountBUnits": str(min_b_units),
+            "approveTxHashes": execution.approve_tx_hashes,
+            "operationTxHashes": execution.operation_tx_hashes,
+        },
+    }
+
+
+def _execute_liquidity_v3_remove(intent: dict[str, Any], chain: str) -> dict[str, Any]:
+    dex = str(intent.get("dex") or "").strip().lower()
+    adapter = build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type="v3")
+    if adapter.protocol_family != "position_manager_v3":
+        raise WalletStoreError(
+            f"unsupported_liquidity_execution_family: Liquidity intent execution requires position_manager_v3 for v3 remove; got '{adapter.protocol_family}'."
+        )
+    if not adapter.supports_operation("remove"):
+        raise UnsupportedLiquidityOperation("unsupported_liquidity_operation")
+    position_id = str(intent.get("positionId") or intent.get("positionRef") or "").strip()
+    if not position_id:
+        raise WalletStoreError("invalid_input: v3 remove intent is missing positionId.")
+    percent_raw = str(intent.get("amountA") or "").strip() or "0"
+    try:
+        percent = int(Decimal(percent_raw).to_integral_value(rounding=ROUND_DOWN))
+    except Exception as exc:
+        raise WalletStoreError("Remove intent amountA is not a valid percent.") from exc
+    if percent < 1 or percent > 100:
+        raise WalletStoreError("Remove intent percent must be between 1 and 100.")
+    details = _intent_details_dict(intent)
+    v3_details = _v3_details_dict(details)
+    min_a_units = str(v3_details.get("minAmountAUnits") or "0").strip() or "0"
+    min_b_units = str(v3_details.get("minAmountBUnits") or "0").strip() or "0"
+    position_manager = str(adapter.position_manager or "").strip()
+    if not position_manager:
+        raise WalletStoreError("chain_config_invalid: missing positionManager for v3 remove execution.")
+    snapshot = _read_v3_position_snapshot(chain, position_manager, position_id)
+    liquidity_total = int(snapshot.get("liquidityUnits") or 0)
+    liquidity_units = (liquidity_total * percent) // 100
+    if liquidity_units <= 0:
+        raise LiquidityExecutionError(
+            "liquidity_preflight_zero_position_liquidity",
+            "Computed v3 liquidity amount is zero; position has no removable liquidity for requested percent.",
+            details={"positionId": position_id, "positionManager": position_manager.lower(), "liquidityTotal": str(liquidity_total), "percent": percent},
+        )
+    store = load_wallet_store()
+    wallet_address, private_key_hex = _execution_wallet(store, chain)
+    deadline = str(int(datetime.now(timezone.utc).timestamp()) + 120)
+    plan = build_liquidity_remove_plan(
+        chain=chain,
+        dex=adapter.dex,
+        position_type="v3",
+        request={
+            "positionId": position_id,
+            "positionRef": position_id,
+            "liquidityUnits": str(liquidity_units),
+            "minAmountAUnits": min_a_units,
+            "minAmountBUnits": min_b_units,
+            "deadline": deadline,
+        },
+        wallet_address=wallet_address,
+        build_calldata=_cast_calldata,
+    )
+    execution = execute_liquidity_plan(
+        executor=_router_action_executor(),
+        plan=plan,
+        wallet_address=wallet_address,
+        private_key_hex=private_key_hex,
+        wait_for_operation_receipts=False,
+        liquidity_operation="remove",
+    )
+    tx_hash = str(execution.tx_hash or "")
+    return {
+        "txHash": tx_hash,
+        "positionId": position_id,
+        "details": {
+            "adapterFamily": adapter.protocol_family,
+            "dex": adapter.dex,
+            "action": "remove",
+            "executionFamily": execution.execution_family,
+            "executionAdapter": execution.execution_adapter,
+            "routeKind": execution.route_kind,
+            "positionManager": position_manager.lower(),
+            "percent": percent,
+            "liquidityTotal": str(liquidity_total),
+            "liquidityUnits": str(liquidity_units),
+            "minAmountAUnits": min_a_units,
+            "minAmountBUnits": min_b_units,
+            "approveTxHashes": execution.approve_tx_hashes,
+            "operationTxHashes": execution.operation_tx_hashes,
+        },
+    }
+
+
 def _parse_uint_from_cast_output(raw: str) -> int:
     text = (raw or "").strip()
     if not text:
@@ -6815,6 +7015,37 @@ def _parse_positive_amount_text(raw: str, field_name: str) -> Decimal:
     return parsed
 
 
+def _parse_v3_range_text(raw: str) -> tuple[str, str, str]:
+    text = str(raw or "").strip()
+    parts = [part.strip() for part in text.split(":")]
+    if len(parts) != 3:
+        raise WalletStoreError("v3-range must use format fee:tickLower:tickUpper.")
+    fee, tick_lower, tick_upper = parts
+    if not re.fullmatch(r"[0-9]+", fee):
+        raise WalletStoreError("v3-range fee must be a positive integer.")
+    if not re.fullmatch(r"-?[0-9]+", tick_lower) or not re.fullmatch(r"-?[0-9]+", tick_upper):
+        raise WalletStoreError("v3-range ticks must be signed integers.")
+    if int(fee) <= 0:
+        raise WalletStoreError("v3-range fee must be greater than zero.")
+    if int(tick_lower) >= int(tick_upper):
+        raise WalletStoreError("v3-range tickLower must be less than tickUpper.")
+    return fee, tick_lower, tick_upper
+
+
+def _intent_details_dict(intent: dict[str, Any]) -> dict[str, Any]:
+    details = intent.get("details")
+    if isinstance(details, dict):
+        return details
+    return {}
+
+
+def _v3_details_dict(details: dict[str, Any]) -> dict[str, Any]:
+    payload = details.get("v3")
+    if isinstance(payload, dict):
+        return payload
+    return {}
+
+
 def _resolve_agent_id_or_fail(chain: str) -> str:
     api_key = _resolve_api_key()
     agent_id = _resolve_agent_id(api_key)
@@ -6995,6 +7226,18 @@ def cmd_liquidity_quote_add(args: argparse.Namespace) -> int:
         slippage_bps = int(args.slippage_bps)
         if slippage_bps < 0 or slippage_bps > 5000:
             return fail("invalid_input", "slippage-bps must be between 0 and 5000.", "Use integer bps in range.", {"slippageBps": args.slippage_bps}, exit_code=2)
+        v3_meta: dict[str, Any] = {}
+        if position_type == "v3":
+            try:
+                fee, tick_lower, tick_upper = _parse_v3_range_text(str(args.v3_range or ""))
+            except WalletStoreError as exc:
+                return fail("invalid_input", str(exc), "Provide --v3-range fee:tickLower:tickUpper.", {"chain": chain, "dex": dex}, exit_code=2)
+            v3_meta = {
+                "fee": fee,
+                "tickLower": tick_lower,
+                "tickUpper": tick_upper,
+                "deadlineSec": 120,
+            }
         preflight = adapter.quote_add(
             {
                 "tokenA": token_a,
@@ -7113,6 +7356,13 @@ def cmd_liquidity_add(args: argparse.Namespace) -> int:
         slippage_bps = int(args.slippage_bps)
         if slippage_bps < 0 or slippage_bps > 5000:
             return fail("invalid_input", "slippage-bps must be between 0 and 5000.", "Use integer bps in range.", {"slippageBps": args.slippage_bps}, exit_code=2)
+        v3_meta: dict[str, Any] = {}
+        if position_type == "v3":
+            try:
+                fee, tick_lower, tick_upper = _parse_v3_range_text(str(args.v3_range or ""))
+            except WalletStoreError as exc:
+                return fail("invalid_input", str(exc), "Provide --v3-range fee:tickLower:tickUpper.", {"chain": chain, "dex": dex}, exit_code=2)
+            v3_meta = {"fee": fee, "tickLower": tick_lower, "tickUpper": tick_upper, "deadlineSec": 120}
 
         provider_requested, _ = _liquidity_provider_settings(chain)
         adapter = build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type=position_type)
@@ -7143,6 +7393,7 @@ def cmd_liquidity_add(args: argparse.Namespace) -> int:
             "slippageBps": slippage_bps,
             "details": {
                 "v3Range": str(args.v3_range or "").strip() or None,
+                "v3": v3_meta if position_type == "v3" else None,
                 "adapterFamily": adapter_family,
                 "preflight": preflight.get("simulation", {}) if isinstance(preflight, dict) else {},
                 "providerRequested": provider_requested,
@@ -7269,12 +7520,25 @@ def cmd_liquidity_remove(args: argparse.Namespace) -> int:
             }
         )
         preflight = adapter_preflight
-        resolved_token_a, resolved_token_b = _resolve_liquidity_remove_tokens(
-            chain,
-            position_id,
-            str(args.token_a or "").strip(),
-            str(args.token_b or "").strip(),
-        )
+        if adapter_family == "position_manager_v3":
+            if not adapter.position_manager:
+                return fail(
+                    "chain_config_invalid",
+                    "Concentrated-liquidity execution metadata is incomplete for this chain.",
+                    "Add execution.liquidity adapter position-manager metadata and retry.",
+                    {"chain": chain, "dex": adapter_dex, "positionId": position_id},
+                    exit_code=2,
+                )
+            snapshot = _read_v3_position_snapshot(chain, adapter.position_manager, position_id)
+            resolved_token_a = str(snapshot.get("token0") or "").strip()
+            resolved_token_b = str(snapshot.get("token1") or "").strip()
+        else:
+            resolved_token_a, resolved_token_b = _resolve_liquidity_remove_tokens(
+                chain,
+                position_id,
+                str(args.token_a or "").strip(),
+                str(args.token_b or "").strip(),
+            )
         display_token_a = _token_symbol_for_display(chain, resolved_token_a) or resolved_token_a
         display_token_b = _token_symbol_for_display(chain, resolved_token_b) or resolved_token_b
         if adapter_family == "amm_v2":
@@ -7317,6 +7581,14 @@ def cmd_liquidity_remove(args: argparse.Namespace) -> int:
             "slippageBps": slippage_bps,
             "details": {
                 "percent": percent,
+                "v3": {
+                    "positionId": position_id,
+                    "percent": percent,
+                    "minAmountAUnits": "0",
+                    "minAmountBUnits": "0",
+                }
+                if position_type == "v3"
+                else None,
                 "adapterFamily": adapter_family,
                 "tokenASymbol": display_token_a,
                 "tokenBSymbol": display_token_b,
@@ -7691,11 +7963,27 @@ def cmd_liquidity_migrate(args: argparse.Namespace) -> int:
 
         store = load_wallet_store()
         wallet_address, private_key_hex = _execution_wallet(store, chain)
+        position_snapshot = _read_v3_position_snapshot(chain, adapter.position_manager, position_id)
+        liquidity_total = int(position_snapshot.get("liquidityUnits") or 0)
+        if liquidity_total <= 0:
+            return fail(
+                "liquidity_preflight_zero_position_liquidity",
+                "Position has no removable concentrated liquidity for migration.",
+                "Choose a position with non-zero liquidity and retry.",
+                {"chain": chain, "dex": dex, "positionId": position_id, "liquidityTotal": str(liquidity_total)},
+                exit_code=1,
+            )
+        deadline = str(int(datetime.now(timezone.utc).timestamp()) + 120)
         request_payload: dict[str, Any] = {
+            "positionId": position_id,
             "tokenId": position_id,
             "inputProtocol": from_protocol,
             "outputProtocol": to_protocol,
             "slippageTolerance": slippage_bps,
+            "liquidityUnits": str(liquidity_total),
+            "minAmountAUnits": "0",
+            "minAmountBUnits": "0",
+            "deadline": deadline,
         }
         request_json = str(args.request_json or "").strip()
         if request_json:
@@ -7703,6 +7991,19 @@ def cmd_liquidity_migrate(args: argparse.Namespace) -> int:
             if not isinstance(extra, dict):
                 raise WalletStoreError("request-json must decode to an object.")
             request_payload.update(extra)
+        migrate_cfg = dict((adapter.operations or {}).get("migrate") or {})
+        target_adapter_key = str(request_payload.get("targetAdapterKey") or migrate_cfg.get("targetAdapterKey") or "").strip()
+        if target_adapter_key:
+            request_payload["targetAdapterKey"] = target_adapter_key
+            try:
+                target_adapter = build_liquidity_adapter_for_request(chain=chain, dex=target_adapter_key, position_type="v3")
+                request_payload["targetPositionManager"] = str(target_adapter.position_manager or "").strip()
+                target_ops = dict(target_adapter.operations or {})
+                target_add = dict(target_ops.get("add") or {})
+                if target_add:
+                    request_payload["targetAddMethod"] = str(target_add.get("method") or "mint").strip() or "mint"
+            except Exception:
+                pass
         plan = build_liquidity_migrate_plan(
             chain=chain,
             dex=adapter.dex,
@@ -7754,8 +8055,6 @@ def cmd_liquidity_migrate(args: argparse.Namespace) -> int:
             return fail("chain_config_invalid", "Concentrated-liquidity execution metadata is incomplete for this chain.", "Add execution.liquidity adapter position-manager metadata and retry.", {"chain": chain, "dex": dex, "positionId": position_id}, exit_code=2)
         if code == "migration_target_not_configured":
             return fail("migration_target_not_configured", "Migration target adapter is not configured for this chain/dex.", "Add execution.liquidity adapter migrate target metadata and retry.", {"chain": chain, "dex": dex, "positionId": position_id}, exit_code=2)
-        if code in {"migrate_request_calls_required", "migrate_request_calls_invalid"}:
-            return fail("invalid_input", "Liquidity migrate requires `--request-json` with a non-empty `calls` array.", "Provide local migration call steps and retry.", {"chain": chain, "dex": dex, "positionId": position_id}, exit_code=2)
         return fail("liquidity_migrate_failed", str(exc), "Verify local router-adapter migrate configuration and retry.", {"chain": chain, "dex": dex, "positionId": position_id}, exit_code=1)
     except WalletStoreError as exc:
         return fail("liquidity_migrate_failed", str(exc), "Verify local router-adapter migrate configuration and retry.", {"chain": chain, "dex": dex, "positionId": position_id}, exit_code=1)
@@ -7954,14 +8253,22 @@ def cmd_liquidity_execute(args: argparse.Namespace) -> int:
 
         def _execute_local() -> tuple[dict[str, Any], str]:
             adapter = build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type=position_type)
-            if adapter.protocol_family != "amm_v2":
-                raise WalletStoreError(
-                    f"unsupported_liquidity_execution_family: Liquidity intent execution currently supports AMM v2 add/remove only; got '{adapter.protocol_family}'."
-                )
             if action == "add":
-                return _execute_liquidity_v2_add(intent, chain), adapter.protocol_family
+                if adapter.protocol_family == "amm_v2":
+                    return _execute_liquidity_v2_add(intent, chain), adapter.protocol_family
+                if adapter.protocol_family == "position_manager_v3":
+                    return _execute_liquidity_v3_add(intent, chain), adapter.protocol_family
+                raise WalletStoreError(
+                    f"unsupported_liquidity_execution_family: Liquidity intent add requires supported local execution family, got '{adapter.protocol_family}'."
+                )
             if action == "remove":
-                return _execute_liquidity_v2_remove(intent, chain), adapter.protocol_family
+                if adapter.protocol_family == "amm_v2":
+                    return _execute_liquidity_v2_remove(intent, chain), adapter.protocol_family
+                if adapter.protocol_family == "position_manager_v3":
+                    return _execute_liquidity_v3_remove(intent, chain), adapter.protocol_family
+                raise WalletStoreError(
+                    f"unsupported_liquidity_execution_family: Liquidity intent remove requires supported local execution family, got '{adapter.protocol_family}'."
+                )
             raise WalletStoreError(f"Unsupported liquidity action '{action}'.")
 
         _post_liquidity_status(liquidity_intent_id, "executing")
@@ -8011,7 +8318,7 @@ def cmd_liquidity_execute(args: argparse.Namespace) -> int:
         )
         transition_state = "verifying"
 
-        if adapter_family == "amm_v2":
+        if adapter_family in {"amm_v2", "position_manager_v3"}:
             _wait_for_tx_receipt_success(chain, tx_hash)
 
         _post_liquidity_status(
@@ -8091,11 +8398,27 @@ def cmd_liquidity_execute(args: argparse.Namespace) -> int:
         )
     except (LiquidityAdapterError, WalletStoreError) as exc:
         err_text = str(exc)
+        if err_text.startswith("invalid_input:"):
+            return fail(
+                "invalid_input",
+                err_text.split(":", 1)[1].strip(),
+                "Update intent payload and retry.",
+                {"liquidityIntentId": liquidity_intent_id, "chain": chain, "txHash": last_tx_hash},
+                exit_code=2,
+            )
         if err_text.startswith("unsupported_liquidity_execution_family:"):
             return fail(
                 "unsupported_liquidity_execution_family",
                 err_text.split(":", 1)[1].strip(),
                 "Use a supported liquidity execution family and retry.",
+                {"liquidityIntentId": liquidity_intent_id, "chain": chain, "txHash": last_tx_hash},
+                exit_code=2,
+            )
+        if err_text.startswith("unsupported_liquidity_operation"):
+            return fail(
+                "unsupported_liquidity_operation",
+                "Requested liquidity operation is not supported by the resolved adapter.",
+                "Use a chain/dex with matching operation capability and retry.",
                 {"liquidityIntentId": liquidity_intent_id, "chain": chain, "txHash": last_tx_hash},
                 exit_code=2,
             )

@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: X-Claw API
   version: 1.0.0
-  description: Canonical API contract. Runtime-local router-adapter execution is canonical for trade, AMM v2 liquidity actions, and concentrated-liquidity advanced operations; `/uniswap/*` paths remain compatibility aliases only.
+  description: Canonical API contract. Runtime-local router-adapter execution is canonical for trade, AMM v2 liquidity actions, and concentrated-liquidity (`position_manager_v3`) add/remove/increase/claim/migrate operations; `/uniswap/*` paths remain compatibility aliases only.
 servers:
   - url: https://xclaw.trade
 paths:

@@ -1,18 +1,18 @@
-# Slice 129 Tasks: Unified Advanced LP Execution (2026-03-04)
+# Slice 130 Tasks: Concentrated-Liquidity Add/Remove + First-Class Migrate Planner (2026-03-04)
 
-Active slice context: `Slice 129`.
+Active slice context: `Slice 130`.
 
 ## 1) Scope lock
-- [x] Limit scope to advanced concentrated-liquidity execution unification plus config/runtime cleanup.
+- [x] Limit scope to concentrated-liquidity add/remove local execution and migrate planner closeout.
 - [x] Preserve `/uniswap/*` HTTP compatibility aliases.
 
 ## 2) Implementation
-- [x] Replace the concentrated-liquidity planner stub with `position_manager_v3` local plan builders.
-- [x] Rewire `liquidity increase`, `liquidity claim-fees`, `liquidity claim-rewards`, and `liquidity migrate` to local adapter-built execution.
-- [x] Remove `_execute_uniswap_liquidity_intent` and remaining active LP proxy branches from `cli.py`.
-- [x] Remove active runtime reads of `tradeOperations`, `liquidityOperations`, and `uniswapApi`.
-- [x] Update active chain configs to express concentrated-liquidity support via `execution.liquidity.adapters.*`.
-- [x] Add regression coverage for local advanced-LP planning and fail-closed config errors.
+- [x] Add local `position_manager_v3` execution handlers for liquidity add/remove intents.
+- [x] Update `cmd_liquidity_execute` family+action routing to support both AMM v2 and concentrated-liquidity add/remove.
+- [x] Normalize v3 add/remove intent details for deterministic local execution.
+- [x] Refactor migrate planner to derive local calls from normalized request + adapter metadata.
+- [x] Remove migrate request-call-list hard requirement from runtime.
+- [x] Add regression coverage for v3 execute paths, malformed v3 range, and migrate planner no-call behavior.
 
 ## 3) Validation
 - [x] `python3 -m unittest apps/agent-runtime/tests/test_liquidity_adapter.py -v`

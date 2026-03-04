@@ -4165,3 +4165,12 @@ Note:
 - [x] Retire active `tradeOperations`, `liquidityOperations`, and `uniswapApi` chain config reads.
 - [x] Promote concentrated-liquidity execution metadata to `position_manager_v3`.
 - [x] Sync source-of-truth, OpenAPI/schema, and handoff artifacts in the same slice.
+
+## 130) Slice 130: Concentrated-Liquidity Add/Remove + First-Class Migrate Planner
+
+- [x] Route concentrated-liquidity `add` and `remove` intent execution through local `position_manager_v3` action-plan/executor paths.
+- [x] Normalize v3 add intents with deterministic range metadata (`fee`, `tickLower`, `tickUpper`, `deadlineSec`).
+- [x] Derive v3 remove liquidity units from on-chain position-manager state for local remove execution.
+- [x] Replace migrate request-call-list dependency with adapter-planned local decrease/collect migration steps.
+- [x] Remove runtime dependency on `migrate_request_calls_required` and `migrate_request_calls_invalid`.
+- [x] Sync source-of-truth, tracker, and handoff artifacts in the same slice.

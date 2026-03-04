@@ -211,20 +211,49 @@ class LiquidityCliTests(unittest.TestCase):
         self.assertEqual(pairs[0]["pairAddress"], "0x0000000000000000000000000000000000002000")
         self.assertEqual(pairs[1]["pairAddress"], "0x0000000000000000000000000000000000003000")
 
-    def test_liquidity_execute_rejects_v3_execution_family(self) -> None:
+    def test_liquidity_execute_supports_v3_add_execution_family(self) -> None:
         args = argparse.Namespace(intent="liq_1", chain="base_sepolia", json=True)
         adapter = mock.Mock()
         adapter.protocol_family = "position_manager_v3"
+        adapter.dex = "uniswap_v3"
+        adapter.supports_operation.return_value = True
         with mock.patch.object(
             cli,
             "_read_liquidity_intent",
             return_value={"liquidityIntentId": "liq_1", "status": "approved", "dex": "uniswap_v3", "positionType": "v3", "action": "add"},
         ), mock.patch.object(cli, "build_liquidity_adapter_for_request", return_value=adapter), mock.patch.object(
             cli, "_post_liquidity_status"
+        ), mock.patch.object(
+            cli, "_execute_liquidity_v3_add", return_value={"txHash": "0xabc", "positionId": "123", "details": {"executionFamily": "position_manager_v3"}}
+        ), mock.patch.object(
+            cli, "_wait_for_tx_receipt_success", return_value={"status": "0x1"}
         ):
             code, payload = self._run(lambda: cli.cmd_liquidity_execute(args))
-        self.assertEqual(code, 2)
-        self.assertEqual(payload.get("code"), "unsupported_liquidity_execution_family")
+        self.assertEqual(code, 0)
+        self.assertEqual(payload.get("status"), "filled")
+        self.assertEqual(payload.get("adapterFamily"), "position_manager_v3")
+
+    def test_liquidity_execute_supports_v3_remove_execution_family(self) -> None:
+        args = argparse.Namespace(intent="liq_2", chain="base_sepolia", json=True)
+        adapter = mock.Mock()
+        adapter.protocol_family = "position_manager_v3"
+        adapter.dex = "uniswap_v3"
+        adapter.supports_operation.return_value = True
+        with mock.patch.object(
+            cli,
+            "_read_liquidity_intent",
+            return_value={"liquidityIntentId": "liq_2", "status": "approved", "dex": "uniswap_v3", "positionType": "v3", "action": "remove"},
+        ), mock.patch.object(cli, "build_liquidity_adapter_for_request", return_value=adapter), mock.patch.object(
+            cli, "_post_liquidity_status"
+        ), mock.patch.object(
+            cli, "_execute_liquidity_v3_remove", return_value={"txHash": "0xdef", "positionId": "123", "details": {"executionFamily": "position_manager_v3"}}
+        ), mock.patch.object(
+            cli, "_wait_for_tx_receipt_success", return_value={"status": "0x1"}
+        ):
+            code, payload = self._run(lambda: cli.cmd_liquidity_execute(args))
+        self.assertEqual(code, 0)
+        self.assertEqual(payload.get("status"), "filled")
+        self.assertEqual(payload.get("adapterFamily"), "position_manager_v3")
 
     def test_liquidity_increase_uses_local_position_manager_plan(self) -> None:
         args = argparse.Namespace(
@@ -301,6 +330,71 @@ class LiquidityCliTests(unittest.TestCase):
             code, payload = self._run(lambda: cli.cmd_liquidity_claim_rewards(args))
         self.assertEqual(code, 1)
         self.assertEqual(payload.get("code"), "claim_rewards_not_configured")
+
+    def test_liquidity_add_v3_rejects_malformed_range(self) -> None:
+        args = argparse.Namespace(
+            chain="base_sepolia",
+            dex="uniswap_v3",
+            token_a="USDC",
+            token_b="WETH",
+            amount_a="10",
+            amount_b="1",
+            position_type="v3",
+            v3_range="3000:bad",
+            slippage_bps=100,
+            json=True,
+        )
+        with mock.patch.object(cli, "assert_chain_capability"), mock.patch.object(
+            cli, "_resolve_token_address", side_effect=["0x" + "11" * 20, "0x" + "22" * 20]
+        ):
+            code, payload = self._run(lambda: cli.cmd_liquidity_add(args))
+        self.assertEqual(code, 2)
+        self.assertEqual(payload.get("code"), "invalid_input")
+
+    def test_liquidity_migrate_succeeds_without_request_calls(self) -> None:
+        args = argparse.Namespace(
+            chain="ethereum_sepolia",
+            dex="uniswap_v3",
+            position_id="123",
+            from_protocol="V3",
+            to_protocol="V3",
+            slippage_bps=100,
+            request_json="",
+            json=True,
+        )
+        adapter = mock.Mock()
+        adapter.protocol_family = "position_manager_v3"
+        adapter.dex = "uniswap_v3"
+        adapter.position_manager = "0x" + "44" * 20
+        adapter.supports_operation.return_value = True
+        adapter.operations = {"migrate": {"targetAdapterKey": "uniswap_v3"}}
+        with mock.patch.object(cli, "assert_chain_capability"), mock.patch.object(
+            cli, "build_liquidity_adapter_for_request", return_value=adapter
+        ), mock.patch.object(
+            cli, "_read_v3_position_snapshot", return_value={"liquidityUnits": "1000", "token0": "0x" + "11" * 20, "token1": "0x" + "22" * 20}
+        ), mock.patch.object(
+            cli, "load_wallet_store", return_value=object()
+        ), mock.patch.object(
+            cli, "_execution_wallet", return_value=("0x" + "33" * 20, "11" * 32)
+        ), mock.patch.object(
+            cli, "build_liquidity_migrate_plan", return_value=mock.Mock()
+        ), mock.patch.object(
+            cli,
+            "execute_liquidity_plan",
+            return_value=mock.Mock(
+                tx_hash="0xabc",
+                approve_tx_hashes=[],
+                operation_tx_hashes=["0xabc"],
+                execution_family="position_manager_v3",
+                execution_adapter="uniswap_v3",
+                route_kind="position_manager",
+                details={"migrationMode": "withdraw_only"},
+            ),
+        ):
+            code, payload = self._run(lambda: cli.cmd_liquidity_migrate(args))
+        self.assertEqual(code, 0)
+        self.assertEqual(payload.get("providerUsed"), "router_adapter")
+        self.assertEqual(payload.get("executionFamily"), "position_manager_v3")
 
     def test_estimate_add_amount_in_with_min_uses_pool_ratio(self) -> None:
         amount_a, amount_b, min_a, min_b = cli._estimate_add_amount_in_with_min(

@@ -116,6 +116,27 @@ Core thesis: **agents act, humans supervise, network observes and allocates trus
 - `uniswap_api`
 - `legacy_router`
 
+## 3.4) Slice 130 Concentrated-Liquidity Add/Remove + Migrate Planner
+
+1. Canonical local execution now includes concentrated-liquidity `add` and `remove` in the same runtime action-plan/executor path used by other unified actions.
+2. `cmd_liquidity_execute` must support:
+- `amm_v2` add/remove
+- `position_manager_v3` add/remove
+and fail closed for unsupported execution families.
+3. `liquidity migrate` is planner-driven and local-runtime canonical:
+- runtime no longer requires request-supplied `calls` arrays,
+- planner derives at least deterministic `decrease + collect` steps from normalized inputs + adapter metadata.
+4. When target recreate metadata is unavailable, migrate remains deterministic via withdraw-only mode and must still emit canonical execution metadata.
+5. Canonical metadata contract remains unchanged:
+- `providerRequested`
+- `providerUsed`
+- `fallbackUsed`
+- `fallbackReason`
+- `executionFamily`
+- `executionAdapter`
+- `routeKind`
+- `liquidityOperation`
+
 ---
 
 ## 4) Scope

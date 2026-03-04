@@ -99,6 +99,32 @@ class LiquidityAdapterTests(unittest.TestCase):
         self.assertEqual(plan.route_kind, "position_manager")
         self.assertEqual(len(plan.approvals), 2)
 
+    def test_v3_build_remove_plan_uses_position_manager_family(self) -> None:
+        adapter = AmmV3LiquidityAdapter(
+            chain="ethereum_sepolia",
+            dex="uniswap_v3",
+            protocol_family="position_manager_v3",
+            position_type="v3",
+            position_manager="0x" + "44" * 20,
+            capabilities={"remove": True},
+            operations={"decrease": {"method": "decreaseLiquidity"}, "claimFees": {"method": "collect"}},
+        )
+        plan = adapter.build_remove_plan(
+            {
+                "positionId": "123",
+                "liquidityUnits": "1000",
+                "minAmountAUnits": "0",
+                "minAmountBUnits": "0",
+                "deadline": "123456",
+            },
+            "0x" + "33" * 20,
+            build_calldata=lambda signature, args: f"{signature}:{args[0]}",
+        )
+        self.assertEqual(plan.execution_family, "position_manager_v3")
+        self.assertEqual(plan.execution_adapter, "uniswap_v3")
+        self.assertEqual(plan.route_kind, "position_manager")
+        self.assertEqual(len(plan.calls), 2)
+
     def test_v3_claim_rewards_requires_reward_contracts(self) -> None:
         adapter = AmmV3LiquidityAdapter(
             chain="ethereum_sepolia",
@@ -116,7 +142,7 @@ class LiquidityAdapterTests(unittest.TestCase):
                 build_calldata=lambda signature, args: f"{signature}:{args}",
             )
 
-    def test_v3_migrate_requires_target_or_calls(self) -> None:
+    def test_v3_migrate_builds_without_request_calls(self) -> None:
         adapter = AmmV3LiquidityAdapter(
             chain="ethereum_sepolia",
             dex="uniswap_v3",
@@ -126,12 +152,15 @@ class LiquidityAdapterTests(unittest.TestCase):
             capabilities={"migrate": True},
             operations={"migrate": {"method": "multicall", "targetAdapterKey": "uniswap_v3"}},
         )
-        with self.assertRaises(ValueError):
-            adapter.build_migrate_plan(
-                {"positionId": "123"},
-                "0x" + "33" * 20,
-                build_calldata=lambda signature, args: f"{signature}:{args}",
-            )
+        plan = adapter.build_migrate_plan(
+            {"positionId": "123", "liquidityUnits": "500", "minAmountAUnits": "0", "minAmountBUnits": "0", "deadline": "123456"},
+            "0x" + "33" * 20,
+            build_calldata=lambda signature, args: f"{signature}:{args[0] if args else ''}",
+        )
+        self.assertEqual(plan.execution_family, "position_manager_v3")
+        self.assertEqual(plan.route_kind, "position_manager")
+        self.assertEqual(plan.details.get("migrationMode"), "withdraw_only")
+        self.assertEqual(len(plan.calls), 2)
 
 
 if __name__ == "__main__":
