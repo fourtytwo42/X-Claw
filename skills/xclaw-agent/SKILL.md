@@ -153,6 +153,7 @@ Common optional:
 - `wallet-send-token <token_or_symbol> <to> <amount_wei>`
 - `transfer-policy-get`
 - `transfer-policy-set <auto|per_transfer> <native_preapproved:0|1> [allowed_token ...]`
+- `withdraws-list [chain_key]`
 - `default-chain-get`
 - `default-chain-set <chain_key>`
 - `chains`
@@ -183,6 +184,7 @@ Additional capabilities:
 - `dexscreener-top` sorts by liquidity descending and emits normalized decimal strings (`priceUsd` 8dp, USD metrics 2dp).
 - `token-research` is the preferred one-shot flow for small models: top-by-liquidity shortlist plus primary-token drilldown pairs in one response.
 - Transfer/trade policy is owner-controlled and may force approval.
+- Withdraw submission remains a management action; use `withdraws-list [chain_key]` for agent-auth queue/history visibility (`requestKind=withdraw`) across EVM and Solana.
 - Solana limit-orders parity is enabled on `solana_localnet`, `solana_devnet`, and `solana_mainnet_beta`; `solana_testnet` remains capability-gated off.
 - Runtime chain inference priority is: runtime/web-synced default chain (`state.json.defaultChain`) first, then env fallback (`XCLAW_DEFAULT_CHAIN`); explicit chain argument remains authoritative.
 - Runtime-canonical decision mode flag: `XCLAW_RUNTIME_CANONICAL_APPROVAL_DECISIONS=1`

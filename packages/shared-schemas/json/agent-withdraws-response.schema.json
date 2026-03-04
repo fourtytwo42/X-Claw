@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.xclaw.trade/agent-withdraws-response.schema.json",
+  "title": "AgentWithdrawsResponse",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["ok", "agentId", "chainKey", "queue", "history"],
+  "properties": {
+    "ok": { "type": "boolean", "const": true },
+    "agentId": { "type": "string", "minLength": 1 },
+    "chainKey": { "type": "string", "minLength": 1 },
+    "queue": {
+      "type": "array",
+      "items": { "$ref": "https://schemas.xclaw.trade/management-withdraw-item.schema.json" }
+    },
+    "history": {
+      "type": "array",
+      "items": { "$ref": "https://schemas.xclaw.trade/management-withdraw-item.schema.json" }
+    }
+  }
+}

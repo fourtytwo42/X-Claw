@@ -1,3 +1,16 @@
+# Slice 201-205 Tasks: Skill Parity Closeout for Withdraw Queue/Status (2026-03-04)
+
+- [x] Add additive agent-auth route `GET /api/v1/agent/withdraws` (chain-scoped withdraw queue/history).
+- [x] Refactor withdraw read projection into shared helper and enforce `request_kind='withdraw'`.
+- [x] Keep management withdraw read route aligned to shared projection logic.
+- [x] Add agent withdraw response shared schema and OpenAPI contract entry.
+- [x] Add runtime command `withdraws list --chain <chain_key> --json`.
+- [x] Add skill wrapper command `withdraws-list [chain_key]`.
+- [x] Update skill docs (`SKILL.md`, `references/commands.md`) for withdraw lifecycle readback.
+- [x] Add targeted tests for runtime CLI + skill wrapper withdraw command paths.
+- [x] Extend management Solana contract script with agent withdraw route/schema coverage.
+- [ ] Run sequential validations + grep proofs + issue evidence post.
+
 # Slice 195-200 Tasks: Canonical Cleanup + Integrated Withdraw Queue/Status (2026-03-04)
 
 - [x] Add active-vs-historical contract boundary language to canonical docs.

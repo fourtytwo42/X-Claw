@@ -12693,6 +12693,48 @@ def cmd_dashboard(args: argparse.Namespace) -> int:
         return fail("dashboard_failed", str(exc), "Inspect runtime dashboard path and retry.", {"chain": args.chain}, exit_code=1)
 
 
+def cmd_withdraws_list(args: argparse.Namespace) -> int:
+    chk = require_json_flag(args)
+    if chk is not None:
+        return chk
+    chain = str(args.chain or "").strip()
+    if not chain:
+        return fail("invalid_input", "chain is required.", "Provide --chain <chain_key> and retry.", exit_code=2)
+    try:
+        status_code, body = _api_request("GET", f"/agent/withdraws?chainKey={urllib.parse.quote(chain)}")
+        if status_code < 200 or status_code >= 300:
+            return fail(
+                str(body.get("code", "api_error")),
+                str(body.get("message", f"withdraw list read failed ({status_code})")),
+                str(body.get("actionHint", "Verify API auth and retry.")),
+                _api_error_details(status_code, body, "/agent/withdraws", chain=chain),
+                exit_code=1,
+            )
+
+        queue = body.get("queue")
+        history = body.get("history")
+        if not isinstance(queue, list) or not isinstance(history, list):
+            return fail(
+                "payload_invalid",
+                "Withdraws response payload is malformed.",
+                "Verify server response contract for /agent/withdraws.",
+                {"chain": chain},
+                exit_code=1,
+            )
+        return ok(
+            "Withdraw queue/history loaded.",
+            chain=chain,
+            queueCount=len([row for row in queue if isinstance(row, dict)]),
+            historyCount=len([row for row in history if isinstance(row, dict)]),
+            queue=queue,
+            history=history,
+        )
+    except WalletStoreError as exc:
+        return fail("withdraws_read_failed", str(exc), "Verify API env/auth and retry.", {"chain": chain}, exit_code=1)
+    except Exception as exc:
+        return fail("withdraws_read_failed", str(exc), "Inspect runtime withdraw read flow and retry.", {"chain": chain}, exit_code=1)
+
+
 def _sync_limit_orders(chain: str) -> tuple[int, int]:
     status_code, body = _api_request("GET", f"/limit-orders?chainKey={urllib.parse.quote(chain)}&status=open&limit=200")
     if status_code < 200 or status_code >= 300:
@@ -14839,6 +14881,13 @@ def build_parser() -> argparse.ArgumentParser:
     chains_cmd.add_argument("--json", action="store_true")
     chains_cmd.set_defaults(func=cmd_chains)
 
+    withdraws = sub.add_parser("withdraws")
+    withdraws_sub = withdraws.add_subparsers(dest="withdraws_cmd")
+    withdraws_list = withdraws_sub.add_parser("list")
+    withdraws_list.add_argument("--chain", required=True)
+    withdraws_list.add_argument("--json", action="store_true")
+    withdraws_list.set_defaults(func=cmd_withdraws_list)
+
     default_chain = sub.add_parser("default-chain")
     default_chain_sub = default_chain.add_subparsers(dest="default_chain_cmd")
 
@@ -15067,6 +15116,8 @@ def main(argv: list[str] | None = None) -> int:
             capability = "liquidity"
         elif top == "limit-orders":
             capability = "limitOrders"
+        elif top == "withdraws":
+            capability = "wallet"
         elif top == "faucet-request":
             capability = "faucet"
         try:

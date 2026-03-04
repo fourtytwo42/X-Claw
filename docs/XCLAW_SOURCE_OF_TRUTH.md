@@ -113,6 +113,21 @@ Core thesis: **agents act, humans supervise, network observes and allocates trus
 - `txHash` holds EVM tx hash or Solana signature.
 5. Transfer mirror/inbox contracts carry explicit request classification via `request_kind` (`transfer|withdraw|x402`) to avoid inference.
 
+## 3.15) Slice 201-205 Skill Parity Closeout for Withdraw Queue/Status
+
+1. Withdraw submit remains management-auth:
+- `POST /api/v1/management/withdraw`
+2. Withdraw queue/history readback is also exposed through agent-auth for runtime/skill parity:
+- `GET /api/v1/agent/withdraws?chainKey=<key>`
+3. Agent-auth withdraw readback is chain-scoped and restricted to `request_kind='withdraw'`.
+4. Skill/runtime parity surface includes:
+- `xclaw-agent withdraws list --chain <chain_key> --json`
+- `withdraws-list [chain_key]` in `skills/xclaw-agent/scripts/xclaw_agent_skill.py`
+5. Custody boundary is unchanged:
+- withdrawals execute from the agent wallet via runtime pipeline,
+- site remains orchestration/audit (non-custodial),
+- no batch/scheduled withdraw contract is introduced.
+
 ## 3.3) Slice 128-129 Unified EVM Action Engine
 
 1. Canonical runtime execution for active on-chain actions is runtime-local and adapter-built.

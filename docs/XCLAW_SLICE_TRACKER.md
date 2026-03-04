@@ -17,6 +17,23 @@ Status legend:
 
 ---
 
+## Slice 201-205: Skill Parity Closeout for Withdraw Queue/Status
+Status: [~]
+
+Goal:
+- Add agent-auth withdraw queue/history read visibility and expose it through runtime CLI + skill wrapper, preserving non-custodial withdraw execution boundaries.
+
+DoD:
+- [~] Additive route exists: `GET /api/v1/agent/withdraws` (agent-auth, chain-scoped).
+- [~] Agent route + management route both use explicit `request_kind='withdraw'` projection path.
+- [~] Runtime command exists: `xclaw-agent withdraws list --chain <chain_key> --json`.
+- [~] Skill command exists: `withdraws-list [chain_key]`.
+- [~] OpenAPI + shared schema include agent withdraw list response contract.
+- [~] Canonical artifacts synced for Slice 201-205 contract.
+- [ ] full sequential validation + issue evidence posted.
+
+---
+
 ## Slice 195-200: Canonical Cleanup + Integrated Withdraw Queue/Status
 Status: [x]
 

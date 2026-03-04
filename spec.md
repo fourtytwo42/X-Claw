@@ -1,3 +1,35 @@
+# Slice 201-205 Spec: Skill Parity Closeout for Withdraw Queue/Status via Agent-Auth Read Path (2026-03-04)
+
+## Goal
+1. Add chain-scoped withdraw queue/history read visibility through agent-auth API.
+2. Expose withdraw readback parity in runtime CLI and Python skill wrapper.
+3. Keep non-custodial withdraw execution boundaries unchanged.
+
+## Non-goals
+1. No withdraw batching/scheduling flows.
+2. No management-cookie dependency for skill/runtime withdraw readback.
+3. No route path changes to withdraw submit (`POST /api/v1/management/withdraw`).
+
+## Locked scope
+1. `apps/network-web/src/lib/withdraws-read.ts`
+2. `apps/network-web/src/app/api/v1/management/withdraws/route.ts`
+3. `apps/network-web/src/app/api/v1/agent/withdraws/route.ts`
+4. `packages/shared-schemas/json/agent-withdraws-response.schema.json`
+5. `docs/api/openapi.v1.yaml`
+6. `apps/agent-runtime/xclaw_agent/cli.py`
+7. `apps/agent-runtime/tests/test_trade_path.py`
+8. `skills/xclaw-agent/scripts/xclaw_agent_skill.py`
+9. `apps/agent-runtime/tests/test_x402_skill_wrapper.py`
+10. `skills/xclaw-agent/SKILL.md`
+11. `skills/xclaw-agent/references/commands.md`
+12. `infrastructure/scripts/management-solana-contract-tests.mjs`
+13. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+14. `docs/XCLAW_SLICE_TRACKER.md`
+15. `docs/XCLAW_BUILD_ROADMAP.md`
+16. `spec.md`
+17. `tasks.md`
+18. `acceptance.md`
+
 # Slice 195-200 Spec: Canonical Artifact Cleanup + Integrated Withdraw Queue/Status (2026-03-04)
 
 ## Goal

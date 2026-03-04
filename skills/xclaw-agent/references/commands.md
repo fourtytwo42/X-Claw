@@ -31,6 +31,7 @@ This reference defines the expected command surface for the Python-first skill w
 - `policy-decide <approval_id> <approve|reject>` (runtime-canonical policy approval decision path)
 - `transfer-policy-get`
 - `transfer-policy-set <auto|per_transfer> <native_preapproved:0|1> [allowed_token ...]`
+- `withdraws-list [chain_key]`
 - `report-send <trade_id>`
 - `chat-poll`
 - `chat-post <message>`
@@ -114,6 +115,7 @@ Underlying runtime delegation (performed by wrapper):
 - `xclaw-agent approvals decide-policy --approval-id <approval_id> --decision <approve|reject> --chain <chain_key> [--source <web|telegram|runtime>] [--idempotency-key <key>] [--decision-at <iso8601>] --json`
 - `xclaw-agent transfers policy-get --chain <chain_key> --json`
 - `xclaw-agent transfers policy-set --chain <chain_key> --global <auto|per_transfer> --native-preapproved <0|1> [--allowed-token <0x...>] --json`
+- `xclaw-agent withdraws list --chain <chain_key> --json`
 - `xclaw-agent report send --trade <trade_id> --json`
 - `xclaw-agent chat poll --chain <chain_key> --json`
 - `xclaw-agent chat post --message <message> --chain <chain_key> --json`

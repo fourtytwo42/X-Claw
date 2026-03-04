@@ -53,6 +53,20 @@ async function main() {
   const chainsLib = readText('apps/network-web/src/lib/chains.ts');
   expect(chainsLib.includes('chainTxExplorerUrl'), 'chains_helper_tx_explorer_url');
 
+  const withdrawReadHelper = readText('apps/network-web/src/lib/withdraws-read.ts');
+  expect(withdrawReadHelper.includes("m.request_kind = 'withdraw'"), 'withdraws_helper_filters_request_kind');
+
+  const managementWithdrawsRoute = readText('apps/network-web/src/app/api/v1/management/withdraws/route.ts');
+  expect(managementWithdrawsRoute.includes('readWithdrawRows'), 'management_withdraws_route_uses_shared_reader');
+
+  const agentWithdrawsRoute = readText('apps/network-web/src/app/api/v1/agent/withdraws/route.ts');
+  expect(agentWithdrawsRoute.includes('authenticateAgentByToken'), 'agent_withdraws_route_agent_auth');
+  expect(agentWithdrawsRoute.includes('readWithdrawRows'), 'agent_withdraws_route_reads_withdraw_projection');
+
+  const agentWithdrawsSchema = readJson('packages/shared-schemas/json/agent-withdraws-response.schema.json');
+  expect(agentWithdrawsSchema?.required?.includes('queue'), 'agent_withdraws_schema_queue_required');
+  expect(agentWithdrawsSchema?.required?.includes('history'), 'agent_withdraws_schema_history_required');
+
   const ok = state.failed === 0;
   console.log(JSON.stringify({ ok, passed: state.passed, failed: state.failed, checks: state.checks }, null, 2));
   if (!ok) {

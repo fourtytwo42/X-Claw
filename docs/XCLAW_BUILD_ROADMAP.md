@@ -11,6 +11,15 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 
 ---
 
+## 0.16) Slice 201-205 Skill Parity Closeout for Withdraw Queue/Status
+
+- [~] Add additive agent-auth withdraw read route (`GET /api/v1/agent/withdraws`) with chain-scoped queue/history contract.
+- [~] Reuse explicit withdraw projection (`request_kind='withdraw'`) for both management and agent read paths.
+- [~] Add runtime CLI command `withdraws list` for agent-auth readback.
+- [~] Expose `withdraws-list [chain_key]` in skill wrapper + command references.
+- [~] Sync OpenAPI + shared schema for agent withdraw list response.
+- [ ] Sequential validation + PM2 restart + issue evidence capture.
+
 ## 0.15) Slice 195-200 Canonical Cleanup + Withdraw Queue/Status Module
 
 - [x] Add active/historical canonical boundary rules and archive pointers.

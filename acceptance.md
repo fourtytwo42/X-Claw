@@ -1,3 +1,43 @@
+# Slice 201-205 Acceptance Evidence: Skill Parity Closeout for Withdraw Queue/Status
+
+Date (UTC): 2026-03-04  
+Active slice context: `Slice 201 -> Slice 205`.
+
+### Objective + Scope Lock
+- Objective:
+  - expose withdraw queue/history readback through agent-auth API + runtime CLI + skill wrapper,
+  - keep withdraw execution non-custodial and management-submit scoped.
+
+### Behavior Checks
+- [x] additive route exists: `GET /api/v1/agent/withdraws`.
+- [x] agent + management withdraw read paths use explicit `request_kind='withdraw'`.
+- [x] runtime command exists: `xclaw-agent withdraws list --chain <chain_key> --json`.
+- [x] skill command exists: `withdraws-list [chain_key]`.
+- [x] OpenAPI + shared schema include agent withdraw list response contract.
+
+### Required Validation Gates
+- [x] targeted Next/API tests for `/agent/withdraws` + `/management/withdraws` regression
+  - `npm run test:management:solana:contract` -> PASS (`ok: true`, `passed: 17`, `failed: 0`)
+- [x] targeted Python tests for runtime CLI + skill wrapper
+  - `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS (`Ran 136 tests`, `OK`)
+  - `python3 -m unittest apps/agent-runtime/tests/test_x402_skill_wrapper.py -v` -> PASS (`Ran 59 tests`, `OK`)
+- [x] `npm run db:parity` -> PASS (`ok: true`)
+- [x] `npm run seed:reset` -> PASS
+- [x] `npm run seed:load` -> PASS
+- [x] `npm run seed:verify` -> PASS
+- [x] `npm run build` -> PASS
+- [x] `pm2 restart all` -> PASS (`xclaw-web online`)
+
+### Required Grep Proofs
+- [x] `request_kind='withdraw'` enforced in both management and agent withdraw read paths.
+  - `apps/network-web/src/lib/withdraws-read.ts` includes:
+    - `and request_kind = 'withdraw'`
+    - `and m.request_kind = 'withdraw'`
+- [x] no management-cookie dependency in skill/runtime withdraw read path.
+  - `rg -n "management cookie|xclaw_mgmt|requireManagementSession" skills/xclaw-agent/scripts/xclaw_agent_skill.py apps/agent-runtime/xclaw_agent/cli.py apps/network-web/src/app/api/v1/agent/withdraws/route.ts` -> no matches
+- [x] no text introducing batch/scheduled withdraw behavior.
+  - `docs/XCLAW_SOURCE_OF_TRUTH.md` includes explicit boundary: `no batch/scheduled withdraw contract is introduced.`
+
 # Slice 195-200 Acceptance Evidence: Canonical Cleanup + Integrated Withdraw Queue/Status
 
 Date (UTC): 2026-03-04  

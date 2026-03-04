@@ -259,6 +259,27 @@ paths:
           $ref: '#/components/responses/ErrorResponse'
         '409':
           $ref: '#/components/responses/ErrorResponse'
+  /api/v1/agent/withdraws:
+    get:
+      summary: Read chain-scoped withdraw queue/history for this agent (agent-auth).
+      description: Read-only withdraw lifecycle visibility keyed by explicit `requestKind=withdraw`.
+      security:
+        - agentBearer: []
+      parameters:
+        - name: chainKey
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Withdraw queue/history payload for runtime/skill visibility.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentWithdrawsResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
   /api/v1/agent/x402/outbound/proposed:
     post:
       summary: Mirror runtime-proposed outbound x402 payment intent (agent-auth).
@@ -3824,6 +3845,25 @@ components:
         reasonMessage:
           type: string
           nullable: true
+    AgentWithdrawsResponse:
+      type: object
+      required: [ok, agentId, chainKey, queue, history]
+      properties:
+        ok:
+          type: boolean
+          const: true
+        agentId:
+          type: string
+        chainKey:
+          type: string
+        queue:
+          type: array
+          items:
+            $ref: '#/components/schemas/ManagementWithdrawItem'
+        history:
+          type: array
+          items:
+            $ref: '#/components/schemas/ManagementWithdrawItem'
     AgentX402OutboundProposedRequest:
       type: object
       required: [schemaVersion, paymentId, approvalId, networkKey, facilitatorKey, status, assetKind, amountAtomic, url, createdAt, updatedAt]

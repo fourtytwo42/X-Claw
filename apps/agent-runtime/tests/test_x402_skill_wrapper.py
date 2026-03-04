@@ -1020,5 +1020,21 @@ class X402SkillWrapperTests(unittest.TestCase):
         self.assertEqual(code, 0)
         run_mock.assert_called_once_with(["limit-orders", "run-once", "--chain", "solana_localnet", "--sync", "--json"])
 
+    def test_withdraws_list_routes_to_runtime_with_explicit_chain(self) -> None:
+        with mock.patch.dict("os.environ", self._ENV, clear=False):
+            with mock.patch.object(skill, "_run_agent", return_value=0) as run_mock:
+                code = skill.main(["xclaw_agent_skill.py", "withdraws-list", "solana_devnet"])
+        self.assertEqual(code, 0)
+        run_mock.assert_called_once_with(["withdraws", "list", "--chain", "solana_devnet", "--json"])
+
+    def test_withdraws_list_routes_to_runtime_with_default_chain(self) -> None:
+        with mock.patch.dict("os.environ", self._ENV, clear=False):
+            with mock.patch.object(skill, "_resolve_active_chain", return_value="base_sepolia"), mock.patch.object(
+                skill, "_run_agent", return_value=0
+            ) as run_mock:
+                code = skill.main(["xclaw_agent_skill.py", "withdraws-list"])
+        self.assertEqual(code, 0)
+        run_mock.assert_called_once_with(["withdraws", "list", "--chain", "base_sepolia", "--json"])
+
 if __name__ == "__main__":
     unittest.main()

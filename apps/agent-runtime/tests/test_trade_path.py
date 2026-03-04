@@ -2940,6 +2940,43 @@ class TradePathRuntimeTests(unittest.TestCase):
             code = cli.cmd_dashboard(args)
         self.assertEqual(code, 0)
 
+    def test_withdraws_list_success(self) -> None:
+        args = argparse.Namespace(chain="solana_devnet", json=True)
+        with mock.patch.object(
+            cli,
+            "_api_request",
+            return_value=(
+                200,
+                {
+                    "queue": [{"approvalId": "xfr_1", "status": "queued"}],
+                    "history": [{"approvalId": "xfr_1", "status": "filled", "txHash": "5fS9abc"}],
+                },
+            ),
+        ):
+            payload = self._run_and_parse_stdout(lambda: cli.cmd_withdraws_list(args))
+        self.assertTrue(payload.get("ok"))
+        self.assertEqual(payload.get("queueCount"), 1)
+        self.assertEqual(payload.get("historyCount"), 1)
+        self.assertEqual((payload.get("history") or [{}])[0].get("txHash"), "5fS9abc")
+
+    def test_withdraws_list_fails_closed_on_malformed_payload(self) -> None:
+        args = argparse.Namespace(chain="base_sepolia", json=True)
+        with mock.patch.object(cli, "_api_request", return_value=(200, {"queue": "bad", "history": []})):
+            payload = self._run_and_parse_stdout(lambda: cli.cmd_withdraws_list(args))
+        self.assertFalse(payload.get("ok"))
+        self.assertEqual(payload.get("code"), "payload_invalid")
+
+    def test_withdraws_list_api_error_mapping(self) -> None:
+        args = argparse.Namespace(chain="base_sepolia", json=True)
+        with mock.patch.object(
+            cli,
+            "_api_request",
+            return_value=(401, {"code": "auth_invalid", "message": "invalid token", "actionHint": "refresh key"}),
+        ):
+            payload = self._run_and_parse_stdout(lambda: cli.cmd_withdraws_list(args))
+        self.assertFalse(payload.get("ok"))
+        self.assertEqual(payload.get("code"), "auth_invalid")
+
     def test_trade_execute_real_does_not_auto_report(self) -> None:
         args = argparse.Namespace(intent="trd_real_1", chain="base_sepolia", json=True)
         trade_payload = {
@@ -3236,6 +3273,12 @@ class TradePathRuntimeTests(unittest.TestCase):
                 ]
             )
         self.assertEqual(code, 0)
+
+    def test_withdraws_list_command_parses_and_dispatches(self) -> None:
+        with mock.patch.object(cli, "cmd_withdraws_list", return_value=0) as cmd_mock:
+            code = cli.main(["withdraws", "list", "--chain", "base_sepolia", "--json"])
+        self.assertEqual(code, 0)
+        cmd_mock.assert_called_once()
 
     def test_x402_receive_request_parser_defaults(self) -> None:
         parser = cli.build_parser()
