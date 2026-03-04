@@ -1,3 +1,52 @@
+# Slice 128 Spec: Unified EVM Action Engine (Phase 1) (2026-03-04)
+
+## Goal
+1. Move phase-1 EVM trade and AMM v2 liquidity execution onto one runtime-local action engine.
+2. Remove phase-1 runtime dependence on proxy-built trade transactions and provider-era control flow.
+3. Keep advanced LP compatibility routes/paths intact while phase-1 actions become canonical local adapter execution.
+
+## Non-goals
+1. No removal of `/uniswap/*` compatibility routes in this slice.
+2. No full AMM v3/increase/migrate/claim unification yet.
+3. No non-EVM support.
+
+## Locked scope
+1. `apps/agent-runtime/xclaw_agent/execution_contracts.py`
+2. `apps/agent-runtime/xclaw_agent/evm_action_executor.py`
+3. `apps/agent-runtime/xclaw_agent/trade_execution.py`
+4. `apps/agent-runtime/xclaw_agent/liquidity_execution.py`
+5. `apps/agent-runtime/xclaw_agent/trade_adapters/amm_v2.py`
+6. `apps/agent-runtime/xclaw_agent/liquidity_adapters/amm_v2.py`
+7. `apps/agent-runtime/xclaw_agent/liquidity_adapters/amm_v3.py`
+8. `apps/agent-runtime/xclaw_agent/dex_adapter.py`
+9. `apps/agent-runtime/xclaw_agent/liquidity_adapter.py`
+10. `apps/agent-runtime/xclaw_agent/cli.py`
+11. `apps/agent-runtime/tests/test_evm_action_executor.py`
+12. `apps/agent-runtime/tests/test_trade_path.py`
+13. `apps/agent-runtime/tests/test_liquidity_cli.py`
+14. `apps/agent-runtime/tests/test_liquidity_adapter.py`
+15. `config/chains/*.json`
+16. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+17. `docs/XCLAW_SLICE_TRACKER.md`
+18. `docs/XCLAW_BUILD_ROADMAP.md`
+19. `docs/api/openapi.v1.yaml`
+20. `spec.md`
+21. `tasks.md`
+22. `acceptance.md`
+
+## Acceptance checks
+- `python3 -m unittest apps/agent-runtime/tests/test_evm_action_executor.py -v`
+- `python3 -m unittest apps/agent-runtime/tests/test_dex_adapter.py -v`
+- `python3 -m unittest apps/agent-runtime/tests/test_liquidity_adapter.py -v`
+- `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v`
+- `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- `npm run db:parity`
+- `npm run seed:reset`
+- `npm run seed:load`
+- `npm run seed:verify`
+- `npm run build`
+- `pm2 restart all`
+
 # Slice 124-127 Spec: Final EVM-Only Closeout (2026-03-03)
 
 ## Goal

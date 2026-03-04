@@ -4146,3 +4146,13 @@ Note:
 
 - [x] Preserve historical migration evidence without rewriting applied migrations.
 - [x] Update handoff artifacts to reflect Slice 124-127 completion and required validation gates.
+
+## 128) Slice 128: Unified EVM Action Engine (Phase 1)
+
+- [x] Add shared runtime action-plan contracts and `EvmActionExecutor`.
+- [x] Add AMM v2 trade adapter plan builder and liquidity add/remove plan builders.
+- [x] Route `trade spot` and `trade execute` through runtime-local adapter-built execution.
+- [x] Route AMM v2 `liquidity add` and `liquidity remove` through the shared executor.
+- [x] Normalize phase-1 runtime metadata to `router_adapter` and generic execution fields.
+- [x] Remove stale `tradeProviders` / `liquidityProviders` from active chain configs.
+- [x] Add/refresh runtime unit coverage for the new executor path.

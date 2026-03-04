@@ -35,10 +35,6 @@
     "faucet": false,
     "deposits": false
   },
-  "tradeProviders": {
-    "primary": "uniswap_api",
-    "fallback": "legacy_router"
-  },
   "uniswapApi": {
     "enabled": true,
     "liquidityEnabled": true,
@@ -69,10 +65,6 @@
       "router.factory() 0x4752ba5dbc23f44d87826276bf6fd6b1c372ad24 -> 0xf1D7CC64Fb4452F05c498126312eBE29f30Fbcf9",
       "eth_chainId https://arb1.arbitrum.io/rpc -> expected 0xa4b1"
     ]
-  },
-  "liquidityProviders": {
-    "primary": "uniswap_api",
-    "fallback": "legacy_router"
   },
   "liquidityOperations": {
     "claimFees": {

@@ -51,12 +51,20 @@ from xclaw_agent.x402_runtime import pay_decide as x402_pay_decide
 from xclaw_agent.x402_runtime import pay_resume as x402_pay_resume
 from xclaw_agent.x402_runtime import X402RuntimeError
 from xclaw_agent.dex_adapter import build_dex_adapter, DexAdapterError
+from xclaw_agent.dex_adapter import resolve_trade_execution_adapter, TradeAdapterResolutionError
+from xclaw_agent.evm_action_executor import EvmActionExecutor
+from xclaw_agent.liquidity_execution import (
+    build_liquidity_add_plan,
+    build_liquidity_remove_plan,
+    execute_liquidity_plan,
+)
 from xclaw_agent.liquidity_adapter import (
     build_liquidity_adapter_for_request,
     LiquidityAdapterError,
     UnsupportedLiquidityOperation,
     UnsupportedLiquidityAdapter,
 )
+from xclaw_agent.trade_execution import build_trade_plan, execute_trade_plan, quote_trade
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 try:
     from argon2.low_level import Type, hash_secret_raw
@@ -6116,24 +6124,6 @@ def _execute_liquidity_v2_add(intent: dict[str, Any], chain: str) -> dict[str, A
     store = load_wallet_store()
     wallet_address, private_key_hex = _execution_wallet(store, chain)
     deadline = str(int(datetime.now(timezone.utc).timestamp()) + 120)
-    # Approve desired max units (not only estimate) so reserve drift between estimate and submit
-    # cannot under-approve and cause router transferFrom failures.
-    _ensure_token_allowance(
-        chain=chain,
-        token_address=token_a,
-        owner=wallet_address,
-        spender=router,
-        required_units=max(amount_a_units, amount_a_estimate_units),
-        private_key_hex=private_key_hex,
-    )
-    _ensure_token_allowance(
-        chain=chain,
-        token_address=token_b,
-        owner=wallet_address,
-        spender=router,
-        required_units=max(amount_b_units, amount_b_estimate_units),
-        private_key_hex=private_key_hex,
-    )
     preflight_details = _preflight_liquidity_v2_add_execution(
         chain=chain,
         token_a=token_a,
@@ -6146,25 +6136,31 @@ def _execute_liquidity_v2_add(intent: dict[str, Any], chain: str) -> dict[str, A
         router=router,
         deadline=deadline,
     )
-    calldata = _cast_calldata(
-        "addLiquidity(address,address,uint256,uint256,uint256,uint256,address,uint256)(uint256,uint256,uint256)",
-        [
-            token_a,
-            token_b,
-            str(amount_a_units),
-            str(amount_b_units),
-            str(min_a_units),
-            str(min_b_units),
-            wallet_address,
-            deadline,
-        ],
-    )
-    tx_hash = _cast_rpc_send_transaction(
-        _chain_rpc_url(chain),
-        {"from": wallet_address, "to": router, "data": calldata},
-        private_key_hex,
+    plan = build_liquidity_add_plan(
         chain=chain,
+        dex=adapter.dex,
+        position_type=position_type,
+        request={
+            "tokenA": token_a,
+            "tokenB": token_b,
+            "amountAUnits": str(max(amount_a_units, amount_a_estimate_units)),
+            "amountBUnits": str(max(amount_b_units, amount_b_estimate_units)),
+            "minAmountAUnits": str(min_a_units),
+            "minAmountBUnits": str(min_b_units),
+            "deadline": deadline,
+        },
+        wallet_address=wallet_address,
+        build_calldata=_cast_calldata,
     )
+    execution = execute_liquidity_plan(
+        executor=_router_action_executor(),
+        plan=plan,
+        wallet_address=wallet_address,
+        private_key_hex=private_key_hex,
+        wait_for_operation_receipts=False,
+        liquidity_operation="add",
+    )
+    tx_hash = str(execution.tx_hash or "")
     return {
         "txHash": tx_hash,
         "positionId": tx_hash,
@@ -6172,10 +6168,15 @@ def _execute_liquidity_v2_add(intent: dict[str, Any], chain: str) -> dict[str, A
             "adapterFamily": adapter.protocol_family,
             "dex": adapter.dex,
             "action": "add",
+            "executionFamily": execution.execution_family,
+            "executionAdapter": execution.execution_adapter,
+            "routeKind": execution.route_kind,
             "amountAEstimate": str(amount_a_estimate_units),
             "amountBEstimate": str(amount_b_estimate_units),
             "minAmountA": str(min_a_units),
             "minAmountB": str(min_b_units),
+            "approveTxHashes": execution.approve_tx_hashes,
+            "operationTxHashes": execution.operation_tx_hashes,
             "preflight": preflight_details,
         },
     }
@@ -6252,33 +6253,32 @@ def _execute_liquidity_v2_remove(intent: dict[str, Any], chain: str) -> dict[str
         liquidity_units=liquidity_units,
         slippage_bps=slippage_bps,
     )
-    _ensure_token_allowance(
-        chain=chain,
-        token_address=lp_token,
-        owner=wallet_address,
-        spender=router,
-        required_units=liquidity_units,
-        private_key_hex=private_key_hex,
-    )
     deadline = str(int(datetime.now(timezone.utc).timestamp()) + 120)
-    calldata = _cast_calldata(
-        "removeLiquidity(address,address,uint256,uint256,uint256,address,uint256)(uint256,uint256)",
-        [
-            token_a,
-            token_b,
-            str(liquidity_units),
-            str(min_a_units),
-            str(min_b_units),
-            wallet_address,
-            deadline,
-        ],
-    )
-    tx_hash = _cast_rpc_send_transaction(
-        _chain_rpc_url(chain),
-        {"from": wallet_address, "to": router, "data": calldata},
-        private_key_hex,
+    plan = build_liquidity_remove_plan(
         chain=chain,
+        dex=adapter.dex,
+        position_type=position_type,
+        request={
+            "tokenA": token_a,
+            "tokenB": token_b,
+            "lpToken": lp_token,
+            "liquidityUnits": str(liquidity_units),
+            "minAmountAUnits": str(min_a_units),
+            "minAmountBUnits": str(min_b_units),
+            "deadline": deadline,
+        },
+        wallet_address=wallet_address,
+        build_calldata=_cast_calldata,
     )
+    execution = execute_liquidity_plan(
+        executor=_router_action_executor(),
+        plan=plan,
+        wallet_address=wallet_address,
+        private_key_hex=private_key_hex,
+        wait_for_operation_receipts=False,
+        liquidity_operation="remove",
+    )
+    tx_hash = str(execution.tx_hash or "")
     return {
         "txHash": tx_hash,
         "positionId": position_id,
@@ -6286,12 +6286,17 @@ def _execute_liquidity_v2_remove(intent: dict[str, Any], chain: str) -> dict[str
             "adapterFamily": adapter.protocol_family,
             "dex": adapter.dex,
             "action": "remove",
+            "executionFamily": execution.execution_family,
+            "executionAdapter": execution.execution_adapter,
+            "routeKind": execution.route_kind,
             "pair": pair.lower(),
             "lpToken": lp_token.lower(),
             "percent": percent,
             "liquidityUnits": str(liquidity_units),
             "minAmountA": str(min_a_units),
             "minAmountB": str(min_b_units),
+            "approveTxHashes": execution.approve_tx_hashes,
+            "operationTxHashes": execution.operation_tx_hashes,
         },
     }
 
@@ -7882,7 +7887,7 @@ def cmd_liquidity_execute(args: argparse.Namespace) -> int:
     transition_state = "init"
     last_tx_hash: str | None = None
     provider_requested = _liquidity_provider_settings(chain)[0]
-    provider_used = "legacy_router"
+    provider_used = "router_adapter"
     fallback_used = False
     fallback_reason: dict[str, str] | None = None
     uniswap_lp_operation: str | None = None
@@ -7951,12 +7956,12 @@ def cmd_liquidity_execute(args: argparse.Namespace) -> int:
                     fallback_used = True
                     fallback_reason = _fallback_reason("uniswap_lp_failed", str(exc))
                     execution, adapter_family = _execute_legacy()
-                    provider_used = "legacy_router"
+                    provider_used = "router_adapter"
                 else:
                     raise WalletStoreError(f"no_execution_provider_available: {exc}") from exc
         else:
             execution, adapter_family = _execute_legacy()
-            provider_used = "legacy_router"
+            provider_used = "router_adapter"
 
         tx_hash = str(execution.get("txHash") or "").strip()
         if not tx_hash:
@@ -8230,8 +8235,8 @@ def _trade_provider_settings(chain: str) -> tuple[str, str]:
         if isinstance(trade_cfg, dict):
             default_provider = str(trade_cfg.get("defaultProvider") or "").strip().lower()
             if default_provider in {"router_adapter", "quote_only", "none"}:
-                return _resolve_operation_provider(chain, "trade", "legacy_router", "none")
-    return _resolve_operation_provider(chain, "trade", "legacy_router", "legacy_router")
+                return default_provider, "none"
+    return "router_adapter", "none"
 
 
 def _liquidity_provider_settings(chain: str) -> tuple[str, str]:
@@ -8242,8 +8247,8 @@ def _liquidity_provider_settings(chain: str) -> tuple[str, str]:
         if isinstance(liquidity_cfg, dict):
             default_provider = str(liquidity_cfg.get("defaultProvider") or "").strip().lower()
             if default_provider in {"router_adapter", "quote_only", "none"}:
-                return _resolve_operation_provider(chain, "liquidity", "legacy_router", "none")
-    return _resolve_operation_provider(chain, "liquidity", "legacy_router", "legacy_router")
+                return default_provider, "none"
+    return "router_adapter", "none"
 
 
 def _chain_trade_legacy_enabled(chain: str) -> bool:
@@ -8304,6 +8309,86 @@ def _build_liquidity_provider_meta(
         "fallbackUsed": bool(fallback_used),
         "fallbackReason": fallback_reason if fallback_used and isinstance(fallback_reason, dict) else None,
         "liquidityOperation": (str(uniswap_lp_operation or "").strip().lower() or None),
+    }
+
+
+def _router_action_executor() -> EvmActionExecutor:
+    return EvmActionExecutor(
+        ensure_token_allowance=_ensure_token_allowance,
+        send_transaction=_cast_rpc_send_transaction,
+        wait_for_receipt_success=_wait_for_tx_receipt_success,
+        rpc_url_for_chain=_chain_rpc_url,
+    )
+
+
+def _resolve_trade_adapter_key(chain: str, requested: str = "") -> str:
+    resolved_key, _ = resolve_trade_execution_adapter(chain, requested)
+    return resolved_key
+
+
+def _quote_trade_via_router_adapter(
+    *,
+    chain: str,
+    adapter_key: str,
+    token_in: str,
+    token_out: str,
+    amount_in_units: str,
+) -> dict[str, Any]:
+    return quote_trade(
+        chain=chain,
+        adapter_key=adapter_key,
+        request={
+            "tokenIn": token_in,
+            "tokenOut": token_out,
+            "amountInUnits": amount_in_units,
+        },
+        get_amount_out=lambda value, token_a, token_b: _router_get_amount_out(chain, value, token_a, token_b),
+    )
+
+
+def _execute_trade_via_router_adapter(
+    *,
+    chain: str,
+    adapter_key: str,
+    wallet_address: str,
+    private_key_hex: str,
+    token_in: str,
+    token_out: str,
+    amount_in_units: str,
+    min_out_units: str,
+    deadline: str,
+    recipient: str,
+    wait_for_receipt: bool,
+) -> dict[str, Any]:
+    plan = build_trade_plan(
+        chain=chain,
+        adapter_key=adapter_key,
+        request={
+            "tokenIn": token_in,
+            "tokenOut": token_out,
+            "amountInUnits": amount_in_units,
+            "amountOutMinUnits": min_out_units,
+            "recipient": recipient,
+            "deadline": deadline,
+            "routeKind": "router_path",
+        },
+        wallet_address=wallet_address,
+        build_calldata=_cast_calldata,
+    )
+    execution = execute_trade_plan(
+        executor=_router_action_executor(),
+        plan=plan,
+        wallet_address=wallet_address,
+        private_key_hex=private_key_hex,
+        wait_for_operation_receipts=wait_for_receipt,
+    )
+    return {
+        "txHash": execution.tx_hash,
+        "approveTxHashes": execution.approve_tx_hashes,
+        "operationTxHashes": execution.operation_tx_hashes,
+        "executionFamily": execution.execution_family,
+        "executionAdapter": execution.execution_adapter,
+        "routeKind": execution.route_kind,
     }
 
 
@@ -8779,7 +8864,7 @@ def cmd_trade_spot(args: argparse.Namespace) -> int:
     last_tx_hash: str | None = None
     last_approve_tx_hash: str | None = None
     provider_requested, _ = _trade_provider_settings(chain)
-    provider_used = "legacy_router"
+    provider_used = "router_adapter"
     fallback_used = False
     fallback_reason: dict[str, str] | None = None
     uniswap_route_type: str | None = None
@@ -8814,9 +8899,10 @@ def cmd_trade_spot(args: argparse.Namespace) -> int:
         wallet_address, private_key_hex = _execution_wallet(store, chain)
         cast_bin = _require_cast_bin()
         rpc_url = _chain_rpc_url(chain)
-        router: str | None = None
-        if _legacy_router_available(chain):
-            router = _require_chain_contract_address(chain, "router")
+        adapter_key, adapter_entry = resolve_trade_execution_adapter(chain, "")
+        router = str(adapter_entry.get("router") or "").strip()
+        if not router:
+            raise WalletStoreError(f"chain_config_invalid: trade adapter '{adapter_key}' on chain '{chain}' is missing router.")
 
         token_in_meta = _fetch_erc20_metadata(chain, token_in)
         token_out_meta = _fetch_erc20_metadata(chain, token_out)
@@ -8827,21 +8913,15 @@ def cmd_trade_spot(args: argparse.Namespace) -> int:
         amount_in_int = int(amount_in_units)
         state, day_key, current_spend, max_daily_wei = _enforce_spend_preconditions(chain, amount_in_int, enforce_native_cap=False)
 
-        expected_out_int: int
-        if provider_requested == "uniswap_api":
-            try:
-                uniswap_quote = _uniswap_quote_via_proxy(chain, wallet_address, token_in, token_out, amount_in_units, slippage_bps)
-                expected_out_int = int(str(uniswap_quote.get("amountOutUnits") or "0"))
-                uniswap_route_type = str(uniswap_quote.get("routeType") or "").strip().upper() or None
-            except Exception as exc:
-                if router:
-                    fallback_used = True
-                    fallback_reason = _fallback_reason("uniswap_quote_failed", str(exc))
-                else:
-                    raise WalletStoreError(f"no_execution_provider_available: {exc}") from exc
-                expected_out_int = _router_get_amount_out(chain, amount_in_units, token_in, token_out)
-        else:
-            expected_out_int = _router_get_amount_out(chain, amount_in_units, token_in, token_out)
+        quote_payload = _quote_trade_via_router_adapter(
+            chain=chain,
+            adapter_key=adapter_key,
+            token_in=token_in,
+            token_out=token_out,
+            amount_in_units=amount_in_units,
+        )
+        expected_out_int = int(str(quote_payload.get("amountOutUnits") or "0"))
+        uniswap_route_type = str(quote_payload.get("routeKind") or "").strip() or None
         min_out_int = (expected_out_int * (10000 - slippage_bps)) // 10000
         if min_out_int <= 0:
             raise WalletStoreError("Computed amountOutMin is zero; reduce slippage or increase amount.")
@@ -8957,20 +9037,15 @@ def cmd_trade_spot(args: argparse.Namespace) -> int:
 
         # Re-quote right before execution so amountOutMin reflects post-approval market state.
         # Approval waits can be long enough that an earlier quote becomes stale and causes SLIPPAGE_NET.
-        if provider_requested == "uniswap_api" and not fallback_used:
-            try:
-                uniswap_quote = _uniswap_quote_via_proxy(chain, wallet_address, token_in, token_out, amount_in_units, slippage_bps)
-                expected_out_int = int(str(uniswap_quote.get("amountOutUnits") or "0"))
-                uniswap_route_type = str(uniswap_quote.get("routeType") or "").strip().upper() or uniswap_route_type
-            except Exception as exc:
-                if router:
-                    fallback_used = True
-                    fallback_reason = _fallback_reason("uniswap_quote_failed", str(exc))
-                else:
-                    raise WalletStoreError(f"no_execution_provider_available: {exc}") from exc
-                expected_out_int = _router_get_amount_out(chain, amount_in_units, token_in, token_out)
-        else:
-            expected_out_int = _router_get_amount_out(chain, amount_in_units, token_in, token_out)
+        quote_payload = _quote_trade_via_router_adapter(
+            chain=chain,
+            adapter_key=adapter_key,
+            token_in=token_in,
+            token_out=token_out,
+            amount_in_units=amount_in_units,
+        )
+        expected_out_int = int(str(quote_payload.get("amountOutUnits") or "0"))
+        uniswap_route_type = str(quote_payload.get("routeKind") or "").strip() or uniswap_route_type
         min_out_int = (expected_out_int * (10000 - slippage_bps)) // 10000
         if min_out_int <= 0:
             raise WalletStoreError("Computed amountOutMin is zero after approval; reduce slippage or increase amount.")
@@ -9000,122 +9075,31 @@ def cmd_trade_spot(args: argparse.Namespace) -> int:
                 exit_code=2,
             )
 
-        tx_hash: str
-        if provider_requested == "uniswap_api" and not fallback_used:
-            try:
-                uniswap_exec = _execute_uniswap_swap_via_proxy(
-                    chain,
-                    wallet_address,
-                    private_key_hex,
-                    token_in,
-                    token_out,
-                    amount_in_units,
-                    slippage_bps,
-                )
-                provider_used = "uniswap_api"
-                approve_tx_hash = str(uniswap_exec.get("approveTxHash") or "") or None
-                tx_hash = str(uniswap_exec.get("txHash") or "")
-                if not re.fullmatch(r"0x[a-fA-F0-9]{64}", tx_hash):
-                    raise WalletStoreError("uniswap_payload_invalid: missing txHash from execution.")
-                if approve_tx_hash:
-                    last_approve_tx_hash = approve_tx_hash
-                uniswap_route_type = str(uniswap_exec.get("routeType") or "").strip().upper() or uniswap_route_type
-                amount_out_units_from_uni = str(uniswap_exec.get("amountOutUnits") or "").strip()
-                if re.fullmatch(r"[0-9]+", amount_out_units_from_uni):
-                    expected_out_int = int(amount_out_units_from_uni)
-            except Exception as exc:
-                if router:
-                    fallback_used = True
-                    fallback_reason = _fallback_reason("uniswap_execution_failed", str(exc))
-                else:
-                    raise WalletStoreError(f"no_execution_provider_available: {exc}") from exc
-                provider_used = "legacy_router"
-                allowance_wei = int(_fetch_token_allowance_wei(chain, token_in, wallet_address, str(router)))
-                if allowance_wei < int(amount_in_units):
-                    approve_data = _cast_calldata("approve(address,uint256)(bool)", [str(router), amount_in_units])
-                    approve_tx_hash = _cast_rpc_send_transaction(
-                        rpc_url,
-                        {
-                            "from": wallet_address,
-                            "to": token_in,
-                            "data": approve_data,
-                        },
-                        private_key_hex,
-                        chain=chain,
-                    )
-                    last_approve_tx_hash = approve_tx_hash
-                    approve_receipt = _run_subprocess(
-                        [cast_bin, "receipt", "--json", "--rpc-url", rpc_url, approve_tx_hash],
-                        timeout_sec=_cast_receipt_timeout_sec(),
-                        kind="cast_receipt",
-                    )
-                    if approve_receipt.returncode != 0:
-                        stderr = (approve_receipt.stderr or "").strip()
-                        stdout = (approve_receipt.stdout or "").strip()
-                        raise WalletStoreError(stderr or stdout or "cast receipt failed for approve tx.")
-                    approve_receipt_payload = json.loads((approve_receipt.stdout or "{}").strip() or "{}")
-                    approve_status = str(approve_receipt_payload.get("status", "0x0")).lower()
-                    if approve_status not in {"0x1", "1"}:
-                        raise WalletStoreError(f"Approve receipt indicates failure status '{approve_status}'.")
-                swap_data = _cast_calldata(
-                    "swapExactTokensForTokens(uint256,uint256,address[],address,uint256)(uint256[])",
-                    [amount_in_units, str(min_out_int), f"[{token_in},{token_out}]", to_addr, deadline],
-                )
-                tx_hash = _cast_rpc_send_transaction(
-                    rpc_url,
-                    {
-                        "from": wallet_address,
-                        "to": str(router),
-                        "data": swap_data,
-                    },
-                    private_key_hex,
-                    chain=chain,
-                )
-        else:
-            if not router:
-                raise WalletStoreError("no_execution_provider_available: legacy router is not configured for this chain.")
-            provider_used = "legacy_router"
-            allowance_wei = int(_fetch_token_allowance_wei(chain, token_in, wallet_address, str(router)))
-            if allowance_wei < int(amount_in_units):
-                approve_data = _cast_calldata("approve(address,uint256)(bool)", [str(router), amount_in_units])
-                approve_tx_hash = _cast_rpc_send_transaction(
-                    rpc_url,
-                    {
-                        "from": wallet_address,
-                        "to": token_in,
-                        "data": approve_data,
-                    },
-                    private_key_hex,
-                    chain=chain,
-                )
-                last_approve_tx_hash = approve_tx_hash
-                approve_receipt = _run_subprocess(
-                    [cast_bin, "receipt", "--json", "--rpc-url", rpc_url, approve_tx_hash],
-                    timeout_sec=_cast_receipt_timeout_sec(),
-                    kind="cast_receipt",
-                )
-                if approve_receipt.returncode != 0:
-                    stderr = (approve_receipt.stderr or "").strip()
-                    stdout = (approve_receipt.stdout or "").strip()
-                    raise WalletStoreError(stderr or stdout or "cast receipt failed for approve tx.")
-                approve_receipt_payload = json.loads((approve_receipt.stdout or "{}").strip() or "{}")
-                approve_status = str(approve_receipt_payload.get("status", "0x0")).lower()
-                if approve_status not in {"0x1", "1"}:
-                    raise WalletStoreError(f"Approve receipt indicates failure status '{approve_status}'.")
-            swap_data = _cast_calldata(
-                "swapExactTokensForTokens(uint256,uint256,address[],address,uint256)(uint256[])",
-                [amount_in_units, str(min_out_int), f"[{token_in},{token_out}]", to_addr, deadline],
-            )
-            tx_hash = _cast_rpc_send_transaction(
-                rpc_url,
-                {
-                    "from": wallet_address,
-                    "to": str(router),
-                    "data": swap_data,
-                },
-                private_key_hex,
-                chain=chain,
-            )
+        execution = _execute_trade_via_router_adapter(
+            chain=chain,
+            adapter_key=adapter_key,
+            wallet_address=wallet_address,
+            private_key_hex=private_key_hex,
+            token_in=token_in,
+            token_out=token_out,
+            amount_in_units=amount_in_units,
+            min_out_units=str(min_out_int),
+            deadline=deadline,
+            recipient=to_addr,
+            wait_for_receipt=False,
+        )
+        provider_used = "router_adapter"
+        approve_tx_hashes = execution.get("approveTxHashes") or []
+        if isinstance(approve_tx_hashes, list) and approve_tx_hashes:
+            approve_tx_hash = str(approve_tx_hashes[-1] or "") or None
+        tx_hash = str(execution.get("txHash") or "")
+        if not re.fullmatch(r"0x[a-fA-F0-9]{64}", tx_hash):
+            raise WalletStoreError("trade_execution_failed: missing txHash from router adapter execution.")
+        if approve_tx_hash:
+            last_approve_tx_hash = approve_tx_hash
+        uniswap_route_type = str(execution.get("routeKind") or "").strip() or uniswap_route_type
+        execution_family = str(execution.get("executionFamily") or "").strip() or "amm_v2"
+        execution_adapter = str(execution.get("executionAdapter") or "").strip() or adapter_key
         last_tx_hash = tx_hash
         provider_meta = _build_provider_meta(provider_requested, provider_used, fallback_used, fallback_reason, uniswap_route_type)
         _post_trade_status(trade_id, "approved", "executing", {"txHash": tx_hash, **provider_meta})
@@ -9195,7 +9179,7 @@ def cmd_trade_spot(args: argparse.Namespace) -> int:
 
         builder_meta = _builder_output_from_hashes(chain, [approve_tx_hash, tx_hash])
         return ok(
-            "Spot swap executed on-chain via configured router (fee proxy).",
+            "Spot swap executed on-chain via runtime-local router adapter.",
             chain=chain,
             router=router,
             fromAddress=wallet_address,
@@ -9242,6 +9226,8 @@ def cmd_trade_spot(args: argparse.Namespace) -> int:
             providerUsed=provider_used,
             fallbackUsed=fallback_used,
             fallbackReason=fallback_reason,
+            executionFamily=execution_family,
+            executionAdapter=execution_adapter,
             routeKind=uniswap_route_type,
             **builder_meta,
         )
@@ -10108,7 +10094,7 @@ def cmd_trade_execute(args: argparse.Namespace) -> int:
     transition_state = "init"
     previous_status = "approved"
     provider_requested, _ = _trade_provider_settings(args.chain)
-    provider_used = "legacy_router"
+    provider_used = "router_adapter"
     fallback_used = False
     fallback_reason: dict[str, str] | None = None
     uniswap_route_type: str | None = None
@@ -10161,11 +10147,12 @@ def cmd_trade_execute(args: argparse.Namespace) -> int:
 
         store = load_wallet_store()
         wallet_address, private_key_hex = _execution_wallet(store, args.chain)
-        cast_bin = _require_cast_bin()
-        rpc_url = _chain_rpc_url(args.chain)
-        router: str | None = None
-        if _legacy_router_available(args.chain):
-            router = _require_chain_contract_address(args.chain, "router")
+        adapter_key, adapter_entry = resolve_trade_execution_adapter(args.chain, "")
+        router = str(adapter_entry.get("router") or "").strip()
+        if not router:
+            raise WalletStoreError(
+                f"chain_config_invalid: trade adapter '{adapter_key}' on chain '{args.chain}' is missing router."
+            )
 
         token_in_raw = str(trade.get("tokenIn") or "").strip()
         token_out_raw = str(trade.get("tokenOut") or "").strip()
@@ -10187,112 +10174,27 @@ def cmd_trade_execute(args: argparse.Namespace) -> int:
         projected_spend_usd = _to_non_negative_decimal(trade.get("amountIn") or "0")
         cap_state, _, current_spend_usd, current_filled_trades, trade_caps = _enforce_trade_caps(args.chain, projected_spend_usd, 1)
         deadline = str(int(datetime.now(timezone.utc).timestamp()) + 120)
-        tx_hash: str
-        approve_tx_hash: str | None = None
-        if provider_requested == "uniswap_api":
-            try:
-                uniswap_exec = _execute_uniswap_swap_via_proxy(
-                    args.chain,
-                    wallet_address,
-                    private_key_hex,
-                    token_in,
-                    token_out,
-                    amount_wei_str,
-                    500,
-                )
-                provider_used = "uniswap_api"
-                approve_tx_hash = str(uniswap_exec.get("approveTxHash") or "") or None
-                tx_hash = str(uniswap_exec.get("txHash") or "")
-                if not re.fullmatch(r"0x[a-fA-F0-9]{64}", tx_hash):
-                    raise WalletStoreError("uniswap_payload_invalid: missing txHash from execution.")
-                uniswap_route_type = str(uniswap_exec.get("routeType") or "").strip().upper() or None
-            except Exception as exc:
-                if router:
-                    fallback_used = True
-                    fallback_reason = _fallback_reason("uniswap_execution_failed", str(exc))
-                    provider_used = "legacy_router"
-                else:
-                    raise WalletStoreError(f"no_execution_provider_available: {exc}") from exc
-                approve_data = _cast_calldata("approve(address,uint256)(bool)", [str(router), amount_wei_str])
-                approve_tx_hash = _cast_rpc_send_transaction(
-                    rpc_url,
-                    {
-                        "from": wallet_address,
-                        "to": token_in,
-                        "data": approve_data,
-                    },
-                    private_key_hex,
-                    chain=args.chain,
-                )
-                approve_receipt = _run_subprocess(
-                    [cast_bin, "receipt", "--json", "--rpc-url", rpc_url, approve_tx_hash],
-                    timeout_sec=_cast_receipt_timeout_sec(),
-                    kind="cast_receipt",
-                )
-                if approve_receipt.returncode != 0:
-                    stderr = (approve_receipt.stderr or "").strip()
-                    stdout = (approve_receipt.stdout or "").strip()
-                    raise WalletStoreError(stderr or stdout or "cast receipt failed for approve tx.")
-                approve_payload = json.loads((approve_receipt.stdout or "{}").strip() or "{}")
-                approve_status = str(approve_payload.get("status", "0x0")).lower()
-                if approve_status not in {"0x1", "1"}:
-                    raise WalletStoreError(f"Approve receipt indicates failure status '{approve_status}'.")
-                swap_data = _cast_calldata(
-                    "swapExactTokensForTokens(uint256,uint256,address[],address,uint256)(uint256[])",
-                    [amount_wei_str, "1", f"[{token_in},{token_out}]", wallet_address, deadline],
-                )
-                tx_hash = _cast_rpc_send_transaction(
-                    rpc_url,
-                    {
-                        "from": wallet_address,
-                        "to": str(router),
-                        "data": swap_data,
-                    },
-                    private_key_hex,
-                    chain=args.chain,
-                )
-        else:
-            if not router:
-                raise WalletStoreError("no_execution_provider_available: legacy router is not configured for this chain.")
-            provider_used = "legacy_router"
-            approve_data = _cast_calldata("approve(address,uint256)(bool)", [str(router), amount_wei_str])
-            approve_tx_hash = _cast_rpc_send_transaction(
-                rpc_url,
-                {
-                    "from": wallet_address,
-                    "to": token_in,
-                    "data": approve_data,
-                },
-                private_key_hex,
-                chain=args.chain,
-            )
-            approve_receipt = _run_subprocess(
-                [cast_bin, "receipt", "--json", "--rpc-url", rpc_url, approve_tx_hash],
-                timeout_sec=_cast_receipt_timeout_sec(),
-                kind="cast_receipt",
-            )
-            if approve_receipt.returncode != 0:
-                stderr = (approve_receipt.stderr or "").strip()
-                stdout = (approve_receipt.stdout or "").strip()
-                raise WalletStoreError(stderr or stdout or "cast receipt failed for approve tx.")
-            approve_payload = json.loads((approve_receipt.stdout or "{}").strip() or "{}")
-            approve_status = str(approve_payload.get("status", "0x0")).lower()
-            if approve_status not in {"0x1", "1"}:
-                raise WalletStoreError(f"Approve receipt indicates failure status '{approve_status}'.")
-            swap_data = _cast_calldata(
-                "swapExactTokensForTokens(uint256,uint256,address[],address,uint256)(uint256[])",
-                [amount_wei_str, "1", f"[{token_in},{token_out}]", wallet_address, deadline],
-            )
-            tx_hash = _cast_rpc_send_transaction(
-                rpc_url,
-                {
-                    "from": wallet_address,
-                    "to": str(router),
-                    "data": swap_data,
-                },
-                private_key_hex,
-                chain=args.chain,
-            )
+        execution = _execute_trade_via_router_adapter(
+            chain=args.chain,
+            adapter_key=adapter_key,
+            wallet_address=wallet_address,
+            private_key_hex=private_key_hex,
+            token_in=token_in,
+            token_out=token_out,
+            amount_in_units=amount_wei_str,
+            min_out_units="1",
+            deadline=deadline,
+            recipient=wallet_address,
+            wait_for_receipt=False,
+        )
+        approve_tx_hashes = execution.get("approveTxHashes") or []
+        approve_tx_hash = str(approve_tx_hashes[-1]) if isinstance(approve_tx_hashes, list) and approve_tx_hashes else None
+        tx_hash = str(execution.get("txHash") or "")
+        if not re.fullmatch(r"0x[a-fA-F0-9]{64}", tx_hash):
+            raise WalletStoreError("trade_execution_failed: missing txHash from router adapter execution.")
+        uniswap_route_type = str(execution.get("routeKind") or "").strip() or None
+        execution_family = str(execution.get("executionFamily") or "").strip() or "amm_v2"
+        execution_adapter = str(execution.get("executionAdapter") or "").strip() or adapter_key
         provider_meta = _build_provider_meta(provider_requested, provider_used, fallback_used, fallback_reason, uniswap_route_type)
         _post_trade_status(args.intent, previous_status, "executing", {"txHash": tx_hash, **provider_meta})
         transition_state = "executing"
@@ -10309,7 +10211,7 @@ def cmd_trade_execute(args: argparse.Namespace) -> int:
         }
         builder_meta = _builder_output_from_hashes(args.chain, [approve_tx_hash, tx_hash])
         return ok(
-            "Trade broadcast in real mode; confirmation is asynchronous.",
+            "Trade broadcast in real mode via runtime-local router adapter; confirmation is asynchronous.",
             tradeId=args.intent,
             chain=args.chain,
             mode=mode,
@@ -10326,6 +10228,8 @@ def cmd_trade_execute(args: argparse.Namespace) -> int:
             providerUsed=provider_used,
             fallbackUsed=fallback_used,
             fallbackReason=fallback_reason,
+            executionFamily=execution_family,
+            executionAdapter=execution_adapter,
             routeKind=uniswap_route_type,
             report=report_result,
             actionHint="Execution is in verifying state; watcher will publish terminal filled/failed status.",

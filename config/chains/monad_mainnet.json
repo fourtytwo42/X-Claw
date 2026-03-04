@@ -35,10 +35,6 @@
     "faucet": false,
     "deposits": false
   },
-  "tradeProviders": {
-    "primary": "uniswap_api",
-    "fallback": "legacy_router"
-  },
   "uniswapApi": {
     "enabled": true,
     "liquidityEnabled": true,
@@ -69,10 +65,6 @@
       "router.factory() 0x4b2ab38dbf28d31d467aa8993f6c2585981d6804 -> 0x182a927119d56008d921126764bf884221b10f59",
       "eth_chainId https://monad.drpc.org -> expected 0x8f"
     ]
-  },
-  "liquidityProviders": {
-    "primary": "uniswap_api",
-    "fallback": "legacy_router"
   },
   "liquidityOperations": {
     "claimFees": {

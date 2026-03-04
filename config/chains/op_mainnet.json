@@ -35,10 +35,6 @@
     "faucet": false,
     "deposits": false
   },
-  "tradeProviders": {
-    "primary": "uniswap_api",
-    "fallback": "legacy_router"
-  },
   "uniswapApi": {
     "enabled": true,
     "liquidityEnabled": true,
@@ -69,10 +65,6 @@
       "router.factory() 0x4A7b5Da61326A6379179b40d00F57E5bbDC962c2 -> 0x0c3c1c532F1e39EdF36BE9Fe0bE1410313E074Bf",
       "eth_chainId https://mainnet.optimism.io -> expected 0xa"
     ]
-  },
-  "liquidityProviders": {
-    "primary": "uniswap_api",
-    "fallback": "legacy_router"
   },
   "liquidityOperations": {
     "claimFees": {

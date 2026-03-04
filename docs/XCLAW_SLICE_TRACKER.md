@@ -2615,3 +2615,19 @@ Status: completed
 Status: completed
 
 - Goal: preserve truthful history while aligning active contracts, schemas, and handoff artifacts to the EVM-only model.
+
+## Slice 128: Unified EVM Action Engine (Phase 1)
+Status: [x]
+Issue: #62
+
+Goal:
+- move spot swap and AMM v2 liquidity add/remove onto one runtime-local EVM action executor with adapter-built plans.
+
+DoD:
+- [x] shared action-plan and executor modules exist in `apps/agent-runtime/xclaw_agent/`.
+- [x] `trade spot` and `trade execute` use local adapter-built router execution, not proxy-built swap transactions.
+- [x] AMM v2 `liquidity add` / `liquidity remove` use the shared executor path.
+- [x] phase-1 runtime metadata emits `router_adapter` + generic execution fields.
+- [x] stale `tradeProviders` / `liquidityProviders` removed from active chain configs.
+- [x] runtime tests cover shared executor and updated trade/liquidity paths.
+- [x] source-of-truth + roadmap + handoff artifacts updated in the same change.

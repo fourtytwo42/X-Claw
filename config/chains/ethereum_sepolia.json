@@ -45,10 +45,6 @@
       "enabled": true
     }
   },
-  "tradeProviders": {
-    "primary": "uniswap_api",
-    "fallback": "legacy_router"
-  },
   "uniswapApi": {
     "enabled": true,
     "liquidityEnabled": true,
@@ -71,10 +67,6 @@
   },
   "marketData": {
     "dexscreenerChainId": "ethereum"
-  },
-  "liquidityProviders": {
-    "primary": "uniswap_api",
-    "fallback": "legacy_router"
   },
   "liquidityOperations": {
     "claimFees": {

@@ -36,10 +36,6 @@
     "faucet": false,
     "deposits": false
   },
-  "tradeProviders": {
-    "primary": "uniswap_api",
-    "fallback": "legacy_router"
-  },
   "uniswapApi": {
     "enabled": true,
     "liquidityEnabled": true,
@@ -70,10 +66,6 @@
       "eth_chainId https://api.avax.network/ext/bc/C/rpc -> expected 0xa86a",
       "router.factory() 0x4752ba5dbc23f44d87826276bf6fd6b1c372ad24 -> 0x9e5A52f57b3038F1B8EeE45F28b3C1967e22799C"
     ]
-  },
-  "liquidityProviders": {
-    "primary": "uniswap_api",
-    "fallback": "legacy_router"
   },
   "liquidityOperations": {
     "claimFees": {

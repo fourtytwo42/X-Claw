@@ -33,10 +33,6 @@
     "faucet": false,
     "deposits": false
   },
-  "tradeProviders": {
-    "primary": "uniswap_api",
-    "fallback": "legacy_router"
-  },
   "uniswapApi": {
     "enabled": true,
     "liquidityEnabled": true,
@@ -55,10 +51,6 @@
     "rpcVerification": [
       "Slice 113: legacy v2 fallback left disabled; no official Uniswap v2 deployment entry for zkSync in docs table."
     ]
-  },
-  "liquidityProviders": {
-    "primary": "uniswap_api",
-    "fallback": "legacy_router"
   },
   "liquidityOperations": {
     "claimFees": {

@@ -1,3 +1,50 @@
+# Slice 128 Acceptance Evidence: Unified EVM Action Engine (Phase 1)
+
+Date (UTC): 2026-03-04
+Active slice context: `Slice 128`.
+
+## Objective + Scope Lock
+- Objective:
+  - make runtime-local router-adapter execution canonical for phase-1 spot swaps and AMM v2 liquidity add/remove,
+  - keep advanced LP and `/uniswap/*` compatibility paths intact.
+- Scope lock:
+  - `apps/agent-runtime/xclaw_agent/execution_contracts.py`
+  - `apps/agent-runtime/xclaw_agent/evm_action_executor.py`
+  - `apps/agent-runtime/xclaw_agent/trade_execution.py`
+  - `apps/agent-runtime/xclaw_agent/liquidity_execution.py`
+  - `apps/agent-runtime/xclaw_agent/trade_adapters/amm_v2.py`
+  - `apps/agent-runtime/xclaw_agent/liquidity_adapters/amm_v2.py`
+  - `apps/agent-runtime/xclaw_agent/liquidity_adapters/amm_v3.py`
+  - `apps/agent-runtime/xclaw_agent/dex_adapter.py`
+  - `apps/agent-runtime/xclaw_agent/liquidity_adapter.py`
+  - `apps/agent-runtime/xclaw_agent/cli.py`
+  - `apps/agent-runtime/tests/test_evm_action_executor.py`
+  - `apps/agent-runtime/tests/test_trade_path.py`
+  - `apps/agent-runtime/tests/test_liquidity_cli.py`
+  - `apps/agent-runtime/tests/test_liquidity_adapter.py`
+  - `config/chains/*.json`
+  - canonical docs + handoff artifacts
+
+## Behavior Checks
+- [x] `trade spot` uses local AMM v2 adapter quote/build/execute flow.
+- [x] `trade execute` uses local AMM v2 adapter execution flow and returns `providerUsed=router_adapter`.
+- [x] AMM v2 `liquidity add` / `liquidity remove` use shared action-plan execution.
+- [x] runtime tests assert generic execution metadata (`router_adapter`, `routeKind`, `executionFamily`, `executionAdapter`).
+- [x] stale `tradeProviders` / `liquidityProviders` are removed from active chain configs.
+
+## Required Validation Gates
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_evm_action_executor.py -v`
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_dex_adapter.py -v`
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_liquidity_adapter.py -v`
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v`
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+
 # Hotfix Acceptance Evidence: Preserve Trade Approval History After Execution
 
 # Hotfix Acceptance Evidence: Liquidity Approval Runtime Env Hydration Parity

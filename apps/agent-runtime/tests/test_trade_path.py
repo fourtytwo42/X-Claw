@@ -2827,6 +2827,8 @@ class TradePathRuntimeTests(unittest.TestCase):
         ), mock.patch.object(
             cli, "_cast_rpc_send_transaction", return_value="0x" + "ab" * 32
         ), mock.patch.object(
+            cli, "_fetch_token_allowance_wei", return_value="0"
+        ), mock.patch.object(
             cli.subprocess, "run", return_value=mock.Mock(returncode=0, stdout='{"status":"0x1"}', stderr="")
         ), mock.patch.object(
             cli, "_post_trade_status"
@@ -2871,6 +2873,8 @@ class TradePathRuntimeTests(unittest.TestCase):
         ), mock.patch.object(
             cli, "_cast_rpc_send_transaction", return_value="0x" + "ab" * 32
         ), mock.patch.object(
+            cli, "_fetch_token_allowance_wei", return_value="0"
+        ), mock.patch.object(
             cli.subprocess, "run", return_value=mock.Mock(returncode=0, stdout='{"status":"0x1"}', stderr="")
         ), mock.patch.object(
             cli, "_post_trade_status"
@@ -2899,7 +2903,7 @@ class TradePathRuntimeTests(unittest.TestCase):
             "slippageBps": 50,
         }
         with mock.patch.object(cli, "_read_trade_details", return_value=trade_payload), mock.patch.object(
-            cli, "_trade_provider_settings", return_value=("uniswap_api", {})
+            cli, "_trade_provider_settings", return_value=("router_adapter", "none")
         ), mock.patch.object(
             cli, "_replay_trade_usage_outbox", return_value=(0, 0)
         ), mock.patch.object(
@@ -2913,7 +2917,16 @@ class TradePathRuntimeTests(unittest.TestCase):
         ), mock.patch.object(
             cli, "_fetch_erc20_metadata", return_value={"decimals": 18, "symbol": "USDC"}
         ), mock.patch.object(
-            cli, "_execute_uniswap_swap_via_proxy", return_value={"txHash": "0x" + "ab" * 32, "routeType": "EXACT_INPUT"}
+            cli,
+            "_execute_trade_via_router_adapter",
+            return_value={
+                "txHash": "0x" + "ab" * 32,
+                "approveTxHashes": [],
+                "operationTxHashes": ["0x" + "ab" * 32],
+                "executionFamily": "amm_v2",
+                "executionAdapter": "uniswap_fork",
+                "routeKind": "router_path",
+            },
         ), mock.patch.object(
             cli, "_post_trade_status"
         ), mock.patch.object(
@@ -3016,6 +3029,8 @@ class TradePathRuntimeTests(unittest.TestCase):
             cli, "_cast_calldata", side_effect=fake_calldata
         ), mock.patch.object(
             cli, "_cast_rpc_send_transaction", side_effect=fake_send
+        ), mock.patch.object(
+            cli, "_fetch_token_allowance_wei", return_value="0"
         ), mock.patch.object(
             cli.subprocess, "run", return_value=mock.Mock(returncode=0, stdout='{"status":"0x1"}', stderr="")
         ), mock.patch.object(
@@ -3180,19 +3195,22 @@ class TradePathRuntimeTests(unittest.TestCase):
         )
         with ExitStack() as stack:
             stack.enter_context(mock.patch.object(cli, "_replay_trade_usage_outbox"))
-            stack.enter_context(mock.patch.object(cli, "_trade_provider_settings", return_value=("uniswap_api", "legacy_router")))
+            stack.enter_context(mock.patch.object(cli, "_trade_provider_settings", return_value=("router_adapter", "none")))
             stack.enter_context(mock.patch.object(cli, "_resolve_token_address", side_effect=["0x" + "11" * 20, "0x" + "22" * 20]))
             stack.enter_context(mock.patch.object(cli, "load_wallet_store", return_value={}))
             stack.enter_context(mock.patch.object(cli, "_execution_wallet", return_value=("0x" + "33" * 20, "0x" + "44" * 32)))
             stack.enter_context(mock.patch.object(cli, "_require_cast_bin", return_value="cast"))
             stack.enter_context(mock.patch.object(cli, "_chain_rpc_url", return_value="https://rpc.example"))
-            stack.enter_context(mock.patch.object(cli, "_legacy_router_available", return_value=False))
             stack.enter_context(
                 mock.patch.object(cli, "_fetch_erc20_metadata", side_effect=[{"symbol": "WETH", "decimals": 18}, {"symbol": "USDC", "decimals": 6}])
             )
             stack.enter_context(mock.patch.object(cli, "_enforce_spend_preconditions", return_value=({}, "2026-02-20", 0, 10**30)))
             stack.enter_context(
-                mock.patch.object(cli, "_uniswap_quote_via_proxy", return_value={"amountOutUnits": str(10**6), "routeType": "CLASSIC", "quote": {"k": "v"}})
+                mock.patch.object(
+                    cli,
+                    "_quote_trade_via_router_adapter",
+                    return_value={"amountOutUnits": str(10**6), "routeKind": "router_path"},
+                )
             )
             stack.enter_context(
                 mock.patch.object(cli, "_enforce_trade_caps", return_value=({}, "2026-02-20", Decimal("0"), 0, {"maxDailyUsd": "1000", "maxDailyTradeCount": 10}))
@@ -3201,8 +3219,15 @@ class TradePathRuntimeTests(unittest.TestCase):
             stack.enter_context(
                 mock.patch.object(
                     cli,
-                    "_execute_uniswap_swap_via_proxy",
-                    return_value={"txHash": "0x" + "ab" * 32, "approveTxHash": None, "amountOutUnits": str(10**6), "routeType": "CLASSIC"},
+                    "_execute_trade_via_router_adapter",
+                    return_value={
+                        "txHash": "0x" + "ab" * 32,
+                        "approveTxHashes": [],
+                        "operationTxHashes": ["0x" + "ab" * 32],
+                        "executionFamily": "amm_v2",
+                        "executionAdapter": "uniswap_v2",
+                        "routeKind": "router_path",
+                    },
                 )
             )
             stack.enter_context(mock.patch.object(cli.subprocess, "run", return_value=mock.Mock(returncode=0, stdout='{\"status\":\"0x1\"}', stderr="")))
@@ -3212,16 +3237,16 @@ class TradePathRuntimeTests(unittest.TestCase):
             stack.enter_context(mock.patch.object(cli, "_post_trade_usage"))
             payload = self._run_and_parse_stdout(lambda: cli.cmd_trade_spot(args))
         self.assertTrue(payload.get("ok"))
-        self.assertEqual(payload.get("providerUsed"), "uniswap_api")
+        self.assertEqual(payload.get("providerUsed"), "router_adapter")
         self.assertEqual(payload.get("fallbackUsed"), False)
-        self.assertEqual(payload.get("routeKind"), "CLASSIC")
+        self.assertEqual(payload.get("routeKind"), "router_path")
         self.assertIn("builderCodeChainEligible", payload)
         self.assertIn("builderCodeApplied", payload)
         self.assertIn("builderCodeSkippedReason", payload)
         self.assertIn("builderCodeSource", payload)
         self.assertIn("builderCodeStandard", payload)
 
-    def test_trade_spot_falls_back_to_legacy_when_uniswap_quote_fails(self) -> None:
+    def test_trade_spot_uses_router_adapter_without_proxy_fallback(self) -> None:
         args = argparse.Namespace(
             chain="ethereum_sepolia",
             token_in="WETH",
@@ -3234,27 +3259,41 @@ class TradePathRuntimeTests(unittest.TestCase):
         )
         with ExitStack() as stack:
             stack.enter_context(mock.patch.object(cli, "_replay_trade_usage_outbox"))
-            stack.enter_context(mock.patch.object(cli, "_trade_provider_settings", return_value=("uniswap_api", "legacy_router")))
+            stack.enter_context(mock.patch.object(cli, "_trade_provider_settings", return_value=("router_adapter", "none")))
             stack.enter_context(mock.patch.object(cli, "_resolve_token_address", side_effect=["0x" + "11" * 20, "0x" + "22" * 20]))
             stack.enter_context(mock.patch.object(cli, "load_wallet_store", return_value={}))
             stack.enter_context(mock.patch.object(cli, "_execution_wallet", return_value=("0x" + "33" * 20, "0x" + "44" * 32)))
             stack.enter_context(mock.patch.object(cli, "_require_cast_bin", return_value="cast"))
             stack.enter_context(mock.patch.object(cli, "_chain_rpc_url", return_value="https://rpc.example"))
-            stack.enter_context(mock.patch.object(cli, "_legacy_router_available", return_value=True))
-            stack.enter_context(mock.patch.object(cli, "_require_chain_contract_address", return_value="0x" + "66" * 20))
             stack.enter_context(
                 mock.patch.object(cli, "_fetch_erc20_metadata", side_effect=[{"symbol": "WETH", "decimals": 18}, {"symbol": "USDC", "decimals": 6}])
             )
             stack.enter_context(mock.patch.object(cli, "_enforce_spend_preconditions", return_value=({}, "2026-02-20", 0, 10**30)))
-            stack.enter_context(mock.patch.object(cli, "_uniswap_quote_via_proxy", side_effect=cli.WalletStoreError("proxy down")))
-            stack.enter_context(mock.patch.object(cli, "_router_get_amount_out", return_value=10**6))
+            stack.enter_context(
+                mock.patch.object(
+                    cli,
+                    "_quote_trade_via_router_adapter",
+                    return_value={"amountOutUnits": str(10**6), "routeKind": "router_path"},
+                )
+            )
             stack.enter_context(
                 mock.patch.object(cli, "_enforce_trade_caps", return_value=({}, "2026-02-20", Decimal("0"), 0, {"maxDailyUsd": "1000", "maxDailyTradeCount": 10}))
             )
             stack.enter_context(mock.patch.object(cli, "_post_trade_proposed", return_value={"ok": True, "tradeId": "trd_1", "status": "approved"}))
-            stack.enter_context(mock.patch.object(cli, "_fetch_token_allowance_wei", return_value=str(10**30)))
-            stack.enter_context(mock.patch.object(cli, "_cast_calldata", return_value="0xdeadbeef"))
-            stack.enter_context(mock.patch.object(cli, "_cast_rpc_send_transaction", return_value="0x" + "ab" * 32))
+            stack.enter_context(
+                mock.patch.object(
+                    cli,
+                    "_execute_trade_via_router_adapter",
+                    return_value={
+                        "txHash": "0x" + "ab" * 32,
+                        "approveTxHashes": [],
+                        "operationTxHashes": ["0x" + "ab" * 32],
+                        "executionFamily": "amm_v2",
+                        "executionAdapter": "uniswap_v2",
+                        "routeKind": "router_path",
+                    },
+                )
+            )
             stack.enter_context(mock.patch.object(cli.subprocess, "run", return_value=mock.Mock(returncode=0, stdout='{\"status\":\"0x1\"}', stderr="")))
             stack.enter_context(mock.patch.object(cli, "_post_trade_status"))
             stack.enter_context(mock.patch.object(cli, "_record_spend"))
@@ -3262,8 +3301,8 @@ class TradePathRuntimeTests(unittest.TestCase):
             stack.enter_context(mock.patch.object(cli, "_post_trade_usage"))
             payload = self._run_and_parse_stdout(lambda: cli.cmd_trade_spot(args))
         self.assertTrue(payload.get("ok"))
-        self.assertEqual(payload.get("providerUsed"), "legacy_router")
-        self.assertEqual(payload.get("fallbackUsed"), True)
+        self.assertEqual(payload.get("providerUsed"), "router_adapter")
+        self.assertEqual(payload.get("fallbackUsed"), False)
 
     def test_liquidity_provider_settings_prefers_chain_config(self) -> None:
         with mock.patch.object(
@@ -3275,8 +3314,8 @@ class TradePathRuntimeTests(unittest.TestCase):
             },
         ):
             primary, fallback = cli._liquidity_provider_settings("ethereum_sepolia")
-        self.assertEqual(primary, "legacy_router")
-        self.assertEqual(fallback, "legacy_router")
+        self.assertEqual(primary, "router_adapter")
+        self.assertEqual(fallback, "none")
 
     def test_liquidity_provider_settings_uniswap_flag_defaults_to_uniswap(self) -> None:
         with mock.patch.object(
@@ -3285,8 +3324,8 @@ class TradePathRuntimeTests(unittest.TestCase):
             return_value={"uniswapApi": {"enabled": True, "liquidityEnabled": True}},
         ):
             primary, fallback = cli._liquidity_provider_settings("ethereum_sepolia")
-        self.assertEqual(primary, "legacy_router")
-        self.assertEqual(fallback, "legacy_router")
+        self.assertEqual(primary, "router_adapter")
+        self.assertEqual(fallback, "none")
 
     def test_liquidity_provider_meta_contains_expected_fields(self) -> None:
         meta = cli._build_liquidity_provider_meta(
@@ -3313,8 +3352,8 @@ class TradePathRuntimeTests(unittest.TestCase):
             },
         ):
             primary, fallback = cli._trade_provider_settings("base_mainnet")
-        self.assertEqual(primary, "legacy_router")
-        self.assertEqual(fallback, "legacy_router")
+        self.assertEqual(primary, "router_adapter")
+        self.assertEqual(fallback, "none")
 
     def test_trade_provider_settings_keeps_fallback_disabled_when_legacy_not_enabled(self) -> None:
         with mock.patch.object(
@@ -3326,7 +3365,7 @@ class TradePathRuntimeTests(unittest.TestCase):
             },
         ):
             primary, fallback = cli._trade_provider_settings("zksync_mainnet")
-        self.assertEqual(primary, "legacy_router")
+        self.assertEqual(primary, "router_adapter")
         self.assertEqual(fallback, "none")
 
 

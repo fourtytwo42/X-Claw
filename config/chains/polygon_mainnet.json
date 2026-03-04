@@ -36,10 +36,6 @@
     "faucet": false,
     "deposits": false
   },
-  "tradeProviders": {
-    "primary": "uniswap_api",
-    "fallback": "legacy_router"
-  },
   "uniswapApi": {
     "enabled": true,
     "liquidityEnabled": true,
@@ -71,10 +67,6 @@
       "eth_chainId https://polygon-bor-rpc.publicnode.com -> expected 0x89",
       "router.factory() 0xedf6066a2b290C185783862C7F4776A2C8077AD1 -> 0x9e5A52f57b3038F1B8EeE45F28b3C1967e22799C"
     ]
-  },
-  "liquidityProviders": {
-    "primary": "uniswap_api",
-    "fallback": "legacy_router"
   },
   "liquidityOperations": {
     "claimFees": {

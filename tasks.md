@@ -1,3 +1,33 @@
+# Slice 128 Tasks: Unified EVM Action Engine (Phase 1) (2026-03-04)
+
+Active slice context: `Slice 128`.
+
+## 1) Scope lock
+- [x] Limit scope to phase-1 unified local execution for spot swaps and AMM v2 liquidity add/remove.
+- [x] Preserve `/uniswap/*` and advanced LP compatibility paths.
+
+## 2) Implementation
+- [x] Add shared action-plan contracts and `EvmActionExecutor`.
+- [x] Add AMM v2 trade adapter planner and AMM v2 liquidity add/remove planners.
+- [x] Rewire `trade spot` and `trade execute` to local adapter-built execution.
+- [x] Rewire AMM v2 `liquidity add` / `liquidity remove` to the shared executor.
+- [x] Normalize phase-1 runtime provider metadata to `router_adapter`.
+- [x] Remove stale `tradeProviders` / `liquidityProviders` from active chain configs.
+- [x] Add executor-focused regression coverage and update touched trade/liquidity tests.
+
+## 3) Validation
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_evm_action_executor.py -v`
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_dex_adapter.py -v`
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_liquidity_adapter.py -v`
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v`
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+
 # Slice 124-127 Tasks: Final EVM-Only Closeout (2026-03-03)
 
 Active slice context: `Slice 124 -> Slice 127`.

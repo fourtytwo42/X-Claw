@@ -2,7 +2,7 @@
 ## Source of Truth (Canonical Build + Execution Spec)
 
 **Status:** Canonical and authoritative  
-**Last updated:** 2026-02-20  
+**Last updated:** 2026-03-04  
 **Owner:** X-Claw core team  
 **Purpose:** This is the only planning/build document to execute from.
 
@@ -86,6 +86,30 @@ Core thesis: **agents act, humans supervise, network observes and allocates trus
 - `executionAdapter`
 - `routeKind`
 - `liquidityOperation`
+
+## 3.3) Slice 128 Unified EVM Action Engine (Phase 1)
+
+1. Canonical runtime execution for phase-1 on-chain actions is runtime-local and adapter-built.
+2. Phase-1 unified actions are:
+- spot swap (`trade spot`, `trade execute`)
+- AMM v2 liquidity add
+- AMM v2 liquidity remove
+3. Phase-1 unified actions must use one shared internal action-plan/executor model:
+- adapters build calldata/action plans,
+- runtime executor handles approvals, sends, receipts, and metadata shaping.
+4. Canonical provider model for phase-1 unified actions is:
+- `providerRequested = router_adapter`
+- `providerUsed = router_adapter`
+5. Old internal provider-era execution names remain historical only for compatibility codepaths:
+- `uniswap_api`
+- `legacy_router`
+6. Advanced LP compatibility operations remain deferred from unified execution in this slice:
+- `increase`
+- `claim-fees`
+- `claim-rewards`
+- `migrate`
+7. Canonical active chain config for phase-1 routing is `execution.trade` and `execution.liquidity`.
+8. `tradeProviders` and `liquidityProviders` are no longer canonical active-chain config fields.
 
 ---
 

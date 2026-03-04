@@ -5,6 +5,9 @@ from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from xclaw_agent.chains import get_chain
+from xclaw_agent.execution_contracts import EvmActionPlan
+from xclaw_agent.liquidity_adapters.amm_v2 import AmmV2LiquidityExecutionAdapter
+from xclaw_agent.liquidity_adapters.amm_v3 import AmmV3LiquidityExecutionAdapter
 
 _DEX_ALIASES: dict[str, str] = {
     "uniswap": "uniswap_v2",
@@ -30,6 +33,9 @@ class LiquidityAdapter:
     dex: str
     protocol_family: str
     position_type: str
+    router: str = ""
+    factory: str = ""
+    quoter: str = ""
 
     def quote_add(self, payload: dict[str, Any]) -> dict[str, Any]:
         amount_a = _require_positive_decimal(payload.get("amountA"), "amountA")
@@ -115,13 +121,68 @@ class LiquidityAdapter:
             "positionId": position_id,
         }
 
+    def build_add_plan(
+        self,
+        payload: dict[str, Any],
+        wallet_address: str,
+        *,
+        build_calldata: callable,
+    ) -> EvmActionPlan:
+        raise UnsupportedLiquidityOperation("unsupported_liquidity_execution_family")
+
+    def build_remove_plan(
+        self,
+        payload: dict[str, Any],
+        wallet_address: str,
+        *,
+        build_calldata: callable,
+    ) -> EvmActionPlan:
+        raise UnsupportedLiquidityOperation("unsupported_liquidity_execution_family")
+
 
 class AmmV2LiquidityAdapter(LiquidityAdapter):
-    pass
+    def build_add_plan(
+        self,
+        payload: dict[str, Any],
+        wallet_address: str,
+        *,
+        build_calldata: callable,
+    ) -> EvmActionPlan:
+        planner = AmmV2LiquidityExecutionAdapter(
+            chain=self.chain,
+            adapter_key=self.dex,
+            router=self.router,
+            factory=self.factory,
+            quoter=self.quoter,
+        )
+        return planner.build_add_plan(payload, wallet_address, build_calldata=build_calldata)
+
+    def build_remove_plan(
+        self,
+        payload: dict[str, Any],
+        wallet_address: str,
+        *,
+        build_calldata: callable,
+    ) -> EvmActionPlan:
+        planner = AmmV2LiquidityExecutionAdapter(
+            chain=self.chain,
+            adapter_key=self.dex,
+            router=self.router,
+            factory=self.factory,
+            quoter=self.quoter,
+        )
+        return planner.build_remove_plan(payload, wallet_address, build_calldata=build_calldata)
 
 
 class AmmV3LiquidityAdapter(LiquidityAdapter):
-    pass
+    def _planner(self) -> AmmV3LiquidityExecutionAdapter:
+        return AmmV3LiquidityExecutionAdapter(
+            chain=self.chain,
+            adapter_key=self.dex,
+            router=self.router,
+            factory=self.factory,
+            quoter=self.quoter,
+        )
 
 
 def _require_non_empty(value: Any, field_name: str) -> str:
@@ -187,6 +248,9 @@ def _protocols_for_chain(chain: str) -> dict[str, dict[str, Any]]:
                 translated[adapter_key] = {
                     "enabled": True,
                     "family": str(value.get("family") or "amm_v2").strip().lower() or "amm_v2",
+                    "router": str(value.get("router") or "").strip(),
+                    "factory": str(value.get("factory") or "").strip(),
+                    "quoter": str(value.get("quoter") or "").strip(),
                 }
         payload = translated
     if not isinstance(payload, dict) or not payload:
@@ -241,6 +305,11 @@ def build_liquidity_adapter(chain: str, dex: str, protocol_family: str, position
     normalized = (protocol_family or "").strip().lower() or "amm_v2"
     normalized_position = (position_type or "v2").strip().lower()
     normalized_dex = (dex or "").strip().lower() or "default"
+    protocols = _protocols_for_chain(chain)
+    protocol_entry = protocols.get(normalized_dex, {})
+    router = str(protocol_entry.get("router") or "").strip()
+    factory = str(protocol_entry.get("factory") or "").strip()
+    quoter = str(protocol_entry.get("quoter") or "").strip()
 
     if normalized == "amm_v3":
         return AmmV3LiquidityAdapter(
@@ -248,6 +317,9 @@ def build_liquidity_adapter(chain: str, dex: str, protocol_family: str, position
             dex=normalized_dex,
             protocol_family=normalized,
             position_type=normalized_position,
+            router=router,
+            factory=factory,
+            quoter=quoter,
         )
     if normalized == "amm_v2":
         return AmmV2LiquidityAdapter(
@@ -255,6 +327,9 @@ def build_liquidity_adapter(chain: str, dex: str, protocol_family: str, position
             dex=normalized_dex,
             protocol_family=normalized,
             position_type=normalized_position,
+            router=router,
+            factory=factory,
+            quoter=quoter,
         )
 
     raise UnsupportedLiquidityAdapter(
