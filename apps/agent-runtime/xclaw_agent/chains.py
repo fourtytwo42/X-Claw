@@ -39,7 +39,7 @@ def list_chains(include_disabled: bool = False) -> list[dict[str, Any]]:
         if not chain_key:
             continue
         family = str(cfg.get("family") or "evm").strip().lower() or "evm"
-        if family != "evm":
+        if family not in {"evm", "solana"}:
             continue
         if not include_disabled and not _is_enabled(cfg):
             continue

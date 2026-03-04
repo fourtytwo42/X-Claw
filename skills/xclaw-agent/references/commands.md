@@ -12,7 +12,7 @@ This reference defines the expected command surface for the Python-first skill w
 - `intents-poll`
 - `approval-check <intent_id>`
 - `trade-exec <intent_id>`
-- `trade-spot <token_in> <token_out> <amount_in> <slippage_bps> [chain_key]` (`amount_in` is human token units; use `wei:<uint>` for raw base units)
+- `trade-spot <token_in> <token_out> <amount_in> <slippage_bps> [chain_key]` (`amount_in` uses chain base units for Solana; for EVM it accepts human units and `wei:<uint>` base-unit form)
 - `trade-resume <trade_id>` (internal auto-resume path for single-trigger Telegram spot approvals)
 - `liquidity-add <dex> <token_a> <token_b> <amount_a> <amount_b> <slippage_bps> [v2|v3] [v3_range]`
 - `liquidity-remove <dex> <position_id> [percent] [slippage_bps] [v2|v3]`
@@ -64,7 +64,7 @@ This reference defines the expected command surface for the Python-first skill w
 - `wallet-wrap-native <amount>`
 - `wallet-create`
 
-`wallet-balance` returns native chain balance plus token balances (`tokens[]`) from canonical tokens and tracked EVM tokens.
+`wallet-balance` returns native chain balance plus token balances (`tokens[]`) from canonical and tracked tokens for the active chain family.
 `dexscreener-search` and `dexscreener-token-pairs` fetch market research data directly from Dexscreener REST (`api.dexscreener.com`) from skill runtime, not via xclaw-agent server routes.
 `dexscreener-top` is a skill-side ranking helper: liquidity-desc order with normalized decimal-string output (`priceUsd` 8dp; USD metrics 2dp).
 `token-research` orchestrates search + ranking + primary token drilldown and returns one compact research payload for chat-first model usage.
@@ -138,7 +138,7 @@ Underlying runtime delegation (performed by wrapper):
 - `xclaw-agent wallet create --chain <chain_key> --json`
 
 Installer/bootstrap note:
-- Hosted installer (`/skill-install.sh`) creates/binds the default-chain EVM wallet/runtime and persists the generic router-adapter env expected by the runtime.
+- Hosted installer (`/skill-install.sh`) creates/binds the default-chain wallet/runtime and persists generic adapter env expected by the runtime across EVM and Solana chains.
 
 ## Output Requirements
 

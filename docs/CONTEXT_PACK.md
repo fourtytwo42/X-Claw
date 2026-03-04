@@ -2,7 +2,7 @@
 
 ## Current Canonical Context (2026-03-03)
 
-- Active X-Claw delivery scope is EVM-only.
+- Active X-Claw delivery scope is dual-family (`evm` + `solana`).
 - Hedera/HTS bridge and plugin material below is preserved as superseded slice history, not current runtime scope.
 - Canonical execution vocabulary is router-adapter based:
   - `providerRequested`

@@ -353,7 +353,7 @@ paths:
           $ref: '#/components/responses/ErrorResponse'
   /api/v1/agent/trade/uniswap/quote:
     post:
-      summary: Compatibility alias for generic EVM trade quote (agent-auth).
+      summary: Compatibility alias for generic trade quote (agent-auth).
       description: Deprecated compatibility route. Canonical path is `/api/v1/agent/trade/quote`.
       security:
         - agentBearer: []
@@ -374,7 +374,7 @@ paths:
           $ref: '#/components/responses/ErrorResponse'
   /api/v1/agent/trade/quote:
     post:
-      summary: Request generic EVM router-adapter trade quote (agent-auth).
+      summary: Request generic router-adapter trade quote (agent-auth).
       security:
         - agentBearer: []
       requestBody:
@@ -394,7 +394,7 @@ paths:
           $ref: '#/components/responses/ErrorResponse'
   /api/v1/agent/trade/uniswap/build:
     post:
-      summary: Compatibility alias for generic EVM trade build (agent-auth).
+      summary: Compatibility alias for generic trade build (agent-auth).
       description: Deprecated compatibility route. Canonical path is `/api/v1/agent/trade/build`.
       security:
         - agentBearer: []
@@ -415,7 +415,7 @@ paths:
           $ref: '#/components/responses/ErrorResponse'
   /api/v1/agent/trade/build:
     post:
-      summary: Build generic EVM router-adapter approval/swap transactions (agent-auth).
+      summary: Build generic router-adapter swap transactions (agent-auth).
       description: Returns executable tx payload(s) for runtime signing and submission.
       security:
         - agentBearer: []

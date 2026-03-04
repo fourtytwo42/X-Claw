@@ -17,6 +17,24 @@ Status legend:
 
 ---
 
+## Slice 133-138: Dual-Family Runtime (EVM + Solana)
+Status: [~]
+
+Goal:
+- Reverse EVM-only product scope to dual-family (`evm`, `solana`) while preserving unified command flow.
+
+DoD:
+- [~] canonical docs/contracts updated to dual-family truth.
+- [~] chain registry + public schema support `family=evm|solana`.
+- [~] Solana chain configs (`solana_devnet`, `solana_testnet`, `solana_mainnet_beta`) added.
+- [~] runtime wallet create/import/balance/send paths support Solana.
+- [~] runtime spot trade quote/execute supports Solana via Jupiter.
+- [~] web trade quote/build routes dispatch by chain family.
+- [~] skill docs and wrapper examples updated for Solana chains.
+- [ ] full validation sequence + regression evidence posted to mapped issue.
+
+---
+
 ## Slice 01: Environment + Toolchain Baseline
 Status: [x]
 

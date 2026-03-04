@@ -1,3 +1,18 @@
+# Slice 133-138 Spec: Dual-Family Runtime (EVM + Solana) (2026-03-04)
+
+## Goal
+1. Reverse EVM-only scope to dual-family chain support (`evm` + `solana`).
+2. Keep wallet/transfer/trade command lifecycle unified across families.
+3. Add runtime-local Solana spot trading via Jupiter with agent-local signing.
+4. Keep `/uniswap/*` as EVM compatibility aliases only.
+
+## Non-goals
+1. No Solana liquidity/LP parity in this pass.
+2. No removal of EVM compatibility routes in this pass.
+3. No custody model changes (private keys remain runtime-local).
+
+---
+
 # Slice 130 Spec: Concentrated-Liquidity Add/Remove + First-Class Migrate Planner (2026-03-04)
 
 ## Goal

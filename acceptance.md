@@ -1,3 +1,30 @@
+# Slice 133-138 Acceptance Evidence: Dual-Family Runtime (EVM + Solana)
+
+Date (UTC): 2026-03-04
+Active slice context: `Slice 133 -> Slice 138`.
+
+## Objective + Scope Lock
+- Objective:
+  - enable dual-family runtime (`evm`, `solana`) with unified wallet/transfer/trade command flow,
+  - add Solana trade quote/execute path via Jupiter while preserving EVM regression behavior.
+
+## Behavior Checks
+- [x] public chain registry/schema allows both `family=evm` and `family=solana`.
+- [x] Solana chain configs present and ui-visible.
+- [x] runtime wallet create/import/sign/send/balance/token-balance support Solana chains.
+- [x] runtime trade spot/execute includes Solana Jupiter execution path.
+- [x] web trade quote/build routes dispatch by chain family (EVM router vs Solana Jupiter).
+- [x] skill wrapper/docs include Solana chain examples.
+
+## Required Validation Gates
+- [ ] targeted Python Solana/EVM runtime tests
+- [ ] `npm run db:parity`
+- [ ] `npm run seed:reset`
+- [ ] `npm run seed:load`
+- [ ] `npm run seed:verify`
+- [ ] `npm run build`
+- [ ] `pm2 restart all`
+
 # Slice 130 Acceptance Evidence: Concentrated-Liquidity Add/Remove + First-Class Migrate Planner
 
 Date (UTC): 2026-03-04

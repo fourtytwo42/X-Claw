@@ -11,6 +11,18 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 
 ---
 
+## 0.5) Slice 133-138 Dual-Family Program (EVM + Solana)
+
+- [~] Canonical contract reversal from EVM-only to dual-family runtime support.
+- [~] Shared chain contracts updated to `family=evm|solana`.
+- [~] Solana chain configs added (devnet/testnet/mainnet-beta).
+- [~] Runtime wallet + transfer + spot trade flow extended to Solana.
+- [~] Web trade quote/build dispatch updated for Solana Jupiter path.
+- [~] Skill wrapper/docs updated for Solana chain examples and behavior.
+- [ ] Sequential validation + PM2 restart evidence captured.
+
+---
+
 ## 0) Program Control and Working Rules
 
 ### 0.1 Control setup

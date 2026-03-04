@@ -1,0 +1,50 @@
+{
+  "chainKey": "solana_mainnet_beta",
+  "family": "solana",
+  "enabled": true,
+  "uiVisible": true,
+  "chainId": 101,
+  "displayName": "Solana Mainnet",
+  "nativeCurrency": {
+    "name": "Solana",
+    "symbol": "SOL",
+    "decimals": 9
+  },
+  "explorerBaseUrl": "https://explorer.solana.com",
+  "rpc": {
+    "primary": "https://api.mainnet-beta.solana.com",
+    "fallback": "https://api.mainnet-beta.solana.com"
+  },
+  "canonicalTokens": {
+    "SOL": "So11111111111111111111111111111111111111112",
+    "USDC": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+  },
+  "capabilities": {
+    "wallet": true,
+    "trade": true,
+    "liquidity": false,
+    "limitOrders": false,
+    "x402": false,
+    "faucet": false,
+    "deposits": false
+  },
+  "marketData": {
+    "dexscreenerChainId": "solana"
+  },
+  "execution": {
+    "trade": {
+      "defaultProvider": "router_adapter",
+      "adapters": {
+        "default": {
+          "adapterKey": "jupiter",
+          "family": "solana_swap",
+          "router": "jupiter_v6"
+        }
+      }
+    },
+    "liquidity": {
+      "defaultProvider": "none",
+      "adapters": {}
+    }
+  }
+}

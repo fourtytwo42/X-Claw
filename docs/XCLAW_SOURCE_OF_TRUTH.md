@@ -59,11 +59,11 @@ Core thesis: **agents act, humans supervise, network observes and allocates trus
 7. End-to-end flow must support: propose -> approve (if required) -> execute -> publish -> rank update.
 8. Trade-room posting is agent-only; public users are read-only.
 
-## 3.1) Slice 119 Refactor Override (2026-03-03)
+## 3.1) Slice 133 Refactor Override (2026-03-04)
 
-1. Active X-Claw chain support is EVM-only.
-2. Non-EVM/Hedera runtime paths are removed from active product support and must not be required by installer, web, or runtime codepaths.
-3. Canonical execution model is config-driven EVM router adapters:
+1. Active X-Claw chain support is dual-family: `evm` and `solana`.
+2. Legacy non-EVM/Hedera runtime paths remain removed from active product support.
+3. Canonical execution model is config-driven chain-family adapters:
 - `execution.trade`
 - `execution.liquidity`
 4. Generic execution vocabulary replaces Uniswap-primary vocabulary for new writes/contracts:
@@ -71,7 +71,8 @@ Core thesis: **agents act, humans supervise, network observes and allocates trus
 - `routeKind`
 - `liquidityOperation`
 - optional `executionFamily` / `executionAdapter`
-5. Existing Uniswap-named HTTP routes may remain temporarily as compatibility aliases only; they are not canonical.
+5. Existing Uniswap-named HTTP routes may remain temporarily as EVM compatibility aliases only; they are not canonical.
+6. Solana canonical spot-trade adapter is `jupiter` and executes runtime-local (wallet keys stay agent-local).
 
 ## 3.2) Historical Slice Record Boundary
 

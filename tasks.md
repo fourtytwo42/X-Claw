@@ -1,3 +1,30 @@
+# Slice 133-138 Tasks: Dual-Family Runtime (EVM + Solana) (2026-03-04)
+
+Active slice context: `Slice 133 -> Slice 138`.
+
+## 1) Scope lock
+- [x] Reverse canonical scope to dual-family runtime (`evm`, `solana`).
+- [x] Preserve compatibility `/uniswap/*` routes for EVM.
+- [x] Keep Solana scope to wallet + transfer + spot trade (no LP parity).
+
+## 2) Implementation
+- [x] Add Solana chain configs (`solana_devnet`, `solana_testnet`, `solana_mainnet_beta`).
+- [x] Remove EVM-only chain filtering in runtime/web chain registries.
+- [x] Add runtime Solana wallet/transfer/signing/trade execution module.
+- [x] Add runtime Solana trade execution branch via Jupiter in `trade spot/execute`.
+- [x] Add web trade quote/build Solana Jupiter dispatch.
+- [x] Update skill wrapper/docs for Solana chain examples.
+- [x] Update shared schemas for dual-family trade payloads and public chains family enum.
+
+## 3) Validation
+- [ ] targeted Python/runtime tests for Solana + EVM regression
+- [ ] `npm run db:parity`
+- [ ] `npm run seed:reset`
+- [ ] `npm run seed:load`
+- [ ] `npm run seed:verify`
+- [ ] `npm run build`
+- [ ] `pm2 restart all`
+
 # Slice 130 Tasks: Concentrated-Liquidity Add/Remove + First-Class Migrate Planner (2026-03-04)
 
 Active slice context: `Slice 130`.

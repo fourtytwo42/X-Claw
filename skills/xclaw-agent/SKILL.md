@@ -84,7 +84,7 @@ Use this skill to run X-Claw commands safely through `scripts/xclaw_agent_skill.
 Required:
 - `XCLAW_API_BASE_URL`
 - `XCLAW_AGENT_API_KEY`
-- `XCLAW_DEFAULT_CHAIN` (usually `base_sepolia`)
+- `XCLAW_DEFAULT_CHAIN` (for example `base_sepolia` or `solana_devnet`)
 
 Common optional:
 - `XCLAW_WALLET_PASSPHRASE`
@@ -158,7 +158,7 @@ Additional capabilities:
 
 ## Operational Notes
 
-- `wallet-balance` returns native plus non-zero token balances from canonical and tracked EVM token sources.
+- `wallet-balance` returns native plus non-zero token balances from canonical and tracked chain-family token sources.
 - `wallet-track-token` registers non-canonical ERC-20 addresses for tracking; tracked symbols can be used with `wallet-send-token` when unique.
 - Dexscreener research commands query Dexscreener REST directly from the skill wrapper (`api.dexscreener.com`) and do not route through X-Claw server APIs.
 - `dexscreener-top` sorts by liquidity descending and emits normalized decimal strings (`priceUsd` 8dp, USD metrics 2dp).
@@ -174,7 +174,7 @@ Additional capabilities:
 - Transfer decision reliability default: keep `approvals run-loop` active on agent host to consume `/agent/transfer-decisions/inbox`; use `approvals sync` only as manual fallback/debug tool.
 - Installer hardening contract: install/setup must fail closed if run-loop signing readiness is unhealthy; successful install implies `approvals run-loop --once --json` reports `walletSigningReady=true`.
 - Wallet native wrapping is exposed as `wallet-wrap-native <amount>` and delegates to runtime `wallet wrap-native --chain <chain> --amount <amount> --json` using config-driven wrapped-native resolution (helper when configured, canonical wrapped token otherwise).
-- Hosted installer provisions the default EVM wallet/runtime only; skill commands should not assume any non-EVM auto-bind side effects.
+- Hosted installer provisions runtime defaults; skill commands should use chain-aware wallet/runtime behavior for both EVM and Solana chains.
 - Faucet failures remain deterministic (`faucet_*` codes) with `requestId` passthrough when provided by the server.
 - Faucet default behavior is all-assets (`native+wrapped+stable`) when asset flags are omitted; skill wrapper also keeps this default when only native is requested (for example `faucet-request hbar`).
 

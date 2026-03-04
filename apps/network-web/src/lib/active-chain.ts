@@ -31,12 +31,18 @@ const FALLBACK_REGISTRY: ChainDescriptor[] = [
   { chainKey: 'adi_testnet', displayName: 'ADI Network AB Testnet', nativeCurrency: { symbol: 'ADI', decimals: 18 } },
   { chainKey: 'og_mainnet', displayName: '0G Mainnet', nativeCurrency: { symbol: '0G', decimals: 18 } },
   { chainKey: 'og_testnet', displayName: '0G Galileo Testnet', nativeCurrency: { symbol: '0G', decimals: 18 } },
+  { chainKey: 'solana_devnet', displayName: 'Solana Devnet', nativeCurrency: { symbol: 'SOL', decimals: 9 } },
+  { chainKey: 'solana_testnet', displayName: 'Solana Testnet', nativeCurrency: { symbol: 'SOL', decimals: 9 } },
+  { chainKey: 'solana_mainnet_beta', displayName: 'Solana Mainnet', nativeCurrency: { symbol: 'SOL', decimals: 9 } },
 ];
 
 function fallbackNativeDecimalsFor(chainKey: string, nativeSymbol: string): number {
   const fromChain = FALLBACK_REGISTRY.find((row) => row.chainKey === chainKey)?.nativeCurrency?.decimals;
   if (typeof fromChain === 'number' && Number.isFinite(fromChain) && fromChain > 0) {
     return Math.floor(fromChain);
+  }
+  if (String(nativeSymbol || '').trim().toUpperCase() === 'SOL') {
+    return 9;
   }
   return 18;
 }
@@ -90,6 +96,9 @@ export function nativeSymbolForChainKey(chainKey: ChainKey): string {
   const found = registry.find((row) => row.chainKey === chainKey);
   if (found?.nativeCurrency?.symbol && found.nativeCurrency.symbol.trim()) {
     return found.nativeCurrency.symbol.trim().toUpperCase();
+  }
+  if (chainKey.startsWith('solana_')) {
+    return 'SOL';
   }
   return 'ETH';
 }

@@ -69,6 +69,20 @@ from xclaw_agent.liquidity_adapter import (
     UnsupportedLiquidityAdapter,
 )
 from xclaw_agent.trade_execution import build_trade_plan, execute_trade_plan, quote_trade
+from xclaw_agent.solana_runtime import (
+    SolanaRuntimeError,
+    generate_wallet as solana_generate_wallet,
+    get_balance_lamports as solana_get_balance_lamports,
+    get_token_balances as solana_get_token_balances,
+    import_wallet_private_key as solana_import_wallet_private_key,
+    is_solana_address,
+    is_solana_chain_key,
+    jupiter_execute_swap as solana_jupiter_execute_swap,
+    jupiter_quote as solana_jupiter_quote,
+    send_native_transfer as solana_send_native_transfer,
+    send_spl_transfer as solana_send_spl_transfer,
+    sign_message as solana_sign_message,
+)
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 try:
     from argon2.low_level import Type, hash_secret_raw
@@ -792,6 +806,17 @@ def is_hex_address(value: str) -> bool:
     return bool(re.fullmatch(r"0x[a-fA-F0-9]{40}", value))
 
 
+def _chain_family(chain: str) -> str:
+    cfg = _load_chain_config(chain)
+    return str(cfg.get("family") or "evm").strip().lower() or "evm"
+
+
+def _is_solana_chain(chain: str) -> bool:
+    if is_solana_chain_key(chain):
+        return True
+    return _chain_family(chain) == "solana"
+
+
 def _normalize_private_key_hex(value: str) -> str | None:
     stripped = value.strip()
     if stripped.startswith("0x"):
@@ -871,6 +896,8 @@ def _is_rpc_endpoint_healthy(rpc_url: str) -> bool:
 
 def _chain_rpc_url(chain: str) -> str:
     candidates = _chain_rpc_candidates(chain)
+    if _is_solana_chain(chain):
+        return candidates[0]
     if len(candidates) == 1:
         return candidates[0]
     for candidate in candidates:
@@ -1123,13 +1150,12 @@ def _derive_aes_key(passphrase: str, salt: bytes) -> bytes:
     )
 
 
-def _encrypt_private_key(private_key_hex: str, passphrase: str) -> dict[str, Any]:
-    private_key_bytes = bytes.fromhex(private_key_hex)
+def _encrypt_secret_bytes(secret_bytes: bytes, passphrase: str) -> dict[str, Any]:
     salt = secrets.token_bytes(16)
     nonce = secrets.token_bytes(12)
     key = _derive_aes_key(passphrase, salt)
     cipher = AESGCM(key)
-    ciphertext = cipher.encrypt(nonce, private_key_bytes, None)
+    ciphertext = cipher.encrypt(nonce, secret_bytes, None)
     return {
         "version": 1,
         "enc": "aes-256-gcm",
@@ -1144,6 +1170,11 @@ def _encrypt_private_key(private_key_hex: str, passphrase: str) -> dict[str, Any
         "nonceB64": base64.b64encode(nonce).decode("ascii"),
         "ciphertextB64": base64.b64encode(ciphertext).decode("ascii"),
     }
+
+
+def _encrypt_private_key(private_key_hex: str, passphrase: str) -> dict[str, Any]:
+    private_key_bytes = bytes.fromhex(private_key_hex)
+    return _encrypt_secret_bytes(private_key_bytes, passphrase)
 
 
 def _decrypt_private_key(entry: dict[str, Any], passphrase: str) -> bytes:
@@ -1170,8 +1201,15 @@ def _validate_wallet_entry_shape(entry: dict[str, Any]) -> None:
     if not isinstance(entry, dict):
         raise WalletStoreError("Wallet entry is not an object.")
     address = entry.get("address")
-    if not isinstance(address, str) or not is_hex_address(address):
+    key_scheme = str(entry.get("keyScheme") or "evm_secp256k1").strip().lower() or "evm_secp256k1"
+    if not isinstance(address, str):
         raise WalletStoreError("Wallet entry address is missing or invalid.")
+    if key_scheme == "solana_ed25519":
+        if not is_solana_address(address):
+            raise WalletStoreError("Wallet entry address is missing or invalid.")
+    else:
+        if not is_hex_address(address):
+            raise WalletStoreError("Wallet entry address is missing or invalid.")
     crypto = entry.get("crypto")
     if not isinstance(crypto, dict):
         raise WalletStoreError("Wallet entry crypto payload is missing.")
@@ -1191,6 +1229,9 @@ def _validate_wallet_entry_shape(entry: dict[str, Any]) -> None:
         raise WalletStoreError("Wallet crypto payload is not valid base64.") from exc
     if len(salt) != 16 or len(nonce) != 12 or len(ciphertext) < 16:
         raise WalletStoreError("Wallet crypto payload has invalid lengths.")
+
+    if key_scheme not in {"evm_secp256k1", "solana_ed25519"}:
+        raise WalletStoreError("Wallet entry keyScheme is invalid.")
 
 
 def _interactive_required() -> bool:
@@ -2599,14 +2640,22 @@ def _execute_pending_transfer_flow(flow: dict[str, Any]) -> dict[str, Any]:
         token_decimals = 18 if transfer_type == "native" else None
     amount_human, amount_unit = _transfer_amount_display(amount_wei, transfer_type, token_symbol, token_decimals)
     amount_display = f"{amount_human} {amount_unit}"
+    is_solana = _is_solana_chain(chain)
     if not approval_id or not chain:
         return {"ok": False, "code": "invalid_state", "message": "Missing approvalId/chain in transfer flow."}
     if not re.fullmatch(r"[0-9]+", amount_wei):
         return {"ok": False, "code": "invalid_state", "message": "Transfer flow amountWei must be uint."}
-    if not is_hex_address(to_address):
+    if is_solana:
+        if not is_solana_address(to_address):
+            return {"ok": False, "code": "invalid_state", "message": "Transfer flow destination is invalid."}
+    elif not is_hex_address(to_address):
         return {"ok": False, "code": "invalid_state", "message": "Transfer flow destination is invalid."}
-    if transfer_type == "token" and (not token_address or not is_hex_address(token_address)):
-        return {"ok": False, "code": "invalid_state", "message": "Transfer token address is invalid."}
+    if transfer_type == "token":
+        if is_solana:
+            if not token_address or not is_solana_address(token_address):
+                return {"ok": False, "code": "invalid_state", "message": "Transfer token address is invalid."}
+        elif not token_address or not is_hex_address(token_address):
+            return {"ok": False, "code": "invalid_state", "message": "Transfer token address is invalid."}
 
     outbound_eval = _evaluate_outbound_transfer_policy(chain, to_address)
     policy_blocked_now = not bool(outbound_eval.get("allowed"))
@@ -2668,55 +2717,65 @@ def _execute_pending_transfer_flow(flow: dict[str, Any]) -> dict[str, Any]:
             token_decimals=token_decimals,
         )
         passphrase = _require_wallet_passphrase_for_signing(chain)
-        private_key_hex = _decrypt_private_key(wallet, passphrase).hex()
+        private_key_bytes = _decrypt_private_key(wallet, passphrase)
 
         tx_hash: str
-        if transfer_type == "native":
-            rpc_url = _chain_rpc_url(chain)
-            tx_hash = _cast_rpc_send_transaction(
-                rpc_url,
-                {
-                    "from": from_address,
-                    "to": to_address,
-                    "value": amount_wei,
-                    "data": "0x",
-                },
-                private_key_hex,
-                chain=chain,
-            )
-            cast_bin = _require_cast_bin()
-            receipt_proc = _run_subprocess(
-                [cast_bin, "receipt", "--json", "--rpc-url", rpc_url, tx_hash],
-                timeout_sec=_cast_receipt_timeout_sec(),
-                kind="cast_receipt",
-            )
-            if receipt_proc.returncode != 0:
-                stderr = (receipt_proc.stderr or "").strip()
-                stdout = (receipt_proc.stdout or "").strip()
-                raise WalletStoreError(stderr or stdout or "cast receipt failed.")
+        rpc_url = _chain_rpc_url(chain)
+        if is_solana:
+            if transfer_type == "native":
+                tx_hash = solana_send_native_transfer(rpc_url, private_key_bytes, to_address, int(amount_wei))
+            else:
+                result = solana_send_spl_transfer(rpc_url, private_key_bytes, to_address, str(token_address), int(amount_wei))
+                tx_hash = str(result.get("signature") or "")
+                if token_decimals is None and isinstance(result.get("decimals"), int):
+                    token_decimals = int(result.get("decimals"))
+                flow["solanaTransfer"] = result
         else:
-            rpc_url = _chain_rpc_url(chain)
-            data = _cast_calldata("transfer(address,uint256)(bool)", [to_address, amount_wei])
-            tx_hash = _cast_rpc_send_transaction(
-                rpc_url,
-                {"from": from_address, "to": str(token_address), "data": data},
-                private_key_hex,
-                chain=chain,
-            )
-            cast_bin = _require_cast_bin()
-            receipt_proc = _run_subprocess(
-                [cast_bin, "receipt", "--json", "--rpc-url", rpc_url, tx_hash],
-                timeout_sec=_cast_receipt_timeout_sec(),
-                kind="cast_receipt",
-            )
-            if receipt_proc.returncode != 0:
-                stderr = (receipt_proc.stderr or "").strip()
-                stdout = (receipt_proc.stdout or "").strip()
-                raise WalletStoreError(stderr or stdout or "cast receipt failed.")
-            receipt_payload = json.loads((receipt_proc.stdout or "{}").strip() or "{}")
-            receipt_status = str(receipt_payload.get("status", "0x0")).lower()
-            if receipt_status not in {"0x1", "1"}:
-                raise WalletStoreError(f"On-chain receipt indicates failure status '{receipt_status}'.")
+            private_key_hex = private_key_bytes.hex()
+            if transfer_type == "native":
+                tx_hash = _cast_rpc_send_transaction(
+                    rpc_url,
+                    {
+                        "from": from_address,
+                        "to": to_address,
+                        "value": amount_wei,
+                        "data": "0x",
+                    },
+                    private_key_hex,
+                    chain=chain,
+                )
+                cast_bin = _require_cast_bin()
+                receipt_proc = _run_subprocess(
+                    [cast_bin, "receipt", "--json", "--rpc-url", rpc_url, tx_hash],
+                    timeout_sec=_cast_receipt_timeout_sec(),
+                    kind="cast_receipt",
+                )
+                if receipt_proc.returncode != 0:
+                    stderr = (receipt_proc.stderr or "").strip()
+                    stdout = (receipt_proc.stdout or "").strip()
+                    raise WalletStoreError(stderr or stdout or "cast receipt failed.")
+            else:
+                data = _cast_calldata("transfer(address,uint256)(bool)", [to_address, amount_wei])
+                tx_hash = _cast_rpc_send_transaction(
+                    rpc_url,
+                    {"from": from_address, "to": str(token_address), "data": data},
+                    private_key_hex,
+                    chain=chain,
+                )
+                cast_bin = _require_cast_bin()
+                receipt_proc = _run_subprocess(
+                    [cast_bin, "receipt", "--json", "--rpc-url", rpc_url, tx_hash],
+                    timeout_sec=_cast_receipt_timeout_sec(),
+                    kind="cast_receipt",
+                )
+                if receipt_proc.returncode != 0:
+                    stderr = (receipt_proc.stderr or "").strip()
+                    stdout = (receipt_proc.stdout or "").strip()
+                    raise WalletStoreError(stderr or stdout or "cast receipt failed.")
+                receipt_payload = json.loads((receipt_proc.stdout or "{}").strip() or "{}")
+                receipt_status = str(receipt_payload.get("status", "0x0")).lower()
+                if receipt_status not in {"0x1", "1"}:
+                    raise WalletStoreError(f"On-chain receipt indicates failure status '{receipt_status}'.")
 
         _record_spend(state, chain, day_key, current_spend + amount_int)
         flow["status"] = "filled"
@@ -2750,6 +2809,7 @@ def _execute_pending_transfer_flow(flow: dict[str, Any]) -> dict[str, Any]:
             "amountDisplay": amount_display,
             "from": from_address,
             "txHash": tx_hash,
+            "signature": tx_hash if is_solana else None,
             "day": day_key,
             "dailySpendWei": str(current_spend + amount_int),
             "maxDailyNativeWei": str(max_daily_wei),
@@ -2791,6 +2851,7 @@ def _execute_pending_transfer_flow(flow: dict[str, Any]) -> dict[str, Any]:
             "amountDisplay": amount_display,
             "from": from_address,
             "txHash": flow.get("txHash"),
+            "signature": flow.get("txHash") if is_solana else None,
             "reasonCode": "transfer_execution_failed",
             "reasonMessage": message,
             "policyBlockedAtCreate": policy_blocked_at_create,
@@ -6796,6 +6857,16 @@ def _format_eth_cost_from_wei(cost_wei: int | None) -> str | None:
 
 def _resolve_token_address(chain: str, token_or_symbol: str) -> str:
     candidate = str(token_or_symbol or "").strip()
+    if _is_solana_chain(chain):
+        if is_solana_address(candidate):
+            return candidate
+        symbol = candidate.upper()
+        token_map = _canonical_token_map(chain)
+        value = token_map.get(symbol)
+        if value and is_solana_address(value):
+            return value
+        raise WalletStoreError("token must be a Solana mint address or canonical token symbol for the active chain.")
+
     if is_hex_address(candidate):
         alias_map = _canonical_token_address_aliases(chain)
         return str(alias_map.get(candidate.lower()) or candidate)
@@ -8828,6 +8899,72 @@ def _execute_uniswap_swap_via_proxy(
     }
 
 
+def _solana_amount_units_or_fail(amount_in: str) -> str:
+    raw = str(amount_in or "").strip()
+    if not re.fullmatch(r"[0-9]+", raw):
+        raise WalletStoreError("For Solana trade execution, amountIn must be base-unit integer (lamports/token units).")
+    return raw
+
+
+def _execute_solana_trade(
+    *,
+    chain: str,
+    trade_id: str,
+    token_in: str,
+    token_out: str,
+    amount_in_units: str,
+    slippage_bps: int,
+    from_status: str,
+) -> dict[str, Any]:
+    quote = solana_jupiter_quote(
+        chain_key=chain,
+        input_mint=token_in,
+        output_mint=token_out,
+        amount_units=amount_in_units,
+        slippage_bps=slippage_bps,
+    )
+    store = load_wallet_store()
+    wallet_address, private_key_bytes, key_scheme = _execution_wallet_secret(store, chain)
+    if key_scheme != "solana_ed25519":
+        raise WalletStoreError(f"Wallet keyScheme '{key_scheme}' is not compatible with Solana execution on chain '{chain}'.")
+    tx = solana_jupiter_execute_swap(
+        chain_key=chain,
+        rpc_url=_chain_rpc_url(chain),
+        private_key_bytes=private_key_bytes,
+        quote_payload=quote.quote_payload,
+        user_address=wallet_address,
+    )
+    signature = str(tx.get("signature") or "")
+    provider_meta = _build_provider_meta("router_adapter", "router_adapter", False, None, quote.route_kind)
+    _post_trade_status(trade_id, from_status, "executing", {"txHash": signature, **provider_meta})
+    _post_trade_status(trade_id, "executing", "verifying", {"txHash": signature, **provider_meta})
+    _post_trade_status(
+        trade_id,
+        "verifying",
+        "filled",
+        {
+            "txHash": signature,
+            "amountOut": quote.amount_out_units,
+            "observationSource": "rpc_receipt",
+            "confirmationCount": 1,
+            "observedAt": utc_now(),
+            **provider_meta,
+        },
+    )
+    return {
+        "txHash": signature,
+        "signature": signature,
+        "amountOutUnits": quote.amount_out_units,
+        "routeKind": quote.route_kind,
+        "providerRequested": "router_adapter",
+        "providerUsed": "router_adapter",
+        "fallbackUsed": False,
+        "fallbackReason": None,
+        "executionFamily": "solana_swap",
+        "executionAdapter": "jupiter",
+    }
+
+
 def cmd_trade_spot(args: argparse.Namespace) -> int:
     chk = require_json_flag(args)
     if chk is not None:
@@ -8844,6 +8981,83 @@ def cmd_trade_spot(args: argparse.Namespace) -> int:
     fallback_reason: dict[str, str] | None = None
     uniswap_route_type: str | None = None
     try:
+        if _is_solana_chain(chain):
+            token_in = _resolve_token_address(chain, args.token_in)
+            token_out = _resolve_token_address(chain, args.token_out)
+            if token_in == token_out:
+                return fail(
+                    "invalid_input",
+                    "token-in and token-out must be different.",
+                    "Provide two distinct token mint addresses (or symbols).",
+                    {"tokenIn": token_in, "tokenOut": token_out, "chain": chain},
+                    exit_code=2,
+                )
+            slippage_bps = int(args.slippage_bps)
+            if slippage_bps < 0 or slippage_bps > 5000:
+                return fail(
+                    "invalid_input",
+                    "slippage-bps must be between 0 and 5000.",
+                    "Use a value like 50 for 0.5% or 500 for 5%.",
+                    {"slippageBps": args.slippage_bps},
+                    exit_code=2,
+                )
+            amount_in_units = _solana_amount_units_or_fail(str(args.amount_in))
+            amount_in_int = int(amount_in_units)
+            state, day_key, current_spend, max_daily_wei = _enforce_spend_preconditions(chain, amount_in_int, enforce_native_cap=False)
+            summary = {
+                "tradeId": None,
+                "chainKey": chain,
+                "tokenInSymbol": str(args.token_in),
+                "tokenOutSymbol": str(args.token_out),
+                "amountInHuman": _normalize_amount_human_text(amount_in_units),
+                "slippageBps": slippage_bps,
+            }
+            proposed = _post_trade_proposed(
+                chain,
+                token_in,
+                token_out,
+                amount_in_units,
+                slippage_bps,
+                amount_out_human=None,
+                reason="trade_spot_solana",
+            )
+            trade_id = str(proposed.get("tradeId") or "")
+            if not trade_id:
+                raise WalletStoreError("Trade proposal did not return a tradeId.")
+            summary["tradeId"] = trade_id
+            if str(proposed.get("status") or "") != "approved":
+                _wait_for_trade_approval(trade_id, chain, summary)
+            execution = _execute_solana_trade(
+                chain=chain,
+                trade_id=trade_id,
+                token_in=token_in,
+                token_out=token_out,
+                amount_in_units=amount_in_units,
+                slippage_bps=slippage_bps,
+                from_status="approved",
+            )
+            _record_spend(state, chain, day_key, current_spend + amount_in_int)
+            return ok(
+                "Spot swap executed on-chain via runtime-local Solana adapter.",
+                chain=chain,
+                tokenIn=token_in,
+                tokenOut=token_out,
+                amountInUnits=amount_in_units,
+                expectedOutUnits=str(execution.get("amountOutUnits") or "0"),
+                txHash=execution.get("txHash"),
+                signature=execution.get("signature"),
+                providerRequested=execution.get("providerRequested"),
+                providerUsed=execution.get("providerUsed"),
+                fallbackUsed=execution.get("fallbackUsed"),
+                fallbackReason=execution.get("fallbackReason"),
+                executionFamily=execution.get("executionFamily"),
+                executionAdapter=execution.get("executionAdapter"),
+                routeKind=execution.get("routeKind"),
+                day=day_key,
+                dailySpendWei=str(current_spend + amount_in_int),
+                maxDailyNativeWei=str(max_daily_wei),
+            )
+
         # Best-effort: usage outbox replay should not block input validation or proposing.
         try:
             _replay_trade_usage_outbox()
@@ -9335,10 +9549,25 @@ def _execution_wallet(store: dict[str, Any], chain: str) -> tuple[str, str]:
     if wallet is None:
         raise WalletStoreError(f"No wallet configured for chain '{chain}'.")
     _validate_wallet_entry_shape(wallet)
+    key_scheme = str(wallet.get("keyScheme") or "evm_secp256k1").strip().lower() or "evm_secp256k1"
+    if key_scheme != "evm_secp256k1":
+        raise WalletStoreError(f"Wallet keyScheme '{key_scheme}' is not compatible with EVM execution on chain '{chain}'.")
     address = str(wallet.get("address"))
     passphrase = _require_wallet_passphrase_for_signing(chain)
     private_key_hex = _decrypt_private_key(wallet, passphrase).hex()
     return address, private_key_hex
+
+
+def _execution_wallet_secret(store: dict[str, Any], chain: str) -> tuple[str, bytes, str]:
+    _, wallet = _chain_wallet(store, chain)
+    if wallet is None:
+        raise WalletStoreError(f"No wallet configured for chain '{chain}'.")
+    _validate_wallet_entry_shape(wallet)
+    address = str(wallet.get("address"))
+    key_scheme = str(wallet.get("keyScheme") or "evm_secp256k1").strip().lower() or "evm_secp256k1"
+    passphrase = _require_wallet_passphrase_for_signing(chain)
+    secret = _decrypt_private_key(wallet, passphrase)
+    return address, secret, key_scheme
 
 
 def _cast_calldata(signature: str, args: list[str]) -> str:
@@ -10074,6 +10303,54 @@ def cmd_trade_execute(args: argparse.Namespace) -> int:
     fallback_reason: dict[str, str] | None = None
     uniswap_route_type: str | None = None
     try:
+        if _is_solana_chain(args.chain):
+            trade = _read_trade_details(args.intent)
+            status = str(trade.get("status"))
+            if str(trade.get("chainKey")) != args.chain:
+                return fail(
+                    "chain_mismatch",
+                    "Trade chain does not match command --chain.",
+                    "Use matching chain or refresh intent selection.",
+                    {"tradeId": args.intent, "tradeChain": trade.get("chainKey"), "requestedChain": args.chain},
+                    exit_code=1,
+                )
+            if status not in {"approved", "failed"}:
+                return fail(
+                    "approval_required",
+                    f"Trade is not executable from status '{status}'.",
+                    "Execute only approved trades or failed trades within retry policy.",
+                    {"tradeId": args.intent, "status": status},
+                    exit_code=1,
+                )
+            token_in = _resolve_token_address(args.chain, str(trade.get("tokenIn") or ""))
+            token_out = _resolve_token_address(args.chain, str(trade.get("tokenOut") or ""))
+            amount_in_units = _solana_amount_units_or_fail(str(trade.get("amountIn") or ""))
+            slippage_bps = int(trade.get("slippageBps", 100) or 100)
+            execution = _execute_solana_trade(
+                chain=args.chain,
+                trade_id=args.intent,
+                token_in=token_in,
+                token_out=token_out,
+                amount_in_units=amount_in_units,
+                slippage_bps=slippage_bps,
+                from_status=status,
+            )
+            return ok(
+                "Trade executed in real mode via runtime-local Solana adapter.",
+                tradeId=args.intent,
+                chain=args.chain,
+                status="filled",
+                txHash=execution.get("txHash"),
+                signature=execution.get("signature"),
+                providerRequested=execution.get("providerRequested"),
+                providerUsed=execution.get("providerUsed"),
+                fallbackUsed=execution.get("fallbackUsed"),
+                fallbackReason=execution.get("fallbackReason"),
+                executionFamily=execution.get("executionFamily"),
+                executionAdapter=execution.get("executionAdapter"),
+                routeKind=execution.get("routeKind"),
+            )
+
         # Best-effort: usage outbox replay should not block intent validation/execution.
         try:
             _replay_trade_usage_outbox()
@@ -10868,6 +11145,37 @@ def _assert_transfer_balance_preconditions(
     token_decimals: int | None,
 ) -> None:
     amount_int = int(amount_wei)
+    is_solana = _is_solana_chain(chain)
+    if is_solana:
+        rpc_url = _chain_rpc_url(chain)
+        if transfer_type == "native":
+            balance_lamports = int(solana_get_balance_lamports(rpc_url, wallet_address))
+            if balance_lamports < amount_int:
+                native_symbol = _native_symbol_for_chain(chain)
+                raise WalletStoreError(
+                    f"Insufficient {native_symbol} balance for transfer: "
+                    f"have {_format_units_pretty(balance_lamports, 9)} {native_symbol}, "
+                    f"need {_format_units_pretty(amount_int, 9)} {native_symbol} "
+                    f"(wallet {wallet_address})."
+                )
+            return
+        if transfer_type == "token":
+            if not token_address or not is_solana_address(token_address):
+                raise WalletStoreError("Transfer token address is invalid.")
+            tokens, _ = solana_get_token_balances(rpc_url, wallet_address)
+            match = next((row for row in tokens if str(row.get("token") or "") == token_address), None)
+            balance_units = int(str((match or {}).get("balanceWei") or "0"))
+            decimals = int(token_decimals if token_decimals is not None else int((match or {}).get("decimals") or 0))
+            symbol = token_symbol.strip() or "TOKEN"
+            if balance_units < amount_int:
+                raise WalletStoreError(
+                    f"Insufficient {symbol} balance for transfer: "
+                    f"have {_format_units_pretty(balance_units, decimals)} {symbol}, "
+                    f"need {_format_units_pretty(amount_int, decimals)} {symbol} "
+                    f"(wallet {wallet_address}, token {token_address})."
+                )
+            return
+
     if transfer_type == "native":
         native_balance_wei = int(_fetch_native_balance_wei(chain, wallet_address))
         if native_balance_wei < amount_int:
@@ -10902,9 +11210,11 @@ def _canonical_token_map(chain: str) -> dict[str, str]:
     tokens = cfg.get("canonicalTokens")
     if not isinstance(tokens, dict):
         return {}
+    is_solana = _is_solana_chain(chain)
     out: dict[str, str] = {}
     for symbol, address in tokens.items():
-        if isinstance(symbol, str) and isinstance(address, str) and is_hex_address(address):
+        valid_address = is_solana_address(address) if is_solana else is_hex_address(address)
+        if isinstance(symbol, str) and isinstance(address, str) and valid_address:
             out[symbol] = address
     return out
 
@@ -10966,6 +11276,16 @@ def _native_symbol_for_chain(chain: str) -> str:
     return "ETH"
 
 
+def _native_decimals_for_chain(chain: str) -> int:
+    cfg = _load_chain_config(chain)
+    native = cfg.get("nativeCurrency")
+    if isinstance(native, dict):
+        decimals = native.get("decimals")
+        if isinstance(decimals, int) and decimals > 0:
+            return decimals
+    return 18
+
+
 _WRAPPED_NATIVE_ALIAS_BY_NATIVE_SYMBOL: dict[str, tuple[str, ...]] = {
     "ETH": ("WETH",),
     "HBAR": ("WHBAR",),
@@ -11024,6 +11344,22 @@ def _fetch_wallet_holdings(chain: str) -> dict[str, Any]:
         raise WalletStoreError(f"No wallet configured for chain '{chain}'.")
     _validate_wallet_entry_shape(wallet)
     address = str(wallet.get("address"))
+    if _is_solana_chain(chain):
+        rpc_url = _chain_rpc_url(chain)
+        native_balance_lamports = int(solana_get_balance_lamports(rpc_url, address))
+        tokens, token_errors = solana_get_token_balances(rpc_url, address)
+        return {
+            "address": address,
+            "native": {
+                "symbol": _native_symbol_for_chain(chain),
+                "balanceWei": str(native_balance_lamports),
+                "balance": _format_units(native_balance_lamports, 9),
+                "balancePretty": _format_units_pretty(native_balance_lamports, 9),
+                "decimals": 9,
+            },
+            "tokens": tokens,
+            "tokenErrors": token_errors,
+        }
     native_balance_wei = _fetch_native_balance_wei(chain, address)
     native_balance_eth = _format_units(int(native_balance_wei), 18)
     token_map = _canonical_token_map(chain)
@@ -11679,15 +12015,21 @@ def cmd_wallet_health(args: argparse.Namespace) -> int:
             probe_passphrase = os.environ.get("XCLAW_WALLET_PASSPHRASE")
             if probe_passphrase:
                 plaintext = _decrypt_private_key(wallet, probe_passphrase)
-                derived = _derive_address(plaintext.hex())
-                if derived.lower() != str(address).lower():
+                key_scheme = str(wallet.get("keyScheme") or "evm_secp256k1").strip().lower() or "evm_secp256k1"
+                if key_scheme == "solana_ed25519":
+                    derived = str(wallet.get("address") or "")
+                    if not is_solana_address(derived):
+                        raise WalletStoreError("Wallet encrypted payload does not match stored address.")
+                else:
+                    derived = _derive_address(plaintext.hex())
+                if str(derived).lower() != str(address).lower():
                     raise WalletStoreError("Wallet encrypted payload does not match stored address.")
                 integrity_checked = True
         else:
             # Legacy fallback for Slice 03 state shape.
             _, legacy_wallet = ensure_wallet_entry(chain)
             legacy_address = legacy_wallet.get("address")
-            if isinstance(legacy_address, str) and is_hex_address(legacy_address):
+            if isinstance(legacy_address, str) and (is_hex_address(legacy_address) or is_solana_address(legacy_address)):
                 has_wallet = True
                 address = legacy_address
 
@@ -11701,7 +12043,7 @@ def cmd_wallet_health(args: argparse.Namespace) -> int:
         metadata_valid = False
         return fail("wallet_health_failed", str(exc), "Inspect wallet files and retry wallet health.", {"chain": chain}, exit_code=1)
 
-    has_cast = cast_exists()
+    has_cast = cast_exists() if not _is_solana_chain(chain) else True
     next_action = "No action needed."
     if not has_cast:
         next_action = "Install Foundry so `cast` is available, then rerun wallet-health."
@@ -11733,10 +12075,9 @@ def cmd_wallet_create(args: argparse.Namespace) -> int:
         return chk
 
     try:
-        passphrase = _create_import_passphrase(args.chain)
-        store = load_wallet_store()
-
         chain = args.chain
+        passphrase = _create_import_passphrase(chain)
+        store = load_wallet_store()
         wallet_id, wallet = _chain_wallet(store, chain)
         if wallet_id and wallet:
             return fail(
@@ -11746,6 +12087,26 @@ def cmd_wallet_create(args: argparse.Namespace) -> int:
                 {"chain": chain, "address": wallet.get("address")},
                 exit_code=1,
             )
+
+        if _is_solana_chain(chain):
+            generated = solana_generate_wallet()
+            address = str(generated.get("address") or "")
+            private_key = str(generated.get("private_key") or "")
+            imported = solana_import_wallet_private_key(private_key)
+            secret_bytes = imported["secret_bytes"]
+            wallet_id = _new_wallet_id()
+            encrypted = _encrypt_secret_bytes(secret_bytes, passphrase)
+            store.setdefault("wallets", {})[wallet_id] = {
+                "walletId": wallet_id,
+                "address": address,
+                "createdAt": utc_now(),
+                "keyScheme": "solana_ed25519",
+                "crypto": encrypted,
+            }
+            _bind_chain_to_wallet(store, chain, wallet_id)
+            save_wallet_store(store)
+            set_wallet_entry(chain, {"address": address, "walletId": wallet_id})
+            return ok("Wallet created.", chain=chain, address=address, created=True, family="solana")
 
         default_wallet_id = store.get("defaultWalletId")
         if isinstance(default_wallet_id, str) and default_wallet_id:
@@ -11769,6 +12130,7 @@ def cmd_wallet_create(args: argparse.Namespace) -> int:
             "walletId": wallet_id,
             "address": address,
             "createdAt": utc_now(),
+            "keyScheme": "evm_secp256k1",
             "crypto": encrypted,
         }
         store["defaultWalletId"] = wallet_id
@@ -11776,7 +12138,7 @@ def cmd_wallet_create(args: argparse.Namespace) -> int:
 
         save_wallet_store(store)
         set_wallet_entry(chain, {"address": address, "walletId": wallet_id})
-        return ok("Wallet created.", chain=chain, address=address, created=True)
+        return ok("Wallet created.", chain=chain, address=address, created=True, family="evm")
 
     except WalletPassphraseError as exc:
         return fail("non_interactive", str(exc), "Set XCLAW_WALLET_PASSPHRASE or run with TTY attached.", {"chain": args.chain}, exit_code=2)
@@ -11786,6 +12148,8 @@ def cmd_wallet_create(args: argparse.Namespace) -> int:
         return fail("unsafe_permissions", str(exc), "Restrict permissions to owner-only (0700/0600) and retry.", {"chain": args.chain}, exit_code=1)
     except WalletStoreError as exc:
         return fail("wallet_store_invalid", str(exc), "Repair wallet store metadata and retry.", {"chain": args.chain}, exit_code=1)
+    except SolanaRuntimeError as exc:
+        return fail(exc.code, str(exc), "Install Solana runtime dependencies and verify RPC configuration.", {"chain": args.chain, **exc.details}, exit_code=1)
     except Exception as exc:
         return fail("wallet_create_failed", str(exc), "Inspect runtime wallet dependencies/configuration and retry.", {"chain": args.chain}, exit_code=1)
 
@@ -11796,22 +12160,11 @@ def cmd_wallet_import(args: argparse.Namespace) -> int:
         return chk
 
     try:
-        private_key_input = _import_private_key_input(args.chain)
-        private_key_hex = _normalize_private_key_hex(private_key_input)
-        if private_key_hex is None:
-            return fail(
-                "invalid_input",
-                "Private key must be 32-byte hex (64 chars, optional 0x prefix).",
-                "Provide a valid EVM private key hex string.",
-                {"chain": args.chain},
-                exit_code=2,
-            )
-
-        address = _derive_address(private_key_hex)
-        passphrase = _create_import_passphrase(args.chain)
+        chain = args.chain
+        private_key_input = _import_private_key_input(chain)
+        passphrase = _create_import_passphrase(chain)
 
         store = load_wallet_store()
-        chain = args.chain
         existing_id, existing_wallet = _chain_wallet(store, chain)
         if existing_id and existing_wallet:
             return fail(
@@ -11821,6 +12174,35 @@ def cmd_wallet_import(args: argparse.Namespace) -> int:
                 {"chain": chain, "address": existing_wallet.get("address")},
                 exit_code=1,
             )
+
+        if _is_solana_chain(chain):
+            imported = solana_import_wallet_private_key(private_key_input)
+            address = str(imported.get("address") or "")
+            secret_bytes = imported["secret_bytes"]
+            wallet_id = _new_wallet_id()
+            encrypted = _encrypt_secret_bytes(secret_bytes, passphrase)
+            store.setdefault("wallets", {})[wallet_id] = {
+                "walletId": wallet_id,
+                "address": address,
+                "createdAt": utc_now(),
+                "keyScheme": "solana_ed25519",
+                "crypto": encrypted,
+            }
+            _bind_chain_to_wallet(store, chain, wallet_id)
+            save_wallet_store(store)
+            set_wallet_entry(chain, {"address": address, "walletId": wallet_id})
+            return ok("Wallet imported.", chain=chain, address=address, imported=True, family="solana")
+
+        private_key_hex = _normalize_private_key_hex(private_key_input)
+        if private_key_hex is None:
+            return fail(
+                "invalid_input",
+                "Private key must be 32-byte hex (64 chars, optional 0x prefix).",
+                "Provide a valid EVM private key hex string.",
+                {"chain": chain},
+                exit_code=2,
+            )
+        address = _derive_address(private_key_hex)
 
         default_wallet_id = store.get("defaultWalletId")
         if isinstance(default_wallet_id, str) and default_wallet_id:
@@ -11848,6 +12230,7 @@ def cmd_wallet_import(args: argparse.Namespace) -> int:
             "walletId": wallet_id,
             "address": address,
             "createdAt": utc_now(),
+            "keyScheme": "evm_secp256k1",
             "crypto": encrypted,
         }
         store["defaultWalletId"] = wallet_id
@@ -11855,7 +12238,7 @@ def cmd_wallet_import(args: argparse.Namespace) -> int:
 
         save_wallet_store(store)
         set_wallet_entry(chain, {"address": address, "walletId": wallet_id})
-        return ok("Wallet imported.", chain=chain, address=address, imported=True)
+        return ok("Wallet imported.", chain=chain, address=address, imported=True, family="evm")
 
     except WalletPassphraseError as exc:
         return fail("non_interactive", str(exc), "Set XCLAW_WALLET_PASSPHRASE/XCLAW_WALLET_IMPORT_PRIVATE_KEY or run with TTY attached.", {"chain": args.chain}, exit_code=2)
@@ -11865,6 +12248,8 @@ def cmd_wallet_import(args: argparse.Namespace) -> int:
         return fail("unsafe_permissions", str(exc), "Restrict permissions to owner-only (0700/0600) and retry.", {"chain": args.chain}, exit_code=1)
     except WalletStoreError as exc:
         return fail("wallet_store_invalid", str(exc), "Repair wallet store metadata and retry.", {"chain": args.chain}, exit_code=1)
+    except SolanaRuntimeError as exc:
+        return fail(exc.code, str(exc), "Provide a valid Solana private key and retry.", {"chain": args.chain, **exc.details}, exit_code=2 if exc.code == "invalid_input" else 1)
     except Exception as exc:
         return fail("wallet_import_failed", str(exc), "Inspect runtime wallet dependencies/configuration and retry.", {"chain": args.chain}, exit_code=1)
 
@@ -11880,7 +12265,7 @@ def cmd_wallet_address(args: argparse.Namespace) -> int:
         _, wallet = _chain_wallet(store, chain)
         if wallet:
             address = wallet.get("address")
-            if isinstance(address, str) and is_hex_address(address):
+            if isinstance(address, str) and (is_hex_address(address) or is_solana_address(address)):
                 return ok("Wallet address fetched.", chain=chain, address=address)
 
     except (WalletStoreError, WalletSecurityError) as exc:
@@ -11888,7 +12273,7 @@ def cmd_wallet_address(args: argparse.Namespace) -> int:
 
     _, legacy_wallet = ensure_wallet_entry(chain)
     addr = legacy_wallet.get("address")
-    if not isinstance(addr, str) or not is_hex_address(addr):
+    if not isinstance(addr, str) or (not is_hex_address(addr) and not is_solana_address(addr)):
         return fail(
             "wallet_missing",
             f"No wallet configured for chain '{chain}'.",
@@ -11939,13 +12324,19 @@ def cmd_wallet_sign_challenge(args: argparse.Namespace) -> int:
 
         passphrase = _require_wallet_passphrase_for_signing(chain)
         private_key_bytes = _decrypt_private_key(wallet, passphrase)
-        signature = _cast_sign_message(private_key_bytes.hex(), args.message)
+        key_scheme = str(wallet.get("keyScheme") or "evm_secp256k1").strip().lower() or "evm_secp256k1"
+        if key_scheme == "solana_ed25519" or _is_solana_chain(chain):
+            signature = solana_sign_message(private_key_bytes, args.message)
+            scheme = "solana_ed25519"
+        else:
+            signature = _cast_sign_message(private_key_bytes.hex(), args.message)
+            scheme = "eip191_personal_sign"
         return ok(
             "Challenge signed.",
             chain=chain,
             address=wallet.get("address"),
             signature=signature,
-            scheme="eip191_personal_sign",
+            scheme=scheme,
             challengeFormat=CHALLENGE_FORMAT_VERSION,
         )
 
@@ -11972,6 +12363,8 @@ def cmd_wallet_sign_challenge(args: argparse.Namespace) -> int:
                 exit_code=1,
             )
         return fail("sign_failed", msg, "Verify wallet passphrase and cast runtime, then retry.", {"chain": chain}, exit_code=1)
+    except SolanaRuntimeError as exc:
+        return fail(exc.code, str(exc), "Install Solana runtime dependencies and retry.", {"chain": chain, **exc.details}, exit_code=1)
     except Exception as exc:
         return fail("sign_failed", str(exc), "Inspect runtime wallet/signing configuration and retry.", {"chain": chain}, exit_code=1)
 
@@ -11980,7 +12373,10 @@ def cmd_wallet_send(args: argparse.Namespace) -> int:
     chk = require_json_flag(args)
     if chk is not None:
         return chk
-    if not is_hex_address(args.to):
+    if _is_solana_chain(args.chain):
+        if not is_solana_address(args.to):
+            return fail("invalid_input", "Invalid recipient address format.", "Use a valid Solana base58 address.", {"to": args.to}, exit_code=2)
+    elif not is_hex_address(args.to):
         return fail("invalid_input", "Invalid recipient address format.", "Use 0x-prefixed 20-byte hex address.", {"to": args.to}, exit_code=2)
     if not re.fullmatch(r"[0-9]+", args.amount_wei):
         return fail("invalid_input", "Invalid amount-wei format.", "Use base-unit integer string.", {"amountWei": args.amount_wei}, exit_code=2)
@@ -11993,10 +12389,11 @@ def cmd_wallet_send(args: argparse.Namespace) -> int:
 
         approval_required, transfer_policy = _transfer_requires_approval(chain, "native", None)
         native_symbol = _native_symbol_for_chain(chain)
-        amount_human, amount_unit = _transfer_amount_display(str(args.amount_wei), "native", native_symbol, 18)
+        amount_human, amount_unit = _transfer_amount_display(str(args.amount_wei), "native", native_symbol, _native_decimals_for_chain(chain))
         amount_display = f"{amount_human} {amount_unit}"
         if not bool(outbound_eval.get("allowed")):
             approval_required = True
+        to_address_store = args.to if _is_solana_chain(chain) else args.to.lower()
         approval_id = _make_transfer_approval_id()
         flow = {
             "approvalId": approval_id,
@@ -12005,8 +12402,8 @@ def cmd_wallet_send(args: argparse.Namespace) -> int:
             "transferType": "native",
             "tokenAddress": None,
             "tokenSymbol": native_symbol,
-            "tokenDecimals": 18,
-            "toAddress": args.to.lower(),
+            "tokenDecimals": _native_decimals_for_chain(chain),
+            "toAddress": to_address_store,
             "amountWei": str(args.amount_wei),
             "reasonCode": None,
             "reasonMessage": None,
@@ -12040,7 +12437,7 @@ def cmd_wallet_send(args: argparse.Namespace) -> int:
                 "Approval required (transfer)\n\n"
                 "Request: Send native token\n"
                 f"Amount: {amount_display} ({args.amount_wei} base units)\n"
-                f"To: `{args.to.lower()}`\n"
+                f"To: `{to_address_store}`\n"
                 f"Chain: `{chain}`\n"
                 f"Approval ID: `{approval_id}`\n"
                 "Status: approval_pending\n\n"
@@ -12101,11 +12498,12 @@ def cmd_wallet_track_token(args: argparse.Namespace) -> int:
         return chk
     chain = str(args.chain or "").strip()
     token = str(args.token or "").strip().lower()
-    if not is_hex_address(token):
+    valid_token = is_solana_address(token) if _is_solana_chain(chain) else is_hex_address(token)
+    if not valid_token:
         return fail(
             "invalid_token_address",
             "Invalid token address format.",
-            "Use 0x-prefixed 20-byte token address.",
+            "Use a chain-valid token address.",
             {"chain": chain, "token": token},
             exit_code=2,
         )
@@ -12114,13 +12512,14 @@ def cmd_wallet_track_token(args: argparse.Namespace) -> int:
         symbol: str | None = None
         name: str | None = None
         decimals: int | None = None
-        try:
-            meta = _fetch_erc20_metadata(chain, token)
-            symbol = str(meta.get("symbol") or "").strip() or None
-            name = str(meta.get("name") or "").strip() or None
-            decimals = int(meta.get("decimals", 18))
-        except Exception:
-            pass
+        if not _is_solana_chain(chain):
+            try:
+                meta = _fetch_erc20_metadata(chain, token)
+                symbol = str(meta.get("symbol") or "").strip() or None
+                name = str(meta.get("name") or "").strip() or None
+                decimals = int(meta.get("decimals", 18))
+            except Exception:
+                pass
         row = _upsert_tracked_token_local(chain, token, symbol=symbol, name=name, decimals=decimals)
         mirror_synced = _mirror_tracked_tokens(chain)
         return ok(
@@ -12157,11 +12556,12 @@ def cmd_wallet_untrack_token(args: argparse.Namespace) -> int:
         return chk
     chain = str(args.chain or "").strip()
     token = str(args.token or "").strip().lower()
-    if not is_hex_address(token):
+    valid_token = is_solana_address(token) if _is_solana_chain(chain) else is_hex_address(token)
+    if not valid_token:
         return fail(
             "invalid_token_address",
             "Invalid token address format.",
-            "Use 0x-prefixed 20-byte token address.",
+            "Use a chain-valid token address.",
             {"chain": chain, "token": token},
             exit_code=2,
         )
@@ -12210,7 +12610,10 @@ def cmd_wallet_send_token(args: argparse.Namespace) -> int:
     chk = require_json_flag(args)
     if chk is not None:
         return chk
-    if not is_hex_address(args.to):
+    if _is_solana_chain(args.chain):
+        if not is_solana_address(args.to):
+            return fail("invalid_input", "Invalid recipient address format.", "Use a valid Solana base58 address.", {"to": args.to}, exit_code=2)
+    elif not is_hex_address(args.to):
         return fail("invalid_input", "Invalid recipient address format.", "Use 0x-prefixed 20-byte hex address.", {"to": args.to}, exit_code=2)
     if not re.fullmatch(r"[0-9]+", args.amount_wei):
         return fail("invalid_input", "Invalid amount-wei format.", "Use base-unit integer string.", {"amountWei": args.amount_wei}, exit_code=2)
@@ -12220,13 +12623,18 @@ def cmd_wallet_send_token(args: argparse.Namespace) -> int:
     try:
         token_input = str(args.token or "").strip()
         token_address = _resolve_token_address(chain, token_input)
-        token_meta = _fetch_erc20_metadata(chain, token_address)
-        token_symbol = str(token_meta.get("symbol") or "").strip() or "TOKEN"
-        try:
-            token_decimals = int(token_meta.get("decimals", 18))
-        except Exception:
-            token_decimals = 18
-        if not is_hex_address(token_input):
+        token_symbol = str(token_input or "").strip().upper() or "TOKEN"
+        token_decimals = 18
+        if _is_solana_chain(chain):
+            token_decimals = 9
+        else:
+            token_meta = _fetch_erc20_metadata(chain, token_address)
+            token_symbol = str(token_meta.get("symbol") or "").strip() or token_symbol
+            try:
+                token_decimals = int(token_meta.get("decimals", 18))
+            except Exception:
+                token_decimals = 18
+        if not _is_solana_chain(chain) and not is_hex_address(token_input):
             # Guard against common natural-language mistakes where "10 USDC" is sent as amount_wei=10.
             min_symbol_wei = 10 ** max(token_decimals - 6, 0)
             if amount_wei < min_symbol_wei:
@@ -12255,16 +12663,18 @@ def cmd_wallet_send_token(args: argparse.Namespace) -> int:
         approval_required, transfer_policy = _transfer_requires_approval(chain, "token", token_address)
         if not bool(outbound_eval.get("allowed")):
             approval_required = True
+        token_address_store = token_address if _is_solana_chain(chain) else token_address.lower()
+        to_address_store = args.to if _is_solana_chain(chain) else args.to.lower()
         approval_id = _make_transfer_approval_id()
         flow = {
             "approvalId": approval_id,
             "chainKey": chain,
             "status": "approval_pending" if approval_required else "approved",
             "transferType": "token",
-            "tokenAddress": token_address.lower(),
+            "tokenAddress": token_address_store,
             "tokenSymbol": token_symbol,
             "tokenDecimals": token_decimals,
-            "toAddress": args.to.lower(),
+            "toAddress": to_address_store,
             "amountWei": str(args.amount_wei),
             "reasonCode": None,
             "reasonMessage": None,
@@ -12297,9 +12707,9 @@ def cmd_wallet_send_token(args: argparse.Namespace) -> int:
             queued_message = (
                 "Approval required (transfer)\n\n"
                 "Request: Send token\n"
-                f"Token: {token_symbol} ({token_address.lower()})\n"
+                f"Token: {token_symbol} ({token_address_store})\n"
                 f"Amount: {amount_display} ({args.amount_wei} wei)\n"
-                f"To: `{args.to.lower()}`\n"
+                f"To: `{to_address_store}`\n"
                 f"Chain: `{chain}`\n"
                 f"Approval ID: `{approval_id}`\n"
                 "Status: approval_pending\n\n"
@@ -12380,6 +12790,7 @@ def cmd_wallet_balance(args: argparse.Namespace) -> int:
             raise WalletStoreError("Wallet holdings payload missing native balance.")
         balance_wei = str(native.get("balanceWei") or "0")
         parsed = _parse_uint_text(balance_wei)
+        native_decimals = int(native.get("decimals", _native_decimals_for_chain(chain)) or _native_decimals_for_chain(chain))
         tokens = holdings.get("tokens", [])
         if not isinstance(tokens, list):
             tokens = []
@@ -12391,8 +12802,8 @@ def cmd_wallet_balance(args: argparse.Namespace) -> int:
             chain=chain,
             address=address,
             balanceWei=str(parsed),
-            balanceEth=_format_units(int(parsed), 18),
-            decimals=18,
+            balanceEth=_format_units(int(parsed), native_decimals),
+            decimals=native_decimals,
             symbol=_native_symbol_for_chain(chain),
             tokens=tokens,
             tokenErrors=token_errors,
@@ -12420,9 +12831,12 @@ def cmd_wallet_token_balance(args: argparse.Namespace) -> int:
     chk = require_json_flag(args)
     if chk is not None:
         return chk
-    if not is_hex_address(args.token):
-        return fail("invalid_input", "Invalid token address format.", "Use 0x-prefixed 20-byte hex address.", {"token": args.token}, exit_code=2)
     chain = args.chain
+    if _is_solana_chain(chain):
+        if not is_solana_address(args.token):
+            return fail("invalid_input", "Invalid token address format.", "Use a Solana mint address.", {"token": args.token}, exit_code=2)
+    elif not is_hex_address(args.token):
+        return fail("invalid_input", "Invalid token address format.", "Use 0x-prefixed 20-byte hex address.", {"token": args.token}, exit_code=2)
     try:
         store = load_wallet_store()
         _, wallet = _chain_wallet(store, chain)
@@ -12436,6 +12850,34 @@ def cmd_wallet_token_balance(args: argparse.Namespace) -> int:
             )
         _validate_wallet_entry_shape(wallet)
         address = str(wallet.get("address"))
+        if _is_solana_chain(chain):
+            holdings = _fetch_wallet_holdings(chain)
+            tokens = holdings.get("tokens", [])
+            if not isinstance(tokens, list):
+                tokens = []
+            row = next((item for item in tokens if str((item or {}).get("token") or "").strip().lower() == str(args.token).strip().lower()), None)
+            if not isinstance(row, dict):
+                return ok(
+                    "Wallet token balance fetched.",
+                    chain=chain,
+                    address=address,
+                    token=args.token,
+                    balanceWei="0",
+                    balance="0",
+                    decimals=0,
+                    symbol=None,
+                )
+            decimals = int(row.get("decimals", 0))
+            return ok(
+                "Wallet token balance fetched.",
+                chain=chain,
+                address=address,
+                token=args.token,
+                balanceWei=str(row.get("balanceWei") or "0"),
+                balance=str(row.get("balance") or "0"),
+                decimals=decimals,
+                symbol=row.get("symbol"),
+            )
         cast_bin = _require_cast_bin()
         rpc_url = _chain_rpc_url(chain)
         proc = _run_subprocess(
@@ -12486,6 +12928,14 @@ def cmd_wallet_wrap_native(args: argparse.Namespace) -> int:
     if chk is not None:
         return chk
     chain = args.chain
+    if _is_solana_chain(chain):
+        return fail(
+            "unsupported_chain_capability",
+            "wallet wrap-native is EVM-only.",
+            "Use spot trade on Solana for SOL -> wrapped SOL routing.",
+            {"chain": chain},
+            exit_code=2,
+        )
     native_symbol = _native_symbol_for_chain(chain)
     wrapped_candidates = _suggest_wrapped_native_symbols(chain)
     wrapped_symbol_hint = wrapped_candidates[0] if wrapped_candidates else "wrapped native token"

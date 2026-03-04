@@ -10,8 +10,7 @@
     "chainKey": { "type": "string", "minLength": 1, "maxLength": 64 },
     "walletAddress": {
       "type": "string",
-      "pattern": "^0x[a-fA-F0-9]{40}$"
+      "pattern": "^(0x[a-fA-F0-9]{40}|[1-9A-HJ-NP-Za-km-z]{32,44})$"
     }
   }
 }
-

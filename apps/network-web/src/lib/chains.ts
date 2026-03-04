@@ -3,7 +3,7 @@ import path from 'node:path';
 
 export type ChainConfig = {
   chainKey: string;
-  family?: 'evm';
+  family?: 'evm' | 'solana';
   enabled?: boolean;
   uiVisible?: boolean;
   chainId?: number;
@@ -119,7 +119,13 @@ function isChainEnabled(cfg: ChainConfig): boolean {
 }
 
 export function listEnabledChains(): ChainConfig[] {
-  return readChainConfigs().filter((cfg) => isChainEnabled(cfg) && (cfg.family ?? 'evm') === 'evm');
+  return readChainConfigs().filter((cfg) => {
+    if (!isChainEnabled(cfg)) {
+      return false;
+    }
+    const family = (cfg.family ?? 'evm') as string;
+    return family === 'evm' || family === 'solana';
+  });
 }
 
 export function listVisibleEnabledChains(): ChainConfig[] {
@@ -187,6 +193,9 @@ export function chainNativeSymbol(chainKey: string): string {
   if (typeof symbol === 'string' && symbol.trim()) {
     return symbol.trim();
   }
+  if (chainKey.startsWith('solana_')) {
+    return 'SOL';
+  }
   return chainKey === 'kite_ai_testnet' ? 'KITE' : 'ETH';
 }
 
@@ -195,6 +204,9 @@ export function chainNativeAtomicDecimals(chainKey: string): number {
   const decimals = getChainConfig(chainKey)?.nativeCurrency?.decimals;
   if (typeof decimals === 'number' && Number.isFinite(decimals) && decimals > 0) {
     return Math.floor(decimals);
+  }
+  if (chainKey.startsWith('solana_')) {
+    return 9;
   }
   return 18;
 }
