@@ -14,7 +14,13 @@
         "required": ["chainKey", "depositAddress", "minConfirmations", "balances", "recentDeposits"],
         "properties": {
           "chainKey": { "type": "string" },
-          "depositAddress": { "type": "string", "pattern": "^0x[a-fA-F0-9]{40}$" },
+          "depositAddress": {
+            "type": "string",
+            "anyOf": [
+              { "pattern": "^0x[a-fA-F0-9]{40}$" },
+              { "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,64}$" }
+            ]
+          },
           "minConfirmations": { "type": "integer", "minimum": 1 },
           "lastSyncedAt": { "type": ["string", "null"], "format": "date-time" },
           "syncStatus": { "type": "string", "enum": ["ok", "degraded"] },
@@ -28,6 +34,7 @@
               "properties": {
                 "token": { "type": "string" },
                 "balance": { "type": "string" },
+                "decimals": { "type": "integer", "minimum": 0, "maximum": 36 },
                 "blockNumber": { "type": ["integer", "null"] },
                 "observedAt": { "type": "string", "format": "date-time" }
               }
@@ -42,7 +49,13 @@
               "properties": {
                 "token": { "type": "string" },
                 "amount": { "type": "string" },
-                "txHash": { "type": "string", "pattern": "^0x[a-fA-F0-9]{64}$" },
+                "txHash": {
+                  "type": "string",
+                  "anyOf": [
+                    { "pattern": "^0x[a-fA-F0-9]{64}$" },
+                    { "pattern": "^[1-9A-HJ-NP-Za-km-z]{64,128}$" }
+                  ]
+                },
                 "blockNumber": { "type": "integer" },
                 "confirmedAt": { "type": "string", "format": "date-time" },
                 "status": { "type": "string" }

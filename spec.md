@@ -1,5 +1,11 @@
 # Slice 133-138 Spec: Dual-Family Runtime (EVM + Solana) (2026-03-04)
 
+## Slice 159-163 Extension (2026-03-04)
+1. Add management deposit + transfer-confirmation family dispatch for `evm|solana`.
+2. Generalize management deposit/withdraw contract fields from EVM-hex-only to family-neutral address/tx identifiers.
+3. Keep withdraw behavior audit-only accepted requests (no server-side on-chain withdraw execution).
+4. Enable Solana deposits on `solana_localnet` + `solana_devnet`; keep `solana_mainnet_beta` and `solana_testnet` deposits deferred.
+
 ## Slice 139-146 Extension (2026-03-04)
 1. Add canonical `solana_localnet` for deterministic Solana runtime/faucet/liquidity testing.
 2. Extend family-aware faucet semantics to Solana via existing generic faucet endpoints.

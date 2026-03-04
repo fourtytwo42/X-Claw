@@ -1,5 +1,31 @@
 # Slice 133-138 Acceptance Evidence: Dual-Family Runtime (EVM + Solana)
 
+## Slice 159-163 Acceptance Evidence: Solana Deposits + Management Parity
+
+Date (UTC): 2026-03-04
+Active slice context: `Slice 159 -> Slice 163`.
+
+### Objective + Scope Lock
+- Objective:
+  - make management deposit and transfer-confirmation surfaces family-aware for `evm|solana`,
+  - keep withdraw behavior unchanged as audit-accepted request records.
+
+### Behavior Checks
+- [x] canonical docs/contracts explicitly permit Solana deposit address/signature semantics.
+- [x] management deposit/withdraw schemas accept family-neutral address and tx id values.
+- [x] `solana_devnet` deposit capability enabled while `solana_mainnet_beta`/`solana_testnet` remain deferred.
+- [x] management deposit sync route dispatches by chain family and degrades deterministically on Solana RPC faults.
+- [x] management transfer confirmations and `/agents/:id` tx explorer links are family-aware.
+
+### Required Validation Gates
+- [x] targeted Node/API tests for management deposit + transfer confirmation family dispatch (`npm run test:management:solana:contract`)
+- [x] `npm run db:parity`
+- [x] `npm run seed:reset`
+- [x] `npm run seed:load`
+- [x] `npm run seed:verify`
+- [x] `npm run build`
+- [x] `pm2 restart all`
+
 ## Slice 139-146 Acceptance Evidence: Localnet-First Solana Agent Parity
 
 Date (UTC): 2026-03-04

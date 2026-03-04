@@ -1,5 +1,16 @@
 # Slice 133-138 Tasks: Dual-Family Runtime (EVM + Solana) (2026-03-04)
 
+## Slice 159-163 Tasks: Solana Deposits + Management Parity (2026-03-04)
+- [x] Update canonical docs/contracts for family-aware management deposit semantics and audit-only withdraw posture.
+- [x] Generalize management deposit/withdraw schemas to allow Solana address/signature values.
+- [x] Enable `solana_devnet` deposits capability (keep localnet enabled; keep mainnet/testnet deposits deferred).
+- [x] Refactor management deposit sync route to dispatch by chain family with deterministic degraded behavior.
+- [x] Make management transfer confirmations + agent-page tx explorer formatting family-aware.
+- [x] Add/extend tests for management deposit/confirmation family dispatch and schema acceptance.
+- [x] Run sequential validations and capture grep proofs/evidence.
+
+Active slice context: `Slice 159 -> Slice 163`.
+
 ## Slice 139-146 Tasks: Localnet-First Solana Agent Parity (2026-03-04)
 - [x] Add `config/chains/solana_localnet.json` with wallet/trade/liquidity/faucet/deposit capabilities.
 - [x] Extend Solana chain execution metadata with CLMM adapter contracts.

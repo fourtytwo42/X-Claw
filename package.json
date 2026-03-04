@@ -18,6 +18,7 @@
     "seed:verify": "node infrastructure/scripts/seed-verify.mjs",
     "test:liquidity:contract": "node infrastructure/scripts/liquidity-contract-tests.mjs",
     "test:management:liquidity:decision": "node infrastructure/scripts/management-approvals-liquidity-tests.mjs",
+    "test:management:solana:contract": "node infrastructure/scripts/management-solana-contract-tests.mjs",
     "test:faucet:contract": "node infrastructure/scripts/faucet-contract-tests.mjs",
     "test:tokens:mirror:contract": "node infrastructure/scripts/tokens-mirror-contract-tests.mjs",
     "solana:localnet:bootstrap": "node infrastructure/scripts/solana-localnet-bootstrap.mjs",

@@ -174,6 +174,20 @@ and fail closed for unsupported execution families.
 4. `solana_localnet` remains deterministic and continues to use `local_clmm`; non-localnet requests for `local_clmm` fail closed.
 5. Any leaked RPC API key is considered compromised and must be rotated before live usage.
 
+## 3.8) Slice 159-163 Solana Deposits + Management Parity (2026-03-04)
+
+1. Management deposit and management transfer-confirmation surfaces are canonical chain-family aware for `evm|solana`.
+2. Management deposit transaction identifiers remain under field name `txHash` for compatibility, but values are family-neutral:
+- EVM: hex tx hash (`0x...`)
+- Solana: signature string.
+3. Management deposit addresses and withdraw destinations are family-neutral strings; they are no longer EVM-hex-only contract values.
+4. Withdraw request behavior is unchanged in this slice:
+- management withdraw routes remain audit-accepted request records (no server-side on-chain execution).
+5. Solana deposit rollout scope in this slice is:
+- enabled: `solana_localnet`, `solana_devnet`
+- deferred: `solana_mainnet_beta`, `solana_testnet`
+6. Management deposit sync must fail closed with deterministic degraded sync state for malformed or unavailable Solana RPC responses; route stability is preserved (no unhandled 500 for sync faults).
+
 ---
 
 ## 4) Scope

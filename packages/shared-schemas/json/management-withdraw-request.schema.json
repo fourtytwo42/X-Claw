@@ -8,6 +8,12 @@
     "chainKey": { "type": "string", "minLength": 1 },
     "asset": { "type": "string", "minLength": 1, "maxLength": 128 },
     "amount": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]{1,18})?$" },
-    "destination": { "type": "string", "pattern": "^0x[a-fA-F0-9]{40}$" }
+    "destination": {
+      "type": "string",
+      "anyOf": [
+        { "pattern": "^0x[a-fA-F0-9]{40}$" },
+        { "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,64}$" }
+      ]
+    }
   }
 }

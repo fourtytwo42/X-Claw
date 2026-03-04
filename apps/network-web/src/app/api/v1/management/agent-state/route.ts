@@ -2,19 +2,17 @@ import type { NextRequest } from 'next/server';
 
 import { dbQuery } from '@/lib/db';
 import { errorResponse, internalErrorResponse, successResponse } from '@/lib/errors';
-import { fetchWithTimeout, upstreamFetchTimeoutMs } from '@/lib/fetch-timeout';
-import { chainRpcUrl, getChainConfig, supportedChainHint } from '@/lib/chains';
+import { getChainConfig, supportedChainHint } from '@/lib/chains';
 import { ensureAgentWalletMappings } from '@/lib/agent-wallet-mappings';
 import { maybeSyncLiquiditySnapshots } from '@/lib/liquidity-indexer';
 import { requireManagementSession, sessionHasAgentAccess } from '@/lib/management-auth';
 import { getRequestId } from '@/lib/request-id';
 import { isTransferMirrorSchemaUnavailableError, transferMirrorSchemaErrorDetails } from '@/lib/transfer-mirror-schema';
 import { resolveTokenMetadata } from '@/lib/token-metadata';
+import { fetchChainTransactionConfirmations } from '@/lib/tx-confirmations';
 import { kickStaleTransferRecovery, kickTerminalTransferPromptCleanup } from '@/lib/transfer-recovery';
 
 export const runtime = 'nodejs';
-
-type RpcReceipt = { blockNumber?: string | null };
 class TransferMirrorUnavailableError extends Error {
   readonly originalError: unknown;
 
@@ -25,70 +23,6 @@ class TransferMirrorUnavailableError extends Error {
   }
 }
 
-function hexToBigInt(raw: string): bigint {
-  if (!raw || typeof raw !== 'string') {
-    return BigInt(0);
-  }
-  return BigInt(raw);
-}
-
-async function rpcRequest(rpcUrl: string, method: string, params: unknown[]): Promise<unknown> {
-  const res = await fetchWithTimeout(
-    rpcUrl,
-    {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params })
-    },
-    upstreamFetchTimeoutMs(),
-  );
-  if (!res.ok) {
-    throw new Error(`RPC ${method} failed with HTTP ${res.status}`);
-  }
-  const parsed = (await res.json()) as { result?: unknown; error?: { message?: string } };
-  if (parsed.error) {
-    throw new Error(parsed.error.message ?? `RPC ${method} returned error`);
-  }
-  return parsed.result;
-}
-
-async function fetchTransferConfirmations(
-  chainKey: string,
-  historyRows: Array<{ tx_hash: string | null }>
-): Promise<Map<string, number | null>> {
-  const byHash = new Map<string, number | null>();
-  const rpcUrl = chainRpcUrl(chainKey);
-  if (!rpcUrl) {
-    return byHash;
-  }
-  const txHashes = Array.from(new Set(historyRows.map((row) => row.tx_hash).filter((hash): hash is string => Boolean(hash))));
-  if (txHashes.length === 0) {
-    return byHash;
-  }
-  try {
-    const latestHex = (await rpcRequest(rpcUrl, 'eth_blockNumber', [])) as string;
-    const latest = hexToBigInt(latestHex);
-    await Promise.all(
-      txHashes.map(async (txHash) => {
-        try {
-          const receipt = (await rpcRequest(rpcUrl, 'eth_getTransactionReceipt', [txHash])) as RpcReceipt | null;
-          if (!receipt?.blockNumber) {
-            byHash.set(txHash, null);
-            return;
-          }
-          const txBlock = hexToBigInt(receipt.blockNumber);
-          const confirmations = latest >= txBlock ? Number(latest - txBlock + BigInt(1)) : 0;
-          byHash.set(txHash, confirmations);
-        } catch {
-          byHash.set(txHash, null);
-        }
-      })
-    );
-  } catch {
-    return byHash;
-  }
-  return byHash;
-}
 
 function isMissingTransferMirrorSchema(error: unknown): boolean {
   return isTransferMirrorSchemaUnavailableError(error);
@@ -875,7 +809,10 @@ export async function GET(req: NextRequest) {
 
     const telegramApprovalEnabled = (approvalChannel.rowCount ?? 0) > 0 ? Boolean(approvalChannel.rows[0].enabled) : false;
     const telegramApprovalUpdatedAt = (approvalChannel.rowCount ?? 0) > 0 ? approvalChannel.rows[0].updated_at ?? null : null;
-    const transferConfirmationsByTx = await fetchTransferConfirmations(chainKey, transferApprovalsHistory.rows);
+    const transferConfirmationsByTx = await fetchChainTransactionConfirmations(
+      chainKey,
+      transferApprovalsHistory.rows.map((row) => row.tx_hash)
+    );
     const staleCutoffMs = 60 * 1000;
     const nowMs = Date.now();
 

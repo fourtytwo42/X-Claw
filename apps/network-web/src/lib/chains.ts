@@ -188,6 +188,35 @@ export function chainDisplayName(chainKey: string): string {
   return getChainConfig(chainKey)?.displayName ?? chainKey;
 }
 
+export function chainFamily(chainKey: string): 'evm' | 'solana' {
+  const raw = String(getChainConfig(chainKey)?.family || '').trim().toLowerCase();
+  return raw === 'solana' ? 'solana' : 'evm';
+}
+
+export function chainTxExplorerUrl(chainKey: string, txId: string | null | undefined): string | null {
+  const id = String(txId || '').trim();
+  if (!id) {
+    return null;
+  }
+  const cfg = getChainConfig(chainKey);
+  const base = String(cfg?.explorerBaseUrl || '').trim();
+  if (!base) {
+    return null;
+  }
+
+  if (chainFamily(chainKey) === 'solana') {
+    if (!base.includes('explorer.solana.com')) {
+      return null;
+    }
+    const clusterMatch = /[?&]cluster=([^&]+)/i.exec(base);
+    const cluster = clusterMatch?.[1] ? decodeURIComponent(clusterMatch[1]) : '';
+    const prefix = `https://explorer.solana.com/tx/${encodeURIComponent(id)}`;
+    return cluster ? `${prefix}?cluster=${encodeURIComponent(cluster)}` : prefix;
+  }
+
+  return `${base.replace(/\/+$/, '')}/tx/${id}`;
+}
+
 export function chainNativeSymbol(chainKey: string): string {
   const symbol = getChainConfig(chainKey)?.nativeCurrency?.symbol;
   if (typeof symbol === 'string' && symbol.trim()) {

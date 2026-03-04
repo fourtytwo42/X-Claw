@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server';
 
 import { authenticateAgentByToken } from '@/lib/agent-auth';
+import { chainFamily } from '@/lib/chains';
 import { dbQuery } from '@/lib/db';
 import { errorResponse, internalErrorResponse, successResponse } from '@/lib/errors';
 import { parseJsonBody } from '@/lib/http';
@@ -97,6 +98,18 @@ export async function POST(req: NextRequest) {
     );
     const priorStatus = (prior.rowCount ?? 0) > 0 ? String(prior.rows[0].status ?? '').trim().toLowerCase() : '';
 
+    const family = chainFamily(body.chainKey);
+    const normalizeAddress = (value: string | null | undefined): string | null => {
+      if (value == null) {
+        return null;
+      }
+      const raw = String(value).trim();
+      if (!raw) {
+        return null;
+      }
+      return family === 'evm' ? raw.toLowerCase() : raw;
+    };
+
     await dbQuery(
       `
       insert into agent_transfer_approval_mirror (
@@ -175,9 +188,9 @@ export async function POST(req: NextRequest) {
         body.status,
         body.transferType,
         body.approvalSource ?? 'transfer',
-        body.tokenAddress ?? null,
+        normalizeAddress(body.tokenAddress),
         body.tokenSymbol ?? null,
-        body.toAddress.toLowerCase(),
+        normalizeAddress(body.toAddress),
         body.amountWei,
         body.txHash ?? null,
         body.reasonCode ?? null,
@@ -190,7 +203,7 @@ export async function POST(req: NextRequest) {
         body.x402NetworkKey ?? null,
         body.x402FacilitatorKey ?? null,
         body.x402AssetKind ?? null,
-        body.x402AssetAddress ?? null,
+        normalizeAddress(body.x402AssetAddress),
         body.x402AmountAtomic ?? null,
         body.x402PaymentId ?? null,
         body.observedBy ?? null,

@@ -1991,6 +1991,7 @@ paths:
   /api/v1/management/withdraw:
     post:
       summary: Submit withdraw request.
+      description: Records a management-audited withdraw request. This route does not execute an on-chain transfer in current contract.
       security:
         - managementCookie: []
       parameters:
@@ -2007,6 +2008,7 @@ paths:
   /api/v1/management/deposit:
     get:
       summary: Read agent deposit address, tracked balances, and confirmed deposits.
+      description: Family-aware deposit payload. `recentDeposits[].txHash` remains field-compatible for EVM tx hashes and Solana signatures.
       security:
         - managementCookie: []
       parameters:

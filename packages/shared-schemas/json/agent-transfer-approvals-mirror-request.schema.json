@@ -23,11 +23,31 @@
       "enum": ["proposed", "approval_pending", "approved", "rejected", "executing", "filled", "failed"]
     },
     "transferType": { "type": "string", "enum": ["native", "token"] },
-    "tokenAddress": { "type": ["string", "null"], "pattern": "^0x[a-fA-F0-9]{40}$" },
+    "tokenAddress": {
+      "type": ["string", "null"],
+      "anyOf": [
+        { "type": "null" },
+        { "pattern": "^0x[a-fA-F0-9]{40}$" },
+        { "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,64}$" }
+      ]
+    },
     "tokenSymbol": { "type": ["string", "null"] },
-    "toAddress": { "type": "string", "pattern": "^0x[a-fA-F0-9]{40}$" },
+    "toAddress": {
+      "type": "string",
+      "anyOf": [
+        { "pattern": "^0x[a-fA-F0-9]{40}$" },
+        { "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,64}$" }
+      ]
+    },
     "amountWei": { "type": "string", "pattern": "^[0-9]+$" },
-    "txHash": { "type": ["string", "null"], "pattern": "^0x[a-fA-F0-9]{64}$" },
+    "txHash": {
+      "type": ["string", "null"],
+      "anyOf": [
+        { "type": "null" },
+        { "pattern": "^0x[a-fA-F0-9]{64}$" },
+        { "pattern": "^[1-9A-HJ-NP-Za-km-z]{64,128}$" }
+      ]
+    },
     "reasonCode": { "type": ["string", "null"] },
     "reasonMessage": { "type": ["string", "null"] },
     "policyBlockedAtCreate": { "type": "boolean" },

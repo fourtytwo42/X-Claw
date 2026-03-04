@@ -1,81 +1,13 @@
 import type { NextRequest } from 'next/server';
 
-import { chainRpcUrl } from '@/lib/chains';
 import { dbQuery } from '@/lib/db';
 import { errorResponse, internalErrorResponse, successResponse } from '@/lib/errors';
-import { fetchWithTimeout, upstreamFetchTimeoutMs } from '@/lib/fetch-timeout';
 import { requireManagementSession, sessionHasAgentAccess } from '@/lib/management-auth';
 import { getRequestId } from '@/lib/request-id';
+import { fetchChainTransactionConfirmations } from '@/lib/tx-confirmations';
 import { kickStaleTransferRecovery, kickTerminalTransferPromptCleanup } from '@/lib/transfer-recovery';
 
 export const runtime = 'nodejs';
-
-type RpcReceipt = { blockNumber?: string | null };
-
-function hexToBigInt(raw: string): bigint {
-  if (!raw || typeof raw !== 'string') {
-    return BigInt(0);
-  }
-  return BigInt(raw);
-}
-
-async function rpcRequest(rpcUrl: string, method: string, params: unknown[]): Promise<unknown> {
-  const res = await fetchWithTimeout(
-    rpcUrl,
-    {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params })
-    },
-    upstreamFetchTimeoutMs(),
-  );
-  if (!res.ok) {
-    throw new Error(`RPC ${method} failed with HTTP ${res.status}`);
-  }
-  const parsed = (await res.json()) as { result?: unknown; error?: { message?: string } };
-  if (parsed.error) {
-    throw new Error(parsed.error.message ?? `RPC ${method} returned error`);
-  }
-  return parsed.result;
-}
-
-async function fetchTransferConfirmations(
-  chainKey: string,
-  historyRows: Array<{ tx_hash: string | null }>
-): Promise<Map<string, number | null>> {
-  const byHash = new Map<string, number | null>();
-  const rpcUrl = chainRpcUrl(chainKey);
-  if (!rpcUrl) {
-    return byHash;
-  }
-  const txHashes = Array.from(new Set(historyRows.map((row) => row.tx_hash).filter((hash): hash is string => Boolean(hash))));
-  if (txHashes.length === 0) {
-    return byHash;
-  }
-  try {
-    const latestHex = (await rpcRequest(rpcUrl, 'eth_blockNumber', [])) as string;
-    const latest = hexToBigInt(latestHex);
-    await Promise.all(
-      txHashes.map(async (txHash) => {
-        try {
-          const receipt = (await rpcRequest(rpcUrl, 'eth_getTransactionReceipt', [txHash])) as RpcReceipt | null;
-          if (!receipt?.blockNumber) {
-            byHash.set(txHash, null);
-            return;
-          }
-          const txBlock = hexToBigInt(receipt.blockNumber);
-          const confirmations = latest >= txBlock ? Number(latest - txBlock + BigInt(1)) : 0;
-          byHash.set(txHash, confirmations);
-        } catch {
-          byHash.set(txHash, null);
-        }
-      })
-    );
-  } catch {
-    return byHash;
-  }
-  return byHash;
-}
 
 export async function GET(req: NextRequest) {
   const requestId = getRequestId(req);
@@ -230,7 +162,10 @@ export async function GET(req: NextRequest) {
       )
     ]);
 
-    const transferConfirmationsByTx = await fetchTransferConfirmations(chainKey, history.rows);
+    const transferConfirmationsByTx = await fetchChainTransactionConfirmations(
+      chainKey,
+      history.rows.map((row) => row.tx_hash)
+    );
     return successResponse(
       {
         ok: true,

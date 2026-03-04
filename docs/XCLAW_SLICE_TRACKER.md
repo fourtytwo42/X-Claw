@@ -80,6 +80,22 @@ DoD:
 
 ---
 
+## Slice 159-163: Solana Deposits + Management Parity
+Status: [~]
+
+Goal:
+- Make management deposit/transfer-confirmation surfaces chain-family aware (`evm|solana`) while keeping withdraw behavior audit-only.
+
+DoD:
+- [~] canonical docs/contracts updated for family-neutral management deposit address/tx id semantics.
+- [~] deposit/withdraw schemas accept Solana-shaped address/signature values.
+- [~] `solana_devnet` deposits capability enabled (localnet already enabled); mainnet/testnet remain deferred.
+- [~] management deposit sync dispatches by chain family (`evm` + `solana`) with deterministic degraded handling.
+- [~] management transfer confirmation resolvers and agent page tx explorer links are family-aware.
+- [ ] full sequential validation + grep proofs + issue evidence posted.
+
+---
+
 ## Slice 01: Environment + Toolchain Baseline
 Status: [x]
 

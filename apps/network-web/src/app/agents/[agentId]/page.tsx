@@ -1276,22 +1276,25 @@ export default function AgentPublicProfilePage() {
     return map;
   }, [activeNativeDecimals, activeNativeSymbol, walletHoldings, management]);
 
-  const explorerTxBaseUrl = useMemo(() => {
-    const base = activeDepositChain?.explorerBaseUrl ?? null;
-    if (!base) {
-      return null;
-    }
-    return `${base.replace(/\/+$/, '')}/tx/`;
-  }, [activeDepositChain?.explorerBaseUrl]);
-
   const toTxExplorerUrl = useCallback(
     (txHash: string | null | undefined) => {
-      if (!txHash || !explorerTxBaseUrl) {
+      const id = String(txHash || '').trim();
+      const base = String(activeDepositChain?.explorerBaseUrl || '').trim();
+      if (!id || !base) {
         return null;
       }
-      return `${explorerTxBaseUrl}${txHash}`;
+      if (activeChainKey.startsWith('solana_')) {
+        if (!base.includes('explorer.solana.com')) {
+          return null;
+        }
+        const clusterMatch = /[?&]cluster=([^&]+)/i.exec(base);
+        const cluster = clusterMatch?.[1] ? decodeURIComponent(clusterMatch[1]) : '';
+        const prefix = `https://explorer.solana.com/tx/${encodeURIComponent(id)}`;
+        return cluster ? `${prefix}?cluster=${encodeURIComponent(cluster)}` : prefix;
+      }
+      return `${base.replace(/\/+$/, '')}/tx/${id}`;
     },
-    [explorerTxBaseUrl]
+    [activeChainKey, activeDepositChain?.explorerBaseUrl]
   );
 
   const formatHumanAmount = useCallback(

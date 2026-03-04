@@ -25,7 +25,7 @@
     "limitOrders": false,
     "x402": false,
     "faucet": false,
-    "deposits": false
+    "deposits": true
   },
   "marketData": {
     "dexscreenerChainId": "solana"

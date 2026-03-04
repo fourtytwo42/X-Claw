@@ -6,6 +6,12 @@
   "properties": {
     "agentId": { "type": "string", "minLength": 1 },
     "chainKey": { "type": "string", "minLength": 1 },
-    "destination": { "type": "string", "pattern": "^0x[a-fA-F0-9]{40}$" }
+    "destination": {
+      "type": "string",
+      "anyOf": [
+        { "pattern": "^0x[a-fA-F0-9]{40}$" },
+        { "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,64}$" }
+      ]
+    }
   }
 }

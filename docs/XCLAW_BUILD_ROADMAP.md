@@ -46,6 +46,15 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 - [~] Update Solana chain configs to `programIds/poolRegistry/accountsTemplate` contract.
 - [ ] Sequential validation + PM2 restart + issue evidence capture.
 
+## 0.9) Slice 159-163 Solana Deposits + Management Parity Program
+
+- [~] Canonical contract update: management deposit/confirmation paths are family-aware (`evm|solana`), withdraw remains audit-only.
+- [~] Generalize management deposit/withdraw schemas from hex-only address/tx constraints to family-neutral contract.
+- [~] Enable `solana_devnet` deposits capability (keep localnet enabled; keep mainnet/testnet deferred).
+- [~] Refactor `/api/v1/management/deposit` sync to dispatch by chain family and degrade deterministically on Solana RPC faults.
+- [~] Make management transfer-confirmation resolvers + agent-page tx explorer formatting family-aware.
+- [ ] Sequential validation + PM2 restart + issue evidence capture.
+
 ---
 
 ## 0) Program Control and Working Rules
