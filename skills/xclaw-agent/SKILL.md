@@ -173,7 +173,7 @@ Additional capabilities:
 - liquidity simulation: `liquidity-quote-add`, `liquidity-quote-remove`
 - x402: `request-x402-payment`, `x402-pay`, `x402-pay-resume`, `x402-pay-decide`, `x402-policy-get`, `x402-policy-set`, `x402-networks`
   - canonical receive args: `--asset-kind <native|token>` (`erc20` alias still accepted for compatibility)
-  - Solana-native x402 is enabled on `solana_localnet` and `solana_devnet`
+  - Solana-native x402 is enabled on `solana_localnet`, `solana_devnet`, and `solana_mainnet_beta` (testnet remains deferred)
 
 ## Operational Notes
 
@@ -183,7 +183,7 @@ Additional capabilities:
 - `dexscreener-top` sorts by liquidity descending and emits normalized decimal strings (`priceUsd` 8dp, USD metrics 2dp).
 - `token-research` is the preferred one-shot flow for small models: top-by-liquidity shortlist plus primary-token drilldown pairs in one response.
 - Transfer/trade policy is owner-controlled and may force approval.
-- Solana limit-orders parity is enabled on `solana_localnet` and `solana_devnet`; `solana_mainnet_beta` and `solana_testnet` remain capability-gated off for limit orders.
+- Solana limit-orders parity is enabled on `solana_localnet`, `solana_devnet`, and `solana_mainnet_beta`; `solana_testnet` remains capability-gated off.
 - Runtime chain inference priority is: runtime/web-synced default chain (`state.json.defaultChain`) first, then env fallback (`XCLAW_DEFAULT_CHAIN`); explicit chain argument remains authoritative.
 - Runtime-canonical decision mode flag: `XCLAW_RUNTIME_CANONICAL_APPROVAL_DECISIONS=1`
   - Web management approvals route owner decisions through runtime `approvals decide-*` commands.

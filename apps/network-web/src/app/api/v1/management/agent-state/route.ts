@@ -9,6 +9,7 @@ import { requireManagementSession, sessionHasAgentAccess } from '@/lib/managemen
 import { getRequestId } from '@/lib/request-id';
 import { isTransferMirrorSchemaUnavailableError, transferMirrorSchemaErrorDetails } from '@/lib/transfer-mirror-schema';
 import { resolveTokenMetadata } from '@/lib/token-metadata';
+import { getSolanaBurninSnapshot } from '@/lib/solana-burnin';
 import { fetchChainTransactionConfirmations } from '@/lib/tx-confirmations';
 import { kickStaleTransferRecovery, kickTerminalTransferPromptCleanup } from '@/lib/transfer-recovery';
 
@@ -813,6 +814,7 @@ export async function GET(req: NextRequest) {
       chainKey,
       transferApprovalsHistory.rows.map((row) => row.tx_hash)
     );
+    const burnin = await getSolanaBurninSnapshot(agentId, chainKey);
     const staleCutoffMs = 60 * 1000;
     const nowMs = Date.now();
 
@@ -974,6 +976,7 @@ export async function GET(req: NextRequest) {
           createdAt: row.created_at,
           updatedAt: row.updated_at
         })),
+        burnin,
         managementSession: {
           sessionId: auth.session.sessionId,
           expiresAt: auth.session.expiresAt

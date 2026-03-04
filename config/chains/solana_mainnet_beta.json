@@ -23,10 +23,10 @@
     "wallet": true,
     "trade": true,
     "liquidity": true,
-    "limitOrders": false,
-    "x402": false,
+    "limitOrders": true,
+    "x402": true,
     "faucet": false,
-    "deposits": false
+    "deposits": true
   },
   "marketData": {
     "dexscreenerChainId": "solana"
@@ -57,10 +57,10 @@
           "capabilities": {
             "add": true,
             "remove": true,
-            "increase": false,
-            "claimFees": false,
-            "claimRewards": false,
-            "migrate": false
+            "increase": true,
+            "claimFees": true,
+            "claimRewards": true,
+            "migrate": true
           },
           "operations": {
             "add": {

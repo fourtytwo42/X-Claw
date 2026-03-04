@@ -1,43 +1,49 @@
-# Slice 183-188 Spec: Management Withdraw Execution Parity (2026-03-04)
+# Slice 189-194 Spec: Solana Mainnet Enablement + Burn-In Gates (2026-03-04)
 
 ## Goal
-1. Convert management withdraw from audit-only accepted record to queued runtime-executed transfer flow.
-2. Preserve stable route/UI entrypoint (`POST /api/v1/management/withdraw` + existing withdraw button).
-3. Reuse existing transfer mirror/decision/runtime execution lifecycle for both `evm` and `solana`.
+1. Promote deferred Solana mainnet capabilities in a staged, reversible rollout.
+2. Keep route paths stable while exposing objective burn-in gate metrics in existing management surfaces.
+3. Preserve deterministic fail-closed behavior and `solana_testnet` deferment for promoted capability set.
 
 ## Non-goals
-1. No dedicated withdraw queue/status module in this slice.
-2. No server-side signing/custody.
-3. No route path changes.
+1. No route path changes.
+2. No Solana testnet promotion.
+3. No DB migration unless proven required by runtime constraints.
 
 ## Locked scope
-1. `infrastructure/migrations/0028_slice183_management_withdraw_execution.sql`
-2. `apps/network-web/src/app/api/v1/management/withdraw/route.ts`
-3. `apps/network-web/src/app/api/v1/agent/transfer-decisions/inbox/route.ts`
-4. `apps/network-web/src/lib/errors.ts`
-5. `apps/network-web/src/app/agents/[agentId]/page.tsx`
-6. `apps/agent-runtime/xclaw_agent/cli.py`
-7. `apps/agent-runtime/tests/test_trade_path.py`
-8. `packages/shared-schemas/json/management-withdraw-request.schema.json`
-9. `packages/shared-schemas/json/management-withdraw-response.schema.json`
-10. `packages/shared-schemas/json/agent-transfer-decisions-inbox-response.schema.json`
-11. `docs/api/openapi.v1.yaml`
-12. `docs/XCLAW_SOURCE_OF_TRUTH.md`
-13. `docs/XCLAW_SLICE_TRACKER.md`
-14. `docs/XCLAW_BUILD_ROADMAP.md`
-15. `spec.md`
-16. `tasks.md`
-17. `acceptance.md`
+1. `config/chains/solana_mainnet_beta.json`
+2. `config/chains/solana_testnet.json`
+3. `config/x402/networks.json`
+4. `apps/network-web/src/lib/solana-burnin.ts`
+5. `apps/network-web/src/app/api/v1/management/agent-state/route.ts`
+6. `apps/network-web/src/app/api/v1/management/transfer-approvals/route.ts`
+7. `apps/network-web/src/app/api/v1/management/x402/payments/route.ts`
+8. `apps/network-web/src/app/api/v1/management/deposit/route.ts`
+9. `infrastructure/scripts/management-solana-contract-tests.mjs`
+10. `infrastructure/scripts/x402-solana-contract-tests.mjs`
+11. `skills/xclaw-agent/SKILL.md`
+12. `skills/xclaw-agent/references/commands.md`
+13. `docs/api/openapi.v1.yaml`
+14. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+15. `docs/XCLAW_SLICE_TRACKER.md`
+16. `docs/XCLAW_BUILD_ROADMAP.md`
+17. `spec.md`
+18. `tasks.md`
+19. `acceptance.md`
 
 ## Acceptance checks
+- targeted Next/API checks for management Solana + x402 contract routes
+- `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v`
+- `python3 -m unittest apps/agent-runtime/tests/test_x402_runtime.py -v`
 - `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v`
-- targeted Next/API checks for `management/withdraw` + `agent/transfer-decisions/inbox`
 - `npm run db:parity`
 - `npm run seed:reset`
 - `npm run seed:load`
 - `npm run seed:verify`
 - `npm run build`
 - `pm2 restart all`
+
+# Slice 183-188 Spec: Management Withdraw Execution Parity (2026-03-04, historical)
 
 # Slice 177-182 Spec: Solana Limit-Orders Parity (2026-03-04)
 
@@ -88,12 +94,12 @@
 ## Slice 164-169 Extension (2026-03-04)
 1. Promote x402 asset contract to canonical `native|token` with compatibility alias `erc20`.
 2. Keep x402 public route paths stable while requiring family-aware settlement verification before status `filled`.
-3. Enable Solana x402 on `solana_localnet` + `solana_devnet`; keep `solana_mainnet_beta` + `solana_testnet` deferred.
+3. Enable Solana x402 on `solana_localnet` + `solana_devnet`; keep `solana_mainnet_beta` + `solana_testnet` deferred (historical scope, superseded by Slice 189-194 for mainnet).
 4. Keep response field name `txHash`, but allow family-neutral values (`0x...` hash or Solana signature).
 
 ## Slice 170-176 Extension (2026-03-04)
 1. Add Solana advanced LP execution parity for `increase`, `claim-fees`, `claim-rewards`, `migrate`, and `resume`.
-2. Enable advanced LP capabilities on `solana_localnet` + `solana_devnet`; keep `solana_mainnet_beta` + `solana_testnet` deferred.
+2. Enable advanced LP capabilities on `solana_localnet` + `solana_devnet`; keep `solana_mainnet_beta` + `solana_testnet` deferred (historical scope, superseded by Slice 189-194 for mainnet).
 3. Extend `local_clmm` deterministic localnet execution to advanced operations and extend `raydium_clmm` direct on-chain planner execution to advanced operations.
 4. Preserve canonical status envelope and route path compatibility while removing `position_manager_v3`-only advanced command gating.
 
@@ -101,7 +107,7 @@
 1. Add management deposit + transfer-confirmation family dispatch for `evm|solana`.
 2. Generalize management deposit/withdraw contract fields from EVM-hex-only to family-neutral address/tx identifiers.
 3. Keep withdraw behavior audit-only accepted requests in this historical slice scope (superseded by Slice 183-188).
-4. Enable Solana deposits on `solana_localnet` + `solana_devnet`; keep `solana_mainnet_beta` and `solana_testnet` deposits deferred.
+4. Enable Solana deposits on `solana_localnet` + `solana_devnet`; keep `solana_mainnet_beta` and `solana_testnet` deposits deferred (historical scope, superseded by Slice 189-194 for mainnet).
 
 ## Slice 139-146 Extension (2026-03-04)
 1. Add canonical `solana_localnet` for deterministic Solana runtime/faucet/liquidity testing.

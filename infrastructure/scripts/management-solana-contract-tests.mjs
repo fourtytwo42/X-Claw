@@ -30,7 +30,7 @@ async function main() {
   const testnet = readJson('config/chains/solana_testnet.json');
 
   expect(devnet?.capabilities?.deposits === true, 'solana_devnet_deposits_enabled');
-  expect(mainnet?.capabilities?.deposits === false, 'solana_mainnet_deposits_deferred');
+  expect(mainnet?.capabilities?.deposits === true, 'solana_mainnet_deposits_enabled');
   expect(testnet?.capabilities?.deposits === false, 'solana_testnet_deposits_deferred');
 
   const depositSchema = readJson('packages/shared-schemas/json/management-deposit-response.schema.json');

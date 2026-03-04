@@ -186,8 +186,8 @@ and fail closed for unsupported execution families.
 - runtime executes with owner-initiated `executionMode=policy_override`.
 - terminal status and `txHash`/signature appear in existing transfer history/read models.
 5. Solana deposit rollout scope in this slice is:
-- enabled: `solana_localnet`, `solana_devnet`
-- deferred: `solana_mainnet_beta`, `solana_testnet`
+- enabled: `solana_localnet`, `solana_devnet`, `solana_mainnet_beta`
+- deferred: `solana_testnet`
 6. Management deposit sync must fail closed with deterministic degraded sync state for malformed or unavailable Solana RPC responses; route stability is preserved (no unhandled 500 for sync faults).
 
 ## 3.9) Slice 164-169 Solana-Native x402 Parity (2026-03-04)
@@ -204,8 +204,8 @@ and fail closed for unsupported execution families.
 - settlement step requires canonical `X-Tx-Id` (compatibility `X-Tx-Hash` accepted),
 - server verifies settlement by chain family before writing terminal `filled`.
 5. Solana x402 rollout scope for this slice:
-- enabled: `solana_localnet`, `solana_devnet`
-- deferred: `solana_mainnet_beta`, `solana_testnet`.
+- enabled: `solana_localnet`, `solana_devnet`, `solana_mainnet_beta`
+- deferred: `solana_testnet`.
 6. Security baseline for this slice:
 - no secrets in docs/config artifacts,
 - chain verification failures fail closed with deterministic error codes (`x402_settlement_proof_invalid`, `rpc_unavailable`).
@@ -213,8 +213,8 @@ and fail closed for unsupported execution families.
 ## 3.10) Slice 170-176 Solana Advanced LP Parity (2026-03-04)
 
 1. Advanced Solana liquidity operations are canonical on:
-- enabled: `solana_localnet`, `solana_devnet`
-- deferred: `solana_mainnet_beta`, `solana_testnet`
+- enabled: `solana_localnet`, `solana_devnet`, `solana_mainnet_beta`
+- deferred: `solana_testnet`
 2. Canonical advanced operations for Solana CLMM adapters:
 - `increase`
 - `claim_fees`
@@ -249,8 +249,8 @@ and fail closed for unsupported execution families.
 1. Limit-order lifecycle remains canonical and unchanged for all families:
 - `open -> triggered -> filled|failed|expired` (with `cancelled` via cancel route).
 2. Solana limit-order rollout scope for this slice:
-- enabled: `solana_localnet`, `solana_devnet`
-- deferred: `solana_mainnet_beta`, `solana_testnet`
+- enabled: `solana_localnet`, `solana_devnet`, `solana_mainnet_beta`
+- deferred: `solana_testnet`
 3. Runtime limit-order quote/fill is chain-family-dispatched:
 - EVM path keeps router quote + EVM swap execution.
 - Solana path uses runtime-local quote/fill (`solana_localnet` deterministic local quote/execution; non-localnet Solana via Jupiter quote/execute).
@@ -282,6 +282,29 @@ and fail closed for unsupported execution families.
 - no server-side signing,
 - no private key material leaves runtime.
 5. Owner-initiated withdraws run as `executionMode=policy_override` and keep canonical transfer status vocabulary (`approved -> executing -> filled|failed`) with family-neutral tx id value in `txHash`.
+
+## 3.13) Slice 189-194 Solana Mainnet Enablement + Burn-In Gates (2026-03-04)
+
+1. Solana mainnet (`solana_mainnet_beta`) deferred capabilities are promoted with staged burn-in gates and reversible config kill switches.
+2. Mainnet capability posture after promotion:
+- `capabilities.deposits=true`
+- `capabilities.limitOrders=true`
+- `capabilities.x402=true`
+- advanced CLMM capabilities under `execution.liquidity.adapters.raydium_clmm.capabilities` enabled (`increase`, `claimFees`, `claimRewards`, `migrate`).
+3. `solana_testnet` remains deferred for promoted capabilities in this slice program.
+4. Burn-in gate statuses are canonical vocabulary:
+- `burnin_ready`
+- `burnin_hold`
+- `burnin_blocked`
+5. Burn-in gate metrics are chain/family-tagged and exposed via existing management surfaces (no new public route requirement):
+- transfer fills/fails
+- x402 fills/fails and settlement-proof failures
+- limit-order triggered/fills/fails
+- advanced-liquidity fills/fails
+- deposit sync degraded occurrences
+6. Canonical rollback posture:
+- capability flip to `false` is immediate kill switch,
+- no DB rollback required for capability rollback.
 
 ---
 

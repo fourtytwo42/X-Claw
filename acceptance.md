@@ -1,23 +1,27 @@
-# Slice 183-188 Acceptance Evidence: Management Withdraw Execution Parity
+# Slice 189-194 Acceptance Evidence: Solana Mainnet Enablement + Burn-In Gates
 
 Date (UTC): 2026-03-04
-Active slice context: `Slice 183 -> Slice 188`.
+Active slice context: `Slice 189 -> Slice 194`.
 
 ### Objective + Scope Lock
 - Objective:
-  - convert `/api/v1/management/withdraw` from audit-only to queued runtime transfer execution,
-  - preserve existing withdraw button + transfer history read-model surface across `evm|solana`.
+  - promote deferred Solana mainnet capabilities with staged burn-in gates and reversible kill-switch posture,
+  - keep route paths stable while exposing chain-aware burn-in metrics on existing management surfaces.
 
 ### Behavior Checks
-- [x] management withdraw route now enqueues executable transfer decision payload with `approvalId` + `decisionId`.
-- [x] runtime transfer decision path hydrates missing local flow from `management_withdraw_v1` payload and executes.
-- [x] transfer inbox response schema/API include optional `decisionPayload`.
-- [x] management UI withdraw submit now surfaces queued approval id in toast feedback.
+- [x] `solana_mainnet_beta` capabilities promoted for deferred set (`deposits`, `limitOrders`, `x402`, advanced CLMM operations).
+- [x] `solana_testnet` remains deferred for promoted capability set.
+- [x] `config/x402/networks.json` enables Solana mainnet.
+- [x] existing management routes include optional `burnin` snapshot for `solana_mainnet_beta`.
+- [x] burn-in gate statuses are deterministic (`burnin_ready|burnin_hold|burnin_blocked`) with phase metrics.
 
 ### Required Validation Gates
+- [x] `npm run test:management:solana:contract` -> PASS (`ok: true`, `passed: 11`, `failed: 0`)
+- [x] `npm run test:x402:solana:contract` -> PASS (`ok: true`, `count: 14`)
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_liquidity_cli.py -v` -> PASS (`Ran 20 tests`, `OK`)
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_x402_runtime.py -v` -> PASS (`Ran 5 tests`, `OK`)
 - [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS (`Ran 132 tests`, `OK`)
-- [x] targeted Next/API checks for management withdraw + transfer decision inbox routes (`npm run test:management:solana:contract`) -> PASS (`ok: true`, `passed: 11`, `failed: 0`)
-- [x] `npm run db:parity` -> PASS (`ok: true`, includes `0028_slice183_management_withdraw_execution.sql`)
+- [x] `npm run db:parity` -> PASS (`ok: true`)
 - [x] `npm run seed:reset` -> PASS
 - [x] `npm run seed:load` -> PASS
 - [x] `npm run seed:verify` -> PASS
@@ -25,11 +29,13 @@ Active slice context: `Slice 183 -> Slice 188`.
 - [x] `pm2 restart all` -> PASS (`xclaw-web online`)
 
 ### Grep Proofs
-- [x] no canonical docs still state active management withdraw behavior is audit-only.
-  - historical slice references still mention audit-only scope but are explicitly marked superseded by Slice 183-188.
-- [x] `/api/v1/management/withdraw` now writes executable transfer decision payload (not audit-only log only).
-- [x] runtime transfer decision flow contains payload hydration for missing local transfer flows.
-- [x] no secret material is stored in withdraw decision payload/audit records.
+- [x] `solana_mainnet_beta` promoted capabilities are present in config and canonical docs.
+- [x] `solana_testnet` remains deferred in config and canonical docs.
+- [x] no route-path changes across management/x402/limit-order/liquidity endpoints.
+  - verified by touched-file allowlist (`git status --short`) showing only config, docs, management route payload extensions, and no API path-file additions/removals.
+- [x] no canonical doc/config drift for Solana mainnet rollout posture.
+
+# Slice 183-188 Acceptance Evidence: Management Withdraw Execution Parity (historical)
 
 # Slice 177-182 Acceptance Evidence: Solana Limit-Orders Parity
 

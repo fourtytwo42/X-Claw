@@ -4,6 +4,7 @@ import { dbQuery } from '@/lib/db';
 import { errorResponse, internalErrorResponse, successResponse } from '@/lib/errors';
 import { requireManagementSession, sessionHasAgentAccess } from '@/lib/management-auth';
 import { getRequestId } from '@/lib/request-id';
+import { getSolanaBurninSnapshot } from '@/lib/solana-burnin';
 import { fetchChainTransactionConfirmations } from '@/lib/tx-confirmations';
 import { kickStaleTransferRecovery, kickTerminalTransferPromptCleanup } from '@/lib/transfer-recovery';
 
@@ -166,11 +167,14 @@ export async function GET(req: NextRequest) {
       chainKey,
       history.rows.map((row) => row.tx_hash)
     );
+    const burnin = await getSolanaBurninSnapshot(agentId, chainKey);
+
     return successResponse(
       {
         ok: true,
         agentId,
         chainKey,
+        burnin,
         queue: queue.rows.map((row) => ({ ...row, confirmations: null })),
         history: history.rows.map((row) => ({
           ...row,

@@ -1590,6 +1590,7 @@ paths:
   /api/v1/management/transfer-approvals:
     get:
       summary: List pending and recent mirrored transfer approvals for authorized management session, including computed confirmation counts when tx hash exists.
+      description: Response may include optional `burnin` snapshot for `solana_mainnet_beta` staged rollout gates.
       security:
         - managementCookie: []
       parameters:
@@ -1642,6 +1643,7 @@ paths:
   /api/v1/management/x402/payments:
     get:
       summary: List x402 inbound/outbound queue and history for authorized management session.
+      description: Response may include optional `burnin` snapshot for `solana_mainnet_beta` staged rollout gates.
       security:
         - managementCookie: []
       parameters:
@@ -2016,7 +2018,7 @@ paths:
   /api/v1/management/deposit:
     get:
       summary: Read agent deposit address, tracked balances, and confirmed deposits.
-      description: Family-aware deposit payload. `recentDeposits[].txHash` remains field-compatible for EVM tx hashes and Solana signatures.
+      description: Family-aware deposit payload. `recentDeposits[].txHash` remains field-compatible for EVM tx hashes and Solana signatures. Response may include optional `burnin` snapshot for `solana_mainnet_beta` staged rollout gates.
       security:
         - managementCookie: []
       parameters:

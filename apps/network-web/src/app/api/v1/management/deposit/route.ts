@@ -8,6 +8,7 @@ import { fetchWithTimeout, upstreamFetchTimeoutMs } from '@/lib/fetch-timeout';
 import { makeId } from '@/lib/ids';
 import { requireCsrfToken, requireManagementSession, sessionHasAgentAccess } from '@/lib/management-auth';
 import { getRequestId } from '@/lib/request-id';
+import { getSolanaBurninSnapshot } from '@/lib/solana-burnin';
 import { resolveTokenDecimals } from '@/lib/token-metadata';
 
 export const runtime = 'nodejs';
@@ -534,6 +535,36 @@ export async function GET(req: NextRequest) {
     for (const wallet of eligibleWallets) {
       const cfg = getChainConfig(wallet.chain_key);
       const sync = await syncChainDeposits(agentId, wallet.chain_key, wallet.address);
+      try {
+        await dbQuery(
+          `
+          insert into management_audit_log (
+            audit_id, agent_id, management_session_id, action_type, action_status,
+            public_redacted_payload, private_payload, user_agent, created_at
+          ) values (
+            $1, $2, $3, 'deposit.sync', 'accepted', $4::jsonb, $5::jsonb, $6, now()
+          )
+          `,
+          [
+            makeId('audit'),
+            agentId,
+            auth.session.sessionId,
+            JSON.stringify({
+              chainKey: wallet.chain_key,
+              syncStatus: sync.syncStatus,
+            }),
+            JSON.stringify({
+              chainKey: wallet.chain_key,
+              syncStatus: sync.syncStatus,
+              syncDetail: sync.syncDetail,
+              minConfirmations: sync.minConfirmations,
+            }),
+            req.headers.get('user-agent') || null,
+          ]
+        );
+      } catch {
+        // Best effort audit signal for burn-in gates.
+      }
 
       const [balances, deposits] = await Promise.all([
         dbQuery<{ token: string; balance: string; block_number: string | null; observed_at: string }>(
@@ -607,7 +638,12 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    return successResponse({ ok: true, agentId, chains }, 200, requestId);
+    const burnin =
+      chainFilter === 'solana_mainnet_beta'
+        ? await getSolanaBurninSnapshot(agentId, 'solana_mainnet_beta')
+        : null;
+
+    return successResponse({ ok: true, agentId, chains, burnin }, 200, requestId);
   } catch {
     return internalErrorResponse(requestId);
   }

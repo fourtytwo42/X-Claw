@@ -104,7 +104,7 @@ Goal:
 
 DoD:
 - [~] canonical x402 asset contract updated to `native|token` with compatibility alias `erc20`.
-- [~] `solana_localnet` + `solana_devnet` have `capabilities.x402=true`; `solana_mainnet_beta` + `solana_testnet` remain deferred.
+- [~] `solana_localnet` + `solana_devnet` have `capabilities.x402=true`; `solana_mainnet_beta` + `solana_testnet` remain deferred (historical scope, superseded by Slice 189-194 for mainnet).
 - [~] runtime x402 pay flow executes local on-chain settlement and submits proof via hosted pay endpoints.
 - [~] hosted pay endpoints verify chain tx proof by family before setting status `filled`.
 - [~] schemas/openapi/skill docs are updated for family-neutral asset address + tx id.
@@ -120,7 +120,7 @@ Goal:
 
 DoD:
 - [~] canonical artifacts updated to state Solana advanced LP parity scope and deterministic error contract.
-- [~] `solana_localnet` + `solana_devnet` advanced LP capabilities enabled in `execution.liquidity.adapters.*`.
+- [~] `solana_localnet` + `solana_devnet` advanced LP capabilities enabled in `execution.liquidity.adapters.*` (historical scope, superseded by Slice 189-194 for mainnet).
 - [~] runtime Solana planners/executors support advanced operation set for `local_clmm` and `raydium_clmm`.
 - [~] `cmd_liquidity_increase|claim_fees|claim_rewards|migrate` are family-aware (`position_manager_v3|local_clmm|raydium_clmm`).
 - [~] `cmd_liquidity_execute/resume` can execute advanced intent actions (`increase|claim_fees|claim_rewards|migrate`) without EVM-only gating.
@@ -137,7 +137,7 @@ Goal:
 
 DoD:
 - [~] canonical docs/contracts updated to include Solana limit-order parity scope and deferred chains.
-- [~] Solana chain capability flags updated (`solana_localnet` + `solana_devnet` enabled; mainnet/testnet deferred).
+- [~] Solana chain capability flags updated (`solana_localnet` + `solana_devnet` enabled; mainnet/testnet deferred) (historical scope, superseded by Slice 189-194 for mainnet).
 - [~] limit-order schemas/openapi updated for family-neutral token ids and tx ids.
 - [~] runtime limit-order quote/fill paths dispatch by family (EVM + Solana).
 - [~] skill wrapper exposes limit-order create/list/cancel/sync/run commands.
@@ -158,6 +158,26 @@ DoD:
 - [~] `POST /api/v1/management/withdraw` writes mirror + decision inbox payload and returns queued execution metadata.
 - [~] runtime transfer decision handling hydrates missing local flow from decision payload for approve decisions.
 - [~] existing management transfer history/read models render withdraw execution outcomes with family-neutral `txHash` values.
+- [x] full sequential validation + grep proofs + issue evidence posted.
+
+---
+
+## Slice 189-194: Solana Mainnet Enablement + Burn-In Gates
+Status: [x]
+
+Goal:
+- Promote deferred Solana mainnet capabilities with staged rollout gates and reversible kill-switch posture, with no route-path changes.
+
+DoD:
+- [x] Canonical docs/contracts define staged burn-in rollout and rollback posture.
+- [x] Existing management surfaces expose optional `burnin` snapshots for `solana_mainnet_beta`.
+- [x] `solana_mainnet_beta` capability flags promoted:
+  - [x] `deposits=true`
+  - [x] `limitOrders=true`
+  - [x] `x402=true`
+  - [x] advanced CLMM capabilities (`increase|claimFees|claimRewards|migrate`) enabled.
+- [x] `config/x402/networks.json` enables `solana_mainnet_beta`.
+- [x] `solana_testnet` remains deferred for promoted capability set.
 - [x] full sequential validation + grep proofs + issue evidence posted.
 
 ---

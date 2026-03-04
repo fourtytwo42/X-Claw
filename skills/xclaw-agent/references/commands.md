@@ -131,7 +131,7 @@ Underlying runtime delegation (performed by wrapper):
   - `XCLAW_SOLANA_RPC_FALLBACK_URL_SOLANA_DEVNET=<fallback_rpc>`
   - `XCLAW_SOLANA_RPC_API_KEY_SOLANA_DEVNET=<tatum_api_key>` (required if provider is `tatum`)
   - For `raydium_clmm` quote/add/remove/increase/claim/migrate on non-localnet Solana, pass `--pool-id` unless chain config provides exactly one default pool in `execution.liquidity.adapters.raydium_clmm.poolRegistry`.
-  - Solana limit-orders are enabled on `solana_localnet` and `solana_devnet`; `solana_mainnet_beta` and `solana_testnet` remain disabled in this slice.
+  - Solana limit-orders are enabled on `solana_localnet`, `solana_devnet`, and `solana_mainnet_beta`; `solana_testnet` remains disabled in this slice.
   - skill-wrapper aliases: `eth|kite -> native`, `weth|wkite -> wrapped`, `usdc|usdt -> stable`
   - skill-wrapper behavior: if only `native` is requested, it omits asset flags so faucet defaults to all assets.
 - `xclaw-agent faucet-networks --json`

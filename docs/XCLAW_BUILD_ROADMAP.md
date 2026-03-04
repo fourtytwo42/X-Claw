@@ -58,7 +58,7 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 ## 0.10) Slice 164-169 Solana-Native x402 Parity Program
 
 - [~] Canonicalize x402 asset contract to `native|token` while keeping compatibility alias `erc20`.
-- [~] Enable x402 capability on `solana_localnet` + `solana_devnet`; keep `solana_mainnet_beta` + `solana_testnet` deferred.
+- [~] Enable x402 capability on `solana_localnet` + `solana_devnet`; keep `solana_mainnet_beta` + `solana_testnet` deferred (historical scope, superseded by Slice 189-194 for mainnet).
 - [~] Replace runtime x402 simulated settle flow with chain-native wallet settlement and hosted proof submission.
 - [~] Add family-aware hosted settlement verification (`evm` receipt + `solana` signature status) before marking `filled`.
 - [~] Update schemas/openapi/skill docs for family-neutral asset address + tx id contracts.
@@ -67,7 +67,7 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 ## 0.11) Slice 170-176 Solana Advanced LP Parity Program
 
 - [~] Canonicalize Solana advanced LP parity scope (`increase`, `claim-fees`, `claim-rewards`, `migrate`, `resume`) with deterministic error contract.
-- [~] Enable advanced LP capabilities for `solana_localnet` + `solana_devnet`; keep `solana_mainnet_beta` + `solana_testnet` deferred.
+- [~] Enable advanced LP capabilities for `solana_localnet` + `solana_devnet`; keep `solana_mainnet_beta` + `solana_testnet` deferred (historical scope, superseded by Slice 189-194 for mainnet).
 - [~] Extend Solana CLMM runtime modules (`local_clmm`, `raydium_clmm`) to support advanced operation set.
 - [~] Remove `position_manager_v3`-only advanced command gates in runtime CLI and route advanced intents through family-dispatch execution.
 - [~] Update OpenAPI/schema/skill docs for advanced Solana LP metadata and examples.
@@ -76,7 +76,7 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 ## 0.12) Slice 177-182 Solana Limit-Orders Parity Program
 
 - [~] Canonicalize Solana limit-order parity scope (`create/list/cancel/sync/run`) with deferred mainnet/testnet posture.
-- [~] Enable `limitOrders` capability on `solana_localnet` + `solana_devnet`; keep `solana_mainnet_beta` + `solana_testnet` disabled.
+- [~] Enable `limitOrders` capability on `solana_localnet` + `solana_devnet`; keep `solana_mainnet_beta` + `solana_testnet` disabled (historical scope, superseded by Slice 189-194 for mainnet).
 - [~] Generalize limit-order schemas/OpenAPI (`tokenIn/tokenOut` family-neutral, `txHash` family-neutral).
 - [~] Refactor runtime limit-order quote/fill path to family dispatch (EVM + Solana).
 - [~] Expose limit-order command surface in skill wrapper and operator docs.
@@ -89,6 +89,16 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 - [~] Update `/api/v1/management/withdraw` to enqueue approved transfer mirror + pending decision inbox row.
 - [~] Extend runtime transfer decision flow to hydrate missing local flow from withdraw decision payload.
 - [~] Keep existing management transfer history surface as the withdraw execution read-model (no dedicated withdraw module in this slice).
+- [x] Sequential validation + PM2 restart + issue evidence capture.
+
+## 0.14) Slice 189-194 Solana Mainnet Enablement + Burn-In Program
+
+- [x] Canonicalize staged Solana mainnet rollout gates and rollback posture.
+- [x] Add optional `burnin` gate snapshot exposure on existing management surfaces (`agent-state`, `transfer-approvals`, `x402/payments`, `deposit`).
+- [x] Promote `solana_mainnet_beta` capability flags for deferred set (`deposits`, `limitOrders`, `x402`).
+- [x] Promote `solana_mainnet_beta` advanced CLMM operation capabilities (`increase|claimFees|claimRewards|migrate`).
+- [x] Enable `solana_mainnet_beta` in `config/x402/networks.json`.
+- [x] Keep `solana_testnet` deferred for promoted capability set.
 - [x] Sequential validation + PM2 restart + issue evidence capture.
 
 ---

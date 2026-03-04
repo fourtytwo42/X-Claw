@@ -1,4 +1,23 @@
-# Slice 183-188 Tasks: Management Withdraw Execution Parity (2026-03-04)
+# Slice 189-194 Tasks: Solana Mainnet Enablement + Burn-In Gates (2026-03-04)
+
+- [x] Update canonical docs/contracts with Solana mainnet burn-in rollout and rollback posture.
+- [x] Add reusable `solana_mainnet_beta` burn-in snapshot helper with phase gates (`burnin_ready|burnin_hold|burnin_blocked`).
+- [x] Expose optional burn-in snapshot in existing management surfaces:
+  - [x] `/api/v1/management/agent-state`
+  - [x] `/api/v1/management/transfer-approvals`
+  - [x] `/api/v1/management/x402/payments`
+  - [x] `/api/v1/management/deposit`
+- [x] Promote `solana_mainnet_beta` deferred capabilities:
+  - [x] `deposits=true`
+  - [x] `limitOrders=true`
+  - [x] `x402=true`
+  - [x] `execution.liquidity.adapters.raydium_clmm.capabilities.{increase,claimFees,claimRewards,migrate}=true`
+- [x] Enable Solana mainnet in `config/x402/networks.json`.
+- [x] Keep `solana_testnet` deferred for promoted capability set.
+- [x] Update Solana management/x402 contract tests for mainnet promotion posture.
+- [x] Run sequential validations + grep proofs + issue evidence post.
+
+# Slice 183-188 Tasks: Management Withdraw Execution Parity (2026-03-04, historical)
 
 - [x] Update canonical docs/contracts to state management withdraw is runtime-queued execution (not audit-only).
 - [x] Add additive migration for `agent_transfer_decision_inbox.decision_payload` with sentinel payload check.
@@ -12,7 +31,7 @@
 # Slice 177-182 Tasks: Solana Limit-Orders Parity (2026-03-04)
 
 - [x] Update canonical docs/contracts for Solana limit-order parity scope and deferred mainnet/testnet posture.
-- [x] Enable `capabilities.limitOrders=true` on `solana_localnet` + `solana_devnet`; keep `solana_mainnet_beta` + `solana_testnet` disabled.
+- [x] Enable `capabilities.limitOrders=true` on `solana_localnet` + `solana_devnet`; keep `solana_mainnet_beta` + `solana_testnet` disabled (historical scope, superseded by Slice 189-194 for mainnet).
 - [x] Generalize limit-order schemas + OpenAPI component contracts for family-neutral token identifiers and tx ids.
 - [x] Refactor runtime limit-order quote/fill path to family dispatch (`_quote_limit_order_price`, Solana local/dev execution branches).
 - [x] Remove runtime create-path hex-only token guard for limit orders.
@@ -24,7 +43,7 @@
 
 ## Slice 170-176 Tasks: Solana Advanced LP Parity (2026-03-04)
 - [x] Update canonical docs/contracts for advanced Solana LP parity scope and deterministic error contract.
-- [x] Enable advanced LP capabilities for `solana_localnet` + `solana_devnet`; keep `solana_mainnet_beta` + `solana_testnet` deferred.
+- [x] Enable advanced LP capabilities for `solana_localnet` + `solana_devnet`; keep `solana_mainnet_beta` + `solana_testnet` deferred (historical scope, superseded by Slice 189-194 for mainnet).
 - [x] Extend `local_clmm` + `raydium_clmm` runtime operation set to include `increase|claim_fees|claim_rewards|migrate`.
 - [x] Remove `position_manager_v3`-only command gates for advanced liquidity CLI and dispatch by family.
 - [x] Add advanced intent action support in `cmd_liquidity_execute/resume` for `increase|claim_fees|claim_rewards|migrate`.
@@ -33,7 +52,7 @@
 
 ## Slice 164-169 Tasks: Solana-Native x402 Parity (2026-03-04)
 - [x] Update canonical docs/contracts for x402 `native|token` contract and family-neutral tx id semantics.
-- [x] Enable Solana x402 capability on `solana_localnet` + `solana_devnet`; keep mainnet/testnet deferred.
+- [x] Enable Solana x402 capability on `solana_localnet` + `solana_devnet`; keep mainnet/testnet deferred (historical scope, superseded by Slice 189-194 for mainnet).
 - [x] Add Solana x402 networks in `config/x402/networks.json` with localnet/devnet enabled and mainnet disabled.
 - [x] Generalize x402 schemas + OpenAPI enums for token-kind aliasing and family-neutral tx/address formats.
 - [x] Replace runtime x402 header-only settlement with challenge -> local chain settlement -> hosted proof submission flow.

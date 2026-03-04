@@ -4,6 +4,7 @@ import { dbQuery } from '@/lib/db';
 import { errorResponse, internalErrorResponse, successResponse } from '@/lib/errors';
 import { requireManagementSession, sessionHasAgentAccess } from '@/lib/management-auth';
 import { getRequestId } from '@/lib/request-id';
+import { getSolanaBurninSnapshot } from '@/lib/solana-burnin';
 
 export const runtime = 'nodejs';
 
@@ -148,7 +149,8 @@ export async function GET(req: NextRequest) {
       )
     ]);
 
-    return successResponse({ ok: true, agentId, chainKey, queue: queue.rows, history: history.rows }, 200, requestId);
+    const burnin = await getSolanaBurninSnapshot(agentId, chainKey);
+    return successResponse({ ok: true, agentId, chainKey, burnin, queue: queue.rows, history: history.rows }, 200, requestId);
   } catch {
     return internalErrorResponse(requestId);
   }

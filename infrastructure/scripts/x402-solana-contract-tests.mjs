@@ -26,13 +26,13 @@ function run() {
   const solTest = readJson('config/chains/solana_testnet.json');
   expect(solLocal?.capabilities?.x402 === true, 'solana_localnet_x402_enabled');
   expect(solDev?.capabilities?.x402 === true, 'solana_devnet_x402_enabled');
-  expect(solMain?.capabilities?.x402 === false, 'solana_mainnet_x402_deferred');
+  expect(solMain?.capabilities?.x402 === true, 'solana_mainnet_x402_enabled');
   expect(solTest?.capabilities?.x402 === false, 'solana_testnet_x402_deferred');
 
   const x402Networks = readJson('config/x402/networks.json');
   expect(x402Networks?.networks?.solana_localnet?.enabled === true, 'x402_networks_solana_localnet_enabled');
   expect(x402Networks?.networks?.solana_devnet?.enabled === true, 'x402_networks_solana_devnet_enabled');
-  expect(x402Networks?.networks?.solana_mainnet_beta?.enabled === false, 'x402_networks_solana_mainnet_deferred');
+  expect(x402Networks?.networks?.solana_mainnet_beta?.enabled === true, 'x402_networks_solana_mainnet_enabled');
 
   const inboundSchema = readJson('packages/shared-schemas/json/agent-x402-inbound-proposed-request.schema.json');
   const kindEnum = inboundSchema?.properties?.assetKind?.enum || [];

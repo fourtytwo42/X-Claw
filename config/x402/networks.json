@@ -78,14 +78,14 @@
       }
     },
     "solana_mainnet_beta": {
-      "enabled": false,
+      "enabled": true,
       "displayName": "Solana Mainnet",
       "chainId": 101,
       "facilitators": {
         "xclaw_hosted": {
           "type": "xclaw_hosted",
           "baseUrl": "https://xclaw.trade",
-          "notes": "Disabled in this slice until post-burn-in promotion."
+          "notes": "Hosted x402 settlement on Solana mainnet."
         }
       }
     }
