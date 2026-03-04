@@ -18,7 +18,7 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 - [~] Add Solana RPC health command surface (`xclaw-agent wallet rpc-health`) and skill alias (`wallet-rpc-health`) for operator verification.
 - [~] Remove paid provider API key requirements from skill/OpenClaw env contract.
 - [~] Sync OpenAPI + shared schema for fallback route request contract.
-- [ ] Sequential validation + PM2 restart + issue evidence capture.
+- [x] Sequential validation + PM2 restart + issue evidence capture.
 
 ## 0.16) Slice 201-205 Skill Parity Closeout for Withdraw Queue/Status
 

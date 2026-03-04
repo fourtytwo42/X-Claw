@@ -11,7 +11,7 @@
 - [x] Update skill docs to remove Tatum API key requirement from agent/OpenClaw runtime env.
 - [x] Extend contract script coverage for new fallback route/schema artifacts.
 - [x] Run sequential validations + grep proofs.
-- [ ] Post issue evidence (mapped issue linkage).
+- [x] Post issue evidence (mapped issue linkage).
 
 # Slice 201-205 Tasks: Skill Parity Closeout for Withdraw Queue/Status (2026-03-04)
 

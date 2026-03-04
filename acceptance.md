@@ -38,6 +38,7 @@ Active slice context: `Slice 206 -> Slice 208`.
 - [x] runtime/skill command surfaces expose RPC health path.
   - `apps/agent-runtime/xclaw_agent/cli.py` includes `wallet rpc-health` parser + `cmd_wallet_rpc_health`.
   - `skills/xclaw-agent/scripts/xclaw_agent_skill.py` includes `wallet-rpc-health` alias.
+- [x] issue evidence posted: `#49` comment `4000930863`.
 
 # Slice 201-205 Acceptance Evidence: Skill Parity Closeout for Withdraw Queue/Status
 
