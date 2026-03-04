@@ -2977,6 +2977,44 @@ class TradePathRuntimeTests(unittest.TestCase):
         self.assertFalse(payload.get("ok"))
         self.assertEqual(payload.get("code"), "auth_invalid")
 
+    def test_wallet_rpc_health_success_public(self) -> None:
+        args = argparse.Namespace(chain="solana_devnet", json=True)
+        with mock.patch.object(
+            cli,
+            "solana_rpc_health",
+            return_value={
+                "chain": "solana_devnet",
+                "mode": "public_ok",
+                "providerUsed": "public_direct",
+                "rpcEndpoint": "https://api.devnet.solana.com",
+                "proxyFallbackUsed": False,
+                "candidates": ["https://api.devnet.solana.com"],
+                "errors": [],
+            },
+        ):
+            payload = self._run_and_parse_stdout(lambda: cli.cmd_wallet_rpc_health(args))
+        self.assertTrue(payload.get("ok"))
+        self.assertEqual(payload.get("mode"), "public_ok")
+
+    def test_wallet_rpc_health_fails_closed_when_fallback_unavailable(self) -> None:
+        args = argparse.Namespace(chain="solana_devnet", json=True)
+        with mock.patch.object(
+            cli,
+            "solana_rpc_health",
+            return_value={
+                "chain": "solana_devnet",
+                "mode": "fallback_unavailable",
+                "providerUsed": "none",
+                "rpcEndpoint": None,
+                "proxyFallbackUsed": False,
+                "candidates": ["https://public-1", "https://public-2"],
+                "errors": [{"endpoint": "server_proxy", "code": "rpc_unavailable", "message": "down"}],
+            },
+        ):
+            payload = self._run_and_parse_stdout(lambda: cli.cmd_wallet_rpc_health(args))
+        self.assertFalse(payload.get("ok"))
+        self.assertEqual(payload.get("code"), "rpc_unavailable")
+
     def test_trade_execute_real_does_not_auto_report(self) -> None:
         args = argparse.Namespace(intent="trd_real_1", chain="base_sepolia", json=True)
         trade_payload = {
@@ -3273,6 +3311,12 @@ class TradePathRuntimeTests(unittest.TestCase):
                 ]
             )
         self.assertEqual(code, 0)
+
+    def test_wallet_rpc_health_command_parses_and_dispatches(self) -> None:
+        with mock.patch.object(cli, "cmd_wallet_rpc_health", return_value=0) as cmd_mock:
+            code = cli.main(["wallet", "rpc-health", "--chain", "solana_devnet", "--json"])
+        self.assertEqual(code, 0)
+        cmd_mock.assert_called_once()
 
     def test_withdraws_list_command_parses_and_dispatches(self) -> None:
         with mock.patch.object(cli, "cmd_withdraws_list", return_value=0) as cmd_mock:

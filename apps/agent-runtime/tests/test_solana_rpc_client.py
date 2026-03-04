@@ -9,6 +9,7 @@ if str(RUNTIME_ROOT) not in sys.path:
 
 from xclaw_agent.solana_rpc_client import (  # noqa: E402
     SolanaRpcClientError,
+    rpc_health,
     rpc_post,
     select_rpc_endpoint,
 )
@@ -113,6 +114,59 @@ class SolanaRpcClientTests(unittest.TestCase):
             with self.assertRaises(SolanaRpcClientError) as ctx:
                 rpc_post("getBalance", ["addr"], chain_key="solana_devnet")
         self.assertIn(ctx.exception.code, {"rpc_unavailable", "chain_config_invalid"})
+
+    def test_rpc_health_reports_proxy_fallback_mode(self) -> None:
+        with mock.patch.dict(
+            "os.environ",
+            {
+                "XCLAW_API_BASE_URL": "https://xclaw.trade/api/v1",
+                "XCLAW_AGENT_API_KEY": "xak_test",
+                "XCLAW_SOLANA_RPC_URL_SOLANA_DEVNET": "https://primary.example",
+                "XCLAW_SOLANA_RPC_FALLBACK_URL_SOLANA_DEVNET": "https://fallback.example",
+            },
+            clear=False,
+        ), mock.patch(
+            "xclaw_agent.solana_rpc_client.get_chain",
+            return_value={"chainKey": "solana_devnet", "family": "solana", "rpc": {"primary": "https://rpc.example"}},
+        ), mock.patch(
+            "urllib.request.urlopen"
+        ) as urlopen:
+
+            def _fake_urlopen(req, timeout=20.0):  # type: ignore[override]
+                url = str(getattr(req, "full_url", "") or getattr(req, "fullurl", "") or "")
+                if url == "https://primary.example":
+                    raise Exception("primary down")
+                if url == "https://fallback.example":
+                    raise Exception("fallback down")
+                if url == "https://xclaw.trade/api/v1/agent/solana/rpc":
+                    handle = mock.Mock()
+                    handle.read.return_value = b'{"ok":true,"providerUsed":"tatum_fallback","result":{"value":{"blockhash":"abc"}}}'
+                    return mock.Mock(__enter__=mock.Mock(return_value=handle), __exit__=mock.Mock(return_value=False))
+                raise AssertionError(f"Unexpected URL {url}")
+
+            urlopen.side_effect = _fake_urlopen
+            payload = rpc_health("solana_devnet")
+        self.assertEqual(payload.get("mode"), "proxy_fallback_used")
+        self.assertEqual(payload.get("providerUsed"), "tatum_fallback")
+
+    def test_rpc_health_reports_fallback_unavailable(self) -> None:
+        with mock.patch.dict(
+            "os.environ",
+            {
+                "XCLAW_SOLANA_RPC_URL_SOLANA_DEVNET": "https://primary.example",
+                "XCLAW_SOLANA_RPC_FALLBACK_URL_SOLANA_DEVNET": "https://fallback.example",
+            },
+            clear=False,
+        ), mock.patch(
+            "xclaw_agent.solana_rpc_client.get_chain",
+            return_value={"chainKey": "solana_devnet", "family": "solana", "rpc": {"primary": "https://rpc.example"}},
+        ), mock.patch(
+            "urllib.request.urlopen",
+            side_effect=Exception("public rpc down"),
+        ):
+            payload = rpc_health("solana_devnet")
+        self.assertEqual(payload.get("mode"), "fallback_unavailable")
+        self.assertEqual(payload.get("providerUsed"), "none")
 
 
 if __name__ == "__main__":

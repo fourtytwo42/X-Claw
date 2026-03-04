@@ -11,11 +11,15 @@ Active slice context: `Slice 206 -> Slice 208`.
 ### Behavior Checks
 - [x] additive route exists: `POST /api/v1/agent/solana/rpc`.
 - [x] runtime Solana RPC client attempts direct candidates first, then proxy fallback.
+- [x] runtime Solana RPC health command exists: `xclaw-agent wallet rpc-health --chain <solana_chain> --json`.
+- [x] skill alias exists: `wallet-rpc-health [chain_key]`.
 - [x] skill docs no longer require Tatum API key env on agent/OpenClaw host.
 - [x] OpenAPI + schema contract include fallback route request/response.
 
 ### Required Validation Gates
-- [x] `python3 -m unittest apps/agent-runtime/tests/test_solana_rpc_client.py -v` -> PASS (`Ran 4 tests`, `OK`)
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_solana_rpc_client.py -v` -> PASS (`Ran 6 tests`, `OK`)
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS (`Ran 139 tests`, `OK`)
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_x402_skill_wrapper.py -v` -> PASS (`Ran 61 tests`, `OK`)
 - [x] `npm run test:management:solana:contract` -> PASS (`ok: true`, `passed: 21`, `failed: 0`)
 - [x] `npm run db:parity` -> PASS (`ok: true`)
 - [x] `npm run seed:reset` -> PASS
@@ -31,6 +35,9 @@ Active slice context: `Slice 206 -> Slice 208`.
   - `solana_rpc_client.py` includes `_rpc_post_via_server_proxy(...)` and URL `${XCLAW_API_BASE_URL}/agent/solana/rpc`
 - [x] new server fallback route uses allowlisted methods only.
   - `apps/network-web/src/app/api/v1/agent/solana/rpc/route.ts` defines `ALLOWED_METHODS` and validates `method` against it.
+- [x] runtime/skill command surfaces expose RPC health path.
+  - `apps/agent-runtime/xclaw_agent/cli.py` includes `wallet rpc-health` parser + `cmd_wallet_rpc_health`.
+  - `skills/xclaw-agent/scripts/xclaw_agent_skill.py` includes `wallet-rpc-health` alias.
 
 # Slice 201-205 Acceptance Evidence: Skill Parity Closeout for Withdraw Queue/Status
 

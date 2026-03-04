@@ -15,6 +15,7 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 
 - [~] Add additive agent-auth Solana RPC fallback route (`POST /api/v1/agent/solana/rpc`) for server-side paid provider use.
 - [~] Keep runtime RPC priority as public/direct first, server-proxied paid fallback second.
+- [~] Add Solana RPC health command surface (`xclaw-agent wallet rpc-health`) and skill alias (`wallet-rpc-health`) for operator verification.
 - [~] Remove paid provider API key requirements from skill/OpenClaw env contract.
 - [~] Sync OpenAPI + shared schema for fallback route request contract.
 - [ ] Sequential validation + PM2 restart + issue evidence capture.

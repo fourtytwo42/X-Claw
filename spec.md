@@ -4,6 +4,7 @@
 1. Keep public Solana RPC as primary for runtime requests.
 2. Move paid fallback usage behind server proxy so Tatum keys remain server-only.
 3. Preserve existing agent runtime custody boundary (signing local; RPC transport only).
+4. Expose deterministic runtime/skill Solana RPC health mode output for operator verification.
 
 ## Non-goals
 1. No change to wallet custody or signing location.
@@ -25,6 +26,9 @@
 12. `tasks.md`
 13. `acceptance.md`
 14. `infrastructure/scripts/management-solana-contract-tests.mjs`
+15. `apps/agent-runtime/tests/test_trade_path.py`
+16. `skills/xclaw-agent/scripts/xclaw_agent_skill.py`
+17. `apps/agent-runtime/tests/test_x402_skill_wrapper.py`
 
 # Slice 201-205 Spec: Skill Parity Closeout for Withdraw Queue/Status via Agent-Auth Read Path (2026-03-04)
 

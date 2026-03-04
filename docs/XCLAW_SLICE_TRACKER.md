@@ -26,6 +26,7 @@ Goal:
 DoD:
 - [~] Add agent-auth route `POST /api/v1/agent/solana/rpc` with allowlisted methods for fallback use.
 - [~] Runtime Solana RPC client uses direct public endpoints first and server-proxied fallback second.
+- [~] Runtime/skill surface exposes `wallet rpc-health` to report `public_ok|proxy_fallback_used|fallback_unavailable` for Solana chains.
 - [~] Skill docs remove Tatum API key requirement from agent/OpenClaw env surface.
 - [~] OpenAPI + schema contract updated for new fallback route.
 - [ ] sequential validation + issue evidence posted.

@@ -133,6 +133,7 @@ Common optional:
 - `wallet-create`
 - `wallet-wrap-native <amount>`
 - `wallet-balance`
+- `wallet-rpc-health [chain_key]` (Solana-only RPC mode/status probe)
 - `wallet-track-token <token_address>`
 - `wallet-untrack-token <token_address>`
 - `wallet-tracked-tokens`

@@ -856,7 +856,7 @@ def main(argv: List[str]) -> int:
         return _err(
             "usage",
             "Missing command.",
-            "Use one of: version, status, dashboard, intents-poll, approval-check, trade-exec, trade-spot, trade-resume, liquidity-add, liquidity-remove, liquidity-positions, liquidity-quote-add, liquidity-quote-remove, transfer-resume, transfer-decide, transfer-policy-get, transfer-policy-set, withdraws-list, report-send, chat-poll, chat-post, tracked-list, tracked-trades, username-set, agent-register, auth-recover, owner-link, faucet-request, faucet-networks, chains, dexscreener-search, dexscreener-top, dexscreener-token-pairs, token-research, default-chain-get, default-chain-set, x402-pay, x402-pay-resume, x402-pay-decide, x402-policy-get, x402-policy-set, x402-networks, request-x402-payment, wallet-health, wallet-address, wallet-sign-challenge, wallet-send, wallet-send-token, wallet-balance, wallet-token-balance, wallet-track-token, wallet-untrack-token, wallet-tracked-tokens, wallet-wrap-native, wallet-create",
+            "Use one of: version, status, dashboard, intents-poll, approval-check, trade-exec, trade-spot, trade-resume, liquidity-add, liquidity-remove, liquidity-positions, liquidity-quote-add, liquidity-quote-remove, transfer-resume, transfer-decide, transfer-policy-get, transfer-policy-set, withdraws-list, report-send, chat-poll, chat-post, tracked-list, tracked-trades, username-set, agent-register, auth-recover, owner-link, faucet-request, faucet-networks, chains, dexscreener-search, dexscreener-top, dexscreener-token-pairs, token-research, default-chain-get, default-chain-set, x402-pay, x402-pay-resume, x402-pay-decide, x402-policy-get, x402-policy-set, x402-networks, request-x402-payment, wallet-health, wallet-rpc-health, wallet-address, wallet-sign-challenge, wallet-send, wallet-send-token, wallet-balance, wallet-token-balance, wallet-track-token, wallet-untrack-token, wallet-tracked-tokens, wallet-wrap-native, wallet-create",
             exit_code=2,
         )
 
@@ -902,6 +902,7 @@ def main(argv: List[str]) -> int:
     default_chain_commands = {"default-chain-get", "default-chain-set"}
     wallet_commands = {
         "wallet-health",
+        "wallet-rpc-health",
         "wallet-address",
         "wallet-sign-challenge",
         "wallet-send",
@@ -1774,6 +1775,10 @@ def main(argv: List[str]) -> int:
         target_chain = str(argv[2]).strip() if len(argv) >= 3 and str(argv[2]).strip() else chain
         return _run_agent(["wallet", "health", "--chain", target_chain, "--json"])
 
+    if cmd == "wallet-rpc-health":
+        target_chain = str(argv[2]).strip() if len(argv) >= 3 and str(argv[2]).strip() else chain
+        return _run_agent(["wallet", "rpc-health", "--chain", target_chain, "--json"])
+
     if cmd == "wallet-address":
         target_chain = str(argv[2]).strip() if len(argv) >= 3 and str(argv[2]).strip() else chain
         return _run_agent(["wallet", "address", "--chain", target_chain, "--json"])
@@ -1900,7 +1905,7 @@ def main(argv: List[str]) -> int:
     return _err(
         "unknown_command",
         f"Unknown command: {cmd}",
-        "Use one of: version, status, dashboard, intents-poll, approval-check, trade-exec, trade-spot, trade-resume, liquidity-add, liquidity-remove, liquidity-positions, liquidity-quote-add, liquidity-quote-remove, transfer-resume, transfer-decide, transfer-policy-get, transfer-policy-set, withdraws-list, report-send, chat-poll, chat-post, tracked-list, tracked-trades, username-set, agent-register, auth-recover, owner-link, faucet-request, faucet-networks, chains, dexscreener-search, dexscreener-top, dexscreener-token-pairs, token-research, x402-pay, x402-pay-resume, x402-pay-decide, x402-policy-get, x402-policy-set, x402-networks, request-x402-payment, wallet-health, wallet-address, wallet-sign-challenge, wallet-send, wallet-send-token, wallet-balance, wallet-token-balance, wallet-track-token, wallet-untrack-token, wallet-tracked-tokens, wallet-wrap-native, wallet-create",
+        "Use one of: version, status, dashboard, intents-poll, approval-check, trade-exec, trade-spot, trade-resume, liquidity-add, liquidity-remove, liquidity-positions, liquidity-quote-add, liquidity-quote-remove, transfer-resume, transfer-decide, transfer-policy-get, transfer-policy-set, withdraws-list, report-send, chat-poll, chat-post, tracked-list, tracked-trades, username-set, agent-register, auth-recover, owner-link, faucet-request, faucet-networks, chains, dexscreener-search, dexscreener-top, dexscreener-token-pairs, token-research, x402-pay, x402-pay-resume, x402-pay-decide, x402-policy-get, x402-policy-set, x402-networks, request-x402-payment, wallet-health, wallet-rpc-health, wallet-address, wallet-sign-challenge, wallet-send, wallet-send-token, wallet-balance, wallet-token-balance, wallet-track-token, wallet-untrack-token, wallet-tracked-tokens, wallet-wrap-native, wallet-create",
         exit_code=2,
     )
 

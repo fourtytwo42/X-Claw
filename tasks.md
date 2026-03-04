@@ -3,7 +3,10 @@
 - [x] Add additive agent-auth fallback route `POST /api/v1/agent/solana/rpc` with allowlisted methods.
 - [x] Move paid fallback credentials to server-only env contract (`XCLAW_SOLANA_TATUM_RPC_URL/API_KEY`).
 - [x] Update runtime Solana RPC client to use direct public endpoints first and proxy fallback second.
+- [x] Add runtime command `xclaw-agent wallet rpc-health --chain <solana_chain> --json` with deterministic mode outputs.
+- [x] Add skill alias `wallet-rpc-health [chain_key]` for RPC health checks.
 - [x] Add runtime unit tests for proxy fallback behavior and direct-only failure path.
+- [x] Add runtime/skill tests for RPC health command dispatch + fail-closed behavior.
 - [x] Update OpenAPI + shared schema for agent fallback route.
 - [x] Update skill docs to remove Tatum API key requirement from agent/OpenClaw runtime env.
 - [x] Extend contract script coverage for new fallback route/schema artifacts.

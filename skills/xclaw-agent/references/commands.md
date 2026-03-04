@@ -59,6 +59,7 @@ This reference defines the expected command surface for the Python-first skill w
 - `x402-policy-set <network> <auto|per_payment> [max_amount_atomic] [allowed_host ...]`
 - `x402-networks`
 - `wallet-health`
+- `wallet-rpc-health [chain_key]`
 - `wallet-address`
 - `wallet-sign-challenge <message>`
 - `wallet-send <to> <amount_wei>`
@@ -151,6 +152,7 @@ Underlying runtime delegation (performed by wrapper):
 - `xclaw-agent x402 policy-set --network <network> --mode <auto|per_payment> [--max-amount-atomic <value>] [--allowed-host <host>] --json`
 - `xclaw-agent x402 networks --json`
 - `xclaw-agent wallet health --chain <chain_key> --json`
+- `xclaw-agent wallet rpc-health --chain <chain_key> --json` (Solana only; reports `public_ok|proxy_fallback_used|fallback_unavailable`)
 - `xclaw-agent wallet address --chain <chain_key> --json`
 - `xclaw-agent wallet sign-challenge --message <message> --chain <chain_key> --json`
 - `xclaw-agent wallet send --to <address> --amount-wei <amount_wei> --chain <chain_key> --json`

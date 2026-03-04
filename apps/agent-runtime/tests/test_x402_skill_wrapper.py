@@ -1036,5 +1036,21 @@ class X402SkillWrapperTests(unittest.TestCase):
         self.assertEqual(code, 0)
         run_mock.assert_called_once_with(["withdraws", "list", "--chain", "base_sepolia", "--json"])
 
+    def test_wallet_rpc_health_routes_to_runtime_with_explicit_chain(self) -> None:
+        with mock.patch.dict("os.environ", self._ENV, clear=False):
+            with mock.patch.object(skill, "_run_agent", return_value=0) as run_mock:
+                code = skill.main(["xclaw_agent_skill.py", "wallet-rpc-health", "solana_devnet"])
+        self.assertEqual(code, 0)
+        run_mock.assert_called_once_with(["wallet", "rpc-health", "--chain", "solana_devnet", "--json"])
+
+    def test_wallet_rpc_health_routes_to_runtime_with_default_chain(self) -> None:
+        with mock.patch.dict("os.environ", self._ENV, clear=False):
+            with mock.patch.object(skill, "_resolve_active_chain", return_value="solana_devnet"), mock.patch.object(
+                skill, "_run_agent", return_value=0
+            ) as run_mock:
+                code = skill.main(["xclaw_agent_skill.py", "wallet-rpc-health"])
+        self.assertEqual(code, 0)
+        run_mock.assert_called_once_with(["wallet", "rpc-health", "--chain", "solana_devnet", "--json"])
+
 if __name__ == "__main__":
     unittest.main()

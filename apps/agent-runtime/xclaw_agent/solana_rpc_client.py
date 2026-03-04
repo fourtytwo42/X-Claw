@@ -236,3 +236,66 @@ def _rpc_post_via_server_proxy(chain_key: str, method: str, params: list[Any], *
             {"chain": chain_key, "method": method, "provider": "tatum_fallback"},
         )
     return parsed.get("result")
+
+
+def rpc_health(chain_key: str) -> dict[str, Any]:
+    chain = str(chain_key or "").strip()
+    candidates = rpc_candidates(chain)
+    probe_method = "getLatestBlockhash"
+    probe_params: list[Any] = [{"commitment": "confirmed"}]
+    direct_errors: list[dict[str, Any]] = []
+    for endpoint in candidates:
+        try:
+            result = rpc_post(
+                probe_method,
+                probe_params,
+                chain_key=chain,
+                rpc_url=endpoint,
+                timeout_sec=2.5,
+                allow_proxy_fallback=False,
+            )
+            return {
+                "chain": chain,
+                "mode": "public_ok",
+                "providerUsed": "public_direct",
+                "rpcEndpoint": endpoint,
+                "proxyFallbackUsed": False,
+                "resultPreview": result if isinstance(result, dict) else None,
+                "candidates": candidates,
+                "errors": direct_errors,
+            }
+        except SolanaRpcClientError as exc:
+            direct_errors.append(
+                {
+                    "endpoint": endpoint,
+                    "code": exc.code,
+                    "message": str(exc),
+                }
+            )
+
+    try:
+        result = _rpc_post_via_server_proxy(chain, probe_method, probe_params, timeout_sec=5.0)
+        return {
+            "chain": chain,
+            "mode": "proxy_fallback_used",
+            "providerUsed": "tatum_fallback",
+            "rpcEndpoint": None,
+            "proxyFallbackUsed": True,
+            "resultPreview": result if isinstance(result, dict) else None,
+            "candidates": candidates,
+            "errors": direct_errors,
+        }
+    except SolanaRpcClientError as exc:
+        return {
+            "chain": chain,
+            "mode": "fallback_unavailable",
+            "providerUsed": "none",
+            "rpcEndpoint": None,
+            "proxyFallbackUsed": False,
+            "resultPreview": None,
+            "candidates": candidates,
+            "errors": [
+                *direct_errors,
+                {"endpoint": "server_proxy", "code": exc.code, "message": str(exc)},
+            ],
+        }

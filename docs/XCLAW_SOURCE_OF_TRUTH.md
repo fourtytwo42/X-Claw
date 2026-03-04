@@ -141,6 +141,10 @@ Core thesis: **agents act, humans supervise, network observes and allocates trus
 - `XCLAW_SOLANA_TATUM_RPC_API_KEY[_<CHAIN>]`
 5. Runtime remains fail-closed:
 - if direct RPC fails and fallback proxy is unavailable/misconfigured, return deterministic `rpc_unavailable|chain_config_invalid`.
+6. Operator/runtime observability includes Solana RPC mode probe command:
+- `xclaw-agent wallet rpc-health --chain <solana_chain> --json`
+- skill alias: `wallet-rpc-health [chain_key]`
+- canonical modes: `public_ok|proxy_fallback_used|fallback_unavailable`.
 
 ## 3.3) Slice 128-129 Unified EVM Action Engine
 

@@ -99,6 +99,7 @@ from xclaw_agent.solana_raydium_clmm import (
 )
 from xclaw_agent.solana_rpc_client import (
     SolanaRpcClientError,
+    rpc_health as solana_rpc_health,
     rpc_post as solana_rpc_post,
     select_rpc_endpoint as solana_select_rpc_endpoint,
 )
@@ -13326,6 +13327,55 @@ def cmd_wallet_health(args: argparse.Namespace) -> int:
     )
 
 
+def cmd_wallet_rpc_health(args: argparse.Namespace) -> int:
+    chk = require_json_flag(args)
+    if chk is not None:
+        return chk
+
+    chain = str(args.chain or "").strip()
+    if not chain:
+        return fail("invalid_input", "--chain is required.", "Provide --chain and retry.", exit_code=2)
+    if not _is_solana_chain(chain):
+        return fail(
+            "unsupported_chain",
+            "wallet rpc-health currently supports Solana chains only.",
+            "Use a solana_* chain key and retry.",
+            {"chain": chain},
+            exit_code=2,
+        )
+
+    try:
+        payload = solana_rpc_health(chain)
+        mode = str(payload.get("mode") or "").strip()
+        if mode == "public_ok":
+            return ok("Solana RPC health checked.", **payload)
+        if mode == "proxy_fallback_used":
+            return ok("Solana RPC health checked (proxy fallback active).", **payload)
+        return fail(
+            "rpc_unavailable",
+            "Solana RPC health check failed for public and proxy fallback paths.",
+            "Verify public RPC and server proxy fallback env/auth, then retry.",
+            {"chain": chain, "rpcHealth": payload},
+            exit_code=1,
+        )
+    except SolanaRpcClientError as exc:
+        return fail(
+            str(exc.code or "rpc_unavailable"),
+            str(exc),
+            "Verify Solana chain config and RPC settings, then retry.",
+            {"chain": chain, **(exc.details or {})},
+            exit_code=1,
+        )
+    except Exception as exc:
+        return fail(
+            "rpc_unavailable",
+            str(exc),
+            "Inspect Solana RPC health path and retry.",
+            {"chain": chain},
+            exit_code=1,
+        )
+
+
 def cmd_wallet_create(args: argparse.Namespace) -> int:
     chk = require_json_flag(args)
     if chk is not None:
@@ -15012,6 +15062,11 @@ def build_parser() -> argparse.ArgumentParser:
     w_health.add_argument("--chain", required=True)
     w_health.add_argument("--json", action="store_true")
     w_health.set_defaults(func=cmd_wallet_health)
+
+    w_rpc_health = wallet_sub.add_parser("rpc-health")
+    w_rpc_health.add_argument("--chain", required=True)
+    w_rpc_health.add_argument("--json", action="store_true")
+    w_rpc_health.set_defaults(func=cmd_wallet_rpc_health)
 
     w_addr = wallet_sub.add_parser("address")
     w_addr.add_argument("--chain", required=True)
