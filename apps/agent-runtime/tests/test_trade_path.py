@@ -2896,6 +2896,23 @@ class TradePathRuntimeTests(unittest.TestCase):
         remove_prompt.assert_called_once_with("trd_1")
         urlopen_mock.assert_not_called()
 
+    def test_resolve_telegram_bot_token_returns_none_on_config_timeout(self) -> None:
+        with mock.patch.dict(
+            os.environ,
+            {"XCLAW_TELEGRAM_BOT_TOKEN": "", "TELEGRAM_BOT_TOKEN": ""},
+            clear=False,
+        ), mock.patch.object(cli, "_require_openclaw_bin", return_value="/usr/bin/openclaw"), mock.patch.object(
+            cli,
+            "_run_subprocess",
+            side_effect=cli.SubprocessTimeout(
+                kind="openclaw_config_get",
+                timeout_sec=5,
+                cmd=["/usr/bin/openclaw", "config", "get", "channels.telegram.botToken", "--json"],
+            ),
+        ):
+            token = cli._resolve_telegram_bot_token()
+        self.assertIsNone(token)
+
     def test_approvals_decide_spot_invalid_decision_at_rejected(self) -> None:
         args = argparse.Namespace(
             trade_id="trd_1",
@@ -2910,6 +2927,28 @@ class TradePathRuntimeTests(unittest.TestCase):
         payload = self._run_and_parse_stdout(lambda: cli.cmd_approvals_decide_spot(args))
         self.assertFalse(payload.get("ok"))
         self.assertEqual(payload.get("code"), "invalid_input")
+
+    def test_approvals_decide_spot_reject_survives_cleanup_failure(self) -> None:
+        args = argparse.Namespace(
+            trade_id="trd_1",
+            decision="reject",
+            chain="solana_mainnet_beta",
+            source="telegram",
+            idempotency_key="tg-cb-2",
+            decision_at=None,
+            reason_message="Denied by owner",
+            json=True,
+        )
+        with mock.patch.object(
+            cli,
+            "_read_trade_details",
+            return_value={"tradeId": "trd_1", "chainKey": "solana_mainnet_beta", "status": "rejected"},
+        ), mock.patch.object(
+            cli, "_clear_telegram_approval_buttons", side_effect=RuntimeError("cleanup timeout")
+        ):
+            payload = self._run_and_parse_stdout(lambda: cli.cmd_approvals_decide_spot(args))
+        self.assertTrue(payload.get("ok"))
+        self.assertEqual(payload.get("code"), "ok")
 
     def test_management_link_normalizes_loopback_host_to_public_domain(self) -> None:
         args = argparse.Namespace(ttl_seconds=600, json=True)

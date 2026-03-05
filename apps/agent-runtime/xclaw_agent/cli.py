@@ -3895,11 +3895,14 @@ def _resolve_telegram_bot_token() -> str | None:
         openclaw = _require_openclaw_bin()
     except Exception:
         return None
-    proc = _run_subprocess(
-        [openclaw, "config", "get", "channels.telegram.botToken", "--json"],
-        timeout_sec=5,
-        kind="openclaw_config_get",
-    )
+    try:
+        proc = _run_subprocess(
+            [openclaw, "config", "get", "channels.telegram.botToken", "--json"],
+            timeout_sec=5,
+            kind="openclaw_config_get",
+        )
+    except Exception:
+        return None
     if proc.returncode != 0:
         return None
     raw = str(proc.stdout or "").strip()
@@ -4091,8 +4094,11 @@ def _clear_telegram_approval_buttons(subject_type: str, subject_id: str) -> dict
 
 
 def _cleanup_trade_approval_prompt(trade_id: str) -> dict[str, Any]:
-    result = _clear_telegram_approval_buttons("trade", trade_id)
-    return dict(result.get("promptCleanup") or {"ok": bool(result.get("ok")), "code": str(result.get("code") or "unknown")})
+    try:
+        result = _clear_telegram_approval_buttons("trade", trade_id)
+        return dict(result.get("promptCleanup") or {"ok": bool(result.get("ok")), "code": str(result.get("code") or "unknown")})
+    except Exception as exc:
+        return {"ok": False, "code": "prompt_cleanup_failed", "error": str(exc)[:300]}
 
 
 def _maybe_delete_telegram_transfer_approval_prompt(approval_id: str) -> None:
@@ -4100,13 +4106,19 @@ def _maybe_delete_telegram_transfer_approval_prompt(approval_id: str) -> None:
 
 
 def _cleanup_transfer_approval_prompt(approval_id: str) -> dict[str, Any]:
-    result = _clear_telegram_approval_buttons("transfer", approval_id)
-    return dict(result.get("promptCleanup") or {"ok": bool(result.get("ok")), "code": str(result.get("code") or "unknown")})
+    try:
+        result = _clear_telegram_approval_buttons("transfer", approval_id)
+        return dict(result.get("promptCleanup") or {"ok": bool(result.get("ok")), "code": str(result.get("code") or "unknown")})
+    except Exception as exc:
+        return {"ok": False, "code": "prompt_cleanup_failed", "error": str(exc)[:300]}
 
 
 def _cleanup_policy_approval_prompt(approval_id: str) -> dict[str, Any]:
-    result = _clear_telegram_approval_buttons("policy", approval_id)
-    return dict(result.get("promptCleanup") or {"ok": bool(result.get("ok")), "code": str(result.get("code") or "unknown")})
+    try:
+        result = _clear_telegram_approval_buttons("policy", approval_id)
+        return dict(result.get("promptCleanup") or {"ok": bool(result.get("ok")), "code": str(result.get("code") or "unknown")})
+    except Exception as exc:
+        return {"ok": False, "code": "prompt_cleanup_failed", "error": str(exc)[:300]}
 
 
 def _fetch_transfer_decision_inbox(chain: str, limit: int = 20) -> list[dict[str, Any]]:
