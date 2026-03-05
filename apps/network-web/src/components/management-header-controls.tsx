@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { fetchWithTimeout, uiFetchTimeoutMs } from '@/lib/fetch-timeout';
 
 const MANAGED_AGENT_IDS_KEY = 'xclaw_managed_agent_ids';
+const MANAGED_AGENT_TOKENS_KEY = 'xclaw_managed_agent_tokens';
 
 function parseStoredAgentIds(raw: string | null): string[] {
   if (!raw) {
@@ -38,6 +39,34 @@ function clearManagedAgents(): void {
     return;
   }
   window.localStorage.removeItem(MANAGED_AGENT_IDS_KEY);
+}
+
+function parseStoredManagedAgentTokens(): Record<string, string> {
+  if (typeof window === 'undefined') {
+    return {};
+  }
+  try {
+    const raw = window.localStorage.getItem(MANAGED_AGENT_TOKENS_KEY);
+    if (!raw) {
+      return {};
+    }
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return {};
+    }
+    const out: Record<string, string> = {};
+    for (const [agentId, token] of Object.entries(parsed)) {
+      const id = String(agentId ?? '').trim();
+      const value = String(token ?? '').trim();
+      if (!id || !value) {
+        continue;
+      }
+      out[id] = value;
+    }
+    return out;
+  } catch {
+    return {};
+  }
 }
 
 export function ManagementHeaderControls() {
@@ -76,12 +105,12 @@ export function ManagementHeaderControls() {
           return;
         }
 
-        const merged = Array.from(new Set([...(payload.managedAgents ?? []), ...stored]));
-        setAgentIds(merged);
+        const sessionIds = Array.from(new Set((payload.managedAgents ?? []).map((item) => String(item ?? '').trim()).filter(Boolean)));
+        setAgentIds(sessionIds);
         if (payload.activeAgentId) {
           setActive(payload.activeAgentId);
         }
-        window.localStorage.setItem(MANAGED_AGENT_IDS_KEY, JSON.stringify(merged));
+        window.localStorage.setItem(MANAGED_AGENT_IDS_KEY, JSON.stringify(sessionIds));
       })
       .catch(() => {
         // no-op
@@ -131,8 +160,25 @@ export function ManagementHeaderControls() {
     return null;
   }
 
-  const onSelect = (nextAgentId: string) => {
+  const onSelect = async (nextAgentId: string) => {
     setActive(nextAgentId);
+    const token = parseStoredManagedAgentTokens()[nextAgentId];
+    if (token) {
+      try {
+        await fetchWithTimeout(
+          '/api/v1/management/session/select',
+          {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ agentId: nextAgentId, token })
+          },
+          uiFetchTimeoutMs(),
+        );
+      } catch {
+        // Best effort: page-level bootstrap fallback still runs.
+      }
+    }
     router.push(`/agents/${nextAgentId}`);
   };
 
@@ -164,7 +210,9 @@ export function ManagementHeaderControls() {
       <select
         id="managed-agent-select"
         value={active || agentIds[0]}
-        onChange={(event) => onSelect(event.target.value)}
+        onChange={(event) => {
+          void onSelect(event.target.value);
+        }}
         className="managed-agent-select"
       >
         {agentIds.map((agentId) => (
