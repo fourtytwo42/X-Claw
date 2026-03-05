@@ -680,7 +680,18 @@ export default function AgentPublicProfilePage() {
     }
 
     if (!bootstrapToken) {
-      setBootstrapState({ phase: 'ready' });
+      setBootstrapState({ phase: 'bootstrapping' });
+      void (async () => {
+        const storedToken = parseStoredManagedAgentTokens()[agentId];
+        if (storedToken) {
+          const restored = await selectManagementSession(agentId, storedToken);
+          if (restored) {
+            rememberManagedAgentToken(agentId, storedToken);
+            rememberManagedAgent(agentId);
+          }
+        }
+        setBootstrapState({ phase: 'ready' });
+      })();
       return;
     }
 
