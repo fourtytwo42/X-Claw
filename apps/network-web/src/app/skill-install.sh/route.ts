@@ -1037,6 +1037,113 @@ except Exception:
   return 1
 }
 
+attempt_bootstrap_refresh_credentials() {
+  local candidate_chain candidate_wallet challenge_payload challenge_response challenge_id challenge_message signature
+  local bootstrap_payload bootstrap_response boot_agent_id boot_api_key boot_agent_name
+  local bootstrap_chain_candidates="$XCLAW_DEFAULT_CHAIN base_sepolia ethereum_sepolia solana_mainnet_beta"
+  for candidate_chain in $bootstrap_chain_candidates; do
+    [ -n "$candidate_chain" ] || continue
+    candidate_wallet="$("$XCLAW_AGENT_BIN" wallet address --chain "$candidate_chain" --json 2>/dev/null | python3 -c 'import json,sys
+try:
+ d=json.load(sys.stdin)
+ print((d.get("address") or "").strip())
+except Exception:
+ print("")' || true)"
+    if [ -z "$candidate_wallet" ]; then
+      continue
+    fi
+    challenge_payload="$(cat <<JSON
+{
+  "schemaVersion": 1,
+  "chainKey": "$candidate_chain",
+  "walletAddress": "$candidate_wallet"
+}
+JSON
+)"
+    challenge_response="$(curl -sS "$XCLAW_API_BASE_URL/agent/bootstrap/challenge" \
+      -H "Content-Type: application/json" \
+      -d "$challenge_payload" 2>/dev/null || true)"
+    challenge_id="$(printf "%s" "$challenge_response" | python3 -c 'import json,sys
+try:
+ d=json.load(sys.stdin)
+ print((d.get("challengeId") or "").strip())
+except Exception:
+ print("")' || true)"
+    challenge_message="$(printf "%s" "$challenge_response" | python3 -c 'import json,sys
+try:
+ d=json.load(sys.stdin)
+ print((d.get("challengeMessage") or "").strip())
+except Exception:
+ print("")' || true)"
+    if [ -z "$challenge_id" ] || [ -z "$challenge_message" ]; then
+      continue
+    fi
+    signature="$(python3 skills/xclaw-agent/scripts/xclaw_agent_skill.py wallet-sign-challenge "$challenge_message" "$candidate_chain" \
+      | python3 -c 'import json,sys
+try:
+ d=json.load(sys.stdin)
+ print((d.get("signature") or "").strip())
+except Exception:
+ print("")' || true)"
+    if [ -z "$signature" ]; then
+      continue
+    fi
+
+    bootstrap_payload="$(cat <<JSON
+{
+  "schemaVersion": 2,
+  "agentName": "$XCLAW_AGENT_NAME",
+  "walletAddress": "$candidate_wallet",
+  "runtimePlatform": "$runtime_platform",
+  "chainKey": "$candidate_chain",
+  "challengeId": "$challenge_id",
+  "signature": "$signature",
+  "mode": "real",
+  "approvalMode": "per_trade",
+  "publicStatus": "active"
+}
+JSON
+)"
+    bootstrap_response="$(curl -sS "$XCLAW_API_BASE_URL/agent/bootstrap" \
+      -H "Content-Type: application/json" \
+      -d "$bootstrap_payload" 2>/dev/null || true)"
+    boot_agent_id="$(printf "%s" "$bootstrap_response" | python3 -c 'import json,sys
+try:
+ d=json.load(sys.stdin)
+ print((d.get("agentId") or "").strip())
+except Exception:
+ print("")' || true)"
+    boot_api_key="$(printf "%s" "$bootstrap_response" | python3 -c 'import json,sys
+try:
+ d=json.load(sys.stdin)
+ print((d.get("agentApiKey") or "").strip())
+except Exception:
+ print("")' || true)"
+    boot_agent_name="$(printf "%s" "$bootstrap_response" | python3 -c 'import json,sys
+try:
+ d=json.load(sys.stdin)
+ print((d.get("agentName") or "").strip())
+except Exception:
+ print("")' || true)"
+    if [ -n "$boot_agent_id" ] && [ -n "$boot_api_key" ]; then
+      export XCLAW_AGENT_ID="$boot_agent_id"
+      export XCLAW_AGENT_API_KEY="$boot_api_key"
+      if [ -n "$boot_agent_name" ]; then
+        export XCLAW_AGENT_NAME="$boot_agent_name"
+      elif [ -z "\${XCLAW_AGENT_NAME:-}" ]; then
+        export XCLAW_AGENT_NAME="$boot_agent_id"
+      fi
+      openclaw config set skills.entries.xclaw-agent.apiKey "$XCLAW_AGENT_API_KEY" >/dev/null 2>&1 || true
+      openclaw config set skills.entries.xclaw-agent.env.XCLAW_AGENT_API_KEY "$XCLAW_AGENT_API_KEY" >/dev/null 2>&1 || true
+      openclaw config set skills.entries.xclaw-agent.env.XCLAW_AGENT_ID "$XCLAW_AGENT_ID" >/dev/null 2>&1 || true
+      openclaw config set skills.entries.xclaw-agent.env.XCLAW_AGENT_NAME "$XCLAW_AGENT_NAME" >/dev/null 2>&1 || true
+      echo "[xclaw] refreshed agent credentials via signed bootstrap (agentId=$XCLAW_AGENT_ID)"
+      return 0
+    fi
+  done
+  return 1
+}
+
 post_agent_with_recovery() {
   local path="$1"
   local idem_key="$2"
@@ -1088,6 +1195,35 @@ except Exception:
       fi
       body="$retry_body"
       http_code="$retry_code"
+    fi
+    if [ "$http_code" = "401" ] && [ "$path" = "/agent/register" ]; then
+      echo "[xclaw] register still unauthorized after auth recovery; attempting signed bootstrap credential refresh"
+      if attempt_bootstrap_refresh_credentials; then
+        payload="$(cat <<JSON
+{
+  "schemaVersion": 1,
+  "agentId": "$XCLAW_AGENT_ID",
+  "agentName": "$XCLAW_AGENT_NAME",
+  "runtimePlatform": "$runtime_platform",
+  "wallets": $wallets_json
+}
+JSON
+)"
+        retry="$(curl -sS -w '\n%{http_code}' "$url" \
+          -H "Content-Type: application/json" \
+          -H "Authorization: Bearer $XCLAW_AGENT_API_KEY" \
+          -H "Idempotency-Key: $idem_key" \
+          -d "$payload" 2>/dev/null || true)"
+        retry_code="$(printf "%s" "$retry" | tail -n1 | tr -d '\r')"
+        retry_body="$(printf "%s" "$retry" | sed '$d')"
+        if [ "$retry_code" -ge 200 ] 2>/dev/null && [ "$retry_code" -lt 300 ] 2>/dev/null; then
+          [ -n "$retry_body" ] && printf "%s\n" "$retry_body"
+          echo "[xclaw] register succeeded after signed bootstrap credential refresh"
+          return 0
+        fi
+        body="$retry_body"
+        http_code="$retry_code"
+      fi
     fi
   fi
   echo "[xclaw] $label failed (http=$http_code)"
