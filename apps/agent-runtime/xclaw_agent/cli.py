@@ -10106,12 +10106,19 @@ def cmd_trade_spot(args: argparse.Namespace) -> int:
             amount_in_units = _solana_amount_units_or_fail(str(args.amount_in))
             amount_in_int = int(amount_in_units)
             state, day_key, current_spend, max_daily_wei = _enforce_spend_preconditions(chain, amount_in_int, enforce_native_cap=False)
+            amount_in_human = _normalize_amount_human_text(amount_in_units)
+            try:
+                token_in_decimals = _solana_mint_decimals(chain, token_in)
+                amount_in_human = _normalize_amount_human_text(_format_units(amount_in_int, token_in_decimals))
+            except Exception:
+                # Approval prompt formatting must not block execution if mint metadata is temporarily unavailable.
+                pass
             summary = {
                 "tradeId": None,
                 "chainKey": chain,
                 "tokenInSymbol": str(args.token_in),
                 "tokenOutSymbol": str(args.token_out),
-                "amountInHuman": _normalize_amount_human_text(amount_in_units),
+                "amountInHuman": amount_in_human,
                 "slippageBps": slippage_bps,
             }
             proposed = _post_trade_proposed(

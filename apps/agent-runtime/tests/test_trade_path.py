@@ -857,6 +857,49 @@ class TradePathRuntimeTests(unittest.TestCase):
         self.assertEqual((flow or {}).get("tokenInSymbol"), "WETH")
         self.assertEqual((flow or {}).get("tokenOutSymbol"), "USDC")
 
+    def test_trade_spot_solana_formats_human_amount_in_approval_summary(self) -> None:
+        args = argparse.Namespace(
+            chain="solana_mainnet_beta",
+            token_in="SOL",
+            token_out="USDC",
+            amount_in="8500000",
+            slippage_bps="100",
+            deadline_sec=120,
+            to=None,
+            json=True,
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir, mock.patch.object(cli, "APP_DIR", pathlib.Path(tmpdir)), mock.patch.object(
+            cli, "PENDING_TRADE_INTENTS_FILE", pathlib.Path(tmpdir) / "pending-trade-intents.json"
+        ), mock.patch.object(
+            cli, "PENDING_SPOT_TRADE_FLOWS_FILE", pathlib.Path(tmpdir) / "pending-spot-trade-flows.json"
+        ), mock.patch.object(
+            cli, "_resolve_token_address", side_effect=["So11111111111111111111111111111111111111112", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"]
+        ), mock.patch.object(
+            cli, "_enforce_spend_preconditions", return_value=({}, "2026-03-05", 0, 10**30)
+        ), mock.patch.object(
+            cli, "_solana_mint_decimals", return_value=9
+        ), mock.patch.object(
+            cli, "_post_trade_proposed", return_value={"ok": True, "tradeId": "trd_sol_1", "status": "approval_pending"}
+        ), mock.patch.object(
+            cli,
+            "_wait_for_trade_approval",
+            side_effect=cli.WalletPolicyError(
+                "approval_required",
+                "Trade is waiting for management approval.",
+                "Approve trade from authorized management view, then retry.",
+                {"tradeId": "trd_sol_1", "chain": "solana_mainnet_beta"},
+            ),
+        ) as wait_mock:
+            payload = self._run_and_parse_stdout(lambda: cli.cmd_trade_spot(args))
+
+        self.assertFalse(payload.get("ok"))
+        self.assertEqual(payload.get("code"), "approval_required")
+        called_summary = wait_mock.call_args.args[2]
+        self.assertEqual(str(called_summary.get("amountInHuman")), "0.0085")
+        self.assertEqual(str(called_summary.get("tokenInSymbol")), "SOL")
+        self.assertEqual(str(called_summary.get("tokenOutSymbol")), "USDC")
+
     def test_approvals_resume_spot_blocks_when_trade_not_actionable(self) -> None:
         args = argparse.Namespace(trade_id="trd_1", chain="base_sepolia", json=True)
         with tempfile.TemporaryDirectory() as tmpdir, mock.patch.object(
