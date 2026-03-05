@@ -766,7 +766,7 @@ export default function AgentPublicProfilePage() {
       const tokenMap = parseStoredManagedAgentTokens();
       const candidateTokens = Array.from(
         new Set(
-          [bootstrapToken, tokenMap[agentId], ...Object.values(tokenMap)]
+          [bootstrapToken, tokenMap[agentId]]
             .map((item) => String(item ?? '').trim())
             .filter((item) => item.length > 0)
         )
@@ -838,16 +838,18 @@ export default function AgentPublicProfilePage() {
       const expectedAgentId = expectedFromDetails || agentId;
       const activeAgent = sessionFromDetails || sessionAgentId || 'none';
       const debugMessage = `Owner session mismatch. Expected ${expectedAgentId}, active session ${activeAgent}. Re-open the exact owner link for this agent.`;
+      const explicitOwnerIntent = Boolean(bootstrapToken) || Boolean(parseStoredManagedAgentTokens()[agentId]);
       console.warn('[agents-page] management unauthorized', {
         agentId,
         bootstrapTokenPresent: Boolean(bootstrapToken),
         storedTokenPresent: Boolean(parseStoredManagedAgentTokens()[agentId]),
+        explicitOwnerIntent,
         activeChainKey,
         authMessage,
         authDetails,
         sessionAgentId
       });
-      setError(debugMessage);
+      setError(explicitOwnerIntent ? debugMessage : null);
       setManagement({ phase: 'unauthorized' });
       setDepositData(null);
       setWithdrawsData(null);
