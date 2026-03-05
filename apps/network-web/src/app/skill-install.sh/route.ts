@@ -1016,6 +1016,27 @@ refresh_api_key_from_config() {
   return 1
 }
 
+refresh_agent_identity_from_auth_recover_json() {
+  local recover_json="$1"
+  local recovered_agent_id=""
+  recovered_agent_id="$(printf "%s" "$recover_json" | python3 -c 'import json,sys
+try:
+ d=json.load(sys.stdin)
+ print((d.get("agentId") or "").strip())
+except Exception:
+ print("")' || true)"
+  if [ -n "$recovered_agent_id" ]; then
+    export XCLAW_AGENT_ID="$recovered_agent_id"
+    if [ -z "\${XCLAW_AGENT_NAME:-}" ]; then
+      export XCLAW_AGENT_NAME="$recovered_agent_id"
+    fi
+    openclaw config set skills.entries.xclaw-agent.env.XCLAW_AGENT_ID "$XCLAW_AGENT_ID" >/dev/null 2>&1 || true
+    openclaw config set skills.entries.xclaw-agent.env.XCLAW_AGENT_NAME "$XCLAW_AGENT_NAME" >/dev/null 2>&1 || true
+    return 0
+  fi
+  return 1
+}
+
 post_agent_with_recovery() {
   local path="$1"
   local idem_key="$2"
@@ -1047,6 +1068,7 @@ try:
 except Exception:
  print("0")' || true)"
       if [ "$recover_flag" = "1" ]; then
+        refresh_agent_identity_from_auth_recover_json "$recover_json" || true
         recover_ok=1
         break
       fi
