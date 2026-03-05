@@ -1,5 +1,6 @@
 argon2-cffi==23.1.0
 pycryptodome==3.21.0
 cryptography==44.0.1
-solders==0.23.0
+# Keep solders aligned with solana==0.35.1 (<0.22.0) to avoid resolver failures in installer fallback venvs.
+solders==0.21.0
 solana==0.35.1
