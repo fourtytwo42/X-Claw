@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
+import os
 import re
 import time
 import urllib.error
@@ -318,6 +319,47 @@ def _jupiter_base_url(chain_key: str) -> str:
     return "https://quote-api.jup.ag/v6"
 
 
+def _jupiter_base_urls(chain_key: str) -> list[str]:
+    chain_env_key = f"XCLAW_JUPITER_BASE_URLS_{str(chain_key or '').strip().upper()}"
+    raw = str(os.environ.get(chain_env_key) or os.environ.get("XCLAW_JUPITER_BASE_URLS") or "").strip()
+    candidates: list[str] = []
+    if raw:
+        for item in raw.split(","):
+            candidate = str(item or "").strip().rstrip("/")
+            if candidate:
+                candidates.append(candidate)
+    default_url = _jupiter_base_url(chain_key).rstrip("/")
+    if default_url not in candidates:
+        candidates.insert(0, default_url)
+    deduped: list[str] = []
+    for item in candidates:
+        if item not in deduped:
+            deduped.append(item)
+    return deduped or [default_url]
+
+
+def _jupiter_quote_retry_attempts() -> int:
+    raw = str(os.environ.get("XCLAW_JUPITER_QUOTE_MAX_ATTEMPTS") or "").strip()
+    try:
+        parsed = int(raw) if raw else 3
+    except Exception:
+        parsed = 3
+    return max(1, min(parsed, 5))
+
+
+def _jupiter_quote_backoff_ms() -> int:
+    raw = str(os.environ.get("XCLAW_JUPITER_QUOTE_BACKOFF_MS") or "").strip()
+    try:
+        parsed = int(raw) if raw else 250
+    except Exception:
+        parsed = 250
+    return max(50, min(parsed, 2000))
+
+
+def _is_retryable_jupiter_http_status(status: int) -> bool:
+    return status in {408, 409, 425, 429} or status >= 500
+
+
 def jupiter_quote(
     *,
     chain_key: str,
@@ -343,13 +385,80 @@ def jupiter_quote(
             "onlyDirectRoutes": "false",
         }
     )
-    url = f"{_jupiter_base_url(chain_key)}/quote?{query}"
-    req = urllib.request.Request(url, method="GET", headers={"accept": "application/json"})
-    try:
-        with urllib.request.urlopen(req, timeout=20) as resp:
-            payload = json.loads(resp.read().decode("utf-8"))
-    except Exception as exc:
-        raise SolanaRuntimeError("rpc_unavailable", "Jupiter quote request failed.", {"error": str(exc)}) from exc
+    endpoints = _jupiter_base_urls(chain_key)
+    max_attempts = _jupiter_quote_retry_attempts()
+    backoff_ms = _jupiter_quote_backoff_ms()
+
+    attempts_made = 0
+    last_endpoint = ""
+    last_status: int | None = None
+    last_error = ""
+    timeout_observed = False
+    payload: dict[str, Any] | None = None
+
+    for endpoint_index, base_url in enumerate(endpoints):
+        url = f"{base_url}/quote?{query}"
+        for endpoint_attempt in range(1, max_attempts + 1):
+            attempts_made += 1
+            last_endpoint = base_url
+            req = urllib.request.Request(url, method="GET", headers={"accept": "application/json"})
+            try:
+                with urllib.request.urlopen(req, timeout=20) as resp:
+                    payload = json.loads(resp.read().decode("utf-8"))
+                break
+            except urllib.error.HTTPError as exc:
+                status = int(getattr(exc, "code", 0) or 0)
+                last_status = status
+                body = ""
+                try:
+                    body = exc.read().decode("utf-8", errors="replace").strip()
+                except Exception:
+                    body = ""
+                last_error = body or str(exc)
+                if not _is_retryable_jupiter_http_status(status):
+                    raise SolanaRuntimeError(
+                        "rpc_unavailable",
+                        "Jupiter quote request failed.",
+                        {
+                            "attempts": attempts_made,
+                            "endpoint": last_endpoint,
+                            "status": status,
+                            "error": last_error[:300],
+                            "retryable": False,
+                        },
+                    ) from exc
+                is_last_attempt = endpoint_attempt >= max_attempts and endpoint_index >= (len(endpoints) - 1)
+                if is_last_attempt:
+                    break
+                time.sleep((backoff_ms * endpoint_attempt) / 1000.0)
+            except Exception as exc:
+                timeout_observed = timeout_observed or isinstance(exc, TimeoutError)
+                if isinstance(exc, urllib.error.URLError):
+                    reason = getattr(exc, "reason", None)
+                    timeout_observed = timeout_observed or isinstance(reason, TimeoutError)
+                last_status = None
+                last_error = str(exc)
+                is_last_attempt = endpoint_attempt >= max_attempts and endpoint_index >= (len(endpoints) - 1)
+                if is_last_attempt:
+                    break
+                time.sleep((backoff_ms * endpoint_attempt) / 1000.0)
+        if payload is not None:
+            break
+
+    if payload is None:
+        raise SolanaRuntimeError(
+            "rpc_unavailable",
+            "Jupiter quote request failed after retries.",
+            {
+                "attempts": attempts_made,
+                "retryExhausted": True,
+                "endpointsTried": endpoints,
+                "lastEndpoint": last_endpoint or None,
+                "lastStatus": last_status,
+                "lastError": last_error[:300] if last_error else None,
+                "timeoutObserved": timeout_observed,
+            },
+        )
 
     out_amount = str(payload.get("outAmount") or "").strip()
     if not re.fullmatch(r"[0-9]+", out_amount) or out_amount == "0":

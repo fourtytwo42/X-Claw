@@ -1,3 +1,15 @@
+# Slice 212 Tasks: Telegram Tap UX + Solana Swap Reliability + Solana Amount Normalization (2026-03-05)
+
+Issue mapping: `#65`
+
+- [x] Update OpenClaw callback patch to clear inline keyboard immediately on tap (`xappr|xpol|xfer|xliq`) while preserving no-delete contract.
+- [x] Remove callback failure behavior that re-attached old approval keyboards.
+- [x] Add Solana Jupiter quote retry/backoff loop with deterministic exhausted diagnostics.
+- [x] Add Solana runtime unit tests for retry success, non-retryable fail-closed, and retry exhaustion.
+- [x] Normalize Solana trade amount rendering on `/agents/[agentId]` wallet activity using token/native decimals.
+- [x] Sync canonical docs/context/handoff artifacts for Slice 212.
+- [x] Run sequential validations + grep proofs + issue evidence post.
+
 # Slice 210 Tasks: OpenClaw Patch Anchor Alignment (Backward-Compatible) (2026-03-05)
 
 Issue mapping: `#64`

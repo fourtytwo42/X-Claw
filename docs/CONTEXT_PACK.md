@@ -14,6 +14,31 @@
   - `routeKind`
   - `liquidityOperation`
 
+## Hotfix Context: Slice 212 Telegram Instant-Clear + Solana Swap Retry + Solana Amount Normalization
+
+Issue mapping: `#65`
+
+### Objective + scope lock
+- Objective: improve owner approval UX responsiveness in Telegram, reduce transient Solana quote failures, and normalize Solana trade amount display on the agent page.
+- Scope guard:
+  - OpenClaw callback patch path only (no delete API behavior change),
+  - runtime Solana Jupiter quote transport only (no slippage/amount auto-adjust),
+  - agent page wallet activity display normalization only.
+
+### Expected touched files
+- `skills/xclaw-agent/scripts/openclaw_gateway_patch.py`
+- `apps/agent-runtime/xclaw_agent/solana_runtime.py`
+- `apps/network-web/src/app/agents/[agentId]/page.tsx`
+- `apps/agent-runtime/tests/test_openclaw_gateway_patch.py`
+- `apps/agent-runtime/tests/test_solana_runtime.py`
+- `docs/XCLAW_SOURCE_OF_TRUTH.md`
+- `docs/XCLAW_SLICE_TRACKER.md`
+- `docs/XCLAW_BUILD_ROADMAP.md`
+- `docs/CONTEXT_PACK.md`
+- `spec.md`
+- `tasks.md`
+- `acceptance.md`
+
 ## Hotfix Context: Slice 209 Skill Wallet Chain-Family Validation Parity
 
 Issue mapping: `#63`

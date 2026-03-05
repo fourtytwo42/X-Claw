@@ -1,3 +1,31 @@
+# Slice 212 Spec: Telegram Tap UX + Solana Swap Reliability + Solana Amount Normalization (2026-03-05)
+
+Issue mapping: `#65`
+
+## Goal
+1. Clear Telegram approval inline buttons immediately on callback tap (no message delete).
+2. Harden Solana Jupiter quote path with bounded retries and deterministic exhausted diagnostics.
+3. Normalize Solana trade amount rendering on `/agents/[agentId]` wallet activity to human units.
+
+## Non-goals
+1. No slippage or amount auto-adjustments during retry.
+2. No API/database schema changes.
+3. No broad dashboard/public-activity normalization in this slice.
+
+## Locked scope
+1. `skills/xclaw-agent/scripts/openclaw_gateway_patch.py`
+2. `apps/agent-runtime/xclaw_agent/solana_runtime.py`
+3. `apps/network-web/src/app/agents/[agentId]/page.tsx`
+4. `apps/agent-runtime/tests/test_openclaw_gateway_patch.py`
+5. `apps/agent-runtime/tests/test_solana_runtime.py`
+6. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+7. `docs/XCLAW_SLICE_TRACKER.md`
+8. `docs/XCLAW_BUILD_ROADMAP.md`
+9. `docs/CONTEXT_PACK.md`
+10. `spec.md`
+11. `tasks.md`
+12. `acceptance.md`
+
 # Slice 210 Spec: OpenClaw Patch Anchor Alignment (Backward-Compatible) (2026-03-05)
 
 Issue mapping: `#64`

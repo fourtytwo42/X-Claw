@@ -3752,8 +3752,21 @@ def _maybe_send_telegram_decision_message(
     summary = summary or {}
     trade = trade or {}
     amount = str(summary.get("amountInHuman") or "").strip() or str(trade.get("amountIn") or "").strip() or "?"
-    token_in = str(summary.get("tokenInSymbol") or "").strip() or str(trade.get("tokenIn") or "").strip() or "TOKEN_IN"
-    token_out = str(summary.get("tokenOutSymbol") or "").strip() or str(trade.get("tokenOut") or "").strip() or "TOKEN_OUT"
+    token_in_raw = str(trade.get("tokenIn") or "").strip()
+    token_out_raw = str(trade.get("tokenOut") or "").strip()
+    token_in = str(summary.get("tokenInSymbol") or "").strip() or token_in_raw or "TOKEN_IN"
+    token_out = str(summary.get("tokenOutSymbol") or "").strip() or token_out_raw or "TOKEN_OUT"
+    # Older/partial payloads can omit summary.amountInHuman for Solana and only include
+    # base units in trade.amountIn. Convert to human units for readable decision prompts.
+    if not str(summary.get("amountInHuman") or "").strip() and _is_solana_chain(chain) and token_in_raw and is_solana_address(token_in_raw):
+        amount_raw = str(trade.get("amountIn") or "").strip()
+        if amount_raw and amount_raw.isdigit():
+            try:
+                token_in_decimals = _solana_mint_decimals(chain, token_in_raw)
+                amount = _normalize_amount_human_text(_format_units(int(amount_raw), token_in_decimals))
+            except Exception:
+                # Best-effort UX formatting only; never block decision handling.
+                pass
     token_in = _token_symbol_for_display(chain, token_in)
     token_out = _token_symbol_for_display(chain, token_out)
     slip = summary.get("slippageBps")
@@ -7468,6 +7481,20 @@ def _compute_v2_remove_liquidity_units(
 def _token_symbol_for_display(chain: str, token_or_symbol: str) -> str:
     value = str(token_or_symbol or "").strip()
     if not value:
+        return value
+    if _is_solana_chain(chain):
+        if not is_solana_address(value):
+            return value
+        token_map = _canonical_token_map(chain)
+        for symbol, address in token_map.items():
+            if str(address or "").strip() == value:
+                return str(symbol or "").strip() or value
+        tracked = _tracked_tokens_for_chain(chain)
+        for row in tracked:
+            token = str(row.get("token") or "").strip()
+            symbol = str(row.get("symbol") or "").strip()
+            if token and token == value and symbol:
+                return symbol
         return value
     if not is_hex_address(value):
         return value

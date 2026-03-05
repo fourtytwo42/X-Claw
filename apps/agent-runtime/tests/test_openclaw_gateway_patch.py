@@ -88,6 +88,21 @@ class OpenClawGatewayPatchTests(unittest.TestCase):
 
         self.assertEqual(bundle_names, ["reply-good.js"])
 
+    def test_loader_patch_clears_buttons_immediately_and_does_not_restore_keyboard_on_failure(self) -> None:
+        raw = self._read_fixture("bot_handlers_callback_with_pagination.ts.txt")
+        out, changed, err = self.patcher._patch_loader_bundle(raw)
+        self.assertIsNone(err)
+        self.assertTrue(changed)
+        self.assertIn(
+            'await bot.api.editMessageReplyMarkup(chatId, callbackMessage.message_id, { inline_keyboard: [] });',
+            out,
+        )
+        self.assertIn(self.patcher.DECISION_ACK_MARKER_V29, out)
+        self.assertNotIn(
+            'await bot.api.editMessageReplyMarkup(chatId, callbackMessage.message_id, { inline_keyboard: kb });',
+            out,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

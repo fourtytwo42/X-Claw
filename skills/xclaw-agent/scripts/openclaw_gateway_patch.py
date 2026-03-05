@@ -56,6 +56,7 @@ DECISION_ACK_MARKER_V25 = "xclaw: telegram approval decision ack v25"
 DECISION_ACK_MARKER_V26 = "xclaw: telegram approval decision ack v26"
 DECISION_ACK_MARKER_V27 = "xclaw: telegram approval decision ack v27"
 DECISION_ACK_MARKER_V28 = "xclaw: telegram approval decision ack v28"
+DECISION_ACK_MARKER_V29 = "xclaw: telegram approval decision ack v29"
 DECISION_ROUTE_MARKER_V1 = "xclaw: telegram approval decision routed to agent"
 DECISION_EXEC_MARKER_V1 = "xclaw: telegram trade resume trigger v1"
 DECISION_RESULT_ROUTE_MARKER_V1 = "xclaw: telegram trade result routed to agent"
@@ -65,7 +66,7 @@ QUEUED_BUTTONS_MARKER_V3 = "xclaw: telegram queued approval buttons v3"
 QUEUED_BUTTONS_MARKER_V4 = "xclaw: telegram queued approval buttons v4"
 LEGACY_DM_SENTINEL = 'Allow in DMs even when inlineButtonsScope is "allowlist", gated by chatId == senderId.'
 # Bump when patch semantics change so we invalidate the cached "already patched" fast-path.
-STATE_SCHEMA_VERSION = 63
+STATE_SCHEMA_VERSION = 64
 STATE_DIR = Path.home() / ".openclaw" / "xclaw"
 STATE_FILE = STATE_DIR / "openclaw_patch_state.json"
 LOCK_FILE = STATE_DIR / "openclaw_patch.lock"
@@ -335,6 +336,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         or DECISION_ACK_MARKER_V26 not in raw
         or DECISION_ACK_MARKER_V27 not in raw
         or DECISION_ACK_MARKER_V28 not in raw
+        or DECISION_ACK_MARKER_V29 not in raw
         or DECISION_ROUTE_MARKER_V1 not in raw
         or DECISION_EXEC_MARKER_V1 not in raw
         or DECISION_RESULT_ROUTE_MARKER_V1 not in raw
@@ -369,6 +371,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         or DECISION_ACK_MARKER_V26 not in raw
         or DECISION_ACK_MARKER_V27 not in raw
         or DECISION_ACK_MARKER_V28 not in raw
+        or DECISION_ACK_MARKER_V29 not in raw
         or DECISION_ROUTE_MARKER_V1 not in raw
         or DECISION_EXEC_MARKER_V1 not in raw
         or DECISION_RESULT_ROUTE_MARKER_V1 not in raw
@@ -607,6 +610,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         and DECISION_ACK_MARKER_V26 in raw
         and DECISION_ACK_MARKER_V27 in raw
         and DECISION_ACK_MARKER_V28 in raw
+        and DECISION_ACK_MARKER_V29 in raw
         and DECISION_ROUTE_MARKER_V1 in raw
         and DECISION_EXEC_MARKER_V1 in raw
         and DECISION_RESULT_ROUTE_MARKER_V1 in raw
@@ -663,6 +667,8 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         '\t\t\t\t\tconst apiKey = String(skill?.apiKey ?? env?.XCLAW_API_KEY ?? process.env.XCLAW_API_KEY ?? "").trim();\n'
         '\t\t\t\t\t// Reduce perceived latency: best-effort stop spinner while runtime applies canonical clear.\n'
         '\t\t\t\t\ttry { bot.api.answerCallbackQuery(callback.id, { text: action === "r" ? "Denying..." : "Approving...", show_alert: false }); } catch {}\n'
+        '\t\t\t\t\t// Immediate UX clear: hide inline buttons on tap (text stays; no delete API).\n'
+        '\t\t\t\t\ttry { if (callbackMessage?.message_id) { await bot.api.editMessageReplyMarkup(chatId, callbackMessage.message_id, { inline_keyboard: [] }); } } catch {}\n'
         '\t\t\t\t\ttry {\n'
         '\t\t\t\t\t\tconst atEpochSec = (typeof callback?.date === "number" ? callback.date : (typeof callbackMessage?.date === "number" ? callbackMessage.date : Math.floor(Date.now() / 1000)));\n'
         '\t\t\t\t\t\tconst atIso = (/* @__PURE__ */ new Date(atEpochSec * 1000)).toISOString();\n'
@@ -796,6 +802,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V26}\n'
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V27}\n'
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V28}\n'
+        f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V29}\n'
         '\t\t\t\t\t\t\t\ttry {\n'
         '\t\t\t\t\t\t\t\t\tconst subjectLabel = parts[0] === "xpol" ? "policy approval" : (parts[0] === "xliq" ? "liquidity approval" : "trade");\n'
         '\t\t\t\t\t\t\t\t\tconst msg = `${action === "r" ? "Denied" : "Approved"} ${subjectLabel} ${subjectId}\\nChain: ${chainKey}`;\n'
@@ -894,14 +901,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         '\t\t\t\t\t\t\t\t}\n'
         '\t\t\t\t\t\t\t\treturn;\n'
         '\t\t\t\t\t\t\t}\n'
-        '\t\t\t\t\t\t\ttry {\n'
-        '\t\t\t\t\t\t\t\tconst kb = parts[0] === "xpol"\n'
-        '\t\t\t\t\t\t\t\t\t? [[{ text: "Approve", callback_data: `xpol|a|${subjectId}|${chainKey}` }, { text: "Deny", callback_data: `xpol|r|${subjectId}|${chainKey}` }]]\n'
-        '\t\t\t\t\t\t\t\t\t: (parts[0] === "xliq"\n'
-        '\t\t\t\t\t\t\t\t\t\t? [[{ text: "Approve", callback_data: `xliq|a|${subjectId}|${chainKey}` }, { text: "Deny", callback_data: `xliq|r|${subjectId}|${chainKey}` }]]\n'
-        '\t\t\t\t\t\t\t\t\t\t: [[{ text: "Approve", callback_data: `xappr|a|${subjectId}|${chainKey}` }, { text: "Deny", callback_data: `xappr|r|${subjectId}|${chainKey}` }]]);\n'
-        '\t\t\t\t\t\t\t\tawait bot.api.editMessageReplyMarkup(chatId, callbackMessage.message_id, { inline_keyboard: kb });\n'
-        '\t\t\t\t\t\t\t} catch {}\n'
+        '\t\t\t\t\t\t\t// Keep buttons cleared on failure; do not restore original keyboard.\n'
         '\t\t\t\t\t\t\tawait bot.api.sendMessage(chatId, `Approval failed: ${String(body?.code ?? ("runtime exit " + String(exitCode)))} (${String((body?.message ?? err) || "runtime decision failed")}).`);\n'
         '\t\t\t\t\t\t\treturn;\n'
         '\t\t\t\t\t\t}\n'
@@ -947,6 +947,7 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V26}\n'
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V27}\n'
         f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V28}\n'
+        f'\t\t\t\t\t\t\t\t// {DECISION_ACK_MARKER_V29}\n'
         '\t\t\t\t\t\t\t\t// Runtime is canonical owner of queued prompt cleanup (button clear, no delete).\n'
         '\t\t\t\t\t\t\t\t// Emit deterministic confirmation immediately so users always see a result.\n'
         '\t\t\t\t\t\t\t\ttry {\n'
@@ -1091,29 +1092,11 @@ def _patch_loader_bundle(raw: str) -> tuple[str, bool, str | None]:
         '\t\t\t\t\t\t\t\treturn;\n'
         '\t\t\t\t\t\t\tlet errCode = "api_error"; let errMsg = `HTTP ${res.status}`;\n'
         '\t\t\t\t\t\t\ttry { const body = await res.json(); if (typeof body?.code === "string" && body.code.trim()) errCode = body.code.trim(); if (typeof body?.message === "string" && body.message.trim()) errMsg = body.message.trim(); if (res.status === 409 && (body?.details?.currentStatus === "approved" || body?.details?.currentStatus === "filled" || body?.details?.currentStatus === "rejected")) { const currentStatus = String(body?.details?.currentStatus || ""); const decision = currentStatus === "rejected" ? "Denied" : "Approved"; const subjectLabel = parts[0] === "xpol" ? "policy approval" : (parts[0] === "xfer" ? "transfer approval" : (parts[0] === "xliq" ? "liquidity approval" : "trade")); if (!(parts[0] === "xappr" || (parts[0] === "xpol" && currentStatus !== "rejected"))) { await bot.api.sendMessage(chatId, `${decision} ${subjectLabel} ${subjectId}\\nChain: ${chainKey}`); } return; } } catch {}\n'
-        '\t\t\t\t\t\t\ttry {\n'
-        '\t\t\t\t\t\t\t\tconst kb = parts[0] === "xpol"\n'
-        '\t\t\t\t\t\t\t\t\t? [[{ text: "Approve", callback_data: `xpol|a|${subjectId}|${chainKey}` }, { text: "Deny", callback_data: `xpol|r|${subjectId}|${chainKey}` }]]\n'
-        '\t\t\t\t\t\t\t\t\t: (parts[0] === "xfer"\n'
-        '\t\t\t\t\t\t\t\t\t\t? [[{ text: "Approve", callback_data: `xfer|a|${subjectId}|${chainKey}` }, { text: "Deny", callback_data: `xfer|r|${subjectId}|${chainKey}` }]]\n'
-        '\t\t\t\t\t\t\t\t\t\t: (parts[0] === "xliq"\n'
-        '\t\t\t\t\t\t\t\t\t\t\t? [[{ text: "Approve", callback_data: `xliq|a|${subjectId}|${chainKey}` }, { text: "Deny", callback_data: `xliq|r|${subjectId}|${chainKey}` }]]\n'
-        '\t\t\t\t\t\t\t\t\t\t\t: [[{ text: "Approve", callback_data: `xappr|a|${subjectId}|${chainKey}` }, { text: "Deny", callback_data: `xappr|r|${subjectId}|${chainKey}` }]]));\n'
-        '\t\t\t\t\t\t\t\tawait bot.api.editMessageReplyMarkup(chatId, callbackMessage.message_id, { inline_keyboard: kb });\n'
-        '\t\t\t\t\t\t\t} catch {}\n'
+        '\t\t\t\t\t\t\t// Keep buttons cleared on failure; do not restore original keyboard.\n'
         '\t\t\t\t\t\t\tawait bot.api.sendMessage(chatId, `Approval failed: ${errCode} (${errMsg}).`);\n'
         '\t\t\t\t\t\t\treturn;\n'
         '\t\t\t\t\t\t} catch (err) {\n'
-        '\t\t\t\t\t\t\ttry {\n'
-        '\t\t\t\t\t\t\t\tconst kb = parts[0] === "xpol"\n'
-        '\t\t\t\t\t\t\t\t\t? [[{ text: "Approve", callback_data: `xpol|a|${subjectId}|${chainKey}` }, { text: "Deny", callback_data: `xpol|r|${subjectId}|${chainKey}` }]]\n'
-        '\t\t\t\t\t\t\t\t\t: (parts[0] === "xfer"\n'
-        '\t\t\t\t\t\t\t\t\t\t? [[{ text: "Approve", callback_data: `xfer|a|${subjectId}|${chainKey}` }, { text: "Deny", callback_data: `xfer|r|${subjectId}|${chainKey}` }]]\n'
-        '\t\t\t\t\t\t\t\t\t\t: (parts[0] === "xliq"\n'
-        '\t\t\t\t\t\t\t\t\t\t\t? [[{ text: "Approve", callback_data: `xliq|a|${subjectId}|${chainKey}` }, { text: "Deny", callback_data: `xliq|r|${subjectId}|${chainKey}` }]]\n'
-        '\t\t\t\t\t\t\t\t\t\t\t: [[{ text: "Approve", callback_data: `xappr|a|${subjectId}|${chainKey}` }, { text: "Deny", callback_data: `xappr|r|${subjectId}|${chainKey}` }]]));\n'
-        '\t\t\t\t\t\t\t\tawait bot.api.editMessageReplyMarkup(chatId, callbackMessage.message_id, { inline_keyboard: kb });\n'
-        '\t\t\t\t\t\t\t} catch {}\n'
+        '\t\t\t\t\t\t\t// Keep buttons cleared on failure; do not restore original keyboard.\n'
         '\t\t\t\t\t\t\tawait bot.api.sendMessage(chatId, `Approval failed: ${String(err)}`);\n'
         '\t\t\t\t\t\t\treturn;\n'
         '\t\t\t\t\t\t}\n'

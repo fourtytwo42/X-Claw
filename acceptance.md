@@ -1,3 +1,41 @@
+# Slice 212 Acceptance Evidence: Telegram Tap UX + Solana Swap Reliability + Solana Amount Normalization
+
+Date (UTC): 2026-03-05  
+Active slice context: `Slice 212`.
+
+Issue mapping: `#65`
+
+### Objective + Scope Lock
+- Objective:
+  - clear Telegram inline buttons immediately on approval tap without message delete,
+  - make Solana Jupiter quote transport retry-resilient and deterministic on exhaustion,
+  - normalize Solana atomic trade amounts to human units on `/agents/[agentId]`.
+
+### Behavior Checks
+- [x] callback patch injects immediate `editMessageReplyMarkup(... inline_keyboard: [])` after callback ack.
+- [x] callback failure paths no longer re-attach `inline_keyboard: kb`.
+- [x] Solana quote retries after transient transport failures and succeeds when endpoint recovers.
+- [x] Solana quote fails closed on non-retryable 4xx with deterministic diagnostics.
+- [x] Solana quote retry exhaustion reports deterministic details (`attempts`, `lastStatus`, `lastEndpoint`).
+- [x] agent page wallet activity uses Solana decimals for trade amount display (human units) while EVM path remains unchanged.
+
+### Required Validation Gates
+- [x] `npm run db:parity` -> PASS (`ok: true`)
+- [x] `npm run seed:reset` -> PASS
+- [x] `npm run seed:load` -> PASS
+- [x] `npm run seed:verify` -> PASS
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_openclaw_gateway_patch.py -v` -> PASS (`Ran 7 tests`, `OK`)
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_solana_runtime.py -v` -> PASS (`Ran 3 tests`, `OK`)
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS (`Ran 143 tests`, `OK`)
+- [x] `npm run build` -> PASS
+- [x] `pm2 restart all` -> PASS (`xclaw-web online`)
+
+### Required Grep Proofs
+- [x] no message delete API introduced in callback/runtime cleanup paths.
+  - `rg -n "deleteMessage\(" skills/xclaw-agent/scripts/openclaw_gateway_patch.py apps/agent-runtime/xclaw_agent/cli.py apps/agent-runtime/tests/test_openclaw_gateway_patch.py apps/agent-runtime/tests/test_trade_path.py` -> no matches
+- [x] runtime/skill wallet paths still contain no direct management-cookie route crossover.
+  - `rg -n "/api/v1/management/|/management/" skills/xclaw-agent/scripts/xclaw_agent_skill.py apps/agent-runtime/xclaw_agent/cli.py apps/agent-runtime/xclaw_agent/solana_runtime.py` -> no matches
+
 # Slice 210 Acceptance Evidence: OpenClaw Patch Anchor Alignment (Backward-Compatible)
 
 Date (UTC): 2026-03-05  

@@ -1460,6 +1460,51 @@ class TradePathRuntimeTests(unittest.TestCase):
         self.assertNotIn("0xC97e903056f679ea1Db80893008A92578aDfE609", message)
         self.assertNotIn("0x39A0C0D1b3dDcE1B49fAa5c6e1D300C14012F4E2", message)
 
+    def test_telegram_decision_message_solana_denied_formats_human_units_and_symbols(self) -> None:
+        captured: dict[str, object] = {}
+
+        def fake_run(cmd: list[str], timeout_sec: int, kind: str):
+            captured["cmd"] = cmd
+            return mock.Mock(returncode=0, stdout='{"ok":true}', stderr="")
+
+        with mock.patch.object(
+            cli, "_get_approval_prompt", return_value={"channel": "telegram", "to": "123", "threadId": None}
+        ), mock.patch.object(
+            cli,
+            "_canonical_token_map",
+            return_value={
+                "SOL": "So11111111111111111111111111111111111111112",
+                "USDC": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            },
+        ), mock.patch.object(
+            cli, "_solana_mint_decimals", return_value=9
+        ), mock.patch.object(
+            cli.shutil, "which", return_value="openclaw"
+        ), mock.patch.object(
+            cli, "_run_subprocess", side_effect=fake_run
+        ):
+            cli._maybe_send_telegram_decision_message(
+                trade_id="trd_sol_1",
+                chain="solana_mainnet_beta",
+                decision="rejected",
+                summary=None,
+                trade={
+                    "amountIn": "7000000",
+                    "tokenIn": "So11111111111111111111111111111111111111112",
+                    "tokenOut": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+                    "reasonMessage": "Denied via Telegram",
+                },
+            )
+
+        cmd = captured.get("cmd") or []
+        self.assertIn("--message", cmd)
+        message = str(cmd[cmd.index("--message") + 1])
+        self.assertIn("Denied swap", message)
+        self.assertIn("0.007 SOL -> USDC", message)
+        self.assertIn("Reason: Denied via Telegram", message)
+        self.assertNotIn("7000000 So11111111111111111111111111111111111111112", message)
+        self.assertNotIn("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", message)
+
     def test_telegram_decision_message_skips_when_harness_suppression_enabled(self) -> None:
         with mock.patch.dict(os.environ, {"XCLAW_TEST_HARNESS_DISABLE_TELEGRAM": "1"}, clear=False), mock.patch.object(
             cli, "_run_subprocess"

@@ -180,6 +180,30 @@ Core thesis: **agents act, humans supervise, network observes and allocates trus
 - may validate anchors against a local OpenClaw checkout,
 - must not introduce runtime coupling between X-Claw and OpenClaw source trees.
 
+## 3.19) Slice 211 Solana Decision Message Normalization (2026-03-05)
+
+1. Approval decision acknowledgements are best-effort UX copy and must remain non-blocking.
+2. For Solana decision messages, when `summary.amountInHuman` is missing and only base-unit `trade.amountIn` exists, runtime must format human units before dispatch.
+3. Solana decision-message token labels must resolve mint addresses to canonical/tracked symbols when available.
+4. Fallback formatting must fail open:
+- message dispatch/cleanup paths must not block approval decision persistence/execution.
+5. EVM decision-message symbol/amount behavior remains unchanged.
+
+## 3.20) Slice 212 Telegram Instant-Clear + Solana Swap Retry + Solana Amount Normalization (2026-03-05)
+
+1. Telegram callback UX for approval buttons (`xappr|xpol|xfer|xliq`) must be immediate:
+- callback path must acknowledge tap and best-effort clear inline keyboard at callback time,
+- original prompt message text must remain (no message delete APIs).
+2. Callback/runtime failure paths must keep cleared keyboard state:
+- failure notices are sent as new messages,
+- prior approval keyboard must not be restored.
+3. Solana Jupiter quote transport must use bounded retry/backoff with deterministic fail-closed diagnostics:
+- no automatic slippage mutation,
+- no automatic amount mutation,
+- exhausted retries return actionable `rpc_unavailable` details.
+4. Agent page wallet activity (`/agents/:id`) must display Solana trade amounts in human units using token/native decimals when stored values are atomic/base units.
+5. EVM trade amount display behavior remains unchanged in this slice.
+
 ## 3.3) Slice 128-129 Unified EVM Action Engine
 
 1. Canonical runtime execution for active on-chain actions is runtime-local and adapter-built.

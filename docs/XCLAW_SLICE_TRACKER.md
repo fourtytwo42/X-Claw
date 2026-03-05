@@ -17,6 +17,40 @@ Status legend:
 
 ---
 
+## Slice 212: Telegram Instant-Clear + Solana Swap Retry + Solana Amount Normalization (Hotfix)
+Status: [x]
+
+Goal:
+- remove perceived Telegram approval latency, harden Solana Jupiter quote reliability, and normalize Solana atomic trade amounts on the agent page without changing custody/auth boundaries.
+
+DoD:
+- [x] OpenClaw callback patch clears inline keyboard immediately on `xappr|xpol|xfer|xliq` tap (no delete API).
+- [x] Callback failure paths keep buttons cleared (no keyboard restore-on-failure behavior).
+- [x] Runtime Solana Jupiter quote uses bounded retry/backoff with deterministic diagnostics on exhaustion.
+- [x] `/agents/[agentId]` wallet activity renders Solana trade amounts with token decimals (human units) while preserving existing EVM display behavior.
+- [x] Regression tests cover callback immediate clear/no-restore and Solana quote retry success/failure paths.
+- [x] Sequential validation + PM2 restart completed.
+
+Issue mapping:
+- `#65`
+
+---
+
+## Slice 211: Solana Decision Message Normalization (Hotfix)
+Status: [x]
+
+Goal:
+- ensure approval decision prompts/messages use human-readable Solana amounts and token symbols instead of raw base units/mint addresses.
+
+DoD:
+- [x] Solana decision message fallback converts base-unit `trade.amountIn` to human amount when summary field is missing.
+- [x] Solana mint addresses in decision messages resolve to canonical/tracked token symbols.
+- [x] EVM decision message symbol resolution remains unchanged.
+- [x] runtime test coverage includes regression for denied Solana decision message formatting.
+- [x] full sequential validation + PM2 restart completed.
+
+---
+
 ## Slice 210: OpenClaw Patch Anchor Alignment (Backward-Compatible Hotfix)
 Status: [x]
 

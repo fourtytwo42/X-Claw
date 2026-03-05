@@ -1385,8 +1385,17 @@ export default function AgentPublicProfilePage() {
       const tokenOut = resolveTokenLabel(trade.token_out, chainTokenSymbolByAddress);
       const normalizedIn = normalizeTokenSelectionSymbol(tokenIn, activeNativeSymbol);
       const normalizedOut = normalizeTokenSelectionSymbol(tokenOut, activeNativeSymbol);
-      const tradedAmount = formatHumanAmount(trade.amount_in, tokenIn);
-      const gainedAmount = formatHumanAmount(trade.amount_out, tokenOut);
+      const isSolanaChain = activeChainKey.startsWith('solana_');
+      const tradedAmount = formatHumanAmount(
+        trade.amount_in,
+        tokenIn,
+        isSolanaChain && normalizedIn ? tokenDecimalsBySymbol.get(normalizedIn) : undefined
+      );
+      const gainedAmount = formatHumanAmount(
+        trade.amount_out,
+        tokenOut,
+        isSolanaChain && normalizedOut ? tokenDecimalsBySymbol.get(normalizedOut) : undefined
+      );
       const reason = trade.reason ?? trade.reason_code ?? trade.reason_message;
       items.push({
         id: `trd-${trade.trade_id}`,

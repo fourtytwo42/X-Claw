@@ -11,6 +11,23 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 
 ---
 
+## 0.21) Slice 212 Telegram Instant-Clear + Solana Swap Retry + Solana Amount Normalization (Hotfix)
+
+- [x] Update OpenClaw callback patch to clear inline buttons immediately on approval taps while preserving no-delete contract.
+- [x] Remove callback failure behavior that re-attached old approval keyboards.
+- [x] Add bounded Solana Jupiter quote retry loop with deterministic exhausted diagnostics.
+- [x] Add runtime tests for Solana quote retry success/non-retryable/exhausted paths.
+- [x] Normalize Solana trade amount display on `/agents/[agentId]` wallet activity using token/native decimals.
+- [x] Sync canonical/process artifacts and issue mapping (`#65`).
+- [x] Sequential validation + PM2 restart completed.
+
+## 0.20) Slice 211 Solana Decision Message Normalization (Hotfix)
+
+- [x] Normalize Solana decision-message amount fallback from base units to human units when summary payload is missing.
+- [x] Resolve Solana mint addresses to canonical/tracked symbols in decision-message copy.
+- [x] Add regression coverage for denied Solana decision path (`0.007 SOL -> USDC` formatting).
+- [x] Sequential validation + PM2 restart completed.
+
 ## 0.19) Slice 210 OpenClaw Patch Anchor Alignment (Backward-Compatible Hotfix)
 
 - [x] Keep queued-buttons patch anchor compatibility for old and current `sendTelegramText` forms.
