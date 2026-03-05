@@ -31,7 +31,8 @@ Issue mapping: `#63`
   - `rg -n "/api/v1/management/" skills/xclaw-agent/scripts/xclaw_agent_skill.py apps/agent-runtime/xclaw_agent/cli.py` -> `no_management_route_matches`
 - [x] wallet validators in skill wrapper now branch by chain family.
   - `skills/xclaw-agent/scripts/xclaw_agent_skill.py` includes `_is_solana_chain_key`, `_is_solana_address`, `_is_chain_address` and applies them in `wallet-send|wallet-send-token|wallet-token-balance|wallet-track-token|wallet-untrack-token`.
-- [ ] issue evidence comment posted to `#63`.
+- [x] issue evidence comment posted to `#63`.
+  - https://github.com/fourtytwo42/X-Claw/issues/63#issuecomment-4001226445
 
 # Slice 206-208 Acceptance Evidence: Solana RPC Fallback Hardening
 

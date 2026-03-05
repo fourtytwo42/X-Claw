@@ -9,7 +9,7 @@ Issue mapping: `#63`
 - [x] Add negative-path tests for malformed Solana addresses and EVM regression behavior.
 - [x] Sync skill docs and wallet command contract wording to chain-family validation semantics.
 - [x] Sync canonical docs/tracker/roadmap/context for new hotfix slice.
-- [ ] Run sequential validations + grep proof + issue evidence comment.
+- [x] Run sequential validations + grep proof + issue evidence comment.
 
 # Slice 206-208 Tasks: Solana RPC Fallback Hardening (2026-03-04)
 

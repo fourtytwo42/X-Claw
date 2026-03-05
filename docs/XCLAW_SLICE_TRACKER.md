@@ -18,7 +18,7 @@ Status legend:
 ---
 
 ## Slice 209: Skill Wallet Chain-Family Validation Parity (Hotfix)
-Status: [~]
+Status: [x]
 
 Goal:
 - remove EVM-only wallet input validation in skill wrapper so Solana wallet flows reach runtime while preserving server/agent trust boundaries.
@@ -29,7 +29,7 @@ DoD:
 - [~] target chain resolution occurs before wrapper-side validation when chain arg is omitted.
 - [~] wrapper tests include Solana positive + negative coverage and EVM regression coverage.
 - [~] canonical docs/contracts synced for chain-family validation language.
-- [ ] full sequential validation + issue evidence posted.
+- [x] full sequential validation + issue evidence posted.
 
 ---
 
