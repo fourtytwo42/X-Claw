@@ -9,7 +9,7 @@ Issue mapping: `#64`
 - [x] Add patcher unittest module for old/new/regex/no-anchor/idempotency/bundle-detection scenarios.
 - [x] Add local drift-check utility script for OpenClaw anchor verification.
 - [x] Sync canonical docs/context/handoff artifacts for slice 210.
-- [ ] Run sequential validations + grep proof + issue evidence comment.
+- [x] Run sequential validations + grep proof + issue evidence comment.
 
 # Slice 209 Tasks: Skill Wallet Chain-Family Validation Parity (2026-03-05)
 

@@ -34,7 +34,8 @@ Issue mapping: `#64`
   - `rg -n "/api/v1/management/" skills/xclaw-agent/scripts/openclaw_gateway_patch.py skills/xclaw-agent/scripts/xclaw_agent_skill.py apps/agent-runtime/xclaw_agent/cli.py` -> `no_management_route_matches`
 - [x] patcher contains old/new/regex anchor support in `_patch_queued_buttons_v2`.
   - `skills/xclaw-agent/scripts/openclaw_gateway_patch.py` includes legacy anchor, new upstream anchor, and regex fallback for `const htmlText = ... ? text : markdownToTelegramHtml(text);`.
-- [ ] issue evidence comment posted to `#64`.
+- [x] issue evidence comment posted to `#64`.
+  - https://github.com/fourtytwo42/X-Claw/issues/64#issuecomment-4001616106
 
 # Slice 209 Acceptance Evidence: Skill Wallet Chain-Family Validation Parity
 
