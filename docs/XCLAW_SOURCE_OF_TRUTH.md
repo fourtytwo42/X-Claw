@@ -233,7 +233,10 @@ Core thesis: **agents act, humans supervise, network observes and allocates trus
 - `~/.xclaw-agent/approvals-run-loop.env` (`XCLAW_WALLET_PASSPHRASE`),
 - then retry signing before failing closed.
 4. Bootstrap submit payload must use the successful signing tuple (`chainKey`, `walletAddress`, `signature`) from the same attempt.
-5. This recovery is installer-only; custody/auth boundaries remain unchanged:
+5. Installer register/heartbeat submit path must auto-recover stale API keys:
+- on `401`, invoke runtime `auth recover` with chain candidates (`default`, `base_sepolia`, `ethereum_sepolia`),
+- refresh API key from OpenClaw config and retry once.
+6. This recovery is installer-only; custody/auth boundaries remain unchanged:
 - wallet keys stay runtime-local,
 - no management-cookie auth path crossover is introduced.
 

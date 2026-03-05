@@ -7,6 +7,7 @@ Issue mapping: `#67`
 - [x] Add chain-aware bootstrap signing retries with explicit chain arg.
 - [x] Add passphrase recovery from approvals-run-loop env and retry signing once.
 - [x] Ensure bootstrap payload binds to successful chain/wallet/signature tuple.
+- [x] Add register/heartbeat 401 recovery via runtime auth recover + API key refresh + retry.
 - [x] Run sequential validations + issue evidence post.
 
 # Slice 213 Tasks: Solana Jupiter Endpoint Resilience (2026-03-05)

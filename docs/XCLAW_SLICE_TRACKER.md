@@ -28,6 +28,7 @@ DoD:
 - [x] Bootstrap signing passes explicit chain arg and retries across deterministic chain candidates (`default`, `base_sepolia`, `ethereum_sepolia`).
 - [x] On signing failure, installer attempts passphrase recovery from approvals run-loop env and retries signing.
 - [x] Bootstrap payload uses successful chain/wallet signing pair.
+- [x] Register/heartbeat path auto-recovers on `401` via runtime auth-recover + API key refresh + single retry.
 - [x] Sequential validation + PM2 restart completed.
 
 Issue mapping:

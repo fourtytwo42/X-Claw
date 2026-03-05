@@ -17,6 +17,7 @@ Issue mapping: `#67`
 - [x] signing retries deterministic chain candidates (`default`, `base_sepolia`, `ethereum_sepolia`) with chain-specific wallet addresses.
 - [x] passphrase recovery from `~/.xclaw-agent/approvals-run-loop.env` is attempted before final signing failure.
 - [x] bootstrap payload uses successful signing chain/wallet pair.
+- [x] register/heartbeat `401` triggers runtime auth recovery + key refresh + retry path.
 
 ### Required Validation Gates
 - [x] `npm run db:parity` -> PASS (`ok: true`)

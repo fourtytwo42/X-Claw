@@ -1003,6 +1003,76 @@ fi
 
 wallets_json="$wallet_rows_json"
 
+refresh_api_key_from_config() {
+  local cfg_api_key=""
+  cfg_api_key="$(openclaw config get skills.entries.xclaw-agent.env.XCLAW_AGENT_API_KEY 2>/dev/null | tail -n1 | sed -E 's/^\"(.*)\"$/\\1/' || true)"
+  if [ -z "$cfg_api_key" ] || [ "$cfg_api_key" = "null" ]; then
+    cfg_api_key="$(openclaw config get skills.entries.xclaw-agent.apiKey 2>/dev/null | tail -n1 | sed -E 's/^\"(.*)\"$/\\1/' || true)"
+  fi
+  if [ -n "$cfg_api_key" ] && [ "$cfg_api_key" != "null" ]; then
+    export XCLAW_AGENT_API_KEY="$cfg_api_key"
+    return 0
+  fi
+  return 1
+}
+
+post_agent_with_recovery() {
+  local path="$1"
+  local idem_key="$2"
+  local payload="$3"
+  local label="$4"
+  local url="$XCLAW_API_BASE_URL$path"
+  local first http_code body
+  first="$(curl -sS -w '\n%{http_code}' "$url" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $XCLAW_AGENT_API_KEY" \
+    -H "Idempotency-Key: $idem_key" \
+    -d "$payload" 2>/dev/null || true)"
+  http_code="$(printf "%s" "$first" | tail -n1 | tr -d '\r')"
+  body="$(printf "%s" "$first" | sed '$d')"
+  if [ "$http_code" -ge 200 ] 2>/dev/null && [ "$http_code" -lt 300 ] 2>/dev/null; then
+    [ -n "$body" ] && printf "%s\n" "$body"
+    return 0
+  fi
+  if [ "$http_code" = "401" ]; then
+    echo "[xclaw] $label returned 401; attempting auth recovery via wallet signature"
+    recover_ok=0
+    for recover_chain in "$XCLAW_DEFAULT_CHAIN" base_sepolia ethereum_sepolia; do
+      [ -n "$recover_chain" ] || continue
+      recover_json="$("$XCLAW_AGENT_BIN" auth recover --chain "$recover_chain" --json 2>/dev/null || true)"
+      recover_flag="$(printf "%s" "$recover_json" | python3 -c 'import json,sys
+try:
+ d=json.load(sys.stdin)
+ print("1" if d.get("ok") else "0")
+except Exception:
+ print("0")' || true)"
+      if [ "$recover_flag" = "1" ]; then
+        recover_ok=1
+        break
+      fi
+    done
+    if [ "$recover_ok" = "1" ] && refresh_api_key_from_config; then
+      retry="$(curl -sS -w '\n%{http_code}' "$url" \
+        -H "Content-Type: application/json" \
+        -H "Authorization: Bearer $XCLAW_AGENT_API_KEY" \
+        -H "Idempotency-Key: $idem_key" \
+        -d "$payload" 2>/dev/null || true)"
+      retry_code="$(printf "%s" "$retry" | tail -n1 | tr -d '\r')"
+      retry_body="$(printf "%s" "$retry" | sed '$d')"
+      if [ "$retry_code" -ge 200 ] 2>/dev/null && [ "$retry_code" -lt 300 ] 2>/dev/null; then
+        [ -n "$retry_body" ] && printf "%s\n" "$retry_body"
+        echo "[xclaw] $label succeeded after auth recovery"
+        return 0
+      fi
+      body="$retry_body"
+      http_code="$retry_code"
+    fi
+  fi
+  echo "[xclaw] $label failed (http=$http_code)"
+  [ -n "$body" ] && printf "%s\n" "$body"
+  return 1
+}
+
 if [ -n "\${XCLAW_AGENT_API_KEY:-}" ] && [ -n "\${XCLAW_AGENT_ID:-}" ] && [ -n "$wallet_address" ]; then
   if [ "$bootstrap_ok" = "1" ]; then
     echo "[xclaw] bootstrap completed; syncing wallet chain bindings via register upsert"
@@ -1032,17 +1102,8 @@ JSON
 JSON
 )"
 
-  curl -fsS "$XCLAW_API_BASE_URL/agent/register" \
-    -H "Content-Type: application/json" \
-    -H "Authorization: Bearer $XCLAW_AGENT_API_KEY" \
-    -H "Idempotency-Key: $register_key" \
-    -d "$register_payload"
-
-  curl -fsS "$XCLAW_API_BASE_URL/agent/heartbeat" \
-    -H "Content-Type: application/json" \
-    -H "Authorization: Bearer $XCLAW_AGENT_API_KEY" \
-    -H "Idempotency-Key: $heartbeat_key" \
-    -d "$heartbeat_payload"
+  post_agent_with_recovery "/agent/register" "$register_key" "$register_payload" "register"
+  post_agent_with_recovery "/agent/heartbeat" "$heartbeat_key" "$heartbeat_payload" "heartbeat"
   if [ "$bootstrap_ok" = "1" ]; then
     echo "[xclaw] register wallet-chain sync + heartbeat attempted"
   else

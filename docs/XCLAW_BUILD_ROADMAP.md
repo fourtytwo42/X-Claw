@@ -17,6 +17,7 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 - [x] Add explicit chain-aware signing attempts for bootstrap challenge (`default`, `base_sepolia`, `ethereum_sepolia`).
 - [x] Add passphrase recovery from approvals run-loop env on signing failure and retry signing.
 - [x] Ensure bootstrap payload uses the successful chain/wallet signing pair.
+- [x] Auto-recover stale API key on register/heartbeat `401` via runtime auth recovery and retry.
 - [x] Sequential validation + PM2 restart completed.
 
 ## 0.22) Slice 213 Solana Jupiter Endpoint Resilience (Hotfix)
