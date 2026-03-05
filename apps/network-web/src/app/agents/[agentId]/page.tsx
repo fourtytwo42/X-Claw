@@ -353,17 +353,8 @@ async function bootstrapSession(
 }
 
 async function selectManagementSession(agentId: string, token: string): Promise<boolean> {
-  const response = await fetchWithTimeout(
-    '/api/v1/management/session/select',
-    {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      credentials: 'same-origin',
-      body: JSON.stringify({ agentId, token })
-    },
-    uiFetchTimeoutMs(),
-  );
-  return response.ok;
+  const result = await bootstrapSession(agentId, token);
+  return result.ok;
 }
 
 function usagePercent(current: number, maxRaw: string, enabled: boolean): number {
@@ -761,7 +752,14 @@ export default function AgentPublicProfilePage() {
     let managementRes = await fetchManagementState();
 
     if (managementRes.status === 401) {
-      const candidateTokens = Array.from(new Set([bootstrapToken, parseStoredManagedAgentTokens()[agentId]].filter((item) => Boolean(item))));
+      const tokenMap = parseStoredManagedAgentTokens();
+      const candidateTokens = Array.from(
+        new Set(
+          [bootstrapToken, tokenMap[agentId], ...Object.values(tokenMap)]
+            .map((item) => String(item ?? '').trim())
+            .filter((item) => item.length > 0)
+        )
+      );
       for (const candidateToken of candidateTokens) {
         const restored = await selectManagementSession(agentId, candidateToken);
         if (!restored) {
