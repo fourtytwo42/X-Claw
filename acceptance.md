@@ -1,3 +1,28 @@
+# Slice 215 Acceptance Evidence: Solana Trade Status Schema Parity
+
+Date (UTC): 2026-03-05  
+Active slice context: `Slice 215`.
+
+Issue mapping: `#68`
+
+### Objective + Scope Lock
+- Objective:
+  - accept Solana base58 tx signatures in trade status updates,
+  - keep EVM tx hash validation unchanged.
+
+### Behavior Checks
+- [x] `trade-status` schema accepts `txHash=0x...` (EVM) and base58 signature (Solana).
+- [x] API payload validator no longer rejects Solana filled/verifying transition payloads solely on `txHash` format.
+- [x] OpenAPI contract text reflects family-neutral tx id.
+
+### Required Validation Gates
+- [x] `npm run db:parity` -> PASS (`ok: true`)
+- [x] `npm run seed:reset` -> PASS
+- [x] `npm run seed:load` -> PASS
+- [x] `npm run seed:verify` -> PASS
+- [x] `npm run build` -> PASS
+- [x] `pm2 restart all` -> PASS (`xclaw-web online`)
+
 # Slice 214 Acceptance Evidence: Installer Bootstrap Signature Auto-Recovery
 
 Date (UTC): 2026-03-05  

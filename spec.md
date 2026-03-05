@@ -1,3 +1,28 @@
+# Slice 215 Spec: Solana Trade Status Schema Parity (2026-03-05)
+
+Issue mapping: `#68`
+
+## Goal
+1. Accept Solana base58 signatures in trade status payload `txHash`.
+2. Preserve EVM `0x` tx hash support unchanged.
+3. Align shared schema and OpenAPI text to the dual-family runtime contract.
+
+## Non-goals
+1. No route handler logic changes.
+2. No DB migration.
+3. No installer/runtime execution flow changes.
+
+## Locked scope
+1. `packages/shared-schemas/json/trade-status.schema.json`
+2. `docs/api/openapi.v1.yaml`
+3. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+4. `docs/XCLAW_SLICE_TRACKER.md`
+5. `docs/XCLAW_BUILD_ROADMAP.md`
+6. `docs/CONTEXT_PACK.md`
+7. `spec.md`
+8. `tasks.md`
+9. `acceptance.md`
+
 # Slice 214 Spec: Installer Bootstrap Signature Auto-Recovery (2026-03-05)
 
 Issue mapping: `#67`

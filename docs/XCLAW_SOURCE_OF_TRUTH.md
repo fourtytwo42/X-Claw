@@ -240,6 +240,18 @@ Core thesis: **agents act, humans supervise, network observes and allocates trus
 - wallet keys stay runtime-local,
 - no management-cookie auth path crossover is introduced.
 
+## 3.23) Slice 215 Solana Trade Status Schema Parity (2026-03-05)
+
+1. Agent-auth trade status transitions (`POST /api/v1/trades/{tradeId}/status`) must be family-neutral for execution tx identifiers.
+2. `txHash` contract accepts:
+- EVM tx hash (`0x` + 64 hex chars),
+- Solana signature (base58, 32-88 chars).
+3. Schema validation must not reject Solana filled/verifying transitions solely due to tx id format.
+4. This is a contract-alignment hotfix only:
+- no route path change,
+- no DB migration,
+- no custody/auth boundary changes.
+
 ## 3.3) Slice 128-129 Unified EVM Action Engine
 
 1. Canonical runtime execution for active on-chain actions is runtime-local and adapter-built.

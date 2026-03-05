@@ -11,6 +11,12 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 
 ---
 
+## 0.24) Slice 215 Solana Trade Status Schema Parity (Hotfix)
+
+- [x] Expand `trade-status` schema `txHash` pattern to accept EVM hash or Solana signature.
+- [x] Update OpenAPI `TradeStatusTransition.txHash` description to family-neutral tx id language.
+- [x] Sequential validation + PM2 restart completed.
+
 ## 0.23) Slice 214 Installer Bootstrap Signature Auto-Recovery (Hotfix)
 
 - [x] Auto-hydrate existing agent credentials from OpenClaw config before bootstrap challenge path.

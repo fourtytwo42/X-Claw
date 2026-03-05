@@ -17,6 +17,22 @@ Status legend:
 
 ---
 
+## Slice 215: Solana Trade Status Schema Parity (Hotfix)
+Status: [x]
+
+Goal:
+- allow Solana trade status transitions to persist base58 signatures (`txHash`) without schema rejection.
+
+DoD:
+- [x] `trade-status` shared schema accepts EVM tx hash (`0x...`) and Solana signature (base58).
+- [x] OpenAPI `TradeStatusTransition.txHash` docs reflect family-neutral tx id contract.
+- [x] Sequential validation + PM2 restart completed.
+
+Issue mapping:
+- `#68`
+
+---
+
 ## Slice 214: Installer Bootstrap Signature Auto-Recovery (Hotfix)
 Status: [x]
 

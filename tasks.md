@@ -1,3 +1,12 @@
+# Slice 215 Tasks: Solana Trade Status Schema Parity (2026-03-05)
+
+Issue mapping: `#68`
+
+- [x] Reproduce `payload_invalid` on Solana status update and localize failing contract.
+- [x] Update `trade-status` schema `txHash` pattern to accept EVM hash or Solana signature.
+- [x] Update OpenAPI docs for family-neutral `txHash` semantics.
+- [x] Run sequential validations + issue evidence post.
+
 # Slice 214 Tasks: Installer Bootstrap Signature Auto-Recovery (2026-03-05)
 
 Issue mapping: `#67`

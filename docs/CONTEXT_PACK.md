@@ -14,6 +14,28 @@
   - `routeKind`
   - `liquidityOperation`
 
+## Hotfix Context: Slice 215 Solana Trade Status Schema Parity
+
+Issue mapping: `#68`
+
+### Objective + scope lock
+- Objective: fix Solana trade execution status updates failing schema validation due to EVM-only `txHash` pattern.
+- Scope guard:
+  - shared `trade-status` schema + OpenAPI description only,
+  - no route logic changes,
+  - no database changes.
+
+### Expected touched files
+- `packages/shared-schemas/json/trade-status.schema.json`
+- `docs/api/openapi.v1.yaml`
+- `docs/XCLAW_SOURCE_OF_TRUTH.md`
+- `docs/XCLAW_SLICE_TRACKER.md`
+- `docs/XCLAW_BUILD_ROADMAP.md`
+- `docs/CONTEXT_PACK.md`
+- `spec.md`
+- `tasks.md`
+- `acceptance.md`
+
 ## Hotfix Context: Slice 214 Installer Bootstrap Signature Auto-Recovery
 
 Issue mapping: `#67`

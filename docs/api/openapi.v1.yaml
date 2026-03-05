@@ -3257,6 +3257,7 @@ components:
           nullable: true
         txHash:
           type: string
+          description: Execution tx id; EVM uses 0x64-hex hash, Solana uses base58 signature.
         mockReceiptId:
           type: string
         errorMessage:
