@@ -466,10 +466,17 @@ export function resolveTokenLabel(value: string | null | undefined, byAddress: M
   if (!raw) {
     return 'token';
   }
-  if (!raw.startsWith('0x')) {
+  const direct = byAddress.get(normalizeHexAddress(raw));
+  if (direct) {
+    return direct;
+  }
+  // Preserve symbol-like values (e.g. "USDC") and only shorten likely address/mint strings.
+  const isHexAddress = /^0x[a-fA-F0-9]{40}$/.test(raw);
+  const isSolanaMint = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(raw);
+  if (!isHexAddress && !isSolanaMint) {
     return raw;
   }
-  return byAddress.get(normalizeHexAddress(raw)) ?? shortenAddress(raw);
+  return shortenAddress(raw);
 }
 
 export function formatActivityTitle(eventType: string): string {
