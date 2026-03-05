@@ -1,3 +1,31 @@
+# Slice 210 Spec: OpenClaw Patch Anchor Alignment (Backward-Compatible) (2026-03-05)
+
+Issue mapping: `#64`
+
+## Goal
+1. Keep OpenClaw gateway patcher compatible with both legacy and current upstream Telegram send-path anchor forms.
+2. Preserve callback/pagination path compatibility and queued-button patch idempotency.
+3. Add deterministic local drift-check tooling for upstream anchor verification.
+
+## Non-goals
+1. No owner-link or approval behavior redesign.
+2. No API route/schema/database changes.
+3. No runtime wallet/transfer execution changes.
+
+## Locked scope
+1. `.gitignore`
+2. `skills/xclaw-agent/scripts/openclaw_gateway_patch.py`
+3. `skills/xclaw-agent/scripts/check_openclaw_patch_alignment.py`
+4. `apps/agent-runtime/tests/test_openclaw_gateway_patch.py`
+5. `apps/agent-runtime/tests/fixtures/openclaw_patch/*`
+6. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+7. `docs/XCLAW_SLICE_TRACKER.md`
+8. `docs/XCLAW_BUILD_ROADMAP.md`
+9. `docs/CONTEXT_PACK.md`
+10. `spec.md`
+11. `tasks.md`
+12. `acceptance.md`
+
 # Slice 209 Spec: Skill Wallet Chain-Family Validation Parity (2026-03-05)
 
 Issue mapping: `#63`

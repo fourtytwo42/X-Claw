@@ -1,0 +1,12 @@
+export async function sendTelegramText(bot, chatId, text, runtime, opts) {
+	const textMode = opts?.textMode ?? "markdown";
+	const htmlText = textMode === "html" ? text : markdownToTelegramHtml(text);
+	try {
+		return await bot.api.sendMessage(chatId, htmlText, {
+			parse_mode: "HTML",
+			...(opts?.replyMarkup ? { reply_markup: opts.replyMarkup } : {}),
+		});
+	} catch (err) {
+		throw err;
+	}
+}

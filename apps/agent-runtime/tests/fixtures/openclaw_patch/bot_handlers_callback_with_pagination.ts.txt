@@ -1,0 +1,11 @@
+bot.on("callback_query", async (ctx) => {
+	const callback = ctx.callbackQuery;
+	if (!callback) {
+		return;
+	}
+	const data = (callback.data ?? "").trim();
+	const paginationMatch = data.match(/^commands_page_(\d+|noop)(?::(.+))?$/);
+	if (paginationMatch) {
+		return;
+	}
+});

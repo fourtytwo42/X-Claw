@@ -1,0 +1,6 @@
+function buildPayload(opts) {
+	const replyMarkup = buildInlineKeyboard(opts.buttons);
+	return {
+		replyMarkup,
+	};
+}

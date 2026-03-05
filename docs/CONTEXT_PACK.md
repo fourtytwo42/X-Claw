@@ -36,6 +36,28 @@ Issue mapping: `#63`
 - `tasks.md`
 - `acceptance.md`
 
+## Hotfix Context: Slice 210 OpenClaw Patch Anchor Alignment (Backward-Compatible)
+
+Issue mapping: `#64`
+
+### Objective + scope lock
+- Objective: align OpenClaw gateway patch anchor matching to current upstream Telegram send path while preserving compatibility for older OpenClaw builds.
+- Scope guard: gateway patcher + regression tests/fixtures + drift-check utility + canonical/process docs only.
+
+### Expected touched files
+- `.gitignore`
+- `skills/xclaw-agent/scripts/openclaw_gateway_patch.py`
+- `skills/xclaw-agent/scripts/check_openclaw_patch_alignment.py`
+- `apps/agent-runtime/tests/test_openclaw_gateway_patch.py`
+- `apps/agent-runtime/tests/fixtures/openclaw_patch/*`
+- `docs/XCLAW_SOURCE_OF_TRUTH.md`
+- `docs/XCLAW_SLICE_TRACKER.md`
+- `docs/XCLAW_BUILD_ROADMAP.md`
+- `docs/CONTEXT_PACK.md`
+- `spec.md`
+- `tasks.md`
+- `acceptance.md`
+
 ## Hotfix Context: Capability-Gated Telegram Patch + Management-Link Fallback
 
 Issue mapping: `#35` (approvals/install reliability track)

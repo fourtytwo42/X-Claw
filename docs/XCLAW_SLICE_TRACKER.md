@@ -17,6 +17,23 @@ Status legend:
 
 ---
 
+## Slice 210: OpenClaw Patch Anchor Alignment (Backward-Compatible Hotfix)
+Status: [~]
+
+Goal:
+- keep X-Claw OpenClaw gateway patching compatible across older and newer OpenClaw Telegram bundle layouts while preserving existing callback/approval behavior.
+
+DoD:
+- [~] queued-buttons patch supports legacy `sendTelegramText` anchor and current upstream anchor.
+- [~] regex fallback anchor matching exists for minor formatting drift.
+- [~] callback/pagination detection remains compatible with current and legacy `bot-handlers` layout.
+- [~] patcher regression tests cover old/new/regex/no-anchor/idempotency scenarios.
+- [~] drift-check utility validates required upstream anchors from local OpenClaw checkout.
+- [~] canonical docs/process artifacts synced with backward-compat contract.
+- [ ] full sequential validation + issue evidence posted.
+
+---
+
 ## Slice 209: Skill Wallet Chain-Family Validation Parity (Hotfix)
 Status: [x]
 

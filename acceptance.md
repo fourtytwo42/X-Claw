@@ -1,3 +1,41 @@
+# Slice 210 Acceptance Evidence: OpenClaw Patch Anchor Alignment (Backward-Compatible)
+
+Date (UTC): 2026-03-05  
+Active slice context: `Slice 210`.
+
+Issue mapping: `#64`
+
+### Objective + Scope Lock
+- Objective:
+  - keep OpenClaw gateway patch compatibility across old and current upstream Telegram send-path anchors,
+  - preserve callback/pagination detection and idempotent patch behavior.
+
+### Behavior Checks
+- [x] old `sendTelegramText` anchor patches successfully.
+- [x] new upstream `sendTelegramText` anchor patches successfully.
+- [x] regex-compatible `htmlText` assignment variant patches successfully.
+- [x] missing-anchor case returns deterministic `queued_buttons_v2_anchor_not_found`.
+- [x] second patch pass does not duplicate queued-buttons v4 injection.
+- [x] callback/pagination loader detection remains valid.
+
+### Required Validation Gates
+- [x] `npm run db:parity` -> PASS (`ok: true`)
+- [x] `npm run seed:reset` -> PASS
+- [x] `npm run seed:load` -> PASS
+- [x] `npm run seed:verify` -> PASS
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_openclaw_gateway_patch.py -v` -> PASS (`Ran 6 tests`, `OK`)
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_x402_skill_wrapper.py -v` -> PASS (`Ran 69 tests`, `OK`)
+- [x] `python3 skills/xclaw-agent/scripts/check_openclaw_patch_alignment.py --openclaw-root Research/openclaw` -> PASS (`ok: true`)
+- [x] `npm run build` -> PASS
+- [x] `pm2 restart all` -> PASS (`xclaw-web online`)
+
+### Required Grep Proofs
+- [x] no direct `/api/v1/management/*` calls introduced in skill/runtime wallet + patch paths.
+  - `rg -n "/api/v1/management/" skills/xclaw-agent/scripts/openclaw_gateway_patch.py skills/xclaw-agent/scripts/xclaw_agent_skill.py apps/agent-runtime/xclaw_agent/cli.py` -> `no_management_route_matches`
+- [x] patcher contains old/new/regex anchor support in `_patch_queued_buttons_v2`.
+  - `skills/xclaw-agent/scripts/openclaw_gateway_patch.py` includes legacy anchor, new upstream anchor, and regex fallback for `const htmlText = ... ? text : markdownToTelegramHtml(text);`.
+- [ ] issue evidence comment posted to `#64`.
+
 # Slice 209 Acceptance Evidence: Skill Wallet Chain-Family Validation Parity
 
 Date (UTC): 2026-03-05  

@@ -65,7 +65,7 @@ QUEUED_BUTTONS_MARKER_V3 = "xclaw: telegram queued approval buttons v3"
 QUEUED_BUTTONS_MARKER_V4 = "xclaw: telegram queued approval buttons v4"
 LEGACY_DM_SENTINEL = 'Allow in DMs even when inlineButtonsScope is "allowlist", gated by chatId == senderId.'
 # Bump when patch semantics change so we invalidate the cached "already patched" fast-path.
-STATE_SCHEMA_VERSION = 62
+STATE_SCHEMA_VERSION = 63
 STATE_DIR = Path.home() / ".openclaw" / "xclaw"
 STATE_FILE = STATE_DIR / "openclaw_patch_state.json"
 LOCK_FILE = STATE_DIR / "openclaw_patch.lock"
@@ -1226,8 +1226,19 @@ def _patch_queued_buttons_v2(raw: str) -> tuple[str, bool, str | None]:
     Patch the Telegram *runtime* send path used by agent replies (`sendTelegramText(bot, ...)`),
     not the CLI send path (`sendMessageTelegram(...)`).
     """
-    anchor = 'const htmlText = (opts?.textMode ?? "markdown") === "html" ? text : markdownToTelegramHtml(text);'
-    if anchor not in raw:
+    anchor_candidates = [
+        'const htmlText = (opts?.textMode ?? "markdown") === "html" ? text : markdownToTelegramHtml(text);',
+        'const htmlText = textMode === "html" ? text : markdownToTelegramHtml(text);',
+    ]
+    anchor: str | None = next((candidate for candidate in anchor_candidates if candidate in raw), None)
+    if anchor is None:
+        anchor_match = re.search(
+            r'const htmlText\s*=\s*[^;]*\?\s*text\s*:\s*markdownToTelegramHtml\(text\);',
+            raw,
+        )
+        if anchor_match:
+            anchor = anchor_match.group(0)
+    if anchor is None:
         return raw, False, "queued_buttons_v2_anchor_not_found"
 
     # v3 is our current canonical behavior. If a v3 block exists but doesn't support policy approvals,

@@ -59,6 +59,9 @@ yarn-error.log*
 **/faucet-private-key*.meta.txt
 **/*private-key*.backup*
 
+# local research worktrees
+/Research/
+
 # vercel
 .vercel
 

@@ -1,3 +1,16 @@
+# Slice 210 Tasks: OpenClaw Patch Anchor Alignment (Backward-Compatible) (2026-03-05)
+
+Issue mapping: `#64`
+
+- [x] Keep `/Research/` ignored in repo-local gitignore for local upstream checkout work.
+- [x] Add/retain multi-anchor support in `_patch_queued_buttons_v2` (old anchor + new anchor + regex fallback).
+- [x] Preserve deterministic missing-anchor error contract (`queued_buttons_v2_anchor_not_found`).
+- [x] Add patcher regression fixtures for delivery send anchors and callback/pagination shape.
+- [x] Add patcher unittest module for old/new/regex/no-anchor/idempotency/bundle-detection scenarios.
+- [x] Add local drift-check utility script for OpenClaw anchor verification.
+- [x] Sync canonical docs/context/handoff artifacts for slice 210.
+- [ ] Run sequential validations + grep proof + issue evidence comment.
+
 # Slice 209 Tasks: Skill Wallet Chain-Family Validation Parity (2026-03-05)
 
 Issue mapping: `#63`

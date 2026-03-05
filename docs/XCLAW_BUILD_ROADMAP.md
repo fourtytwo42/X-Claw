@@ -11,6 +11,15 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 
 ---
 
+## 0.19) Slice 210 OpenClaw Patch Anchor Alignment (Backward-Compatible Hotfix)
+
+- [~] Keep queued-buttons patch anchor compatibility for old and current `sendTelegramText` forms.
+- [~] Add regex fallback matching for `htmlText` assignment drift.
+- [~] Add regression tests for old/new/regex/no-anchor/idempotency patch scenarios.
+- [~] Add operator drift-check utility for local OpenClaw checkout anchor verification.
+- [~] Sync canonical docs/context/handoff artifacts with backward-compat contract.
+- [ ] Sequential validation + PM2 restart + issue evidence capture.
+
 ## 0.18) Slice 209 Skill Wallet Chain-Family Validation Parity (Hotfix)
 
 - [~] Update skill wrapper wallet validators to dispatch by chain family (`evm|solana`) for recipient and token identifiers.

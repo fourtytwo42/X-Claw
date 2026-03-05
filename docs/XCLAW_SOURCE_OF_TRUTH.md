@@ -163,6 +163,23 @@ Core thesis: **agents act, humans supervise, network observes and allocates trus
 - skill/runtime wallet paths must not call management-cookie routes directly.
 5. Owner-link normalization behavior for transfer `approval_pending` remains unchanged in this hotfix.
 
+## 3.18) Slice 210 OpenClaw Patch Anchor Alignment (Backward-Compatible Hotfix)
+
+1. OpenClaw gateway patching must remain backward-compatible across known Telegram send-path forms:
+- legacy `sendTelegramText` html anchor (`(opts?.textMode ?? "markdown") === "html"`),
+- current upstream html anchor (`textMode === "html"`),
+- and regex-compatible formatting variants.
+2. Patcher compatibility is mandatory for both:
+- callback interception path (`bot.on("callback_query"...`) with pagination anchor detection,
+- queued approval button attach path in Telegram send flow.
+3. Deterministic failure contract remains:
+- if no supported send-path anchor is found, return `queued_buttons_v2_anchor_not_found` without partial mutation.
+4. Patcher behavior must remain idempotent:
+- repeated patch runs must not duplicate queued-buttons injection blocks.
+5. Operator drift checks are local tooling only:
+- may validate anchors against a local OpenClaw checkout,
+- must not introduce runtime coupling between X-Claw and OpenClaw source trees.
+
 ## 3.3) Slice 128-129 Unified EVM Action Engine
 
 1. Canonical runtime execution for active on-chain actions is runtime-local and adapter-built.
