@@ -1,3 +1,40 @@
+# Slice 213 Acceptance Evidence: Solana Jupiter Endpoint Resilience
+
+Date (UTC): 2026-03-05  
+Active slice context: `Slice 213`.
+
+Issue mapping: `#66`
+
+### Objective + Scope Lock
+- Objective:
+  - remove single-host Jupiter dependency that can fail on DNS/transport (`quote-api.jup.ag`),
+  - prefer resilient default endpoint candidate(s),
+  - keep quote/swap endpoint selection consistent.
+
+### Behavior Checks
+- [x] runtime default endpoint candidates prefer `https://lite-api.jup.ag/swap/v1`.
+- [x] runtime keeps `https://quote-api.jup.ag/v6` as fallback candidate.
+- [x] swap execution path prefers quote-selected endpoint before fallback candidates.
+- [x] env override contract remains supported (`XCLAW_JUPITER_BASE_URLS[_<CHAIN>]`).
+- [x] no slippage/amount mutation behavior introduced.
+
+### Root-cause Reproduction Evidence
+- [x] host-level DNS/transport check confirms `quote-api` unreachable while `lite-api` reachable:
+  - `curl -sS -m 10 https://quote-api.jup.ag/v6/quote?...` -> `Could not resolve host: quote-api.jup.ag`
+  - `curl -sS -m 10 https://lite-api.jup.ag/swap/v1/quote?...` -> valid quote payload
+- [x] post-fix runtime quote probe succeeds with default endpoint selection:
+  - `python3 - <<'PY' ... jupiter_quote(...) ... PY` -> endpoint `https://lite-api.jup.ag/swap/v1`
+
+### Required Validation Gates
+- [x] `npm run db:parity` -> PASS (`ok: true`)
+- [x] `npm run seed:reset` -> PASS
+- [x] `npm run seed:load` -> PASS
+- [x] `npm run seed:verify` -> PASS
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_solana_runtime.py -v` -> PASS (`Ran 5 tests`, `OK`)
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS (`Ran 143 tests`, `OK`)
+- [x] `npm run build` -> PASS
+- [x] `pm2 restart all` -> PASS (`xclaw-web online`)
+
 # Slice 212 Acceptance Evidence: Telegram Tap UX + Solana Swap Reliability + Solana Amount Normalization
 
 Date (UTC): 2026-03-05  

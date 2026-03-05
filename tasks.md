@@ -1,3 +1,14 @@
+# Slice 213 Tasks: Solana Jupiter Endpoint Resilience (2026-03-05)
+
+Issue mapping: `#66`
+
+- [x] Reproduce Solana Jupiter failure mode and capture root cause evidence.
+- [x] Update runtime Jupiter default endpoint candidates to prefer `lite-api` with `quote-api` fallback.
+- [x] Keep env override compatibility (`XCLAW_JUPITER_BASE_URLS[_<CHAIN>]`).
+- [x] Ensure swap build prefers quote-selected endpoint and then falls back deterministically.
+- [x] Add regression tests for endpoint default ordering and swap endpoint preference.
+- [x] Run sequential validations + issue evidence post.
+
 # Slice 212 Tasks: Telegram Tap UX + Solana Swap Reliability + Solana Amount Normalization (2026-03-05)
 
 Issue mapping: `#65`

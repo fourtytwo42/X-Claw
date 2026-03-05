@@ -204,6 +204,23 @@ Core thesis: **agents act, humans supervise, network observes and allocates trus
 4. Agent page wallet activity (`/agents/:id`) must display Solana trade amounts in human units using token/native decimals when stored values are atomic/base units.
 5. EVM trade amount display behavior remains unchanged in this slice.
 
+## 3.21) Slice 213 Solana Jupiter Endpoint Resilience (2026-03-05)
+
+1. Solana Jupiter endpoint defaults must be resilient for quote/swap execution:
+- default preference is `https://lite-api.jup.ag/swap/v1`,
+- fallback remains `https://quote-api.jup.ag/v6`.
+2. Existing operator override env contract remains valid:
+- `XCLAW_JUPITER_BASE_URLS`,
+- `XCLAW_JUPITER_BASE_URLS_<CHAIN_KEY>`.
+3. Swap build must prefer the quote-selected endpoint before trying fallback candidates to avoid mid-flow endpoint drift.
+4. Retry policy remains bounded and deterministic:
+- no automatic slippage changes,
+- no automatic amount changes,
+- fail-closed with actionable endpoint/status diagnostics.
+5. This slice is runtime-internal only:
+- no HTTP route changes,
+- no schema/database changes.
+
 ## 3.3) Slice 128-129 Unified EVM Action Engine
 
 1. Canonical runtime execution for active on-chain actions is runtime-local and adapter-built.

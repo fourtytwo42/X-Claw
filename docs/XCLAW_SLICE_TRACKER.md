@@ -17,6 +17,24 @@ Status legend:
 
 ---
 
+## Slice 213: Solana Jupiter Endpoint Resilience (Hotfix)
+Status: [x]
+
+Goal:
+- fix Solana swap reliability on hosts where `quote-api.jup.ag` is intermittently unreachable by using resilient endpoint defaults and quote/swap endpoint consistency.
+
+DoD:
+- [x] Runtime Jupiter defaults prefer `lite-api.jup.ag` and retain `quote-api.jup.ag` fallback.
+- [x] Swap build uses quote-selected endpoint preference before fallback candidates.
+- [x] Existing env override contract remains supported (`XCLAW_JUPITER_BASE_URLS[_<CHAIN>]`).
+- [x] Regression tests cover default endpoint ordering and swap endpoint preference.
+- [x] Sequential validation + PM2 restart completed.
+
+Issue mapping:
+- `#66`
+
+---
+
 ## Slice 212: Telegram Instant-Clear + Solana Swap Retry + Solana Amount Normalization (Hotfix)
 Status: [x]
 

@@ -11,6 +11,14 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 
 ---
 
+## 0.22) Slice 213 Solana Jupiter Endpoint Resilience (Hotfix)
+
+- [x] Update Jupiter default endpoint candidates to prefer `https://lite-api.jup.ag/swap/v1` with `quote-api` fallback.
+- [x] Keep env override support for `XCLAW_JUPITER_BASE_URLS[_<CHAIN>]`.
+- [x] Ensure swap build path prefers the endpoint that succeeded during quote before trying fallback candidates.
+- [x] Add runtime tests for default endpoint order and swap endpoint preference.
+- [x] Sequential validation + PM2 restart completed.
+
 ## 0.21) Slice 212 Telegram Instant-Clear + Solana Swap Retry + Solana Amount Normalization (Hotfix)
 
 - [x] Update OpenClaw callback patch to clear inline buttons immediately on approval taps while preserving no-delete contract.

@@ -58,6 +58,7 @@ class SolanaQuote:
     amount_out_units: str
     route_kind: str
     quote_payload: dict[str, Any]
+    quote_endpoint: str | None = None
 
 
 def _require_solana_dependencies() -> None:
@@ -312,11 +313,21 @@ def send_spl_transfer(rpc_url: str, private_key_bytes: bytes, to_address: str, m
     }
 
 
-def _jupiter_base_url(chain_key: str) -> str:
+def _jupiter_default_base_urls(chain_key: str) -> list[str]:
     normalized = str(chain_key or "").strip().lower()
     if normalized == "solana_mainnet_beta":
-        return "https://quote-api.jup.ag/v6"
-    return "https://quote-api.jup.ag/v6"
+        return [
+            "https://lite-api.jup.ag/swap/v1",
+            "https://quote-api.jup.ag/v6",
+        ]
+    return [
+        "https://lite-api.jup.ag/swap/v1",
+        "https://quote-api.jup.ag/v6",
+    ]
+
+
+def _jupiter_base_url(chain_key: str) -> str:
+    return _jupiter_default_base_urls(chain_key)[0]
 
 
 def _jupiter_base_urls(chain_key: str) -> list[str]:
@@ -328,14 +339,15 @@ def _jupiter_base_urls(chain_key: str) -> list[str]:
             candidate = str(item or "").strip().rstrip("/")
             if candidate:
                 candidates.append(candidate)
-    default_url = _jupiter_base_url(chain_key).rstrip("/")
-    if default_url not in candidates:
-        candidates.insert(0, default_url)
+    for default_url in _jupiter_default_base_urls(chain_key):
+        normalized_default = default_url.rstrip("/")
+        if normalized_default and normalized_default not in candidates:
+            candidates.append(normalized_default)
     deduped: list[str] = []
     for item in candidates:
         if item not in deduped:
             deduped.append(item)
-    return deduped or [default_url]
+    return deduped or _jupiter_default_base_urls(chain_key)
 
 
 def _jupiter_quote_retry_attempts() -> int:
@@ -467,15 +479,31 @@ def jupiter_quote(
     route_plan = payload.get("routePlan")
     if isinstance(route_plan, list) and len(route_plan) > 1:
         route_kind = "multi_hop"
-    return SolanaQuote(amount_out_units=out_amount, route_kind=route_kind, quote_payload=payload)
+    return SolanaQuote(amount_out_units=out_amount, route_kind=route_kind, quote_payload=payload, quote_endpoint=last_endpoint or None)
 
 
-def jupiter_execute_swap(*, chain_key: str, rpc_url: str, private_key_bytes: bytes, quote_payload: dict[str, Any], user_address: str) -> dict[str, Any]:
+def jupiter_execute_swap(
+    *,
+    chain_key: str,
+    rpc_url: str,
+    private_key_bytes: bytes,
+    quote_payload: dict[str, Any],
+    user_address: str,
+    quote_endpoint: str | None = None,
+) -> dict[str, Any]:
     _require_solana_dependencies()
     if not is_solana_address(user_address):
         raise SolanaRuntimeError("invalid_input", "userAddress must be a valid Solana address.")
 
-    base_url = _jupiter_base_url(chain_key)
+    endpoints: list[str] = []
+    preferred = str(quote_endpoint or "").strip().rstrip("/")
+    if preferred:
+        endpoints.append(preferred)
+    for candidate in _jupiter_base_urls(chain_key):
+        if candidate not in endpoints:
+            endpoints.append(candidate)
+    max_attempts = _jupiter_quote_retry_attempts()
+    backoff_ms = _jupiter_quote_backoff_ms()
     request_payload = {
         "quoteResponse": quote_payload,
         "userPublicKey": user_address,
@@ -483,17 +511,78 @@ def jupiter_execute_swap(*, chain_key: str, rpc_url: str, private_key_bytes: byt
         "dynamicComputeUnitLimit": True,
         "prioritizationFeeLamports": "auto",
     }
-    req = urllib.request.Request(
-        f"{base_url}/swap",
-        method="POST",
-        headers={"content-type": "application/json", "accept": "application/json"},
-        data=json.dumps(request_payload).encode("utf-8"),
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=25) as resp:
-            payload = json.loads(resp.read().decode("utf-8"))
-    except Exception as exc:
-        raise SolanaRuntimeError("rpc_unavailable", "Jupiter swap build request failed.", {"error": str(exc)}) from exc
+    attempts_made = 0
+    last_endpoint = ""
+    last_status: int | None = None
+    last_error = ""
+    timeout_observed = False
+    payload: dict[str, Any] | None = None
+    for endpoint_index, endpoint in enumerate(endpoints):
+        for endpoint_attempt in range(1, max_attempts + 1):
+            attempts_made += 1
+            last_endpoint = endpoint
+            req = urllib.request.Request(
+                f"{endpoint}/swap",
+                method="POST",
+                headers={"content-type": "application/json", "accept": "application/json"},
+                data=json.dumps(request_payload).encode("utf-8"),
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=25) as resp:
+                    payload = json.loads(resp.read().decode("utf-8"))
+                break
+            except urllib.error.HTTPError as exc:
+                status = int(getattr(exc, "code", 0) or 0)
+                last_status = status
+                body = ""
+                try:
+                    body = exc.read().decode("utf-8", errors="replace").strip()
+                except Exception:
+                    body = ""
+                last_error = body or str(exc)
+                if not _is_retryable_jupiter_http_status(status):
+                    raise SolanaRuntimeError(
+                        "rpc_unavailable",
+                        "Jupiter swap build request failed.",
+                        {
+                            "attempts": attempts_made,
+                            "endpoint": last_endpoint,
+                            "status": status,
+                            "error": last_error[:300],
+                            "retryable": False,
+                        },
+                    ) from exc
+                is_last_attempt = endpoint_attempt >= max_attempts and endpoint_index >= (len(endpoints) - 1)
+                if is_last_attempt:
+                    break
+                time.sleep((backoff_ms * endpoint_attempt) / 1000.0)
+            except Exception as exc:
+                timeout_observed = timeout_observed or isinstance(exc, TimeoutError)
+                if isinstance(exc, urllib.error.URLError):
+                    reason = getattr(exc, "reason", None)
+                    timeout_observed = timeout_observed or isinstance(reason, TimeoutError)
+                last_status = None
+                last_error = str(exc)
+                is_last_attempt = endpoint_attempt >= max_attempts and endpoint_index >= (len(endpoints) - 1)
+                if is_last_attempt:
+                    break
+                time.sleep((backoff_ms * endpoint_attempt) / 1000.0)
+        if payload is not None:
+            break
+    if payload is None:
+        raise SolanaRuntimeError(
+            "rpc_unavailable",
+            "Jupiter swap build request failed after retries.",
+            {
+                "attempts": attempts_made,
+                "retryExhausted": True,
+                "endpointsTried": endpoints,
+                "lastEndpoint": last_endpoint or None,
+                "lastStatus": last_status,
+                "lastError": last_error[:300] if last_error else None,
+                "timeoutObserved": timeout_observed,
+            },
+        )
 
     swap_tx_b64 = str(payload.get("swapTransaction") or "").strip()
     if not swap_tx_b64:
@@ -509,6 +598,7 @@ def jupiter_execute_swap(*, chain_key: str, rpc_url: str, private_key_bytes: byt
     signature = _send_raw_tx(rpc_url, bytes(signed))
     return {
         "signature": signature,
+        "endpointUsed": last_endpoint or None,
         "swapTransactionSize": len(bytes(signed)),
         "prioritizationFeeLamports": payload.get("prioritizationFeeLamports"),
         "computeUnitLimit": payload.get("computeUnitLimit"),

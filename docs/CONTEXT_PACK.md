@@ -14,6 +14,29 @@
   - `routeKind`
   - `liquidityOperation`
 
+## Hotfix Context: Slice 213 Solana Jupiter Endpoint Resilience
+
+Issue mapping: `#66`
+
+### Objective + scope lock
+- Objective: fix Solana swap failures on hosts where `quote-api.jup.ag` DNS/transport is unreliable by preferring resilient Jupiter defaults and keeping quote/swap endpoint selection consistent.
+- Scope guard:
+  - runtime Jupiter endpoint selection and retry behavior only,
+  - no API/schema/database changes,
+  - no slippage/amount mutation behavior changes.
+
+### Expected touched files
+- `apps/agent-runtime/xclaw_agent/solana_runtime.py`
+- `apps/agent-runtime/xclaw_agent/cli.py`
+- `apps/agent-runtime/tests/test_solana_runtime.py`
+- `docs/XCLAW_SOURCE_OF_TRUTH.md`
+- `docs/XCLAW_SLICE_TRACKER.md`
+- `docs/XCLAW_BUILD_ROADMAP.md`
+- `docs/CONTEXT_PACK.md`
+- `spec.md`
+- `tasks.md`
+- `acceptance.md`
+
 ## Hotfix Context: Slice 212 Telegram Instant-Clear + Solana Swap Retry + Solana Amount Normalization
 
 Issue mapping: `#65`

@@ -1,3 +1,29 @@
+# Slice 213 Spec: Solana Jupiter Endpoint Resilience (2026-03-05)
+
+Issue mapping: `#66`
+
+## Goal
+1. Eliminate Solana swap failures caused by runtime dependence on a single Jupiter hostname (`quote-api.jup.ag`).
+2. Keep quote and swap build paths endpoint-consistent to avoid mid-flow host drift.
+3. Preserve backward compatibility for existing env overrides.
+
+## Non-goals
+1. No slippage or amount auto-adjustments.
+2. No API/schema/database changes.
+3. No Telegram/web approval UX behavior changes.
+
+## Locked scope
+1. `apps/agent-runtime/xclaw_agent/solana_runtime.py`
+2. `apps/agent-runtime/xclaw_agent/cli.py`
+3. `apps/agent-runtime/tests/test_solana_runtime.py`
+4. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+5. `docs/XCLAW_SLICE_TRACKER.md`
+6. `docs/XCLAW_BUILD_ROADMAP.md`
+7. `docs/CONTEXT_PACK.md`
+8. `spec.md`
+9. `tasks.md`
+10. `acceptance.md`
+
 # Slice 212 Spec: Telegram Tap UX + Solana Swap Reliability + Solana Amount Normalization (2026-03-05)
 
 Issue mapping: `#65`

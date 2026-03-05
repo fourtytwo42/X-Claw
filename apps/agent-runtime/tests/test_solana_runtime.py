@@ -28,6 +28,12 @@ class _FakeResponse:
 
 
 class SolanaRuntimeTests(unittest.TestCase):
+    def test_jupiter_base_urls_prefers_lite_api_by_default(self) -> None:
+        urls = solana_runtime._jupiter_base_urls("solana_mainnet_beta")
+        self.assertGreaterEqual(len(urls), 2)
+        self.assertEqual(urls[0], "https://lite-api.jup.ag/swap/v1")
+        self.assertIn("https://quote-api.jup.ag/v6", urls)
+
     def test_jupiter_quote_retries_transport_error_then_succeeds(self) -> None:
         def _urlopen_side_effect(req, timeout=0):  # type: ignore[no-untyped-def]
             if _urlopen_side_effect.calls == 0:
@@ -104,8 +110,40 @@ class SolanaRuntimeTests(unittest.TestCase):
 
         self.assertEqual(ctx.exception.code, "rpc_unavailable")
         self.assertEqual(ctx.exception.details.get("retryExhausted"), True)
-        self.assertEqual(ctx.exception.details.get("attempts"), 3)
+        self.assertGreaterEqual(int(ctx.exception.details.get("attempts") or 0), 3)
         self.assertEqual(ctx.exception.details.get("lastStatus"), 503)
+
+    def test_jupiter_swap_prefers_quote_endpoint_before_default_candidates(self) -> None:
+        called_urls: list[str] = []
+
+        def _urlopen_side_effect(req, timeout=0):  # type: ignore[no-untyped-def]
+            called_urls.append(str(getattr(req, "full_url", "")))
+            raise urllib.error.URLError("dns failure")
+
+        with mock.patch.object(solana_runtime, "_require_solana_dependencies"), mock.patch.object(
+            solana_runtime, "is_solana_address", return_value=True
+        ), mock.patch.dict(
+            solana_runtime.os.environ, {"XCLAW_JUPITER_QUOTE_MAX_ATTEMPTS": "1"}, clear=False
+        ), mock.patch.object(
+            solana_runtime.time, "sleep"
+        ), mock.patch(
+            "urllib.request.urlopen", side_effect=_urlopen_side_effect
+        ):
+            with self.assertRaises(solana_runtime.SolanaRuntimeError) as ctx:
+                solana_runtime.jupiter_execute_swap(
+                    chain_key="solana_mainnet_beta",
+                    rpc_url="http://localhost:8899",
+                    private_key_bytes=b"\x00" * 64,
+                    quote_payload={"routePlan": []},
+                    user_address="ChcB9rcv6pFjFduThDckf6KN8eQdQAqUCHiSXSFFKSdA",
+                    quote_endpoint="https://alt-api.jup.ag/swap/v1",
+                )
+
+        self.assertEqual(ctx.exception.code, "rpc_unavailable")
+        self.assertEqual(ctx.exception.details.get("retryExhausted"), True)
+        self.assertTrue(called_urls)
+        self.assertTrue(called_urls[0].startswith("https://alt-api.jup.ag/swap/v1/swap"))
+        self.assertTrue(any(url.startswith("https://lite-api.jup.ag/swap/v1/swap") for url in called_urls))
 
 
 if __name__ == "__main__":

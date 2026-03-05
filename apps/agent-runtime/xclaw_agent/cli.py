@@ -10074,6 +10074,7 @@ def _execute_solana_trade(
         private_key_bytes=private_key_bytes,
         quote_payload=quote.quote_payload,
         user_address=wallet_address,
+        quote_endpoint=quote.quote_endpoint,
     )
     signature = str(tx.get("signature") or "")
     provider_meta = _build_provider_meta("router_adapter", "router_adapter", False, None, quote.route_kind)
@@ -12860,6 +12861,7 @@ def _execute_limit_order_real_solana(order: dict[str, Any], chain: str) -> str:
                 private_key_bytes=private_key_bytes,
                 quote_payload=quote.quote_payload,
                 user_address=wallet_address,
+                quote_endpoint=quote.quote_endpoint,
             )
             signature = str(tx.get("signature") or "").strip()
         if not signature:
