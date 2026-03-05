@@ -1122,6 +1122,7 @@ export default function AgentPublicProfilePage() {
     [policyAllowedTokens]
   );
   const hasAutoApprovalsEnabled = policyApprovalMode === 'auto' || policyAllowedTokenSet.size > 0;
+  const chainSpendEnabled = management.phase === 'ready' ? management.data.chainPolicy.chainEnabled : true;
 
   function buildPolicyUpdatePayload(next: { approvalMode?: 'per_trade' | 'auto'; allowedTokens?: string[] }) {
     return {
@@ -2240,12 +2241,15 @@ export default function AgentPublicProfilePage() {
                 <div className={styles.accountMetaChips}>
                   <span className={styles.walletChip}>Chain: {activeChainLabel}</span>
                   <span className={styles.walletChip}>Wallet: {activeWallet ? shortenAddress(activeWallet.address) : '—'}</span>
+                  {management.phase === 'ready' ? (
+                    <span className={styles.walletChip}>Chain Spend: {chainSpendEnabled ? 'enabled' : 'disabled'}</span>
+                  ) : null}
                 </div>
               </div>
             </div>
             {isOwner ? (
               <div className={styles.headerApprovalControl}>
-                <span className={styles.globalApprovalLabel}>Approve trades</span>
+                <span className={styles.globalApprovalLabel}>Auto-approve trades</span>
                 <label className={styles.iosToggle} title="When on, this agent can trade without asking every time.">
                   <input
                     type="checkbox"
@@ -2264,6 +2268,9 @@ export default function AgentPublicProfilePage() {
                   />
                   <span className={styles.iosSlider} />
                 </label>
+                <span className={styles.muted}>
+                  Off means trades queue for approve/deny. If chain spend is disabled, trades are hard-blocked before approval queue.
+                </span>
               </div>
             ) : null}
 

@@ -141,6 +141,65 @@ class SetupAgentSkillTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 module.ensure_approvals_run_loop_service("base_sepolia", runtime_bin="/usr/bin/xclaw-agent", require_healthy=True)
 
+    def test_ensure_default_policy_file_hydrates_missing_solana_chains(self) -> None:
+        module = _load_setup_module()
+        with tempfile.TemporaryDirectory() as tmp:
+            tmpdir = pathlib.Path(tmp)
+            app_dir = tmpdir / ".xclaw-agent"
+            policy_path = app_dir / "policy.json"
+            app_dir.mkdir(parents=True, exist_ok=True)
+            policy_path.write_text(
+                json.dumps(
+                    {
+                        "paused": False,
+                        "chains": {"base_sepolia": {"chain_enabled": True}},
+                        "spend": {"approval_required": False, "approval_granted": True, "max_daily_native_wei": "1"},
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with mock.patch.object(module, "APP_DIR", app_dir), mock.patch.object(module, "POLICY_FILE", policy_path):
+                module.ensure_default_policy_file("base_sepolia")
+
+            payload = json.loads(policy_path.read_text(encoding="utf-8"))
+            chains = payload.get("chains", {})
+            self.assertTrue(bool(chains["base_sepolia"]["chain_enabled"]))
+            self.assertTrue(bool(chains["solana_mainnet_beta"]["chain_enabled"]))
+            self.assertTrue(bool(chains["solana_testnet"]["chain_enabled"]))
+            self.assertTrue(bool(chains["solana_devnet"]["chain_enabled"]))
+            self.assertTrue(bool(chains["solana_localnet"]["chain_enabled"]))
+
+    def test_ensure_default_policy_file_keeps_existing_chain_disabled_flags(self) -> None:
+        module = _load_setup_module()
+        with tempfile.TemporaryDirectory() as tmp:
+            tmpdir = pathlib.Path(tmp)
+            app_dir = tmpdir / ".xclaw-agent"
+            policy_path = app_dir / "policy.json"
+            app_dir.mkdir(parents=True, exist_ok=True)
+            policy_path.write_text(
+                json.dumps(
+                    {
+                        "paused": False,
+                        "chains": {
+                            "base_sepolia": {"chain_enabled": True},
+                            "solana_mainnet_beta": {"chain_enabled": False},
+                        },
+                        "spend": {"approval_required": True, "approval_granted": False, "max_daily_native_wei": "2"},
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with mock.patch.object(module, "APP_DIR", app_dir), mock.patch.object(module, "POLICY_FILE", policy_path):
+                module.ensure_default_policy_file("base_sepolia")
+
+            payload = json.loads(policy_path.read_text(encoding="utf-8"))
+            self.assertFalse(bool(payload["chains"]["solana_mainnet_beta"]["chain_enabled"]))
+            self.assertTrue(bool(payload["spend"]["approval_required"]))
+            self.assertFalse(bool(payload["spend"]["approval_granted"]))
+            self.assertEqual(str(payload["spend"]["max_daily_native_wei"]), "2")
+
 
 if __name__ == "__main__":
     unittest.main()

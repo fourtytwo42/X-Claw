@@ -394,37 +394,62 @@ def _probe_run_loop_health(default_chain: str, runtime_bin: str, env_values: dic
 
 
 def ensure_default_policy_file(default_chain: str) -> None:
-    """Create a safe default local policy file when missing.
+    """Create or hydrate a safe local policy file.
 
     Policy is required for spend actions (spot swap, transfers) and is enforced by xclaw-agent runtime.
     """
     APP_DIR.mkdir(parents=True, exist_ok=True)
     _chmod_if_posix(APP_DIR, 0o700)
 
+    payload: dict[str, Any]
     if POLICY_FILE.exists():
-        # Do not mutate an existing policy; owners may have tightened it.
-        return
+        try:
+            raw = json.loads(POLICY_FILE.read_text(encoding="utf-8") or "{}")
+        except Exception:
+            raw = {}
+        payload = raw if isinstance(raw, dict) else {}
+    else:
+        payload = {}
 
     # NOTE: Slice 06 policy caps are temporarily native-denominated. In practice, this cap is used
     # as a coarse safety brake for any spend-like action until USD-cap pipeline slices land.
     #
     # Defaults are intentionally permissive enough for testnet usage while still being finite.
-    payload = {
-        "paused": False,
-        "chains": {
-            # Enable the default chain to avoid "policy missing" spend failures after install.
-            default_chain: {"chain_enabled": True},
-            # Hardhat-local is commonly used for local verification; keep enabled when present.
-            "hardhat_local": {"chain_enabled": True},
-        },
-        "spend": {
-            # Keep spot swaps usable out-of-the-box. Owners can tighten to require explicit approval.
-            "approval_required": False,
-            "approval_granted": True,
-            # 1000e18 (1,000 "native wei-denominated units") daily cap as a coarse brake.
-            "max_daily_native_wei": "1000000000000000000000",
-        },
+    if not isinstance(payload.get("paused"), bool):
+        payload["paused"] = False
+
+    chains = payload.get("chains")
+    if not isinstance(chains, dict):
+        chains = {}
+        payload["chains"] = chains
+
+    # Hydrate missing chain entries so newly enabled chain families (e.g. Solana) do not fail-local
+    # on older installs that only seeded default_chain/hardhat_local.
+    required_chains = {
+        default_chain,
+        "hardhat_local",
+        "solana_mainnet_beta",
+        "solana_testnet",
+        "solana_devnet",
+        "solana_localnet",
     }
+    for chain_key in sorted({str(v).strip() for v in required_chains if str(v).strip()}):
+        current = chains.get(chain_key)
+        if not isinstance(current, dict):
+            chains[chain_key] = {"chain_enabled": True}
+
+    spend = payload.get("spend")
+    if not isinstance(spend, dict):
+        spend = {}
+        payload["spend"] = spend
+    if not isinstance(spend.get("approval_required"), bool):
+        # Keep spot swaps usable out-of-the-box. Owners can tighten to require explicit approval.
+        spend["approval_required"] = False
+    if not isinstance(spend.get("approval_granted"), bool):
+        spend["approval_granted"] = True
+    if not str(spend.get("max_daily_native_wei") or "").strip():
+        # 1000e18 (1,000 "native wei-denominated units") daily cap as a coarse brake.
+        spend["max_daily_native_wei"] = "1000000000000000000000"
 
     POLICY_FILE.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     _chmod_if_posix(POLICY_FILE, 0o600)
