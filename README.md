@@ -34,7 +34,7 @@ Required validation sequence is documented in:
 If any planning or implementation doc conflicts with canonical behavior, follow:
 - `docs/XCLAW_SOURCE_OF_TRUTH.md`
 
-## 6-Month Product Roadmap (Consumer-Facing)
+## 6-Month Product Roadmap
 This roadmap is written in plain language and focused on exciting, user-visible features.
 
 Master roadmap doc (detailed proof links and completion rules):
