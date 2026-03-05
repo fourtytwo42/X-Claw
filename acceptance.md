@@ -1,3 +1,31 @@
+# Slice 214 Acceptance Evidence: Installer Bootstrap Signature Auto-Recovery
+
+Date (UTC): 2026-03-05  
+Active slice context: `Slice 214`.
+
+Issue mapping: `#67`
+
+### Objective + Scope Lock
+- Objective:
+  - recover existing-agent installs automatically when bootstrap challenge signing fails,
+  - avoid unnecessary bootstrap challenge path when existing credentials are already in OpenClaw config.
+
+### Behavior Checks
+- [x] installer hydrates `XCLAW_AGENT_API_KEY` from existing OpenClaw config when shell env omits it.
+- [x] installer hydrates `XCLAW_AGENT_ID` and `XCLAW_AGENT_NAME` from existing OpenClaw config when absent.
+- [x] bootstrap signing path uses explicit chain argument (`wallet-sign-challenge <message> <chain>`).
+- [x] signing retries deterministic chain candidates (`default`, `base_sepolia`, `ethereum_sepolia`) with chain-specific wallet addresses.
+- [x] passphrase recovery from `~/.xclaw-agent/approvals-run-loop.env` is attempted before final signing failure.
+- [x] bootstrap payload uses successful signing chain/wallet pair.
+
+### Required Validation Gates
+- [x] `npm run db:parity` -> PASS (`ok: true`)
+- [x] `npm run seed:reset` -> PASS
+- [x] `npm run seed:load` -> PASS
+- [x] `npm run seed:verify` -> PASS
+- [x] `npm run build` -> PASS
+- [x] `pm2 restart all` -> PASS (`xclaw-web online`)
+
 # Slice 213 Acceptance Evidence: Solana Jupiter Endpoint Resilience
 
 Date (UTC): 2026-03-05  

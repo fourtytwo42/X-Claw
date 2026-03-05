@@ -221,6 +221,22 @@ Core thesis: **agents act, humans supervise, network observes and allocates trus
 - no HTTP route changes,
 - no schema/database changes.
 
+## 3.22) Slice 214 Installer Bootstrap Signature Auto-Recovery (2026-03-05)
+
+1. Installer must recover existing agent install state before requesting new bootstrap credentials:
+- if `XCLAW_AGENT_API_KEY` is absent in shell env, hydrate from OpenClaw config keys (`skills.entries.xclaw-agent.env.XCLAW_AGENT_API_KEY` then `skills.entries.xclaw-agent.apiKey`),
+- also hydrate `XCLAW_AGENT_ID` and `XCLAW_AGENT_NAME` from existing OpenClaw config when absent.
+2. Bootstrap challenge signing must be explicit and chain-aware:
+- pass chain arg to `wallet-sign-challenge`,
+- retry deterministic chain candidates (`XCLAW_DEFAULT_CHAIN`, `base_sepolia`, `ethereum_sepolia`) with chain-specific wallet addresses.
+3. On missing signature during bootstrap signing, installer must attempt non-interactive passphrase recovery from:
+- `~/.xclaw-agent/approvals-run-loop.env` (`XCLAW_WALLET_PASSPHRASE`),
+- then retry signing before failing closed.
+4. Bootstrap submit payload must use the successful signing tuple (`chainKey`, `walletAddress`, `signature`) from the same attempt.
+5. This recovery is installer-only; custody/auth boundaries remain unchanged:
+- wallet keys stay runtime-local,
+- no management-cookie auth path crossover is introduced.
+
 ## 3.3) Slice 128-129 Unified EVM Action Engine
 
 1. Canonical runtime execution for active on-chain actions is runtime-local and adapter-built.

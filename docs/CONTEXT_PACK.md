@@ -14,6 +14,27 @@
   - `routeKind`
   - `liquidityOperation`
 
+## Hotfix Context: Slice 214 Installer Bootstrap Signature Auto-Recovery
+
+Issue mapping: `#67`
+
+### Objective + scope lock
+- Objective: remove manual recovery steps when installer fails at bootstrap challenge signing despite an existing wallet/agent state.
+- Scope guard:
+  - installer script only (`/skill-install.sh`),
+  - no runtime trade path or API/schema changes,
+  - preserve existing custody/auth boundaries.
+
+### Expected touched files
+- `apps/network-web/src/app/skill-install.sh/route.ts`
+- `docs/XCLAW_SOURCE_OF_TRUTH.md`
+- `docs/XCLAW_SLICE_TRACKER.md`
+- `docs/XCLAW_BUILD_ROADMAP.md`
+- `docs/CONTEXT_PACK.md`
+- `spec.md`
+- `tasks.md`
+- `acceptance.md`
+
 ## Hotfix Context: Slice 213 Solana Jupiter Endpoint Resilience
 
 Issue mapping: `#66`

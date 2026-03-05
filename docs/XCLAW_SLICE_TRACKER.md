@@ -17,6 +17,24 @@ Status legend:
 
 ---
 
+## Slice 214: Installer Bootstrap Signature Auto-Recovery (Hotfix)
+Status: [x]
+
+Goal:
+- make `skill-install.sh` recover automatically when bootstrap signature flow fails due to missing/overwritten env context, without requiring manual operator intervention.
+
+DoD:
+- [x] Installer hydrates existing `XCLAW_AGENT_API_KEY|XCLAW_AGENT_ID|XCLAW_AGENT_NAME` from OpenClaw config before entering auto-bootstrap path.
+- [x] Bootstrap signing passes explicit chain arg and retries across deterministic chain candidates (`default`, `base_sepolia`, `ethereum_sepolia`).
+- [x] On signing failure, installer attempts passphrase recovery from approvals run-loop env and retries signing.
+- [x] Bootstrap payload uses successful chain/wallet signing pair.
+- [x] Sequential validation + PM2 restart completed.
+
+Issue mapping:
+- `#67`
+
+---
+
 ## Slice 213: Solana Jupiter Endpoint Resilience (Hotfix)
 Status: [x]
 

@@ -487,6 +487,33 @@ if [ -n "\${XCLAW_WALLET_PASSPHRASE:-}" ]; then
   openclaw config set skills.entries.xclaw-agent.env.XCLAW_WALLET_PASSPHRASE "$XCLAW_WALLET_PASSPHRASE" || true
 fi
 
+if [ -z "\${XCLAW_AGENT_API_KEY:-}" ]; then
+  existing_cfg_api_key="$(openclaw config get skills.entries.xclaw-agent.env.XCLAW_AGENT_API_KEY 2>/dev/null | tail -n1 | sed -E 's/^\"(.*)\"$/\\1/' || true)"
+  if [ -z "$existing_cfg_api_key" ] || [ "$existing_cfg_api_key" = "null" ]; then
+    existing_cfg_api_key="$(openclaw config get skills.entries.xclaw-agent.apiKey 2>/dev/null | tail -n1 | sed -E 's/^\"(.*)\"$/\\1/' || true)"
+  fi
+  if [ -n "$existing_cfg_api_key" ] && [ "$existing_cfg_api_key" != "null" ]; then
+    export XCLAW_AGENT_API_KEY="$existing_cfg_api_key"
+    echo "[xclaw] recovered XCLAW_AGENT_API_KEY from existing OpenClaw config"
+  fi
+fi
+
+if [ -z "\${XCLAW_AGENT_ID:-}" ]; then
+  existing_cfg_agent_id="$(openclaw config get skills.entries.xclaw-agent.env.XCLAW_AGENT_ID 2>/dev/null | tail -n1 | sed -E 's/^\"(.*)\"$/\\1/' || true)"
+  if [ -n "$existing_cfg_agent_id" ] && [ "$existing_cfg_agent_id" != "null" ]; then
+    export XCLAW_AGENT_ID="$existing_cfg_agent_id"
+    echo "[xclaw] recovered XCLAW_AGENT_ID from existing OpenClaw config"
+  fi
+fi
+
+if [ -z "\${XCLAW_AGENT_NAME:-}" ]; then
+  existing_cfg_agent_name="$(openclaw config get skills.entries.xclaw-agent.env.XCLAW_AGENT_NAME 2>/dev/null | tail -n1 | sed -E 's/^\"(.*)\"$/\\1/' || true)"
+  if [ -n "$existing_cfg_agent_name" ] && [ "$existing_cfg_agent_name" != "null" ]; then
+    export XCLAW_AGENT_NAME="$existing_cfg_agent_name"
+    echo "[xclaw] recovered XCLAW_AGENT_NAME from existing OpenClaw config"
+  fi
+fi
+
 # Encrypted passphrase backup (non-interactive, no prompting).
 # This provides redundancy if OpenClaw config is accidentally overwritten or lost.
 passphrase_backup_path="$wallet_home/passphrase.backup.v1.json"
@@ -780,47 +807,118 @@ if [ -z "\${XCLAW_AGENT_API_KEY:-}" ] && [ -n "$wallet_address" ]; then
     agent_name_field="\"agentName\": \"$XCLAW_AGENT_NAME\","
   fi
 
-  echo "[xclaw] requesting signed bootstrap challenge"
-  challenge_payload="$(cat <<JSON
+  recover_passphrase_from_runloop_env() {
+    local env_file="$HOME/.xclaw-agent/approvals-run-loop.env"
+    if [ ! -f "$env_file" ]; then
+      return 1
+    fi
+    local recovered=""
+    recovered="$(grep '^XCLAW_WALLET_PASSPHRASE=' "$env_file" | tail -n1 | cut -d= -f2- || true)"
+    if [ -z "$recovered" ]; then
+      return 1
+    fi
+    export XCLAW_WALLET_PASSPHRASE="$recovered"
+    openclaw config set skills.entries.xclaw-agent.env.XCLAW_WALLET_PASSPHRASE "$XCLAW_WALLET_PASSPHRASE" >/dev/null 2>&1 || true
+    echo "[xclaw] recovered wallet passphrase from approvals run-loop env"
+    return 0
+  }
+
+  bootstrap_chain=""
+  bootstrap_wallet=""
+  challenge_id=""
+  challenge_message=""
+  signature=""
+  attempted_signing=0
+  bootstrap_chain_candidates="$XCLAW_DEFAULT_CHAIN base_sepolia ethereum_sepolia"
+
+  for candidate_chain in $bootstrap_chain_candidates; do
+    [ -n "$candidate_chain" ] || continue
+    candidate_wallet=""
+    if [ "$candidate_chain" = "$XCLAW_DEFAULT_CHAIN" ]; then
+      candidate_wallet="$wallet_address"
+    else
+      candidate_wallet="$("$XCLAW_AGENT_BIN" wallet address --chain "$candidate_chain" --json 2>/dev/null | python3 -c 'import json,sys
+try:
+ d=json.load(sys.stdin)
+ print((d.get("address") or "").strip())
+except Exception:
+ print("")' || true)"
+    fi
+    if [ -z "$candidate_wallet" ]; then
+      continue
+    fi
+
+    echo "[xclaw] requesting signed bootstrap challenge (chain=$candidate_chain)"
+    challenge_payload="$(cat <<JSON
 {
   "schemaVersion": 1,
-  "chainKey": "$XCLAW_DEFAULT_CHAIN",
-  "walletAddress": "$wallet_address"
+  "chainKey": "$candidate_chain",
+  "walletAddress": "$candidate_wallet"
 }
 JSON
 )"
-  challenge_response="$(curl -fsS "$XCLAW_API_BASE_URL/agent/bootstrap/challenge" \
-    -H "Content-Type: application/json" \
-    -d "$challenge_payload")"
+    set +e
+    challenge_response="$(curl -fsS "$XCLAW_API_BASE_URL/agent/bootstrap/challenge" \
+      -H "Content-Type: application/json" \
+      -d "$challenge_payload" 2>/dev/null)"
+    challenge_rc=$?
+    set -e
+    if [ "$challenge_rc" -ne 0 ]; then
+      continue
+    fi
 
-  challenge_id="$(printf "%s" "$challenge_response" | python3 -c 'import json,sys;
+    challenge_id="$(printf "%s" "$challenge_response" | python3 -c 'import json,sys;
 try:
  d=json.load(sys.stdin)
  print(d.get("challengeId",""))
 except Exception:
  print("")')"
-  challenge_message="$(printf "%s" "$challenge_response" | python3 -c 'import json,sys;
+    challenge_message="$(printf "%s" "$challenge_response" | python3 -c 'import json,sys;
 try:
  d=json.load(sys.stdin)
  print(d.get("challengeMessage",""))
 except Exception:
  print("")')"
-  if [ -z "$challenge_id" ] || [ -z "$challenge_message" ]; then
-    echo "[xclaw] bootstrap challenge failed; unable to continue"
-    exit 1
-  fi
+    if [ -z "$challenge_id" ] || [ -z "$challenge_message" ]; then
+      continue
+    fi
 
-  echo "[xclaw] signing bootstrap challenge with local wallet"
-  sig_json="$(python3 skills/xclaw-agent/scripts/xclaw_agent_skill.py wallet-sign-challenge "$challenge_message" \
-    | python3 -c 'import sys; print(sys.stdin.read().strip())' || true)"
-  signature="$(printf "%s" "$sig_json" | python3 -c 'import json,sys;
+    echo "[xclaw] signing bootstrap challenge with local wallet (chain=$candidate_chain)"
+    attempted_signing=1
+    sig_json="$(python3 skills/xclaw-agent/scripts/xclaw_agent_skill.py wallet-sign-challenge "$challenge_message" "$candidate_chain" \
+      | python3 -c 'import sys; print(sys.stdin.read().strip())' || true)"
+    signature="$(printf "%s" "$sig_json" | python3 -c 'import json,sys;
 try:
  d=json.load(sys.stdin)
  print((d.get("signature") or "").strip())
 except Exception:
  print("")' || true)"
+
+    if [ -z "$signature" ] && recover_passphrase_from_runloop_env; then
+      sig_json="$(python3 skills/xclaw-agent/scripts/xclaw_agent_skill.py wallet-sign-challenge "$challenge_message" "$candidate_chain" \
+        | python3 -c 'import sys; print(sys.stdin.read().strip())' || true)"
+      signature="$(printf "%s" "$sig_json" | python3 -c 'import json,sys;
+try:
+ d=json.load(sys.stdin)
+ print((d.get("signature") or "").strip())
+except Exception:
+ print("")' || true)"
+    fi
+
+    if [ -n "$signature" ]; then
+      bootstrap_chain="$candidate_chain"
+      bootstrap_wallet="$candidate_wallet"
+      break
+    fi
+  done
+
   if [ -z "$signature" ]; then
-    echo "[xclaw] unable to sign bootstrap challenge (missing signature). Ensure XCLAW_WALLET_PASSPHRASE is configured and cast is installed."
+    if [ "$attempted_signing" = "1" ]; then
+      echo "[xclaw] unable to sign bootstrap challenge (missing signature) after chain/passphrase recovery attempts."
+    else
+      echo "[xclaw] bootstrap challenge failed; no signable wallet chain candidate found."
+    fi
+    echo "[xclaw] Ensure XCLAW_WALLET_PASSPHRASE is configured and cast is installed."
     exit 1
   fi
 
@@ -828,9 +926,9 @@ except Exception:
 {
   "schemaVersion": 2,
   $agent_name_field
-  "walletAddress": "$wallet_address",
+  "walletAddress": "$bootstrap_wallet",
   "runtimePlatform": "$runtime_platform",
-  "chainKey": "$XCLAW_DEFAULT_CHAIN",
+  "chainKey": "$bootstrap_chain",
   "challengeId": "$challenge_id",
   "signature": "$signature",
   "mode": "real",

@@ -11,6 +11,14 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 
 ---
 
+## 0.23) Slice 214 Installer Bootstrap Signature Auto-Recovery (Hotfix)
+
+- [x] Auto-hydrate existing agent credentials from OpenClaw config before bootstrap challenge path.
+- [x] Add explicit chain-aware signing attempts for bootstrap challenge (`default`, `base_sepolia`, `ethereum_sepolia`).
+- [x] Add passphrase recovery from approvals run-loop env on signing failure and retry signing.
+- [x] Ensure bootstrap payload uses the successful chain/wallet signing pair.
+- [x] Sequential validation + PM2 restart completed.
+
 ## 0.22) Slice 213 Solana Jupiter Endpoint Resilience (Hotfix)
 
 - [x] Update Jupiter default endpoint candidates to prefer `https://lite-api.jup.ag/swap/v1` with `quote-api` fallback.

@@ -1,3 +1,27 @@
+# Slice 214 Spec: Installer Bootstrap Signature Auto-Recovery (2026-03-05)
+
+Issue mapping: `#67`
+
+## Goal
+1. Make installer recover automatically from bootstrap challenge signing failures for existing agents.
+2. Prefer existing config credentials over unnecessary bootstrap challenge requests.
+3. Keep install path backward-compatible and non-interactive.
+
+## Non-goals
+1. No runtime trading logic changes.
+2. No API/schema/database changes.
+3. No wallet custody model changes.
+
+## Locked scope
+1. `apps/network-web/src/app/skill-install.sh/route.ts`
+2. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+3. `docs/XCLAW_SLICE_TRACKER.md`
+4. `docs/XCLAW_BUILD_ROADMAP.md`
+5. `docs/CONTEXT_PACK.md`
+6. `spec.md`
+7. `tasks.md`
+8. `acceptance.md`
+
 # Slice 213 Spec: Solana Jupiter Endpoint Resilience (2026-03-05)
 
 Issue mapping: `#66`

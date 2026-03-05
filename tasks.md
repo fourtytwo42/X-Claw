@@ -1,3 +1,14 @@
+# Slice 214 Tasks: Installer Bootstrap Signature Auto-Recovery (2026-03-05)
+
+Issue mapping: `#67`
+
+- [x] Reproduce and localize installer bootstrap-signature failure path.
+- [x] Add config credential hydration (`API key`, `agent id`, `agent name`) before bootstrap request path.
+- [x] Add chain-aware bootstrap signing retries with explicit chain arg.
+- [x] Add passphrase recovery from approvals-run-loop env and retry signing once.
+- [x] Ensure bootstrap payload binds to successful chain/wallet/signature tuple.
+- [x] Run sequential validations + issue evidence post.
+
 # Slice 213 Tasks: Solana Jupiter Endpoint Resilience (2026-03-05)
 
 Issue mapping: `#66`
