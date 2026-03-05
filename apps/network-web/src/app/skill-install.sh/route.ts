@@ -658,40 +658,34 @@ if [ "$wallet_exists" = "1" ]; then
 fi
 
 discover_wallet_chains() {
-  "$XCLAW_AGENT_BIN" chains --json 2>/dev/null | python3 - <<'PY'
-import json
-import sys
-
+  "$XCLAW_AGENT_BIN" chains --json 2>/dev/null | python3 -c 'import json,sys
 try:
-    payload = json.load(sys.stdin)
+ d=json.load(sys.stdin)
 except Exception:
-    payload = {}
-
-items = payload.get("chains")
-if not isinstance(items, list):
-    print("")
-    raise SystemExit(0)
-
-out = []
-seen = set()
+ d={}
+items=d.get("chains")
+if not isinstance(items,list):
+ print("")
+ raise SystemExit(0)
+out=[]
+seen=set()
 for row in items:
-    if not isinstance(row, dict):
-        continue
-    key = str(row.get("chainKey") or "").strip()
-    if not key:
-        continue
-    if key.lower() in seen:
-        continue
-    caps = row.get("capabilities")
-    if isinstance(caps, dict):
-        wallet_cap = caps.get("wallet")
-        if isinstance(wallet_cap, bool) and not wallet_cap:
-            continue
-    out.append(key)
-    seen.add(key.lower())
-
-print(" ".join(out))
-PY
+ if not isinstance(row,dict):
+  continue
+ key=str(row.get("chainKey") or "").strip()
+ if not key:
+  continue
+ low=key.lower()
+ if low in seen:
+  continue
+ caps=row.get("capabilities")
+ if isinstance(caps,dict):
+  wallet_cap=caps.get("wallet")
+  if isinstance(wallet_cap,bool) and not wallet_cap:
+   continue
+ out.append(key)
+ seen.add(low)
+print(" ".join(out))'
 }
 
 runtime_wallet_chains="$(discover_wallet_chains || true)"
