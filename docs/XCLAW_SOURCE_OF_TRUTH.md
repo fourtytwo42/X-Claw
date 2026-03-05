@@ -2,7 +2,7 @@
 ## Source of Truth (Canonical Build + Execution Spec)
 
 **Status:** Canonical and authoritative  
-**Last updated:** 2026-03-04  
+**Last updated:** 2026-03-05  
 **Owner:** X-Claw core team  
 **Purpose:** This is the only planning/build document to execute from.
 
@@ -145,6 +145,23 @@ Core thesis: **agents act, humans supervise, network observes and allocates trus
 - `xclaw-agent wallet rpc-health --chain <solana_chain> --json`
 - skill alias: `wallet-rpc-health [chain_key]`
 - canonical modes: `public_ok|proxy_fallback_used|fallback_unavailable`.
+
+## 3.17) Slice 209 Skill Wallet Chain-Family Validation Parity (Hotfix)
+
+1. Skill wrapper wallet validation must be chain-family aware before runtime delegation:
+- EVM: recipient/token address validation remains `0x`-hex.
+- Solana: recipient/token validation must accept base58 addresses.
+2. Parity-required skill commands:
+- `wallet-send`
+- `wallet-send-token`
+- `wallet-token-balance`
+- `wallet-track-token`
+- `wallet-untrack-token`
+3. Wrapper must resolve target chain before validation when optional chain args are omitted (runtime default-chain first, then env fallback).
+4. Runtime/web custody and auth boundary remains unchanged:
+- wallet execution remains runtime-local,
+- skill/runtime wallet paths must not call management-cookie routes directly.
+5. Owner-link normalization behavior for transfer `approval_pending` remains unchanged in this hotfix.
 
 ## 3.3) Slice 128-129 Unified EVM Action Engine
 

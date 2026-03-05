@@ -116,12 +116,12 @@ Errors MUST be machine-parseable and human-readable:
 
 ## 5) Validation Rules
 
-1. `wallet-send` validates recipient address format before delegation.
+1. `wallet-send` validates recipient address format by chain family before delegation (`0x...` for EVM, base58 for Solana).
 2. `wallet-send` validates amount is non-negative integer string.
-3. `wallet-send-token` accepts canonical token symbol, tracked token symbol (when unique), or `0x` token address before execution.
-4. `wallet-track-token` and `wallet-untrack-token` require `0x` 20-byte token addresses.
+3. `wallet-send-token` accepts canonical token symbol, tracked token symbol (when unique), or chain-valid token identifier (`0x` token address on EVM, mint address on Solana) before execution.
+4. `wallet-track-token` and `wallet-untrack-token` require chain-valid token identifiers for the selected chain.
 5. `wallet-send-token` returns deterministic `token_symbol_ambiguous` when a tracked symbol maps to multiple token addresses.
-6. `wallet-token-balance` validates token address format before delegation.
+6. `wallet-token-balance` validates token address format by chain family before delegation.
 7. `wallet-sign-challenge` rejects empty message.
 6. `wallet-create` and `wallet-import` support non-interactive automation when required env vars are provided:
 - `wallet-create`: requires `XCLAW_WALLET_PASSPHRASE`
@@ -188,7 +188,9 @@ Current behavior in `apps/agent-runtime/xclaw_agent/cli.py`:
    - native balance fields (`balanceWei`, `balanceEth`, `symbol`, `decimals`),
    - token holdings in `tokens[]` include only non-zero balances (canonical + tracked + discovered),
    - token query/discovery failures in `tokenErrors[]` without failing native balance fetch.
-9. `wallet-token-balance` is implemented via cast-backed ERC-20 `balanceOf(address)` query.
+9. `wallet-token-balance` is chain-family aware:
+   - EVM path uses cast-backed ERC-20 `balanceOf(address)` query.
+   - Solana path resolves balances from runtime Solana holdings payload.
 10. `wallet-wrap-native` is implemented as config-driven cross-chain behavior:
    - if `coreContracts.wrappedNativeHelper` exists and is valid, runtime calls payable `deposit()` on helper contract.
    - otherwise runtime resolves canonical wrapped-native token from `canonicalTokens` via native-symbol mapping (`W<NativeSymbol>` + strict aliases) and calls payable `deposit()` on that token contract.

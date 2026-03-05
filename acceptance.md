@@ -1,3 +1,38 @@
+# Slice 209 Acceptance Evidence: Skill Wallet Chain-Family Validation Parity
+
+Date (UTC): 2026-03-05  
+Active slice context: `Slice 209`.
+
+Issue mapping: `#63`
+
+### Objective + Scope Lock
+- Objective:
+  - align skill-wrapper wallet validation with runtime chain-family behavior (`evm|solana`),
+  - prevent Solana wallet commands from failing pre-runtime due to EVM-only checks.
+
+### Behavior Checks
+- [x] `wallet-send` accepts Solana base58 recipients on Solana chains.
+- [x] `wallet-send-token` accepts Solana base58 recipients on Solana chains.
+- [x] `wallet-token-balance`, `wallet-track-token`, `wallet-untrack-token` accept Solana mint addresses on Solana chains.
+- [x] EVM behavior remains unchanged (`0x...` checks still enforced on EVM chains).
+- [x] Owner-link normalization behavior unchanged.
+
+### Required Validation Gates
+- [x] `npm run db:parity` -> PASS (`ok: true`)
+- [x] `npm run seed:reset` -> PASS
+- [x] `npm run seed:load` -> PASS
+- [x] `npm run seed:verify` -> PASS
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_x402_skill_wrapper.py -v` -> PASS (`Ran 69 tests`, `OK`)
+- [x] `npm run build` -> PASS
+- [x] `pm2 restart all` -> PASS (`xclaw-web online`)
+
+### Required Grep Proofs
+- [x] no direct `/api/v1/management/*` calls introduced in skill/runtime wallet command paths.
+  - `rg -n "/api/v1/management/" skills/xclaw-agent/scripts/xclaw_agent_skill.py apps/agent-runtime/xclaw_agent/cli.py` -> `no_management_route_matches`
+- [x] wallet validators in skill wrapper now branch by chain family.
+  - `skills/xclaw-agent/scripts/xclaw_agent_skill.py` includes `_is_solana_chain_key`, `_is_solana_address`, `_is_chain_address` and applies them in `wallet-send|wallet-send-token|wallet-token-balance|wallet-track-token|wallet-untrack-token`.
+- [ ] issue evidence comment posted to `#63`.
+
 # Slice 206-208 Acceptance Evidence: Solana RPC Fallback Hardening
 
 Date (UTC): 2026-03-04  

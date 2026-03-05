@@ -408,6 +408,68 @@ class X402SkillWrapperTests(unittest.TestCase):
             ]
         )
 
+    def test_wallet_send_allows_solana_recipient_on_solana_chain(self) -> None:
+        recipient = "So11111111111111111111111111111111111111112"
+        with mock.patch.dict("os.environ", {"XCLAW_DEFAULT_CHAIN": "base_sepolia"}, clear=False):
+            with mock.patch.object(skill, "_run_agent", return_value=0) as run_mock:
+                code = skill.main(["xclaw_agent_skill.py", "wallet-send", recipient, "1000", "solana_devnet"])
+        self.assertEqual(code, 0)
+        run_mock.assert_called_once_with(["wallet", "send", "--to", recipient, "--amount-wei", "1000", "--chain", "solana_devnet", "--json"])
+
+    def test_wallet_send_rejects_solana_recipient_on_evm_chain(self) -> None:
+        recipient = "So11111111111111111111111111111111111111112"
+        with mock.patch.dict("os.environ", {"XCLAW_DEFAULT_CHAIN": "base_sepolia"}, clear=False):
+            code, payload = self._capture(["xclaw_agent_skill.py", "wallet-send", recipient, "1000"])
+        self.assertEqual(code, 2)
+        self.assertEqual(payload.get("code"), "invalid_input")
+
+    def test_wallet_send_token_allows_solana_recipient_on_solana_chain(self) -> None:
+        recipient = "So11111111111111111111111111111111111111112"
+        with mock.patch.dict("os.environ", {"XCLAW_DEFAULT_CHAIN": "base_sepolia"}, clear=False):
+            with mock.patch.object(skill, "_run_agent", return_value=0) as run_mock:
+                code = skill.main(["xclaw_agent_skill.py", "wallet-send-token", "USDC", recipient, "1000000", "solana_devnet"])
+        self.assertEqual(code, 0)
+        run_mock.assert_called_once_with(
+            ["wallet", "send-token", "--token", "USDC", "--to", recipient, "--amount-wei", "1000000", "--chain", "solana_devnet", "--json"]
+        )
+
+    def test_wallet_send_token_rejects_invalid_solana_recipient(self) -> None:
+        with mock.patch.dict("os.environ", {"XCLAW_DEFAULT_CHAIN": "base_sepolia"}, clear=False):
+            code, payload = self._capture(["xclaw_agent_skill.py", "wallet-send-token", "USDC", "bad_sol", "1000000", "solana_devnet"])
+        self.assertEqual(code, 2)
+        self.assertEqual(payload.get("code"), "invalid_input")
+
+    def test_wallet_token_balance_allows_solana_mint_on_solana_chain(self) -> None:
+        mint = "So11111111111111111111111111111111111111112"
+        with mock.patch.dict("os.environ", {"XCLAW_DEFAULT_CHAIN": "base_sepolia"}, clear=False):
+            with mock.patch.object(skill, "_run_agent", return_value=0) as run_mock:
+                code = skill.main(["xclaw_agent_skill.py", "wallet-token-balance", mint, "solana_devnet"])
+        self.assertEqual(code, 0)
+        run_mock.assert_called_once_with(["wallet", "token-balance", "--token", mint, "--chain", "solana_devnet", "--json"])
+
+    def test_wallet_track_token_allows_solana_mint_on_solana_chain(self) -> None:
+        mint = "So11111111111111111111111111111111111111112"
+        with mock.patch.dict("os.environ", {"XCLAW_DEFAULT_CHAIN": "base_sepolia"}, clear=False):
+            with mock.patch.object(skill, "_run_agent", return_value=0) as run_mock:
+                code = skill.main(["xclaw_agent_skill.py", "wallet-track-token", mint, "solana_devnet"])
+        self.assertEqual(code, 0)
+        run_mock.assert_called_once_with(["wallet", "track-token", "--token", mint, "--chain", "solana_devnet", "--json"])
+
+    def test_wallet_track_token_rejects_solana_mint_on_evm_chain(self) -> None:
+        mint = "So11111111111111111111111111111111111111112"
+        with mock.patch.dict("os.environ", {"XCLAW_DEFAULT_CHAIN": "base_sepolia"}, clear=False):
+            code, payload = self._capture(["xclaw_agent_skill.py", "wallet-track-token", mint])
+        self.assertEqual(code, 2)
+        self.assertEqual(payload.get("code"), "invalid_input")
+
+    def test_wallet_untrack_token_allows_solana_mint_on_solana_chain(self) -> None:
+        mint = "So11111111111111111111111111111111111111112"
+        with mock.patch.dict("os.environ", {"XCLAW_DEFAULT_CHAIN": "base_sepolia"}, clear=False):
+            with mock.patch.object(skill, "_run_agent", return_value=0) as run_mock:
+                code = skill.main(["xclaw_agent_skill.py", "wallet-untrack-token", mint, "solana_devnet"])
+        self.assertEqual(code, 0)
+        run_mock.assert_called_once_with(["wallet", "untrack-token", "--token", mint, "--chain", "solana_devnet", "--json"])
+
     def test_wallet_untrack_token_delegates_to_runtime(self) -> None:
         with mock.patch.dict("os.environ", {"XCLAW_DEFAULT_CHAIN": "base_sepolia"}, clear=False):
             with mock.patch.object(skill, "_run_agent", return_value=0) as run_mock:

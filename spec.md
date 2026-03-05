@@ -1,3 +1,31 @@
+# Slice 209 Spec: Skill Wallet Chain-Family Validation Parity (2026-03-05)
+
+Issue mapping: `#63`
+
+## Goal
+1. Make skill-wrapper wallet input validation chain-family aware so Solana wallet commands are not blocked by EVM-only checks.
+2. Preserve runtime-local wallet custody and server/agent trust boundaries.
+3. Keep owner-link normalization behavior unchanged.
+
+## Non-goals
+1. No management-link architecture changes.
+2. No API route/schema path additions.
+3. No runtime wallet execution logic changes.
+
+## Locked scope
+1. `skills/xclaw-agent/scripts/xclaw_agent_skill.py`
+2. `apps/agent-runtime/tests/test_x402_skill_wrapper.py`
+3. `skills/xclaw-agent/SKILL.md`
+4. `skills/xclaw-agent/references/commands.md`
+5. `docs/api/WALLET_COMMAND_CONTRACT.md`
+6. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+7. `docs/XCLAW_SLICE_TRACKER.md`
+8. `docs/XCLAW_BUILD_ROADMAP.md`
+9. `docs/CONTEXT_PACK.md`
+10. `spec.md`
+11. `tasks.md`
+12. `acceptance.md`
+
 # Slice 206-208 Spec: Solana RPC Fallback Hardening (Public Primary + Server-Proxy Paid Fallback) (2026-03-04)
 
 ## Goal

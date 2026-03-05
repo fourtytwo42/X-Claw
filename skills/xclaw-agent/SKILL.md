@@ -181,7 +181,8 @@ Additional capabilities:
 ## Operational Notes
 
 - `wallet-balance` returns native plus non-zero token balances from canonical and tracked chain-family token sources.
-- `wallet-track-token` registers non-canonical ERC-20 addresses for tracking; tracked symbols can be used with `wallet-send-token` when unique.
+- Wallet send/token commands validate recipient format by chain family (`0x...` for EVM, base58 for Solana) before runtime delegation.
+- `wallet-track-token` registers chain-valid token identifiers for tracking (`0x...` on EVM, mint address on Solana); tracked symbols can be used with `wallet-send-token` when unique.
 - Dexscreener research commands query Dexscreener REST directly from the skill wrapper (`api.dexscreener.com`) and do not route through X-Claw server APIs.
 - `dexscreener-top` sorts by liquidity descending and emits normalized decimal strings (`priceUsd` 8dp, USD metrics 2dp).
 - `token-research` is the preferred one-shot flow for small models: top-by-liquidity shortlist plus primary-token drilldown pairs in one response.

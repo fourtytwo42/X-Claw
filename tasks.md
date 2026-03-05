@@ -1,3 +1,16 @@
+# Slice 209 Tasks: Skill Wallet Chain-Family Validation Parity (2026-03-05)
+
+Issue mapping: `#63`
+
+- [x] Add chain-family-aware wallet address validators in skill wrapper (`evm` hex vs `solana` base58).
+- [x] Ensure `wallet-send` and `wallet-send-token` resolve target chain before recipient validation.
+- [x] Ensure `wallet-token-balance`, `wallet-track-token`, and `wallet-untrack-token` resolve target chain before token validation.
+- [x] Add Solana positive-path wrapper tests for the above wallet commands.
+- [x] Add negative-path tests for malformed Solana addresses and EVM regression behavior.
+- [x] Sync skill docs and wallet command contract wording to chain-family validation semantics.
+- [x] Sync canonical docs/tracker/roadmap/context for new hotfix slice.
+- [ ] Run sequential validations + grep proof + issue evidence comment.
+
 # Slice 206-208 Tasks: Solana RPC Fallback Hardening (2026-03-04)
 
 - [x] Add additive agent-auth fallback route `POST /api/v1/agent/solana/rpc` with allowlisted methods.

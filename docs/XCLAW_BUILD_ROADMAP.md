@@ -11,6 +11,14 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 
 ---
 
+## 0.18) Slice 209 Skill Wallet Chain-Family Validation Parity (Hotfix)
+
+- [~] Update skill wrapper wallet validators to dispatch by chain family (`evm|solana`) for recipient and token identifiers.
+- [~] Ensure wallet command validation resolves target chain before address checks when chain arg is omitted.
+- [~] Add wrapper regression tests for Solana positive/negative and EVM non-regression behavior.
+- [~] Sync skill docs + wallet command contract language to chain-family validation truth.
+- [ ] Sequential validation + PM2 restart + issue evidence capture.
+
 ## 0.17) Slice 206-208 Solana RPC Fallback Hardening
 
 - [~] Add additive agent-auth Solana RPC fallback route (`POST /api/v1/agent/solana/rpc`) for server-side paid provider use.

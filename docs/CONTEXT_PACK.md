@@ -14,6 +14,28 @@
   - `routeKind`
   - `liquidityOperation`
 
+## Hotfix Context: Slice 209 Skill Wallet Chain-Family Validation Parity
+
+Issue mapping: `#63`
+
+### Objective + scope lock
+- Objective: remove EVM-only skill-wrapper wallet pre-validation so Solana wallet command flows delegate to runtime while preserving trust boundaries.
+- Scope guard: skill wrapper + tests + canonical docs/contract language only; no owner-link behavior changes and no route/schema path additions.
+
+### Expected touched files
+- `skills/xclaw-agent/scripts/xclaw_agent_skill.py`
+- `apps/agent-runtime/tests/test_x402_skill_wrapper.py`
+- `skills/xclaw-agent/SKILL.md`
+- `skills/xclaw-agent/references/commands.md`
+- `docs/api/WALLET_COMMAND_CONTRACT.md`
+- `docs/XCLAW_SOURCE_OF_TRUTH.md`
+- `docs/XCLAW_SLICE_TRACKER.md`
+- `docs/XCLAW_BUILD_ROADMAP.md`
+- `docs/CONTEXT_PACK.md`
+- `spec.md`
+- `tasks.md`
+- `acceptance.md`
+
 ## Hotfix Context: Capability-Gated Telegram Patch + Management-Link Fallback
 
 Issue mapping: `#35` (approvals/install reliability track)

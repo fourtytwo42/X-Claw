@@ -624,6 +624,27 @@ def _is_hex_address(value: str) -> bool:
     return bool(re.fullmatch(r"0x[a-fA-F0-9]{40}", value))
 
 
+def _is_solana_chain_key(value: str) -> bool:
+    return str(value or "").strip().lower().startswith("solana_")
+
+
+def _is_solana_address(value: str) -> bool:
+    candidate = str(value or "").strip()
+    return bool(re.fullmatch(r"[1-9A-HJ-NP-Za-km-z]{32,44}", candidate))
+
+
+def _is_chain_address(value: str, chain_key: str) -> bool:
+    if _is_solana_chain_key(chain_key):
+        return _is_solana_address(value)
+    return _is_hex_address(value)
+
+
+def _address_hint_for_chain(chain_key: str) -> str:
+    if _is_solana_chain_key(chain_key):
+        return "Use a valid Solana base58 address."
+    return "Use 0x-prefixed 20-byte hex address."
+
+
 def _is_uint_string(value: str) -> bool:
     return bool(re.fullmatch(r"[0-9]+", value))
 
@@ -1802,11 +1823,17 @@ def main(argv: List[str]) -> int:
             return _err("usage", "wallet-send requires <to> <amount_wei>", "usage: wallet-send <to> <amount_wei>", exit_code=2)
         to_addr = argv[2]
         amount_wei = argv[3]
-        if not _is_hex_address(to_addr):
-            return _err("invalid_input", "Invalid recipient address format.", "Use 0x-prefixed 20-byte hex address.", {"to": to_addr}, exit_code=2)
+        target_chain = str(argv[4]).strip() if len(argv) >= 5 and str(argv[4]).strip() else chain
+        if not _is_chain_address(to_addr, target_chain):
+            return _err(
+                "invalid_input",
+                "Invalid recipient address format.",
+                _address_hint_for_chain(target_chain),
+                {"to": to_addr, "chain": target_chain},
+                exit_code=2,
+            )
         if not _is_uint_string(amount_wei):
             return _err("invalid_input", "Invalid amount_wei format.", "Use base-unit integer string, for example 10000000000000000.", {"amountWei": amount_wei}, exit_code=2)
-        target_chain = str(argv[4]).strip() if len(argv) >= 5 and str(argv[4]).strip() else chain
         return _run_agent(["wallet", "send", "--to", to_addr, "--amount-wei", amount_wei, "--chain", target_chain, "--json"])
 
     if cmd == "wallet-send-token":
@@ -1820,6 +1847,7 @@ def main(argv: List[str]) -> int:
         token_or_symbol = argv[2].strip()
         to_addr = argv[3]
         amount_wei = argv[4]
+        target_chain = str(argv[5]).strip() if len(argv) >= 6 and str(argv[5]).strip() else chain
         if not token_or_symbol:
             return _err(
                 "invalid_input",
@@ -1828,11 +1856,16 @@ def main(argv: List[str]) -> int:
                 {"token": token_or_symbol},
                 exit_code=2,
             )
-        if not _is_hex_address(to_addr):
-            return _err("invalid_input", "Invalid recipient address format.", "Use 0x-prefixed 20-byte hex address.", {"to": to_addr}, exit_code=2)
+        if not _is_chain_address(to_addr, target_chain):
+            return _err(
+                "invalid_input",
+                "Invalid recipient address format.",
+                _address_hint_for_chain(target_chain),
+                {"to": to_addr, "chain": target_chain},
+                exit_code=2,
+            )
         if not _is_uint_string(amount_wei):
             return _err("invalid_input", "Invalid amount_wei format.", "Use base-unit integer string.", {"amountWei": amount_wei}, exit_code=2)
-        target_chain = str(argv[5]).strip() if len(argv) >= 6 and str(argv[5]).strip() else chain
         return _run_agent(
             [
                 "wallet",
@@ -1857,27 +1890,45 @@ def main(argv: List[str]) -> int:
         if len(argv) < 3:
             return _err("usage", "wallet-token-balance requires <token_address>", "usage: wallet-token-balance <token_address>", exit_code=2)
         token_addr = argv[2]
-        if not _is_hex_address(token_addr):
-            return _err("invalid_input", "Invalid token address format.", "Use 0x-prefixed 20-byte hex address.", {"token": token_addr}, exit_code=2)
         target_chain = str(argv[3]).strip() if len(argv) >= 4 and str(argv[3]).strip() else chain
+        if not _is_chain_address(token_addr, target_chain):
+            return _err(
+                "invalid_input",
+                "Invalid token address format.",
+                _address_hint_for_chain(target_chain),
+                {"token": token_addr, "chain": target_chain},
+                exit_code=2,
+            )
         return _run_agent(["wallet", "token-balance", "--token", token_addr, "--chain", target_chain, "--json"])
 
     if cmd == "wallet-track-token":
         if len(argv) < 3:
             return _err("usage", "wallet-track-token requires <token_address>", "usage: wallet-track-token <token_address>", exit_code=2)
         token_addr = argv[2].strip()
-        if not _is_hex_address(token_addr):
-            return _err("invalid_input", "Invalid token address format.", "Use 0x-prefixed 20-byte hex address.", {"token": token_addr}, exit_code=2)
         target_chain = str(argv[3]).strip() if len(argv) >= 4 and str(argv[3]).strip() else chain
+        if not _is_chain_address(token_addr, target_chain):
+            return _err(
+                "invalid_input",
+                "Invalid token address format.",
+                _address_hint_for_chain(target_chain),
+                {"token": token_addr, "chain": target_chain},
+                exit_code=2,
+            )
         return _run_agent(["wallet", "track-token", "--token", token_addr, "--chain", target_chain, "--json"])
 
     if cmd == "wallet-untrack-token":
         if len(argv) < 3:
             return _err("usage", "wallet-untrack-token requires <token_address>", "usage: wallet-untrack-token <token_address>", exit_code=2)
         token_addr = argv[2].strip()
-        if not _is_hex_address(token_addr):
-            return _err("invalid_input", "Invalid token address format.", "Use 0x-prefixed 20-byte hex address.", {"token": token_addr}, exit_code=2)
         target_chain = str(argv[3]).strip() if len(argv) >= 4 and str(argv[3]).strip() else chain
+        if not _is_chain_address(token_addr, target_chain):
+            return _err(
+                "invalid_input",
+                "Invalid token address format.",
+                _address_hint_for_chain(target_chain),
+                {"token": token_addr, "chain": target_chain},
+                exit_code=2,
+            )
         return _run_agent(["wallet", "untrack-token", "--token", token_addr, "--chain", target_chain, "--json"])
 
     if cmd == "wallet-tracked-tokens":

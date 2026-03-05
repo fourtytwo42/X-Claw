@@ -284,6 +284,7 @@ Installer/bootstrap note:
 - If direct send succeeds, `owner-link` output omits `managementUrl` to prevent duplicate model echo; include URL only when direct send fails.
 - Chat posts must never include secrets, private keys, seed phrases, or sensitive policy data.
 - Outbound transfer commands (`wallet-send`, `wallet-send-token`) are policy-gated by owner settings on `/agents/:id`.
+- Wallet recipient/token validation is chain-family aware before runtime delegation (`0x...` on EVM, base58 on Solana).
 - Transfer approvals use `xfr_...` IDs and queued messages with `Status: approval_pending` for Telegram button auto-attach.
 - For transfer approvals, skill wrapper suppresses raw queued transfer message text from user-facing output to avoid streaming dumps.
 - x402 payment approvals use `xfr_...` IDs and deterministic statuses (`proposed|approval_pending|approved|rejected|executing|filled|failed`).
