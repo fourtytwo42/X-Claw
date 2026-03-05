@@ -898,17 +898,17 @@ export default function AgentPublicProfilePage() {
       }
     }
 
-    const [depositPayload, withdrawsPayload, x402PaymentsPayload, x402ReceivePayload] = await Promise.all([
+    const [depositResult, withdrawsResult, x402PaymentsResult, x402ReceiveResult] = await Promise.allSettled([
       managementGet(`/api/v1/management/deposit?agentId=${encodeURIComponent(agentId)}&chainKey=${encodeURIComponent(activeChainKey)}`),
       managementGet(`/api/v1/management/withdraws?agentId=${encodeURIComponent(agentId)}&chainKey=${encodeURIComponent(activeChainKey)}`),
       managementGet(`/api/v1/management/x402/payments?agentId=${encodeURIComponent(agentId)}&chainKey=${encodeURIComponent(activeChainKey)}`),
       managementGet(`/api/v1/management/x402/receive-link?agentId=${encodeURIComponent(agentId)}&chainKey=${encodeURIComponent(activeChainKey)}`)
     ]);
 
-    setDepositData(depositPayload as DepositPayload);
-    setWithdrawsData(withdrawsPayload as WithdrawsPayload);
-    setX402Payments(x402PaymentsPayload as X402PaymentsPayload);
-    setX402ReceiveLink(x402ReceivePayload as X402ReceiveLinkPayload);
+    setDepositData(depositResult.status === 'fulfilled' ? (depositResult.value as DepositPayload) : null);
+    setWithdrawsData(withdrawsResult.status === 'fulfilled' ? (withdrawsResult.value as WithdrawsPayload) : null);
+    setX402Payments(x402PaymentsResult.status === 'fulfilled' ? (x402PaymentsResult.value as X402PaymentsPayload) : null);
+    setX402ReceiveLink(x402ReceiveResult.status === 'fulfilled' ? (x402ReceiveResult.value as X402ReceiveLinkPayload) : null);
   }, [activeChainKey, agentId, bootstrapToken]);
 
   const refreshAll = useCallback(async (options?: { showLoading?: boolean }) => {
