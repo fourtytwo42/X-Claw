@@ -11,6 +11,15 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 
 ---
 
+## 0.42) Slice 233 Runtime State + Auth/Policy Services
+
+- [x] Extract runtime auth and pending trade/spot flow persistence helpers into `runtime/services/runtime_state.py`.
+- [x] Extract transfer policy persistence/normalize/sync helpers into `runtime/services/transfer_policy.py`.
+- [x] Extract trade-cap ledger and trade-usage helpers into `runtime/services/trade_caps.py`.
+- [x] Keep `cli.py` wrappers thin and preserve current patch/test seams.
+- [x] Add direct service coverage and keep targeted runtime suites green.
+- [x] Run full sequential validation chain and capture evidence + issue comment.
+
 ## 0.40) Slice 231 Trade Router Execution Service Extraction
 
 - [x] Extract shared trade/router receipt, allowance, quote, and execute helpers into `runtime/services/trade_execution.py`.

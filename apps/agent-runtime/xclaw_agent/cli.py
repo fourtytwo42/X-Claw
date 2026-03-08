@@ -1497,41 +1497,38 @@ def _extract_agent_id_from_signed_key(api_key: str) -> str | None:
     return None
 
 
+def _build_runtime_state_service_ctx() -> runtime_services.RuntimeStateServiceContext:
+    return runtime_services.RuntimeStateServiceContext(
+        os_module=os,
+        pathlib_module=pathlib,
+        json_module=json,
+        ensure_app_dir=ensure_app_dir,
+        load_state=load_state,
+        save_state=save_state,
+        utc_now=utc_now,
+        pending_trade_intents_file=PENDING_TRADE_INTENTS_FILE,
+        pending_spot_trade_flows_file=PENDING_SPOT_TRADE_FLOWS_FILE,
+        state_file=STATE_FILE,
+        env_get=os.environ.get,
+        extract_agent_id_from_signed_key=_extract_agent_id_from_signed_key,
+        wallet_store_error=WalletStoreError,
+    )
+
+
 def _load_agent_runtime_auth() -> tuple[str | None, str | None]:
-    state = load_state()
-    state_agent_id = state.get("agentId")
-    state_api_key = state.get("agentApiKey")
-    agent_id = str(state_agent_id).strip() if isinstance(state_agent_id, str) else None
-    api_key = str(state_api_key).strip() if isinstance(state_api_key, str) else None
-    return agent_id, api_key
+    return runtime_services.load_agent_runtime_auth(_build_runtime_state_service_ctx())
 
 
 def _save_agent_runtime_auth(agent_id: str | None, api_key: str) -> None:
-    state = load_state()
-    state["agentApiKey"] = api_key
-    if agent_id:
-        state["agentId"] = agent_id
-    save_state(state)
+    runtime_services.save_agent_runtime_auth(_build_runtime_state_service_ctx(), agent_id, api_key)
 
 
 def _resolve_api_key() -> str:
-    env_api_key = (os.environ.get("XCLAW_AGENT_API_KEY") or "").strip()
-    if env_api_key:
-        return env_api_key
-    _, state_api_key = _load_agent_runtime_auth()
-    if state_api_key:
-        return state_api_key
-    raise WalletStoreError("Missing required auth: XCLAW_AGENT_API_KEY (or recovered key in runtime state).")
+    return runtime_services.resolve_api_key(_build_runtime_state_service_ctx())
 
 
 def _resolve_agent_id(api_key: str) -> str | None:
-    env_agent_id = (os.environ.get("XCLAW_AGENT_ID") or "").strip()
-    if env_agent_id:
-        return env_agent_id
-    state_agent_id, _ = _load_agent_runtime_auth()
-    if state_agent_id:
-        return state_agent_id
-    return _extract_agent_id_from_signed_key(api_key)
+    return runtime_services.resolve_agent_id(_build_runtime_state_service_ctx(), api_key)
 
 
 def _http_json_request(
@@ -1914,66 +1911,38 @@ def _to_non_negative_int(raw: Any) -> int:
     return value if value >= 0 else 0
 
 
+def _build_trade_caps_service_ctx() -> runtime_services.TradeCapsServiceContext:
+    return runtime_services.TradeCapsServiceContext(
+        load_state=load_state,
+        save_state=save_state,
+        utc_now=utc_now,
+        decimal_text=_decimal_text,
+        to_non_negative_decimal=_to_non_negative_decimal,
+        to_non_negative_int=_to_non_negative_int,
+        load_trade_usage_outbox=load_trade_usage_outbox,
+        save_trade_usage_outbox=save_trade_usage_outbox,
+        api_request=_api_request,
+        resolve_api_key=_resolve_api_key,
+        resolve_agent_id=_resolve_agent_id,
+        token_hex=secrets.token_hex,
+        wallet_store_error=WalletStoreError,
+    )
+
+
 def _load_trade_cap_ledger(state: dict[str, Any], chain: str, day_key: str) -> tuple[Decimal, int]:
-    ledger = state.get("tradeCapLedger")
-    if not isinstance(ledger, dict):
-        return Decimal("0"), 0
-    chain_ledger = ledger.get(chain)
-    if not isinstance(chain_ledger, dict):
-        return Decimal("0"), 0
-    row = chain_ledger.get(day_key)
-    if not isinstance(row, dict):
-        return Decimal("0"), 0
-    spend = _to_non_negative_decimal(row.get("dailySpendUsd", "0"))
-    filled = _to_non_negative_int(row.get("dailyFilledTrades", 0))
-    return spend, filled
+    return runtime_services.load_trade_cap_ledger(_build_trade_caps_service_ctx(), state, chain, day_key)
 
 
 def _record_trade_cap_ledger(state: dict[str, Any], chain: str, day_key: str, spend_usd: Decimal, filled_trades: int) -> None:
-    ledger = state.setdefault("tradeCapLedger", {})
-    if not isinstance(ledger, dict):
-        raise WalletStoreError("State field 'tradeCapLedger' must be an object.")
-    chain_ledger = ledger.setdefault(chain, {})
-    if not isinstance(chain_ledger, dict):
-        raise WalletStoreError(f"State trade cap ledger for chain '{chain}' must be an object.")
-    chain_ledger[day_key] = {
-        "dailySpendUsd": _decimal_text(spend_usd),
-        "dailyFilledTrades": int(max(0, filled_trades)),
-        "updatedAt": utc_now(),
-    }
-    save_state(state)
+    runtime_services.record_trade_cap_ledger(_build_trade_caps_service_ctx(), state, chain, day_key, spend_usd, filled_trades)
 
 
 def _queue_trade_usage_report(item: dict[str, Any]) -> None:
-    outbox = load_trade_usage_outbox()
-    outbox.append(item)
-    save_trade_usage_outbox(outbox)
+    runtime_services.queue_trade_usage_report(_build_trade_caps_service_ctx(), item)
 
 
 def _replay_trade_usage_outbox() -> tuple[int, int]:
-    queued = load_trade_usage_outbox()
-    if not queued:
-        return 0, 0
-    remaining: list[dict[str, Any]] = []
-    replayed = 0
-    for entry in queued:
-        payload = entry.get("payload")
-        idempotency_key = entry.get("idempotencyKey")
-        if not isinstance(payload, dict) or not isinstance(idempotency_key, str) or not idempotency_key.strip():
-            continue
-        status_code, body = _api_request(
-            "POST",
-            "/agent/trade-usage",
-            payload=payload,
-            include_idempotency=True,
-            idempotency_key=idempotency_key,
-        )
-        if status_code < 200 or status_code >= 300:
-            remaining.append(entry)
-            continue
-        replayed += 1
-    save_trade_usage_outbox(remaining)
-    return replayed, len(remaining)
+    return runtime_services.replay_trade_usage_outbox(_build_trade_caps_service_ctx())
 
 
 def _enforce_trade_caps(chain: str, projected_spend_usd: Decimal, projected_filled_trades: int) -> tuple[dict[str, Any], str, Decimal, int, dict[str, Any]]:
@@ -2017,40 +1986,7 @@ def _enforce_trade_caps(chain: str, projected_spend_usd: Decimal, projected_fill
 
 
 def _post_trade_usage(chain: str, utc_day: str, spend_usd_delta: Decimal, filled_trades_delta: int) -> None:
-    if spend_usd_delta < 0:
-        spend_usd_delta = Decimal("0")
-    if filled_trades_delta < 0:
-        filled_trades_delta = 0
-    if spend_usd_delta == 0 and filled_trades_delta == 0:
-        return
-
-    api_key = _resolve_api_key()
-    agent_id = _resolve_agent_id(api_key)
-    if not agent_id:
-        raise WalletStoreError("Agent id could not be resolved for trade-usage reporting.")
-
-    idempotency_key = f"rt-usage-{chain}-{utc_day}-{secrets.token_hex(8)}"
-    payload = {
-        "schemaVersion": 1,
-        "agentId": agent_id,
-        "chainKey": chain,
-        "utcDay": utc_day,
-        "spendUsdDelta": _decimal_text(spend_usd_delta),
-        "filledTradesDelta": int(filled_trades_delta),
-    }
-
-    status_code, body = _api_request(
-        "POST",
-        "/agent/trade-usage",
-        payload=payload,
-        include_idempotency=True,
-        idempotency_key=idempotency_key,
-    )
-    if status_code < 200 or status_code >= 300:
-        _queue_trade_usage_report({"idempotencyKey": idempotency_key, "payload": payload, "queuedAt": utc_now()})
-        code = str(body.get("code", "api_error"))
-        message = str(body.get("message", f"trade usage report failed ({status_code})"))
-        raise WalletStoreError(f"{code}: {message}")
+    runtime_services.post_trade_usage(_build_trade_caps_service_ctx(), chain, utc_day, spend_usd_delta, filled_trades_delta)
 
 
 def _canonical_event_for_trade_status(status: str) -> str:
@@ -2147,129 +2083,43 @@ def _trade_intent_key(chain: str, token_in: str, token_out: str, amount_in_human
 
 
 def _load_pending_trade_intents() -> dict[str, Any]:
-    try:
-        ensure_app_dir()
-        if not PENDING_TRADE_INTENTS_FILE.exists():
-            return {"version": 1, "intents": {}}
-        raw = PENDING_TRADE_INTENTS_FILE.read_text(encoding="utf-8")
-        payload = json.loads(raw or "{}")
-        if not isinstance(payload, dict):
-            return {"version": 1, "intents": {}}
-        intents = payload.get("intents")
-        if not isinstance(intents, dict):
-            payload["intents"] = {}
-        if payload.get("version") != 1:
-            return {"version": 1, "intents": {}}
-        return payload
-    except Exception:
-        return {"version": 1, "intents": {}}
+    return runtime_services.load_pending_trade_intents(_build_runtime_state_service_ctx())
 
 
 def _save_pending_trade_intents(payload: dict[str, Any]) -> None:
-    ensure_app_dir()
-    if payload.get("version") != 1:
-        payload["version"] = 1
-    if not isinstance(payload.get("intents"), dict):
-        payload["intents"] = {}
-    tmp = f"{PENDING_TRADE_INTENTS_FILE}.{os.getpid()}.tmp"
-    pathlib.Path(tmp).write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
-    if os.name != "nt":
-        os.chmod(tmp, 0o600)
-    pathlib.Path(tmp).replace(PENDING_TRADE_INTENTS_FILE)
-    if os.name != "nt":
-        os.chmod(PENDING_TRADE_INTENTS_FILE, 0o600)
+    runtime_services.save_pending_trade_intents(_build_runtime_state_service_ctx(), payload)
 
 
 def _get_pending_trade_intent(intent_key: str) -> dict[str, Any] | None:
-    state = _load_pending_trade_intents()
-    intents = state.get("intents")
-    if not isinstance(intents, dict):
-        return None
-    entry = intents.get(intent_key)
-    return entry if isinstance(entry, dict) else None
+    return runtime_services.get_pending_trade_intent(_build_runtime_state_service_ctx(), intent_key)
 
 
 def _record_pending_trade_intent(intent_key: str, entry: dict[str, Any]) -> None:
-    state = _load_pending_trade_intents()
-    intents = state.get("intents")
-    if not isinstance(intents, dict):
-        intents = {}
-        state["intents"] = intents
-    intents[intent_key] = {**entry, "updatedAt": utc_now()}
-    _save_pending_trade_intents(state)
+    runtime_services.record_pending_trade_intent(_build_runtime_state_service_ctx(), intent_key, entry)
 
 
 def _remove_pending_trade_intent(intent_key: str) -> None:
-    state = _load_pending_trade_intents()
-    intents = state.get("intents")
-    if not isinstance(intents, dict):
-        return
-    if intent_key in intents:
-        intents.pop(intent_key, None)
-        _save_pending_trade_intents(state)
+    runtime_services.remove_pending_trade_intent(_build_runtime_state_service_ctx(), intent_key)
 
 
 def _load_pending_spot_trade_flows() -> dict[str, Any]:
-    try:
-        ensure_app_dir()
-        if not PENDING_SPOT_TRADE_FLOWS_FILE.exists():
-            return {"version": 1, "flows": {}}
-        raw = PENDING_SPOT_TRADE_FLOWS_FILE.read_text(encoding="utf-8")
-        payload = json.loads(raw or "{}")
-        if not isinstance(payload, dict):
-            return {"version": 1, "flows": {}}
-        flows = payload.get("flows")
-        if not isinstance(flows, dict):
-            payload["flows"] = {}
-        if payload.get("version") != 1:
-            return {"version": 1, "flows": {}}
-        return payload
-    except Exception:
-        return {"version": 1, "flows": {}}
+    return runtime_services.load_pending_spot_trade_flows(_build_runtime_state_service_ctx())
 
 
 def _save_pending_spot_trade_flows(payload: dict[str, Any]) -> None:
-    ensure_app_dir()
-    if payload.get("version") != 1:
-        payload["version"] = 1
-    if not isinstance(payload.get("flows"), dict):
-        payload["flows"] = {}
-    tmp = f"{PENDING_SPOT_TRADE_FLOWS_FILE}.{os.getpid()}.tmp"
-    pathlib.Path(tmp).write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
-    if os.name != "nt":
-        os.chmod(tmp, 0o600)
-    pathlib.Path(tmp).replace(PENDING_SPOT_TRADE_FLOWS_FILE)
-    if os.name != "nt":
-        os.chmod(PENDING_SPOT_TRADE_FLOWS_FILE, 0o600)
+    runtime_services.save_pending_spot_trade_flows(_build_runtime_state_service_ctx(), payload)
 
 
 def _get_pending_spot_trade_flow(trade_id: str) -> dict[str, Any] | None:
-    state = _load_pending_spot_trade_flows()
-    flows = state.get("flows")
-    if not isinstance(flows, dict):
-        return None
-    entry = flows.get(trade_id)
-    return entry if isinstance(entry, dict) else None
+    return runtime_services.get_pending_spot_trade_flow(_build_runtime_state_service_ctx(), trade_id)
 
 
 def _record_pending_spot_trade_flow(trade_id: str, entry: dict[str, Any]) -> None:
-    state = _load_pending_spot_trade_flows()
-    flows = state.get("flows")
-    if not isinstance(flows, dict):
-        flows = {}
-        state["flows"] = flows
-    flows[trade_id] = {**entry, "updatedAt": utc_now()}
-    _save_pending_spot_trade_flows(state)
+    runtime_services.record_pending_spot_trade_flow(_build_runtime_state_service_ctx(), trade_id, entry)
 
 
 def _remove_pending_spot_trade_flow(trade_id: str) -> None:
-    state = _load_pending_spot_trade_flows()
-    flows = state.get("flows")
-    if not isinstance(flows, dict):
-        return
-    if trade_id in flows:
-        flows.pop(trade_id, None)
-        _save_pending_spot_trade_flows(state)
+    runtime_services.remove_pending_spot_trade_flow(_build_runtime_state_service_ctx(), trade_id)
 
 
 def _build_transfer_flow_service_ctx() -> runtime_services.TransferFlowContext:
@@ -2343,110 +2193,45 @@ def _is_stale_executing_transfer_flow(flow: dict[str, Any]) -> bool:
     return runtime_services.is_stale_executing_transfer_flow(_build_transfer_flow_service_ctx(), flow)
 
 
+def _build_transfer_policy_service_ctx() -> runtime_services.TransferPolicyServiceContext:
+    return runtime_services.TransferPolicyServiceContext(
+        transfer_policy_file=TRANSFER_POLICY_FILE,
+        read_json=_read_json,
+        write_json=_write_json,
+        utc_now=utc_now,
+        re_module=re,
+        api_request=_api_request,
+        urllib_parse=urllib.parse,
+        datetime_cls=datetime,
+    )
+
+
 def _default_transfer_policy() -> dict[str, Any]:
-    return {
-        "schemaVersion": 1,
-        "chains": {},
-    }
+    return runtime_services.default_transfer_policy()
 
 
 def _load_transfer_policy_state() -> dict[str, Any]:
-    try:
-        ensure_app_dir()
-        if not TRANSFER_POLICY_FILE.exists():
-            return _default_transfer_policy()
-        payload = _read_json(TRANSFER_POLICY_FILE)
-        if not isinstance(payload, dict):
-            return _default_transfer_policy()
-        if payload.get("schemaVersion") != 1:
-            return _default_transfer_policy()
-        chains = payload.get("chains")
-        if not isinstance(chains, dict):
-            payload["chains"] = {}
-        return payload
-    except Exception:
-        return _default_transfer_policy()
+    return runtime_services.load_transfer_policy_state(_build_transfer_policy_service_ctx())
 
 
 def _save_transfer_policy_state(payload: dict[str, Any]) -> None:
-    if payload.get("schemaVersion") != 1:
-        payload["schemaVersion"] = 1
-    chains = payload.get("chains")
-    if not isinstance(chains, dict):
-        payload["chains"] = {}
-    _write_json(TRANSFER_POLICY_FILE, payload)
+    runtime_services.save_transfer_policy_state(_build_transfer_policy_service_ctx(), payload)
 
 
 def _normalize_transfer_policy(chain: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
-    payload = payload or {}
-    mode = str(payload.get("transferApprovalMode") or "per_transfer").strip().lower()
-    if mode not in {"auto", "per_transfer"}:
-        mode = "per_transfer"
-    native_preapproved = bool(payload.get("nativeTransferPreapproved", False))
-    raw_tokens = payload.get("allowedTransferTokens")
-    out_tokens: list[str] = []
-    if isinstance(raw_tokens, list):
-        seen: set[str] = set()
-        for token in raw_tokens:
-            if not isinstance(token, str):
-                continue
-            normalized = token.strip().lower()
-            if re.fullmatch(r"0x[a-f0-9]{40}", normalized) and normalized not in seen:
-                seen.add(normalized)
-                out_tokens.append(normalized)
-    updated_at = str(payload.get("updatedAt") or "").strip() or utc_now()
-    return {
-        "chainKey": chain,
-        "transferApprovalMode": mode,
-        "nativeTransferPreapproved": native_preapproved,
-        "allowedTransferTokens": out_tokens,
-        "updatedAt": updated_at,
-    }
+    return runtime_services.normalize_transfer_policy(_build_transfer_policy_service_ctx(), chain, payload)
 
 
 def _get_transfer_policy(chain: str) -> dict[str, Any]:
-    state = _load_transfer_policy_state()
-    chains = state.get("chains")
-    if not isinstance(chains, dict):
-        chains = {}
-    row = chains.get(chain)
-    if not isinstance(row, dict):
-        row = {}
-    return _normalize_transfer_policy(chain, row)
+    return runtime_services.get_transfer_policy(_build_transfer_policy_service_ctx(), chain)
 
 
 def _set_transfer_policy(chain: str, policy: dict[str, Any]) -> dict[str, Any]:
-    normalized = _normalize_transfer_policy(chain, policy)
-    state = _load_transfer_policy_state()
-    chains = state.get("chains")
-    if not isinstance(chains, dict):
-        chains = {}
-        state["chains"] = chains
-    chains[chain] = normalized
-    _save_transfer_policy_state(state)
-    return normalized
+    return runtime_services.set_transfer_policy(_build_transfer_policy_service_ctx(), chain, policy)
 
 
 def _sync_transfer_policy_from_remote(chain: str) -> dict[str, Any]:
-    local = _get_transfer_policy(chain)
-    try:
-        status_code, body = _api_request("GET", f"/agent/transfer-policy?chainKey={urllib.parse.quote(chain)}")
-        if status_code < 200 or status_code >= 300:
-            return local
-        remote_raw = body.get("transferPolicy")
-        if not isinstance(remote_raw, dict):
-            return local
-        remote = _normalize_transfer_policy(chain, remote_raw)
-        try:
-            local_updated = datetime.fromisoformat(str(local.get("updatedAt")).replace("Z", "+00:00"))
-            remote_updated = datetime.fromisoformat(str(remote.get("updatedAt")).replace("Z", "+00:00"))
-            if remote_updated <= local_updated:
-                return local
-        except Exception:
-            pass
-        return _set_transfer_policy(chain, remote)
-    except Exception:
-        return local
+    return runtime_services.sync_transfer_policy_from_remote(_build_transfer_policy_service_ctx(), chain)
 
 
 def _mirror_transfer_approval(flow: dict[str, Any], *, require_delivery: bool = False) -> bool:

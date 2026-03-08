@@ -1,26 +1,27 @@
-# Slice 232 Acceptance Evidence: Final cli.py Reduction + Service-Hardening Pass
+# Slice 233 Acceptance Evidence: Runtime State + Auth/Policy Services
 
 Date (UTC): 2026-03-08  
-Active slice context: `Slice 232`.
+Active slice context: `Slice 233`.
 
-Issue mapping: `#85`
+Issue mapping: `#86`
 
 ### Objective + Scope Lock
 - Objective:
-  - move the remaining provider/liquidity execution helper ownership out of `cli.py`,
-  - preserve trade/liquidity runtime JSON/CLI behavior,
+  - move runtime auth/state/policy/trade-cap helper ownership out of `cli.py`,
+  - preserve runtime JSON/CLI behavior and on-disk formats,
   - keep patch/test seams stable through `cli.py` wrappers.
 
 ### Behavior Checks
-- [x] provider settings/fallback/provider-meta helper ownership lives in runtime services.
-- [x] advanced liquidity nested-command execution helper ownership lives in runtime services.
-- [x] `cli.py` preserves wrapper/test seams for trade and liquidity callers.
+- [x] runtime auth + pending trade/spot flow helper ownership lives in runtime services.
+- [x] transfer policy persistence/normalize/sync helper ownership lives in runtime services.
+- [x] trade-cap ledger and trade-usage helper ownership lives in runtime services.
+- [x] `cli.py` preserves wrapper/test seams for affected callers.
 - [x] direct runtime service tests cover the moved service seams.
 
 ### Required Validation Gates
-- [x] `python3 -m unittest -v apps/agent-runtime/tests/test_runtime_services.py apps/agent-runtime/tests/test_runtime_adapters.py apps/agent-runtime/tests/test_trade_path.py` -> PASS (`Ran 167 tests`, `OK`)
-- [x] `python3 -m unittest -v apps/agent-runtime/tests/test_approvals_run_loop.py apps/agent-runtime/tests/test_liquidity_cli.py apps/agent-runtime/tests/test_x402_cli.py` -> PASS (`Ran 26 tests`, `OK`)
-- [x] `npm run db:parity` -> PASS (`ok: true`, `checkedAt=2026-03-08T18:27:25.489Z`)
+- [x] `python3 -m unittest -v apps/agent-runtime/tests/test_runtime_services.py` -> PASS (`Ran 10 tests`, `OK`)
+- [x] `python3 -m unittest -v apps/agent-runtime/tests/test_trade_path.py apps/agent-runtime/tests/test_wallet_core.py apps/agent-runtime/tests/test_approvals_run_loop.py` -> PASS (`Ran 162 tests`, `OK`)
+- [x] `npm run db:parity` -> PASS (`ok: true`, `checkedAt=2026-03-08T19:08:31.929Z`)
 - [x] `npm run seed:reset` -> PASS
 - [x] `npm run seed:load` -> PASS
 - [x] `npm run seed:verify` -> PASS

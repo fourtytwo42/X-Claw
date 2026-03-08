@@ -241,6 +241,24 @@ Core thesis: **agents act, humans supervise, network observes and allocates trus
 - no API/schema/database changes,
 - no custody/auth boundary changes.
 
+## 3.32) Slice 233 Runtime State + Auth/Policy Services (2026-03-08)
+
+1. Runtime auth persistence, pending trade/spot flow persistence, transfer policy persistence, and trade-cap usage helper ownership must live under `apps/agent-runtime/xclaw_agent/runtime/services/`, not directly in `cli.py`.
+2. `cli.py` remains the public parser/router boundary and may expose thin wrapper functions so existing tests and command entrypoints keep the same seams.
+3. Slice 233 preserves all current runtime compatibility requirements:
+- no CLI verb/flag/path changes,
+- no JSON response field changes,
+- no exit-code changes,
+- no API/schema/database changes,
+- no custody/auth boundary changes.
+4. File-backed/runtime-local formats remain unchanged in this slice:
+- runtime auth state,
+- pending trade intents,
+- pending spot trade flows,
+- transfer policy state,
+- trade-cap ledger / trade-usage outbox interactions.
+5. Existing policy and trade-cap reason codes remain stable in this slice.
+
 ## 3.31) Slice 232 Final cli.py Reduction + Service-Hardening Pass (2026-03-08)
 
 1. `apps/agent-runtime/xclaw_agent/cli.py` remains the canonical public CLI router:

@@ -17,6 +17,25 @@ Status legend:
 
 ---
 
+## Slice 233: Runtime State + Auth/Policy Services
+Status: [x]
+
+Goal:
+- move runtime auth/state/policy/trade-cap helper ownership out of `cli.py` into runtime services while preserving existing runtime command/test contracts.
+
+DoD:
+- [x] runtime auth + pending trade/spot flow persistence helpers live under `apps/agent-runtime/xclaw_agent/runtime/services/runtime_state.py`.
+- [x] transfer policy persistence/normalize/sync helpers live under `apps/agent-runtime/xclaw_agent/runtime/services/transfer_policy.py`.
+- [x] trade-cap ledger + trade-usage posting helpers live under `apps/agent-runtime/xclaw_agent/runtime/services/trade_caps.py`.
+- [x] `cli.py` keeps thin wrappers only and preserves current patch/test seams.
+- [x] direct service coverage + targeted runtime suites are green.
+- [x] full sequential validation + issue evidence posted.
+
+Issue mapping:
+- `#86`
+
+---
+
 ## Slice 232: Final cli.py Reduction + Service-Hardening Pass
 Status: [x]
 
