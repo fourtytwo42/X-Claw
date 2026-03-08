@@ -21,12 +21,12 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 
 ## 0.49) Slice 240 Local State, Replay, and Corruption Hardening
 
-- [ ] Add direct corruption/replay coverage for `runtime/services/runtime_state.py`.
-- [ ] Add direct corruption/replay coverage for `runtime/services/transfer_flows.py`.
-- [ ] Add direct corruption/replay coverage for `runtime/services/approval_prompts.py`.
-- [ ] Add direct corruption/replay coverage for `runtime/services/trade_caps.py`.
-- [ ] Add direct corruption/replay coverage for `runtime/services/transfer_policy.py`.
-- [ ] Keep command-surface behavior unchanged and run the full sequential validation chain.
+- [x] Add direct corruption/replay coverage for `runtime/services/runtime_state.py`.
+- [x] Add direct corruption/replay coverage for `runtime/services/transfer_flows.py`.
+- [x] Add direct corruption/replay coverage for `runtime/services/approval_prompts.py`.
+- [x] Add direct corruption/replay coverage for `runtime/services/trade_caps.py`.
+- [x] Add direct corruption/replay coverage for `runtime/services/transfer_policy.py`.
+- [x] Keep command-surface behavior unchanged and run the full sequential validation chain.
 
 ## 0.48) Slice 239 Transport and Remote Failure Hardening
 

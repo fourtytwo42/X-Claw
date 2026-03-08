@@ -14,7 +14,37 @@
   - `routeKind`
   - `liquidityOperation`
 
-## Active Context: Slice 239 Transport and Remote Failure Hardening
+## Completed Context: Slice 240 Local State, Replay, and Corruption Hardening
+
+Issue mapping: `#93`
+
+### Objective + scope lock
+- Objective:
+  - harden local runtime state, replay, approval prompt, transfer flow, trade-cap, and policy helpers against corrupted local payloads and duplicate replay cases,
+  - preserve runtime JSON/CLI behavior and current command/test contracts,
+  - keep public runtime contracts unchanged.
+- Scope guard:
+  - runtime internal reliability hardening only,
+  - no API/schema/database changes.
+
+### Expected touched files
+- `apps/agent-runtime/tests/test_runtime_services.py`
+- `apps/agent-runtime/tests/test_trade_path.py`
+- `apps/agent-runtime/tests/test_approvals_run_loop.py`
+- `apps/agent-runtime/tests/test_liquidity_cli.py`
+- `apps/agent-runtime/xclaw_agent/runtime/services/trade_caps.py`
+- `docs/XCLAW_SOURCE_OF_TRUTH.md`
+- `docs/XCLAW_SLICE_TRACKER.md`
+- `docs/XCLAW_BUILD_ROADMAP.md`
+- `docs/CONTEXT_PACK.md`
+- `spec.md`
+- `tasks.md`
+- `acceptance.md`
+
+### Completion note
+- Completed 2026-03-08 with direct corruption/replay coverage for runtime state, transfer flow, approval prompt, trade-cap, and transfer policy services, plus the required sequential validation chain (`db:parity`, `seed:reset/load/verify`, `build`, `pm2 restart all`).
+
+## Completed Context: Slice 239 Transport and Remote Failure Hardening
 
 Issue mapping: `#92`
 

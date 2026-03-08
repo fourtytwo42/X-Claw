@@ -1,9 +1,9 @@
-# Slice 239 Tasks: Transport and Remote Failure Hardening (2026-03-08)
+# Slice 240 Tasks: Local State, Replay, and Corruption Hardening (2026-03-08)
 
-Issue mapping: `#92`
+Issue mapping: `#93`
 
-- [x] Add direct negative-path coverage for `agent_api.py`.
-- [x] Add direct negative-path coverage for `mirroring.py`.
-- [x] Add direct negative-path coverage for `reporting.py`.
-- [x] Add direct negative-path coverage for `telegram_delivery.py` and `owner_link_delivery.py`.
+- [x] Add direct corruption/replay coverage for `runtime_state.py`.
+- [x] Add direct corruption/replay coverage for `transfer_flows.py`.
+- [x] Add direct corruption/replay coverage for `approval_prompts.py`.
+- [x] Add direct corruption/replay coverage for `trade_caps.py` and `transfer_policy.py`.
 - [x] Run full sequential validations + capture evidence in `acceptance.md`.

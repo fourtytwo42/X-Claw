@@ -36,17 +36,17 @@ Issue mapping:
 ---
 
 ## Slice 240: Local State, Replay, and Corruption Hardening
-Status: [ ]
+Status: [x]
 
 Goal:
 - harden local runtime state, replay, approval prompt, transfer flow, and policy helpers against corrupted local payloads and partial replay failures while preserving current command/test contracts.
 
 DoD:
-- [ ] direct corruption/replay coverage exists for `runtime_state.py`, `transfer_flows.py`, `approval_prompts.py`, `trade_caps.py`, and `transfer_policy.py`.
-- [ ] malformed local state fails closed or resets to the existing safe empty state contract, without silent bad behavior.
-- [ ] replay, queue, and stale-recovery behavior remain deterministic and idempotent.
-- [ ] command-surface behavior remains unchanged for approvals, transfers, liquidity, and trade-cap callers.
-- [ ] full sequential validation + issue evidence posted.
+- [x] direct corruption/replay coverage exists for `runtime_state.py`, `transfer_flows.py`, `approval_prompts.py`, `trade_caps.py`, and `transfer_policy.py`.
+- [x] malformed local state fails closed or resets to the existing safe empty state contract, without silent bad behavior.
+- [x] replay, queue, and stale-recovery behavior remain deterministic and idempotent.
+- [x] command-surface behavior remains unchanged for approvals, transfers, liquidity, and trade-cap callers.
+- [x] full sequential validation + issue evidence posted.
 
 Issue mapping:
 - `#93`

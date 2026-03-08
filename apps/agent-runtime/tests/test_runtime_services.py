@@ -85,6 +85,26 @@ class RuntimeServicesTests(unittest.TestCase):
             loaded = transfer_flows.load_pending_transfer_flows(ctx)
             self.assertEqual(loaded, {"version": 1, "flows": {}})
 
+    def test_transfer_flow_service_native_balance_precondition_fails_closed(self) -> None:
+        ctx = SimpleNamespace(
+            fetch_token_balance_wei=lambda chain, wallet, token: "0",
+            fetch_native_balance_wei=lambda chain, wallet: "0",
+            transfer_amount_display=lambda amount, transfer_type, symbol, decimals: ("2", "ETH"),
+            wallet_store_error=cli.WalletStoreError,
+        )
+        with self.assertRaises(cli.WalletStoreError) as caught:
+            transfer_flows.assert_transfer_balance_preconditions(
+                ctx,
+                chain="base_sepolia",
+                transfer_type="native",
+                wallet_address="0x" + "11" * 20,
+                amount_wei="2",
+                token_address=None,
+                token_symbol="ETH",
+                token_decimals=18,
+            )
+        self.assertIn("Insufficient ETH balance", str(caught.exception))
+
     def test_transfer_flow_service_execute_propagates_pre_execution_mirror_failure(self) -> None:
         ctx = transfer_flows.TransferFlowContext(
             ensure_app_dir=lambda: None,
@@ -284,6 +304,54 @@ class RuntimeServicesTests(unittest.TestCase):
             approval_prompts.wait_for_trade_approval(ctx, "trd_1", "base_sepolia", {"tokenInSymbol": "WETH"})
         self.assertEqual(caught.exception.code, "approval_required")
 
+    def test_approval_prompt_service_invalid_prompt_file_falls_back_to_empty(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            prompts_file = pathlib.Path(tmpdir) / "approval-prompts.json"
+            prompts_file.write_text('{"prompts":[]}', encoding="utf-8")
+            ctx = approval_prompts.ApprovalPromptContext(
+                ensure_app_dir=lambda: None,
+                prompts_file=prompts_file,
+                json_module=cli.json,
+                os_module=cli.os,
+                pathlib_module=cli.pathlib,
+                utc_now=cli.utc_now,
+                parse_iso_utc=cli._parse_iso_utc,
+                get_approval_prompt=lambda trade_id: None,
+                record_approval_prompt=mock.Mock(),
+                post_approval_prompt_metadata=mock.Mock(),
+                read_openclaw_last_delivery=lambda: None,
+                maybe_send_telegram_approval_prompt=mock.Mock(),
+                trade_approval_prompt_resend_cooldown_sec=lambda: 60,
+                telegram_dispatch_suppressed_for_harness=lambda: False,
+                display_chain_key=cli._display_chain_key,
+                transfer_amount_display=cli._transfer_amount_display,
+                token_symbol_for_display=cli._token_symbol_for_display,
+                is_solana_chain=cli._is_solana_chain,
+                is_solana_address=cli.is_solana_address,
+                solana_mint_decimals=cli._solana_mint_decimals,
+                normalize_amount_human_text=cli._normalize_amount_human_text,
+                format_units=cli._format_units,
+                require_openclaw_bin=lambda: "openclaw",
+                run_subprocess=mock.Mock(),
+                extract_openclaw_message_id=lambda stdout: None,
+                api_request=lambda *args, **kwargs: (200, {"ok": True}),
+                wallet_store_error=cli.WalletStoreError,
+                openclaw_state_dir=cli._openclaw_state_dir,
+                sanitize_openclaw_agent_id=cli._sanitize_openclaw_agent_id,
+                approval_wait_timeout_sec=1,
+                approval_wait_poll_sec=0,
+                last_delivery_is_telegram=lambda: False,
+                trade_approval_inline_wait_sec=lambda: 1,
+                read_trade_details=lambda trade_id: {"tradeId": trade_id, "status": "approval_pending"},
+                maybe_delete_telegram_approval_prompt=lambda trade_id: None,
+                maybe_send_telegram_decision_message=lambda **kwargs: None,
+                remove_pending_spot_trade_flow=lambda trade_id: None,
+                remove_approval_prompt=lambda trade_id: None,
+                time_module=SimpleNamespace(time=lambda: 0, sleep=lambda _: None),
+                wallet_policy_error=cli.WalletPolicyError,
+            )
+            self.assertEqual(approval_prompts.load_approval_prompts(ctx), {"prompts": {}})
+
     def test_trade_execution_service_builds_router_quote_request(self) -> None:
         quote_mock = mock.Mock(return_value={"amountOutUnits": "123", "routeKind": "router_path"})
         ctx = trade_execution.TradeExecutionServiceContext(
@@ -420,6 +488,49 @@ class RuntimeServicesTests(unittest.TestCase):
             runtime_state.remove_pending_spot_trade_flow(ctx, "trd_1")
             self.assertIsNone(runtime_state.get_pending_spot_trade_flow(ctx, "trd_1"))
 
+    def test_runtime_state_service_corrupted_pending_files_reset_to_safe_empty(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            pending_intents = pathlib.Path(tmpdir) / "pending-trade-intents.json"
+            pending_flows = pathlib.Path(tmpdir) / "pending-spot-trade-flows.json"
+            pending_intents.write_text('["bad"]', encoding="utf-8")
+            pending_flows.write_text('{"version":2,"flows":{"trd_1":{"tradeId":"trd_1"}}}', encoding="utf-8")
+            ctx = runtime_state.RuntimeStateServiceContext(
+                os_module=os,
+                pathlib_module=pathlib,
+                json_module=cli.json,
+                ensure_app_dir=lambda: None,
+                load_state=lambda: {},
+                save_state=lambda payload: None,
+                utc_now=cli.utc_now,
+                pending_trade_intents_file=pending_intents,
+                pending_spot_trade_flows_file=pending_flows,
+                state_file=pathlib.Path(tmpdir) / "state.json",
+                env_get=lambda key: None,
+                extract_agent_id_from_signed_key=lambda api_key: None,
+                wallet_store_error=cli.WalletStoreError,
+            )
+            self.assertEqual(runtime_state.load_pending_trade_intents(ctx), {"version": 1, "intents": {}})
+            self.assertEqual(runtime_state.load_pending_spot_trade_flows(ctx), {"version": 1, "flows": {}})
+
+    def test_runtime_state_service_env_api_key_takes_precedence_over_state(self) -> None:
+        ctx = runtime_state.RuntimeStateServiceContext(
+            os_module=os,
+            pathlib_module=pathlib,
+            json_module=cli.json,
+            ensure_app_dir=lambda: None,
+            load_state=lambda: {"agentApiKey": "xak_state", "agentId": "ag_state"},
+            save_state=lambda payload: None,
+            utc_now=cli.utc_now,
+            pending_trade_intents_file=pathlib.Path("/tmp/pending-intents-unused.json"),
+            pending_spot_trade_flows_file=pathlib.Path("/tmp/pending-flows-unused.json"),
+            state_file=pathlib.Path("/tmp/state-unused.json"),
+            env_get=lambda key: "xak_env" if key == "XCLAW_AGENT_API_KEY" else None,
+            extract_agent_id_from_signed_key=lambda api_key: "ag_signed",
+            wallet_store_error=cli.WalletStoreError,
+        )
+        self.assertEqual(runtime_state.resolve_api_key(ctx), "xak_env")
+        self.assertEqual(runtime_state.resolve_agent_id(ctx, "xak1.ag_signed.sig"), "ag_state")
+
     def test_transfer_policy_service_normalizes_and_syncs(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             path = pathlib.Path(tmpdir) / "transfer-policy.json"
@@ -452,6 +563,39 @@ class RuntimeServicesTests(unittest.TestCase):
             self.assertEqual(synced["transferApprovalMode"], "auto")
             self.assertTrue(synced["nativeTransferPreapproved"])
             self.assertEqual(synced["allowedTransferTokens"], ["0x" + "11" * 20])
+
+    def test_transfer_policy_service_invalid_state_and_older_remote_preserve_safe_local(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = pathlib.Path(tmpdir) / "transfer-policy.json"
+            path.write_text('["bad"]', encoding="utf-8")
+            ctx = transfer_policy.TransferPolicyServiceContext(
+                transfer_policy_file=path,
+                read_json=lambda p: cli.json.loads(p.read_text(encoding="utf-8")),
+                write_json=lambda p, payload: p.write_text(cli.json.dumps(payload), encoding="utf-8"),
+                utc_now=lambda: "2026-03-08T00:00:00+00:00",
+                re_module=cli.re,
+                api_request=lambda *args, **kwargs: (
+                    200,
+                    {
+                        "transferPolicy": {
+                            "transferApprovalMode": "auto",
+                            "nativeTransferPreapproved": True,
+                            "allowedTransferTokens": ["0x" + "11" * 20],
+                            "updatedAt": "2026-03-07T00:00:00+00:00",
+                        }
+                    },
+                ),
+                urllib_parse=cli.urllib.parse,
+                datetime_cls=datetime,
+            )
+            self.assertEqual(transfer_policy.load_transfer_policy_state(ctx), {"schemaVersion": 1, "chains": {}})
+            local = transfer_policy.set_transfer_policy(
+                ctx,
+                "base_sepolia",
+                {"transferApprovalMode": "per_transfer", "updatedAt": "2026-03-08T12:00:00+00:00"},
+            )
+            synced = transfer_policy.sync_transfer_policy_from_remote(ctx, "base_sepolia")
+            self.assertEqual(synced, local)
 
     def test_trade_caps_service_records_and_queues_usage(self) -> None:
         state_store: dict[str, object] = {}
@@ -513,6 +657,33 @@ class RuntimeServicesTests(unittest.TestCase):
         self.assertEqual((replayed, remaining), (1, 1))
         self.assertEqual(len(outbox), 1)
         self.assertEqual(outbox[0]["idempotencyKey"], "idem_2")
+
+    def test_trade_caps_service_replay_deduplicates_duplicate_idempotency_keys(self) -> None:
+        outbox = [
+            {"idempotencyKey": "idem_1", "payload": {"a": 1}},
+            {"idempotencyKey": "idem_1", "payload": {"a": 1}},
+            {"idempotencyKey": "idem_2", "payload": {"a": 2}},
+        ]
+        api_request = mock.Mock(side_effect=[(200, {"ok": True}), (503, {"message": "down"})])
+        ctx = trade_caps.TradeCapsServiceContext(
+            load_state=lambda: {},
+            save_state=lambda payload: None,
+            utc_now=cli.utc_now,
+            decimal_text=cli._decimal_text,
+            to_non_negative_decimal=cli._to_non_negative_decimal,
+            to_non_negative_int=cli._to_non_negative_int,
+            load_trade_usage_outbox=lambda: list(outbox),
+            save_trade_usage_outbox=lambda items: (outbox.clear(), outbox.extend(items)),
+            api_request=api_request,
+            resolve_api_key=lambda: "xak_test",
+            resolve_agent_id=lambda api_key: "ag_1",
+            token_hex=lambda n: "abcd1234",
+            wallet_store_error=cli.WalletStoreError,
+        )
+        replayed, remaining = trade_caps.replay_trade_usage_outbox(ctx)
+        self.assertEqual((replayed, remaining), (1, 1))
+        self.assertEqual(api_request.call_count, 2)
+        self.assertEqual(outbox, [{"idempotencyKey": "idem_2", "payload": {"a": 2}}])
 
     def test_trade_caps_service_post_usage_missing_agent_id_fails_closed(self) -> None:
         ctx = trade_caps.TradeCapsServiceContext(

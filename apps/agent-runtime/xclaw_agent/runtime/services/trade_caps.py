@@ -79,11 +79,15 @@ def replay_trade_usage_outbox(ctx: TradeCapsServiceContext) -> tuple[int, int]:
         return 0, 0
     remaining: list[dict[str, Any]] = []
     replayed = 0
+    seen_idempotency_keys: set[str] = set()
     for entry in queued:
         payload = entry.get("payload")
         idempotency_key = entry.get("idempotencyKey")
         if not isinstance(payload, dict) or not isinstance(idempotency_key, str) or not idempotency_key.strip():
             continue
+        if idempotency_key in seen_idempotency_keys:
+            continue
+        seen_idempotency_keys.add(idempotency_key)
         status_code, _body = ctx.api_request(
             "POST",
             "/agent/trade-usage",
