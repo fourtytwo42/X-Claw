@@ -11,6 +11,14 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 
 ---
 
+## 0.44) Slice 235 Status/Reporting Services + Final cli.py Audit
+
+- [x] Extract trade/liquidity status posting helpers into `runtime/services/reporting.py`.
+- [x] Extract trade-detail read + trade execution report helpers into `runtime/services/reporting.py`.
+- [x] Keep `cli.py` wrappers thin and preserve current patch/test seams.
+- [x] Add direct service coverage and keep targeted runtime suites green.
+- [x] Run full sequential validation chain and capture evidence + issue comment.
+
 ## 0.43) Slice 234 Telegram Messaging + Delivery Cleanup Services
 
 - [x] Extract Telegram transfer/policy/liquidity prompt send helpers into `runtime/services/telegram_delivery.py`.

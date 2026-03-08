@@ -17,6 +17,24 @@ Status legend:
 
 ---
 
+## Slice 235: Status/Reporting Services + Final cli.py Audit
+Status: [x]
+
+Goal:
+- move trade/liquidity status posting and trade execution report helper ownership out of `cli.py` into runtime services while preserving current runtime command/test contracts.
+
+DoD:
+- [x] trade/liquidity status posting helper ownership lives under `apps/agent-runtime/xclaw_agent/runtime/services/reporting.py`.
+- [x] trade-detail read + trade execution report helper ownership lives under `apps/agent-runtime/xclaw_agent/runtime/services/reporting.py`.
+- [x] `cli.py` keeps thin wrappers only and preserves current patch/test seams.
+- [x] direct service coverage + targeted runtime suites are green.
+- [x] full sequential validation + issue evidence posted.
+
+Issue mapping:
+- `#88`
+
+---
+
 ## Slice 234: Telegram Messaging + Delivery Cleanup Services
 Status: [x]
 

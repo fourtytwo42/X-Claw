@@ -13,7 +13,7 @@ AGENT_RUNTIME_ROOT = REPO_ROOT / "apps" / "agent-runtime"
 if str(AGENT_RUNTIME_ROOT) not in sys.path:
     sys.path.insert(0, str(AGENT_RUNTIME_ROOT))
 
-from xclaw_agent.runtime.services import approval_prompts, execution_contracts, liquidity_execution, owner_link_delivery, runtime_state, telegram_delivery, trade_caps, trade_execution, transfer_flows, transfer_policy  # noqa: E402
+from xclaw_agent.runtime.services import approval_prompts, execution_contracts, liquidity_execution, owner_link_delivery, reporting, runtime_state, telegram_delivery, trade_caps, trade_execution, transfer_flows, transfer_policy  # noqa: E402
 from xclaw_agent import cli  # noqa: E402
 
 
@@ -370,6 +370,73 @@ class RuntimeServicesTests(unittest.TestCase):
         result = owner_link_delivery.maybe_send_owner_link_to_active_chat(ctx, "https://xclaw.trade/agents/ag_1?token=ol1.test", "2026-02-18T16:39:52.313Z")
         self.assertFalse(bool(result.get("sent")))
         self.assertEqual(result.get("reason"), "telegram_channel_skipped")
+
+    def test_reporting_service_posts_trade_status_with_watcher_metadata(self) -> None:
+        api_request = mock.Mock(return_value=(200, {"ok": True}))
+        ctx = reporting.ReportingServiceContext(
+            api_request=api_request,
+            wallet_store_error=cli.WalletStoreError,
+            parse_decision_at=lambda value: value or "2026-03-08T00:00:00+00:00",
+            utc_now=lambda: "2026-03-08T00:00:01+00:00",
+            watcher_run_id=lambda: "wrun_test",
+            canonical_event_for_trade_status=lambda status: f"trade.{status}",
+        )
+        reporting.post_trade_status(
+            ctx,
+            trade_id="trd_1",
+            from_status="approved",
+            to_status="filled",
+            extra={"txHash": "0x" + "ab" * 32},
+            idempotency_key="idem_1",
+        )
+        self.assertEqual(api_request.call_args.args[:2], ("POST", "/trades/trd_1/status"))
+        payload = api_request.call_args.kwargs["payload"]
+        self.assertEqual(payload["watcherRunId"], "wrun_test")
+        self.assertEqual(payload["txHash"], "0x" + "ab" * 32)
+        self.assertEqual(api_request.call_args.kwargs["idempotency_key"], "idem_1")
+
+    def test_reporting_service_reads_trade_details_and_sends_execution_report(self) -> None:
+        api_request = mock.Mock(
+            side_effect=[
+                (200, {"trade": {"tradeId": "trd_1", "agentId": "ag_1", "status": "filled", "mode": "real", "chainKey": "base_sepolia"}}),
+                (200, {"trade": {"tradeId": "trd_1", "agentId": "ag_1", "status": "filled", "mode": "real", "chainKey": "base_sepolia"}}),
+                (200, {"ok": True}),
+            ]
+        )
+        ctx = reporting.ReportingServiceContext(
+            api_request=api_request,
+            wallet_store_error=cli.WalletStoreError,
+            parse_decision_at=lambda value: value or "2026-03-08T00:00:00+00:00",
+            utc_now=lambda: "2026-03-08T00:00:01+00:00",
+            watcher_run_id=lambda: "wrun_test",
+            canonical_event_for_trade_status=lambda status: f"trade.{status}",
+        )
+        trade = reporting.read_trade_details(ctx, "trd_1")
+        self.assertEqual(trade["tradeId"], "trd_1")
+        result = reporting.send_trade_execution_report_via_context(ctx, trade_id="trd_1")
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["eventType"], "trade.filled")
+        self.assertEqual(api_request.call_args.args[:2], ("POST", "/events"))
+
+    def test_reporting_service_posts_liquidity_status_without_none_fields(self) -> None:
+        api_request = mock.Mock(return_value=(200, {"ok": True}))
+        ctx = reporting.ReportingServiceContext(
+            api_request=api_request,
+            wallet_store_error=cli.WalletStoreError,
+            parse_decision_at=lambda value: value or "2026-03-08T00:00:00+00:00",
+            utc_now=lambda: "2026-03-08T00:00:01+00:00",
+            watcher_run_id=lambda: "wrun_test",
+            canonical_event_for_trade_status=lambda status: f"trade.{status}",
+        )
+        reporting.post_liquidity_status(
+            ctx,
+            liquidity_intent_id="liq_1",
+            to_status="filled",
+            extra={"txHash": "0x1", "receipt": None},
+        )
+        self.assertEqual(api_request.call_args.args[:2], ("POST", "/liquidity/liq_1/status"))
+        payload = api_request.call_args.kwargs["payload"]
+        self.assertEqual(payload, {"status": "filled", "txHash": "0x1"})
 
 
 if __name__ == "__main__":

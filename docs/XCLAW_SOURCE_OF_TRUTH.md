@@ -241,6 +241,22 @@ Core thesis: **agents act, humans supervise, network observes and allocates trus
 - no API/schema/database changes,
 - no custody/auth boundary changes.
 
+## 3.34) Slice 235 Status/Reporting Services + Final cli.py Audit (2026-03-08)
+
+1. Trade/liquidity status posting helper ownership must live under `apps/agent-runtime/xclaw_agent/runtime/services/reporting.py`, not directly in `cli.py`.
+2. Trade-detail read and execution-report helper ownership must live under runtime reporting services.
+3. `cli.py` remains the public parser/router boundary and may expose thin wrapper functions so existing tests and command entrypoints keep the same seams.
+4. Slice 235 preserves all current runtime compatibility requirements:
+- no CLI verb/flag/path changes,
+- no JSON response field changes,
+- no exit-code changes,
+- no API/schema/database changes,
+- no custody/auth boundary changes.
+5. Existing watcher/reporting/status semantics remain unchanged in this slice:
+- trade/liquidity status payload shapes remain stable,
+- trade execution event typing remains stable,
+- no new mock/stub execution paths are introduced.
+
 ## 3.33) Slice 234 Telegram Messaging + Delivery Cleanup Services (2026-03-08)
 
 1. Telegram transfer/policy/liquidity prompt send helper ownership must live under `apps/agent-runtime/xclaw_agent/runtime/services/telegram_delivery.py`, not directly in `cli.py`.

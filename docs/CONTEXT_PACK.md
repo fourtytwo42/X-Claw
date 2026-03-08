@@ -14,7 +14,39 @@
   - `routeKind`
   - `liquidityOperation`
 
-## Active Context: Slice 234 Telegram Messaging + Delivery Cleanup Services
+## Active Context: Slice 235 Status/Reporting Services + Final cli.py Audit
+
+Issue mapping: `#88`
+
+### Objective + scope lock
+- Objective:
+  - move trade/liquidity status posting and trade execution report helper ownership out of `cli.py`,
+  - preserve runtime JSON/CLI behavior and reporting/status contracts,
+  - keep `cli.py` as parser/router + thin compatibility wrappers only.
+- Scope guard:
+  - runtime internal hardening only,
+  - no API/schema/database changes.
+
+### Expected touched files
+- `apps/agent-runtime/xclaw_agent/cli.py`
+- `apps/agent-runtime/xclaw_agent/runtime/services/__init__.py`
+- `apps/agent-runtime/xclaw_agent/runtime/services/reporting.py`
+- `apps/agent-runtime/tests/test_runtime_services.py`
+- `apps/agent-runtime/tests/test_trade_path.py`
+- `apps/agent-runtime/tests/test_liquidity_cli.py`
+- `apps/agent-runtime/tests/test_x402_cli.py`
+- `docs/XCLAW_SOURCE_OF_TRUTH.md`
+- `docs/XCLAW_SLICE_TRACKER.md`
+- `docs/XCLAW_BUILD_ROADMAP.md`
+- `docs/CONTEXT_PACK.md`
+- `spec.md`
+- `tasks.md`
+- `acceptance.md`
+
+### Completion note
+- Completed 2026-03-08 with direct runtime reporting-service coverage plus targeted runtime regressions and the required sequential validation chain (`db:parity`, `seed:reset/load/verify`, `build`, `pm2 restart all`).
+
+## Completed Context: Slice 234 Telegram Messaging + Delivery Cleanup Services
 
 Issue mapping: `#87`
 
@@ -44,6 +76,9 @@ Issue mapping: `#87`
 - `spec.md`
 - `tasks.md`
 - `acceptance.md`
+
+### Completion note
+- Completed 2026-03-08 with direct runtime service coverage plus targeted runtime regressions and the required sequential validation chain (`db:parity`, `seed:reset/load/verify`, `build`, `pm2 restart all`).
 
 ### Completion note
 - Completed 2026-03-08 with direct runtime service coverage plus targeted runtime regressions and the required sequential validation chain (`db:parity`, `seed:reset/load/verify`, `build`, `pm2 restart all`).

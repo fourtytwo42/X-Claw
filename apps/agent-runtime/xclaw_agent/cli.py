@@ -3019,6 +3019,17 @@ def _watcher_run_id() -> str:
     return run_id
 
 
+def _build_reporting_service_ctx() -> runtime_services.ReportingServiceContext:
+    return runtime_services.ReportingServiceContext(
+        api_request=_api_request,
+        wallet_store_error=WalletStoreError,
+        parse_decision_at=_parse_decision_at,
+        utc_now=utc_now,
+        watcher_run_id=_watcher_run_id,
+        canonical_event_for_trade_status=_canonical_event_for_trade_status,
+    )
+
+
 def _post_trade_status(
     trade_id: str,
     from_status: str,
@@ -3028,29 +3039,15 @@ def _post_trade_status(
     idempotency_key: str | None = None,
     decision_at: str | None = None,
 ) -> None:
-    payload: dict[str, Any] = {
-        "tradeId": trade_id,
-        "fromStatus": from_status,
-        "toStatus": to_status,
-        "at": _parse_decision_at(decision_at),
-        "observedBy": "agent_watcher",
-        "observationSource": "local_send_result",
-        "observedAt": utc_now(),
-        "watcherRunId": _watcher_run_id(),
-    }
-    if extra:
-        payload.update(extra)
-    status_code, body = _api_request(
-        "POST",
-        f"/trades/{trade_id}/status",
-        payload=payload,
-        include_idempotency=True,
+    return runtime_services.post_trade_status(
+        _build_reporting_service_ctx(),
+        trade_id=trade_id,
+        from_status=from_status,
+        to_status=to_status,
+        extra=extra,
         idempotency_key=idempotency_key,
+        decision_at=decision_at,
     )
-    if status_code < 200 or status_code >= 300:
-        code = str(body.get("code", "api_error"))
-        message = str(body.get("message", f"trade status update failed ({status_code})"))
-        raise WalletStoreError(f"{code}: {message}")
 
 
 def _post_liquidity_status(
@@ -3058,22 +3055,12 @@ def _post_liquidity_status(
     to_status: str,
     extra: dict[str, Any] | None = None,
 ) -> None:
-    payload: dict[str, Any] = {"status": to_status}
-    if extra:
-        for key, value in extra.items():
-            if value is None:
-                continue
-            payload[key] = value
-    status_code, body = _api_request(
-        "POST",
-        f"/liquidity/{urllib.parse.quote(liquidity_intent_id)}/status",
-        payload=payload,
-        include_idempotency=True,
+    return runtime_services.post_liquidity_status(
+        _build_reporting_service_ctx(),
+        liquidity_intent_id=urllib.parse.quote(liquidity_intent_id),
+        to_status=to_status,
+        extra=extra,
     )
-    if status_code < 200 or status_code >= 300:
-        code = str(body.get("code", "api_error"))
-        message = str(body.get("message", f"liquidity status update failed ({status_code})"))
-        raise WalletStoreError(f"{code}: {message}")
 
 
 def _read_liquidity_intent(liquidity_intent_id: str, chain: str) -> dict[str, Any]:
@@ -5549,15 +5536,7 @@ def _execute_solana_trade(
 def cmd_trade_spot(args: argparse.Namespace) -> int:
     return trade_commands.cmd_trade_spot(_build_trade_runtime_adapter(), args)
 def _read_trade_details(trade_id: str) -> dict[str, Any]:
-    status_code, body = _api_request("GET", f"/trades/{trade_id}")
-    if status_code < 200 or status_code >= 300:
-        code = str(body.get("code", "api_error"))
-        message = str(body.get("message", f"trade read failed ({status_code})"))
-        raise WalletStoreError(f"{code}: {message}")
-    trade = body.get("trade")
-    if not isinstance(trade, dict):
-        raise WalletStoreError("Trade details response missing trade object.")
-    return trade
+    return runtime_services.read_trade_details(_build_reporting_service_ctx(), trade_id)
 
 
 def _execution_wallet(store: dict[str, Any], chain: str) -> tuple[str, str]:
@@ -6281,12 +6260,9 @@ def cmd_approvals_check(args: argparse.Namespace) -> int:
 def cmd_trade_execute(args: argparse.Namespace) -> int:
     return trade_commands.cmd_trade_execute(_build_trade_runtime_adapter(), args)
 def _send_trade_execution_report(trade_id: str) -> dict[str, Any]:
-    return runtime_services.send_trade_execution_report(
+    return runtime_services.send_trade_execution_report_via_context(
+        _build_reporting_service_ctx(),
         trade_id=trade_id,
-        read_trade_details=_read_trade_details,
-        canonical_event_for_trade_status=_canonical_event_for_trade_status,
-        api_request=_api_request,
-        wallet_store_error=WalletStoreError,
     )
 
 
