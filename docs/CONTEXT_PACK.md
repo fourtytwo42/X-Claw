@@ -14,7 +14,39 @@
   - `routeKind`
   - `liquidityOperation`
 
-## Active Context: Slice 236 API/Mirroring/Reporting Failure-Injection Hardening
+## Active Context: Slice 237 Transfer-Flow/Approval-Prompt/Trade-Cap Resilience
+
+Issue mapping: `#91`
+
+### Objective + scope lock
+- Objective:
+  - harden transfer-flow, approval-prompt, and trade-cap services against malformed local state and partial failures,
+  - preserve runtime JSON/CLI behavior and approval/replay contracts,
+  - keep current command-surface behavior unchanged.
+- Scope guard:
+  - runtime internal hardening only,
+  - no API/schema/database changes.
+
+### Expected touched files
+- `apps/agent-runtime/xclaw_agent/runtime/services/transfer_flows.py`
+- `apps/agent-runtime/xclaw_agent/runtime/services/approval_prompts.py`
+- `apps/agent-runtime/xclaw_agent/runtime/services/trade_caps.py`
+- `apps/agent-runtime/tests/test_runtime_services.py`
+- `apps/agent-runtime/tests/test_trade_path.py`
+- `apps/agent-runtime/tests/test_approvals_run_loop.py`
+- `apps/agent-runtime/tests/test_liquidity_cli.py`
+- `docs/XCLAW_SOURCE_OF_TRUTH.md`
+- `docs/XCLAW_SLICE_TRACKER.md`
+- `docs/XCLAW_BUILD_ROADMAP.md`
+- `docs/CONTEXT_PACK.md`
+- `spec.md`
+- `tasks.md`
+- `acceptance.md`
+
+### Completion note
+- Completed 2026-03-08 with direct resilience coverage plus targeted runtime regressions and the required sequential validation chain (`db:parity`, `seed:reset/load/verify`, `build`, `pm2 restart all`).
+
+## Completed Context: Slice 236 API/Mirroring/Reporting Failure-Injection Hardening
 
 Issue mapping: `#90`
 

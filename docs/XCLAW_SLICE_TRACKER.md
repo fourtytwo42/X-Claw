@@ -17,6 +17,24 @@ Status legend:
 
 ---
 
+## Slice 237: Transfer-Flow/Approval-Prompt/Trade-Cap Resilience
+Status: [x]
+
+Goal:
+- harden local-state recovery, approval lifecycle, and trade-cap replay behavior in runtime services while preserving all current runtime command/test contracts.
+
+DoD:
+- [x] direct resilience coverage exists for `transfer_flows.py`, `approval_prompts.py`, and `trade_caps.py`.
+- [x] stale recovery, resend cooldown, cleanup failure tolerance, and replay/queue behavior are deterministic and preserved.
+- [x] local malformed state fails closed without silent bad behavior.
+- [x] command-surface behavior remains unchanged for approvals, transfers, and trade-cap paths.
+- [x] full sequential validation + issue evidence posted.
+
+Issue mapping:
+- `#91`
+
+---
+
 ## Slice 236: API/Mirroring/Reporting Failure-Injection Hardening
 Status: [x]
 

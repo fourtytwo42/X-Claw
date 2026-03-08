@@ -5,6 +5,14 @@ from decimal import Decimal
 from typing import Any, Callable
 
 
+def _response_error(body: dict[str, Any] | Any, fallback_message: str) -> str:
+    if isinstance(body, dict):
+        code = str(body.get("code", "api_error"))
+        message = str(body.get("message", fallback_message))
+        return f"{code}: {message}"
+    return f"api_error: {fallback_message}"
+
+
 @dataclass(frozen=True)
 class TradeCapsServiceContext:
     load_state: Callable[[], dict[str, Any]]
@@ -123,6 +131,4 @@ def post_trade_usage(ctx: TradeCapsServiceContext, chain: str, utc_day: str, spe
     )
     if status_code < 200 or status_code >= 300:
         queue_trade_usage_report(ctx, {"idempotencyKey": idempotency_key, "payload": payload, "queuedAt": ctx.utc_now()})
-        code = str(body.get("code", "api_error"))
-        message = str(body.get("message", f"trade usage report failed ({status_code})"))
-        raise ctx.wallet_store_error(f"{code}: {message}")
+        raise ctx.wallet_store_error(_response_error(body, f"trade usage report failed ({status_code})"))

@@ -241,6 +241,19 @@ Core thesis: **agents act, humans supervise, network observes and allocates trus
 - no API/schema/database changes,
 - no custody/auth boundary changes.
 
+## 3.36) Slice 237 Transfer-Flow/Approval-Prompt/Trade-Cap Resilience (2026-03-08)
+
+1. Transfer-flow, approval-prompt, and trade-cap service helpers must handle malformed local state and partial failure paths deterministically.
+2. Stale executing transfer recovery, approval prompt resend/cooldown behavior, prompt cleanup failure tolerance, and trade-usage replay/queue semantics must remain stable.
+3. Local-state corruption must fail closed without silent success or silent mutation.
+4. Slice 237 preserves all public runtime compatibility requirements:
+- no CLI verb/flag/path changes,
+- no JSON response field changes,
+- no exit-code changes,
+- no API/schema/database changes,
+- no custody/auth boundary changes.
+5. This slice is runtime-internal resilience hardening only and must preserve current command-surface behavior.
+
 ## 3.35) Slice 236 API/Mirroring/Reporting Failure-Injection Hardening (2026-03-08)
 
 1. Runtime API, mirroring, and reporting service helpers must fail closed deterministically on malformed or non-2xx server responses.

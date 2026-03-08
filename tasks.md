@@ -1,9 +1,9 @@
-# Slice 236 Tasks: API/Mirroring/Reporting Failure-Injection Hardening (2026-03-08)
+# Slice 237 Tasks: Transfer-Flow/Approval-Prompt/Trade-Cap Resilience (2026-03-08)
 
-Issue mapping: `#90`
+Issue mapping: `#91`
 
-- [x] Add direct negative-path coverage for `runtime/services/agent_api.py`.
-- [x] Add direct negative-path coverage for `runtime/services/mirroring.py`.
-- [x] Add direct negative-path coverage for `runtime/services/reporting.py`.
-- [x] Preserve required-delivery vs best-effort mirror behavior and current wrapper/test seams.
+- [x] Add direct resilience coverage for `runtime/services/transfer_flows.py`.
+- [x] Add direct resilience coverage for `runtime/services/approval_prompts.py`.
+- [x] Add direct resilience coverage for `runtime/services/trade_caps.py`.
+- [x] Preserve stale recovery, resend/cooldown, cleanup, and replay semantics.
 - [x] Run full sequential validations + capture evidence in `acceptance.md`.

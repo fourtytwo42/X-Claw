@@ -11,6 +11,14 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 
 ---
 
+## 0.46) Slice 237 Transfer-Flow/Approval-Prompt/Trade-Cap Resilience
+
+- [x] Add direct resilience coverage for `runtime/services/transfer_flows.py`.
+- [x] Add direct resilience coverage for `runtime/services/approval_prompts.py`.
+- [x] Add direct resilience coverage for `runtime/services/trade_caps.py`.
+- [x] Keep approvals/transfers/trade-cap command-surface behavior unchanged.
+- [x] Run full sequential validation chain and capture evidence + issue comment.
+
 ## 0.45) Slice 236 API/Mirroring/Reporting Failure-Injection Hardening
 
 - [x] Add direct negative-path coverage for `runtime/services/agent_api.py`.
