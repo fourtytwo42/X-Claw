@@ -28,7 +28,7 @@ DoD:
 - [x] approval prompt persistence/wait-loop/cleanup helpers live under `apps/agent-runtime/xclaw_agent/runtime/services/approval_prompts.py`.
 - [x] `cli.py` keeps only thin wrappers for the moved transfer/prompt helpers.
 - [x] direct service coverage + targeted runtime suites are green.
-- [ ] full sequential validation + issue evidence posted.
+- [x] full sequential validation + issue evidence posted.
 
 Issue mapping:
 - `#83`

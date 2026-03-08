@@ -17,7 +17,7 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 - [x] Extract approval prompt persistence/wait-loop/cleanup helpers into `runtime/services/approval_prompts.py`.
 - [x] Keep `cli.py` wrappers thin and preserve current patch/test seams.
 - [x] Add direct service coverage and keep targeted runtime suites green.
-- [ ] Run full sequential validation chain and capture evidence + issue comment.
+- [x] Run full sequential validation chain and capture evidence + issue comment.
 
 ## 0.38) Slice 229 Service Extraction from cli and Final Router Reduction
 
