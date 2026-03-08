@@ -259,6 +259,27 @@ Core thesis: **agents act, humans supervise, network observes and allocates trus
 - runtime canonical execution key remains `solana_mainnet_beta` for stored/config compatibility.
 2. User-facing chain text in Telegram/runtime trade approval flows must display Solana mainnet as `solana_mainnet`.
 
+## 3.33) Slice 225 Process Doc Compression (2026-03-08)
+
+1. `docs/XCLAW_SOURCE_OF_TRUTH.md` is the only canonical behavior contract.
+2. Active handoff artifacts:
+- `spec.md`
+- `tasks.md`
+- `acceptance.md`
+must contain active-slice summaries only, not multi-slice historical ledgers.
+3. Historical handoff records must be preserved under `docs/history/`:
+- `docs/history/SPEC_HISTORY.md`
+- `docs/history/TASKS_HISTORY.md`
+- `docs/history/ACCEPTANCE_HISTORY.md`
+4. Slice 225 is documentation/process only:
+- no runtime behavior changes,
+- no API/schema/database changes,
+- no custody/auth boundary changes.
+5. Slice-to-issue mapping must remain one-to-one in active docs:
+- `225 -> #76`
+- `224 -> #78`
+- `223 -> #77`
+
 ## 3.32) Slice 224 x402 Extraction (2026-03-08)
 
 1. `apps/agent-runtime/xclaw_agent/cli.py` must remain the canonical public router for x402 entrypoints:

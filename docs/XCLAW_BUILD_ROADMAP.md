@@ -13,10 +13,10 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 
 ## 0.34) Slice 225 Process Doc Compression
 
-- [ ] Keep `docs/XCLAW_SOURCE_OF_TRUTH.md` as the only canonical behavior contract.
-- [ ] Reduce `spec.md`, `tasks.md`, and `acceptance.md` to thin active-slice handoff summaries or archived/generated history.
-- [ ] Normalize slice-to-issue mapping so each active slice maps to one live GitHub issue.
-- [ ] Run validation/build/restart checks and capture issue evidence.
+- [x] Keep `docs/XCLAW_SOURCE_OF_TRUTH.md` as the only canonical behavior contract.
+- [x] Reduce `spec.md`, `tasks.md`, and `acceptance.md` to thin active-slice handoff summaries or archived/generated history.
+- [x] Normalize slice-to-issue mapping so each active slice maps to one live GitHub issue.
+- [x] Run validation/build/restart checks and capture issue evidence.
 
 ## 0.33) Slice 224 x402 Extraction
 

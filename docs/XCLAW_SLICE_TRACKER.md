@@ -18,16 +18,16 @@ Status legend:
 ---
 
 ## Slice 225: Process Doc Compression
-Status: [ ]
+Status: [x]
 
 Goal:
 - keep `docs/XCLAW_SOURCE_OF_TRUTH.md` canonical, compress `spec.md|tasks.md|acceptance.md` into thinner active-slice handoff artifacts, and normalize slice-to-issue mapping.
 
 DoD:
-- [ ] historical slice ledgers are moved out of active handoff docs or replaced by generated summaries.
-- [ ] active slice docs are concise and issue mappings are one-to-one with live GitHub issues.
-- [ ] no runtime behavior changes are introduced in this slice.
-- [ ] validation/build/restart evidence captured and issue evidence posted.
+- [x] historical slice ledgers are moved out of active handoff docs or replaced by generated summaries.
+- [x] active slice docs are concise and issue mappings are one-to-one with live GitHub issues.
+- [x] no runtime behavior changes are introduced in this slice.
+- [x] validation/build/restart evidence captured and issue evidence posted.
 
 Issue mapping:
 - `#76`
