@@ -14,6 +14,40 @@
   - `routeKind`
   - `liquidityOperation`
 
+## Active Context: Slice 221 Runtime-First Shared Contract Layer + Wallet/Trade Extraction
+
+Issue mapping: `#74`
+
+### Objective + scope lock
+- Objective:
+  - close out hotfix bookkeeping for slices `219` and `220`,
+  - extract shared runtime helpers for canonical command failures, validation, and preconditions,
+  - move wallet/trade business logic out of `cli.py` while preserving current command behavior.
+- Scope guard:
+  - runtime-core extraction only,
+  - wallet/trade only in this slice,
+  - no API/schema/database changes,
+  - no limit-order, approvals, liquidity, or x402 extraction in this slice.
+
+### Expected touched files
+- `apps/agent-runtime/xclaw_agent/cli.py`
+- `apps/agent-runtime/xclaw_agent/commands/wallet.py`
+- `apps/agent-runtime/xclaw_agent/commands/trade.py`
+- `apps/agent-runtime/xclaw_agent/runtime/errors.py`
+- `apps/agent-runtime/xclaw_agent/runtime/validators.py`
+- `apps/agent-runtime/xclaw_agent/runtime/preconditions.py`
+- `apps/agent-runtime/xclaw_agent/runtime/execution/evm.py`
+- `apps/agent-runtime/xclaw_agent/runtime/execution/solana.py`
+- `apps/agent-runtime/tests/test_runtime_contract.py`
+- `apps/agent-runtime/tests/test_trade_path.py`
+- `docs/XCLAW_SOURCE_OF_TRUTH.md`
+- `docs/XCLAW_SLICE_TRACKER.md`
+- `docs/XCLAW_BUILD_ROADMAP.md`
+- `docs/CONTEXT_PACK.md`
+- `spec.md`
+- `tasks.md`
+- `acceptance.md`
+
 ## Hotfix Context: Slice 219 EVM Reliability + Mock/Stub Elimination
 
 Issue mapping: `#72`

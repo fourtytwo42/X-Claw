@@ -17,8 +17,26 @@ Status legend:
 
 ---
 
+## Slice 221: Runtime-First Shared Contract Layer + Wallet/Trade Extraction
+Status: [x]
+
+Goal:
+- extract a canonical runtime helper layer and move wallet/trade business logic out of `cli.py` while preserving current CLI behavior, JSON output contracts, exit codes, and custody/auth boundaries.
+
+DoD:
+- [x] Slices `219` and `220` formally closed with canonical evidence alignment.
+- [x] shared runtime helper modules exist for canonical error/result mapping, validation, and preconditions.
+- [x] wallet/trade command logic is extracted behind stable `cli.py` wrappers.
+- [x] direct helper tests cover invariant contracts and existing wallet/trade command-surface tests remain green.
+- [x] full sequential validation + issue evidence posted.
+
+Issue mapping:
+- `#74`
+
+---
+
 ## Slice 220: Solana Reliability + Capability Truth Alignment (Hotfix)
-Status: [~]
+Status: [x]
 
 Goal:
 - align Solana runtime/test expectations with promoted Solana mainnet capability truth, add fail-closed runtime coverage for active Solana execution surfaces, and re-verify deterministic Solana contract paths.
@@ -28,7 +46,7 @@ DoD:
 - [x] active Solana runtime command surfaces fail closed on malformed recipients, same-mint swaps, and non-Solana wallet key schemes.
 - [x] Solana management/x402 contract checks remain green with no opaque server failures.
 - [x] canonical artifacts synced for Solana reliability objective + evidence.
-- [ ] full sequential validation + issue evidence posted.
+- [x] full sequential validation + issue evidence posted.
 
 Issue mapping:
 - `#73`
@@ -36,17 +54,17 @@ Issue mapping:
 ---
 
 ## Slice 219: EVM Reliability + Mock/Stub Elimination (Hotfix)
-Status: [~]
+Status: [x]
 
 Goal:
 - stabilize active EVM API/runtime contract paths and remove mock-mode execution usage from active EVM workflows while preserving historical compatibility records.
 
 DoD:
-- [~] `POST /api/v1/agent/register` no longer fails `500` on legacy schema drift around `last_name_change_at`.
-- [~] `POST /api/v1/agent/tokens/mirror` returns deterministic non-`500` response for unregistered agent state.
-- [~] E2E execution scripts use `mode=real` for active EVM trade and limit-order create requests.
-- [~] contract regression checks cover positive + negative mirror/register behavior and avoid opaque server-error-only failures.
-- [ ] full sequential validation + issue evidence posted.
+- [x] `POST /api/v1/agent/register` no longer fails `500` on legacy schema drift around `last_name_change_at`.
+- [x] `POST /api/v1/agent/tokens/mirror` returns deterministic non-`500` response for unregistered agent state.
+- [x] E2E execution scripts use `mode=real` for active EVM trade and limit-order create requests.
+- [x] contract regression checks cover positive + negative mirror/register behavior and avoid opaque server-error-only failures.
+- [x] full sequential validation + issue evidence posted.
 
 Issue mapping:
 - `#72`

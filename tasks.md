@@ -1,3 +1,15 @@
+# Slice 221 Tasks: Runtime-First Shared Contract Layer + Wallet/Trade Extraction (2026-03-08)
+
+Issue mapping: `#74`
+
+- [x] Close out Slice `219` and Slice `220` status/evidence bookkeeping in canonical docs.
+- [x] Add shared runtime helper modules for canonical failure mapping, validators, and preconditions.
+- [x] Extract `wallet rpc-health|address|sign-challenge|send|send-token` behind stable `cli.py` wrappers.
+- [x] Extract `trade spot|execute` behind stable `cli.py` wrappers and family-specific execution helpers.
+- [x] Add direct helper invariant tests.
+- [x] Keep runtime command-surface regression tests green.
+- [x] Run full sequential validations + capture evidence in `acceptance.md`.
+
 # Slice 220 Tasks: Solana Reliability + Capability Truth Alignment (2026-03-08)
 
 Issue mapping: `#73`
@@ -17,7 +29,7 @@ Issue mapping: `#72`
 - [x] Add deterministic non-`500` handling in tracked-token mirror path for unregistered-agent state.
 - [x] Update EVM e2e execution payloads to `mode=real` for trade/limit-order create flows.
 - [x] Extend token-mirror contract checks with register preflight and explicit negative auth mismatch assertions.
-- [ ] Run full sequential validations + capture evidence in `acceptance.md`.
+- [x] Run full sequential validations + capture evidence in `acceptance.md`.
 
 # Slice 218 Tasks: Solana Naming UX Tightening (2026-03-05)
 

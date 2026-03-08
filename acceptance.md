@@ -1,3 +1,35 @@
+# Slice 221 Acceptance Evidence: Runtime-First Shared Contract Layer + Wallet/Trade Extraction
+
+Date (UTC): 2026-03-08  
+Active slice context: `Slice 221`.
+
+Issue mapping: `#74`
+
+### Objective + Scope Lock
+- Objective:
+  - close out the prior hotfix slice bookkeeping,
+  - extract a canonical runtime helper layer for errors, validators, and preconditions,
+  - move wallet/trade business logic out of `cli.py` behind stable wrappers without changing public CLI behavior.
+
+### Behavior Checks
+- [x] `apps/agent-runtime/xclaw_agent/cli.py` remains the public command router for wallet/trade entrypoints.
+- [x] shared runtime helpers exist under `apps/agent-runtime/xclaw_agent/runtime/*`.
+- [x] wallet/trade command logic is extracted under `apps/agent-runtime/xclaw_agent/commands/*`.
+- [x] direct helper invariant tests pass:
+  - `python3 -m unittest -v apps/agent-runtime/tests/test_runtime_contract.py`
+- [x] existing command-surface regression tests pass:
+  - `python3 -m unittest -v apps/agent-runtime/tests/test_trade_path.py`
+
+### Required Validation Gates
+- [x] `npm run db:parity` -> PASS (`ok: true`)
+- [x] `npm run seed:reset` -> PASS
+- [x] `npm run seed:load` -> PASS
+- [x] `npm run seed:verify` -> PASS
+- [x] `python3 -m unittest -v apps/agent-runtime/tests/test_runtime_contract.py` -> PASS (`Ran 8 tests`, `OK`)
+- [x] `python3 -m unittest -v apps/agent-runtime/tests/test_trade_path.py` -> PASS (`Ran 147 tests`, `OK`)
+- [x] `npm run build` -> PASS (Next.js build completed successfully)
+- [x] `pm2 restart all` -> PASS (`xclaw-web online`)
+
 # Slice 220 Acceptance Evidence: Solana Reliability + Capability Truth Alignment
 
 Date (UTC): 2026-03-08  

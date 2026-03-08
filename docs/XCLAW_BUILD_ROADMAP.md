@@ -11,13 +11,22 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 
 ---
 
+## 0.30) Slice 221 Runtime-First Shared Contract Layer + Wallet/Trade Extraction
+
+- [x] Close out Slice `219` and Slice `220` bookkeeping in canonical docs.
+- [x] Add shared runtime helper modules for canonical errors, validators, and preconditions.
+- [x] Extract wallet command logic behind stable `cli.py` wrappers.
+- [x] Extract trade spot/execute logic behind stable `cli.py` wrappers.
+- [x] Add direct helper invariant tests and keep command-surface trade tests green.
+- [x] Run full sequential validation chain and capture evidence + issue comment.
+
 ## 0.29) Slice 220 Solana Reliability + Capability Truth Alignment (Hotfix)
 
 - [x] Align Solana advanced LP regression expectations with promoted `solana_mainnet_beta` capability truth.
 - [x] Add fail-closed runtime coverage for Solana wallet-send, wallet-send-token, and trade execution guards.
 - [x] Re-verify Solana management/x402 contract scripts remain green and deterministic.
 - [x] Sync canonical artifacts and evidence for Solana reliability objective.
-- [ ] Run full sequential validation chain and capture evidence + blockers.
+- [x] Run full sequential validation chain and capture evidence + blockers.
 
 ## 0.28) Slice 219 EVM Reliability + Mock/Stub Elimination (Hotfix)
 
@@ -25,7 +34,7 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 - [~] Make tracked-token mirror path deterministic for unregistered-agent state (structured non-`500` response).
 - [~] Update active EVM e2e execution flows to use `mode=real` for trade/limit-order create paths.
 - [~] Extend contract checks with explicit positive + negative coverage for register/mirror behavior.
-- [ ] Run full sequential validation chain and capture evidence + request IDs.
+- [x] Run full sequential validation chain and capture evidence + request IDs.
 
 ## 0.27) Slice 218 Solana Naming UX Tightening (Hotfix)
 

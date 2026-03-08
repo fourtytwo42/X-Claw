@@ -1,3 +1,36 @@
+# Slice 221 Spec: Runtime-First Shared Contract Layer + Wallet/Trade Extraction (2026-03-08)
+
+Issue mapping: `#74`
+
+## Goal
+1. Extract a canonical shared runtime contract layer for errors, validators, and preconditions.
+2. Move wallet/trade business logic out of `apps/agent-runtime/xclaw_agent/cli.py` behind stable wrappers.
+3. Preserve current CLI verbs, flags, JSON response shapes, exit codes, and custody/auth boundaries.
+
+## Non-goals
+1. No API route/schema/database changes in this slice.
+2. No limit-order, approvals, liquidity, or x402 extraction in this slice.
+3. No process-doc compression beyond mandatory canonical sync.
+
+## Locked scope
+1. `apps/agent-runtime/xclaw_agent/cli.py`
+2. `apps/agent-runtime/xclaw_agent/commands/wallet.py`
+3. `apps/agent-runtime/xclaw_agent/commands/trade.py`
+4. `apps/agent-runtime/xclaw_agent/runtime/errors.py`
+5. `apps/agent-runtime/xclaw_agent/runtime/validators.py`
+6. `apps/agent-runtime/xclaw_agent/runtime/preconditions.py`
+7. `apps/agent-runtime/xclaw_agent/runtime/execution/evm.py`
+8. `apps/agent-runtime/xclaw_agent/runtime/execution/solana.py`
+9. `apps/agent-runtime/tests/test_runtime_contract.py`
+10. `apps/agent-runtime/tests/test_trade_path.py`
+11. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+12. `docs/XCLAW_SLICE_TRACKER.md`
+13. `docs/XCLAW_BUILD_ROADMAP.md`
+14. `docs/CONTEXT_PACK.md`
+15. `spec.md`
+16. `tasks.md`
+17. `acceptance.md`
+
 # Slice 220 Spec: Solana Reliability + Capability Truth Alignment (2026-03-08)
 
 Issue mapping: `#73`

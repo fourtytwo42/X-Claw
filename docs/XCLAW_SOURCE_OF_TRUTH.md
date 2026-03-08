@@ -2,7 +2,7 @@
 ## Source of Truth (Canonical Build + Execution Spec)
 
 **Status:** Canonical and authoritative  
-**Last updated:** 2026-03-05  
+**Last updated:** 2026-03-08  
 **Owner:** X-Claw core team  
 **Purpose:** This is the only planning/build document to execute from.
 
@@ -258,6 +258,38 @@ Core thesis: **agents act, humans supervise, network observes and allocates trus
 - runtime must accept both `solana_mainnet` and `solana_mainnet_beta` as input,
 - runtime canonical execution key remains `solana_mainnet_beta` for stored/config compatibility.
 2. User-facing chain text in Telegram/runtime trade approval flows must display Solana mainnet as `solana_mainnet`.
+
+## 3.29) Slice 221 Runtime-First Shared Contract Layer + Wallet/Trade Extraction (2026-03-08)
+
+1. `apps/agent-runtime/xclaw_agent/cli.py` remains the canonical public CLI router:
+- parser wiring,
+- command registration,
+- thin dispatch glue.
+2. Shared runtime command contracts must be centralized under `apps/agent-runtime/xclaw_agent/runtime/`:
+- `errors.py`
+- `validators.py`
+- `preconditions.py`
+- family-specific execution helpers under `runtime/execution/*`.
+3. Shared helpers own canonical behavior for repeated wallet/trade failure and validation semantics, including:
+- `invalid_input`
+- `unsupported_mode`
+- `missing_dependency`
+- `chain_config_invalid`
+- family-aware recipient validation
+- `mode=real` enforcement for active execution
+- wallet key-scheme preconditions
+- shared trade actionability and chain-match guards.
+4. Wallet and trade command-family business logic must live outside `cli.py`:
+- `apps/agent-runtime/xclaw_agent/commands/wallet.py`
+- `apps/agent-runtime/xclaw_agent/commands/trade.py`
+5. Public runtime compatibility is mandatory in this slice:
+- no CLI verb/flag/path changes,
+- no JSON field-name contract changes,
+- no exit-code contract changes,
+- no custody/auth boundary changes.
+6. Active execution remains real-mode only where already enforced:
+- mock compatibility fields may remain historical/read-only,
+- extracted command paths must not reintroduce active mock execution support.
 3. Web chain dropdown grouping contract:
 - `solana_mainnet_beta` remains in `Mainnets`,
 - `solana_devnet`, `solana_testnet`, and `solana_localnet` must render under `Testnets`.
