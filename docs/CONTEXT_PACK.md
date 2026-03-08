@@ -14,28 +14,27 @@
   - `routeKind`
   - `liquidityOperation`
 
-## Active Context: Slice 223 Liquidity Extraction
+## Active Context: Slice 224 x402 Extraction
 
-Issue mapping: `#77`
+Issue mapping: `#78`
 
 ### Objective + scope lock
 - Objective:
-  - move liquidity business logic out of `cli.py` behind stable wrappers,
-  - extend shared runtime lifecycle helpers only where liquidity execute/resume orchestration needs it,
-  - preserve current Solana/EVM liquidity behavior exactly.
+  - move x402 command-family logic out of `cli.py` behind stable wrappers,
+  - preserve current x402 payment, resume, decision, policy, and network behavior exactly,
+  - keep process-doc compression and non-x402 runtime extraction out of this slice.
 - Scope guard:
   - runtime-core extraction only,
-  - liquidity only in this slice,
+  - x402 only in this slice,
   - no API/schema/database changes,
-  - no x402 extraction or process-doc compression in this slice.
+  - no liquidity/process-doc compression work in this slice.
 
 ### Expected touched files
 - `apps/agent-runtime/xclaw_agent/cli.py`
-- `apps/agent-runtime/xclaw_agent/commands/liquidity.py`
-- `apps/agent-runtime/xclaw_agent/runtime/state_machine.py`
-- `apps/agent-runtime/tests/test_runtime_state_machine.py`
+- `apps/agent-runtime/xclaw_agent/commands/x402.py`
+- `apps/agent-runtime/tests/test_x402_runtime.py`
+- `apps/agent-runtime/tests/test_x402_cli.py`
 - `apps/agent-runtime/tests/test_trade_path.py`
-- `apps/agent-runtime/tests/test_liquidity_cli.py`
 - `docs/XCLAW_SOURCE_OF_TRUTH.md`
 - `docs/XCLAW_SLICE_TRACKER.md`
 - `docs/XCLAW_BUILD_ROADMAP.md`

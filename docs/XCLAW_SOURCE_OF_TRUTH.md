@@ -259,6 +259,25 @@ Core thesis: **agents act, humans supervise, network observes and allocates trus
 - runtime canonical execution key remains `solana_mainnet_beta` for stored/config compatibility.
 2. User-facing chain text in Telegram/runtime trade approval flows must display Solana mainnet as `solana_mainnet`.
 
+## 3.32) Slice 224 x402 Extraction (2026-03-08)
+
+1. `apps/agent-runtime/xclaw_agent/cli.py` must remain the canonical public router for x402 entrypoints:
+- parser wiring,
+- command registration,
+- thin dispatch glue only.
+2. x402 business logic must live outside `cli.py`:
+- `apps/agent-runtime/xclaw_agent/commands/x402.py`
+3. Slice 224 preserves all public runtime compatibility requirements:
+- no CLI verb/flag/path changes,
+- no JSON field-name contract changes,
+- no exit-code contract changes,
+- no custody/auth boundary changes.
+4. Existing x402 behavior remains unchanged in this slice:
+- transfer-approval fallback into x402 payment decision flows must remain intact,
+- x402 payment status vocabulary remains unchanged,
+- x402 policy/network contracts remain unchanged.
+5. Shared runtime lifecycle/state-machine helpers from earlier runtime slices may be reused, but this slice does not redesign x402 runtime engines; it moves command orchestration ownership only.
+
 ## 3.31) Slice 223 Liquidity Extraction (2026-03-08)
 
 1. `apps/agent-runtime/xclaw_agent/cli.py` must remain the canonical public router for liquidity entrypoints:

@@ -1,3 +1,31 @@
+# Slice 224 Spec: x402 Extraction (2026-03-08)
+
+Issue mapping: `#78`
+
+## Goal
+1. Move x402 command-family orchestration out of `apps/agent-runtime/xclaw_agent/cli.py` behind stable wrappers.
+2. Preserve current x402 payment, resume, decision, policy, and network contracts exactly.
+3. Keep CLI verbs, flags, JSON response shapes, exit codes, and custody/auth boundaries unchanged.
+
+## Non-goals
+1. No API route/schema/database changes in this slice.
+2. No liquidity extraction or process-doc compression in this slice.
+3. No redesign of x402 runtime engines or fallback semantics.
+
+## Locked scope
+1. `apps/agent-runtime/xclaw_agent/cli.py`
+2. `apps/agent-runtime/xclaw_agent/commands/x402.py`
+3. `apps/agent-runtime/tests/test_x402_runtime.py`
+4. `apps/agent-runtime/tests/test_x402_cli.py`
+5. `apps/agent-runtime/tests/test_trade_path.py`
+6. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+7. `docs/XCLAW_SLICE_TRACKER.md`
+8. `docs/XCLAW_BUILD_ROADMAP.md`
+9. `docs/CONTEXT_PACK.md`
+10. `spec.md`
+11. `tasks.md`
+12. `acceptance.md`
+
 # Slice 223 Spec: Liquidity Extraction (2026-03-08)
 
 Issue mapping: `#77`

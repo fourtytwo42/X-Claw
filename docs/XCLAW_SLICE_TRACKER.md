@@ -35,16 +35,16 @@ Issue mapping:
 ---
 
 ## Slice 224: x402 Extraction
-Status: [ ]
+Status: [x]
 
 Goal:
 - extract x402 command-family logic out of `cli.py` behind stable wrappers and reuse the shared runtime lifecycle helpers without changing x402 fallback semantics.
 
 DoD:
-- [ ] x402 command logic lives outside `cli.py` under `apps/agent-runtime/xclaw_agent/commands/x402.py`.
-- [ ] `cli.py` remains parser/dispatch glue only for x402 entrypoints.
-- [ ] x402 payment/policy/network contracts remain byte-for-byte compatible at the JSON field level.
-- [ ] direct command/helper tests and required sequential validations pass, with issue evidence posted.
+- [x] x402 command logic lives outside `cli.py` under `apps/agent-runtime/xclaw_agent/commands/x402.py`.
+- [x] `cli.py` remains parser/dispatch glue only for x402 entrypoints.
+- [x] x402 payment/policy/network contracts remain byte-for-byte compatible at the JSON field level.
+- [x] direct command/helper tests and required sequential validations pass, with issue evidence posted.
 
 Issue mapping:
 - `#78`

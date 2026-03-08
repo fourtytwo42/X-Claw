@@ -20,10 +20,10 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 
 ## 0.33) Slice 224 x402 Extraction
 
-- [ ] Extract `x402 receive-request|pay|pay-resume|pay-decide|policy-get|policy-set|networks` behind stable `cli.py` wrappers.
-- [ ] Reuse shared runtime lifecycle helpers for x402 resume/decision handling without changing fallback semantics.
-- [ ] Add direct x402 command/helper coverage and keep current runtime regression suites green.
-- [ ] Run full sequential validation chain and capture evidence + issue comment.
+- [x] Extract `x402 receive-request|pay|pay-resume|pay-decide|policy-get|policy-set|networks` behind stable `cli.py` wrappers.
+- [x] Reuse shared runtime lifecycle helpers for x402 resume/decision handling without changing fallback semantics.
+- [x] Add direct x402 command/helper coverage and keep current runtime regression suites green.
+- [x] Run full sequential validation chain and capture evidence + issue comment.
 
 ## 0.32) Slice 223 Liquidity Extraction
 

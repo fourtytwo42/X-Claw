@@ -1,3 +1,33 @@
+# Slice 224 Acceptance Evidence: x402 Extraction
+
+Date (UTC): 2026-03-08  
+Active slice context: `Slice 224`.
+
+Issue mapping: `#78`
+
+### Objective + Scope Lock
+- Objective:
+  - extract x402 command-family orchestration out of `cli.py`,
+  - preserve x402 payment/resume/decision/policy/network contracts exactly,
+  - keep fallback semantics unchanged.
+
+### Behavior Checks
+- [x] `apps/agent-runtime/xclaw_agent/cli.py` remains the public router for x402 entrypoints.
+- [x] x402 command logic is extracted under `apps/agent-runtime/xclaw_agent/commands/x402.py`.
+- [x] direct x402 command-surface coverage exists in `apps/agent-runtime/tests/test_x402_cli.py`.
+- [x] x402/trade regression suites are green.
+
+### Required Validation Gates
+- [x] `npm run db:parity` -> PASS (`ok: true`, `checkedAt=2026-03-08T16:49:22.541Z`)
+- [x] `npm run seed:reset` -> PASS
+- [x] `npm run seed:load` -> PASS
+- [x] `npm run seed:verify` -> PASS
+- [x] `python3 -m unittest -v apps/agent-runtime/tests/test_x402_cli.py` -> PASS (`Ran 3 tests`, `OK`)
+- [x] `python3 -m unittest -v apps/agent-runtime/tests/test_x402_runtime.py` -> PASS (`Ran 5 tests`, `OK`)
+- [x] `python3 -m unittest -v apps/agent-runtime/tests/test_trade_path.py` -> PASS (`Ran 147 tests`, `OK`)
+- [x] `npm run build` -> PASS (Next.js build completed successfully)
+- [x] `pm2 restart all` -> PASS (`xclaw-web online`)
+
 # Slice 223 Acceptance Evidence: Liquidity Extraction
 
 Date (UTC): 2026-03-08  

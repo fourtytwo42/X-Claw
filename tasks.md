@@ -1,3 +1,13 @@
+# Slice 224 Tasks: x402 Extraction (2026-03-08)
+
+Issue mapping: `#78`
+
+- [x] Extract `x402 receive-request|pay|pay-resume|pay-decide|policy-get|policy-set|networks` behind stable `cli.py` wrappers.
+- [x] Keep x402 fallback/payment/policy/network behavior unchanged.
+- [x] Add direct x402 command-surface coverage in `test_x402_cli.py`.
+- [x] Keep x402/trade runtime regression suites green.
+- [x] Run full sequential validations + capture evidence in `acceptance.md`.
+
 # Slice 223 Tasks: Liquidity Extraction (2026-03-08)
 
 Issue mapping: `#77`
