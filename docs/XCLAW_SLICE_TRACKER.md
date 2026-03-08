@@ -17,6 +17,24 @@ Status legend:
 
 ---
 
+## Slice 228: Explicit Adapters for Wallet and Limit-Orders
+Status: [x]
+
+Goal:
+- replace dynamic runtime binding for extracted wallet and limit-order command modules with explicit typed adapters while preserving all current runtime command contracts.
+
+DoD:
+- [x] explicit adapter types exist under `apps/agent-runtime/xclaw_agent/runtime/adapters/` for wallet and limit-orders.
+- [x] wallet and limit-order command modules no longer depend on `sys.modules[__name__]`.
+- [x] `cli.py` builds explicit adapters and dispatches through stable wrappers for wallet/limit-orders.
+- [x] direct adapter coverage and wallet/limit-order regression surfaces are green.
+- [x] full sequential validation + issue evidence posted.
+
+Issue mapping:
+- `#81`
+
+---
+
 ## Slice 227: Explicit Adapters for Approvals and Trade
 Status: [x]
 

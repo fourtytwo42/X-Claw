@@ -229,6 +229,17 @@ Core thesis: **agents act, humans supervise, network observes and allocates trus
 - no CLI verb/flag/path changes,
 - no API/schema/database changes,
 - no custody/auth boundary changes.
+
+## 3.27) Slice 228 Explicit Adapters for Wallet and Limit-Orders (2026-03-08)
+
+1. Extracted runtime wallet and limit-order command families must also consume explicit typed adapter objects rather than `sys.modules[__name__]`.
+2. This rule now applies across approvals, trade, wallet, limit-orders, liquidity, and x402 extracted command families.
+3. Wallet and limit-order command wrappers must preserve existing patch/test seams through public `cli.py` entrypoints.
+4. Limit-order foreground `run-loop` output contract remains one JSON payload and must not drift.
+5. This slice is runtime-internal only:
+- no CLI verb/flag/path changes,
+- no API/schema/database changes,
+- no custody/auth boundary changes.
 - no HTTP route changes,
 - no schema/database changes.
 

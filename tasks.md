@@ -1,10 +1,9 @@
-# Slice 227 Tasks: Explicit Adapters for Approvals and Trade (2026-03-08)
+# Slice 228 Tasks: Explicit Adapters for Wallet and Limit-Orders (2026-03-08)
 
-Issue mapping: `#80`
+Issue mapping: `#81`
 
-- [x] Add explicit runtime adapter types for approvals and trade under `runtime/adapters/`.
-- [x] Refactor approvals and trade command modules to consume explicit adapters instead of `sys.modules[__name__]`.
-- [x] Update `cli.py` to build typed adapters and dispatch approvals/trade through thin wrappers.
-- [x] Extract shared agent API helper functions used by these adapters into `runtime/services/agent_api.py`.
-- [x] Add direct adapter contract coverage in `test_runtime_adapters.py` and keep approvals/trade regressions green.
+- [x] Add explicit runtime adapter types for wallet and limit-orders under `runtime/adapters/`.
+- [x] Refactor wallet and limit-order command modules to consume explicit adapters instead of `sys.modules[__name__]`.
+- [x] Update `cli.py` to build typed adapters and dispatch wallet/limit-order commands through thin wrappers.
+- [x] Keep direct adapter contract coverage for wallet/limit-order wrapper dispatch in `test_runtime_adapters.py`.
 - [x] Run full sequential validations + capture evidence in `acceptance.md`.

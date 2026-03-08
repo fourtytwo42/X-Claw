@@ -11,6 +11,14 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 
 ---
 
+## 0.37) Slice 228 Explicit Adapters for Wallet and Limit-Orders
+
+- [x] Add explicit runtime adapter types for extracted wallet and limit-order command modules.
+- [x] Refactor wallet and limit-order command modules to consume explicit adapters instead of `sys.modules[__name__]`.
+- [x] Update `cli.py` to build adapters and dispatch without module-as-service coupling for wallet/limit-orders.
+- [x] Keep direct adapter contract coverage for wallet/limit-order wrapper dispatch.
+- [x] Run full sequential validation chain and capture evidence + issue comment.
+
 ## 0.36) Slice 227 Explicit Adapters for Approvals and Trade
 
 - [x] Add explicit runtime adapter types for extracted approvals and trade command modules.
