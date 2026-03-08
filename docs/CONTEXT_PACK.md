@@ -14,14 +14,14 @@
   - `routeKind`
   - `liquidityOperation`
 
-## Active Context: Slice 233 Runtime State + Auth/Policy Services
+## Active Context: Slice 234 Telegram Messaging + Delivery Cleanup Services
 
-Issue mapping: `#86`
+Issue mapping: `#87`
 
 ### Objective + scope lock
 - Objective:
-  - move runtime auth/state/policy/trade-cap helper ownership out of `cli.py`,
-  - preserve runtime JSON/CLI behavior and on-disk formats,
+  - move Telegram and owner-link delivery helper ownership out of `cli.py`,
+  - preserve runtime JSON/CLI behavior and approval UX contracts,
   - keep `cli.py` as parser/router + thin compatibility wrappers only.
 - Scope guard:
   - runtime internal hardening only,
@@ -30,13 +30,13 @@ Issue mapping: `#86`
 ### Expected touched files
 - `apps/agent-runtime/xclaw_agent/cli.py`
 - `apps/agent-runtime/xclaw_agent/runtime/services/__init__.py`
-- `apps/agent-runtime/xclaw_agent/runtime/services/runtime_state.py`
-- `apps/agent-runtime/xclaw_agent/runtime/services/transfer_policy.py`
-- `apps/agent-runtime/xclaw_agent/runtime/services/trade_caps.py`
+- `apps/agent-runtime/xclaw_agent/runtime/services/telegram_delivery.py`
+- `apps/agent-runtime/xclaw_agent/runtime/services/owner_link_delivery.py`
 - `apps/agent-runtime/tests/test_runtime_services.py`
 - `apps/agent-runtime/tests/test_trade_path.py`
 - `apps/agent-runtime/tests/test_approvals_run_loop.py`
-- `apps/agent-runtime/tests/test_wallet_core.py`
+- `apps/agent-runtime/tests/test_liquidity_cli.py`
+- `apps/agent-runtime/tests/test_x402_cli.py`
 - `docs/XCLAW_SOURCE_OF_TRUTH.md`
 - `docs/XCLAW_SLICE_TRACKER.md`
 - `docs/XCLAW_BUILD_ROADMAP.md`
@@ -44,6 +44,9 @@ Issue mapping: `#86`
 - `spec.md`
 - `tasks.md`
 - `acceptance.md`
+
+### Completion note
+- Completed 2026-03-08 with direct runtime service coverage plus targeted runtime regressions and the required sequential validation chain (`db:parity`, `seed:reset/load/verify`, `build`, `pm2 restart all`).
 
 ## Hotfix Context: Slice 219 EVM Reliability + Mock/Stub Elimination
 

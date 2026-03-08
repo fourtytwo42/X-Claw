@@ -11,6 +11,15 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 
 ---
 
+## 0.43) Slice 234 Telegram Messaging + Delivery Cleanup Services
+
+- [x] Extract Telegram transfer/policy/liquidity prompt send helpers into `runtime/services/telegram_delivery.py`.
+- [x] Extract Telegram decision/terminal/cleanup/bot-token helpers into `runtime/services/telegram_delivery.py`.
+- [x] Extract active-chat owner-link delivery helper into `runtime/services/owner_link_delivery.py`.
+- [x] Keep `cli.py` wrappers thin and preserve current patch/test seams.
+- [x] Add direct service coverage and keep targeted runtime suites green.
+- [x] Run full sequential validation chain and capture evidence + issue comment.
+
 ## 0.42) Slice 233 Runtime State + Auth/Policy Services
 
 - [x] Extract runtime auth and pending trade/spot flow persistence helpers into `runtime/services/runtime_state.py`.

@@ -13,7 +13,7 @@ AGENT_RUNTIME_ROOT = REPO_ROOT / "apps" / "agent-runtime"
 if str(AGENT_RUNTIME_ROOT) not in sys.path:
     sys.path.insert(0, str(AGENT_RUNTIME_ROOT))
 
-from xclaw_agent.runtime.services import approval_prompts, execution_contracts, liquidity_execution, runtime_state, trade_caps, trade_execution, transfer_flows, transfer_policy  # noqa: E402
+from xclaw_agent.runtime.services import approval_prompts, execution_contracts, liquidity_execution, owner_link_delivery, runtime_state, telegram_delivery, trade_caps, trade_execution, transfer_flows, transfer_policy  # noqa: E402
 from xclaw_agent import cli  # noqa: E402
 
 
@@ -326,6 +326,50 @@ class RuntimeServicesTests(unittest.TestCase):
         with self.assertRaises(cli.WalletStoreError):
             trade_caps.post_trade_usage(ctx, "base_sepolia", "2026-03-08", Decimal("1.25"), 1)
         self.assertEqual(len(outbox), 1)
+
+    def test_telegram_delivery_resolves_bot_token_from_env(self) -> None:
+        ctx = telegram_delivery.TelegramDeliveryServiceContext(
+            telegram_dispatch_suppressed_for_harness=lambda: False,
+            read_openclaw_last_delivery=lambda: None,
+            get_approval_prompt=lambda trade_id: None,
+            get_transfer_approval_prompt=lambda approval_id: None,
+            get_policy_approval_prompt=lambda approval_id: None,
+            record_approval_prompt=lambda *args, **kwargs: None,
+            record_transfer_approval_prompt=lambda *args, **kwargs: None,
+            record_policy_approval_prompt=lambda *args, **kwargs: None,
+            require_openclaw_bin=lambda: "openclaw",
+            run_subprocess=lambda *args, **kwargs: None,
+            wallet_store_error=cli.WalletStoreError,
+            extract_openclaw_message_id=lambda stdout: None,
+            utc_now=cli.utc_now,
+            display_chain_key=cli._display_chain_key,
+            token_symbol_for_display=cli._token_symbol_for_display,
+            is_solana_chain=cli._is_solana_chain,
+            is_solana_address=cli.is_solana_address,
+            solana_mint_decimals=cli._solana_mint_decimals,
+            normalize_amount_human_text=cli._normalize_amount_human_text,
+            format_units=cli._format_units,
+            canonical_token_map=cli._canonical_token_map,
+            shutil_module=cli.shutil,
+            re_module=cli.re,
+            clear_telegram_approval_buttons=lambda subject_type, subject_id: {},
+            remove_approval_prompt=lambda trade_id: None,
+            remove_transfer_approval_prompt=lambda approval_id: None,
+            remove_policy_approval_prompt=lambda approval_id: None,
+        )
+        with mock.patch.dict(os.environ, {"XCLAW_TELEGRAM_BOT_TOKEN": "tok_1"}, clear=False):
+            self.assertEqual(telegram_delivery.resolve_telegram_bot_token(ctx), "tok_1")
+
+    def test_owner_link_delivery_skips_telegram(self) -> None:
+        ctx = owner_link_delivery.OwnerLinkDeliveryServiceContext(
+            read_openclaw_last_delivery=lambda: {"lastChannel": "telegram", "lastTo": "123", "lastThreadId": None},
+            shutil_module=cli.shutil,
+            run_subprocess=lambda *args, **kwargs: None,
+            extract_openclaw_message_id=lambda stdout: None,
+        )
+        result = owner_link_delivery.maybe_send_owner_link_to_active_chat(ctx, "https://xclaw.trade/agents/ag_1?token=ol1.test", "2026-02-18T16:39:52.313Z")
+        self.assertFalse(bool(result.get("sent")))
+        self.assertEqual(result.get("reason"), "telegram_channel_skipped")
 
 
 if __name__ == "__main__":

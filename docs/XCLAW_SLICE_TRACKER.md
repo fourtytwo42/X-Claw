@@ -17,6 +17,25 @@ Status legend:
 
 ---
 
+## Slice 234: Telegram Messaging + Delivery Cleanup Services
+Status: [x]
+
+Goal:
+- move Telegram prompt/decision/cleanup and owner-link delivery helper ownership out of `cli.py` into runtime services while preserving current runtime command/test contracts.
+
+DoD:
+- [x] Telegram transfer/policy/liquidity prompt send helpers live under `apps/agent-runtime/xclaw_agent/runtime/services/telegram_delivery.py`.
+- [x] Telegram decision/terminal/cleanup/bot-token helper ownership lives under `apps/agent-runtime/xclaw_agent/runtime/services/telegram_delivery.py`.
+- [x] active-chat owner-link delivery helper ownership lives under `apps/agent-runtime/xclaw_agent/runtime/services/owner_link_delivery.py`.
+- [x] `cli.py` keeps thin wrappers only and preserves current patch/test seams.
+- [x] direct service coverage + targeted runtime suites are green.
+- [x] full sequential validation + issue evidence posted.
+
+Issue mapping:
+- `#87`
+
+---
+
 ## Slice 233: Runtime State + Auth/Policy Services
 Status: [x]
 

@@ -56,6 +56,20 @@ from xclaw_agent.runtime.services.trade_caps import (
     record_trade_cap_ledger,
     replay_trade_usage_outbox,
 )
+from xclaw_agent.runtime.services.telegram_delivery import (
+    TelegramDeliveryServiceContext,
+    cleanup_prompt,
+    maybe_send_decision_message,
+    maybe_send_liquidity_approval_prompt,
+    maybe_send_policy_approval_prompt,
+    maybe_send_trade_terminal_message,
+    maybe_send_transfer_approval_prompt,
+    resolve_telegram_bot_token,
+)
+from xclaw_agent.runtime.services.owner_link_delivery import (
+    OwnerLinkDeliveryServiceContext,
+    maybe_send_owner_link_to_active_chat,
+)
 from xclaw_agent.runtime.services.transfer_flows import (
     TransferFlowContext,
     assert_transfer_balance_preconditions,
@@ -142,6 +156,16 @@ __all__ = [
     "queue_trade_usage_report",
     "record_trade_cap_ledger",
     "replay_trade_usage_outbox",
+    "TelegramDeliveryServiceContext",
+    "cleanup_prompt",
+    "maybe_send_decision_message",
+    "maybe_send_liquidity_approval_prompt",
+    "maybe_send_policy_approval_prompt",
+    "maybe_send_trade_terminal_message",
+    "maybe_send_transfer_approval_prompt",
+    "resolve_telegram_bot_token",
+    "OwnerLinkDeliveryServiceContext",
+    "maybe_send_owner_link_to_active_chat",
     "TransferFlowContext",
     "assert_transfer_balance_preconditions",
     "execute_pending_transfer_flow",

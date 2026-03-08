@@ -2649,269 +2649,48 @@ def _maybe_send_telegram_approval_prompt(trade_id: str, chain: str, summary: dic
     runtime_services.maybe_send_telegram_approval_prompt(_build_approval_prompt_service_ctx(), trade_id, chain, summary)
 
 
+def _build_telegram_delivery_service_ctx() -> runtime_services.TelegramDeliveryServiceContext:
+    return runtime_services.TelegramDeliveryServiceContext(
+        telegram_dispatch_suppressed_for_harness=_telegram_dispatch_suppressed_for_harness,
+        read_openclaw_last_delivery=_read_openclaw_last_delivery,
+        get_approval_prompt=_get_approval_prompt,
+        get_transfer_approval_prompt=_get_transfer_approval_prompt,
+        get_policy_approval_prompt=_get_policy_approval_prompt,
+        record_approval_prompt=_record_approval_prompt,
+        record_transfer_approval_prompt=_record_transfer_approval_prompt,
+        record_policy_approval_prompt=_record_policy_approval_prompt,
+        require_openclaw_bin=_require_openclaw_bin,
+        run_subprocess=_run_subprocess,
+        wallet_store_error=WalletStoreError,
+        extract_openclaw_message_id=_extract_openclaw_message_id,
+        utc_now=utc_now,
+        display_chain_key=_display_chain_key,
+        token_symbol_for_display=_token_symbol_for_display,
+        is_solana_chain=_is_solana_chain,
+        is_solana_address=is_solana_address,
+        solana_mint_decimals=_solana_mint_decimals,
+        normalize_amount_human_text=_normalize_amount_human_text,
+        format_units=_format_units,
+        canonical_token_map=_canonical_token_map,
+        shutil_module=shutil,
+        re_module=re,
+        clear_telegram_approval_buttons=_clear_telegram_approval_buttons,
+        remove_approval_prompt=_remove_approval_prompt,
+        remove_transfer_approval_prompt=_remove_transfer_approval_prompt,
+        remove_policy_approval_prompt=_remove_policy_approval_prompt,
+    )
+
+
 def _maybe_send_telegram_transfer_approval_prompt(flow: dict[str, Any]) -> None:
-    if _telegram_dispatch_suppressed_for_harness():
-        return
-    approval_id = str(flow.get("approvalId") or "").strip()
-    chain = str(flow.get("chainKey") or "").strip()
-    if not approval_id or not chain:
-        return
-    existing = _get_transfer_approval_prompt(approval_id)
-    if existing and str(existing.get("channel") or "") == "telegram":
-        return
-
-    delivery = _read_openclaw_last_delivery()
-    if not delivery or str(delivery.get("lastChannel") or "").lower() != "telegram":
-        return
-
-    chat_id = str(delivery.get("lastTo") or "").strip()
-    if not chat_id:
-        return
-
-    thread_raw = delivery.get("lastThreadId")
-    thread_id: str | None = None
-    if isinstance(thread_raw, int):
-        thread_id = str(thread_raw)
-    elif isinstance(thread_raw, str) and thread_raw.strip():
-        thread_id = thread_raw.strip()
-
-    callback_approve = f"xfer|a|{approval_id}|{chain}"
-    callback_deny = f"xfer|r|{approval_id}|{chain}"
-    if len(callback_approve.encode("utf-8")) > 64 or len(callback_deny.encode("utf-8")) > 64:
-        return
-
-    display_chain = _display_chain_key(chain)
-    transfer_type = str(flow.get("transferType") or "token").strip().lower()
-    token_symbol = str(flow.get("tokenSymbol") or ("ETH" if transfer_type == "native" else "TOKEN")).strip() or "TOKEN"
-    token_decimals = 18
-    try:
-        token_decimals = int(flow.get("tokenDecimals", 18))
-    except Exception:
-        token_decimals = 18
-    amount_wei = str(flow.get("amountWei") or "0").strip() or "0"
-    amount_human, amount_unit = _transfer_amount_display(amount_wei, transfer_type, token_symbol, token_decimals)
-    amount_display = f"{amount_human} {amount_unit}"
-    to_address = str(flow.get("toAddress") or "").strip().lower() or "unknown"
-
-    text = (
-        "Approve transfer\n"
-        f"Amount: {amount_display}\n"
-        f"To: `{to_address}`\n"
-        f"Chain: `{display_chain}`\n"
-        f"Approval: `{approval_id}`\n\n"
-        "Tap Approve to execute (or Deny to reject)."
-    )
-    if bool(flow.get("policyBlockedAtCreate")):
-        reason_code = str(flow.get("policyBlockReasonCode") or "unknown")
-        text += (
-            f"\n\nPolicy blocked at create: {reason_code}"
-            "\nApprove executes this transfer as a one-off override."
-        )
-
-    buttons = json.dumps(
-        [[{"text": "Approve", "callback_data": callback_approve}, {"text": "Deny", "callback_data": callback_deny}]],
-        separators=(",", ":"),
-    )
-    openclaw = _require_openclaw_bin()
-    cmd = [openclaw, "message", "send", "--channel", "telegram", "--target", chat_id, "--message", text, "--buttons", buttons, "--json"]
-    if thread_id:
-        cmd.extend(["--thread-id", thread_id])
-    proc = _run_subprocess(cmd, timeout_sec=30, kind="openclaw_send")
-    if proc.returncode != 0:
-        stderr = (proc.stderr or "").strip()
-        stdout = (proc.stdout or "").strip()
-        raise WalletStoreError(stderr or stdout or "openclaw message send failed.")
-    message_id = _extract_openclaw_message_id(proc.stdout or "")
-    if not message_id:
-        message_id = "unknown"
-    _record_transfer_approval_prompt(
-        approval_id,
-        {
-            "channel": "telegram",
-            "chainKey": chain,
-            "to": chat_id,
-            "threadId": thread_id,
-            "messageId": message_id,
-            "createdAt": utc_now(),
-        },
-    )
+    runtime_services.maybe_send_transfer_approval_prompt(_build_telegram_delivery_service_ctx(), flow)
 
 
 def _maybe_send_telegram_policy_approval_prompt(flow: dict[str, Any]) -> None:
-    if _telegram_dispatch_suppressed_for_harness():
-        return
-    approval_id = str(flow.get("policyApprovalId") or "").strip()
-    chain = str(flow.get("chainKey") or "").strip()
-    if not approval_id or not chain:
-        return
-    existing = _get_policy_approval_prompt(approval_id)
-    if existing and str(existing.get("channel") or "") == "telegram":
-        return
-
-    delivery = _read_openclaw_last_delivery()
-    if not delivery or str(delivery.get("lastChannel") or "").lower() != "telegram":
-        return
-
-    chat_id = str(delivery.get("lastTo") or "").strip()
-    if not chat_id:
-        return
-
-    thread_raw = delivery.get("lastThreadId")
-    thread_id: str | None = None
-    if isinstance(thread_raw, int):
-        thread_id = str(thread_raw)
-    elif isinstance(thread_raw, str) and thread_raw.strip():
-        thread_id = thread_raw.strip()
-
-    callback_approve = f"xpol|a|{approval_id}|{chain}"
-    callback_deny = f"xpol|r|{approval_id}|{chain}"
-    if len(callback_approve.encode("utf-8")) > 64 or len(callback_deny.encode("utf-8")) > 64:
-        return
-
-    display_chain = _display_chain_key(chain)
-    request_type = str(flow.get("requestType") or "").strip().lower()
-    token_display = str(flow.get("tokenDisplay") or "").strip()
-    request_label = "Policy update"
-    if request_type == "token_preapprove_add":
-        request_label = "Preapprove token for trading"
-    elif request_type == "token_preapprove_remove":
-        request_label = "Revoke preapproved token"
-    elif request_type == "global_approval_enable":
-        request_label = "Enable Approve all (global trading)"
-    elif request_type == "global_approval_disable":
-        request_label = "Disable Approve all (global trading)"
-
-    lines = [
-        "Approve policy change",
-        f"Request: {request_label}",
-    ]
-    if token_display:
-        lines.append(f"Token: {token_display}")
-    lines.extend(
-        [
-            f"Chain: {display_chain}",
-            f"Approval ID: {approval_id}",
-            "Status: approval_pending",
-            "",
-            "Tap Approve to apply (or Deny to reject).",
-        ]
-    )
-    text = "\n".join(lines)
-    buttons = json.dumps(
-        [[{"text": "Approve", "callback_data": callback_approve}, {"text": "Deny", "callback_data": callback_deny}]],
-        separators=(",", ":"),
-    )
-    openclaw = _require_openclaw_bin()
-    cmd = [openclaw, "message", "send", "--channel", "telegram", "--target", chat_id, "--message", text, "--buttons", buttons, "--json"]
-    if thread_id:
-        cmd.extend(["--thread-id", thread_id])
-    proc = _run_subprocess(cmd, timeout_sec=30, kind="openclaw_send")
-    if proc.returncode != 0:
-        stderr = (proc.stderr or "").strip()
-        stdout = (proc.stdout or "").strip()
-        raise WalletStoreError(stderr or stdout or "openclaw message send failed.")
-    message_id = _extract_openclaw_message_id(proc.stdout or "")
-    if not message_id:
-        message_id = "unknown"
-    _record_policy_approval_prompt(
-        approval_id,
-        {
-            "channel": "telegram",
-            "chainKey": chain,
-            "to": chat_id,
-            "threadId": thread_id,
-            "messageId": message_id,
-            "createdAt": utc_now(),
-        },
-    )
+    runtime_services.maybe_send_policy_approval_prompt(_build_telegram_delivery_service_ctx(), flow)
 
 
 def _maybe_send_telegram_liquidity_approval_prompt(flow: dict[str, Any]) -> None:
-    if _telegram_dispatch_suppressed_for_harness():
-        return
-    liquidity_intent_id = str(flow.get("liquidityIntentId") or "").strip()
-    chain = str(flow.get("chainKey") or "").strip()
-    if not liquidity_intent_id or not chain:
-        return
-    existing = _get_approval_prompt(liquidity_intent_id)
-    if existing and str(existing.get("channel") or "") == "telegram":
-        return
-
-    delivery = _read_openclaw_last_delivery()
-    if not delivery or str(delivery.get("lastChannel") or "").lower() != "telegram":
-        return
-
-    chat_id = str(delivery.get("lastTo") or "").strip()
-    if not chat_id:
-        return
-
-    thread_raw = delivery.get("lastThreadId")
-    thread_id: str | None = None
-    if isinstance(thread_raw, int):
-        thread_id = str(thread_raw)
-    elif isinstance(thread_raw, str) and thread_raw.strip():
-        thread_id = thread_raw.strip()
-
-    callback_approve = f"xliq|a|{liquidity_intent_id}|{chain}"
-    callback_deny = f"xliq|r|{liquidity_intent_id}|{chain}"
-    if len(callback_approve.encode("utf-8")) > 64 or len(callback_deny.encode("utf-8")) > 64:
-        return
-
-    display_chain = _display_chain_key(chain)
-    action = str(flow.get("action") or "remove").strip().lower()
-    dex = str(flow.get("dex") or "unknown").strip().lower() or "unknown"
-    token_a = str(flow.get("tokenASymbol") or _token_symbol_for_display(chain, str(flow.get("tokenA") or "")) or "TOKEN").strip() or "TOKEN"
-    token_b = str(flow.get("tokenBSymbol") or _token_symbol_for_display(chain, str(flow.get("tokenB") or "")) or "TOKEN").strip() or "TOKEN"
-    amount_a = str(flow.get("amountA") or "").strip()
-    amount_b = str(flow.get("amountB") or "").strip()
-    position_id = str(flow.get("positionId") or "").strip()
-    percent = str(flow.get("percent") or "").strip()
-
-    lines = [
-        "Approve liquidity action",
-        f"Action: {action}",
-        f"Pair: {token_a}/{token_b}",
-        f"Chain: `{display_chain}`",
-        f"DEX: `{dex}`",
-        f"Intent ID: `{liquidity_intent_id}`",
-        "Status: approval_pending",
-    ]
-    if position_id:
-        lines.append(f"Position ID: `{position_id}`")
-    if percent:
-        lines.append(f"Percent: {percent}%")
-    if amount_a or amount_b:
-        lines.append(f"Amounts: {amount_a or '?'} / {amount_b or '?'}")
-    lines.extend(["", "Tap Approve to execute (or Deny to reject)."])
-    text = "\n".join(lines)
-
-    buttons = json.dumps(
-        [[{"text": "Approve", "callback_data": callback_approve}, {"text": "Deny", "callback_data": callback_deny}]],
-        separators=(",", ":"),
-    )
-    openclaw = _require_openclaw_bin()
-    cmd = [openclaw, "message", "send", "--channel", "telegram", "--target", chat_id, "--message", text, "--buttons", buttons, "--json"]
-    if thread_id:
-        cmd.extend(["--thread-id", thread_id])
-    proc = _run_subprocess(cmd, timeout_sec=30, kind="openclaw_send")
-    if proc.returncode != 0:
-        stderr = (proc.stderr or "").strip()
-        stdout = (proc.stdout or "").strip()
-        raise WalletStoreError(stderr or stdout or "openclaw message send failed.")
-    message_id = _extract_openclaw_message_id(proc.stdout or "")
-    if not message_id:
-        message_id = "unknown"
-    _record_approval_prompt(
-        liquidity_intent_id,
-        {
-            "channel": "telegram",
-            "chainKey": chain,
-            "to": chat_id,
-            "threadId": thread_id,
-            "messageId": message_id,
-            "createdAt": utc_now(),
-        },
-    )
+    runtime_services.maybe_send_liquidity_approval_prompt(_build_telegram_delivery_service_ctx(), flow)
 
 
 def _maybe_send_telegram_decision_message(
@@ -2922,94 +2701,14 @@ def _maybe_send_telegram_decision_message(
     summary: dict[str, Any] | None,
     trade: dict[str, Any] | None,
 ) -> None:
-    """
-    Best-effort acknowledgement into the active Telegram chat when an approval is decided.
-    This is advisory UX only and must never gate execution.
-    """
-    if _telegram_dispatch_suppressed_for_harness():
-        return
-    # Prefer the exact prompt destination when available; session-store "last delivery" can drift.
-    chat_id = ""
-    thread_id: str | None = None
-    prompt = _get_approval_prompt(trade_id)
-    if prompt and str(prompt.get("channel") or "") == "telegram":
-        chat_id = str(prompt.get("to") or "").strip()
-        thread_raw = prompt.get("threadId")
-        if isinstance(thread_raw, int):
-            thread_id = str(thread_raw)
-        elif isinstance(thread_raw, str) and thread_raw.strip():
-            thread_id = thread_raw.strip()
-    if not chat_id:
-        delivery = _read_openclaw_last_delivery()
-        if not delivery or str(delivery.get("lastChannel") or "").lower() != "telegram":
-            return
-        chat_id = str(delivery.get("lastTo") or "").strip()
-        if not chat_id:
-            return
-        thread_raw = delivery.get("lastThreadId")
-        if isinstance(thread_raw, int):
-            thread_id = str(thread_raw)
-        elif isinstance(thread_raw, str) and thread_raw.strip():
-            thread_id = thread_raw.strip()
-
-    display_chain = _display_chain_key(chain)
-    summary = summary or {}
-    trade = trade or {}
-    amount = str(summary.get("amountInHuman") or "").strip() or str(trade.get("amountIn") or "").strip() or "?"
-    token_in_raw = str(trade.get("tokenIn") or "").strip()
-    token_out_raw = str(trade.get("tokenOut") or "").strip()
-    token_in = str(summary.get("tokenInSymbol") or "").strip() or token_in_raw or "TOKEN_IN"
-    token_out = str(summary.get("tokenOutSymbol") or "").strip() or token_out_raw or "TOKEN_OUT"
-    # Older/partial payloads can omit summary.amountInHuman for Solana and only include
-    # base units in trade.amountIn. Convert to human units for readable decision prompts.
-    if not str(summary.get("amountInHuman") or "").strip() and _is_solana_chain(chain) and token_in_raw and is_solana_address(token_in_raw):
-        amount_raw = str(trade.get("amountIn") or "").strip()
-        if amount_raw and amount_raw.isdigit():
-            try:
-                token_in_decimals = _solana_mint_decimals(chain, token_in_raw)
-                amount = _normalize_amount_human_text(_format_units(int(amount_raw), token_in_decimals))
-            except Exception:
-                # Best-effort UX formatting only; never block decision handling.
-                pass
-    token_in = _token_symbol_for_display(chain, token_in)
-    token_out = _token_symbol_for_display(chain, token_out)
-    slip = summary.get("slippageBps")
-    slip_str = ""
-    try:
-        if slip is not None:
-            slip_str = f" (slippage {int(slip)} bps)"
-    except Exception:
-        slip_str = ""
-
-    if decision == "approved":
-        text = (
-            "Approval received.\n\n"
-            f"• Pair: {amount} {token_in} -> {token_out}{slip_str}\n"
-            f"• Trade ID: `{trade_id}`\n"
-            f"• Chain: `{display_chain}`\n\n"
-            "Executing now. I will send a final success/failure update after on-chain outcome is known."
-        )
-    else:
-        reason_code = str(trade.get("reasonCode") or "").strip()
-        reason_message = str(trade.get("reasonMessage") or "").strip()
-        reason = reason_message or reason_code or "Denied."
-        text = (
-            "Denied swap\n"
-            f"{amount} {token_in} -> {token_out}{slip_str}\n"
-            f"Chain: {display_chain}\n"
-            f"Trade: {trade_id}\n\n"
-            f"Reason: {reason}"
-        )
-
-    openclaw = shutil.which("openclaw")
-    if not openclaw:
-        return
-    cmd = [openclaw, "message", "send", "--channel", "telegram", "--target", chat_id, "--message", text, "--json"]
-    if thread_id:
-        cmd.extend(["--thread-id", thread_id])
-    proc = _run_subprocess(cmd, timeout_sec=20, kind="openclaw_send")
-    if proc.returncode != 0:
-        return
+    runtime_services.maybe_send_decision_message(
+        _build_telegram_delivery_service_ctx(),
+        trade_id=trade_id,
+        chain=chain,
+        decision=decision,
+        summary=summary,
+        trade=trade,
+    )
 
 
 def _maybe_send_telegram_trade_terminal_message(
@@ -3020,68 +2719,14 @@ def _maybe_send_telegram_trade_terminal_message(
     tx_hash: str | None = None,
     reason_message: str | None = None,
 ) -> None:
-    if _telegram_dispatch_suppressed_for_harness():
-        return
-    normalized = str(status or "").strip().lower()
-    if normalized not in {"filled", "failed", "rejected", "verification_timeout"}:
-        return
-    chat_id = ""
-    thread_id: str | None = None
-    prompt = _get_approval_prompt(trade_id)
-    if prompt and str(prompt.get("channel") or "") == "telegram":
-        chat_id = str(prompt.get("to") or "").strip()
-        thread_raw = prompt.get("threadId")
-        if isinstance(thread_raw, int):
-            thread_id = str(thread_raw)
-        elif isinstance(thread_raw, str) and thread_raw.strip():
-            thread_id = thread_raw.strip()
-    if not chat_id:
-        delivery = _read_openclaw_last_delivery()
-        if not delivery or str(delivery.get("lastChannel") or "").lower() != "telegram":
-            return
-        chat_id = str(delivery.get("lastTo") or "").strip()
-        if not chat_id:
-            return
-        thread_raw = delivery.get("lastThreadId")
-        if isinstance(thread_raw, int):
-            thread_id = str(thread_raw)
-        elif isinstance(thread_raw, str) and thread_raw.strip():
-            thread_id = thread_raw.strip()
-
-    display_chain = _display_chain_key(chain)
-    tx_hash_clean = str(tx_hash or "").strip()
-    # Fail closed for owner UX truthfulness: do not send a success terminal message
-    # when runtime cannot provide a transaction hash.
-    if normalized == "filled" and not tx_hash_clean:
-        normalized = "failed"
-        if not str(reason_message or "").strip():
-            reason_message = "Execution reported filled without tx hash; treating as unverified."
-    tx_line = f"\nTx: `{tx_hash_clean}`" if tx_hash_clean else ""
-    if normalized == "filled":
-        text = (
-            "Swap completed.\n\n"
-            f"Trade: `{trade_id}`\n"
-            f"Chain: `{display_chain}`"
-            f"{tx_line}"
-        )
-    else:
-        reason = str(reason_message or "").strip() or "Execution failed."
-        text = (
-            "Swap failed.\n\n"
-            f"Trade: `{trade_id}`\n"
-            f"Chain: `{display_chain}`\n"
-            f"Reason: {reason}"
-            f"{tx_line}"
-        )
-    openclaw = shutil.which("openclaw")
-    if not openclaw:
-        return
-    cmd = [openclaw, "message", "send", "--channel", "telegram", "--target", chat_id, "--message", text, "--json"]
-    if thread_id:
-        cmd.extend(["--thread-id", thread_id])
-    proc = _run_subprocess(cmd, timeout_sec=20, kind="openclaw_send")
-    if proc.returncode != 0:
-        return
+    runtime_services.maybe_send_trade_terminal_message(
+        _build_telegram_delivery_service_ctx(),
+        trade_id=trade_id,
+        chain=chain,
+        status=status,
+        tx_hash=tx_hash,
+        reason_message=reason_message,
+    )
 
 
 def _maybe_delete_telegram_approval_prompt(trade_id: str) -> None:
@@ -3096,41 +2741,7 @@ def _normalize_telegram_target(value: str) -> str:
 
 
 def _resolve_telegram_bot_token() -> str | None:
-    for candidate in (
-        os.environ.get("XCLAW_TELEGRAM_BOT_TOKEN"),
-        os.environ.get("TELEGRAM_BOT_TOKEN"),
-    ):
-        token = str(candidate or "").strip()
-        if token:
-            return token
-
-    try:
-        openclaw = _require_openclaw_bin()
-    except Exception:
-        return None
-    try:
-        proc = _run_subprocess(
-            [openclaw, "config", "get", "channels.telegram.botToken", "--json"],
-            timeout_sec=5,
-            kind="openclaw_config_get",
-        )
-    except Exception:
-        return None
-    if proc.returncode != 0:
-        return None
-    raw = str(proc.stdout or "").strip()
-    if not raw:
-        return None
-    try:
-        parsed = json.loads(raw)
-        if isinstance(parsed, str) and parsed.strip():
-            return parsed.strip()
-    except Exception:
-        pass
-    if raw.startswith('"') and raw.endswith('"'):
-        raw = raw[1:-1]
-    raw = raw.strip()
-    return raw or None
+    return runtime_services.resolve_telegram_bot_token(_build_telegram_delivery_service_ctx())
 
 
 def _approval_prompt_store_ops(subject_type: str) -> tuple[Any, Any]:
@@ -3156,11 +2767,7 @@ def _clear_telegram_approval_buttons(subject_type: str, subject_id: str) -> dict
 
 
 def _cleanup_trade_approval_prompt(trade_id: str) -> dict[str, Any]:
-    try:
-        result = _clear_telegram_approval_buttons("trade", trade_id)
-        return dict(result.get("promptCleanup") or {"ok": bool(result.get("ok")), "code": str(result.get("code") or "unknown")})
-    except Exception as exc:
-        return {"ok": False, "code": "prompt_cleanup_failed", "error": str(exc)[:300]}
+    return runtime_services.cleanup_prompt(_build_telegram_delivery_service_ctx(), "trade", trade_id)
 
 
 def _maybe_delete_telegram_transfer_approval_prompt(approval_id: str) -> None:
@@ -3168,19 +2775,11 @@ def _maybe_delete_telegram_transfer_approval_prompt(approval_id: str) -> None:
 
 
 def _cleanup_transfer_approval_prompt(approval_id: str) -> dict[str, Any]:
-    try:
-        result = _clear_telegram_approval_buttons("transfer", approval_id)
-        return dict(result.get("promptCleanup") or {"ok": bool(result.get("ok")), "code": str(result.get("code") or "unknown")})
-    except Exception as exc:
-        return {"ok": False, "code": "prompt_cleanup_failed", "error": str(exc)[:300]}
+    return runtime_services.cleanup_prompt(_build_telegram_delivery_service_ctx(), "transfer", approval_id)
 
 
 def _cleanup_policy_approval_prompt(approval_id: str) -> dict[str, Any]:
-    try:
-        result = _clear_telegram_approval_buttons("policy", approval_id)
-        return dict(result.get("promptCleanup") or {"ok": bool(result.get("ok")), "code": str(result.get("code") or "unknown")})
-    except Exception as exc:
-        return {"ok": False, "code": "prompt_cleanup_failed", "error": str(exc)[:300]}
+    return runtime_services.cleanup_prompt(_build_telegram_delivery_service_ctx(), "policy", approval_id)
 
 
 def _fetch_transfer_decision_inbox(chain: str, limit: int = 20) -> list[dict[str, Any]]:
@@ -3252,42 +2851,16 @@ def _publish_runtime_signing_readiness(chain: str, readiness: dict[str, Any]) ->
 
 
 def _maybe_send_owner_link_to_active_chat(management_url: str, expires_at: str | None) -> dict[str, Any]:
-    """
-    Best-effort direct owner-link handoff into the currently active chat channel.
-    This path is intentionally non-blocking: failures should not prevent returning the link payload.
-    """
-    delivery = _read_openclaw_last_delivery()
-    if not delivery:
-        return {"sent": False, "reason": "no_active_delivery"}
-    channel = str(delivery.get("lastChannel") or "").strip().lower()
-    target = str(delivery.get("lastTo") or "").strip()
-    if not channel or not target:
-        return {"sent": False, "reason": "missing_channel_or_target"}
-    if channel == "telegram":
-        return {"sent": False, "reason": "telegram_channel_skipped"}
-    openclaw = shutil.which("openclaw")
-    if not openclaw:
-        return {"sent": False, "reason": "openclaw_missing"}
-
-    message = f"Owner management link:\n{management_url}"
-    if isinstance(expires_at, str) and expires_at.strip():
-        message += f"\nExpires: {expires_at.strip()}"
-    message += "\nShort-lived one-time link. Do not forward."
-
-    cmd = [openclaw, "message", "send", "--channel", channel, "--target", target, "--message", message, "--json"]
-    thread_raw = delivery.get("lastThreadId")
-    if channel == "telegram":
-        if isinstance(thread_raw, int):
-            cmd.extend(["--thread-id", str(thread_raw)])
-        elif isinstance(thread_raw, str) and thread_raw.strip():
-            cmd.extend(["--thread-id", thread_raw.strip()])
-    proc = _run_subprocess(cmd, timeout_sec=20, kind="openclaw_send")
-    if proc.returncode != 0:
-        stderr = (proc.stderr or "").strip()
-        stdout = (proc.stdout or "").strip()
-        return {"sent": False, "reason": "send_failed", "error": stderr or stdout or "openclaw message send failed"}
-    message_id = _extract_openclaw_message_id(proc.stdout or "")
-    return {"sent": True, "channel": channel, "messageId": message_id}
+    return runtime_services.maybe_send_owner_link_to_active_chat(
+        runtime_services.OwnerLinkDeliveryServiceContext(
+            read_openclaw_last_delivery=_read_openclaw_last_delivery,
+            shutil_module=shutil,
+            run_subprocess=_run_subprocess,
+            extract_openclaw_message_id=_extract_openclaw_message_id,
+        ),
+        management_url,
+        expires_at,
+    )
 
 
 def cmd_approvals_sync(args: argparse.Namespace) -> int:
