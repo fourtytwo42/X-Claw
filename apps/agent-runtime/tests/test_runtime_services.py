@@ -589,6 +589,115 @@ class RuntimeServicesTests(unittest.TestCase):
         with mock.patch.dict(os.environ, {"XCLAW_TELEGRAM_BOT_TOKEN": "tok_1"}, clear=False):
             self.assertEqual(telegram_delivery.resolve_telegram_bot_token(ctx), "tok_1")
 
+    def test_telegram_delivery_resolve_bot_token_returns_none_on_subprocess_exception(self) -> None:
+        ctx = telegram_delivery.TelegramDeliveryServiceContext(
+            telegram_dispatch_suppressed_for_harness=lambda: False,
+            read_openclaw_last_delivery=lambda: None,
+            get_approval_prompt=lambda trade_id: None,
+            get_transfer_approval_prompt=lambda approval_id: None,
+            get_policy_approval_prompt=lambda approval_id: None,
+            record_approval_prompt=lambda *args, **kwargs: None,
+            record_transfer_approval_prompt=lambda *args, **kwargs: None,
+            record_policy_approval_prompt=lambda *args, **kwargs: None,
+            require_openclaw_bin=lambda: "openclaw",
+            run_subprocess=lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("timeout")),
+            wallet_store_error=cli.WalletStoreError,
+            extract_openclaw_message_id=lambda stdout: None,
+            utc_now=cli.utc_now,
+            display_chain_key=cli._display_chain_key,
+            token_symbol_for_display=cli._token_symbol_for_display,
+            is_solana_chain=cli._is_solana_chain,
+            is_solana_address=cli.is_solana_address,
+            solana_mint_decimals=cli._solana_mint_decimals,
+            normalize_amount_human_text=cli._normalize_amount_human_text,
+            format_units=cli._format_units,
+            canonical_token_map=cli._canonical_token_map,
+            shutil_module=cli.shutil,
+            re_module=cli.re,
+            clear_telegram_approval_buttons=lambda subject_type, subject_id: {},
+            remove_approval_prompt=lambda trade_id: None,
+            remove_transfer_approval_prompt=lambda approval_id: None,
+            remove_policy_approval_prompt=lambda approval_id: None,
+        )
+        self.assertIsNone(telegram_delivery.resolve_telegram_bot_token(ctx))
+
+    def test_telegram_delivery_transfer_prompt_subprocess_failure_raises_deterministically(self) -> None:
+        recorder = mock.Mock()
+        ctx = telegram_delivery.TelegramDeliveryServiceContext(
+            telegram_dispatch_suppressed_for_harness=lambda: False,
+            read_openclaw_last_delivery=lambda: {"lastChannel": "telegram", "lastTo": "123", "lastThreadId": None},
+            get_approval_prompt=lambda trade_id: None,
+            get_transfer_approval_prompt=lambda approval_id: None,
+            get_policy_approval_prompt=lambda approval_id: None,
+            record_approval_prompt=lambda *args, **kwargs: None,
+            record_transfer_approval_prompt=recorder,
+            record_policy_approval_prompt=lambda *args, **kwargs: None,
+            require_openclaw_bin=lambda: "openclaw",
+            run_subprocess=lambda *args, **kwargs: SimpleNamespace(returncode=1, stdout="", stderr="send failed"),
+            wallet_store_error=cli.WalletStoreError,
+            extract_openclaw_message_id=lambda stdout: None,
+            utc_now=cli.utc_now,
+            display_chain_key=cli._display_chain_key,
+            token_symbol_for_display=cli._token_symbol_for_display,
+            is_solana_chain=cli._is_solana_chain,
+            is_solana_address=cli.is_solana_address,
+            solana_mint_decimals=cli._solana_mint_decimals,
+            normalize_amount_human_text=cli._normalize_amount_human_text,
+            format_units=cli._format_units,
+            canonical_token_map=cli._canonical_token_map,
+            shutil_module=cli.shutil,
+            re_module=cli.re,
+            clear_telegram_approval_buttons=lambda subject_type, subject_id: {},
+            remove_approval_prompt=lambda trade_id: None,
+            remove_transfer_approval_prompt=lambda approval_id: None,
+            remove_policy_approval_prompt=lambda approval_id: None,
+        )
+        with self.assertRaises(cli.WalletStoreError) as caught:
+            telegram_delivery.maybe_send_transfer_approval_prompt(
+                ctx,
+                {"approvalId": "xfr_1", "chainKey": "base_sepolia", "transferType": "native", "amountWei": "1", "toAddress": "0x" + "11" * 20},
+            )
+        self.assertEqual(str(caught.exception), "send failed")
+        recorder.assert_not_called()
+
+    def test_telegram_delivery_terminal_message_subprocess_failure_is_best_effort(self) -> None:
+        ctx = telegram_delivery.TelegramDeliveryServiceContext(
+            telegram_dispatch_suppressed_for_harness=lambda: False,
+            read_openclaw_last_delivery=lambda: {"lastChannel": "telegram", "lastTo": "123", "lastThreadId": None},
+            get_approval_prompt=lambda trade_id: {"channel": "telegram", "to": "123", "threadId": None},
+            get_transfer_approval_prompt=lambda approval_id: None,
+            get_policy_approval_prompt=lambda approval_id: None,
+            record_approval_prompt=lambda *args, **kwargs: None,
+            record_transfer_approval_prompt=lambda *args, **kwargs: None,
+            record_policy_approval_prompt=lambda *args, **kwargs: None,
+            require_openclaw_bin=lambda: "openclaw",
+            run_subprocess=lambda *args, **kwargs: SimpleNamespace(returncode=1, stdout="", stderr="send failed"),
+            wallet_store_error=cli.WalletStoreError,
+            extract_openclaw_message_id=lambda stdout: None,
+            utc_now=cli.utc_now,
+            display_chain_key=cli._display_chain_key,
+            token_symbol_for_display=cli._token_symbol_for_display,
+            is_solana_chain=cli._is_solana_chain,
+            is_solana_address=cli.is_solana_address,
+            solana_mint_decimals=cli._solana_mint_decimals,
+            normalize_amount_human_text=cli._normalize_amount_human_text,
+            format_units=cli._format_units,
+            canonical_token_map=cli._canonical_token_map,
+            shutil_module=SimpleNamespace(which=lambda name: "openclaw"),
+            re_module=cli.re,
+            clear_telegram_approval_buttons=lambda subject_type, subject_id: {},
+            remove_approval_prompt=lambda trade_id: None,
+            remove_transfer_approval_prompt=lambda approval_id: None,
+            remove_policy_approval_prompt=lambda approval_id: None,
+        )
+        telegram_delivery.maybe_send_trade_terminal_message(
+            ctx,
+            trade_id="trd_1",
+            chain="base_sepolia",
+            status="filled",
+            tx_hash="0x" + "ab" * 32,
+        )
+
     def test_owner_link_delivery_skips_telegram(self) -> None:
         ctx = owner_link_delivery.OwnerLinkDeliveryServiceContext(
             read_openclaw_last_delivery=lambda: {"lastChannel": "telegram", "lastTo": "123", "lastThreadId": None},
@@ -599,6 +708,28 @@ class RuntimeServicesTests(unittest.TestCase):
         result = owner_link_delivery.maybe_send_owner_link_to_active_chat(ctx, "https://xclaw.trade/agents/ag_1?token=ol1.test", "2026-02-18T16:39:52.313Z")
         self.assertFalse(bool(result.get("sent")))
         self.assertEqual(result.get("reason"), "telegram_channel_skipped")
+
+    def test_owner_link_delivery_missing_openclaw_is_stable_noop(self) -> None:
+        ctx = owner_link_delivery.OwnerLinkDeliveryServiceContext(
+            read_openclaw_last_delivery=lambda: {"lastChannel": "discord", "lastTo": "user_1", "lastThreadId": None},
+            shutil_module=SimpleNamespace(which=lambda name: None),
+            run_subprocess=lambda *args, **kwargs: None,
+            extract_openclaw_message_id=lambda stdout: None,
+        )
+        result = owner_link_delivery.maybe_send_owner_link_to_active_chat(ctx, "https://xclaw.trade/agents/ag_1?token=ol1.test", None)
+        self.assertEqual(result, {"sent": False, "reason": "openclaw_missing"})
+
+    def test_owner_link_delivery_send_failure_returns_stable_error_payload(self) -> None:
+        ctx = owner_link_delivery.OwnerLinkDeliveryServiceContext(
+            read_openclaw_last_delivery=lambda: {"lastChannel": "discord", "lastTo": "user_1", "lastThreadId": None},
+            shutil_module=SimpleNamespace(which=lambda name: "openclaw"),
+            run_subprocess=lambda *args, **kwargs: SimpleNamespace(returncode=1, stdout="", stderr="send failed"),
+            extract_openclaw_message_id=lambda stdout: None,
+        )
+        result = owner_link_delivery.maybe_send_owner_link_to_active_chat(ctx, "https://xclaw.trade/agents/ag_1?token=ol1.test", None)
+        self.assertEqual(result["sent"], False)
+        self.assertEqual(result["reason"], "send_failed")
+        self.assertEqual(result["error"], "send failed")
 
     def test_agent_api_ack_transfer_decision_inbox_includes_reason_fields(self) -> None:
         api_request = mock.Mock(return_value=(200, {"ok": True}))
@@ -652,6 +783,20 @@ class RuntimeServicesTests(unittest.TestCase):
             wallet_store_error=cli.WalletStoreError,
         )
         self.assertFalse(ok)
+
+    def test_mirroring_required_delivery_wraps_transport_exception_deterministically(self) -> None:
+        api_request = mock.Mock(side_effect=RuntimeError("network down"))
+        with self.assertRaises(cli.WalletStoreError) as caught:
+            mirroring.mirror_transfer_approval(
+                flow={"approvalId": "xfr_1", "chainKey": "base_sepolia"},
+                require_delivery=True,
+                api_request=api_request,
+                utc_now=lambda: "2026-03-08T00:00:00+00:00",
+                watcher_run_id=lambda: "wrun_test",
+                token_hex=lambda n: "abc12345",
+                wallet_store_error=cli.WalletStoreError,
+            )
+        self.assertEqual(str(caught.exception), "network down")
 
     def test_mirroring_x402_outbound_sets_payment_id_and_swallows_errors(self) -> None:
         flow = {
@@ -720,6 +865,30 @@ class RuntimeServicesTests(unittest.TestCase):
             wallet_store_error=cli.WalletStoreError,
         )
         queue.assert_called_once()
+
+    def test_reporting_service_limit_order_status_transport_error_queues_when_allowed(self) -> None:
+        queue = mock.Mock()
+        reporting.post_limit_order_status(
+            order_id="ord_1",
+            payload={"status": "filled"},
+            queue_on_failure=True,
+            api_request=mock.Mock(side_effect=RuntimeError("timeout")),
+            queue_limit_order_action=queue,
+            wallet_store_error=cli.WalletStoreError,
+        )
+        queue.assert_called_once_with("POST", "/limit-orders/ord_1/status", {"status": "filled"})
+
+    def test_reporting_service_limit_order_status_transport_error_raises_when_queue_disabled(self) -> None:
+        with self.assertRaises(RuntimeError) as caught:
+            reporting.post_limit_order_status(
+                order_id="ord_1",
+                payload={"status": "filled"},
+                queue_on_failure=False,
+                api_request=mock.Mock(side_effect=RuntimeError("timeout")),
+                queue_limit_order_action=mock.Mock(),
+                wallet_store_error=cli.WalletStoreError,
+            )
+        self.assertEqual(str(caught.exception), "timeout")
 
     def test_reporting_service_execution_report_non_2xx_is_deterministic(self) -> None:
         ctx = reporting.ReportingServiceContext(

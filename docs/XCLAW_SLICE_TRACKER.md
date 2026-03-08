@@ -17,6 +17,60 @@ Status legend:
 
 ---
 
+## Slice 241: Command-Surface Failure Injection Sweep
+Status: [ ]
+
+Goal:
+- harden EVM and Solana command-surface behavior under injected runtime service failures while preserving all public CLI and JSON contracts.
+
+DoD:
+- [ ] command-surface failure injection covers wallet, trade, approvals, limit-orders, liquidity, and x402 families.
+- [ ] EVM and Solana degraded-path error codes and JSON field names remain stable where semantics match.
+- [ ] no mock/stub execution regressions or duplicate queue/replay side effects are introduced.
+- [ ] command-family regressions remain green.
+- [ ] full sequential validation + issue evidence posted.
+
+Issue mapping:
+- `#94`
+
+---
+
+## Slice 240: Local State, Replay, and Corruption Hardening
+Status: [ ]
+
+Goal:
+- harden local runtime state, replay, approval prompt, transfer flow, and policy helpers against corrupted local payloads and partial replay failures while preserving current command/test contracts.
+
+DoD:
+- [ ] direct corruption/replay coverage exists for `runtime_state.py`, `transfer_flows.py`, `approval_prompts.py`, `trade_caps.py`, and `transfer_policy.py`.
+- [ ] malformed local state fails closed or resets to the existing safe empty state contract, without silent bad behavior.
+- [ ] replay, queue, and stale-recovery behavior remain deterministic and idempotent.
+- [ ] command-surface behavior remains unchanged for approvals, transfers, liquidity, and trade-cap callers.
+- [ ] full sequential validation + issue evidence posted.
+
+Issue mapping:
+- `#93`
+
+---
+
+## Slice 239: Transport and Remote Failure Hardening
+Status: [x]
+
+Goal:
+- harden remote/API/mirroring/reporting/Telegram delivery runtime service seams against transport and malformed-response failures while preserving current command/test contracts.
+
+DoD:
+- [x] direct negative-path coverage exists for `agent_api.py`, `mirroring.py`, `reporting.py`, `telegram_delivery.py`, and `owner_link_delivery.py`.
+- [x] required-delivery paths raise deterministically and best-effort paths remain stable no-ops.
+- [x] remote/reporting payload shaping remains stable under malformed responses and subprocess failures.
+- [x] command-family regressions remain green.
+- [x] full sequential validation + issue evidence posted.
+
+Issue mapping:
+- `#92`
+
+---
+
 ## Slice 238: Cross-Service Invariants + Residual cli.py Audit
 Status: [x]
 

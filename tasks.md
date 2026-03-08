@@ -1,9 +1,9 @@
-# Slice 238 Tasks: Cross-Service Invariants + Residual cli.py Audit (2026-03-08)
+# Slice 239 Tasks: Transport and Remote Failure Hardening (2026-03-08)
 
-Issue mapping: `#89`
+Issue mapping: `#92`
 
-- [x] Add direct invariant coverage for required/best-effort mirror behavior.
-- [x] Add direct invariant coverage for stable reporting/event payload fields.
-- [x] Add direct invariant coverage for idempotent trade-usage replay semantics.
-- [x] Audit residual `cli.py` helpers in the Slice 238 service seams and prove wrapper-only delegation.
+- [x] Add direct negative-path coverage for `agent_api.py`.
+- [x] Add direct negative-path coverage for `mirroring.py`.
+- [x] Add direct negative-path coverage for `reporting.py`.
+- [x] Add direct negative-path coverage for `telegram_delivery.py` and `owner_link_delivery.py`.
 - [x] Run full sequential validations + capture evidence in `acceptance.md`.

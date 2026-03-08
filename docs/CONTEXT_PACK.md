@@ -14,7 +14,35 @@
   - `routeKind`
   - `liquidityOperation`
 
-## Active Context: Slice 238 Cross-Service Invariants + Residual cli.py Audit
+## Active Context: Slice 239 Transport and Remote Failure Hardening
+
+Issue mapping: `#92`
+
+### Objective + scope lock
+- Objective:
+  - harden remote/API/mirroring/reporting/Telegram delivery runtime service seams against transport and malformed-response failures,
+  - preserve runtime JSON/CLI behavior and current wrapper/test seams,
+  - keep public runtime contracts unchanged.
+- Scope guard:
+  - runtime internal reliability hardening only,
+  - no API/schema/database changes.
+
+### Expected touched files
+- `apps/agent-runtime/tests/test_runtime_services.py`
+- `apps/agent-runtime/tests/test_trade_path.py`
+- `apps/agent-runtime/tests/test_x402_cli.py`
+- `docs/XCLAW_SOURCE_OF_TRUTH.md`
+- `docs/XCLAW_SLICE_TRACKER.md`
+- `docs/XCLAW_BUILD_ROADMAP.md`
+- `docs/CONTEXT_PACK.md`
+- `spec.md`
+- `tasks.md`
+- `acceptance.md`
+
+### Completion note
+- Completed 2026-03-08 with expanded remote/transport negative-path coverage plus targeted runtime regressions and the required sequential validation chain (`db:parity`, `seed:reset/load/verify`, `build`, `pm2 restart all`).
+
+## Completed Context: Slice 238 Cross-Service Invariants + Residual cli.py Audit
 
 Issue mapping: `#89`
 

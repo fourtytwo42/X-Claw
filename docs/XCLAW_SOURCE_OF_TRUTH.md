@@ -258,6 +258,49 @@ Core thesis: **agents act, humans supervise, network observes and allocates trus
 - no custody/auth boundary changes.
 5. This slice is audit-and-test hardening only unless a residual helper move is clearly justified by an existing service seam.
 
+## 3.38) Slice 239 Transport and Remote Failure Hardening (2026-03-08)
+
+1. Runtime service seams that depend on remote/API/subprocess delivery must fail deterministically on transport errors, malformed responses, and subprocess failures.
+2. Required-delivery paths must raise explicit runtime errors; best-effort paths must remain non-destabilizing no-ops.
+3. Reporting and remote payload shaping must remain stable under degraded conditions:
+- same endpoints,
+- same idempotency behavior,
+- same status vocabulary,
+- same event-type mapping.
+4. Slice 239 preserves all public runtime compatibility requirements:
+- no CLI verb/flag/path changes,
+- no JSON response field changes,
+- no exit-code changes,
+- no API/schema/database changes,
+- no custody/auth boundary changes.
+5. This slice is remote-failure hardening only and must preserve current wrapper/test seams.
+
+## 3.39) Slice 240 Local State, Replay, and Corruption Hardening (2026-03-08)
+
+1. Local runtime state and replay helpers must handle corrupted state files, wrong payload shapes, duplicate replay entries, and stale recovery cases deterministically.
+2. Where a service already defines a safe empty-state contract, malformed local payloads must reset to that state; otherwise helpers must fail closed explicitly.
+3. Replay and queue behavior must remain idempotent, and prompt cleanup remains non-destructive.
+4. Slice 240 preserves all public runtime compatibility requirements:
+- no CLI verb/flag/path changes,
+- no JSON response field changes,
+- no exit-code changes,
+- no API/schema/database changes,
+- no custody/auth boundary changes.
+5. This slice is local-state resilience hardening only and must preserve current command-surface behavior.
+
+## 3.40) Slice 241 Command-Surface Failure Injection Sweep (2026-03-08)
+
+1. Runtime command surfaces must be directly tested under injected service failures across EVM and Solana families.
+2. Error codes, JSON field names, retry/not-actionable behavior, and approval-required behavior must remain stable where semantics match.
+3. Active execution remains fail-closed with no reintroduction of mock/stub execution paths.
+4. Slice 241 preserves all public runtime compatibility requirements:
+- no CLI verb/flag/path changes,
+- no JSON response field changes,
+- no exit-code changes,
+- no API/schema/database changes,
+- no custody/auth boundary changes.
+5. This slice is command-surface reliability hardening only and must not start a new extraction program.
+
 ## 3.36) Slice 237 Transfer-Flow/Approval-Prompt/Trade-Cap Resilience (2026-03-08)
 
 1. Transfer-flow, approval-prompt, and trade-cap service helpers must handle malformed local state and partial failure paths deterministically.

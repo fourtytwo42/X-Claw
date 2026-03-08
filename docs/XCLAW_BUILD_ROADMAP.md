@@ -11,6 +11,32 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 
 ---
 
+## 0.50) Slice 241 Command-Surface Failure Injection Sweep
+
+- [ ] Expand failure-injection coverage across wallet, trade, approvals, limit-orders, liquidity, and x402 command families.
+- [ ] Keep EVM and Solana degraded-path error contracts aligned where semantics match.
+- [ ] Prove no mock/stub execution regressions or duplicate queue/replay side effects.
+- [ ] Keep command-family regression suites green.
+- [ ] Run full sequential validation chain and capture evidence + issue comment.
+
+## 0.49) Slice 240 Local State, Replay, and Corruption Hardening
+
+- [ ] Add direct corruption/replay coverage for `runtime/services/runtime_state.py`.
+- [ ] Add direct corruption/replay coverage for `runtime/services/transfer_flows.py`.
+- [ ] Add direct corruption/replay coverage for `runtime/services/approval_prompts.py`.
+- [ ] Add direct corruption/replay coverage for `runtime/services/trade_caps.py`.
+- [ ] Add direct corruption/replay coverage for `runtime/services/transfer_policy.py`.
+- [ ] Keep command-surface behavior unchanged and run the full sequential validation chain.
+
+## 0.48) Slice 239 Transport and Remote Failure Hardening
+
+- [x] Add direct negative-path coverage for `runtime/services/agent_api.py`.
+- [x] Add direct negative-path coverage for `runtime/services/mirroring.py`.
+- [x] Add direct negative-path coverage for `runtime/services/reporting.py`.
+- [x] Add direct negative-path coverage for `runtime/services/telegram_delivery.py`.
+- [x] Add direct negative-path coverage for `runtime/services/owner_link_delivery.py`.
+- [x] Keep public runtime contracts unchanged and run the full sequential validation chain.
+
 ## 0.47) Slice 238 Cross-Service Invariants + Residual cli.py Audit
 
 - [x] Add direct invariant coverage for required/best-effort delivery, stable reporting payloads, and idempotent replay behavior.
