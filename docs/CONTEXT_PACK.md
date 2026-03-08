@@ -14,32 +14,32 @@
   - `routeKind`
   - `liquidityOperation`
 
-## Active Context: Slice 221 Runtime-First Shared Contract Layer + Wallet/Trade Extraction
+## Active Context: Slice 222 Limit-Orders + Approvals Extraction + Shared Runtime State Machine
 
-Issue mapping: `#74`
+Issue mapping: `#75`
 
 ### Objective + scope lock
 - Objective:
-  - close out hotfix bookkeeping for slices `219` and `220`,
-  - extract shared runtime helpers for canonical command failures, validation, and preconditions,
-  - move wallet/trade business logic out of `cli.py` while preserving current command behavior.
+  - add shared runtime lifecycle helpers for nested command execution and prompt cleanup,
+  - move limit-orders and approvals business logic out of `cli.py` while preserving current command behavior,
+  - keep liquidity and x402 extraction out of this slice.
 - Scope guard:
   - runtime-core extraction only,
-  - wallet/trade only in this slice,
+  - approvals + limit-orders only in this slice,
   - no API/schema/database changes,
-  - no limit-order, approvals, liquidity, or x402 extraction in this slice.
+  - no liquidity/x402 extraction beyond preserving existing fallback behavior.
 
 ### Expected touched files
 - `apps/agent-runtime/xclaw_agent/cli.py`
-- `apps/agent-runtime/xclaw_agent/commands/wallet.py`
-- `apps/agent-runtime/xclaw_agent/commands/trade.py`
-- `apps/agent-runtime/xclaw_agent/runtime/errors.py`
-- `apps/agent-runtime/xclaw_agent/runtime/validators.py`
-- `apps/agent-runtime/xclaw_agent/runtime/preconditions.py`
-- `apps/agent-runtime/xclaw_agent/runtime/execution/evm.py`
-- `apps/agent-runtime/xclaw_agent/runtime/execution/solana.py`
+- `apps/agent-runtime/xclaw_agent/commands/approvals.py`
+- `apps/agent-runtime/xclaw_agent/commands/limit_orders.py`
+- `apps/agent-runtime/xclaw_agent/runtime/state_machine.py`
+- `apps/agent-runtime/tests/test_runtime_state_machine.py`
 - `apps/agent-runtime/tests/test_runtime_contract.py`
+- `apps/agent-runtime/tests/test_approvals_run_loop.py`
 - `apps/agent-runtime/tests/test_trade_path.py`
+- `apps/agent-runtime/tests/test_liquidity_cli.py`
+- `apps/agent-runtime/tests/test_x402_runtime.py`
 - `docs/XCLAW_SOURCE_OF_TRUTH.md`
 - `docs/XCLAW_SLICE_TRACKER.md`
 - `docs/XCLAW_BUILD_ROADMAP.md`

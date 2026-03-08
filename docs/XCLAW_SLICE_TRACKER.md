@@ -17,6 +17,24 @@ Status legend:
 
 ---
 
+## Slice 222: Limit-Orders + Approvals Extraction + Shared Runtime State Machine
+Status: [x]
+
+Goal:
+- extract limit-order and approvals command-family logic out of `cli.py`, add shared lifecycle helpers for nested JSON execution and prompt cleanup, and preserve current runtime CLI behavior.
+
+DoD:
+- [x] shared runtime state-machine helpers exist for nested JSON command execution, prompt cleanup envelopes, and limit-order failure normalization.
+- [x] limit-order command logic is extracted behind stable `cli.py` wrappers.
+- [x] approvals command logic is extracted behind stable `cli.py` wrappers, including resume/decision/request surfaces.
+- [x] direct helper tests cover the shared state-machine helpers and command-surface regressions remain green.
+- [x] full sequential validation + issue evidence posted.
+
+Issue mapping:
+- `#75`
+
+---
+
 ## Slice 221: Runtime-First Shared Contract Layer + Wallet/Trade Extraction
 Status: [x]
 

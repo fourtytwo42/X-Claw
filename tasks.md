@@ -1,13 +1,12 @@
-# Slice 221 Tasks: Runtime-First Shared Contract Layer + Wallet/Trade Extraction (2026-03-08)
+# Slice 222 Tasks: Limit-Orders + Approvals Extraction + Shared Runtime State Machine (2026-03-08)
 
-Issue mapping: `#74`
+Issue mapping: `#75`
 
-- [x] Close out Slice `219` and Slice `220` status/evidence bookkeeping in canonical docs.
-- [x] Add shared runtime helper modules for canonical failure mapping, validators, and preconditions.
-- [x] Extract `wallet rpc-health|address|sign-challenge|send|send-token` behind stable `cli.py` wrappers.
-- [x] Extract `trade spot|execute` behind stable `cli.py` wrappers and family-specific execution helpers.
-- [x] Add direct helper invariant tests.
-- [x] Keep runtime command-surface regression tests green.
+- [x] Add shared runtime lifecycle helpers for nested JSON command execution, prompt cleanup, and limit-order failure normalization.
+- [x] Extract `limit-orders create|cancel|list|sync|status|run-once|run-loop` behind stable `cli.py` wrappers.
+- [x] Extract `approvals sync|run-loop|cleanup-spot|clear-prompt|resume-*|decide-*|request-*|revoke-*|check` behind stable `cli.py` wrappers.
+- [x] Add direct helper invariant tests in `test_runtime_state_machine.py`.
+- [x] Keep runtime command-surface regression suites green.
 - [x] Run full sequential validations + capture evidence in `acceptance.md`.
 
 # Slice 220 Tasks: Solana Reliability + Capability Truth Alignment (2026-03-08)

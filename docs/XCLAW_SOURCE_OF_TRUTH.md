@@ -259,6 +259,27 @@ Core thesis: **agents act, humans supervise, network observes and allocates trus
 - runtime canonical execution key remains `solana_mainnet_beta` for stored/config compatibility.
 2. User-facing chain text in Telegram/runtime trade approval flows must display Solana mainnet as `solana_mainnet`.
 
+## 3.30) Slice 222 Limit-Orders + Approvals Extraction + Shared Runtime State Machine (2026-03-08)
+
+1. `apps/agent-runtime/xclaw_agent/cli.py` must continue to own parser wiring, command registration, and thin dispatch glue only for approvals and limit-orders.
+2. Shared lifecycle helpers for extracted runtime command families must live under `apps/agent-runtime/xclaw_agent/runtime/` and own canonical behavior for:
+- nested JSON command execution/capture,
+- prompt cleanup success/failure envelope shaping,
+- limit-order failure reason normalization,
+- active execution `mode=real` enforcement where already required.
+3. Limit-order and approvals business logic must live outside `cli.py`:
+- `apps/agent-runtime/xclaw_agent/commands/limit_orders.py`
+- `apps/agent-runtime/xclaw_agent/commands/approvals.py`
+4. Slice 222 preserves all public runtime compatibility requirements:
+- no CLI verb/flag/path changes,
+- no JSON field-name contract changes,
+- no exit-code contract changes,
+- no custody/auth boundary changes.
+5. Existing active execution constraints remain mandatory:
+- limit-order create/run paths remain `mode=real` only where already enforced,
+- approvals resume/decision flows remain idempotent and fail closed on non-actionable states,
+- x402 fallback behavior for missing transfer approval flows remains unchanged.
+
 ## 3.29) Slice 221 Runtime-First Shared Contract Layer + Wallet/Trade Extraction (2026-03-08)
 
 1. `apps/agent-runtime/xclaw_agent/cli.py` remains the canonical public CLI router:

@@ -1,31 +1,34 @@
-# Slice 221 Acceptance Evidence: Runtime-First Shared Contract Layer + Wallet/Trade Extraction
+# Slice 222 Acceptance Evidence: Limit-Orders + Approvals Extraction + Shared Runtime State Machine
 
 Date (UTC): 2026-03-08  
-Active slice context: `Slice 221`.
+Active slice context: `Slice 222`.
 
-Issue mapping: `#74`
+Issue mapping: `#75`
 
 ### Objective + Scope Lock
 - Objective:
-  - close out the prior hotfix slice bookkeeping,
-  - extract a canonical runtime helper layer for errors, validators, and preconditions,
-  - move wallet/trade business logic out of `cli.py` behind stable wrappers without changing public CLI behavior.
+  - extract limit-order and approvals command logic out of `cli.py`,
+  - add shared runtime lifecycle helpers for nested command execution and prompt cleanup,
+  - preserve current runtime CLI behavior and x402 fallback behavior.
 
 ### Behavior Checks
-- [x] `apps/agent-runtime/xclaw_agent/cli.py` remains the public command router for wallet/trade entrypoints.
-- [x] shared runtime helpers exist under `apps/agent-runtime/xclaw_agent/runtime/*`.
-- [x] wallet/trade command logic is extracted under `apps/agent-runtime/xclaw_agent/commands/*`.
-- [x] direct helper invariant tests pass:
-  - `python3 -m unittest -v apps/agent-runtime/tests/test_runtime_contract.py`
-- [x] existing command-surface regression tests pass:
-  - `python3 -m unittest -v apps/agent-runtime/tests/test_trade_path.py`
+- [x] `apps/agent-runtime/xclaw_agent/cli.py` remains the public router for approvals and limit-order entrypoints.
+- [x] shared lifecycle helpers exist under `apps/agent-runtime/xclaw_agent/runtime/state_machine.py`.
+- [x] approvals command logic is extracted under `apps/agent-runtime/xclaw_agent/commands/approvals.py`.
+- [x] limit-order command logic is extracted under `apps/agent-runtime/xclaw_agent/commands/limit_orders.py`.
+- [x] direct helper invariant tests pass.
+- [x] existing approvals/limit-order command-surface regression tests pass.
 
 ### Required Validation Gates
-- [x] `npm run db:parity` -> PASS (`ok: true`)
+- [x] `npm run db:parity` -> PASS (`ok: true`, `checkedAt=2026-03-08T07:10:31.541Z`)
 - [x] `npm run seed:reset` -> PASS
 - [x] `npm run seed:load` -> PASS
 - [x] `npm run seed:verify` -> PASS
+- [x] `python3 -m unittest -v apps/agent-runtime/tests/test_runtime_state_machine.py` -> PASS (`Ran 4 tests`, `OK`)
 - [x] `python3 -m unittest -v apps/agent-runtime/tests/test_runtime_contract.py` -> PASS (`Ran 8 tests`, `OK`)
+- [x] `python3 -m unittest -v apps/agent-runtime/tests/test_approvals_run_loop.py` -> PASS (`Ran 3 tests`, `OK`)
+- [x] `python3 -m unittest -v apps/agent-runtime/tests/test_x402_runtime.py` -> PASS (`Ran 5 tests`, `OK`)
+- [x] `python3 -m unittest -v apps/agent-runtime/tests/test_liquidity_cli.py` -> PASS (`Ran 20 tests`, `OK`)
 - [x] `python3 -m unittest -v apps/agent-runtime/tests/test_trade_path.py` -> PASS (`Ran 147 tests`, `OK`)
 - [x] `npm run build` -> PASS (Next.js build completed successfully)
 - [x] `pm2 restart all` -> PASS (`xclaw-web online`)

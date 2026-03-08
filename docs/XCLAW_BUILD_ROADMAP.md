@@ -11,6 +11,14 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 
 ---
 
+## 0.31) Slice 222 Limit-Orders + Approvals Extraction + Shared Runtime State Machine
+
+- [x] Add shared runtime lifecycle helpers for nested JSON execution, prompt cleanup, and limit-order failure mapping.
+- [x] Extract limit-order create/cancel/list/sync/status/run-once/run-loop behind stable `cli.py` wrappers.
+- [x] Extract approvals sync/run-loop/resume/decision/request/check surfaces behind stable `cli.py` wrappers.
+- [x] Add direct helper invariant tests and keep approvals/limit-order command-surface regressions green.
+- [x] Run full sequential validation chain and capture evidence + issue comment.
+
 ## 0.30) Slice 221 Runtime-First Shared Contract Layer + Wallet/Trade Extraction
 
 - [x] Close out Slice `219` and Slice `220` bookkeeping in canonical docs.
@@ -30,10 +38,10 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 
 ## 0.28) Slice 219 EVM Reliability + Mock/Stub Elimination (Hotfix)
 
-- [~] Add register-path resilience for legacy schema drift (`last_name_change_at`) without returning opaque `500`.
-- [~] Make tracked-token mirror path deterministic for unregistered-agent state (structured non-`500` response).
-- [~] Update active EVM e2e execution flows to use `mode=real` for trade/limit-order create paths.
-- [~] Extend contract checks with explicit positive + negative coverage for register/mirror behavior.
+- [x] Add register-path resilience for legacy schema drift (`last_name_change_at`) without returning opaque `500`.
+- [x] Make tracked-token mirror path deterministic for unregistered-agent state (structured non-`500` response).
+- [x] Update active EVM e2e execution flows to use `mode=real` for trade/limit-order create paths.
+- [x] Extend contract checks with explicit positive + negative coverage for register/mirror behavior.
 - [x] Run full sequential validation chain and capture evidence + request IDs.
 
 ## 0.27) Slice 218 Solana Naming UX Tightening (Hotfix)
