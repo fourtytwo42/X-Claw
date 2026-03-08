@@ -14,15 +14,16 @@
   - `routeKind`
   - `liquidityOperation`
 
-## Active Context: Slice 229 Service Extraction from cli and Final Router Reduction
+## Active Context: Slice 230 Transfer Execution and Approval Prompt Services
 
-Issue mapping: `#82`
+Issue mapping: `#83`
 
 ### Objective + scope lock
 - Objective:
-  - move remaining shared helper graphs used by extracted command families out of `cli.py`,
+  - move transfer-flow persistence/recovery + execution helper ownership out of `cli.py`,
+  - move approval prompt persistence/wait-loop/cleanup helper ownership out of `cli.py`,
   - preserve all existing runtime JSON/CLI behavior,
-  - keep command modules independent from `cli.py` internals.
+  - keep thin compatibility wrappers in `cli.py` for existing tests and command entrypoints.
 - Scope guard:
   - runtime internal hardening only,
   - no API/schema/database changes.
@@ -30,13 +31,10 @@ Issue mapping: `#82`
 ### Expected touched files
 - `apps/agent-runtime/xclaw_agent/cli.py`
 - `apps/agent-runtime/xclaw_agent/runtime/services/__init__.py`
-- `apps/agent-runtime/xclaw_agent/runtime/services/agent_api.py`
-- `apps/agent-runtime/xclaw_agent/runtime/services/mirroring.py`
-- `apps/agent-runtime/xclaw_agent/runtime/services/reporting.py`
-- `apps/agent-runtime/tests/test_runtime_adapters.py`
+- `apps/agent-runtime/xclaw_agent/runtime/services/transfer_flows.py`
+- `apps/agent-runtime/xclaw_agent/runtime/services/approval_prompts.py`
+- `apps/agent-runtime/tests/test_runtime_services.py`
 - `apps/agent-runtime/tests/test_approvals_run_loop.py`
-- `apps/agent-runtime/tests/test_liquidity_cli.py`
-- `apps/agent-runtime/tests/test_x402_cli.py`
 - `apps/agent-runtime/tests/test_trade_path.py`
 - `docs/XCLAW_SOURCE_OF_TRUTH.md`
 - `docs/XCLAW_SLICE_TRACKER.md`

@@ -17,6 +17,24 @@ Status legend:
 
 ---
 
+## Slice 230: Transfer Execution and Approval Prompt Services
+Status: [x]
+
+Goal:
+- move transfer-flow execution/state recovery and approval prompt ownership out of `cli.py` into runtime service modules while preserving all runtime command/test contracts.
+
+DoD:
+- [x] transfer flow persistence/recovery + execution helpers live under `apps/agent-runtime/xclaw_agent/runtime/services/transfer_flows.py`.
+- [x] approval prompt persistence/wait-loop/cleanup helpers live under `apps/agent-runtime/xclaw_agent/runtime/services/approval_prompts.py`.
+- [x] `cli.py` keeps only thin wrappers for the moved transfer/prompt helpers.
+- [x] direct service coverage + targeted runtime suites are green.
+- [ ] full sequential validation + issue evidence posted.
+
+Issue mapping:
+- `#83`
+
+---
+
 ## Slice 229: Service Extraction from cli and Final Router Reduction
 Status: [x]
 

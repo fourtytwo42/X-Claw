@@ -241,6 +241,18 @@ Core thesis: **agents act, humans supervise, network observes and allocates trus
 - no API/schema/database changes,
 - no custody/auth boundary changes.
 
+## 3.29) Slice 230 Transfer Execution and Approval Prompt Services (2026-03-08)
+
+1. Transfer-flow persistence/recovery and transfer execution helper ownership must live under `apps/agent-runtime/xclaw_agent/runtime/services/transfer_flows.py`, not directly in `cli.py`.
+2. Approval prompt persistence, trade approval wait-loop handling, and Telegram button-clear-only cleanup helper ownership must live under `apps/agent-runtime/xclaw_agent/runtime/services/approval_prompts.py`.
+3. `cli.py` remains the public parser/router boundary and may expose thin wrapper functions so existing tests and command entrypoints keep the same seams.
+4. Slice 230 preserves current runtime compatibility requirements:
+- no CLI verb/flag/path changes,
+- no JSON response field changes,
+- no exit-code changes,
+- no API/schema/database changes,
+- no custody/auth boundary changes.
+
 ## 3.28) Slice 229 Service Extraction from cli and Final Router Reduction (2026-03-08)
 
 1. Shared helper graphs used by extracted runtime command families must live in runtime service modules rather than `cli.py` where feasible.

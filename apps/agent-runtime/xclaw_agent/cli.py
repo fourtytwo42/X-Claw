@@ -2272,94 +2272,75 @@ def _remove_pending_spot_trade_flow(trade_id: str) -> None:
         _save_pending_spot_trade_flows(state)
 
 
+def _build_transfer_flow_service_ctx() -> runtime_services.TransferFlowContext:
+    return runtime_services.TransferFlowContext(
+        ensure_app_dir=ensure_app_dir,
+        flows_file=PENDING_TRANSFER_FLOWS_FILE,
+        json_module=json,
+        os_module=os,
+        pathlib_module=pathlib,
+        utc_now=utc_now,
+        is_solana_chain=_is_solana_chain,
+        is_solana_address=is_solana_address,
+        is_hex_address=is_hex_address,
+        transfer_executing_stale_sec=_transfer_executing_stale_sec,
+        evaluate_outbound_transfer_policy=_evaluate_outbound_transfer_policy,
+        watcher_run_id=_watcher_run_id,
+        record_pending_transfer_flow=_record_pending_transfer_flow,
+        mirror_transfer_approval=_mirror_transfer_approval,
+        remove_pending_transfer_flow=_remove_pending_transfer_flow,
+        transfer_amount_display=_transfer_amount_display,
+        enforce_spend_preconditions=_enforce_spend_preconditions,
+        load_wallet_store=load_wallet_store,
+        chain_wallet=_chain_wallet,
+        validate_wallet_entry_shape=_validate_wallet_entry_shape,
+        fetch_token_balance_wei=_fetch_token_balance_wei,
+        fetch_native_balance_wei=_fetch_native_balance_wei,
+        assert_transfer_balance_preconditions=_assert_transfer_balance_preconditions,
+        require_wallet_passphrase_for_signing=_require_wallet_passphrase_for_signing,
+        decrypt_private_key=_decrypt_private_key,
+        chain_rpc_url=_chain_rpc_url,
+        solana_send_native_transfer=solana_send_native_transfer,
+        solana_send_spl_transfer=solana_send_spl_transfer,
+        cast_rpc_send_transaction=_cast_rpc_send_transaction,
+        require_cast_bin=_require_cast_bin,
+        run_subprocess=_run_subprocess,
+        cast_receipt_timeout_sec=_cast_receipt_timeout_sec,
+        cast_calldata=_cast_calldata,
+        record_spend=_record_spend,
+        builder_output_from_hashes=_builder_output_from_hashes,
+        re_module=re,
+        json_loads=json.loads,
+        wallet_store_error=WalletStoreError,
+    )
+
+
 def _load_pending_transfer_flows() -> dict[str, Any]:
-    try:
-        ensure_app_dir()
-        if not PENDING_TRANSFER_FLOWS_FILE.exists():
-            return {"version": 1, "flows": {}}
-        raw = PENDING_TRANSFER_FLOWS_FILE.read_text(encoding="utf-8")
-        payload = json.loads(raw or "{}")
-        if not isinstance(payload, dict):
-            return {"version": 1, "flows": {}}
-        flows = payload.get("flows")
-        if not isinstance(flows, dict):
-            payload["flows"] = {}
-        if payload.get("version") != 1:
-            return {"version": 1, "flows": {}}
-        return payload
-    except Exception:
-        return {"version": 1, "flows": {}}
+    return runtime_services.load_pending_transfer_flows(_build_transfer_flow_service_ctx())
 
 
 def _save_pending_transfer_flows(payload: dict[str, Any]) -> None:
-    ensure_app_dir()
-    if payload.get("version") != 1:
-        payload["version"] = 1
-    if not isinstance(payload.get("flows"), dict):
-        payload["flows"] = {}
-    tmp = f"{PENDING_TRANSFER_FLOWS_FILE}.{os.getpid()}.tmp"
-    pathlib.Path(tmp).write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
-    if os.name != "nt":
-        os.chmod(tmp, 0o600)
-    pathlib.Path(tmp).replace(PENDING_TRANSFER_FLOWS_FILE)
-    if os.name != "nt":
-        os.chmod(PENDING_TRANSFER_FLOWS_FILE, 0o600)
+    runtime_services.save_pending_transfer_flows(_build_transfer_flow_service_ctx(), payload)
 
 
 def _get_pending_transfer_flow(approval_id: str) -> dict[str, Any] | None:
-    state = _load_pending_transfer_flows()
-    flows = state.get("flows")
-    if not isinstance(flows, dict):
-        return None
-    entry = flows.get(approval_id)
-    return entry if isinstance(entry, dict) else None
+    return runtime_services.get_pending_transfer_flow(_build_transfer_flow_service_ctx(), approval_id)
 
 
 def _record_pending_transfer_flow(approval_id: str, entry: dict[str, Any]) -> None:
-    state = _load_pending_transfer_flows()
-    flows = state.get("flows")
-    if not isinstance(flows, dict):
-        flows = {}
-        state["flows"] = flows
-    flows[approval_id] = {**entry, "updatedAt": utc_now()}
-    _save_pending_transfer_flows(state)
+    runtime_services.record_pending_transfer_flow(_build_transfer_flow_service_ctx(), approval_id, entry)
 
 
 def _remove_pending_transfer_flow(approval_id: str) -> None:
-    state = _load_pending_transfer_flows()
-    flows = state.get("flows")
-    if not isinstance(flows, dict):
-        return
-    if approval_id in flows:
-        flows.pop(approval_id, None)
-        _save_pending_transfer_flows(state)
+    runtime_services.remove_pending_transfer_flow(_build_transfer_flow_service_ctx(), approval_id)
 
 
 def _parse_iso_utc(value: str | None) -> datetime | None:
-    raw = str(value or "").strip()
-    if not raw:
-        return None
-    normalized = raw.replace("Z", "+00:00")
-    try:
-        parsed = datetime.fromisoformat(normalized)
-        if parsed.tzinfo is None:
-            parsed = parsed.replace(tzinfo=timezone.utc)
-        return parsed.astimezone(timezone.utc)
-    except Exception:
-        return None
+    return runtime_services.parse_iso_utc(value)
 
 
 def _is_stale_executing_transfer_flow(flow: dict[str, Any]) -> bool:
-    status = str(flow.get("status") or "")
-    if status not in {"executing", "verifying"}:
-        return False
-    if str(flow.get("txHash") or "").strip():
-        return False
-    updated_at = _parse_iso_utc(str(flow.get("updatedAt") or flow.get("decidedAt") or flow.get("createdAt") or ""))
-    if updated_at is None:
-        return True
-    age_sec = (datetime.now(timezone.utc) - updated_at).total_seconds()
-    return age_sec >= float(_transfer_executing_stale_sec())
+    return runtime_services.is_stale_executing_transfer_flow(_build_transfer_flow_service_ctx(), flow)
 
 
 def _default_transfer_policy() -> dict[str, Any]:
@@ -2653,443 +2634,108 @@ def _transfer_amount_display(
 
 
 def _execute_pending_transfer_flow(flow: dict[str, Any]) -> dict[str, Any]:
-    approval_id = str(flow.get("approvalId") or "").strip()
-    chain = str(flow.get("chainKey") or "").strip()
-    transfer_type = str(flow.get("transferType") or "native").strip().lower()
-    amount_wei = str(flow.get("amountWei") or "0").strip()
-    to_address = str(flow.get("toAddress") or "").strip()
-    token_address = str(flow.get("tokenAddress") or "").strip().lower() if transfer_type == "token" else None
-    token_symbol = str(flow.get("tokenSymbol") or ("NATIVE" if transfer_type == "native" else "TOKEN")).strip()
-    token_decimals_raw = flow.get("tokenDecimals", 18 if transfer_type == "native" else None)
-    token_decimals: int | None
-    try:
-        token_decimals = int(token_decimals_raw) if token_decimals_raw is not None else None
-    except Exception:
-        token_decimals = 18 if transfer_type == "native" else None
-    amount_human, amount_unit = _transfer_amount_display(amount_wei, transfer_type, token_symbol, token_decimals)
-    amount_display = f"{amount_human} {amount_unit}"
-    is_solana = _is_solana_chain(chain)
-    if not approval_id or not chain:
-        return {"ok": False, "code": "invalid_state", "message": "Missing approvalId/chain in transfer flow."}
-    if not re.fullmatch(r"[0-9]+", amount_wei):
-        return {"ok": False, "code": "invalid_state", "message": "Transfer flow amountWei must be uint."}
-    if is_solana:
-        if not is_solana_address(to_address):
-            return {"ok": False, "code": "invalid_state", "message": "Transfer flow destination is invalid."}
-    elif not is_hex_address(to_address):
-        return {"ok": False, "code": "invalid_state", "message": "Transfer flow destination is invalid."}
-    if transfer_type == "token":
-        if is_solana:
-            if not token_address or not is_solana_address(token_address):
-                return {"ok": False, "code": "invalid_state", "message": "Transfer token address is invalid."}
-        elif not token_address or not is_hex_address(token_address):
-            return {"ok": False, "code": "invalid_state", "message": "Transfer token address is invalid."}
-
-    outbound_eval = _evaluate_outbound_transfer_policy(chain, to_address)
-    policy_blocked_now = not bool(outbound_eval.get("allowed"))
-    policy_blocked_at_create = bool(flow.get("policyBlockedAtCreate", False))
-    force_policy_override = bool(flow.get("forcePolicyOverride", False))
-    execution_mode = "policy_override" if force_policy_override else "normal"
-    if not force_policy_override and policy_blocked_now:
-        if not policy_blocked_at_create:
-            return {
-                "ok": False,
-                "code": "not_actionable",
-                "message": "Transfer is no longer actionable because outbound transfer policy now blocks it.",
-                "approvalId": approval_id,
-                "chain": chain,
-                "status": str(flow.get("status") or "approval_pending"),
-                "policyBlockedAtCreate": policy_blocked_at_create,
-                "policyBlockReasonCode": outbound_eval.get("policyBlockReasonCode"),
-                "policyBlockReasonMessage": outbound_eval.get("policyBlockReasonMessage"),
-            }
-        execution_mode = "policy_override"
-    flow["executionMode"] = execution_mode
-    flow["status"] = "executing"
-    flow["updatedAt"] = utc_now()
-    flow["observedBy"] = "agent_watcher"
-    flow["observationSource"] = "local_send_result"
-    flow["observedAt"] = flow["updatedAt"]
-    flow["watcherRunId"] = _watcher_run_id()
-    flow["confirmationCount"] = None
-    _record_pending_transfer_flow(approval_id, flow)
-    _mirror_transfer_approval(flow)
-
-    from_address: str | None = None
-    try:
-        amount_int = int(amount_wei)
-        state, day_key, current_spend, max_daily_wei = _enforce_spend_preconditions(chain, amount_int)
-        transfer_policy = {
-            "outboundTransfersEnabled": bool(outbound_eval.get("outboundTransfersEnabled")),
-            "outboundMode": str(outbound_eval.get("outboundMode") or "disabled"),
-            "outboundWhitelistAddresses": list(outbound_eval.get("outboundWhitelistAddresses") or []),
-            "updatedAt": outbound_eval.get("updatedAt"),
-            "policyBlockedAtCreate": policy_blocked_at_create,
-            "policyBlockReasonCode": flow.get("policyBlockReasonCode") or outbound_eval.get("policyBlockReasonCode"),
-            "policyBlockReasonMessage": flow.get("policyBlockReasonMessage") or outbound_eval.get("policyBlockReasonMessage"),
-            "executionMode": execution_mode,
-            "forcePolicyOverride": force_policy_override,
-        }
-
-        store = load_wallet_store()
-        _, wallet = _chain_wallet(store, chain)
-        if wallet is None:
-            raise WalletStoreError(f"No wallet configured for chain '{chain}'.")
-        _validate_wallet_entry_shape(wallet)
-        from_address = str(wallet.get("address"))
-        _assert_transfer_balance_preconditions(
-            chain=chain,
-            transfer_type=transfer_type,
-            wallet_address=from_address,
-            amount_wei=amount_wei,
-            token_address=token_address,
-            token_symbol=token_symbol,
-            token_decimals=token_decimals,
-        )
-        passphrase = _require_wallet_passphrase_for_signing(chain)
-        private_key_bytes = _decrypt_private_key(wallet, passphrase)
-
-        tx_hash: str
-        rpc_url = _chain_rpc_url(chain)
-        if is_solana:
-            if transfer_type == "native":
-                tx_hash = solana_send_native_transfer(rpc_url, private_key_bytes, to_address, int(amount_wei))
-            else:
-                result = solana_send_spl_transfer(rpc_url, private_key_bytes, to_address, str(token_address), int(amount_wei))
-                tx_hash = str(result.get("signature") or "")
-                if token_decimals is None and isinstance(result.get("decimals"), int):
-                    token_decimals = int(result.get("decimals"))
-                flow["solanaTransfer"] = result
-        else:
-            private_key_hex = private_key_bytes.hex()
-            if transfer_type == "native":
-                tx_hash = _cast_rpc_send_transaction(
-                    rpc_url,
-                    {
-                        "from": from_address,
-                        "to": to_address,
-                        "value": amount_wei,
-                        "data": "0x",
-                    },
-                    private_key_hex,
-                    chain=chain,
-                )
-                cast_bin = _require_cast_bin()
-                receipt_proc = _run_subprocess(
-                    [cast_bin, "receipt", "--json", "--rpc-url", rpc_url, tx_hash],
-                    timeout_sec=_cast_receipt_timeout_sec(),
-                    kind="cast_receipt",
-                )
-                if receipt_proc.returncode != 0:
-                    stderr = (receipt_proc.stderr or "").strip()
-                    stdout = (receipt_proc.stdout or "").strip()
-                    raise WalletStoreError(stderr or stdout or "cast receipt failed.")
-            else:
-                data = _cast_calldata("transfer(address,uint256)(bool)", [to_address, amount_wei])
-                tx_hash = _cast_rpc_send_transaction(
-                    rpc_url,
-                    {"from": from_address, "to": str(token_address), "data": data},
-                    private_key_hex,
-                    chain=chain,
-                )
-                cast_bin = _require_cast_bin()
-                receipt_proc = _run_subprocess(
-                    [cast_bin, "receipt", "--json", "--rpc-url", rpc_url, tx_hash],
-                    timeout_sec=_cast_receipt_timeout_sec(),
-                    kind="cast_receipt",
-                )
-                if receipt_proc.returncode != 0:
-                    stderr = (receipt_proc.stderr or "").strip()
-                    stdout = (receipt_proc.stdout or "").strip()
-                    raise WalletStoreError(stderr or stdout or "cast receipt failed.")
-                receipt_payload = json.loads((receipt_proc.stdout or "{}").strip() or "{}")
-                receipt_status = str(receipt_payload.get("status", "0x0")).lower()
-                if receipt_status not in {"0x1", "1"}:
-                    raise WalletStoreError(f"On-chain receipt indicates failure status '{receipt_status}'.")
-
-        _record_spend(state, chain, day_key, current_spend + amount_int)
-        flow["status"] = "filled"
-        flow["txHash"] = tx_hash
-        flow["updatedAt"] = utc_now()
-        flow["terminalAt"] = flow["updatedAt"]
-        flow["observedBy"] = "agent_watcher"
-        flow["observationSource"] = "rpc_receipt"
-        flow["observedAt"] = flow["updatedAt"]
-        flow["watcherRunId"] = _watcher_run_id()
-        flow["confirmationCount"] = 1
-        _record_pending_transfer_flow(approval_id, flow)
-        _mirror_transfer_approval(flow)
-        _remove_pending_transfer_flow(approval_id)
-        builder_meta = _builder_output_from_hashes(chain, [tx_hash])
-        return {
-            "ok": True,
-            "code": "ok",
-            "message": "Transfer executed.",
-            "approvalId": approval_id,
-            "chain": chain,
-            "status": "filled",
-            "transferType": transfer_type,
-            "tokenAddress": token_address,
-            "tokenSymbol": token_symbol,
-            "tokenDecimals": token_decimals,
-            "to": to_address,
-            "amountWei": amount_wei,
-            "amount": amount_human,
-            "amountUnit": amount_unit,
-            "amountDisplay": amount_display,
-            "from": from_address,
-            "txHash": tx_hash,
-            "signature": tx_hash if is_solana else None,
-            "day": day_key,
-            "dailySpendWei": str(current_spend + amount_int),
-            "maxDailyNativeWei": str(max_daily_wei),
-            "transferPolicy": transfer_policy,
-            "policyBlockedAtCreate": policy_blocked_at_create,
-            "policyBlockReasonCode": flow.get("policyBlockReasonCode"),
-            "policyBlockReasonMessage": flow.get("policyBlockReasonMessage"),
-            "executionMode": execution_mode,
-            **builder_meta,
-        }
-    except Exception as exc:
-        message = str(exc) or "Transfer execution failed."
-        flow["status"] = "failed"
-        flow["reasonCode"] = "transfer_execution_failed"
-        flow["reasonMessage"] = message
-        flow["updatedAt"] = utc_now()
-        flow["terminalAt"] = flow["updatedAt"]
-        flow["observedBy"] = "agent_watcher"
-        flow["observationSource"] = "rpc_receipt"
-        flow["observedAt"] = flow["updatedAt"]
-        flow["watcherRunId"] = _watcher_run_id()
-        _record_pending_transfer_flow(approval_id, flow)
-        _mirror_transfer_approval(flow)
-        return {
-            "ok": False,
-            "code": "transfer_execution_failed",
-            "message": message,
-            "approvalId": approval_id,
-            "chain": chain,
-            "status": "failed",
-            "transferType": transfer_type,
-            "tokenAddress": token_address,
-            "tokenSymbol": token_symbol,
-            "tokenDecimals": token_decimals,
-            "to": to_address,
-            "amountWei": amount_wei,
-            "amount": amount_human,
-            "amountUnit": amount_unit,
-            "amountDisplay": amount_display,
-            "from": from_address,
-            "txHash": flow.get("txHash"),
-            "signature": flow.get("txHash") if is_solana else None,
-            "reasonCode": "transfer_execution_failed",
-            "reasonMessage": message,
-            "policyBlockedAtCreate": policy_blocked_at_create,
-            "policyBlockReasonCode": flow.get("policyBlockReasonCode"),
-            "policyBlockReasonMessage": flow.get("policyBlockReasonMessage"),
-            "executionMode": execution_mode,
-        }
+    return runtime_services.execute_pending_transfer_flow(_build_transfer_flow_service_ctx(), flow)
 
 
 def _wait_for_trade_approval(trade_id: str, chain: str, summary: dict[str, Any] | None = None) -> dict[str, Any]:
-    # Always attempt Telegram prompt delivery when Telegram is the active chat.
-    # Helper applies channel checks + de-dupe.
-    try:
-        _maybe_send_telegram_approval_prompt(trade_id, chain, summary or {})
-    except Exception:
-        pass
-    wait_timeout_sec = APPROVAL_WAIT_TIMEOUT_SEC
-    if _last_delivery_is_telegram():
-        # Do not block active Telegram chats for owner decisions.
-        wait_timeout_sec = min(wait_timeout_sec, _trade_approval_inline_wait_sec())
-    deadline_ms = int(time.time() * 1000) + (wait_timeout_sec * 1000)
-    last_status: str | None = None
-    while int(time.time() * 1000) <= deadline_ms:
-        trade = _read_trade_details(trade_id)
-        status = str(trade.get("status") or "")
-        last_status = status
-        if status == "approved":
-            try:
-                _maybe_delete_telegram_approval_prompt(trade_id)
-            except Exception:
-                pass
-            _remove_approval_prompt(trade_id)
-            try:
-                _maybe_send_telegram_decision_message(
-                    trade_id=trade_id,
-                    chain=chain,
-                    decision="approved",
-                    summary=summary,
-                    trade=trade,
-                )
-            except Exception:
-                pass
-            _remove_pending_spot_trade_flow(trade_id)
-            return trade
-        if status == "approval_pending":
-            time.sleep(APPROVAL_WAIT_POLL_SEC)
-            continue
-        if status == "rejected":
-            try:
-                _maybe_delete_telegram_approval_prompt(trade_id)
-            except Exception:
-                pass
-            _remove_approval_prompt(trade_id)
-            try:
-                _maybe_send_telegram_decision_message(
-                    trade_id=trade_id,
-                    chain=chain,
-                    decision="rejected",
-                    summary=summary,
-                    trade=trade,
-                )
-            except Exception:
-                pass
-            _remove_pending_spot_trade_flow(trade_id)
-            reason_code = trade.get("reasonCode")
-            reason_message = trade.get("reasonMessage")
-            raise WalletPolicyError(
-                "approval_rejected",
-                "Trade approval was rejected.",
-                "Review rejection reason and create a new trade if needed.",
-                {"tradeId": trade_id, "chain": chain, "reasonCode": reason_code, "reasonMessage": reason_message},
-            )
-        if status == "expired":
-            try:
-                _maybe_delete_telegram_approval_prompt(trade_id)
-            except Exception:
-                pass
-            _remove_approval_prompt(trade_id)
-            _remove_pending_spot_trade_flow(trade_id)
-            raise WalletPolicyError(
-                "approval_expired",
-                "Trade approval has expired.",
-                "Re-propose trade and request approval again.",
-                {"tradeId": trade_id, "chain": chain},
-            )
-        # Any other status is not actionable for approval gating; fail closed.
-        try:
-            _maybe_delete_telegram_approval_prompt(trade_id)
-        except Exception:
-            pass
-        _remove_approval_prompt(trade_id)
-        _remove_pending_spot_trade_flow(trade_id)
-        raise WalletPolicyError(
-            "policy_denied",
-            f"Trade is not executable from status '{status}'.",
-            "Poll intents and execute only actionable trades.",
-            {"tradeId": trade_id, "chain": chain, "status": status},
-        )
+    return runtime_services.wait_for_trade_approval(_build_approval_prompt_service_ctx(), trade_id, chain, summary)
 
-    raise WalletPolicyError(
-        "approval_required",
-        "Trade is waiting for management approval.",
-        "Approve the pending trade in Telegram or web management; execution resumes automatically after approval.",
-        {"tradeId": trade_id, "chain": chain, "lastStatus": last_status},
+
+def _build_approval_prompt_service_ctx() -> runtime_services.ApprovalPromptContext:
+    return runtime_services.ApprovalPromptContext(
+        ensure_app_dir=ensure_app_dir,
+        prompts_file=APPROVAL_PROMPTS_FILE,
+        json_module=json,
+        os_module=os,
+        pathlib_module=pathlib,
+        utc_now=utc_now,
+        parse_iso_utc=_parse_iso_utc,
+        get_approval_prompt=_get_approval_prompt,
+        record_approval_prompt=_record_approval_prompt,
+        post_approval_prompt_metadata=_post_approval_prompt_metadata,
+        read_openclaw_last_delivery=_read_openclaw_last_delivery,
+        maybe_send_telegram_approval_prompt=_maybe_send_telegram_approval_prompt,
+        trade_approval_prompt_resend_cooldown_sec=_trade_approval_prompt_resend_cooldown_sec,
+        telegram_dispatch_suppressed_for_harness=_telegram_dispatch_suppressed_for_harness,
+        display_chain_key=_display_chain_key,
+        transfer_amount_display=_transfer_amount_display,
+        token_symbol_for_display=_token_symbol_for_display,
+        is_solana_chain=_is_solana_chain,
+        is_solana_address=is_solana_address,
+        solana_mint_decimals=_solana_mint_decimals,
+        normalize_amount_human_text=_normalize_amount_human_text,
+        format_units=_format_units,
+        require_openclaw_bin=_require_openclaw_bin,
+        run_subprocess=_run_subprocess,
+        extract_openclaw_message_id=_extract_openclaw_message_id,
+        api_request=_api_request,
+        wallet_store_error=WalletStoreError,
+        openclaw_state_dir=_openclaw_state_dir,
+        sanitize_openclaw_agent_id=_sanitize_openclaw_agent_id,
+        approval_wait_timeout_sec=APPROVAL_WAIT_TIMEOUT_SEC,
+        approval_wait_poll_sec=APPROVAL_WAIT_POLL_SEC,
+        last_delivery_is_telegram=_last_delivery_is_telegram,
+        trade_approval_inline_wait_sec=_trade_approval_inline_wait_sec,
+        read_trade_details=_read_trade_details,
+        maybe_delete_telegram_approval_prompt=_maybe_delete_telegram_approval_prompt,
+        maybe_send_telegram_decision_message=_maybe_send_telegram_decision_message,
+        remove_pending_spot_trade_flow=_remove_pending_spot_trade_flow,
+        remove_approval_prompt=_remove_approval_prompt,
+        time_module=time,
+        wallet_policy_error=WalletPolicyError,
     )
 
 
 def _load_approval_prompts() -> dict[str, Any]:
-    try:
-        ensure_app_dir()
-        if not APPROVAL_PROMPTS_FILE.exists():
-            return {"prompts": {}}
-        raw = APPROVAL_PROMPTS_FILE.read_text(encoding="utf-8")
-        payload = json.loads(raw or "{}")
-        if not isinstance(payload, dict):
-            return {"prompts": {}}
-        prompts = payload.get("prompts")
-        if not isinstance(prompts, dict):
-            payload["prompts"] = {}
-        return payload
-    except Exception:
-        return {"prompts": {}}
+    return runtime_services.load_approval_prompts(_build_approval_prompt_service_ctx())
 
 
 def _save_approval_prompts(payload: dict[str, Any]) -> None:
-    ensure_app_dir()
-    if not isinstance(payload.get("prompts"), dict):
-        payload["prompts"] = {}
-    tmp = f"{APPROVAL_PROMPTS_FILE}.{os.getpid()}.tmp"
-    pathlib.Path(tmp).write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
-    os.chmod(tmp, 0o600)
-    pathlib.Path(tmp).replace(APPROVAL_PROMPTS_FILE)
-    os.chmod(APPROVAL_PROMPTS_FILE, 0o600)
+    runtime_services.save_approval_prompts(_build_approval_prompt_service_ctx(), payload)
 
 
 def _record_approval_prompt(trade_id: str, prompt: dict[str, Any]) -> None:
-    state = _load_approval_prompts()
-    prompts = state.get("prompts")
-    if not isinstance(prompts, dict):
-        prompts = {}
-        state["prompts"] = prompts
-    prompts[trade_id] = {**prompt, "updatedAt": utc_now()}
-    _save_approval_prompts(state)
+    runtime_services.record_approval_prompt(_build_approval_prompt_service_ctx(), trade_id, prompt)
 
 
 def _transfer_prompt_key(approval_id: str) -> str:
-    return f"xfer:{approval_id}"
+    return runtime_services.transfer_prompt_key(approval_id)
 
 
 def _policy_prompt_key(approval_id: str) -> str:
-    return f"xpol:{approval_id}"
+    return runtime_services.policy_prompt_key(approval_id)
 
 
 def _record_transfer_approval_prompt(approval_id: str, prompt: dict[str, Any]) -> None:
-    _record_approval_prompt(
-        _transfer_prompt_key(approval_id),
-        {
-            **prompt,
-            "promptType": "transfer",
-            "approvalId": approval_id,
-        },
-    )
+    runtime_services.record_transfer_approval_prompt(_build_approval_prompt_service_ctx(), approval_id, prompt)
 
 
 def _get_approval_prompt(trade_id: str) -> dict[str, Any] | None:
-    state = _load_approval_prompts()
-    prompts = state.get("prompts")
-    if not isinstance(prompts, dict):
-        return None
-    entry = prompts.get(trade_id)
-    return entry if isinstance(entry, dict) else None
+    return runtime_services.get_approval_prompt(_build_approval_prompt_service_ctx(), trade_id)
 
 
 def _get_transfer_approval_prompt(approval_id: str) -> dict[str, Any] | None:
-    return _get_approval_prompt(_transfer_prompt_key(approval_id))
+    return runtime_services.get_transfer_approval_prompt(_build_approval_prompt_service_ctx(), approval_id)
 
 
 def _record_policy_approval_prompt(approval_id: str, prompt: dict[str, Any]) -> None:
-    _record_approval_prompt(
-        _policy_prompt_key(approval_id),
-        {
-            **prompt,
-            "promptType": "policy",
-            "approvalId": approval_id,
-        },
-    )
+    runtime_services.record_policy_approval_prompt(_build_approval_prompt_service_ctx(), approval_id, prompt)
 
 
 def _get_policy_approval_prompt(approval_id: str) -> dict[str, Any] | None:
-    return _get_approval_prompt(_policy_prompt_key(approval_id))
+    return runtime_services.get_policy_approval_prompt(_build_approval_prompt_service_ctx(), approval_id)
 
 
 def _remove_approval_prompt(trade_id: str) -> None:
-    state = _load_approval_prompts()
-    prompts = state.get("prompts")
-    if not isinstance(prompts, dict):
-        return
-    if trade_id in prompts:
-        prompts.pop(trade_id, None)
-        _save_approval_prompts(state)
+    runtime_services.remove_approval_prompt(_build_approval_prompt_service_ctx(), trade_id)
 
 
 def _remove_transfer_approval_prompt(approval_id: str) -> None:
-    _remove_approval_prompt(_transfer_prompt_key(approval_id))
+    runtime_services.remove_transfer_approval_prompt(_build_approval_prompt_service_ctx(), approval_id)
 
 
 def _remove_policy_approval_prompt(approval_id: str) -> None:
-    _remove_approval_prompt(_policy_prompt_key(approval_id))
+    runtime_services.remove_policy_approval_prompt(_build_approval_prompt_service_ctx(), approval_id)
 
 
 def _approval_channels_enabled(policy_payload: dict[str, Any], channel: str) -> bool:
@@ -3118,43 +2764,7 @@ def _sanitize_openclaw_agent_id(value: str | None) -> str:
 
 
 def _read_openclaw_last_delivery() -> dict[str, Any] | None:
-    """
-    Read OpenClaw session store and return best-effort last delivery context:
-      { lastChannel, lastTo, lastThreadId }
-    """
-    agent_id = _sanitize_openclaw_agent_id(os.environ.get("XCLAW_OPENCLAW_AGENT_ID"))
-    store_path = _openclaw_state_dir() / "agents" / agent_id / "sessions" / "sessions.json"
-    if not store_path.exists():
-        return None
-    try:
-        raw = store_path.read_text(encoding="utf-8")
-        payload = json.loads(raw or "{}")
-        if not isinstance(payload, dict):
-            return None
-        best: dict[str, Any] | None = None
-        best_updated = -1
-        for _, entry in payload.items():
-            if not isinstance(entry, dict):
-                continue
-            updated = entry.get("updatedAt")
-            try:
-                updated_ms = int(updated) if updated is not None else 0
-            except Exception:
-                updated_ms = 0
-            last_channel = str(entry.get("lastChannel") or "").strip().lower()
-            last_to = str(entry.get("lastTo") or "").strip()
-            if not last_channel or not last_to:
-                continue
-            if updated_ms >= best_updated:
-                best_updated = updated_ms
-                best = {
-                    "lastChannel": last_channel,
-                    "lastTo": last_to,
-                    "lastThreadId": entry.get("lastThreadId"),
-                }
-        return best
-    except Exception:
-        return None
+    return runtime_services.read_openclaw_last_delivery(_build_approval_prompt_service_ctx())
 
 
 def _last_delivery_is_telegram() -> bool:
@@ -3248,110 +2858,10 @@ def _extract_openclaw_message_id(stdout: str) -> str | None:
 
 
 def _post_approval_prompt_metadata(trade_id: str, chain: str, to_addr: str, thread_id: str | None, message_id: str) -> None:
-    payload: dict[str, Any] = {
-        "schemaVersion": 1,
-        "tradeId": trade_id,
-        "chainKey": chain,
-        "channel": "telegram",
-        "to": to_addr,
-        "messageId": message_id,
-    }
-    if thread_id:
-        payload["threadId"] = thread_id
-    status_code, body = _api_request(
-        "POST",
-        "/agent/approvals/prompt",
-        payload=payload,
-        include_idempotency=True,
-        idempotency_key=f"rt-appr-prompt-{trade_id}-{secrets.token_hex(8)}",
-    )
-    if status_code < 200 or status_code >= 300:
-        code = str(body.get("code", "api_error"))
-        message = str(body.get("message", f"prompt report failed ({status_code})"))
-        raise WalletStoreError(f"{code}: {message}")
+    runtime_services.post_approval_prompt_metadata(_build_approval_prompt_service_ctx(), trade_id, chain, to_addr, thread_id, message_id)
 
 def _maybe_send_telegram_approval_prompt(trade_id: str, chain: str, summary: dict[str, Any] | None = None) -> None:
-    if _telegram_dispatch_suppressed_for_harness():
-        return
-    # Avoid duplicate sends within a short cooldown window.
-    existing = _get_approval_prompt(trade_id)
-    if existing and str(existing.get("channel") or "") == "telegram":
-        updated_at = _parse_iso_utc(str(existing.get("updatedAt") or existing.get("createdAt") or ""))
-        if updated_at is not None:
-            age_sec = (datetime.now(timezone.utc) - updated_at).total_seconds()
-            if age_sec < float(_trade_approval_prompt_resend_cooldown_sec()):
-                return
-
-    delivery = _read_openclaw_last_delivery()
-    if not delivery or str(delivery.get("lastChannel") or "").lower() != "telegram":
-        return
-
-    chat_id = str(delivery.get("lastTo") or "").strip()
-    if not chat_id:
-        return
-
-    thread_raw = delivery.get("lastThreadId")
-    thread_id: str | None = None
-    if isinstance(thread_raw, int):
-        thread_id = str(thread_raw)
-    elif isinstance(thread_raw, str) and thread_raw.strip():
-        thread_id = thread_raw.strip()
-
-    callback_approve = f"xappr|a|{trade_id}|{chain}"
-    callback_reject = f"xappr|r|{trade_id}|{chain}"
-    if len(callback_approve.encode("utf-8")) > 64 or len(callback_reject.encode("utf-8")) > 64:
-        # Fail closed: do not send a prompt we can't action safely.
-        return
-
-    display_chain = _display_chain_key(chain)
-    summary = summary or {}
-    amount = str(summary.get("amountInHuman") or "").strip() or "?"
-    token_in_symbol = str(summary.get("tokenInSymbol") or "").strip() or "TOKEN_IN"
-    token_out_symbol = str(summary.get("tokenOutSymbol") or "").strip() or "TOKEN_OUT"
-    text = (
-        "Approve swap\n"
-        f"{amount} {token_in_symbol} -> {token_out_symbol}\n"
-        f"Chain: `{display_chain}`\n"
-        f"Trade: `{trade_id}`\n\n"
-        "Tap Approve to continue (or Deny to reject). This will submit an on-chain transaction from the agent wallet."
-    )
-    # Telegram does not support per-button colors; use text labels only.
-    buttons = json.dumps(
-        [[{"text": "Approve", "callback_data": callback_approve}, {"text": "Deny", "callback_data": callback_reject}]],
-        separators=(",", ":"),
-    )
-    openclaw = _require_openclaw_bin()
-    cmd = [openclaw, "message", "send", "--channel", "telegram", "--target", chat_id, "--message", text, "--buttons", buttons, "--json"]
-    if thread_id:
-        cmd.extend(["--thread-id", thread_id])
-    proc = _run_subprocess(cmd, timeout_sec=30, kind="openclaw_send")
-    if proc.returncode != 0:
-        stderr = (proc.stderr or "").strip()
-        stdout = (proc.stdout or "").strip()
-        raise WalletStoreError(stderr or stdout or "openclaw message send failed.")
-
-    message_id = _extract_openclaw_message_id(proc.stdout or "")
-    if not message_id:
-        # We still record a stub so sync can handle later; without messageId delete won't work.
-        message_id = "unknown"
-
-    _record_approval_prompt(
-        trade_id,
-        {
-            "channel": "telegram",
-            "chainKey": chain,
-            "to": chat_id,
-            "threadId": thread_id,
-            "messageId": message_id,
-            "createdAt": utc_now(),
-        },
-    )
-
-    # Best-effort server sync; failures should not block local wait loop.
-    try:
-        _post_approval_prompt_metadata(trade_id, chain, chat_id, thread_id, message_id)
-    except Exception:
-        pass
+    runtime_services.maybe_send_telegram_approval_prompt(_build_approval_prompt_service_ctx(), trade_id, chain, summary)
 
 
 def _maybe_send_telegram_transfer_approval_prompt(flow: dict[str, Any]) -> None:
@@ -3790,12 +3300,7 @@ def _maybe_send_telegram_trade_terminal_message(
 
 
 def _maybe_delete_telegram_approval_prompt(trade_id: str) -> None:
-    entry = _get_approval_prompt(trade_id)
-    if not entry or str(entry.get("channel") or "") != "telegram":
-        return
-    # Telegram inline buttons should be cleared in callback/web paths;
-    # do not delete the original message here.
-    _remove_approval_prompt(trade_id)
+    runtime_services.maybe_delete_telegram_approval_prompt(_build_approval_prompt_service_ctx(), trade_id)
 
 
 def _normalize_telegram_target(value: str) -> str:
@@ -3855,165 +3360,14 @@ def _approval_prompt_store_ops(subject_type: str) -> tuple[Any, Any]:
 
 
 def _clear_telegram_approval_buttons(subject_type: str, subject_id: str) -> dict[str, Any]:
-    if _telegram_dispatch_suppressed_for_harness():
-        get_prompt, remove_prompt = _approval_prompt_store_ops(subject_type)
-        entry = get_prompt(subject_id)
-        if entry:
-            remove_prompt(subject_id)
-        return {
-            "ok": True,
-            "code": "telegram_dispatch_suppressed",
-            "subjectType": subject_type,
-            "subjectId": subject_id,
-            "promptCleanup": {
-                "ok": True,
-                "code": "telegram_dispatch_suppressed",
-                "channel": "telegram",
-            },
-        }
     get_prompt, remove_prompt = _approval_prompt_store_ops(subject_type)
-    entry = get_prompt(subject_id)
-    if not entry:
-        return {
-            "ok": False,
-            "code": "prompt_not_found",
-            "subjectType": subject_type,
-            "subjectId": subject_id,
-            "promptCleanup": {"ok": False, "code": "prompt_not_found", "channel": "telegram"},
-        }
-    if str(entry.get("channel") or "") != "telegram":
-        remove_prompt(subject_id)
-        return {
-            "ok": True,
-            "code": "non_telegram_removed",
-            "subjectType": subject_type,
-            "subjectId": subject_id,
-            "promptCleanup": {"ok": True, "code": "non_telegram_removed", "channel": str(entry.get("channel") or "")},
-        }
-    chat_id = _normalize_telegram_target(str(entry.get("to") or ""))
-    message_id = str(entry.get("messageId") or "").strip()
-    if not chat_id:
-        remove_prompt(subject_id)
-        return {
-            "ok": False,
-            "code": "missing_target",
-            "subjectType": subject_type,
-            "subjectId": subject_id,
-            "promptCleanup": {"ok": False, "code": "missing_target", "channel": "telegram", "messageId": message_id or None},
-        }
-    if not message_id or message_id == "unknown":
-        remove_prompt(subject_id)
-        return {
-            "ok": False,
-            "code": "missing_message_id",
-            "subjectType": subject_type,
-            "subjectId": subject_id,
-            "promptCleanup": {"ok": False, "code": "missing_message_id", "channel": "telegram", "messageId": message_id or None},
-        }
-    try:
-        numeric_message_id = int(message_id)
-    except Exception:
-        remove_prompt(subject_id)
-        return {
-            "ok": False,
-            "code": "invalid_message_id",
-            "subjectType": subject_type,
-            "subjectId": subject_id,
-            "promptCleanup": {"ok": False, "code": "invalid_message_id", "channel": "telegram", "messageId": message_id},
-        }
-    bot_token = _resolve_telegram_bot_token()
-    if not bot_token:
-        openclaw_missing = shutil.which("openclaw") is None
-        return {
-            "ok": False,
-            "code": "openclaw_missing" if openclaw_missing else "telegram_bot_token_missing",
-            "subjectType": subject_type,
-            "subjectId": subject_id,
-            "promptCleanup": {
-                "ok": False,
-                "code": "openclaw_missing" if openclaw_missing else "telegram_bot_token_missing",
-                "channel": "telegram",
-                "messageId": message_id,
-            },
-        }
-
-    endpoint = f"https://api.telegram.org/bot{urllib.parse.quote(bot_token, safe='')}/editMessageReplyMarkup"
-    req_payload = {
-        "chat_id": chat_id,
-        "message_id": numeric_message_id,
-        "reply_markup": {"inline_keyboard": []},
-    }
-    request = urllib.request.Request(
-        url=endpoint,
-        data=json.dumps(req_payload).encode("utf-8"),
-        headers={"content-type": "application/json"},
-        method="POST",
+    return runtime_services.clear_telegram_approval_buttons(
+        _build_approval_prompt_service_ctx(),
+        subject_type,
+        subject_id,
+        get_prompt=get_prompt,
+        remove_prompt=remove_prompt,
     )
-    try:
-        with urllib.request.urlopen(request, timeout=10) as response:
-            response_body = response.read().decode("utf-8", errors="replace").strip()
-        remove_prompt(subject_id)
-        return {
-            "ok": True,
-            "code": "buttons_cleared",
-            "subjectType": subject_type,
-            "subjectId": subject_id,
-            "promptCleanup": {
-                "ok": True,
-                "code": "buttons_cleared",
-                "channel": "telegram",
-                "messageId": message_id,
-                "response": response_body[:300] if response_body else None,
-            },
-        }
-    except urllib.error.HTTPError as exc:
-        body = ""
-        try:
-            body = exc.read().decode("utf-8", errors="replace")
-        except Exception:
-            body = ""
-        body_trimmed = body.strip()
-        if "message is not modified" in body_trimmed.lower():
-            remove_prompt(subject_id)
-            return {
-                "ok": True,
-                "code": "already_cleared",
-                "subjectType": subject_type,
-                "subjectId": subject_id,
-                "promptCleanup": {
-                    "ok": True,
-                    "code": "already_cleared",
-                    "channel": "telegram",
-                    "messageId": message_id,
-                },
-            }
-        return {
-            "ok": False,
-            "code": "telegram_api_failed",
-            "subjectType": subject_type,
-            "subjectId": subject_id,
-            "promptCleanup": {
-                "ok": False,
-                "code": "telegram_api_failed",
-                "channel": "telegram",
-                "messageId": message_id,
-                "error": (body_trimmed or str(exc))[:300],
-            },
-        }
-    except Exception as exc:
-        return {
-            "ok": False,
-            "code": "telegram_api_failed",
-            "subjectType": subject_type,
-            "subjectId": subject_id,
-            "promptCleanup": {
-                "ok": False,
-                "code": "telegram_api_failed",
-                "channel": "telegram",
-                "messageId": message_id,
-                "error": str(exc)[:300],
-            },
-        }
 
 
 def _cleanup_trade_approval_prompt(trade_id: str) -> dict[str, Any]:
@@ -8242,65 +7596,16 @@ def _assert_transfer_balance_preconditions(
     token_symbol: str,
     token_decimals: int | None,
 ) -> None:
-    amount_int = int(amount_wei)
-    is_solana = _is_solana_chain(chain)
-    if is_solana:
-        rpc_url = _chain_rpc_url(chain)
-        if transfer_type == "native":
-            balance_lamports = int(solana_get_balance_lamports(rpc_url, wallet_address))
-            if balance_lamports < amount_int:
-                native_symbol = _native_symbol_for_chain(chain)
-                raise WalletStoreError(
-                    f"Insufficient {native_symbol} balance for transfer: "
-                    f"have {_format_units_pretty(balance_lamports, 9)} {native_symbol}, "
-                    f"need {_format_units_pretty(amount_int, 9)} {native_symbol} "
-                    f"(wallet {wallet_address})."
-                )
-            return
-        if transfer_type == "token":
-            if not token_address or not is_solana_address(token_address):
-                raise WalletStoreError("Transfer token address is invalid.")
-            tokens, _ = solana_get_token_balances(rpc_url, wallet_address)
-            match = next((row for row in tokens if str(row.get("token") or "") == token_address), None)
-            balance_units = int(str((match or {}).get("balanceWei") or "0"))
-            decimals = int(token_decimals if token_decimals is not None else int((match or {}).get("decimals") or 0))
-            symbol = token_symbol.strip() or "TOKEN"
-            if balance_units < amount_int:
-                raise WalletStoreError(
-                    f"Insufficient {symbol} balance for transfer: "
-                    f"have {_format_units_pretty(balance_units, decimals)} {symbol}, "
-                    f"need {_format_units_pretty(amount_int, decimals)} {symbol} "
-                    f"(wallet {wallet_address}, token {token_address})."
-                )
-            return
-
-    if transfer_type == "native":
-        native_balance_wei = int(_fetch_native_balance_wei(chain, wallet_address))
-        if native_balance_wei < amount_int:
-            native_symbol = _native_symbol_for_chain(chain)
-            raise WalletStoreError(
-                f"Insufficient {native_symbol} balance for transfer: "
-                f"have {_format_units_pretty(native_balance_wei, 18)} {native_symbol}, "
-                f"need {_format_units_pretty(amount_int, 18)} {native_symbol} "
-                f"(wallet {wallet_address})."
-            )
-        return
-
-    if transfer_type != "token":
-        return
-    if not token_address or not is_hex_address(token_address):
-        raise WalletStoreError("Transfer token address is invalid.")
-
-    token_balance_wei = int(_fetch_token_balance_wei(chain, wallet_address, token_address))
-    decimals = int(token_decimals) if token_decimals is not None else 18
-    symbol = token_symbol.strip() or "TOKEN"
-    if token_balance_wei < amount_int:
-        raise WalletStoreError(
-            f"Insufficient {symbol} balance for transfer: "
-            f"have {_format_units_pretty(token_balance_wei, decimals)} {symbol}, "
-            f"need {_format_units_pretty(amount_int, decimals)} {symbol} "
-            f"(wallet {wallet_address}, token {token_address})."
-        )
+    runtime_services.assert_transfer_balance_preconditions(
+        _build_transfer_flow_service_ctx(),
+        chain=chain,
+        transfer_type=transfer_type,
+        wallet_address=wallet_address,
+        amount_wei=amount_wei,
+        token_address=token_address,
+        token_symbol=token_symbol,
+        token_decimals=token_decimals,
+    )
 
 
 def _canonical_token_map(chain: str) -> dict[str, str]:
