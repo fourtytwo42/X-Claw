@@ -100,6 +100,33 @@ def _agent_app_dir() -> pathlib.Path:
     return pathlib.Path(os.environ.get("XCLAW_AGENT_APP_DIR", "~/.xclaw-agent")).expanduser()
 
 
+def _openclaw_skill_env() -> dict[str, str]:
+    config_path = pathlib.Path.home() / ".openclaw" / "openclaw.json"
+    if not config_path.exists():
+        return {}
+    try:
+        payload = _read_json(config_path)
+    except Exception:
+        return {}
+    skills = payload.get("skills")
+    if not isinstance(skills, dict):
+        return {}
+    entries = skills.get("entries")
+    if not isinstance(entries, dict):
+        return {}
+    entry = entries.get("xclaw-agent")
+    if not isinstance(entry, dict):
+        return {}
+    env = entry.get("env")
+    if not isinstance(env, dict):
+        return {}
+    out: dict[str, str] = {}
+    for key, value in env.items():
+        if isinstance(key, str) and isinstance(value, str):
+            out[key] = value
+    return out
+
+
 def _canonical_challenge_message(chain: str) -> str:
     nonce = f"harness{int(time.time())}"
     timestamp = _now_iso().replace("Z", "+00:00")
@@ -229,6 +256,7 @@ class WalletApprovalHarness:
         self.unresolved_pending: list[dict[str, Any]] = []
         self.initial_state: dict[str, Any] = {}
         self._chain_config_cache: dict[str, Any] | None = None
+        self._skill_env_cache: dict[str, str] | None = None
 
     def _record(self, name: str, ok: bool, message: str, details: dict[str, Any] | None = None) -> None:
         payload = details or {}
@@ -279,6 +307,7 @@ class WalletApprovalHarness:
 
     def _runtime(self, args: list[str], *, timeout: int = 240) -> tuple[int, dict[str, Any], str, str]:
         cmd = [self.runtime_bin, *args, "--json"]
+        skill_env = self._skill_env()
         env = {
             **os.environ,
             "XCLAW_API_BASE_URL": self.api_base,
@@ -289,6 +318,12 @@ class WalletApprovalHarness:
         }
         if self.wallet_passphrase:
             env["XCLAW_WALLET_PASSPHRASE"] = self.wallet_passphrase
+        for key in ("XCLAW_BUILDER_CODE_BASE", f"XCLAW_BUILDER_CODE_{self.chain.strip().upper()}"):
+            if str(env.get(key) or "").strip():
+                continue
+            fallback = str(skill_env.get(key) or "").strip()
+            if fallback:
+                env[key] = fallback
         proc = subprocess.run(cmd, text=True, capture_output=True, timeout=timeout, env=env)
         out = (proc.stdout or "").strip()
         payload: dict[str, Any] = {}
@@ -304,6 +339,11 @@ class WalletApprovalHarness:
                 payload = candidate
                 break
         return proc.returncode, payload, proc.stdout or "", proc.stderr or ""
+
+    def _skill_env(self) -> dict[str, str]:
+        if self._skill_env_cache is None:
+            self._skill_env_cache = _openclaw_skill_env()
+        return self._skill_env_cache
 
     def _load_bootstrap_token(self) -> str:
         data = _read_json(pathlib.Path(self.args.bootstrap_token_file))
@@ -502,6 +542,36 @@ class WalletApprovalHarness:
             raise HarnessError(f"management agent-state failed ({status}): {body}")
         return body
 
+    def _wait_for_transfer_approval_actionable(self, approval_id: str, *, timeout_sec: int = 30) -> dict[str, Any]:
+        deadline = time.time() + timeout_sec
+        last: dict[str, Any] = {}
+        path = (
+            f"/management/transfer-approvals?agentId={urllib.parse.quote(self.agent_id)}"
+            f"&chainKey={urllib.parse.quote(self.chain)}"
+        )
+        while time.time() < deadline:
+            status, body = self._http("GET", path, auth_mode="management")
+            if status == 200 and bool(body.get("ok")):
+                queue = body.get("queue") if isinstance(body.get("queue"), list) else []
+                history = body.get("history") if isinstance(body.get("history"), list) else []
+                for collection in (queue, history):
+                    for item in collection:
+                        if not isinstance(item, dict):
+                            continue
+                        if str(item.get("approval_id") or item.get("approvalId") or "").strip() != approval_id:
+                            continue
+                        current_status = str(item.get("status") or "").strip().lower()
+                        last = item
+                        if current_status in {"approval_pending", "approved"}:
+                            return item
+            time.sleep(1)
+        raise HarnessError(
+            f"Timed out waiting for transfer approval {approval_id} to become actionable; last={last}",
+            code="transfer_approval_visibility_timeout",
+            category="runtime_trade_failure",
+            details={"approvalId": approval_id, "chain": self.chain, "last": last},
+        )
+
     def _trade_read(self, trade_id: str) -> dict[str, Any]:
         status, body = self._http("GET", f"/trades/{urllib.parse.quote(trade_id)}", auth_mode="agent")
         if status != 200 or not bool(body.get("ok")):
@@ -548,13 +618,36 @@ class WalletApprovalHarness:
             capture_output=True,
             timeout=45,
         )
-        if proc.returncode != 0:
-            return False
+        if proc.returncode == 0:
+            try:
+                payload = json.loads((proc.stdout or "{}").strip() or "{}")
+            except Exception:
+                payload = {}
+            status = str(payload.get("status") or "").strip().lower()
+            if status in {"0x1", "1"}:
+                return True
         try:
-            payload = json.loads((proc.stdout or "{}").strip() or "{}")
+            req = urllib.request.Request(
+                rpc_url,
+                data=json.dumps(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": 1,
+                        "method": "eth_getTransactionReceipt",
+                        "params": [tx_hash],
+                    }
+                ).encode("utf-8"),
+                headers={"content-type": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=20) as resp:
+                payload = json.loads((resp.read() or b"{}").decode("utf-8", errors="replace"))
         except Exception:
             return False
-        status = str(payload.get("status") or "").strip().lower()
+        result = payload.get("result") if isinstance(payload, dict) else None
+        if not isinstance(result, dict):
+            return False
+        status = str(result.get("status") or "").strip().lower()
         return status in {"0x1", "1"}
 
     def _management_post_with_retry(
@@ -1215,12 +1308,6 @@ class WalletApprovalHarness:
             label="trade_decision_approve",
         )
 
-        code, resume_payload, _, resume_stderr = self._runtime(
-            ["approvals", "resume-spot", "--trade-id", trade_id, "--chain", self.chain], timeout=420
-        )
-        if code != 0 or not bool(resume_payload.get("ok")):
-            raise HarnessError(f"trade resume failed: {resume_payload} stderr={resume_stderr}")
-
         terminal = self._wait_for_trade_status(trade_id, {"filled", "failed", "rejected"}, timeout_sec=420)
         if str(terminal.get("status") or "") != "filled":
             raise HarnessError(f"trade terminal status expected filled, got {terminal}")
@@ -1437,7 +1524,7 @@ class WalletApprovalHarness:
                     "--facilitator",
                     "cdp",
                     "--amount-atomic",
-                    "0.00001",
+                    "1",
                     "--asset-kind",
                     "native",
                     "--resource-description",
@@ -1458,7 +1545,7 @@ class WalletApprovalHarness:
                 "--facilitator",
                 "cdp",
                 "--amount-atomic",
-                "0.00001",
+                "1",
                 "--asset-kind",
                 "native",
                 "--resource-description",
@@ -1482,7 +1569,7 @@ class WalletApprovalHarness:
                 "--facilitator",
                 "cdp",
                 "--amount-atomic",
-                "0.00001",
+                "1",
             ]
         )
         if code_pay != 0 and str(pay_payload.get("code") or "") not in {"approval_required", "approval_pending"}:
@@ -1492,19 +1579,14 @@ class WalletApprovalHarness:
         if not approval_id:
             raise HarnessError(f"x402 pay approval id missing: {pay_payload}")
         self.created_x402_approval_ids.append(approval_id)
+        _ = self._wait_for_transfer_approval_actionable(approval_id)
 
-        try:
-            _ = self._management_post_with_retry(
-                "/management/transfer-approvals/decision",
-                {"agentId": self.agent_id, "approvalId": approval_id, "decision": "approve", "chainKey": self.chain},
-                label="x402_decision_approve",
-                accepted_conflict_codes={"not_actionable"},
-            )
-        except HarnessError as exc:
-            attempts = exc.details.get("attempts") if isinstance(exc.details, dict) else []
-            last = attempts[-1] if isinstance(attempts, list) and attempts else {}
-            if not (isinstance(last, dict) and int(last.get("status", 0)) == 404 and str(last.get("code") or "") == "payload_invalid"):
-                raise
+        _ = self._management_post_with_retry(
+            "/management/transfer-approvals/decision",
+            {"agentId": self.agent_id, "approvalId": approval_id, "decision": "approve", "chainKey": self.chain},
+            label="x402_decision_approve",
+            accepted_conflict_codes={"not_actionable"},
+        )
         _ = self._runtime(["x402", "pay-resume", "--approval-id", approval_id], timeout=240)
         return {"x402ApprovalId": approval_id}
 

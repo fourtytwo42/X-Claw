@@ -17,7 +17,7 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 - [x] Extend `wallet_approval_harness.py` with Solana-specific live evidence defaults/reporting while preserving existing EVM behavior.
 - [x] Add/expand direct unit coverage for Solana matrix ordering and truthful supported/unsupported Solana harness outcomes.
 - [x] Run Solana contract rails plus the full sequential validation chain.
-- [!] Run the refreshed live matrix and capture per-chain evidence or concrete blockers in `acceptance.md`.
+- [x] Run the refreshed live matrix and capture per-chain evidence or concrete blockers in `acceptance.md`.
 
 ## 0.51) Slice 242 Runtime Recovery and Watchdog Sweep
 

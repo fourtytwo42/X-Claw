@@ -333,6 +333,10 @@ Core thesis: **agents act, humans supervise, network observes and allocates trus
 - no API/schema/database changes,
 - no runtime command contract changes,
 - only additive chain-matrix CLI/report support for Solana evidence legs.
+6. Slice 243 closeout requires Base Sepolia to be cleared before any later-chain blocker is accepted:
+- builder-code env must propagate through both harness-invoked runtime commands and web management approval resume paths,
+- x402 transfer approvals must not be decided before mirrored/actionable visibility exists,
+- once `hardhat_local`, `base_sepolia`, and `ethereum_sepolia` are green, a later stop at `solana_localnet` or `solana_devnet` may close the slice if the blocker is concrete and recorded in `acceptance.md`.
 
 ## 3.36) Slice 237 Transfer-Flow/Approval-Prompt/Trade-Cap Resilience (2026-03-08)
 

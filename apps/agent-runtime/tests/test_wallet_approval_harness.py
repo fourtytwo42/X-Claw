@@ -72,6 +72,16 @@ class WalletApprovalHarnessUnitTests(unittest.TestCase):
         called_env = run_mock.call_args.kwargs.get("env") or {}
         self.assertEqual(str(called_env.get("XCLAW_TEST_HARNESS_DISABLE_TELEGRAM")), "1")
 
+    def test_runtime_inherits_builder_code_from_skill_env(self) -> None:
+        runner = harness.WalletApprovalHarness(self._args())
+        proc = mock.Mock(returncode=0, stdout='{"ok":true}\n', stderr="")
+        with mock.patch.object(harness, "_openclaw_skill_env", return_value={"XCLAW_BUILDER_CODE_BASE_SEPOLIA": "xclaw"}), mock.patch.object(
+            harness.subprocess, "run", return_value=proc
+        ) as run_mock:
+            runner._runtime(["trade", "execute", "--trade-id", "trd_1"])
+        called_env = run_mock.call_args.kwargs.get("env") or {}
+        self.assertEqual(str(called_env.get("XCLAW_BUILDER_CODE_BASE_SEPOLIA")), "xclaw")
+
     def test_main_returns_nonzero_on_harness_error(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             token_file = pathlib.Path(tmpdir) / "bootstrap-token.json"
@@ -372,6 +382,47 @@ class WalletApprovalHarnessUnitTests(unittest.TestCase):
             out = runner._scenario_x402_or_capability_assertion()
         self.assertEqual(out.get("assertedUnsupportedCode"), "unsupported_chain_capability")
 
+    def test_wait_for_transfer_approval_actionable_polls_management_queue(self) -> None:
+        runner = harness.WalletApprovalHarness(self._args())
+        with mock.patch.object(
+            runner,
+            "_http",
+            side_effect=[
+                (200, {"ok": True, "queue": [], "history": []}),
+                (200, {"ok": True, "queue": [{"approval_id": "xfr_1", "status": "approval_pending"}], "history": []}),
+            ],
+        ), mock.patch.object(harness.time, "sleep", return_value=None):
+            result = runner._wait_for_transfer_approval_actionable("xfr_1", timeout_sec=2)
+        self.assertEqual(str(result.get("approval_id")), "xfr_1")
+
+    def test_scenario_x402_waits_for_actionable_approval_before_decision(self) -> None:
+        runner = harness.WalletApprovalHarness(self._args())
+        with mock.patch.object(runner, "_has_chain_capability", return_value=True), mock.patch.object(
+            runner,
+            "_runtime",
+            side_effect=[
+                (0, {"ok": True, "paymentUrl": "https://example.test/pay"}, "", ""),
+                (1, {"ok": False, "code": "approval_required", "approval": {"approvalId": "xfr_x402"}}, "", ""),
+                (0, {"ok": True}, "", ""),
+            ],
+        ) as runtime_mock, mock.patch.object(
+            runner,
+            "_wait_for_transfer_approval_actionable",
+            return_value={"approval_id": "xfr_x402", "status": "approval_pending"},
+        ) as wait_mock, mock.patch.object(
+            runner,
+            "_management_post_with_retry",
+            return_value={"ok": True},
+        ) as decision_mock:
+            out = runner._scenario_x402_or_capability_assertion()
+        wait_mock.assert_called_once_with("xfr_x402")
+        self.assertEqual(str(out.get("x402ApprovalId")), "xfr_x402")
+        self.assertEqual(decision_mock.call_args.args[0], "/management/transfer-approvals/decision")
+        receive_cmd = runtime_mock.call_args_list[0].args[0]
+        pay_cmd = runtime_mock.call_args_list[1].args[0]
+        self.assertEqual(receive_cmd[receive_cmd.index("--amount-atomic") + 1], "1")
+        self.assertEqual(pay_cmd[pay_cmd.index("--amount-atomic") + 1], "1")
+
     def test_prepare_trade_pair_sets_solana_defaults_from_native_balance(self) -> None:
         args = self._args()
         args.chain = "solana_devnet"
@@ -430,27 +481,19 @@ class WalletApprovalHarnessUnitTests(unittest.TestCase):
         self.assertFalse(out.get("liquiditySupported"))
         self.assertEqual(out.get("liquidityUnsupportedReason"), "liquidity_preflight_failed")
 
-    def test_trade_pending_approve_raises_when_resume_fails(self) -> None:
+    def test_trade_pending_approve_raises_when_terminal_status_is_not_filled(self) -> None:
         args = self._args()
         args.chain = "ethereum_sepolia"
         runner = harness.WalletApprovalHarness(args)
         with mock.patch.object(runner, "_post_permissions_update"), mock.patch.object(
             runner,
             "_runtime",
-            side_effect=[
-                (1, {"ok": False, "code": "approval_required", "status": "approval_pending", "tradeId": "trd_1"}, "", ""),
-                (
-                    0,
-                    {
-                        "ok": False,
-                        "code": "trade_execute_failed",
-                        "details": {"fallbackReason": {"message": "unsupported_execution_adapter: no router adapter available"}},
-                    },
-                    "",
-                    "",
-                ),
-            ],
-        ), mock.patch.object(runner, "_management_post_with_retry", return_value={"ok": True}):
+            return_value=(1, {"ok": False, "code": "approval_required", "status": "approval_pending", "tradeId": "trd_1"}, "", ""),
+        ), mock.patch.object(runner, "_management_post_with_retry", return_value={"ok": True}), mock.patch.object(
+            runner,
+            "_wait_for_trade_status",
+            return_value={"tradeId": "trd_1", "status": "failed"},
+        ):
             with self.assertRaises(harness.HarnessError):
                 runner._scenario_trade_pending_approve()
 
@@ -608,6 +651,28 @@ class WalletApprovalHarnessUnitTests(unittest.TestCase):
         ), mock.patch.object(harness.time, "sleep", return_value=None):
             with self.assertRaises(harness.HarnessError):
                 runner._wait_for_trade_status("trd_2", {"filled", "failed"}, timeout_sec=3)
+
+    def test_trade_receipt_succeeded_falls_back_to_rpc_when_cast_fails(self) -> None:
+        args = self._args()
+        args.chain = "base_sepolia"
+        runner = harness.WalletApprovalHarness(args)
+        urlopen_mock = mock.MagicMock()
+        urlopen_mock.__enter__.return_value = urlopen_mock
+        urlopen_mock.read.return_value = b'{"jsonrpc":"2.0","id":1,"result":{"status":"0x1"}}'
+        with mock.patch.object(
+            runner,
+            "_chain_config",
+            return_value={"rpc": {"primary": "https://rpc.example.test"}},
+        ), mock.patch.object(
+            harness.subprocess,
+            "run",
+            return_value=mock.Mock(returncode=1, stdout="", stderr="cast failed"),
+        ), mock.patch.object(
+            harness.urllib.request,
+            "urlopen",
+            return_value=urlopen_mock,
+        ):
+            self.assertTrue(runner._trade_receipt_succeeded("0x" + "11" * 32))
 
     def test_prepare_trade_pair_prefers_usdc_over_weth_when_available(self) -> None:
         args = self._args()

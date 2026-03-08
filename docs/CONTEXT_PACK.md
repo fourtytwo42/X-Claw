@@ -22,7 +22,8 @@ Issue mapping: `#96`
 - Objective:
   - preserve the current EVM live evidence path,
   - extend the approval matrix to `solana_localnet` then `solana_devnet`,
-  - generate truthful per-chain and aggregate evidence artifacts without changing public runtime contracts.
+  - generate truthful per-chain and aggregate evidence artifacts without changing public runtime contracts,
+  - clear the Base Sepolia builder-code and x402 actionability blockers before accepting any later-chain stop.
 - Scope guard:
   - harness/matrix/report/evidence work only, plus the minimum management bootstrap host/cookie fixes required to make local live evidence truthful,
   - no API/schema/database changes,
@@ -36,6 +37,7 @@ Issue mapping: `#96`
 - `apps/network-web/src/lib/management-cookies.ts`
 - `apps/network-web/src/app/api/v1/agent/management-link/route.ts`
 - `apps/network-web/src/app/api/v1/management/owner-link/route.ts`
+- `apps/network-web/src/app/api/v1/management/approvals/decision/route.ts`
 - `infrastructure/scripts/management-solana-contract-tests.mjs`
 - `docs/XCLAW_SOURCE_OF_TRUTH.md`
 - `docs/XCLAW_SLICE_TRACKER.md`

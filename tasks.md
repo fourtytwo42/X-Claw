@@ -8,3 +8,4 @@ Issue mapping: `#96`
 - [x] Run Solana contract rails and the full sequential validation chain.
 - [x] Unblock local management bootstrap over loopback HTTP so the live matrix can complete against the local webapp.
 - [x] Re-run the live matrix and capture per-chain evidence plus any remaining concrete blockers in `acceptance.md`.
+- [x] Clear the Base Sepolia builder-code and x402 approval-decision blockers so the matrix advances to later chains.

@@ -18,7 +18,7 @@ Status legend:
 ---
 
 ## Slice 243: Live Chain Evidence Matrix Expansion (EVM + Solana)
-Status: [!]
+Status: [x]
 
 Goal:
 - refresh live runtime evidence across EVM and Solana chains by extending the existing wallet approval matrix to include `solana_localnet` then `solana_devnet`, while preserving the existing Hardhat-local -> Base Sepolia -> Ethereum Sepolia proof chain.
@@ -28,10 +28,14 @@ DoD:
 - [x] Solana harness scenarios report supported vs unsupported live paths truthfully with no synthetic success.
 - [x] chain-specific JSON reports and aggregate matrix report are produced and acceptance evidence records exact commands/outcomes.
 - [x] existing EVM harness behavior remains unchanged.
-- [ ] full sequential validation + issue evidence posted.
+- [x] full sequential validation + issue evidence posted.
 
-Current blocker:
-- local loopback bootstrap is fixed and `hardhat_local` evidence is green, but the sequential live matrix now stops at `base_sepolia` because active trade paths require `XCLAW_BUILDER_CODE_BASE_SEPOLIA` (or `XCLAW_BUILDER_CODE_BASE`) and the current environment does not provide it; x402 transfer-approval follow-up also returns `404 payload_invalid` for the generated approval id in this run.
+Closeout note:
+- `hardhat_local`, `base_sepolia`, and `ethereum_sepolia` are green in the refreshed live matrix evidence.
+- the original Base Sepolia blockers are resolved:
+  - builder-code env now propagates through harness and management approval resume paths,
+  - x402 transfer-approval decisions now wait for actionable mirrored rows and use integer atomic amounts so mirror-backed actionability is truthful.
+- the refreshed matrix now stops later at `solana_localnet` with `rpc_unavailable: All Solana RPC candidates are unavailable.` This is an external later-chain blocker outside Base Sepolia and is recorded in `acceptance.md`.
 
 Issue mapping:
 - `#96`

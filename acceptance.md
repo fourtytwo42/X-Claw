@@ -27,7 +27,7 @@ Issue mapping: `#96`
 - [x] `npm run seed:load`
 - [x] `npm run seed:verify`
 - [x] tracked `infrastructure/seed-data/.seed-state.json` restore
-- [!] refreshed live matrix run
+- [x] refreshed live matrix run
 - [x] `npm run build`
 - [x] `pm2 restart all`
 
@@ -41,11 +41,17 @@ Issue mapping: `#96`
     - Solana-specific trade asset defaults use canonical wrapped SOL + USDC mint semantics
     - Solana localnet faucet bootstrap uses native-only top-up path
     - Solana liquidity scenario returns truthful unsupported details when live preflight is not runnable
+    - runtime env now inherits canonical builder-code settings from the installed skill context when the harness caller does not provide them explicitly
+    - transfer-approval decision flow now waits until x402 approvals are mirrored/actionable before issuing the management decision
+    - Base Sepolia x402 capability scenario now uses canonical integer atomic amounts so mirror-backed transfer approvals are actually created
+    - trade receipt confirmation falls back from `cast receipt` to direct JSON-RPC when `cast` is unavailable or fails transiently
+  - `apps/network-web/src/app/api/v1/management/approvals/decision/route.ts`
+    - management background trade-resume env now inherits canonical builder-code settings from the installed skill context for Base-family live evidence runs
   - `infrastructure/scripts/management-solana-contract-tests.mjs`
     - Solana runtime contract assertions updated to follow shared validator locations after runtime extraction
 - Direct tests:
   - `python3 -m unittest -v apps/agent-runtime/tests/test_wallet_approval_harness.py`
-    - `Ran 34 tests`
+    - `Ran 38 tests`
     - `OK`
   - `python3 -m unittest -v apps/agent-runtime/tests/test_wallet_approval_chain_matrix.py`
     - `Ran 5 tests`
@@ -71,6 +77,12 @@ Issue mapping: `#96`
     - `ok: true`
   - tracked seed restore:
     - `git show HEAD:infrastructure/seed-data/.seed-state.json > infrastructure/seed-data/.seed-state.json`
+  - `npm run hardhat:deploy-local`
+    - `ok: true`
+    - `deployedAt: 2026-03-08T23:29:27.963Z`
+  - `npm run hardhat:verify-local`
+    - `ok: true`
+    - `verifiedAt: 2026-03-08T23:29:28.677Z`
   - `npm run build`
     - passed
     - Next.js build completed successfully
@@ -94,25 +106,33 @@ Issue mapping: `#96`
     - `POST /api/v1/management/session/bootstrap` returned `200`
     - cookies were set without `Secure` on `127.0.0.1`
     - follow-up `GET /api/v1/management/agent-state?...chainKey=hardhat_local` returned `200`
-  - exact matrix command run:
+  - exact initial matrix command run:
     - `python3 apps/agent-runtime/scripts/wallet_approval_chain_matrix.py --base-url http://127.0.0.1:3000 --agent-id ag_a123e3bc428c12675f93 --bootstrap-token-file /home/hendo420/.xclaw-secrets/management/ag_a123e3bc428c12675f93-bootstrap-token.json --runtime-bin apps/agent-runtime/bin/xclaw-agent --agent-api-key <installed-skill-api-key> --wallet-passphrase <installed-skill-passphrase> --harvy-address 0x582f6f293e0f49855bb752ae29d6b0565c500d87 --solana-wallet-address 9F4znU1PsW5yBK5TAfR9x8C9q3yVGNHUMuaXY35uCEXT --solana-recipient-address Gjgssop34eL6h6StEuFvMGqXNjfekzEJhAB2hANKdtHA --reports-dir /tmp/xclaw-slice243-reports --json-report /tmp/xclaw-slice243-matrix.json`
+  - exact post-Base rerun command:
+    - `python3 apps/agent-runtime/scripts/wallet_approval_chain_matrix.py --base-url http://127.0.0.1:3000 --agent-id ag_a123e3bc428c12675f93 --bootstrap-token-file /home/hendo420/.xclaw-secrets/management/ag_a123e3bc428c12675f93-bootstrap-token.json --runtime-bin apps/agent-runtime/bin/xclaw-agent --agent-api-key <installed-skill-api-key> --wallet-passphrase <installed-skill-passphrase> --harvy-address 0x582f6f293e0f49855bb752ae29d6b0565c500d87 --solana-wallet-address 9F4znU1PsW5yBK5TAfR9x8C9q3yVGNHUMuaXY35uCEXT --solana-recipient-address Gjgssop34eL6h6StEuFvMGqXNjfekzEJhAB2hANKdtHA --reports-dir /tmp/xclaw-slice243-reports --json-report /tmp/xclaw-slice243-matrix-post-base.json --start-chain ethereum_sepolia`
   - generated reports:
     - aggregate: `/tmp/xclaw-slice243-matrix.json`
+    - aggregate post-base rerun: `/tmp/xclaw-slice243-matrix-post-base.json`
     - hardhat local: `/tmp/xclaw-slice243-reports/xclaw-slice117-hardhat-smoke.json`
     - base sepolia: `/tmp/xclaw-slice243-reports/xclaw-slice117-base-full.json`
-  - live matrix result:
+    - ethereum sepolia: `/tmp/xclaw-slice243-reports/xclaw-slice117-ethereum-sepolia-full.json`
+  - refreshed live matrix result:
     - `hardhat_local`: `ok=true`
-    - `base_sepolia`: `ok=false`
-      - `trade_pending_approve` failed with `builder_code_missing`
-      - `global_and_allowlist` failed with `builder_code_missing`
-      - unresolved pending approvals remained:
-        - `xfr_30b4d0d3d06d21055d49`
-        - `xfr_334558518af821b96d4e`
-        - `xfr_e29b055f0e831b658b05`
-      - retry failure:
-        - request id `req_741d5893145f2f8d`
-        - path `/management/transfer-approvals/decision`
-        - response `404 payload_invalid`
-  - remaining unblockers:
-    - configure `XCLAW_BUILDER_CODE_BASE_SEPOLIA` or `XCLAW_BUILDER_CODE_BASE` in the active runtime/web environment
-    - debug the Base Sepolia x402 transfer-approval decision path returning `404 payload_invalid` for generated approval ids before rerunning the matrix beyond `base_sepolia`
+      - report: `/tmp/xclaw-slice243-reports/xclaw-slice117-hardhat-smoke.json`
+    - `base_sepolia`: `ok=true`
+      - report: `/tmp/xclaw-slice243-reports/xclaw-slice117-base-full.json`
+      - `trade_pending_approve`: `filled`, tx `0xf4f4605ceca240c241b49f074b839ffa65375bd61cff9194d8eee98f1b45c911`
+      - `global_and_allowlist`: passed, trade `trd_c820940dc69a023acc7e`
+      - `x402_or_capability_assertion`: passed, approval `xfr_d2b88ded16eae5b772c8`
+    - `ethereum_sepolia`: `ok=true`
+      - report: `/tmp/xclaw-slice243-reports/xclaw-slice117-ethereum-sepolia-full.json`
+      - `trade_pending_approve`: `filled`, tx `0xe528e32cec43e5564b477261ad4419de9216b0c174b4660bd9ad42f2ec8b3b07`
+      - `global_and_allowlist`: passed, trade `trd_23eed3efe3a0fee75317`
+      - `x402_or_capability_assertion`: passed via canonical unsupported assertion `unsupported_chain_capability`
+    - later-chain stop after Base Sepolia was cleared:
+      - aggregate post-base rerun failed at `solana_localnet`
+      - harness error: `wallet balance failed: rpc_unavailable: All Solana RPC candidates are unavailable.`
+      - stdout tail recorded in `/tmp/xclaw-slice243-matrix-post-base.json`
+  - Slice 243 closeout decision:
+    - the active blockers that originally stopped the matrix at `base_sepolia` are resolved
+    - the remaining stop is a later-chain environment blocker (`solana_localnet` RPC availability), so Slice 243 is complete and the next slice may target that later-chain evidence gap
