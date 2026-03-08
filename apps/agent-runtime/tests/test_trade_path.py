@@ -568,6 +568,28 @@ class TradePathRuntimeTests(unittest.TestCase):
         self.assertEqual(payload.get("code"), "unsupported_mode")
         post_mock.assert_not_called()
 
+    def test_trade_execute_solana_rejects_mock_mode(self) -> None:
+        args = argparse.Namespace(intent="trd_sol_mock", chain="solana_devnet", json=True)
+        trade_payload = {
+            "tradeId": "trd_sol_mock",
+            "chainKey": "solana_devnet",
+            "status": "approved",
+            "mode": "mock",
+            "retry": {"eligible": False},
+            "tokenIn": "So11111111111111111111111111111111111111112",
+            "tokenOut": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "amountIn": "1000",
+            "slippageBps": 100,
+        }
+        with mock.patch.object(cli, "_read_trade_details", return_value=trade_payload), mock.patch.object(
+            cli, "_post_trade_status"
+        ) as post_mock:
+            payload = self._run_and_parse_stdout(lambda: cli.cmd_trade_execute(args))
+        self.assertFalse(payload.get("ok"))
+        self.assertEqual(payload.get("code"), "unsupported_mode")
+        self.assertEqual((payload.get("details") or {}).get("tradeId"), "trd_sol_mock")
+        post_mock.assert_not_called()
+
     def test_trade_execute_retry_not_eligible_denied(self) -> None:
         args = argparse.Namespace(intent="trd_1", chain="hardhat_local", json=True)
         trade_payload = {
@@ -582,6 +604,55 @@ class TradePathRuntimeTests(unittest.TestCase):
             code = cli.cmd_trade_execute(args)
 
         self.assertEqual(code, 1)
+
+    def test_trade_execute_fails_closed_when_status_posting_rejected(self) -> None:
+        args = argparse.Namespace(intent="trd_real_status_fail", chain="base_sepolia", json=True)
+        trade_payload = {
+            "tradeId": "trd_real_status_fail",
+            "chainKey": "base_sepolia",
+            "status": "approved",
+            "mode": "real",
+            "retry": {"eligible": False},
+            "tokenIn": "0x1111111111111111111111111111111111111111",
+            "tokenOut": "0x2222222222222222222222222222222222222222",
+            "amountIn": "1",
+            "slippageBps": 50,
+        }
+        with mock.patch.object(cli, "_read_trade_details", return_value=trade_payload), mock.patch.object(
+            cli, "_trade_provider_settings", return_value=("router_adapter", "none")
+        ), mock.patch.object(
+            cli, "_replay_trade_usage_outbox", return_value=(0, 0)
+        ), mock.patch.object(
+            cli, "_enforce_spend_preconditions", return_value=({}, "2026-02-14", 0, 1000000000)
+        ), mock.patch.object(
+            cli, "_enforce_trade_caps", return_value=({}, "2026-02-14", cli.Decimal("0"), 0, {"maxDailyUsd": "1000", "maxDailyTradeCount": 10})
+        ), mock.patch.object(
+            cli, "_execution_wallet", return_value=("0x1111111111111111111111111111111111111111", "11" * 32)
+        ), mock.patch.object(
+            cli, "_resolve_token_address", side_effect=["0x" + "11" * 20, "0x" + "22" * 20]
+        ), mock.patch.object(
+            cli, "_fetch_erc20_metadata", return_value={"decimals": 18, "symbol": "USDC"}
+        ), mock.patch.object(
+            cli,
+            "_execute_trade_via_router_adapter",
+            return_value={
+                "txHash": "0x" + "ab" * 32,
+                "approveTxHashes": [],
+                "operationTxHashes": ["0x" + "ab" * 32],
+                "executionFamily": "amm_v2",
+                "executionAdapter": "uniswap_fork",
+                "routeKind": "router_path",
+            },
+        ), mock.patch.object(
+            cli,
+            "_api_request",
+            return_value=(503, {"code": "api_error", "message": "status down"}),
+        ):
+            payload = self._run_and_parse_stdout(lambda: cli.cmd_trade_execute(args))
+        self.assertFalse(payload.get("ok"))
+        self.assertEqual(payload.get("code"), "trade_execute_failed")
+        self.assertEqual((payload.get("details") or {}).get("tradeId"), "trd_real_status_fail")
+        self.assertEqual((payload.get("details") or {}).get("chain"), "base_sepolia")
 
     def test_report_send_deprecated(self) -> None:
         args = argparse.Namespace(trade="trd_1", json=True)
@@ -1884,6 +1955,36 @@ class TradePathRuntimeTests(unittest.TestCase):
         details = payload.get("details") or {}
         self.assertTrue(str(details.get("approvalId") or "").startswith("xfr_"))
 
+    def test_wallet_send_fails_when_approval_sync_missing(self) -> None:
+        args = argparse.Namespace(
+            to="0x" + "22" * 20,
+            amount_wei="100",
+            chain="base_sepolia",
+            json=True,
+        )
+        with mock.patch.object(
+            cli,
+            "_evaluate_outbound_transfer_policy",
+            return_value={
+                "allowed": False,
+                "policyBlockedAtCreate": False,
+                "policyBlockReasonCode": None,
+                "policyBlockReasonMessage": None,
+            },
+        ), mock.patch.object(
+            cli, "_enforce_spend_preconditions", return_value=({}, "2026-02-16", 0, 10**30)
+        ), mock.patch.object(
+            cli, "_sync_transfer_policy_from_remote", return_value={"transferApprovalMode": "per_transfer", "nativeTransferPreapproved": False, "allowedTransferTokens": []}
+        ), mock.patch.object(
+            cli, "_api_request", side_effect=RuntimeError("mirror down")
+        ):
+            payload = self._run_and_parse_stdout(lambda: cli.cmd_wallet_send(args))
+        self.assertFalse(payload.get("ok"))
+        self.assertEqual(payload.get("code"), "approval_sync_failed")
+        details = payload.get("details") or {}
+        self.assertEqual(details.get("chain"), "base_sepolia")
+        self.assertTrue(str(details.get("approvalId") or "").startswith("xfr_"))
+
     def test_wallet_send_token_redacts_private_key_in_error_payload(self) -> None:
         args = argparse.Namespace(
             token="0x" + "11" * 20,
@@ -2090,6 +2191,31 @@ class TradePathRuntimeTests(unittest.TestCase):
             "x402_pay_decide",
             return_value={"approvalId": approval_id, "status": "filled", "network": "base_sepolia", "facilitator": "cdp"},
         ), mock.patch.object(cli, "_mirror_x402_outbound"):
+            payload = self._run_and_parse_stdout(lambda: cli.cmd_approvals_decide_transfer(args))
+        self.assertTrue(payload.get("ok"))
+        approval = payload.get("approval") or {}
+        self.assertEqual(approval.get("approvalId"), approval_id)
+        self.assertEqual(approval.get("status"), "filled")
+
+    def test_approvals_decide_transfer_x402_fallback_survives_best_effort_mirror_failure(self) -> None:
+        approval_id = "xfr_x402_mirror_fail"
+        args = argparse.Namespace(approval_id=approval_id, decision="approve", reason_message=None, chain="base_sepolia", json=True)
+        with mock.patch.object(cli, "_get_pending_transfer_flow", return_value=None), mock.patch.object(
+            cli.x402_state, "get_pending_pay_flow", return_value={"approvalId": approval_id, "status": "approval_pending"}
+        ), mock.patch.object(
+            cli,
+            "x402_pay_decide",
+            return_value={
+                "approvalId": approval_id,
+                "status": "filled",
+                "network": "base_sepolia",
+                "facilitator": "cdp",
+                "url": "https://example.com/pay",
+                "amountAtomic": "1",
+            },
+        ), mock.patch.object(
+            cli, "_api_request", side_effect=RuntimeError("mirror down")
+        ):
             payload = self._run_and_parse_stdout(lambda: cli.cmd_approvals_decide_transfer(args))
         self.assertTrue(payload.get("ok"))
         approval = payload.get("approval") or {}

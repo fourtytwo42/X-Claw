@@ -1,8 +1,12 @@
 import pathlib
 import sys
 import unittest
+import argparse
+import io
+import json
 from decimal import Decimal
 from types import SimpleNamespace
+from contextlib import redirect_stdout
 from unittest import mock
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
@@ -15,6 +19,13 @@ from xclaw_agent.runtime.services import mirroring, reporting, trade_caps  # noq
 
 
 class RuntimeInvariantTests(unittest.TestCase):
+    def _run_and_parse_stdout(self, fn):
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            code = fn()
+        self.assertIsInstance(code, int)
+        return code, json.loads(buf.getvalue().strip())
+
     def test_mirroring_required_vs_best_effort_delivery_invariant(self) -> None:
         flow = {
             "approvalId": "xfr_1",
@@ -133,6 +144,34 @@ class RuntimeInvariantTests(unittest.TestCase):
         replayed_again, remaining_again = trade_caps.replay_trade_usage_outbox(ctx)
         self.assertEqual((replayed_again, remaining_again), (0, 0))
         self.assertEqual(api_request.call_count, 1)
+
+    def test_trade_execute_mock_mode_rejected_for_evm_and_solana_invariant(self) -> None:
+        cases = [
+            ("base_sepolia", "trd_evm_mock", "0x1111111111111111111111111111111111111111", "0x2222222222222222222222222222222222222222"),
+            ("solana_devnet", "trd_sol_mock", "So11111111111111111111111111111111111111112", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"),
+        ]
+        for chain, trade_id, token_in, token_out in cases:
+            args = argparse.Namespace(intent=trade_id, chain=chain, json=True)
+            trade_payload = {
+                "tradeId": trade_id,
+                "chainKey": chain,
+                "status": "approved",
+                "mode": "mock",
+                "retry": {"eligible": False},
+                "tokenIn": token_in,
+                "tokenOut": token_out,
+                "amountIn": "1000",
+                "slippageBps": 100,
+            }
+            with mock.patch.object(cli, "_read_trade_details", return_value=trade_payload), mock.patch.object(
+                cli, "_post_trade_status"
+            ) as post_status:
+                code, payload = self._run_and_parse_stdout(lambda: cli.cmd_trade_execute(args))
+            self.assertEqual(code, 1)
+            self.assertFalse(payload.get("ok"))
+            self.assertEqual(payload.get("code"), "unsupported_mode")
+            self.assertEqual((payload.get("details") or {}).get("tradeId"), trade_id)
+            post_status.assert_not_called()
 
     def test_cli_wrapper_delegations_remain_thin(self) -> None:
         ctx_transfer = object()

@@ -14,6 +14,36 @@
   - `routeKind`
   - `liquidityOperation`
 
+## Completed Context: Slice 241 Command-Surface Failure Injection Sweep
+
+Issue mapping: `#94`
+
+### Objective + scope lock
+- Objective:
+  - harden wallet, trade, approvals, limit-order, liquidity, and x402 command surfaces under injected runtime-service failures,
+  - preserve current EVM/Solana JSON error contracts and command semantics,
+  - keep public runtime contracts unchanged.
+- Scope guard:
+  - runtime internal reliability hardening only,
+  - no API/schema/database changes.
+
+### Expected touched files
+- `apps/agent-runtime/tests/test_trade_path.py`
+- `apps/agent-runtime/tests/test_liquidity_cli.py`
+- `apps/agent-runtime/tests/test_x402_cli.py`
+- `apps/agent-runtime/tests/test_runtime_invariants.py`
+- `apps/agent-runtime/tests/test_trade_path.py`
+- `docs/XCLAW_SOURCE_OF_TRUTH.md`
+- `docs/XCLAW_SLICE_TRACKER.md`
+- `docs/XCLAW_BUILD_ROADMAP.md`
+- `docs/CONTEXT_PACK.md`
+- `spec.md`
+- `tasks.md`
+- `acceptance.md`
+
+### Completion note
+- Completed 2026-03-08 with command-surface failure-injection coverage for wallet, trade, approvals, liquidity, and x402, a Solana `mode=mock` execution rejection fix, and the required sequential validation chain (`db:parity`, `seed:reset/load/verify`, `build`, `pm2 restart all`).
+
 ## Completed Context: Slice 240 Local State, Replay, and Corruption Hardening
 
 Issue mapping: `#93`

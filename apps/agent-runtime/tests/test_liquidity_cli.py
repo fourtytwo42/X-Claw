@@ -233,6 +233,22 @@ class LiquidityCliTests(unittest.TestCase):
         self.assertEqual(payload.get("status"), "filled")
         self.assertEqual(payload.get("adapterFamily"), "position_manager_v3")
 
+    def test_liquidity_execute_fails_closed_when_status_post_rejected(self) -> None:
+        args = argparse.Namespace(intent="liq_status_fail", chain="base_sepolia", json=True)
+        with mock.patch.object(
+            cli,
+            "_read_liquidity_intent",
+            return_value={"liquidityIntentId": "liq_status_fail", "status": "approved", "dex": "uniswap_v3", "positionType": "v3", "action": "add"},
+        ), mock.patch.object(
+            cli,
+            "_api_request",
+            return_value=(503, {"code": "api_error", "message": "status down"}),
+        ):
+            code, payload = self._run(lambda: cli.cmd_liquidity_execute(args))
+        self.assertEqual(code, 1)
+        self.assertEqual(payload.get("code"), "liquidity_execution_failed")
+        self.assertEqual((payload.get("details") or {}).get("liquidityIntentId"), "liq_status_fail")
+
     def test_liquidity_quote_add_solana_raydium_uses_planner_quote(self) -> None:
         args = argparse.Namespace(
             chain="solana_devnet",

@@ -390,6 +390,10 @@ def cmd_trade_execute(rt: TradeRuntimeAdapter, args: Any) -> int:
         status = str(trade.get("status"))
         retry = trade.get("retry") if isinstance(trade.get("retry"), dict) else {}
         runtime_preconditions.ensure_trade_actionable(rt, trade_id=args.intent, status=status, retry=retry)
+        try:
+            runtime_validators.require_real_mode(str(trade.get("mode")), chain=args.chain, details={"tradeId": args.intent})
+        except runtime_errors.RuntimeCommandFailure as exc:
+            return runtime_errors.emit_failure(rt, exc)
 
         if rt._is_solana_chain(args.chain):
             token_in = rt._resolve_token_address(args.chain, str(trade.get("tokenIn") or ""))
@@ -428,10 +432,6 @@ def cmd_trade_execute(rt: TradeRuntimeAdapter, args: Any) -> int:
             pass
 
         previous_status = status
-        try:
-            runtime_validators.require_real_mode(str(trade.get("mode")), chain=args.chain, details={"tradeId": args.intent})
-        except runtime_errors.RuntimeCommandFailure as exc:
-            return runtime_errors.emit_failure(rt, exc)
 
         wallet_address, private_key_hex, adapter_key = evm_execution.resolve_trade_execution_context(rt, args.chain)
 

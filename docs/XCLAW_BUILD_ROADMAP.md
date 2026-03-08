@@ -13,11 +13,11 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 
 ## 0.50) Slice 241 Command-Surface Failure Injection Sweep
 
-- [ ] Expand failure-injection coverage across wallet, trade, approvals, limit-orders, liquidity, and x402 command families.
-- [ ] Keep EVM and Solana degraded-path error contracts aligned where semantics match.
-- [ ] Prove no mock/stub execution regressions or duplicate queue/replay side effects.
-- [ ] Keep command-family regression suites green.
-- [ ] Run full sequential validation chain and capture evidence + issue comment.
+- [x] Expand failure-injection coverage across wallet, trade, approvals, limit-orders, liquidity, and x402 command families.
+- [x] Keep EVM and Solana degraded-path error contracts aligned where semantics match.
+- [x] Prove no mock/stub execution regressions or duplicate queue/replay side effects.
+- [x] Keep command-family regression suites green.
+- [x] Run full sequential validation chain and capture evidence + issue comment.
 
 ## 0.49) Slice 240 Local State, Replay, and Corruption Hardening
 

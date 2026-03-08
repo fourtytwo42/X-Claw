@@ -41,6 +41,35 @@ class X402CliTests(unittest.TestCase):
         self.assertTrue(result.get("ok"))
         mirror_mock.assert_called_once_with(payload["approval"])
 
+    def test_x402_pay_best_effort_mirror_failure_does_not_change_payload(self) -> None:
+        args = argparse.Namespace(
+            url="https://example.com/pay",
+            network="base_sepolia",
+            facilitator="cdp",
+            amount_atomic="1",
+            memo=None,
+            json=True,
+        )
+        payload = {
+            "ok": True,
+            "approval": {
+                "approvalId": "xfr_1",
+                "status": "approval_pending",
+                "network": "base_sepolia",
+                "facilitator": "cdp",
+                "url": "https://example.com/pay",
+                "amountAtomic": "1",
+            },
+        }
+        with mock.patch.object(cli, "x402_pay_create_or_execute", return_value=payload), mock.patch.object(
+            cli, "_api_request", side_effect=RuntimeError("mirror down")
+        ):
+            result = self._run_and_parse_stdout(lambda: cli.cmd_x402_pay(args))
+        self.assertTrue(result.get("ok"))
+        approval = result.get("approval") or {}
+        self.assertEqual(approval.get("approvalId"), "xfr_1")
+        self.assertEqual(approval.get("status"), "approval_pending")
+
     def test_x402_receive_request_rejects_token_without_symbol_or_address(self) -> None:
         args = argparse.Namespace(
             network="base_sepolia",

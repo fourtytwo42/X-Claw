@@ -1,27 +1,30 @@
-# Slice 240 Acceptance Evidence: Local State, Replay, and Corruption Hardening
+# Slice 241 Acceptance Evidence: Command-Surface Failure Injection Sweep
 
 Date (UTC): 2026-03-08  
-Active slice context: `Slice 240`.
+Active slice context: `Slice 241`.
 
-Issue mapping: `#93`
+Issue mapping: `#94`
 
 ### Objective + Scope Lock
 - Objective:
-  - harden local runtime state, replay, approval prompt, transfer flow, trade-cap, and policy helpers against corrupted local payloads and duplicate replay cases,
-  - preserve runtime JSON/CLI behavior and current command/test contracts,
+  - harden wallet, trade, approvals, limit-order, liquidity, and x402 command surfaces under injected runtime-service failures,
+  - preserve current EVM/Solana JSON error contracts and command semantics,
   - keep public runtime contracts unchanged.
 
 ### Behavior Checks
-- [x] direct corruption/replay coverage exists for `runtime_state.py`, `transfer_flows.py`, `approval_prompts.py`, `trade_caps.py`, and `transfer_policy.py`.
-- [x] malformed local state fails closed or resets to the existing safe empty state contract without silent bad behavior.
-- [x] replay, queue, and stale-recovery behavior remain deterministic and idempotent.
+- [x] command-surface failure injection covers wallet, trade, approvals, limit-orders, liquidity, and x402 families.
+- [x] EVM and Solana degraded-path error codes and JSON field names remain stable where semantics match.
+- [x] no mock/stub execution regressions or duplicate queue/replay side effects are introduced.
 - [x] command-family regressions remain green.
 
 ### Required Validation Gates
+- [x] expanded command-surface failure-injection suites for wallet/trade/approvals/limit-orders/liquidity/x402
+- [x] `python3 -m unittest -v apps/agent-runtime/tests/test_runtime_invariants.py`
 - [x] `python3 -m unittest -v apps/agent-runtime/tests/test_runtime_services.py`
+- [x] `python3 -m unittest -v apps/agent-runtime/tests/test_runtime_adapters.py`
 - [x] `python3 -m unittest -v apps/agent-runtime/tests/test_trade_path.py`
-- [x] `python3 -m unittest -v apps/agent-runtime/tests/test_approvals_run_loop.py`
 - [x] `python3 -m unittest -v apps/agent-runtime/tests/test_liquidity_cli.py`
+- [x] `python3 -m unittest -v apps/agent-runtime/tests/test_x402_cli.py`
 - [x] `npm run db:parity`
 - [x] `npm run seed:reset`
 - [x] `npm run seed:load`
@@ -30,23 +33,30 @@ Issue mapping: `#93`
 - [x] `pm2 restart all`
 
 ### Evidence
-- Direct service coverage added in [test_runtime_services.py](/home/hendo420/ETHDenver2026/apps/agent-runtime/tests/test_runtime_services.py):
-  - `test_approval_prompt_service_invalid_prompt_file_falls_back_to_empty`
-  - `test_runtime_state_service_corrupted_pending_files_reset_to_safe_empty`
-  - `test_runtime_state_service_env_api_key_takes_precedence_over_state`
-  - `test_transfer_policy_service_invalid_state_and_older_remote_preserve_safe_local`
-  - `test_trade_caps_service_replay_deduplicates_duplicate_idempotency_keys`
-  - `test_transfer_flow_service_native_balance_precondition_fails_closed`
-- Runtime change in [trade_caps.py](/home/hendo420/ETHDenver2026/apps/agent-runtime/xclaw_agent/runtime/services/trade_caps.py):
-  - `replay_trade_usage_outbox(...)` now deduplicates duplicate queued entries by `idempotencyKey` before replaying usage posts.
+- Runtime bug fix in [trade.py](/home/hendo420/ETHDenver2026/apps/agent-runtime/xclaw_agent/commands/trade.py):
+  - `cmd_trade_execute(...)` now enforces `mode=real` before entering either the EVM or Solana execution branch, closing the prior Solana mock-execution gap.
+- Command-surface failure-injection coverage added:
+  - [test_trade_path.py](/home/hendo420/ETHDenver2026/apps/agent-runtime/tests/test_trade_path.py)
+    - `test_trade_execute_solana_rejects_mock_mode`
+    - `test_trade_execute_fails_closed_when_status_posting_rejected`
+    - `test_wallet_send_fails_when_approval_sync_missing`
+    - `test_approvals_decide_transfer_x402_fallback_survives_best_effort_mirror_failure`
+  - [test_liquidity_cli.py](/home/hendo420/ETHDenver2026/apps/agent-runtime/tests/test_liquidity_cli.py)
+    - `test_liquidity_execute_fails_closed_when_status_post_rejected`
+  - [test_x402_cli.py](/home/hendo420/ETHDenver2026/apps/agent-runtime/tests/test_x402_cli.py)
+    - `test_x402_pay_best_effort_mirror_failure_does_not_change_payload`
+  - [test_runtime_invariants.py](/home/hendo420/ETHDenver2026/apps/agent-runtime/tests/test_runtime_invariants.py)
+    - `test_trade_execute_mock_mode_rejected_for_evm_and_solana_invariant`
 - Validation results:
+  - `python3 -m unittest -v apps/agent-runtime/tests/test_runtime_invariants.py` -> `Ran 5 tests`, `OK`
   - `python3 -m unittest -v apps/agent-runtime/tests/test_runtime_services.py` -> `Ran 47 tests`, `OK`
-  - `python3 -m unittest -v apps/agent-runtime/tests/test_trade_path.py` -> `Ran 147 tests`, `OK`
-  - `python3 -m unittest -v apps/agent-runtime/tests/test_approvals_run_loop.py` -> `Ran 3 tests`, `OK`
-  - `python3 -m unittest -v apps/agent-runtime/tests/test_liquidity_cli.py` -> `Ran 20 tests`, `OK`
-  - `npm run db:parity` -> `checkedAt=2026-03-08T20:57:12.912Z`
+  - `python3 -m unittest -v apps/agent-runtime/tests/test_runtime_adapters.py` -> `Ran 13 tests`, `OK`
+  - `python3 -m unittest -v apps/agent-runtime/tests/test_trade_path.py` -> `Ran 151 tests`, `OK`
+  - `python3 -m unittest -v apps/agent-runtime/tests/test_liquidity_cli.py` -> `Ran 21 tests`, `OK`
+  - `python3 -m unittest -v apps/agent-runtime/tests/test_x402_cli.py` -> `Ran 4 tests`, `OK`
+  - `npm run db:parity` -> `checkedAt=2026-03-08T21:07:00.617Z`
   - `npm run seed:reset` -> `ok: true`
-  - `npm run seed:load` -> `ok: true`, `loadedAt=2026-03-08T20:57:17.434Z`
+  - `npm run seed:load` -> `ok: true`, `loadedAt=2026-03-08T21:07:06.453Z`
   - `npm run seed:verify` -> `ok: true`
   - tracked seed file restored via `git show HEAD:infrastructure/seed-data/.seed-state.json > infrastructure/seed-data/.seed-state.json`
   - `npm run build` -> `ok`

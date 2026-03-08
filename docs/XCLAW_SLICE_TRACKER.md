@@ -18,17 +18,17 @@ Status legend:
 ---
 
 ## Slice 241: Command-Surface Failure Injection Sweep
-Status: [ ]
+Status: [x]
 
 Goal:
 - harden EVM and Solana command-surface behavior under injected runtime service failures while preserving all public CLI and JSON contracts.
 
 DoD:
-- [ ] command-surface failure injection covers wallet, trade, approvals, limit-orders, liquidity, and x402 families.
-- [ ] EVM and Solana degraded-path error codes and JSON field names remain stable where semantics match.
-- [ ] no mock/stub execution regressions or duplicate queue/replay side effects are introduced.
-- [ ] command-family regressions remain green.
-- [ ] full sequential validation + issue evidence posted.
+- [x] command-surface failure injection covers wallet, trade, approvals, limit-orders, liquidity, and x402 families.
+- [x] EVM and Solana degraded-path error codes and JSON field names remain stable where semantics match.
+- [x] no mock/stub execution regressions or duplicate queue/replay side effects are introduced.
+- [x] command-family regressions remain green.
+- [x] full sequential validation + issue evidence posted.
 
 Issue mapping:
 - `#94`
