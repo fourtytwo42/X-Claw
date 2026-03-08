@@ -2304,6 +2304,59 @@ class TradePathRuntimeTests(unittest.TestCase):
         self.assertTrue(payload.get("ok"))
         self.assertEqual(payload.get("status"), "filled")
 
+    def test_approvals_resume_transfer_stale_recovery_converges_once_across_restart(self) -> None:
+        approval_id = "xfr_resume_stale_once"
+        args = argparse.Namespace(approval_id=approval_id, chain="base_sepolia", json=True)
+        with tempfile.TemporaryDirectory() as tmpdir, mock.patch.object(
+            cli, "APP_DIR", pathlib.Path(tmpdir)
+        ), mock.patch.object(
+            cli, "PENDING_TRANSFER_FLOWS_FILE", pathlib.Path(tmpdir) / "pending-transfer-flows.json"
+        ), mock.patch.object(
+            cli, "_cleanup_transfer_approval_prompt"
+        ):
+            cli._record_pending_transfer_flow(
+                approval_id,
+                {
+                    "approvalId": approval_id,
+                    "chainKey": "base_sepolia",
+                    "status": "executing",
+                    "transferType": "native",
+                    "toAddress": "0x" + "22" * 20,
+                    "amountWei": "1",
+                    "createdAt": "2026-02-18T00:00:00+00:00",
+                    "updatedAt": "2026-02-18T00:00:00+00:00",
+                },
+            )
+
+            def fake_execute(flow: dict[str, object]) -> dict[str, object]:
+                cli._record_pending_transfer_flow(
+                    approval_id,
+                    {
+                        **flow,
+                        "status": "filled",
+                        "txHash": "0x" + "ab" * 32,
+                        "updatedAt": cli.utc_now(),
+                    },
+                )
+                return {"ok": True, "code": "ok", "status": "filled", "approvalId": approval_id, "txHash": "0x" + "ab" * 32}
+
+            with mock.patch.object(cli, "_is_stale_executing_transfer_flow", return_value=True), mock.patch.object(
+                cli, "_execute_pending_transfer_flow", side_effect=fake_execute
+            ), mock.patch.object(
+                cli, "_mirror_transfer_approval"
+            ) as mirror_mock:
+                first = self._run_and_parse_stdout(lambda: cli.cmd_approvals_resume_transfer(args))
+
+            second = self._run_and_parse_stdout(lambda: cli.cmd_approvals_resume_transfer(args))
+
+        self.assertTrue(first.get("ok"))
+        self.assertEqual(first.get("status"), "filled")
+        mirror_mock.assert_called_once()
+        self.assertTrue(second.get("ok"))
+        self.assertTrue(second.get("skipped"))
+        self.assertEqual(second.get("status"), "filled")
+        self.assertEqual(second.get("reasonCode"), None)
+
     def test_approvals_resume_transfer_skips_recent_executing_without_txhash(self) -> None:
         approval_id = "xfr_resume_recent"
         now = cli.utc_now()
@@ -2699,6 +2752,32 @@ class TradePathRuntimeTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual([str(item.get("status")) for item in status_payloads], ["triggered", "filled"])
         self.assertEqual(str((status_payloads[-1] or {}).get("txHash")), "3x8qkNq3gFmX8nEo6S4R8rM2nV4jD7yP1wzN6Q5uR2mL")
+
+    def test_limit_orders_run_once_replays_queued_status_after_restart(self) -> None:
+        args = argparse.Namespace(chain="base_sepolia", json=True, sync=False)
+        with tempfile.TemporaryDirectory() as tmpdir, mock.patch.object(
+            cli, "APP_DIR", pathlib.Path(tmpdir)
+        ), mock.patch.object(
+            cli, "LIMIT_ORDER_OUTBOX_FILE", pathlib.Path(tmpdir) / "limit-order-outbox.json"
+        ):
+            cli.save_limit_order_outbox(
+                [
+                    {
+                        "method": "POST",
+                        "path": "/limit-orders/ord_1/status",
+                        "payload": {"status": "filled", "triggerAt": "2026-03-08T00:00:00+00:00"},
+                        "queuedAt": "2026-03-08T00:00:00+00:00",
+                    }
+                ]
+            )
+            with mock.patch.object(cli, "_api_request", return_value=(200, {"ok": True})), mock.patch.object(
+                cli, "load_limit_order_store", return_value={"version": 1, "orders": []}
+            ):
+                payload = self._run_and_parse_stdout(lambda: cli.cmd_limit_orders_run_once(args))
+
+        self.assertTrue(payload.get("ok"))
+        self.assertEqual(payload.get("replayed"), 1)
+        self.assertEqual(payload.get("outboxRemaining"), 0)
 
     def test_profile_set_name_success(self) -> None:
         args = argparse.Namespace(name="harvey-ops", chain="hardhat_local", json=True)

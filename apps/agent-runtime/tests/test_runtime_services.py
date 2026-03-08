@@ -159,6 +159,78 @@ class RuntimeServicesTests(unittest.TestCase):
             )
         self.assertEqual(str(caught.exception), "mirror failed")
 
+    def test_transfer_flow_service_mirror_failure_preserves_executing_flow_across_restart(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            flows_file = pathlib.Path(tmpdir) / "pending-transfer-flows.json"
+
+            def build_ctx() -> transfer_flows.TransferFlowContext:
+                holder: dict[str, transfer_flows.TransferFlowContext] = {}
+
+                def record_flow(approval_id: str, flow: dict[str, object]) -> None:
+                    transfer_flows.record_pending_transfer_flow(holder["ctx"], approval_id, flow)
+
+                ctx = transfer_flows.TransferFlowContext(
+                    ensure_app_dir=lambda: None,
+                    flows_file=flows_file,
+                    json_module=cli.json,
+                    os_module=cli.os,
+                    pathlib_module=cli.pathlib,
+                    utc_now=lambda: "2026-03-08T00:00:00+00:00",
+                    is_solana_chain=lambda chain: False,
+                    is_solana_address=cli.is_solana_address,
+                    is_hex_address=cli.is_hex_address,
+                    transfer_executing_stale_sec=lambda: 60,
+                    evaluate_outbound_transfer_policy=lambda chain, to: {"allowed": True},
+                    watcher_run_id=lambda: "wrun_test",
+                    record_pending_transfer_flow=record_flow,
+                    mirror_transfer_approval=lambda flow: (_ for _ in ()).throw(cli.WalletStoreError("mirror failed")),
+                    remove_pending_transfer_flow=lambda approval_id: transfer_flows.remove_pending_transfer_flow(holder["ctx"], approval_id),
+                    transfer_amount_display=lambda amount, transfer_type, symbol, decimals: ("1", "ETH"),
+                    enforce_spend_preconditions=lambda chain, amount: ({}, "2026-03-08", 0, 100),
+                    load_wallet_store=lambda: {},
+                    chain_wallet=lambda store, chain: (None, {"address": "0x" + "11" * 20}),
+                    validate_wallet_entry_shape=lambda wallet: None,
+                    fetch_token_balance_wei=lambda chain, wallet, token: "100",
+                    fetch_native_balance_wei=lambda chain, wallet: "100",
+                    assert_transfer_balance_preconditions=lambda **kwargs: None,
+                    require_wallet_passphrase_for_signing=lambda chain: "pw",
+                    decrypt_private_key=lambda wallet, pw: b"\x11" * 32,
+                    chain_rpc_url=lambda chain: "https://rpc.example",
+                    solana_send_native_transfer=lambda *args: "sig",
+                    solana_send_spl_transfer=lambda *args: {"signature": "sig"},
+                    cast_rpc_send_transaction=lambda *args, **kwargs: "0x" + "ab" * 32,
+                    require_cast_bin=lambda: "cast",
+                    run_subprocess=lambda *args, **kwargs: SimpleNamespace(returncode=0, stdout='{"status":"0x1"}', stderr=""),
+                    cast_receipt_timeout_sec=lambda: 5,
+                    cast_calldata=lambda *args, **kwargs: "0xdeadbeef",
+                    record_spend=lambda *args, **kwargs: None,
+                    builder_output_from_hashes=lambda chain, hashes: {"builderCodeApplied": False},
+                    re_module=cli.re,
+                    json_loads=cli.json.loads,
+                    wallet_store_error=cli.WalletStoreError,
+                )
+                holder["ctx"] = ctx
+                return ctx
+
+            ctx = build_ctx()
+            with self.assertRaises(cli.WalletStoreError):
+                transfer_flows.execute_pending_transfer_flow(
+                    ctx,
+                    {
+                        "approvalId": "xfr_1",
+                        "chainKey": "base_sepolia",
+                        "transferType": "native",
+                        "amountWei": "1",
+                        "toAddress": "0x" + "22" * 20,
+                    },
+                )
+
+            restarted_ctx = build_ctx()
+            saved = transfer_flows.get_pending_transfer_flow(restarted_ctx, "xfr_1")
+            self.assertIsNotNone(saved)
+            self.assertEqual(str((saved or {}).get("status")), "executing")
+            self.assertEqual(str((saved or {}).get("watcherRunId")), "wrun_test")
+
     def test_approval_prompt_service_uses_injected_patch_surfaces(self) -> None:
         ctx = approval_prompts.ApprovalPromptContext(
             ensure_app_dir=lambda: None,
@@ -208,6 +280,76 @@ class RuntimeServicesTests(unittest.TestCase):
             approval_prompts.wait_for_trade_approval(ctx, "trd_1", "base_sepolia", {"tokenInSymbol": "WETH", "tokenOutSymbol": "USDC"})
         self.assertEqual(caught.exception.code, "approval_required")
         ctx.maybe_send_telegram_approval_prompt.assert_called_once()
+
+    def test_approval_prompt_service_persisted_prompt_survives_restart_and_cooldown(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            prompts_file = pathlib.Path(tmpdir) / "approval-prompts.json"
+
+            def build_ctx() -> approval_prompts.ApprovalPromptContext:
+                holder: dict[str, approval_prompts.ApprovalPromptContext] = {}
+                run_subprocess = mock.Mock(return_value=SimpleNamespace(returncode=0, stdout='{"payload":{"messageId":"777"}}', stderr=""))
+
+                def get_prompt(trade_id: str) -> dict[str, object] | None:
+                    return approval_prompts.get_approval_prompt(holder["ctx"], trade_id)
+
+                def record_prompt(trade_id: str, prompt: dict[str, object]) -> None:
+                    approval_prompts.record_approval_prompt(holder["ctx"], trade_id, prompt)
+
+                ctx = approval_prompts.ApprovalPromptContext(
+                    ensure_app_dir=lambda: None,
+                    prompts_file=prompts_file,
+                    json_module=cli.json,
+                    os_module=cli.os,
+                    pathlib_module=cli.pathlib,
+                    utc_now=lambda: datetime.now(timezone.utc).isoformat(),
+                    parse_iso_utc=cli._parse_iso_utc,
+                    get_approval_prompt=get_prompt,
+                    record_approval_prompt=record_prompt,
+                    post_approval_prompt_metadata=mock.Mock(),
+                    read_openclaw_last_delivery=lambda: {"lastChannel": "telegram", "lastTo": "123", "lastThreadId": None},
+                    maybe_send_telegram_approval_prompt=mock.Mock(),
+                    trade_approval_prompt_resend_cooldown_sec=lambda: 600,
+                    telegram_dispatch_suppressed_for_harness=lambda: False,
+                    display_chain_key=cli._display_chain_key,
+                    transfer_amount_display=cli._transfer_amount_display,
+                    token_symbol_for_display=cli._token_symbol_for_display,
+                    is_solana_chain=cli._is_solana_chain,
+                    is_solana_address=cli.is_solana_address,
+                    solana_mint_decimals=cli._solana_mint_decimals,
+                    normalize_amount_human_text=cli._normalize_amount_human_text,
+                    format_units=cli._format_units,
+                    require_openclaw_bin=lambda: "openclaw",
+                    run_subprocess=run_subprocess,
+                    extract_openclaw_message_id=lambda stdout: "777",
+                    api_request=lambda *args, **kwargs: (200, {"ok": True}),
+                    wallet_store_error=cli.WalletStoreError,
+                    openclaw_state_dir=cli._openclaw_state_dir,
+                    sanitize_openclaw_agent_id=cli._sanitize_openclaw_agent_id,
+                    approval_wait_timeout_sec=2,
+                    approval_wait_poll_sec=0,
+                    last_delivery_is_telegram=lambda: True,
+                    trade_approval_inline_wait_sec=lambda: 1,
+                    read_trade_details=lambda trade_id: {"tradeId": trade_id, "status": "approval_pending"},
+                    maybe_delete_telegram_approval_prompt=lambda trade_id: None,
+                    maybe_send_telegram_decision_message=lambda **kwargs: None,
+                    remove_pending_spot_trade_flow=lambda trade_id: None,
+                    remove_approval_prompt=lambda trade_id: None,
+                    time_module=SimpleNamespace(time=lambda: 0, sleep=lambda _: None),
+                    wallet_policy_error=cli.WalletPolicyError,
+                )
+                holder["ctx"] = ctx
+                return ctx
+
+            first_ctx = build_ctx()
+            approval_prompts.maybe_send_telegram_approval_prompt(first_ctx, "trd_1", "base_sepolia", {"amountInHuman": "1"})
+            first_ctx.run_subprocess.assert_called_once()
+
+            restarted_ctx = build_ctx()
+            saved = approval_prompts.get_approval_prompt(restarted_ctx, "trd_1")
+            self.assertIsNotNone(saved)
+            self.assertEqual(str((saved or {}).get("messageId")), "777")
+            approval_prompts.maybe_send_telegram_approval_prompt(restarted_ctx, "trd_1", "base_sepolia", {"amountInHuman": "1"})
+            restarted_ctx.run_subprocess.assert_not_called()
 
     def test_approval_prompt_service_resend_cooldown_skips_send(self) -> None:
         sender = mock.Mock()
@@ -512,6 +654,41 @@ class RuntimeServicesTests(unittest.TestCase):
             self.assertEqual(runtime_state.load_pending_trade_intents(ctx), {"version": 1, "intents": {}})
             self.assertEqual(runtime_state.load_pending_spot_trade_flows(ctx), {"version": 1, "flows": {}})
 
+    def test_runtime_state_service_corrupted_pending_files_can_be_rewritten_after_restart(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            pending_intents = pathlib.Path(tmpdir) / "pending-trade-intents.json"
+            pending_flows = pathlib.Path(tmpdir) / "pending-spot-trade-flows.json"
+            pending_intents.write_text('["bad"]', encoding="utf-8")
+            pending_flows.write_text('{"version":2,"flows":{"trd_1":{"tradeId":"trd_1"}}}', encoding="utf-8")
+
+            def build_ctx() -> runtime_state.RuntimeStateServiceContext:
+                return runtime_state.RuntimeStateServiceContext(
+                    os_module=os,
+                    pathlib_module=pathlib,
+                    json_module=cli.json,
+                    ensure_app_dir=lambda: None,
+                    load_state=lambda: {},
+                    save_state=lambda payload: None,
+                    utc_now=lambda: "2026-03-08T00:00:00+00:00",
+                    pending_trade_intents_file=pending_intents,
+                    pending_spot_trade_flows_file=pending_flows,
+                    state_file=pathlib.Path(tmpdir) / "state.json",
+                    env_get=lambda key: None,
+                    extract_agent_id_from_signed_key=lambda api_key: None,
+                    wallet_store_error=cli.WalletStoreError,
+                )
+
+            first_ctx = build_ctx()
+            self.assertEqual(runtime_state.load_pending_trade_intents(first_ctx), {"version": 1, "intents": {}})
+            self.assertEqual(runtime_state.load_pending_spot_trade_flows(first_ctx), {"version": 1, "flows": {}})
+
+            runtime_state.record_pending_trade_intent(first_ctx, "intent_1", {"tradeId": "trd_1"})
+            runtime_state.record_pending_spot_trade_flow(first_ctx, "trd_1", {"tradeId": "trd_1"})
+
+            restarted_ctx = build_ctx()
+            self.assertEqual(runtime_state.get_pending_trade_intent(restarted_ctx, "intent_1"), {"tradeId": "trd_1", "updatedAt": "2026-03-08T00:00:00+00:00"})
+            self.assertEqual(runtime_state.get_pending_spot_trade_flow(restarted_ctx, "trd_1"), {"tradeId": "trd_1", "updatedAt": "2026-03-08T00:00:00+00:00"})
+
     def test_runtime_state_service_env_api_key_takes_precedence_over_state(self) -> None:
         ctx = runtime_state.RuntimeStateServiceContext(
             os_module=os,
@@ -684,6 +861,40 @@ class RuntimeServicesTests(unittest.TestCase):
         self.assertEqual((replayed, remaining), (1, 1))
         self.assertEqual(api_request.call_count, 2)
         self.assertEqual(outbox, [{"idempotencyKey": "idem_2", "payload": {"a": 2}}])
+
+    def test_trade_caps_service_replay_after_restart_preserves_deduplicated_remaining_queue(self) -> None:
+        outbox = [
+            {"idempotencyKey": "idem_1", "payload": {"a": 1}, "queuedAt": "2026-03-08T00:00:00+00:00"},
+            {"idempotencyKey": "idem_1", "payload": {"a": 1}, "queuedAt": "2026-03-08T00:00:01+00:00"},
+            {"idempotencyKey": "idem_2", "payload": {"a": 2}, "queuedAt": "2026-03-08T00:00:02+00:00"},
+        ]
+
+        def build_ctx(api_request) -> trade_caps.TradeCapsServiceContext:
+            return trade_caps.TradeCapsServiceContext(
+                load_state=lambda: {},
+                save_state=lambda payload: None,
+                utc_now=cli.utc_now,
+                decimal_text=cli._decimal_text,
+                to_non_negative_decimal=cli._to_non_negative_decimal,
+                to_non_negative_int=cli._to_non_negative_int,
+                load_trade_usage_outbox=lambda: list(outbox),
+                save_trade_usage_outbox=lambda items: (outbox.clear(), outbox.extend(items)),
+                api_request=api_request,
+                resolve_api_key=lambda: "xak_test",
+                resolve_agent_id=lambda api_key: "ag_1",
+                token_hex=lambda n: "abcd1234",
+                wallet_store_error=cli.WalletStoreError,
+            )
+
+        first_api = mock.Mock(side_effect=[(200, {"ok": True}), (503, {"message": "down"})])
+        replayed, remaining = trade_caps.replay_trade_usage_outbox(build_ctx(first_api))
+        self.assertEqual((replayed, remaining), (1, 1))
+        self.assertEqual(outbox, [{"idempotencyKey": "idem_2", "payload": {"a": 2}, "queuedAt": "2026-03-08T00:00:02+00:00"}])
+
+        second_api = mock.Mock(return_value=(200, {"ok": True}))
+        replayed_again, remaining_again = trade_caps.replay_trade_usage_outbox(build_ctx(second_api))
+        self.assertEqual((replayed_again, remaining_again), (1, 0))
+        self.assertEqual(outbox, [])
 
     def test_trade_caps_service_post_usage_missing_agent_id_fails_closed(self) -> None:
         ctx = trade_caps.TradeCapsServiceContext(

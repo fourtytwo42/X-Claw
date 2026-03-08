@@ -17,6 +17,25 @@ Status legend:
 
 ---
 
+## Slice 242: Runtime Recovery and Watchdog Sweep
+Status: [x]
+
+Goal:
+- harden runtime restart/replay/recovery behavior for pending flows, prompts, outboxes, and resume paths while preserving all public CLI and JSON contracts.
+
+DoD:
+- [x] direct recovery/restart coverage exists for `runtime_state.py`, `transfer_flows.py`, `approval_prompts.py`, `trade_caps.py`, `reporting.py`, and `mirroring.py`.
+- [x] pending-flow restart/resume behavior is deterministic and does not silently convert incomplete state into success.
+- [x] replay queues remain idempotent after interruption and partial delivery.
+- [x] prompt cleanup and resend semantics remain stable after reload.
+- [x] command-family regressions remain green.
+- [x] full sequential validation + issue evidence posted.
+
+Issue mapping:
+- `#95`
+
+---
+
 ## Slice 241: Command-Surface Failure Injection Sweep
 Status: [x]
 

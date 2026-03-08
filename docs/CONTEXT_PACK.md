@@ -14,6 +14,36 @@
   - `routeKind`
   - `liquidityOperation`
 
+## Active Context: Slice 242 Runtime Recovery and Watchdog Sweep
+
+Issue mapping: `#95`
+
+### Objective + scope lock
+- Objective:
+  - harden restart/replay/recovery behavior for pending flows, prompts, outboxes, and resume paths,
+  - preserve current runtime JSON/CLI behavior and recovery semantics,
+  - keep public runtime contracts unchanged.
+- Scope guard:
+  - runtime internal reliability hardening only,
+  - no API/schema/database changes.
+
+### Expected touched files
+- `apps/agent-runtime/tests/test_runtime_services.py`
+- `apps/agent-runtime/tests/test_trade_path.py`
+- `apps/agent-runtime/tests/test_approvals_run_loop.py`
+- `apps/agent-runtime/tests/test_liquidity_cli.py`
+- `apps/agent-runtime/tests/test_runtime_invariants.py`
+- `docs/XCLAW_SOURCE_OF_TRUTH.md`
+- `docs/XCLAW_SLICE_TRACKER.md`
+- `docs/XCLAW_BUILD_ROADMAP.md`
+- `docs/CONTEXT_PACK.md`
+- `spec.md`
+- `tasks.md`
+- `acceptance.md`
+
+### Completion note
+- Completed 2026-03-08 with restart/replay recovery coverage for runtime state, transfer flows, approval prompts, trade-usage replay, limit-order queued status replay, and liquidity resume, plus the required sequential validation chain (`db:parity`, `seed:reset/load/verify`, tracked seed-state restore, `build`, `pm2 restart all`).
+
 ## Completed Context: Slice 241 Command-Surface Failure Injection Sweep
 
 Issue mapping: `#94`

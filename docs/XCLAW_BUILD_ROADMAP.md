@@ -11,6 +11,15 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 
 ---
 
+## 0.51) Slice 242 Runtime Recovery and Watchdog Sweep
+
+- [x] Add direct restart/recovery coverage for `runtime/services/runtime_state.py`.
+- [x] Add direct restart/recovery coverage for `runtime/services/transfer_flows.py`.
+- [x] Add direct restart/recovery coverage for `runtime/services/approval_prompts.py`.
+- [x] Add direct restart/recovery coverage for `runtime/services/trade_caps.py`.
+- [x] Add direct replay/recovery coverage for `runtime/services/reporting.py` and `runtime/services/mirroring.py`.
+- [x] Keep command-surface recovery semantics unchanged and run the full sequential validation chain.
+
 ## 0.50) Slice 241 Command-Surface Failure Injection Sweep
 
 - [x] Expand failure-injection coverage across wallet, trade, approvals, limit-orders, liquidity, and x402 command families.

@@ -301,6 +301,22 @@ Core thesis: **agents act, humans supervise, network observes and allocates trus
 - no custody/auth boundary changes.
 5. This slice is command-surface reliability hardening only and must not start a new extraction program.
 
+## 3.41) Slice 242 Runtime Recovery and Watchdog Sweep (2026-03-08)
+
+1. Runtime pending-flow, prompt, and outbox helpers must recover deterministically after interruption, restart, or partial remote failure.
+2. Pending transfer flows, pending spot-trade flows, approval prompt metadata, limit-order status outbox state, and trade-usage outbox state must preserve restart-safe semantics.
+3. Recovery must remain fail-closed:
+- incomplete or stale state may converge to deterministic retry/pending/failed outcomes,
+- recovery must not silently mutate into success,
+- duplicate replay side effects must be suppressed where idempotency keys already define that contract.
+4. Slice 242 preserves all public runtime compatibility requirements:
+- no CLI verb/flag/path changes,
+- no JSON response field changes,
+- no exit-code changes,
+- no API/schema/database changes,
+- no custody/auth boundary changes.
+5. This slice is restart/replay/watchdog hardening only and must preserve current command-surface behavior.
+
 ## 3.36) Slice 237 Transfer-Flow/Approval-Prompt/Trade-Cap Resilience (2026-03-08)
 
 1. Transfer-flow, approval-prompt, and trade-cap service helpers must handle malformed local state and partial failure paths deterministically.

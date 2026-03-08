@@ -233,6 +233,29 @@ class LiquidityCliTests(unittest.TestCase):
         self.assertEqual(payload.get("status"), "filled")
         self.assertEqual(payload.get("adapterFamily"), "position_manager_v3")
 
+    def test_liquidity_resume_reuses_execute_contract_for_approved_intent(self) -> None:
+        args = argparse.Namespace(intent="liq_resume_1", chain="base_sepolia", json=True)
+        adapter = mock.Mock()
+        adapter.protocol_family = "position_manager_v3"
+        adapter.dex = "uniswap_v3"
+        adapter.supports_operation.return_value = True
+        with mock.patch.object(
+            cli,
+            "_read_liquidity_intent",
+            return_value={"liquidityIntentId": "liq_resume_1", "status": "approved", "dex": "uniswap_v3", "positionType": "v3", "action": "add"},
+        ), mock.patch.object(cli, "build_liquidity_adapter_for_request", return_value=adapter), mock.patch.object(
+            cli, "_post_liquidity_status"
+        ), mock.patch.object(
+            cli, "_execute_liquidity_v3_add", return_value={"txHash": "0xabc", "positionId": "123", "details": {"executionFamily": "position_manager_v3"}}
+        ), mock.patch.object(
+            cli, "_wait_for_tx_receipt_success", return_value={"status": "0x1"}
+        ):
+            code, payload = self._run(lambda: cli.cmd_liquidity_resume(args))
+
+        self.assertEqual(code, 0)
+        self.assertEqual(payload.get("status"), "filled")
+        self.assertEqual(payload.get("liquidityIntentId"), "liq_resume_1")
+
     def test_liquidity_execute_fails_closed_when_status_post_rejected(self) -> None:
         args = argparse.Namespace(intent="liq_status_fail", chain="base_sepolia", json=True)
         with mock.patch.object(
