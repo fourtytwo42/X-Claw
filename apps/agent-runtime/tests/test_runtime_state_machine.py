@@ -68,6 +68,11 @@ class RuntimeStateMachineTests(unittest.TestCase):
         self.assertEqual(ctx.exception.code, 'unsupported_mode')
         self.assertEqual(ctx.exception.details['supportedMode'], 'real')
 
+    def test_liquidity_status_helpers_classify_terminal_and_in_progress(self) -> None:
+        self.assertTrue(runtime_state_machine.is_liquidity_terminal_status('filled'))
+        self.assertTrue(runtime_state_machine.is_liquidity_in_progress_status('verifying'))
+        self.assertFalse(runtime_state_machine.is_liquidity_terminal_status('approved'))
+
 
 if __name__ == '__main__':
     unittest.main()

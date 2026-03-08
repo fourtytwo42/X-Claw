@@ -74,3 +74,15 @@ def ensure_real_mode(mode: str, *, chain: str, details: dict[str, Any] | None = 
             "Use network mode (`real`) on a configured chain.",
             {"mode": mode, "supportedMode": "real", "chain": chain, **(details or {})},
         )
+
+
+_LIQUIDITY_TERMINAL_STATUSES = {"filled", "failed", "rejected", "expired", "verification_timeout"}
+_LIQUIDITY_IN_PROGRESS_STATUSES = {"executing", "verifying"}
+
+
+def is_liquidity_terminal_status(status: str) -> bool:
+    return str(status or "").strip().lower() in _LIQUIDITY_TERMINAL_STATUSES
+
+
+def is_liquidity_in_progress_status(status: str) -> bool:
+    return str(status or "").strip().lower() in _LIQUIDITY_IN_PROGRESS_STATUSES

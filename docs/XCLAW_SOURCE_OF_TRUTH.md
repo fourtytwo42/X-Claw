@@ -259,6 +259,29 @@ Core thesis: **agents act, humans supervise, network observes and allocates trus
 - runtime canonical execution key remains `solana_mainnet_beta` for stored/config compatibility.
 2. User-facing chain text in Telegram/runtime trade approval flows must display Solana mainnet as `solana_mainnet`.
 
+## 3.31) Slice 223 Liquidity Extraction (2026-03-08)
+
+1. `apps/agent-runtime/xclaw_agent/cli.py` must remain the canonical public router for liquidity entrypoints:
+- parser wiring,
+- command registration,
+- thin dispatch glue only.
+2. Liquidity business logic must live outside `cli.py`:
+- `apps/agent-runtime/xclaw_agent/commands/liquidity.py`
+3. Shared runtime lifecycle helpers under `apps/agent-runtime/xclaw_agent/runtime/` may be extended only for liquidity-specific orchestration needs, including:
+- nested execute/resume command execution shaping,
+- liquidity terminal vs in-progress status classification,
+- fail-closed non-actionable/terminal intent handling,
+- prompt cleanup and terminal envelope shaping where already required.
+4. Slice 223 preserves all public runtime compatibility requirements:
+- no CLI verb/flag/path changes,
+- no JSON field-name contract changes,
+- no exit-code contract changes,
+- no custody/auth boundary changes.
+5. Existing chain-family execution behavior remains unchanged in this slice:
+- Solana local/Raydium liquidity execution stays on current execution internals,
+- EVM liquidity planning/execution stays on current execution internals,
+- this slice moves orchestration ownership only; it does not redesign execution engines.
+
 ## 3.30) Slice 222 Limit-Orders + Approvals Extraction + Shared Runtime State Machine (2026-03-08)
 
 1. `apps/agent-runtime/xclaw_agent/cli.py` must continue to own parser wiring, command registration, and thin dispatch glue only for approvals and limit-orders.

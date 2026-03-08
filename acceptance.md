@@ -1,3 +1,33 @@
+# Slice 223 Acceptance Evidence: Liquidity Extraction
+
+Date (UTC): 2026-03-08  
+Active slice context: `Slice 223`.
+
+Issue mapping: `#77`
+
+### Objective + Scope Lock
+- Objective:
+  - extract liquidity command-family orchestration out of `cli.py`,
+  - extend shared runtime lifecycle helpers only where liquidity needs shared behavior,
+  - preserve current Solana/EVM liquidity command behavior.
+
+### Behavior Checks
+- [x] `apps/agent-runtime/xclaw_agent/cli.py` remains the public router for liquidity entrypoints.
+- [x] liquidity command logic is extracted under `apps/agent-runtime/xclaw_agent/commands/liquidity.py`.
+- [x] shared lifecycle helpers cover liquidity terminal/in-progress classification in `apps/agent-runtime/xclaw_agent/runtime/state_machine.py`.
+- [x] liquidity/trade regression suites are green.
+
+### Required Validation Gates
+- [x] `npm run db:parity` -> PASS (`ok: true`, `checkedAt=2026-03-08T16:44:48.913Z`)
+- [x] `npm run seed:reset` -> PASS
+- [x] `npm run seed:load` -> PASS
+- [x] `npm run seed:verify` -> PASS
+- [x] `python3 -m unittest -v apps/agent-runtime/tests/test_runtime_state_machine.py` -> PASS (`Ran 5 tests`, `OK`)
+- [x] `python3 -m unittest -v apps/agent-runtime/tests/test_liquidity_cli.py` -> PASS (`Ran 20 tests`, `OK`)
+- [x] `python3 -m unittest -v apps/agent-runtime/tests/test_trade_path.py` -> PASS (`Ran 147 tests`, `OK`)
+- [x] `npm run build` -> PASS (Next.js build completed successfully)
+- [x] `pm2 restart all` -> PASS (`xclaw-web online`)
+
 # Slice 222 Acceptance Evidence: Limit-Orders + Approvals Extraction + Shared Runtime State Machine
 
 Date (UTC): 2026-03-08  

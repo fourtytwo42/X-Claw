@@ -17,6 +17,57 @@ Status legend:
 
 ---
 
+## Slice 225: Process Doc Compression
+Status: [ ]
+
+Goal:
+- keep `docs/XCLAW_SOURCE_OF_TRUTH.md` canonical, compress `spec.md|tasks.md|acceptance.md` into thinner active-slice handoff artifacts, and normalize slice-to-issue mapping.
+
+DoD:
+- [ ] historical slice ledgers are moved out of active handoff docs or replaced by generated summaries.
+- [ ] active slice docs are concise and issue mappings are one-to-one with live GitHub issues.
+- [ ] no runtime behavior changes are introduced in this slice.
+- [ ] validation/build/restart evidence captured and issue evidence posted.
+
+Issue mapping:
+- `#76`
+
+---
+
+## Slice 224: x402 Extraction
+Status: [ ]
+
+Goal:
+- extract x402 command-family logic out of `cli.py` behind stable wrappers and reuse the shared runtime lifecycle helpers without changing x402 fallback semantics.
+
+DoD:
+- [ ] x402 command logic lives outside `cli.py` under `apps/agent-runtime/xclaw_agent/commands/x402.py`.
+- [ ] `cli.py` remains parser/dispatch glue only for x402 entrypoints.
+- [ ] x402 payment/policy/network contracts remain byte-for-byte compatible at the JSON field level.
+- [ ] direct command/helper tests and required sequential validations pass, with issue evidence posted.
+
+Issue mapping:
+- `#78`
+
+---
+
+## Slice 223: Liquidity Extraction
+Status: [x]
+
+Goal:
+- extract liquidity command-family orchestration out of `cli.py`, extend the shared runtime lifecycle layer only where liquidity needs it, and preserve current Solana/EVM liquidity behavior exactly.
+
+DoD:
+- [x] liquidity command logic lives outside `cli.py` under `apps/agent-runtime/xclaw_agent/commands/liquidity.py`.
+- [x] `cli.py` remains parser/dispatch glue only for liquidity entrypoints.
+- [x] shared runtime lifecycle helpers cover liquidity terminal/in-progress classification and nested execute/resume needs without changing command contracts.
+- [x] liquidity regression suites and full sequential validation pass, with issue evidence posted.
+
+Issue mapping:
+- `#77`
+
+---
+
 ## Slice 222: Limit-Orders + Approvals Extraction + Shared Runtime State Machine
 Status: [x]
 

@@ -11,6 +11,27 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 
 ---
 
+## 0.34) Slice 225 Process Doc Compression
+
+- [ ] Keep `docs/XCLAW_SOURCE_OF_TRUTH.md` as the only canonical behavior contract.
+- [ ] Reduce `spec.md`, `tasks.md`, and `acceptance.md` to thin active-slice handoff summaries or archived/generated history.
+- [ ] Normalize slice-to-issue mapping so each active slice maps to one live GitHub issue.
+- [ ] Run validation/build/restart checks and capture issue evidence.
+
+## 0.33) Slice 224 x402 Extraction
+
+- [ ] Extract `x402 receive-request|pay|pay-resume|pay-decide|policy-get|policy-set|networks` behind stable `cli.py` wrappers.
+- [ ] Reuse shared runtime lifecycle helpers for x402 resume/decision handling without changing fallback semantics.
+- [ ] Add direct x402 command/helper coverage and keep current runtime regression suites green.
+- [ ] Run full sequential validation chain and capture evidence + issue comment.
+
+## 0.32) Slice 223 Liquidity Extraction
+
+- [x] Extract liquidity `discover-pairs|quote-add|quote-remove|add|remove|increase|claim-fees|claim-rewards|migrate|execute|resume|positions` behind stable `cli.py` wrappers.
+- [x] Extend shared runtime lifecycle helpers only for liquidity terminal/in-progress classification and nested execute/resume shaping.
+- [x] Add direct liquidity helper coverage and keep liquidity/trade regression suites green.
+- [x] Run full sequential validation chain and capture evidence + issue comment.
+
 ## 0.31) Slice 222 Limit-Orders + Approvals Extraction + Shared Runtime State Machine
 
 - [x] Add shared runtime lifecycle helpers for nested JSON execution, prompt cleanup, and limit-order failure mapping.

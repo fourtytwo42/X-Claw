@@ -1,3 +1,13 @@
+# Slice 223 Tasks: Liquidity Extraction (2026-03-08)
+
+Issue mapping: `#77`
+
+- [x] Extract liquidity `discover-pairs|quote-add|quote-remove|add|remove|increase|claim-fees|claim-rewards|migrate|execute|resume|positions` behind stable `cli.py` wrappers.
+- [x] Extend shared runtime lifecycle helpers only for liquidity terminal/in-progress classification.
+- [x] Add direct helper coverage in `test_runtime_state_machine.py`.
+- [x] Keep liquidity/trade runtime regression suites green.
+- [x] Run full sequential validations + capture evidence in `acceptance.md`.
+
 # Slice 222 Tasks: Limit-Orders + Approvals Extraction + Shared Runtime State Machine (2026-03-08)
 
 Issue mapping: `#75`

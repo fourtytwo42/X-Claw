@@ -1,3 +1,33 @@
+# Slice 223 Spec: Liquidity Extraction (2026-03-08)
+
+Issue mapping: `#77`
+
+## Goal
+1. Move liquidity command-family orchestration out of `apps/agent-runtime/xclaw_agent/cli.py` behind stable wrappers.
+2. Extend the shared runtime lifecycle layer only where liquidity execute/resume handling needs shared behavior.
+3. Preserve current CLI verbs, flags, JSON response shapes, exit codes, and custody/auth boundaries.
+
+## Non-goals
+1. No API route/schema/database changes in this slice.
+2. No x402 extraction in this slice.
+3. No process-doc compression beyond mandatory canonical sync.
+4. No redesign of Solana or EVM liquidity execution internals.
+
+## Locked scope
+1. `apps/agent-runtime/xclaw_agent/cli.py`
+2. `apps/agent-runtime/xclaw_agent/commands/liquidity.py`
+3. `apps/agent-runtime/xclaw_agent/runtime/state_machine.py`
+4. `apps/agent-runtime/tests/test_runtime_state_machine.py`
+5. `apps/agent-runtime/tests/test_liquidity_cli.py`
+6. `apps/agent-runtime/tests/test_trade_path.py`
+7. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+8. `docs/XCLAW_SLICE_TRACKER.md`
+9. `docs/XCLAW_BUILD_ROADMAP.md`
+10. `docs/CONTEXT_PACK.md`
+11. `spec.md`
+12. `tasks.md`
+13. `acceptance.md`
+
 # Slice 222 Spec: Limit-Orders + Approvals Extraction + Shared Runtime State Machine (2026-03-08)
 
 Issue mapping: `#75`

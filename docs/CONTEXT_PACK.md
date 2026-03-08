@@ -14,32 +14,28 @@
   - `routeKind`
   - `liquidityOperation`
 
-## Active Context: Slice 222 Limit-Orders + Approvals Extraction + Shared Runtime State Machine
+## Active Context: Slice 223 Liquidity Extraction
 
-Issue mapping: `#75`
+Issue mapping: `#77`
 
 ### Objective + scope lock
 - Objective:
-  - add shared runtime lifecycle helpers for nested command execution and prompt cleanup,
-  - move limit-orders and approvals business logic out of `cli.py` while preserving current command behavior,
-  - keep liquidity and x402 extraction out of this slice.
+  - move liquidity business logic out of `cli.py` behind stable wrappers,
+  - extend shared runtime lifecycle helpers only where liquidity execute/resume orchestration needs it,
+  - preserve current Solana/EVM liquidity behavior exactly.
 - Scope guard:
   - runtime-core extraction only,
-  - approvals + limit-orders only in this slice,
+  - liquidity only in this slice,
   - no API/schema/database changes,
-  - no liquidity/x402 extraction beyond preserving existing fallback behavior.
+  - no x402 extraction or process-doc compression in this slice.
 
 ### Expected touched files
 - `apps/agent-runtime/xclaw_agent/cli.py`
-- `apps/agent-runtime/xclaw_agent/commands/approvals.py`
-- `apps/agent-runtime/xclaw_agent/commands/limit_orders.py`
+- `apps/agent-runtime/xclaw_agent/commands/liquidity.py`
 - `apps/agent-runtime/xclaw_agent/runtime/state_machine.py`
 - `apps/agent-runtime/tests/test_runtime_state_machine.py`
-- `apps/agent-runtime/tests/test_runtime_contract.py`
-- `apps/agent-runtime/tests/test_approvals_run_loop.py`
 - `apps/agent-runtime/tests/test_trade_path.py`
 - `apps/agent-runtime/tests/test_liquidity_cli.py`
-- `apps/agent-runtime/tests/test_x402_runtime.py`
 - `docs/XCLAW_SOURCE_OF_TRUTH.md`
 - `docs/XCLAW_SLICE_TRACKER.md`
 - `docs/XCLAW_BUILD_ROADMAP.md`
