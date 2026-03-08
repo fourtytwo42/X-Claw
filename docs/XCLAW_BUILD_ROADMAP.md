@@ -11,6 +11,47 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 
 ---
 
+## 0.29) Slice 220 Solana Reliability + Capability Truth Alignment (Hotfix)
+
+- [x] Align Solana advanced LP regression expectations with promoted `solana_mainnet_beta` capability truth.
+- [x] Add fail-closed runtime coverage for Solana wallet-send, wallet-send-token, and trade execution guards.
+- [x] Re-verify Solana management/x402 contract scripts remain green and deterministic.
+- [x] Sync canonical artifacts and evidence for Solana reliability objective.
+- [ ] Run full sequential validation chain and capture evidence + blockers.
+
+## 0.28) Slice 219 EVM Reliability + Mock/Stub Elimination (Hotfix)
+
+- [~] Add register-path resilience for legacy schema drift (`last_name_change_at`) without returning opaque `500`.
+- [~] Make tracked-token mirror path deterministic for unregistered-agent state (structured non-`500` response).
+- [~] Update active EVM e2e execution flows to use `mode=real` for trade/limit-order create paths.
+- [~] Extend contract checks with explicit positive + negative coverage for register/mirror behavior.
+- [ ] Run full sequential validation chain and capture evidence + request IDs.
+
+## 0.27) Slice 218 Solana Naming UX Tightening (Hotfix)
+
+- [x] Hide `solana_localnet` from web chain dropdown options.
+- [x] Normalize skill user-facing chain fields from `solana_mainnet_beta` to `solana_mainnet`.
+- [x] Keep runtime/internal compatibility with canonical `solana_mainnet_beta`.
+- [x] Add regression coverage for skill output chain normalization.
+- [x] Sequential validation + PM2 restart completed.
+
+## 0.26) Slice 217 Solana Token Symbol Resolution on Agent Page (Hotfix)
+
+- [x] Add family-safe token address normalization helper for agent-page view-model lookups.
+- [x] Keep EVM address matching case-insensitive; keep Solana mint matching case-sensitive.
+- [x] Resolve wallet token labels from chain-token metadata on `/agents/[agentId]`.
+- [x] Resolve policy-approval token labels from chain-token metadata on `/agents/[agentId]`.
+- [x] Sequential validation + PM2 restart completed.
+
+## 0.25) Slice 216 Solana Mainnet Alias + Dropdown Testnet Grouping (Hotfix)
+
+- [x] Add runtime chain alias normalization so `solana_mainnet` input resolves to canonical `solana_mainnet_beta`.
+- [x] Keep stored/config/runtime internal key compatibility on `solana_mainnet_beta`.
+- [x] Update Telegram/runtime user-facing chain copy to show `solana_mainnet`.
+- [x] Update web chain dropdown grouping so `solana_devnet|solana_testnet|solana_localnet` appear in `Testnets`.
+- [x] Add regression tests for alias acceptance and Solana decision-message chain display.
+- [x] Sequential validation + PM2 restart completed.
+
 ## 0.24) Slice 215 Solana Trade Status Schema Parity (Hotfix)
 
 - [x] Expand `trade-status` schema `txHash` pattern to accept EVM hash or Solana signature.

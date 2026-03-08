@@ -56,6 +56,11 @@ function run() {
   expect(payCompat.includes('verifyX402Settlement'), 'x402_compat_route_uses_verifier');
   expect(payCompat.includes("req.headers.get('x-tx-id')"), 'x402_compat_route_supports_tx_id_header');
 
+  const verifier = readText('apps/network-web/src/lib/x402-verification.ts');
+  expect(verifier.includes('getSignatureStatuses'), 'x402_solana_verifier_signature_status');
+  expect(verifier.includes('getTransaction'), 'x402_solana_verifier_recipient_lookup');
+  expect(verifier.includes('Solana settlement proof verified.'), 'x402_solana_verifier_real_rpc_proof');
+
   console.log(JSON.stringify({ ok: true, count: results.length, results }, null, 2));
 }
 

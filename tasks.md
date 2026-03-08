@@ -1,3 +1,54 @@
+# Slice 220 Tasks: Solana Reliability + Capability Truth Alignment (2026-03-08)
+
+Issue mapping: `#73`
+
+- [x] Fix stale Solana advanced LP deferred assertion for `solana_mainnet_beta` in liquidity adapter tests.
+- [x] Add negative-path runtime tests for Solana recipient validation, same-mint trade rejection, and Solana-only execution key-scheme guard.
+- [x] Extend Solana contract checks with explicit runtime fail-closed and real-RPC verifier assertions.
+- [x] Run Solana runtime/RPC/planner/liquidity adapter unit checks.
+- [x] Run Solana management/x402 contract checks.
+- [x] Run full sequential validations + capture evidence in `acceptance.md`.
+
+# Slice 219 Tasks: EVM Reliability + Mock/Stub Elimination (2026-03-08)
+
+Issue mapping: `#72`
+
+- [x] Harden `agent/register` against legacy `last_name_change_at` schema drift without opaque `500`.
+- [x] Add deterministic non-`500` handling in tracked-token mirror path for unregistered-agent state.
+- [x] Update EVM e2e execution payloads to `mode=real` for trade/limit-order create flows.
+- [x] Extend token-mirror contract checks with register preflight and explicit negative auth mismatch assertions.
+- [ ] Run full sequential validations + capture evidence in `acceptance.md`.
+
+# Slice 218 Tasks: Solana Naming UX Tightening (2026-03-05)
+
+Issue mapping: `#71`
+
+- [x] Remove `solana_localnet` from web dropdown options.
+- [x] Add skill output normalization for `chain|chainKey|defaultChain` to display `solana_mainnet`.
+- [x] Add regression test for skill `_run_agent` success output normalization.
+- [x] Run sequential validations + issue evidence post.
+
+# Slice 217 Tasks: Solana Token Symbol Resolution on Agent Page (2026-03-05)
+
+Issue mapping: `#70`
+
+- [x] Add family-safe token address normalization helper in agent-page view-model.
+- [x] Ensure token symbol map lookups preserve Solana mint case-sensitivity.
+- [x] Update agent-page policy token lookup paths to use family-safe normalization.
+- [x] Update agent-page wallet token label display to resolve symbols via chain token map.
+- [x] Run sequential validations + issue evidence post.
+
+# Slice 216 Tasks: Solana Mainnet Alias + Dropdown Testnet Grouping (2026-03-05)
+
+Issue mapping: `#69`
+
+- [x] Add runtime chain alias normalization for `solana_mainnet -> solana_mainnet_beta`.
+- [x] Keep runtime internal chain execution/storage compatibility on canonical `solana_mainnet_beta`.
+- [x] Update Telegram/runtime user-facing chain copy to render `solana_mainnet`.
+- [x] Update web chain dropdown testnet classifier for Solana `devnet|testnet|localnet`.
+- [x] Add regression tests for alias acceptance and Solana chain display normalization.
+- [x] Run sequential validations + issue evidence post.
+
 # Slice 215 Tasks: Solana Trade Status Schema Parity (2026-03-05)
 
 Issue mapping: `#68`

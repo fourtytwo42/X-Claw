@@ -900,6 +900,58 @@ class TradePathRuntimeTests(unittest.TestCase):
         self.assertEqual(str(called_summary.get("tokenInSymbol")), "SOL")
         self.assertEqual(str(called_summary.get("tokenOutSymbol")), "USDC")
 
+    def test_trade_spot_solana_rejects_same_mint(self) -> None:
+        args = argparse.Namespace(
+            chain="solana_devnet",
+            token_in="SOL",
+            token_out="WSOL",
+            amount_in="8500000",
+            slippage_bps="100",
+            deadline_sec=120,
+            to=None,
+            json=True,
+        )
+
+        with mock.patch.object(
+            cli,
+            "_resolve_token_address",
+            side_effect=["So11111111111111111111111111111111111111112", "So11111111111111111111111111111111111111112"],
+        ):
+            payload = self._run_and_parse_stdout(lambda: cli.cmd_trade_spot(args))
+
+        self.assertFalse(payload.get("ok"))
+        self.assertEqual(payload.get("code"), "invalid_input")
+        self.assertEqual((payload.get("details") or {}).get("chain"), "solana_devnet")
+
+    def test_execute_solana_trade_rejects_non_solana_wallet_key_scheme(self) -> None:
+        quote = mock.Mock(
+            quote_payload={"routePlan": []},
+            quote_endpoint="https://lite-api.jup.ag/swap/v1",
+            amount_out_units="1234",
+            route_kind="jupiter",
+        )
+
+        with mock.patch.object(cli, "solana_jupiter_quote", return_value=quote), mock.patch.object(
+            cli, "load_wallet_store", return_value={}
+        ), mock.patch.object(
+            cli, "_execution_wallet_secret", return_value=("So11111111111111111111111111111111111111112", b"secret", "evm_secp256k1")
+        ), mock.patch.object(
+            cli, "solana_jupiter_execute_swap"
+        ) as execute_mock:
+            with self.assertRaises(cli.WalletStoreError) as ctx:
+                cli._execute_solana_trade(
+                    chain="solana_devnet",
+                    trade_id="trd_sol_exec_1",
+                    token_in="So11111111111111111111111111111111111111112",
+                    token_out="EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+                    amount_in_units="8500000",
+                    slippage_bps=100,
+                    from_status="approved",
+                )
+
+        self.assertIn("not compatible with Solana execution", str(ctx.exception))
+        execute_mock.assert_not_called()
+
     def test_approvals_resume_spot_blocks_when_trade_not_actionable(self) -> None:
         args = argparse.Namespace(trade_id="trd_1", chain="base_sepolia", json=True)
         with tempfile.TemporaryDirectory() as tmpdir, mock.patch.object(
@@ -1501,6 +1553,8 @@ class TradePathRuntimeTests(unittest.TestCase):
         message = str(cmd[cmd.index("--message") + 1])
         self.assertIn("Denied swap", message)
         self.assertIn("0.007 SOL -> USDC", message)
+        self.assertIn("Chain: solana_mainnet", message)
+        self.assertNotIn("solana_mainnet_beta", message)
         self.assertIn("Reason: Denied via Telegram", message)
         self.assertNotIn("7000000 So11111111111111111111111111111111111111112", message)
         self.assertNotIn("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", message)
@@ -1909,6 +1963,33 @@ class TradePathRuntimeTests(unittest.TestCase):
         self.assertIn("builderCodeSkippedReason", payload)
         self.assertIn("builderCodeSource", payload)
         self.assertIn("builderCodeStandard", payload)
+
+    def test_wallet_send_rejects_invalid_solana_recipient(self) -> None:
+        args = argparse.Namespace(
+            to="not-a-solana-address",
+            amount_wei="100",
+            chain="solana_devnet",
+            json=True,
+        )
+        with mock.patch.object(cli, "is_solana_address", return_value=False):
+            payload = self._run_and_parse_stdout(lambda: cli.cmd_wallet_send(args))
+        self.assertFalse(payload.get("ok"))
+        self.assertEqual(payload.get("code"), "invalid_input")
+        self.assertEqual((payload.get("details") or {}).get("to"), "not-a-solana-address")
+
+    def test_wallet_send_token_rejects_invalid_solana_recipient(self) -> None:
+        args = argparse.Namespace(
+            token="So11111111111111111111111111111111111111112",
+            to="not-a-solana-address",
+            amount_wei="100",
+            chain="solana_devnet",
+            json=True,
+        )
+        with mock.patch.object(cli, "is_solana_address", return_value=False):
+            payload = self._run_and_parse_stdout(lambda: cli.cmd_wallet_send_token(args))
+        self.assertFalse(payload.get("ok"))
+        self.assertEqual(payload.get("code"), "invalid_input")
+        self.assertEqual((payload.get("details") or {}).get("to"), "not-a-solana-address")
 
     def test_approvals_decide_transfer_approve_executes(self) -> None:
         approval_id = "xfr_test_1"

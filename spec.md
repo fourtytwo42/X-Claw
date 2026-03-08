@@ -1,3 +1,139 @@
+# Slice 220 Spec: Solana Reliability + Capability Truth Alignment (2026-03-08)
+
+Issue mapping: `#73`
+
+## Goal
+1. Align Solana advanced LP regression behavior with promoted `solana_mainnet_beta` capability truth.
+2. Add explicit fail-closed runtime coverage for active Solana command surfaces (`wallet-send`, `wallet-send-token`, `trade spot`, trade execution key-scheme guard).
+3. Re-validate Solana management/x402 contract surfaces for deterministic pass behavior.
+4. Keep canonical docs/evidence synchronized for Solana reliability status.
+
+## Non-goals
+1. No Solana API schema shape changes.
+2. No new Solana capability promotion/deprecation in this slice.
+3. No custody/auth boundary changes.
+4. No historical storage cleanup for mock compatibility fields.
+
+## Locked scope
+1. `apps/agent-runtime/tests/test_liquidity_adapter.py`
+2. `apps/agent-runtime/tests/test_trade_path.py`
+3. `infrastructure/scripts/management-solana-contract-tests.mjs`
+4. `infrastructure/scripts/x402-solana-contract-tests.mjs`
+5. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+6. `docs/XCLAW_SLICE_TRACKER.md`
+7. `docs/XCLAW_BUILD_ROADMAP.md`
+8. `docs/CONTEXT_PACK.md`
+9. `spec.md`
+10. `tasks.md`
+11. `acceptance.md`
+
+# Slice 219 Spec: EVM Reliability + Mock/Stub Elimination (2026-03-08)
+
+Issue mapping: `#72`
+
+## Goal
+1. Eliminate opaque `500` outcomes on active EVM contract paths (`agent/register`, tracked-token mirror).
+2. Keep historical mock compatibility fields intact while enforcing active EVM execution as `mode=real`.
+3. Update active EVM e2e scripts to stop sending `mode=mock` execution payloads.
+
+## Non-goals
+1. No breaking API/schema removals for historical `mode/is_mock/mockReceiptId`.
+2. No changes to custody/auth trust boundaries.
+3. No Solana behavior changes in this slice.
+
+## Locked scope
+1. `apps/network-web/src/app/api/v1/agent/register/route.ts`
+2. `apps/network-web/src/app/api/v1/agent/tokens/mirror/route.ts`
+3. `infrastructure/scripts/tokens-mirror-contract-tests.mjs`
+4. `infrastructure/scripts/e2e-full-pass.sh`
+5. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+6. `docs/XCLAW_SLICE_TRACKER.md`
+7. `docs/XCLAW_BUILD_ROADMAP.md`
+8. `docs/CONTEXT_PACK.md`
+9. `spec.md`
+10. `tasks.md`
+11. `acceptance.md`
+
+# Slice 218 Spec: Solana Naming UX Tightening (2026-03-05)
+
+Issue mapping: `#71`
+
+## Goal
+1. Remove `solana_localnet` from the web chain dropdown.
+2. Ensure skill user-facing chain labels use `solana_mainnet` instead of `solana_mainnet_beta`.
+3. Preserve runtime compatibility with canonical internal keying.
+
+## Non-goals
+1. No API/schema/database changes.
+2. No runtime chain-config migration.
+3. No custody/auth boundary changes.
+
+## Locked scope
+1. `apps/network-web/src/components/chain-header-control.tsx`
+2. `skills/xclaw-agent/scripts/xclaw_agent_skill.py`
+3. `apps/agent-runtime/tests/test_x402_skill_wrapper.py`
+4. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+5. `docs/XCLAW_SLICE_TRACKER.md`
+6. `docs/XCLAW_BUILD_ROADMAP.md`
+7. `docs/CONTEXT_PACK.md`
+8. `spec.md`
+9. `tasks.md`
+10. `acceptance.md`
+
+# Slice 217 Spec: Solana Token Symbol Resolution on Agent Page (2026-03-05)
+
+Issue mapping: `#70`
+
+## Goal
+1. Resolve Solana mint addresses to token symbols on `/agents/[agentId]` when chain token metadata is available.
+2. Preserve existing EVM token symbol/address behavior.
+3. Keep this as a UI/view-model-only hotfix.
+
+## Non-goals
+1. No API/schema/database changes.
+2. No runtime wallet/trade behavior changes.
+3. No management auth/cookie boundary changes.
+
+## Locked scope
+1. `apps/network-web/src/lib/agent-page-view-model.ts`
+2. `apps/network-web/src/app/agents/[agentId]/page.tsx`
+3. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+4. `docs/XCLAW_SLICE_TRACKER.md`
+5. `docs/XCLAW_BUILD_ROADMAP.md`
+6. `docs/CONTEXT_PACK.md`
+7. `spec.md`
+8. `tasks.md`
+9. `acceptance.md`
+
+# Slice 216 Spec: Solana Mainnet Alias + Dropdown Testnet Grouping (2026-03-05)
+
+Issue mapping: `#69`
+
+## Goal
+1. Accept `solana_mainnet` as a backward-compatible alias while preserving canonical internal key `solana_mainnet_beta`.
+2. Show `solana_mainnet` in user-facing Telegram/runtime trade messages.
+3. Group Solana non-mainnet chains under `Testnets` in web chain dropdowns.
+
+## Non-goals
+1. No database/schema/API route changes.
+2. No migration of stored chain keys from `solana_mainnet_beta`.
+3. No custody/auth boundary changes.
+
+## Locked scope
+1. `apps/agent-runtime/xclaw_agent/chains.py`
+2. `apps/agent-runtime/xclaw_agent/cli.py`
+3. `apps/agent-runtime/tests/test_trade_path.py`
+4. `apps/agent-runtime/tests/test_chain_aliases.py`
+5. `apps/network-web/src/components/chain-header-control.tsx`
+6. `skills/xclaw-agent/scripts/xclaw_agent_skill.py`
+7. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+8. `docs/XCLAW_SLICE_TRACKER.md`
+9. `docs/XCLAW_BUILD_ROADMAP.md`
+10. `docs/CONTEXT_PACK.md`
+11. `spec.md`
+12. `tasks.md`
+13. `acceptance.md`
+
 # Slice 215 Spec: Solana Trade Status Schema Parity (2026-03-05)
 
 Issue mapping: `#68`

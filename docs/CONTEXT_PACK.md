@@ -14,6 +14,134 @@
   - `routeKind`
   - `liquidityOperation`
 
+## Hotfix Context: Slice 219 EVM Reliability + Mock/Stub Elimination
+
+Issue mapping: `#72`
+
+### Objective + scope lock
+- Objective:
+  - remove opaque `500` failures on active EVM contract paths (`agent/register`, tracked-token mirror),
+  - keep historical mock fields compatibility while ensuring active EVM execution surfaces use network mode (`real`),
+  - refresh contract/e2e scripts to stop proposing mock-mode execution requests.
+- Scope guard:
+  - EVM API/runtime stability + script contract cleanup only,
+  - no breaking schema removals for historical `mode/is_mock/mockReceiptId` fields.
+
+### Expected touched files
+- `apps/network-web/src/app/api/v1/agent/register/route.ts`
+- `apps/network-web/src/app/api/v1/agent/tokens/mirror/route.ts`
+- `infrastructure/scripts/tokens-mirror-contract-tests.mjs`
+- `infrastructure/scripts/e2e-full-pass.sh`
+- `docs/XCLAW_SOURCE_OF_TRUTH.md`
+- `docs/XCLAW_SLICE_TRACKER.md`
+- `docs/XCLAW_BUILD_ROADMAP.md`
+- `docs/CONTEXT_PACK.md`
+- `spec.md`
+- `tasks.md`
+- `acceptance.md`
+
+## Hotfix Context: Slice 220 Solana Reliability + Capability Truth Alignment
+
+Issue mapping: `#73`
+
+### Objective + scope lock
+- Objective:
+  - resolve Solana reliability drift caused by stale deferred-capability assertions,
+  - add fail-closed runtime coverage for active Solana command surfaces,
+  - confirm promoted Solana mainnet advanced LP and Solana contract surfaces stay deterministic.
+- Scope guard:
+  - Solana capability-truth alignment + fail-closed runtime coverage + verification evidence only,
+  - no schema/database breaking changes.
+
+### Expected touched files
+- `apps/agent-runtime/tests/test_liquidity_adapter.py`
+- `apps/agent-runtime/tests/test_trade_path.py`
+- `infrastructure/scripts/management-solana-contract-tests.mjs`
+- `infrastructure/scripts/x402-solana-contract-tests.mjs`
+- `docs/XCLAW_SOURCE_OF_TRUTH.md`
+- `docs/XCLAW_SLICE_TRACKER.md`
+- `docs/XCLAW_BUILD_ROADMAP.md`
+- `docs/CONTEXT_PACK.md`
+- `spec.md`
+- `tasks.md`
+- `acceptance.md`
+
+## Hotfix Context: Slice 216 Solana Mainnet Alias + Dropdown Testnet Grouping
+
+Issue mapping: `#69`
+
+### Objective + scope lock
+- Objective:
+  - keep backward compatibility with existing `solana_mainnet_beta` chain-key persistence,
+  - expose `solana_mainnet` in user-facing runtime/Telegram copy,
+  - group Solana non-mainnet options under `Testnets` in chain dropdowns.
+- Scope guard:
+  - runtime chain alias normalization + display copy only,
+  - web dropdown grouping only,
+  - no schema/DB/API route changes.
+
+### Expected touched files
+- `apps/agent-runtime/xclaw_agent/chains.py`
+- `apps/agent-runtime/xclaw_agent/cli.py`
+- `apps/agent-runtime/tests/test_trade_path.py`
+- `apps/agent-runtime/tests/test_chain_aliases.py`
+- `apps/network-web/src/components/chain-header-control.tsx`
+- `skills/xclaw-agent/scripts/xclaw_agent_skill.py`
+- `docs/XCLAW_SOURCE_OF_TRUTH.md`
+- `docs/XCLAW_SLICE_TRACKER.md`
+- `docs/XCLAW_BUILD_ROADMAP.md`
+- `docs/CONTEXT_PACK.md`
+- `spec.md`
+- `tasks.md`
+- `acceptance.md`
+
+## Hotfix Context: Slice 217 Solana Token Symbol Resolution on Agent Page
+
+Issue mapping: `#70`
+
+### Objective + scope lock
+- Objective:
+  - stop showing raw Solana mint addresses in agent-page wallet/approval labels when symbol metadata exists,
+  - keep EVM token-label behavior unchanged.
+- Scope guard:
+  - agent page + agent-page view-model only,
+  - no API/schema/database/runtime execution changes.
+
+### Expected touched files
+- `apps/network-web/src/lib/agent-page-view-model.ts`
+- `apps/network-web/src/app/agents/[agentId]/page.tsx`
+- `docs/XCLAW_SOURCE_OF_TRUTH.md`
+- `docs/XCLAW_SLICE_TRACKER.md`
+- `docs/XCLAW_BUILD_ROADMAP.md`
+- `docs/CONTEXT_PACK.md`
+- `spec.md`
+- `tasks.md`
+- `acceptance.md`
+
+## Hotfix Context: Slice 218 Solana Naming UX Tightening
+
+Issue mapping: `#71`
+
+### Objective + scope lock
+- Objective:
+  - remove `solana_localnet` from production web dropdown selectors,
+  - avoid exposing `solana_mainnet_beta` wording in skill user-facing output.
+- Scope guard:
+  - web dropdown component + skill wrapper output normalization only,
+  - no API/schema/database/runtime execution changes.
+
+### Expected touched files
+- `apps/network-web/src/components/chain-header-control.tsx`
+- `skills/xclaw-agent/scripts/xclaw_agent_skill.py`
+- `apps/agent-runtime/tests/test_x402_skill_wrapper.py`
+- `docs/XCLAW_SOURCE_OF_TRUTH.md`
+- `docs/XCLAW_SLICE_TRACKER.md`
+- `docs/XCLAW_BUILD_ROADMAP.md`
+- `docs/CONTEXT_PACK.md`
+- `spec.md`
+- `tasks.md`
+- `acceptance.md`
+
 ## Hotfix Context: Slice 215 Solana Trade Status Schema Parity
 
 Issue mapping: `#68`

@@ -252,6 +252,40 @@ Core thesis: **agents act, humans supervise, network observes and allocates trus
 - no DB migration,
 - no custody/auth boundary changes.
 
+## 3.24) Slice 216 Solana Mainnet Alias + Dropdown Testnet Grouping (2026-03-05)
+
+1. Backward-compatible chain aliasing is required for Solana mainnet naming:
+- runtime must accept both `solana_mainnet` and `solana_mainnet_beta` as input,
+- runtime canonical execution key remains `solana_mainnet_beta` for stored/config compatibility.
+2. User-facing chain text in Telegram/runtime trade approval flows must display Solana mainnet as `solana_mainnet`.
+3. Web chain dropdown grouping contract:
+- `solana_mainnet_beta` remains in `Mainnets`,
+- `solana_devnet`, `solana_testnet`, and `solana_localnet` must render under `Testnets`.
+4. This slice is compatibility + presentation only:
+- no schema/database migration,
+- no management-cookie boundary change,
+- no custody/auth model change.
+
+## 3.25) Slice 217 Solana Token Symbol Resolution on Agent Page (2026-03-05)
+
+1. Agent page token label resolution must be family-safe:
+- EVM token-address matching remains case-insensitive (`0x...` lowercase normalization),
+- Solana mint-address matching must remain case-sensitive (no lowercase normalization).
+2. Wallet/approval/activity labels on `/agents/[agentId]` must prefer resolved chain-token symbols over raw Solana mint addresses when metadata exists.
+3. This slice is UI/view-model only:
+- no API/schema/database change,
+- no runtime execution/custody/auth boundary change.
+
+## 3.26) Slice 218 Solana Naming UX Tightening (2026-03-05)
+
+1. Web chain dropdowns must not expose `solana_localnet` in production-facing chain selectors.
+2. Skill user-facing JSON output must present Solana mainnet as `solana_mainnet`:
+- normalize `solana_mainnet_beta` -> `solana_mainnet` for display keys (`chain`, `chainKey`, `defaultChain`),
+- preserve runtime canonical compatibility (`solana_mainnet_beta` remains accepted internally).
+3. This slice is presentation-only:
+- no API/schema/database change,
+- no custody/auth boundary change.
+
 ## 3.3) Slice 128-129 Unified EVM Action Engine
 
 1. Canonical runtime execution for active on-chain actions is runtime-local and adapter-built.
@@ -5131,3 +5165,27 @@ Supersession note (Slice 117 Hotfix D):
   - approval decision acknowledgement must be non-terminal (no success claim before execution outcome),
   - runtime must send a terminal follow-up message for trade outcome (`filled|failed|rejected|verification_timeout`) with tx/reason context when available.
   - Telegram callback synthesis must fail closed: treat trade result as success only when terminal status is `filled` and `txHash` is present; missing tx-hash outcomes must be classified as failed/unverified.
+
+### Slice 219 Hotfix Addendum: EVM Reliability + Mock/Stub Elimination
+- Historical compatibility fields remain supported in storage/read models:
+  - `mode`,
+  - `is_mock`,
+  - `mockReceiptId`.
+- Active EVM execution surfaces remain network-only:
+  - runtime trade execution rejects `mode=mock` with deterministic `unsupported_mode`,
+  - runtime limit-order execution rejects `mode=mock` with deterministic `unsupported_mode`,
+  - active e2e execution scripts must use `mode=real` for EVM trade/limit-order create requests.
+- Deterministic failure mapping replaces opaque server errors on active EVM paths:
+  - `POST /api/v1/agent/tokens/mirror` for unregistered agent state returns structured non-`500` guidance (register/bootstrap first),
+  - `POST /api/v1/agent/register` remains resilient when legacy schema drift omits `last_name_change_at` (no opaque `500` for this drift case).
+
+### Slice 220 Hotfix Addendum: Solana Reliability + Capability Truth Alignment
+- Solana promoted capability truth remains authoritative for `solana_mainnet_beta`:
+  - advanced CLMM operations are enabled (`increase`, `claimFees`, `claimRewards`, `migrate`),
+  - runtime/test expectations must not treat these operations as deferred.
+- Active Solana runtime execution surfaces must fail closed:
+  - `wallet-send` and `wallet-send-token` reject malformed Solana recipient addresses with deterministic `invalid_input`,
+  - `trade spot` rejects identical Solana input/output mints,
+  - runtime Solana execution requires wallet `keyScheme=solana_ed25519`.
+- Mock compatibility fields may remain in historical storage/read models, but active Solana runtime trade execution remains `mode=real` only and rejects mock execution with deterministic `unsupported_mode`.
+- Solana contract paths (`management-solana`, `x402-solana`) must remain deterministic and green with no opaque `500` behavior in baseline checks.

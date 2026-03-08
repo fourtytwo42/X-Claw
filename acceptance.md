@@ -1,3 +1,153 @@
+# Slice 220 Acceptance Evidence: Solana Reliability + Capability Truth Alignment
+
+Date (UTC): 2026-03-08  
+Active slice context: `Slice 220`.
+
+Issue mapping: `#73`
+
+### Objective + Scope Lock
+- Objective:
+  - align Solana test expectations with promoted Solana mainnet advanced LP capabilities,
+  - verify active Solana runtime/contract surfaces remain deterministic and fail closed on invalid execution inputs.
+
+### Behavior Checks
+- [x] Solana mainnet advanced LP operations (`increase|claim_fees|claim_rewards|migrate`) are asserted enabled in adapter regression tests.
+- [x] Solana runtime rejects malformed base58 recipients, same-mint swaps, and non-`solana_ed25519` execution wallets deterministically.
+- [x] active Solana trade execution remains `mode=real` only; mock execution is rejected by runtime contract.
+- [x] Solana management and x402 contract scripts pass.
+
+### Required Validation Gates
+- [x] `npm run db:parity` -> PASS (`ok: true`, `checkedAt=2026-03-08T06:07:08.873Z`)
+- [x] `npm run seed:reset` -> PASS
+- [x] `npm run seed:load` -> PASS
+- [x] `npm run seed:verify` -> PASS
+- [x] `python3 -m unittest -v apps/agent-runtime/tests/test_trade_path.py` -> PASS (`Ran 147 tests`, `OK`)
+- [x] `python3 -m unittest -v apps/agent-runtime/tests/test_solana_runtime.py apps/agent-runtime/tests/test_solana_rpc_client.py apps/agent-runtime/tests/test_solana_raydium_planner.py apps/agent-runtime/tests/test_solana_liquidity_local.py apps/agent-runtime/tests/test_liquidity_adapter.py apps/agent-runtime/tests/test_trade_path.py` -> PASS (`Ran 180 tests`, `OK`)
+- [x] `npm run test:management:solana:contract` -> PASS (`ok: true`, `passed: 25`, `failed: 0`)
+- [x] `npm run test:x402:solana:contract` -> PASS (`ok: true`, `count: 17`)
+- [x] `npm run build` -> PASS
+- [x] `pm2 restart all` -> PASS (`xclaw-web online`)
+
+# Slice 219 Acceptance Evidence: EVM Reliability + Mock/Stub Elimination
+
+Date (UTC): 2026-03-08  
+Active slice context: `Slice 219`.
+
+Issue mapping: `#72`
+
+### Objective + Scope Lock
+- Objective:
+  - remove opaque `500` behavior from active EVM register/token-mirror contract paths,
+  - keep historical mock compatibility fields while enforcing active EVM execution as `real` mode.
+
+### Behavior Checks
+- [x] `POST /api/v1/agent/register` is resilient when `last_name_change_at` column is unavailable.
+- [x] `POST /api/v1/agent/tokens/mirror` returns deterministic non-`500` for unregistered agent state.
+- [x] `infrastructure/scripts/e2e-full-pass.sh` EVM execution payloads use `mode=real` for trade/limit-order create.
+
+### Required Validation Gates
+- [x] `npm run db:parity` -> PASS (`ok: true`, `checkedAt=2026-03-08T02:36:15.601Z`)
+- [x] `npm run seed:reset` -> PASS
+- [x] `npm run seed:load` -> PASS
+- [x] `npm run seed:verify` -> PASS
+- [x] `npm run hardhat:deploy-local` -> PASS (`ok: true`, contract addresses written to `infrastructure/seed-data/hardhat-local-deploy.json`)
+- [x] `npm run hardhat:verify-local` -> PASS (`ok: true`, on-chain code present for factory/dexRouter/router/quoter/escrow/WETH/USDC)
+- [ ] `python3 -m unittest -v apps/agent-runtime/tests/test_wallet_core.py apps/agent-runtime/tests/test_trade_path.py apps/agent-runtime/tests/test_evm_action_executor.py apps/agent-runtime/tests/test_liquidity_adapter.py apps/agent-runtime/tests/test_liquidity_cli.py apps/agent-runtime/tests/test_x402_runtime.py` -> BLOCKED (non-EVM pre-existing failure: `test_solana_mainnet_advanced_ops_deferred`, assertion expects deferred op but runtime reports enabled)
+- [x] `npm run test:liquidity:contract` -> PASS (`ok: true`, deterministic register cooldown handling accepted)
+- [x] `npm run test:tokens:mirror:contract` -> PASS (`ok: true`, register + positive + negative auth mismatch + mirror/list checks)
+- [x] `npm run test:faucet:contract` -> PASS (`ok: true`, non-demo path skipped due missing env)
+- [ ] Base Sepolia harness/matrix evidence -> BLOCKED
+  - `wallet_approval_harness.py --chain base_sepolia` initially blocked by hardhat gate (`hardhat_evidence_missing`)
+  - hardhat smoke attempt blocked by invalid bootstrap token (`Management bootstrap failed (401)`, `requestId=req_e5be9fa35c265887`)
+- [x] `npm run build` -> PASS
+- [x] `pm2 restart all` -> PASS (`xclaw-web online`)
+
+# Slice 218 Acceptance Evidence: Solana Naming UX Tightening
+
+Date (UTC): 2026-03-05  
+Active slice context: `Slice 218`.
+
+Issue mapping: `#71`
+
+### Objective + Scope Lock
+- Objective:
+  - remove `solana_localnet` from web dropdown chain selectors,
+  - normalize skill user-facing Solana mainnet label to `solana_mainnet`.
+
+### Behavior Checks
+- [x] dropdown option list excludes `solana_localnet`.
+- [x] skill JSON output normalizes `chain/chainKey/defaultChain` from `solana_mainnet_beta` to `solana_mainnet`.
+- [x] runtime canonical compatibility remains unchanged.
+
+### Required Validation Gates
+- [ ] `npm run db:parity`
+- [ ] `npm run seed:reset`
+- [ ] `npm run seed:load`
+- [ ] `npm run seed:verify`
+- [ ] `python3 -m unittest apps/agent-runtime/tests/test_x402_skill_wrapper.py -v`
+- [ ] `npm run build`
+- [ ] `pm2 restart all`
+
+# Slice 217 Acceptance Evidence: Solana Token Symbol Resolution on Agent Page
+
+Date (UTC): 2026-03-05  
+Active slice context: `Slice 217`.
+
+Issue mapping: `#70`
+
+### Objective + Scope Lock
+- Objective:
+  - resolve Solana mint addresses to symbols on the agent page where metadata exists,
+  - keep EVM token label behavior unchanged.
+
+### Behavior Checks
+- [x] Solana mint lookup no longer lowercases address keys.
+- [x] Policy approval token labels use family-safe lookup keys.
+- [x] Wallet token title labels use resolved symbol labels when available.
+
+### Required Validation Gates
+- [x] `npm run db:parity` -> PASS (`ok: true`)
+- [x] `npm run seed:reset` -> PASS
+- [x] `npm run seed:load` -> PASS
+- [x] `npm run seed:verify` -> PASS
+- [x] `npm run build` -> PASS
+- [x] `pm2 restart all` -> PASS (`xclaw-web online`)
+
+# Slice 216 Acceptance Evidence: Solana Mainnet Alias + Dropdown Testnet Grouping
+
+Date (UTC): 2026-03-05  
+Active slice context: `Slice 216`.
+
+Issue mapping: `#69`
+
+### Objective + Scope Lock
+- Objective:
+  - preserve compatibility with `solana_mainnet_beta` internals while accepting/displaying `solana_mainnet` publicly,
+  - move Solana non-mainnet chains into `Testnets` dropdown grouping.
+
+### Behavior Checks
+- [x] runtime accepts `--chain solana_mainnet` and normalizes to canonical `solana_mainnet_beta`.
+- [x] Telegram decision message copy displays `Chain: solana_mainnet` for Solana mainnet flows.
+- [x] Existing `solana_mainnet_beta` input remains accepted.
+- [x] web dropdown classifier treats `solana_devnet|solana_testnet|solana_localnet` as testnets.
+
+### Required Validation Gates
+- [x] `npm run db:parity` -> PASS (`ok: true`)
+- [x] `npm run seed:reset` -> PASS
+- [x] `npm run seed:load` -> PASS
+- [x] `npm run seed:verify` -> PASS
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_chain_aliases.py -v` -> PASS (`Ran 2 tests`, `OK`)
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_trade_path.py -v` -> PASS (`Ran 143 tests`, `OK`)
+- [x] `python3 -m unittest apps/agent-runtime/tests/test_x402_skill_wrapper.py -v` -> PASS (`Ran 69 tests`, `OK`)
+- [x] `npm run build` -> PASS
+- [x] `pm2 restart all` -> PASS (`xclaw-web online`)
+
+### Required Grep Proofs
+- [x] no management-cookie route crossover introduced in runtime/skill wallet paths.
+  - `rg -n "/api/v1/management/|/management/" apps/agent-runtime/xclaw_agent/cli.py skills/xclaw-agent/scripts/xclaw_agent_skill.py apps/agent-runtime/xclaw_agent/chains.py` -> no matches
+- [x] no Telegram message-delete API calls introduced.
+  - `rg -n "deleteMessage\\(" apps/agent-runtime/xclaw_agent/cli.py skills/xclaw-agent/scripts/openclaw_gateway_patch.py` -> no matches
+
 # Slice 215 Acceptance Evidence: Solana Trade Status Schema Parity
 
 Date (UTC): 2026-03-05  

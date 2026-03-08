@@ -17,6 +17,94 @@ Status legend:
 
 ---
 
+## Slice 220: Solana Reliability + Capability Truth Alignment (Hotfix)
+Status: [~]
+
+Goal:
+- align Solana runtime/test expectations with promoted Solana mainnet capability truth, add fail-closed runtime coverage for active Solana execution surfaces, and re-verify deterministic Solana contract paths.
+
+DoD:
+- [x] Solana advanced LP capability regression tests match promoted `solana_mainnet_beta` contract (`increase|claimFees|claimRewards|migrate` enabled).
+- [x] active Solana runtime command surfaces fail closed on malformed recipients, same-mint swaps, and non-Solana wallet key schemes.
+- [x] Solana management/x402 contract checks remain green with no opaque server failures.
+- [x] canonical artifacts synced for Solana reliability objective + evidence.
+- [ ] full sequential validation + issue evidence posted.
+
+Issue mapping:
+- `#73`
+
+---
+
+## Slice 219: EVM Reliability + Mock/Stub Elimination (Hotfix)
+Status: [~]
+
+Goal:
+- stabilize active EVM API/runtime contract paths and remove mock-mode execution usage from active EVM workflows while preserving historical compatibility records.
+
+DoD:
+- [~] `POST /api/v1/agent/register` no longer fails `500` on legacy schema drift around `last_name_change_at`.
+- [~] `POST /api/v1/agent/tokens/mirror` returns deterministic non-`500` response for unregistered agent state.
+- [~] E2E execution scripts use `mode=real` for active EVM trade and limit-order create requests.
+- [~] contract regression checks cover positive + negative mirror/register behavior and avoid opaque server-error-only failures.
+- [ ] full sequential validation + issue evidence posted.
+
+Issue mapping:
+- `#72`
+
+---
+
+## Slice 218: Solana Naming UX Tightening (Hotfix)
+Status: [x]
+
+Goal:
+- remove confusing Solana naming in user-facing skill/web UI surfaces while preserving runtime compatibility.
+
+DoD:
+- [x] `solana_localnet` removed from web chain dropdown options.
+- [x] skill user-facing JSON output normalizes `solana_mainnet_beta` to `solana_mainnet` for chain display fields.
+- [x] compatibility preserved for runtime canonical key `solana_mainnet_beta`.
+- [x] Sequential validation + PM2 restart completed.
+
+Issue mapping:
+- `#71`
+
+---
+
+## Slice 217: Solana Token Symbol Resolution on Agent Page (Hotfix)
+Status: [x]
+
+Goal:
+- ensure Solana mint addresses render as token symbols on the agent page wherever chain token metadata is available.
+
+DoD:
+- [x] token-address normalization is family-safe (EVM case-insensitive, Solana case-sensitive).
+- [x] wallet token labels on `/agents/[agentId]` resolve Solana mint addresses to symbols.
+- [x] policy-approval labels on `/agents/[agentId]` resolve Solana mint addresses to symbols.
+- [x] Sequential validation + PM2 restart completed.
+
+Issue mapping:
+- `#70`
+
+---
+
+## Slice 216: Solana Mainnet Alias + Dropdown Testnet Grouping (Hotfix)
+Status: [x]
+
+Goal:
+- keep backward compatibility with existing `solana_mainnet_beta` storage/config while exposing `solana_mainnet` as the public-facing Solana mainnet name and improving chain dropdown grouping.
+
+DoD:
+- [x] Runtime accepts `solana_mainnet` alias and normalizes internally to `solana_mainnet_beta`.
+- [x] Telegram/runtime trade approval/decision copy displays `solana_mainnet` (user-facing) while preserving internal key compatibility.
+- [x] Web chain dropdown classifies `solana_devnet`, `solana_testnet`, and `solana_localnet` under `Testnets`.
+- [x] Backward compatibility preserved for existing `solana_mainnet_beta` config/state paths.
+- [x] Sequential validation + PM2 restart completed.
+
+Issue mapping:
+- `#69`
+
+---
+
 ## Slice 215: Solana Trade Status Schema Parity (Hotfix)
 Status: [x]
 
