@@ -11,6 +11,14 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 
 ---
 
+## 0.47) Slice 238 Cross-Service Invariants + Residual cli.py Audit
+
+- [x] Add direct invariant coverage for required/best-effort delivery, stable reporting payloads, and idempotent replay behavior.
+- [x] Audit residual `cli.py` helpers against existing runtime service seams.
+- [x] Keep only wrapper/test-safe delegations in `cli.py` for the audited seams.
+- [x] Keep command-family regression suites green.
+- [x] Run full sequential validation chain and capture evidence + issue comment.
+
 ## 0.46) Slice 237 Transfer-Flow/Approval-Prompt/Trade-Cap Resilience
 
 - [x] Add direct resilience coverage for `runtime/services/transfer_flows.py`.

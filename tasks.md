@@ -1,9 +1,9 @@
-# Slice 237 Tasks: Transfer-Flow/Approval-Prompt/Trade-Cap Resilience (2026-03-08)
+# Slice 238 Tasks: Cross-Service Invariants + Residual cli.py Audit (2026-03-08)
 
-Issue mapping: `#91`
+Issue mapping: `#89`
 
-- [x] Add direct resilience coverage for `runtime/services/transfer_flows.py`.
-- [x] Add direct resilience coverage for `runtime/services/approval_prompts.py`.
-- [x] Add direct resilience coverage for `runtime/services/trade_caps.py`.
-- [x] Preserve stale recovery, resend/cooldown, cleanup, and replay semantics.
+- [x] Add direct invariant coverage for required/best-effort mirror behavior.
+- [x] Add direct invariant coverage for stable reporting/event payload fields.
+- [x] Add direct invariant coverage for idempotent trade-usage replay semantics.
+- [x] Audit residual `cli.py` helpers in the Slice 238 service seams and prove wrapper-only delegation.
 - [x] Run full sequential validations + capture evidence in `acceptance.md`.

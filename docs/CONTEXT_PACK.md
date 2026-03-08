@@ -14,7 +14,39 @@
   - `routeKind`
   - `liquidityOperation`
 
-## Active Context: Slice 237 Transfer-Flow/Approval-Prompt/Trade-Cap Resilience
+## Active Context: Slice 238 Cross-Service Invariants + Residual cli.py Audit
+
+Issue mapping: `#89`
+
+### Objective + scope lock
+- Objective:
+  - add direct cross-service invariant coverage for runtime service seams,
+  - prove residual `cli.py` helpers in audited seams are thin compatibility wrappers,
+  - preserve runtime JSON/CLI behavior with no public contract drift.
+- Scope guard:
+  - runtime internal audit-and-test hardening only,
+  - no API/schema/database changes.
+
+### Expected touched files
+- `apps/agent-runtime/tests/test_runtime_invariants.py`
+- `apps/agent-runtime/xclaw_agent/cli.py` (only if residual non-wrapper helper ownership is found)
+- `apps/agent-runtime/tests/test_runtime_services.py`
+- `apps/agent-runtime/tests/test_runtime_adapters.py`
+- `apps/agent-runtime/tests/test_trade_path.py`
+- `apps/agent-runtime/tests/test_liquidity_cli.py`
+- `apps/agent-runtime/tests/test_x402_cli.py`
+- `docs/XCLAW_SOURCE_OF_TRUTH.md`
+- `docs/XCLAW_SLICE_TRACKER.md`
+- `docs/XCLAW_BUILD_ROADMAP.md`
+- `docs/CONTEXT_PACK.md`
+- `spec.md`
+- `tasks.md`
+- `acceptance.md`
+
+### Completion note
+- Completed 2026-03-08 with direct invariant coverage, a wrapper-only residual `cli.py` audit for the scoped seams, and the required sequential validation chain (`db:parity`, `seed:reset/load/verify`, `build`, `pm2 restart all`).
+
+## Completed Context: Slice 237 Transfer-Flow/Approval-Prompt/Trade-Cap Resilience
 
 Issue mapping: `#91`
 
@@ -45,7 +77,6 @@ Issue mapping: `#91`
 
 ### Completion note
 - Completed 2026-03-08 with direct resilience coverage plus targeted runtime regressions and the required sequential validation chain (`db:parity`, `seed:reset/load/verify`, `build`, `pm2 restart all`).
-
 ## Completed Context: Slice 236 API/Mirroring/Reporting Failure-Injection Hardening
 
 Issue mapping: `#90`

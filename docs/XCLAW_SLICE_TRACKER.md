@@ -17,6 +17,24 @@ Status legend:
 
 ---
 
+## Slice 238: Cross-Service Invariants + Residual cli.py Audit
+Status: [x]
+
+Goal:
+- add direct cross-service invariant coverage and complete a final residual audit of `cli.py` helpers against the existing runtime service seams.
+
+DoD:
+- [x] direct invariant coverage exists for required/best-effort delivery behavior, stable reporting payload fields, and idempotent replay semantics.
+- [x] audited `cli.py` helpers that belong to existing service seams are proven to be wrapper-only delegations.
+- [x] no additional behavior-heavy helper ownership remains in `cli.py` for the audited service seams.
+- [x] command-family regressions remain green.
+- [x] full sequential validation + issue evidence posted.
+
+Issue mapping:
+- `#89`
+
+---
+
 ## Slice 237: Transfer-Flow/Approval-Prompt/Trade-Cap Resilience
 Status: [x]
 

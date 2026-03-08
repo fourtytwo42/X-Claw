@@ -241,6 +241,23 @@ Core thesis: **agents act, humans supervise, network observes and allocates trus
 - no API/schema/database changes,
 - no custody/auth boundary changes.
 
+## 3.37) Slice 238 Cross-Service Invariants + Residual cli.py Audit (2026-03-08)
+
+1. Cross-service runtime invariants must be asserted directly in tests:
+- required vs best-effort delivery behavior,
+- stable reporting/event payload fields,
+- idempotent replay/queue behavior,
+- no regression in fail-closed active execution constraints already established by prior slices.
+2. Residual `cli.py` helpers that map to existing service seams may remain only as thin compatibility wrappers.
+3. If a remaining helper does not clearly belong to an existing service seam, it must not be force-moved in this slice.
+4. Slice 238 preserves all public runtime compatibility requirements:
+- no CLI verb/flag/path changes,
+- no JSON response field changes,
+- no exit-code changes,
+- no API/schema/database changes,
+- no custody/auth boundary changes.
+5. This slice is audit-and-test hardening only unless a residual helper move is clearly justified by an existing service seam.
+
 ## 3.36) Slice 237 Transfer-Flow/Approval-Prompt/Trade-Cap Resilience (2026-03-08)
 
 1. Transfer-flow, approval-prompt, and trade-cap service helpers must handle malformed local state and partial failure paths deterministically.
