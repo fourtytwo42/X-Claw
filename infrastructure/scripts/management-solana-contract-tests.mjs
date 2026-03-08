@@ -24,6 +24,10 @@ function readText(relPath) {
   return fs.readFileSync(path.join(ROOT, relPath), 'utf8');
 }
 
+function anyTextIncludes(paths, needle) {
+  return paths.some((relPath) => readText(relPath).includes(needle));
+}
+
 async function main() {
   const devnet = readJson('config/chains/solana_devnet.json');
   const mainnet = readJson('config/chains/solana_mainnet_beta.json');
@@ -77,14 +81,55 @@ async function main() {
   const skillDoc = readText('skills/xclaw-agent/SKILL.md');
   expect(!skillDoc.includes('XCLAW_SOLANA_RPC_API_KEY_<CHAIN>'), 'skill_doc_no_agent_tatum_key_requirement');
 
-  const runtimeCli = readText('apps/agent-runtime/xclaw_agent/cli.py');
-  expect(runtimeCli.includes('Use a valid Solana base58 address.'), 'runtime_wallet_send_solana_address_validation');
-  expect(runtimeCli.includes('token-in and token-out must be different.'), 'runtime_trade_spot_solana_distinct_mints');
   expect(
-    runtimeCli.includes("Wallet keyScheme '") && runtimeCli.includes('solana_ed25519'),
+    anyTextIncludes(
+      [
+        'apps/agent-runtime/xclaw_agent/cli.py',
+        'apps/agent-runtime/xclaw_agent/runtime/validators.py',
+        'apps/agent-runtime/xclaw_agent/commands/wallet.py',
+      ],
+      'Use a valid Solana base58 address.'
+    ),
+    'runtime_wallet_send_solana_address_validation'
+  );
+  expect(
+    anyTextIncludes(
+      [
+        'apps/agent-runtime/xclaw_agent/cli.py',
+        'apps/agent-runtime/xclaw_agent/runtime/validators.py',
+        'apps/agent-runtime/xclaw_agent/commands/trade.py',
+      ],
+      'token-in and token-out must be different.'
+    ),
+    'runtime_trade_spot_solana_distinct_mints'
+  );
+  expect(
+    anyTextIncludes(
+      [
+        'apps/agent-runtime/xclaw_agent/cli.py',
+        'apps/agent-runtime/xclaw_agent/commands/wallet.py',
+      ],
+      "Wallet keyScheme '"
+    ) && anyTextIncludes(
+      [
+        'apps/agent-runtime/xclaw_agent/cli.py',
+        'apps/agent-runtime/xclaw_agent/commands/wallet.py',
+      ],
+      'solana_ed25519'
+    ),
     'runtime_solana_execution_key_scheme_guard'
   );
-  expect(runtimeCli.includes('Mock mode is deprecated for runtime trade execution.'), 'runtime_trade_execute_mock_rejected');
+  expect(
+    anyTextIncludes(
+      [
+        'apps/agent-runtime/xclaw_agent/cli.py',
+        'apps/agent-runtime/xclaw_agent/runtime/validators.py',
+        'apps/agent-runtime/xclaw_agent/commands/trade.py',
+      ],
+      'Mock mode is deprecated for runtime trade execution.'
+    ),
+    'runtime_trade_execute_mock_rejected'
+  );
 
   const ok = state.failed === 0;
   console.log(JSON.stringify({ ok, passed: state.passed, failed: state.failed, checks: state.checks }, null, 2));

@@ -1,8 +1,8 @@
-# Slice 242 Tasks: Runtime Recovery and Watchdog Sweep (2026-03-08)
+# Slice 243 Tasks: Live Chain Evidence Matrix Expansion (EVM + Solana) (2026-03-08)
 
-Issue mapping: `#95`
+Issue mapping: `#96`
 
-- [x] Add direct restart/recovery coverage for runtime state, transfer flows, approval prompts, trade caps, reporting, and mirroring.
-- [x] Keep pending-flow restart/resume behavior deterministic and fail-closed.
-- [x] Prove replay queues and prompt cleanup remain idempotent after interruption/reload.
-- [x] Run full sequential validations + capture evidence in `acceptance.md`.
+- [x] Extend the chain matrix to include `solana_localnet` then `solana_devnet` after the existing EVM legs.
+- [x] Extend the wallet approval harness with Solana-specific live evidence defaults and truthful unsupported reporting.
+- [x] Add direct unit coverage for Solana matrix ordering and Solana harness behavior.
+- [x] Run Solana contract rails and the full sequential validation chain; capture the live-matrix blocker in `acceptance.md`.

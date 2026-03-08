@@ -17,6 +17,27 @@ Status legend:
 
 ---
 
+## Slice 243: Live Chain Evidence Matrix Expansion (EVM + Solana)
+Status: [!]
+
+Goal:
+- refresh live runtime evidence across EVM and Solana chains by extending the existing wallet approval matrix to include `solana_localnet` then `solana_devnet`, while preserving the existing Hardhat-local -> Base Sepolia -> Ethereum Sepolia proof chain.
+
+DoD:
+- [x] chain-matrix harness includes `solana_localnet` and `solana_devnet` in deterministic order after the existing EVM legs.
+- [x] Solana harness scenarios report supported vs unsupported live paths truthfully with no synthetic success.
+- [ ] chain-specific JSON reports and aggregate matrix report are produced and acceptance evidence records exact commands/outcomes.
+- [x] existing EVM harness behavior remains unchanged.
+- [ ] full sequential validation + issue evidence posted.
+
+Blocker:
+- live matrix execution is blocked by missing valid runtime inputs for `--agent-id`, `--bootstrap-token-file`, and `--harvy-address` in the current environment; Solana expected wallet/recipient inputs are also not provisioned.
+
+Issue mapping:
+- `#96`
+
+---
+
 ## Slice 242: Runtime Recovery and Watchdog Sweep
 Status: [x]
 

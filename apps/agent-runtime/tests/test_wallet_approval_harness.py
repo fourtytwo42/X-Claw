@@ -372,6 +372,64 @@ class WalletApprovalHarnessUnitTests(unittest.TestCase):
             out = runner._scenario_x402_or_capability_assertion()
         self.assertEqual(out.get("assertedUnsupportedCode"), "unsupported_chain_capability")
 
+    def test_prepare_trade_pair_sets_solana_defaults_from_native_balance(self) -> None:
+        args = self._args()
+        args.chain = "solana_devnet"
+        runner = harness.WalletApprovalHarness(args)
+        with mock.patch.object(
+            runner,
+            "_balance_snapshot",
+            return_value={"NATIVE": Decimal("1000"), harness.SOLANA_USDC_MINT.lower(): Decimal("0")},
+        ):
+            runner._prepare_trade_pair_and_amounts()
+        self.assertEqual(runner.trade_token_in, "SOL")
+        self.assertEqual(runner.trade_token_out, harness.SOLANA_USDC_MINT)
+        self.assertEqual(runner.trade_amounts["pending_approve"], "0.001")
+
+    def test_attempt_faucet_topup_uses_native_only_for_solana_localnet(self) -> None:
+        args = self._args()
+        args.chain = "solana_localnet"
+        runner = harness.WalletApprovalHarness(args)
+        with mock.patch.object(
+            runner,
+            "_runtime",
+            return_value=(0, {"ok": True}, "", ""),
+        ) as runtime_mock, mock.patch.object(
+            runner,
+            "_balance_snapshot",
+            side_effect=[{"NATIVE": Decimal("0")}, {"NATIVE": Decimal("1000")}],
+        ):
+            runner._attempt_faucet_topup(require_native_topup=True)
+        faucet_cmd = runtime_mock.call_args_list[0].args[0]
+        self.assertEqual(faucet_cmd, ["faucet-request", "--chain", "solana_localnet", "--asset", "native"])
+
+    def test_solana_liquidity_reports_truthful_unsupported_reason(self) -> None:
+        args = self._args()
+        args.chain = "solana_devnet"
+        runner = harness.WalletApprovalHarness(args)
+        with mock.patch.object(runner, "_post_permissions_update", return_value={"ok": True}), mock.patch.object(
+            runner,
+            "_runtime",
+            side_effect=[
+                (
+                    1,
+                    {
+                        "ok": False,
+                        "code": "liquidity_preflight_failed",
+                        "details": {"reasonCode": "liquidity_preflight_router_transfer_from_failed"},
+                    },
+                    "",
+                    "",
+                ),
+                (1, {"ok": False, "code": "agent_paused"}, "", ""),
+            ],
+        ), mock.patch.object(runner, "_management_post_with_retry", return_value={"ok": True}), mock.patch.object(
+            runner, "_wallet_address", return_value="So11111111111111111111111111111111111111112"
+        ):
+            out = runner._scenario_liquidity_and_pause()
+        self.assertFalse(out.get("liquiditySupported"))
+        self.assertEqual(out.get("liquidityUnsupportedReason"), "liquidity_preflight_failed")
+
     def test_trade_pending_approve_raises_when_resume_fails(self) -> None:
         args = self._args()
         args.chain = "ethereum_sepolia"

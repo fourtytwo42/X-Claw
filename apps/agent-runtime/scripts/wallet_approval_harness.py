@@ -24,6 +24,9 @@ from decimal import Decimal, InvalidOperation
 from http import cookiejar
 from typing import Any
 
+SOLANA_WRAPPED_NATIVE_MINT = "So11111111111111111111111111111111111111112"
+SOLANA_USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+
 
 def _now_iso() -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
@@ -867,6 +870,8 @@ class WalletApprovalHarness:
                 details={"chain": self.chain, "field": "canonicalTokens"},
             )
         raw = str(tokens.get(symbol) or "").strip()
+        if not raw and symbol == "USDC" and str(self.chain).strip().lower() in {"solana_localnet", "solana_devnet"}:
+            raw = SOLANA_USDC_MINT
         if not raw:
             raise HarnessError(
                 f"Chain config missing canonical token address for {symbol}.",
@@ -909,23 +914,34 @@ class WalletApprovalHarness:
             dex = str(core.get("dex") or "").strip()
             if dex:
                 return dex
+        chain_normalized = str(self.chain).strip().lower()
+        if chain_normalized == "solana_localnet":
+            return "local_clmm"
+        if chain_normalized.startswith("solana_"):
+            return "raydium_clmm"
         return "uniswap_v2"
 
     def _attempt_faucet_topup(self, *, require_native_topup: bool = False) -> None:
         chain_normalized = str(self.chain).strip().lower()
-        if chain_normalized != "base_sepolia":
-            return
         if not self._has_chain_capability("faucet"):
             return
         baseline_native = Decimal("0")
         if require_native_topup:
             baseline_native = self._balance_snapshot().get("NATIVE", Decimal("0"))
-        _ = self._runtime(["faucet-request", "--chain", self.chain, "stable", "wrapped", "native"], timeout=120)
+        assets = ["native"]
+        if chain_normalized == "base_sepolia":
+            assets = ["stable", "wrapped", "native"]
+        faucet_args = ["faucet-request", "--chain", self.chain]
+        for asset in assets:
+            faucet_args.extend(["--asset", asset])
+        _ = self._runtime(faucet_args, timeout=120)
         for _i in range(6):
             bal = self._balance_snapshot()
             if require_native_topup and bal.get("NATIVE", Decimal("0")) > baseline_native:
                 return
             if bal.get("USDC", Decimal("0")) > 0 or bal.get("WETH", Decimal("0")) > 0:
+                return
+            if chain_normalized.startswith("solana_") and bal.get("NATIVE", Decimal("0")) > baseline_native:
                 return
             time.sleep(8)
 
@@ -1086,6 +1102,46 @@ class WalletApprovalHarness:
 
     def _prepare_trade_pair_and_amounts(self) -> None:
         chain_normalized = str(self.chain).strip().lower()
+        if chain_normalized.startswith("solana_"):
+            bal = self._balance_snapshot()
+            native = bal.get("NATIVE", Decimal("0"))
+            stable_mint = self._canonical_token_address("USDC")
+            stable = bal.get(stable_mint.lower(), Decimal("0")) or bal.get("USDC", Decimal("0"))
+            if native <= 0 and self._has_chain_capability("faucet"):
+                self._attempt_faucet_topup(require_native_topup=True)
+                bal = self._balance_snapshot()
+                native = bal.get("NATIVE", Decimal("0"))
+                stable = bal.get(stable_mint.lower(), Decimal("0")) or bal.get("USDC", Decimal("0"))
+            if native > 0:
+                self.trade_token_in = "SOL"
+                self.trade_token_out = stable_mint
+                self.trade_amounts = {
+                    "pending_approve": "0.001",
+                    "reject": "0.0008",
+                    "dedupe": "0.0007",
+                    "global_auto": "0.0006",
+                    "allowlist": "0.0005",
+                    "rebalance": "0.0004",
+                }
+                return
+            if stable > 0:
+                self.trade_token_in = stable_mint
+                self.trade_token_out = "SOL"
+                self.trade_amounts = {
+                    "pending_approve": "0.5",
+                    "reject": "0.4",
+                    "dedupe": "0.3",
+                    "global_auto": "0.2",
+                    "allowlist": "0.15",
+                    "rebalance": "0.1",
+                }
+                return
+            raise HarnessError(
+                "No usable Solana trade funding detected for configured trade pair.",
+                code="scenario_funding_missing",
+                category="preflight_failure",
+                details={"chain": self.chain, "nativeAtomic": str(native), "stableAtomic": str(stable), "stableMint": stable_mint},
+            )
         bal = self._balance_snapshot()
         usdc = bal.get("USDC", Decimal("0"))
         weth = bal.get("WETH", Decimal("0"))
@@ -1129,8 +1185,6 @@ class WalletApprovalHarness:
                 "chain": self.chain,
                 "usdcWei": str(usdc),
                 "wethWei": str(weth),
-                "sauceWei": str(sauce),
-                "whbarWei": str(whbar),
             },
         )
 
@@ -1308,6 +1362,8 @@ class WalletApprovalHarness:
 
     def _scenario_transfer_only(self) -> dict[str, Any]:
         recipient = (self.args.recipient_address or self._wallet_address()).strip()
+        native_transfer_amount = "1000" if str(self.chain).strip().lower().startswith("solana_") else "1000000000000000"
+        token_transfer_amount = "1000" if str(self.chain).strip().lower().startswith("solana_") else "1000000000000000000"
         self._post_permissions_update(
             {
                 "agentId": self.agent_id,
@@ -1323,7 +1379,7 @@ class WalletApprovalHarness:
 
         # Native transfer approve
         c1, p1, _, e1 = self._runtime(
-            ["wallet", "send", "--to", recipient, "--amount-wei", "1000000000000000", "--chain", self.chain]
+            ["wallet", "send", "--to", recipient, "--amount-wei", native_transfer_amount, "--chain", self.chain]
         )
         if c1 != 0 and str(p1.get("code") or "") not in {"approval_required", "approval_pending"}:
             raise HarnessError(f"native transfer proposal failed: {p1} stderr={e1}")
@@ -1350,7 +1406,7 @@ class WalletApprovalHarness:
                 "--to",
                 recipient,
                 "--amount-wei",
-                "1000000000000000000",
+                token_transfer_amount,
                 "--chain",
                 self.chain,
             ]
@@ -1481,10 +1537,17 @@ class WalletApprovalHarness:
             ],
             timeout=300,
         )
-        if c_add != 0 and str(p_add.get("code") or "") not in {"approval_required", "approval_pending", "liquidity_preflight_failed"}:
+        code = str(p_add.get("code") or "")
+        if c_add != 0 and code not in {"approval_required", "approval_pending", "liquidity_preflight_failed", "unsupported_liquidity_adapter", "unsupported_liquidity_execution_family", "chain_config_invalid"}:
             raise HarnessError(f"liquidity add proposal failed: {p_add} stderr={e_add}")
         liq_id = _extract_liquidity_intent_id(p_add)
         liq_status = str(p_add.get("status") or "").strip().lower()
+        if not liq_id and code in {"liquidity_preflight_failed", "unsupported_liquidity_adapter", "unsupported_liquidity_execution_family", "chain_config_invalid"}:
+            return {
+                "liquiditySupported": False,
+                "liquidityUnsupportedReason": code,
+                "liquidityUnsupportedDetails": (p_add.get("details") if isinstance(p_add.get("details"), dict) else {}),
+            }
         if liq_id:
             self.created_liquidity_intent_ids.append(liq_id)
             if liq_status in {"", "approval_pending", "pending"}:

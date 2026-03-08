@@ -317,6 +317,23 @@ Core thesis: **agents act, humans supervise, network observes and allocates trus
 - no custody/auth boundary changes.
 5. This slice is restart/replay/watchdog hardening only and must preserve current command-surface behavior.
 
+## 3.42) Slice 243 Live Chain Evidence Matrix Expansion (EVM + Solana) (2026-03-08)
+
+1. The canonical live evidence matrix remains ordered and fail-short-circuiting:
+- `hardhat_local` before `base_sepolia`,
+- `base_sepolia` before `ethereum_sepolia`,
+- `solana_localnet` before `solana_devnet`.
+2. Slice 243 scope is evidence refresh only for `EVM + Solana`; Hedera is explicitly deferred and must not be implied by this matrix slice.
+3. Existing EVM harness behavior remains unchanged while Solana evidence is added through the same machine-readable harness/report pattern.
+4. Solana harness scenarios must stay truthful:
+- report supported live flows normally,
+- report unsupported/not-live-ready paths with explicit unsupported/preflight reason fields,
+- never synthesize success for liquidity/x402/trade paths that are not actually runnable in the current environment.
+5. Slice 243 preserves all public compatibility requirements:
+- no API/schema/database changes,
+- no runtime command contract changes,
+- only additive chain-matrix CLI/report support for Solana evidence legs.
+
 ## 3.36) Slice 237 Transfer-Flow/Approval-Prompt/Trade-Cap Resilience (2026-03-08)
 
 1. Transfer-flow, approval-prompt, and trade-cap service helpers must handle malformed local state and partial failure paths deterministically.

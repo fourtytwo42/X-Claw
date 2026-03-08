@@ -51,13 +51,13 @@ class WalletApprovalChainMatrixTests(unittest.TestCase):
             with mock.patch.object(runner_mod.subprocess, "run", side_effect=fake_run):
                 rc = runner_mod.main(self._argv(tmpdir))
             self.assertEqual(rc, 0)
-            self.assertEqual(chains, ["hardhat_local", "base_sepolia", "ethereum_sepolia"])
+            self.assertEqual(chains, ["hardhat_local", "base_sepolia", "ethereum_sepolia", "solana_localnet", "solana_devnet"])
 
             matrix = json.loads(pathlib.Path(tmpdir, "matrix.json").read_text(encoding="utf-8"))
             self.assertTrue(matrix.get("ok"))
             self.assertEqual(
                 [s.get("chain") for s in matrix.get("steps", [])],
-                ["hardhat_local", "base_sepolia", "ethereum_sepolia"],
+                ["hardhat_local", "base_sepolia", "ethereum_sepolia", "solana_localnet", "solana_devnet"],
             )
 
     def test_stops_on_first_failure(self) -> None:
@@ -96,10 +96,23 @@ class WalletApprovalChainMatrixTests(unittest.TestCase):
             with mock.patch.object(runner_mod.subprocess, "run", side_effect=fake_run):
                 rc = runner_mod.main(argv)
             self.assertEqual(rc, 0)
-            self.assertEqual(chains, ["ethereum_sepolia"])
+            self.assertEqual(chains, ["ethereum_sepolia", "solana_localnet", "solana_devnet"])
             matrix = json.loads(pathlib.Path(tmpdir, "matrix.json").read_text(encoding="utf-8"))
             self.assertTrue(matrix.get("ok"))
-            self.assertEqual([s.get("chain") for s in matrix.get("steps", [])], ["ethereum_sepolia"])
+            self.assertEqual([s.get("chain") for s in matrix.get("steps", [])], ["ethereum_sepolia", "solana_localnet", "solana_devnet"])
+
+    def test_can_resume_from_solana_localnet(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            pathlib.Path(tmpdir, "bootstrap.json").write_text(json.dumps({"token": "t"}), encoding="utf-8")
+            chains, fake_run = self._mock_subprocess()
+            argv = self._argv(tmpdir) + ["--start-chain", "solana_localnet"]
+            with mock.patch.object(runner_mod.subprocess, "run", side_effect=fake_run):
+                rc = runner_mod.main(argv)
+            self.assertEqual(rc, 0)
+            self.assertEqual(chains, ["solana_localnet", "solana_devnet"])
+            matrix = json.loads(pathlib.Path(tmpdir, "matrix.json").read_text(encoding="utf-8"))
+            self.assertTrue(matrix.get("ok"))
+            self.assertEqual([s.get("chain") for s in matrix.get("steps", [])], ["solana_localnet", "solana_devnet"])
 
 
 if __name__ == "__main__":

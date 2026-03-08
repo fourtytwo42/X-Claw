@@ -5,6 +5,8 @@ Execution order is strict:
 1) hardhat_local (smoke)
 2) base_sepolia (full)
 3) ethereum_sepolia (full)
+4) solana_localnet (full)
+5) solana_devnet (full)
 """
 
 from __future__ import annotations
@@ -18,7 +20,7 @@ import sys
 import time
 from typing import Any
 
-CHAIN_ORDER = ["hardhat_local", "base_sepolia", "ethereum_sepolia"]
+CHAIN_ORDER = ["hardhat_local", "base_sepolia", "ethereum_sepolia", "solana_localnet", "solana_devnet"]
 
 
 def _now_iso() -> str:
@@ -51,6 +53,7 @@ def _run_harness(
     scenario_set: str,
     json_report: str,
     expected_wallet_address: str,
+    recipient_address: str,
 ) -> dict[str, Any]:
     cmd = [
         sys.executable,
@@ -82,6 +85,8 @@ def _run_harness(
         cmd.extend(["--wallet-passphrase", wallet_passphrase])
     if expected_wallet_address:
         cmd.extend(["--expected-wallet-address", expected_wallet_address])
+    if recipient_address:
+        cmd.extend(["--recipient-address", recipient_address])
 
     proc = subprocess.run(cmd, text=True, capture_output=True)
     report_payload: dict[str, Any] = {}
@@ -115,6 +120,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--wallet-passphrase", default=os.environ.get("XCLAW_WALLET_PASSPHRASE", ""))
     parser.add_argument("--hardhat-rpc-url", default="http://127.0.0.1:8545")
     parser.add_argument("--harvy-address", required=True)
+    parser.add_argument("--solana-wallet-address", default=os.environ.get("XCLAW_SOLANA_WALLET_ADDRESS", ""))
+    parser.add_argument("--solana-recipient-address", default=os.environ.get("XCLAW_SOLANA_RECIPIENT", ""))
     parser.add_argument("--reports-dir", default="/tmp")
     parser.add_argument("--json-report", required=True)
     parser.add_argument("--start-chain", choices=CHAIN_ORDER, default="hardhat_local")
@@ -129,16 +136,26 @@ def main(argv: list[str] | None = None) -> int:
     hardhat_report = reports_dir / "xclaw-slice117-hardhat-smoke.json"
     base_report = reports_dir / "xclaw-slice117-base-full.json"
     eth_report = reports_dir / "xclaw-slice117-ethereum-sepolia-full.json"
+    sol_local_report = reports_dir / "xclaw-slice243-solana-localnet-full.json"
+    sol_dev_report = reports_dir / "xclaw-slice243-solana-devnet-full.json"
     report_map = {
         "hardhat_local": hardhat_report,
         "base_sepolia": base_report,
         "ethereum_sepolia": eth_report,
+        "solana_localnet": sol_local_report,
+        "solana_devnet": sol_dev_report,
     }
 
     steps: list[dict[str, Any]] = []
     start_idx = CHAIN_ORDER.index(args.start_chain)
     for chain in CHAIN_ORDER[start_idx:]:
-        expected_wallet_address = str(args.harvy_address or "").strip() if chain == "ethereum_sepolia" else ""
+        expected_wallet_address = ""
+        recipient_address = ""
+        if chain == "ethereum_sepolia":
+            expected_wallet_address = str(args.harvy_address or "").strip()
+        elif chain in {"solana_localnet", "solana_devnet"}:
+            expected_wallet_address = str(args.solana_wallet_address or "").strip()
+            recipient_address = str(args.solana_recipient_address or "").strip()
         scenario_set = "smoke" if chain == "hardhat_local" else "full"
         step = _run_harness(
             harness_bin=args.harness_bin,
@@ -154,6 +171,7 @@ def main(argv: list[str] | None = None) -> int:
             scenario_set=scenario_set,
             json_report=str(report_map[chain]),
             expected_wallet_address=expected_wallet_address,
+            recipient_address=recipient_address,
         )
         steps.append(step)
         if not step.get("ok"):

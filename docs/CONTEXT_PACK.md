@@ -14,25 +14,26 @@
   - `routeKind`
   - `liquidityOperation`
 
-## Active Context: Slice 242 Runtime Recovery and Watchdog Sweep
+## Active Context: Slice 243 Live Chain Evidence Matrix Expansion (EVM + Solana)
 
-Issue mapping: `#95`
+Issue mapping: `#96`
 
 ### Objective + scope lock
 - Objective:
-  - harden restart/replay/recovery behavior for pending flows, prompts, outboxes, and resume paths,
-  - preserve current runtime JSON/CLI behavior and recovery semantics,
-  - keep public runtime contracts unchanged.
+  - preserve the current EVM live evidence path,
+  - extend the approval matrix to `solana_localnet` then `solana_devnet`,
+  - generate truthful per-chain and aggregate evidence artifacts without changing public runtime contracts.
 - Scope guard:
-  - runtime internal reliability hardening only,
-  - no API/schema/database changes.
+  - harness/matrix/report/evidence work only,
+  - no API/schema/database changes,
+  - Hedera explicitly deferred.
 
 ### Expected touched files
-- `apps/agent-runtime/tests/test_runtime_services.py`
-- `apps/agent-runtime/tests/test_trade_path.py`
-- `apps/agent-runtime/tests/test_approvals_run_loop.py`
-- `apps/agent-runtime/tests/test_liquidity_cli.py`
-- `apps/agent-runtime/tests/test_runtime_invariants.py`
+- `apps/agent-runtime/scripts/wallet_approval_harness.py`
+- `apps/agent-runtime/scripts/wallet_approval_chain_matrix.py`
+- `apps/agent-runtime/tests/test_wallet_approval_harness.py`
+- `apps/agent-runtime/tests/test_wallet_approval_chain_matrix.py`
+- `infrastructure/scripts/management-solana-contract-tests.mjs`
 - `docs/XCLAW_SOURCE_OF_TRUTH.md`
 - `docs/XCLAW_SLICE_TRACKER.md`
 - `docs/XCLAW_BUILD_ROADMAP.md`
@@ -40,9 +41,6 @@ Issue mapping: `#95`
 - `spec.md`
 - `tasks.md`
 - `acceptance.md`
-
-### Completion note
-- Completed 2026-03-08 with restart/replay recovery coverage for runtime state, transfer flows, approval prompts, trade-usage replay, limit-order queued status replay, and liquidity resume, plus the required sequential validation chain (`db:parity`, `seed:reset/load/verify`, tracked seed-state restore, `build`, `pm2 restart all`).
 
 ## Completed Context: Slice 241 Command-Surface Failure Injection Sweep
 
