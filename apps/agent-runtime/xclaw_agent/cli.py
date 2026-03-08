@@ -39,7 +39,15 @@ from xclaw_agent.commands import liquidity as liquidity_commands
 from xclaw_agent.commands import trade as trade_commands
 from xclaw_agent.commands import wallet as wallet_commands
 from xclaw_agent.commands import x402 as x402_commands
-from xclaw_agent.runtime.adapters import LiquidityRuntimeAdapter, X402RuntimeAdapter
+from xclaw_agent.runtime.adapters import (
+    ApprovalsRuntimeAdapter,
+    LimitOrdersRuntimeAdapter,
+    LiquidityRuntimeAdapter,
+    TradeRuntimeAdapter,
+    WalletRuntimeAdapter,
+    X402RuntimeAdapter,
+)
+from xclaw_agent.runtime.services import agent_api as runtime_agent_api
 from xclaw_agent import x402_state
 from xclaw_agent.chains import (
     ChainRegistryError,
@@ -4187,16 +4195,13 @@ def _ack_transfer_decision_inbox(
     reason_code: str | None = None,
     reason_message: str | None = None,
 ) -> tuple[int, dict[str, Any]]:
-    payload: dict[str, Any] = {
-        "schemaVersion": 1,
-        "decisionId": decision_id,
-        "status": status,
-    }
-    if reason_code:
-        payload["reasonCode"] = reason_code
-    if reason_message:
-        payload["reasonMessage"] = reason_message
-    return _api_request("POST", "/agent/transfer-decisions/inbox", payload=payload, include_idempotency=True)
+    return runtime_agent_api.ack_transfer_decision_inbox(
+        _api_request,
+        decision_id,
+        status,
+        reason_code=reason_code,
+        reason_message=reason_message,
+    )
 
 
 def _run_decide_transfer_inline(
@@ -4209,7 +4214,7 @@ def _run_decide_transfer_inline(
     decision_payload: dict[str, Any] | None,
 ) -> tuple[int, dict[str, Any]]:
     return approvals_commands._run_decide_transfer_inline(
-        sys.modules[__name__],
+        _build_approvals_runtime_adapter(),
         approval_id=approval_id,
         decision=decision,
         chain=chain,
@@ -4220,18 +4225,11 @@ def _run_decide_transfer_inline(
 
 
 def _run_approvals_sync_inline(chain: str) -> tuple[int, dict[str, Any]]:
-    return approvals_commands._run_approvals_sync_inline(sys.modules[__name__], chain)
+    return approvals_commands._run_approvals_sync_inline(_build_approvals_runtime_adapter(), chain)
 
 
 def _publish_runtime_signing_readiness(chain: str, readiness: dict[str, Any]) -> tuple[int, dict[str, Any]]:
-    payload = {
-        "schemaVersion": 1,
-        "chainKey": chain,
-        "walletSigningReady": bool(readiness.get("walletSigningReady")),
-        "walletSigningReasonCode": readiness.get("walletSigningReasonCode"),
-        "walletSigningCheckedAt": readiness.get("walletSigningCheckedAt"),
-    }
-    return _api_request("POST", "/agent/runtime-readiness", payload=payload, include_idempotency=True)
+    return runtime_agent_api.publish_runtime_signing_readiness(_api_request, chain, readiness)
 
 
 def _maybe_send_owner_link_to_active_chat(management_url: str, expires_at: str | None) -> dict[str, Any]:
@@ -4274,43 +4272,43 @@ def _maybe_send_owner_link_to_active_chat(management_url: str, expires_at: str |
 
 
 def cmd_approvals_sync(args: argparse.Namespace) -> int:
-    return approvals_commands.cmd_approvals_sync(sys.modules[__name__], args)
+    return approvals_commands.cmd_approvals_sync(_build_approvals_runtime_adapter(), args)
 
 
 def cmd_approvals_run_loop(args: argparse.Namespace) -> int:
-    return approvals_commands.cmd_approvals_run_loop(sys.modules[__name__], args)
+    return approvals_commands.cmd_approvals_run_loop(_build_approvals_runtime_adapter(), args)
 
 
 def cmd_approvals_cleanup_spot(args: argparse.Namespace) -> int:
-    return approvals_commands.cmd_approvals_cleanup_spot(sys.modules[__name__], args)
+    return approvals_commands.cmd_approvals_cleanup_spot(_build_approvals_runtime_adapter(), args)
 
 
 def cmd_approvals_clear_prompt(args: argparse.Namespace) -> int:
-    return approvals_commands.cmd_approvals_clear_prompt(sys.modules[__name__], args)
+    return approvals_commands.cmd_approvals_clear_prompt(_build_approvals_runtime_adapter(), args)
 
 
 def _run_resume_spot_inline(trade_id: str, chain: str) -> tuple[int, dict[str, Any]]:
-    return approvals_commands._run_resume_spot_inline(sys.modules[__name__], trade_id, chain)
+    return approvals_commands._run_resume_spot_inline(_build_approvals_runtime_adapter(), trade_id, chain)
 
 
 def cmd_approvals_resume_spot(args: argparse.Namespace) -> int:
-    return approvals_commands.cmd_approvals_resume_spot(sys.modules[__name__], args)
+    return approvals_commands.cmd_approvals_resume_spot(_build_approvals_runtime_adapter(), args)
 
 
 def cmd_approvals_resume_transfer(args: argparse.Namespace) -> int:
-    return approvals_commands.cmd_approvals_resume_transfer(sys.modules[__name__], args)
+    return approvals_commands.cmd_approvals_resume_transfer(_build_approvals_runtime_adapter(), args)
 
 
 def cmd_approvals_decide_spot(args: argparse.Namespace) -> int:
-    return approvals_commands.cmd_approvals_decide_spot(sys.modules[__name__], args)
+    return approvals_commands.cmd_approvals_decide_spot(_build_approvals_runtime_adapter(), args)
 
 
 def cmd_approvals_decide_liquidity(args: argparse.Namespace) -> int:
-    return approvals_commands.cmd_approvals_decide_liquidity(sys.modules[__name__], args)
+    return approvals_commands.cmd_approvals_decide_liquidity(_build_approvals_runtime_adapter(), args)
 
 
 def cmd_approvals_decide_policy(args: argparse.Namespace) -> int:
-    return approvals_commands.cmd_approvals_decide_policy(sys.modules[__name__], args)
+    return approvals_commands.cmd_approvals_decide_policy(_build_approvals_runtime_adapter(), args)
 
 
 def _hydrate_transfer_flow_from_decision_payload(
@@ -4318,11 +4316,11 @@ def _hydrate_transfer_flow_from_decision_payload(
     chain: str,
     payload: dict[str, Any],
 ) -> dict[str, Any]:
-    return approvals_commands._hydrate_transfer_flow_from_decision_payload(sys.modules[__name__], approval_id, chain, payload)
+    return approvals_commands._hydrate_transfer_flow_from_decision_payload(_build_approvals_runtime_adapter(), approval_id, chain, payload)
 
 
 def cmd_approvals_decide_transfer(args: argparse.Namespace) -> int:
-    return approvals_commands.cmd_approvals_decide_transfer(sys.modules[__name__], args)
+    return approvals_commands.cmd_approvals_decide_transfer(_build_approvals_runtime_adapter(), args)
 
 
 def cmd_transfers_policy_get(args: argparse.Namespace) -> int:
@@ -4376,19 +4374,19 @@ def cmd_transfers_policy_set(args: argparse.Namespace) -> int:
 
 
 def cmd_approvals_request_token(args: argparse.Namespace) -> int:
-    return approvals_commands.cmd_approvals_request_token(sys.modules[__name__], args)
+    return approvals_commands.cmd_approvals_request_token(_build_approvals_runtime_adapter(), args)
 
 
 def cmd_approvals_request_global(args: argparse.Namespace) -> int:
-    return approvals_commands.cmd_approvals_request_global(sys.modules[__name__], args)
+    return approvals_commands.cmd_approvals_request_global(_build_approvals_runtime_adapter(), args)
 
 
 def cmd_approvals_revoke_token(args: argparse.Namespace) -> int:
-    return approvals_commands.cmd_approvals_revoke_token(sys.modules[__name__], args)
+    return approvals_commands.cmd_approvals_revoke_token(_build_approvals_runtime_adapter(), args)
 
 
 def cmd_approvals_revoke_global(args: argparse.Namespace) -> int:
-    return approvals_commands.cmd_approvals_revoke_global(sys.modules[__name__], args)
+    return approvals_commands.cmd_approvals_revoke_global(_build_approvals_runtime_adapter(), args)
 
 
 def _parse_decision_at(value: str | None) -> str:
@@ -6298,11 +6296,7 @@ def _resolve_raydium_pool_id(adapter: Any, explicit_pool_id: str) -> str:
 
 
 def _resolve_agent_id_or_fail(chain: str) -> str:
-    api_key = _resolve_api_key()
-    agent_id = _resolve_agent_id(api_key)
-    if not agent_id:
-        raise WalletStoreError("Agent id could not be resolved. Set XCLAW_AGENT_ID or use signed agent token format.")
-    return agent_id
+    return runtime_agent_api.resolve_agent_id_or_fail(_resolve_api_key, _resolve_agent_id, WalletStoreError)
 
 
 def _build_liquidity_runtime_adapter() -> LiquidityRuntimeAdapter:
@@ -6411,6 +6405,200 @@ def _build_x402_runtime_adapter() -> X402RuntimeAdapter:
         x402_set_policy=x402_set_policy,
         x402_list_networks=x402_list_networks,
         utc_now=utc_now,
+    )
+
+
+def _build_approvals_runtime_adapter() -> ApprovalsRuntimeAdapter:
+    return ApprovalsRuntimeAdapter(
+        require_json_flag=require_json_flag,
+        fail=fail,
+        ok=ok,
+        emit=emit,
+        json=json,
+        sys=sys,
+        re=re,
+        utc_now=utc_now,
+        APPROVAL_RUN_LOOP_INTERVAL_MS=APPROVAL_RUN_LOOP_INTERVAL_MS,
+        APPROVAL_RUN_LOOP_BACKOFF_MAX_MS=APPROVAL_RUN_LOOP_BACKOFF_MAX_MS,
+        WalletStoreError=WalletStoreError,
+        X402RuntimeError=X402RuntimeError,
+        _load_approval_prompts=_load_approval_prompts,
+        _read_trade_details=_read_trade_details,
+        _maybe_delete_telegram_approval_prompt=_maybe_delete_telegram_approval_prompt,
+        _fetch_transfer_decision_inbox=_fetch_transfer_decision_inbox,
+        _ack_transfer_decision_inbox=_ack_transfer_decision_inbox,
+        _run_decide_transfer_inline=_run_decide_transfer_inline,
+        _run_approvals_sync_inline=_run_approvals_sync_inline,
+        _run_resume_spot_inline=_run_resume_spot_inline,
+        _runtime_wallet_signing_readiness=_runtime_wallet_signing_readiness,
+        _publish_runtime_signing_readiness=_publish_runtime_signing_readiness,
+        _clear_telegram_approval_buttons=_clear_telegram_approval_buttons,
+        _cleanup_trade_approval_prompt=_cleanup_trade_approval_prompt,
+        _cleanup_transfer_approval_prompt=_cleanup_transfer_approval_prompt,
+        _cleanup_policy_approval_prompt=_cleanup_policy_approval_prompt,
+        _get_pending_spot_trade_flow=_get_pending_spot_trade_flow,
+        _remove_pending_spot_trade_flow=_remove_pending_spot_trade_flow,
+        _get_pending_transfer_flow=_get_pending_transfer_flow,
+        _is_stale_executing_transfer_flow=_is_stale_executing_transfer_flow,
+        _record_pending_transfer_flow=_record_pending_transfer_flow,
+        _mirror_transfer_approval=_mirror_transfer_approval,
+        _execute_pending_transfer_flow=_execute_pending_transfer_flow,
+        _post_trade_status=_post_trade_status,
+        _post_liquidity_status=_post_liquidity_status,
+        _read_liquidity_intent=_read_liquidity_intent,
+        _run_liquidity_execute_inline=_run_liquidity_execute_inline,
+        cmd_approvals_sync=cmd_approvals_sync,
+        cmd_approvals_resume_spot=cmd_approvals_resume_spot,
+        cmd_approvals_decide_transfer=cmd_approvals_decide_transfer,
+        cmd_trade_execute=cmd_trade_execute,
+        _maybe_send_telegram_decision_message=_maybe_send_telegram_decision_message,
+        _maybe_send_telegram_trade_terminal_message=_maybe_send_telegram_trade_terminal_message,
+        _maybe_send_telegram_policy_approval_prompt=_maybe_send_telegram_policy_approval_prompt,
+        _normalize_address=_normalize_address,
+        _resolve_token_address=_resolve_token_address,
+        _transfer_amount_display=_transfer_amount_display,
+        _native_symbol_for_chain=_native_symbol_for_chain,
+        _native_decimals_for_chain=_native_decimals_for_chain,
+        _is_solana_chain=_is_solana_chain,
+        is_solana_address=is_solana_address,
+        is_hex_address=is_hex_address,
+        _api_request=_api_request,
+        x402_state=x402_state,
+        x402_pay_resume=x402_pay_resume,
+        x402_pay_decide=x402_pay_decide,
+        _mirror_x402_outbound=_mirror_x402_outbound,
+    )
+
+
+def _build_trade_runtime_adapter() -> TradeRuntimeAdapter:
+    return TradeRuntimeAdapter(
+        require_json_flag=require_json_flag,
+        fail=fail,
+        ok=ok,
+        json=json,
+        re=re,
+        utc_now=utc_now,
+        load_wallet_store=load_wallet_store,
+        MAX_TRADE_RETRIES=MAX_TRADE_RETRIES,
+        RETRY_WINDOW_SEC=RETRY_WINDOW_SEC,
+        is_hex_address=is_hex_address,
+        WalletPolicyError=WalletPolicyError,
+        WalletStoreError=WalletStoreError,
+        _trade_provider_settings=_trade_provider_settings,
+        _is_solana_chain=_is_solana_chain,
+        _resolve_token_address=_resolve_token_address,
+        _enforce_spend_preconditions=_enforce_spend_preconditions,
+        _normalize_amount_human_text=_normalize_amount_human_text,
+        _solana_mint_decimals=_solana_mint_decimals,
+        _format_units=_format_units,
+        _replay_trade_usage_outbox=_replay_trade_usage_outbox,
+        _fetch_erc20_metadata=_fetch_erc20_metadata,
+        _parse_amount_in_units=_parse_amount_in_units,
+        _quote_trade_via_router_adapter=_quote_trade_via_router_adapter,
+        _to_non_negative_decimal=_to_non_negative_decimal,
+        _projected_trade_spend_usd=_projected_trade_spend_usd,
+        _enforce_trade_caps=_enforce_trade_caps,
+        _trade_intent_key=_trade_intent_key,
+        _get_pending_trade_intent=_get_pending_trade_intent,
+        _read_trade_details=_read_trade_details,
+        _record_pending_spot_trade_flow=_record_pending_spot_trade_flow,
+        _wait_for_trade_approval=_wait_for_trade_approval,
+        _remove_pending_trade_intent=_remove_pending_trade_intent,
+        _post_trade_proposed=_post_trade_proposed,
+        _record_pending_trade_intent=_record_pending_trade_intent,
+        _require_cast_bin=_require_cast_bin,
+        _chain_rpc_url=_chain_rpc_url,
+        _execution_wallet=_execution_wallet,
+        _execution_wallet_secret=_execution_wallet_secret,
+        _execute_trade_via_router_adapter=_execute_trade_via_router_adapter,
+        solana_jupiter_quote=solana_jupiter_quote,
+        solana_jupiter_execute_swap=solana_jupiter_execute_swap,
+        resolve_trade_execution_adapter=resolve_trade_execution_adapter,
+        _build_provider_meta=_build_provider_meta,
+        _post_trade_status=_post_trade_status,
+        _run_subprocess=_run_subprocess,
+        _cast_receipt_timeout_sec=_cast_receipt_timeout_sec,
+        _record_spend=_record_spend,
+        _record_trade_cap_ledger=_record_trade_cap_ledger,
+        _post_trade_usage=_post_trade_usage,
+        _builder_output_from_hashes=_builder_output_from_hashes,
+        _format_units_pretty=_format_units_pretty,
+        _decimal_text=_decimal_text,
+        _to_units_uint=_to_units_uint,
+        _remove_pending_spot_trade_flow=_remove_pending_spot_trade_flow,
+    )
+
+
+def _build_limit_orders_runtime_adapter() -> LimitOrdersRuntimeAdapter:
+    return LimitOrdersRuntimeAdapter(
+        require_json_flag=require_json_flag,
+        fail=fail,
+        ok=ok,
+        emit=emit,
+        utc_now=utc_now,
+        WalletPolicyError=WalletPolicyError,
+        WalletStoreError=WalletStoreError,
+        _resolve_token_address=_resolve_token_address,
+        _is_valid_limit_order_token=_is_valid_limit_order_token,
+        _limit_order_token_format_hint=_limit_order_token_format_hint,
+        _resolve_api_key=_resolve_api_key,
+        _resolve_agent_id=_resolve_agent_id,
+        _api_request=_api_request,
+        _api_error_details=_api_error_details,
+        _sync_limit_orders=_sync_limit_orders,
+        load_limit_order_store=load_limit_order_store,
+        load_limit_order_outbox=load_limit_order_outbox,
+        _replay_limit_order_outbox=_replay_limit_order_outbox,
+        _replay_trade_usage_outbox=_replay_trade_usage_outbox,
+        _post_limit_order_status=_post_limit_order_status,
+        _quote_limit_order_price=_quote_limit_order_price,
+        _limit_order_triggered=_limit_order_triggered,
+        _execute_limit_order_real=_execute_limit_order_real,
+    )
+
+
+def _build_wallet_runtime_adapter() -> WalletRuntimeAdapter:
+    return WalletRuntimeAdapter(
+        require_json_flag=require_json_flag,
+        fail=fail,
+        ok=ok,
+        emit=emit,
+        load_wallet_store=load_wallet_store,
+        ensure_wallet_entry=ensure_wallet_entry,
+        _chain_wallet=_chain_wallet,
+        _validate_wallet_entry_shape=_validate_wallet_entry_shape,
+        _is_solana_chain=_is_solana_chain,
+        is_hex_address=is_hex_address,
+        is_solana_address=is_solana_address,
+        solana_rpc_health=solana_rpc_health,
+        solana_sign_message=solana_sign_message,
+        _parse_canonical_challenge=_parse_canonical_challenge,
+        _require_wallet_passphrase_for_signing=_require_wallet_passphrase_for_signing,
+        _decrypt_private_key=_decrypt_private_key,
+        _cast_sign_message=_cast_sign_message,
+        _resolve_token_address=_resolve_token_address,
+        _fetch_erc20_metadata=_fetch_erc20_metadata,
+        _enforce_spend_preconditions=_enforce_spend_preconditions,
+        _evaluate_outbound_transfer_policy=_evaluate_outbound_transfer_policy,
+        _transfer_requires_approval=_transfer_requires_approval,
+        _transfer_amount_display=_transfer_amount_display,
+        _native_symbol_for_chain=_native_symbol_for_chain,
+        _native_decimals_for_chain=_native_decimals_for_chain,
+        _make_transfer_approval_id=_make_transfer_approval_id,
+        _record_pending_transfer_flow=_record_pending_transfer_flow,
+        _remove_pending_transfer_flow=_remove_pending_transfer_flow,
+        _mirror_transfer_approval=_mirror_transfer_approval,
+        _maybe_send_telegram_transfer_approval_prompt=_maybe_send_telegram_transfer_approval_prompt,
+        _execute_pending_transfer_flow=_execute_pending_transfer_flow,
+        utc_now=utc_now,
+        CHALLENGE_FORMAT_VERSION=CHALLENGE_FORMAT_VERSION,
+        SolanaRpcClientError=SolanaRpcClientError,
+        SolanaRuntimeError=SolanaRuntimeError,
+        TokenResolutionError=TokenResolutionError,
+        WalletPassphraseError=WalletPassphraseError,
+        WalletPolicyError=WalletPolicyError,
+        WalletSecurityError=WalletSecurityError,
+        WalletStoreError=WalletStoreError,
     )
 
 
@@ -6838,7 +7026,7 @@ def _execute_uniswap_swap_via_proxy(
 
 
 def _solana_amount_units_or_fail(amount_in: str) -> str:
-    return trade_commands.solana_execution.solana_amount_units_or_fail(sys.modules[__name__], amount_in)
+    return trade_commands.solana_execution.solana_amount_units_or_fail(_build_trade_runtime_adapter(), amount_in)
 
 
 def _execute_solana_trade(
@@ -6852,7 +7040,7 @@ def _execute_solana_trade(
     from_status: str,
 ) -> dict[str, Any]:
     return trade_commands.solana_execution.execute_solana_trade(
-        sys.modules[__name__],
+        _build_trade_runtime_adapter(),
         chain=chain,
         trade_id=trade_id,
         token_in=token_in,
@@ -6864,7 +7052,7 @@ def _execute_solana_trade(
 
 
 def cmd_trade_spot(args: argparse.Namespace) -> int:
-    return trade_commands.cmd_trade_spot(sys.modules[__name__], args)
+    return trade_commands.cmd_trade_spot(_build_trade_runtime_adapter(), args)
 def _read_trade_details(trade_id: str) -> dict[str, Any]:
     status_code, body = _api_request("GET", f"/trades/{trade_id}")
     if status_code < 200 or status_code >= 300:
@@ -7592,11 +7780,11 @@ def cmd_intents_poll(args: argparse.Namespace) -> int:
 
 
 def cmd_approvals_check(args: argparse.Namespace) -> int:
-    return approvals_commands.cmd_approvals_check(sys.modules[__name__], args)
+    return approvals_commands.cmd_approvals_check(_build_approvals_runtime_adapter(), args)
 
 
 def cmd_trade_execute(args: argparse.Namespace) -> int:
-    return trade_commands.cmd_trade_execute(sys.modules[__name__], args)
+    return trade_commands.cmd_trade_execute(_build_trade_runtime_adapter(), args)
 def _send_trade_execution_report(trade_id: str) -> dict[str, Any]:
     trade = _read_trade_details(trade_id)
     event_type = _canonical_event_for_trade_status(str(trade.get("status")))
@@ -8863,31 +9051,31 @@ def _execute_limit_order_real_evm(order: dict[str, Any], chain: str) -> str:
 
 
 def cmd_limit_orders_create(args: argparse.Namespace) -> int:
-    return limit_order_commands.cmd_limit_orders_create(sys.modules[__name__], args)
+    return limit_order_commands.cmd_limit_orders_create(_build_limit_orders_runtime_adapter(), args)
 
 
 def cmd_limit_orders_cancel(args: argparse.Namespace) -> int:
-    return limit_order_commands.cmd_limit_orders_cancel(sys.modules[__name__], args)
+    return limit_order_commands.cmd_limit_orders_cancel(_build_limit_orders_runtime_adapter(), args)
 
 
 def cmd_limit_orders_list(args: argparse.Namespace) -> int:
-    return limit_order_commands.cmd_limit_orders_list(sys.modules[__name__], args)
+    return limit_order_commands.cmd_limit_orders_list(_build_limit_orders_runtime_adapter(), args)
 
 
 def cmd_limit_orders_sync(args: argparse.Namespace) -> int:
-    return limit_order_commands.cmd_limit_orders_sync(sys.modules[__name__], args)
+    return limit_order_commands.cmd_limit_orders_sync(_build_limit_orders_runtime_adapter(), args)
 
 
 def cmd_limit_orders_status(args: argparse.Namespace) -> int:
-    return limit_order_commands.cmd_limit_orders_status(sys.modules[__name__], args)
+    return limit_order_commands.cmd_limit_orders_status(_build_limit_orders_runtime_adapter(), args)
 
 
 def cmd_limit_orders_run_once(args: argparse.Namespace) -> int:
-    return limit_order_commands.cmd_limit_orders_run_once(sys.modules[__name__], args)
+    return limit_order_commands.cmd_limit_orders_run_once(_build_limit_orders_runtime_adapter(), args)
 
 
 def cmd_limit_orders_run_loop(args: argparse.Namespace) -> int:
-    return limit_order_commands.cmd_limit_orders_run_loop(sys.modules[__name__], args)
+    return limit_order_commands.cmd_limit_orders_run_loop(_build_limit_orders_runtime_adapter(), args)
 
 
 def cmd_wallet_health(args: argparse.Namespace) -> int:
@@ -8977,7 +9165,7 @@ def cmd_wallet_health(args: argparse.Namespace) -> int:
 
 
 def cmd_wallet_rpc_health(args: argparse.Namespace) -> int:
-    return wallet_commands.cmd_wallet_rpc_health(sys.modules[__name__], args)
+    return wallet_commands.cmd_wallet_rpc_health(_build_wallet_runtime_adapter(), args)
 def cmd_wallet_create(args: argparse.Namespace) -> int:
     chk = require_json_flag(args)
     if chk is not None:
@@ -9164,11 +9352,11 @@ def cmd_wallet_import(args: argparse.Namespace) -> int:
 
 
 def cmd_wallet_address(args: argparse.Namespace) -> int:
-    return wallet_commands.cmd_wallet_address(sys.modules[__name__], args)
+    return wallet_commands.cmd_wallet_address(_build_wallet_runtime_adapter(), args)
 def cmd_wallet_sign_challenge(args: argparse.Namespace) -> int:
-    return wallet_commands.cmd_wallet_sign_challenge(sys.modules[__name__], args)
+    return wallet_commands.cmd_wallet_sign_challenge(_build_wallet_runtime_adapter(), args)
 def cmd_wallet_send(args: argparse.Namespace) -> int:
-    return wallet_commands.cmd_wallet_send(sys.modules[__name__], args)
+    return wallet_commands.cmd_wallet_send(_build_wallet_runtime_adapter(), args)
 def cmd_wallet_track_token(args: argparse.Namespace) -> int:
     chk = require_json_flag(args)
     if chk is not None:
@@ -9284,7 +9472,7 @@ def cmd_wallet_tracked_tokens(args: argparse.Namespace) -> int:
 
 
 def cmd_wallet_send_token(args: argparse.Namespace) -> int:
-    return wallet_commands.cmd_wallet_send_token(sys.modules[__name__], args)
+    return wallet_commands.cmd_wallet_send_token(_build_wallet_runtime_adapter(), args)
 def cmd_wallet_balance(args: argparse.Namespace) -> int:
     chk = require_json_flag(args)
     if chk is not None:

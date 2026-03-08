@@ -7,11 +7,12 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any
 
+from xclaw_agent.runtime.adapters.limit_orders import LimitOrdersRuntimeAdapter
 from xclaw_agent.runtime import errors as runtime_errors
 from xclaw_agent.runtime import state_machine as runtime_state_machine
 
 
-def cmd_limit_orders_create(rt: Any, args: Any) -> int:
+def cmd_limit_orders_create(rt: LimitOrdersRuntimeAdapter, args: Any) -> int:
     chk = rt.require_json_flag(args)
     if chk is not None:
         return chk
@@ -65,7 +66,7 @@ def cmd_limit_orders_create(rt: Any, args: Any) -> int:
         return rt.fail("limit_orders_create_failed", str(exc), "Inspect runtime limit-order create path and retry.", {"chain": args.chain}, exit_code=1)
 
 
-def cmd_limit_orders_cancel(rt: Any, args: Any) -> int:
+def cmd_limit_orders_cancel(rt: LimitOrdersRuntimeAdapter, args: Any) -> int:
     chk = rt.require_json_flag(args)
     if chk is not None:
         return chk
@@ -92,7 +93,7 @@ def cmd_limit_orders_cancel(rt: Any, args: Any) -> int:
         return rt.fail("limit_orders_cancel_failed", str(exc), "Inspect runtime limit-order cancel path and retry.", {"chain": args.chain}, exit_code=1)
 
 
-def cmd_limit_orders_list(rt: Any, args: Any) -> int:
+def cmd_limit_orders_list(rt: LimitOrdersRuntimeAdapter, args: Any) -> int:
     chk = rt.require_json_flag(args)
     if chk is not None:
         return chk
@@ -115,7 +116,7 @@ def cmd_limit_orders_list(rt: Any, args: Any) -> int:
         return rt.fail("limit_orders_list_failed", str(exc), "Inspect runtime limit-order list path and retry.", {"chain": args.chain}, exit_code=1)
 
 
-def cmd_limit_orders_sync(rt: Any, args: Any) -> int:
+def cmd_limit_orders_sync(rt: LimitOrdersRuntimeAdapter, args: Any) -> int:
     chk = rt.require_json_flag(args)
     if chk is not None:
         return chk
@@ -128,7 +129,7 @@ def cmd_limit_orders_sync(rt: Any, args: Any) -> int:
         return rt.fail("limit_orders_sync_failed", str(exc), "Inspect runtime limit-order sync path and retry.", {"chain": args.chain}, exit_code=1)
 
 
-def cmd_limit_orders_status(rt: Any, args: Any) -> int:
+def cmd_limit_orders_status(rt: LimitOrdersRuntimeAdapter, args: Any) -> int:
     chk = rt.require_json_flag(args)
     if chk is not None:
         return chk
@@ -147,7 +148,7 @@ def cmd_limit_orders_status(rt: Any, args: Any) -> int:
         return rt.fail("limit_orders_status_failed", str(exc), "Inspect runtime limit-order status path and retry.", {"chain": args.chain}, exit_code=1)
 
 
-def _limit_orders_run_once_result(rt: Any, chain: str, sync: bool) -> dict[str, Any]:
+def _limit_orders_run_once_result(rt: LimitOrdersRuntimeAdapter, chain: str, sync: bool) -> dict[str, Any]:
     replayed, remaining = rt._replay_limit_order_outbox()
     try:
         trade_usage_replayed, trade_usage_remaining = rt._replay_trade_usage_outbox()
@@ -242,7 +243,7 @@ def _limit_orders_run_once_result(rt: Any, chain: str, sync: bool) -> dict[str, 
 
 
 
-def cmd_limit_orders_run_once(rt: Any, args: Any) -> int:
+def cmd_limit_orders_run_once(rt: LimitOrdersRuntimeAdapter, args: Any) -> int:
     chk = rt.require_json_flag(args)
     if chk is not None:
         return chk
@@ -255,7 +256,7 @@ def cmd_limit_orders_run_once(rt: Any, args: Any) -> int:
         return rt.fail("limit_orders_run_failed", str(exc), "Inspect runtime limit-order loop and retry.", {"chain": args.chain}, exit_code=1)
 
 
-def cmd_limit_orders_run_loop(rt: Any, args: Any) -> int:
+def cmd_limit_orders_run_loop(rt: LimitOrdersRuntimeAdapter, args: Any) -> int:
     chk = rt.require_json_flag(args)
     if chk is not None:
         return chk
@@ -281,7 +282,7 @@ def cmd_limit_orders_run_loop(rt: Any, args: Any) -> int:
         while True:
             nested = argparse.Namespace(chain=args.chain, json=True, sync=args.sync)
             code, run_payload = runtime_state_machine.run_json_command(
-                lambda nested_args: rt.cmd_limit_orders_run_once(nested_args),
+                lambda nested_args: cmd_limit_orders_run_once(rt, nested_args),
                 nested,
                 fallback_payload={
                     "ok": False,

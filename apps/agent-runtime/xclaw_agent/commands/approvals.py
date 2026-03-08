@@ -8,6 +8,7 @@ import urllib.parse
 from datetime import datetime, timezone
 from typing import Any
 
+from xclaw_agent.runtime.adapters.approvals import ApprovalsRuntimeAdapter
 from xclaw_agent.runtime import state_machine as runtime_state_machine
 
 
@@ -23,7 +24,9 @@ def _parse_decision_at(value: str | None) -> str:
 
 
 
-def _hydrate_transfer_flow_from_decision_payload(rt: Any, approval_id: str, chain: str, payload: dict[str, Any]) -> dict[str, Any]:
+def _hydrate_transfer_flow_from_decision_payload(
+    rt: ApprovalsRuntimeAdapter, approval_id: str, chain: str, payload: dict[str, Any]
+) -> dict[str, Any]:
     kind = str(payload.get("kind") or "").strip().lower()
     if kind != "management_withdraw_v1":
         raise rt.WalletStoreError("unsupported decision payload kind.")
@@ -126,7 +129,7 @@ def _run_decide_transfer_inline(
 
 
 
-def _run_approvals_sync_inline(rt: Any, chain: str) -> tuple[int, dict[str, Any]]:
+def _run_approvals_sync_inline(rt: ApprovalsRuntimeAdapter, chain: str) -> tuple[int, dict[str, Any]]:
     nested = argparse.Namespace(chain=chain, json=True)
     return runtime_state_machine.run_json_command(
         lambda nested_args: rt.cmd_approvals_sync(nested_args),
@@ -141,7 +144,7 @@ def _run_approvals_sync_inline(rt: Any, chain: str) -> tuple[int, dict[str, Any]
 
 
 
-def _run_resume_spot_inline(rt: Any, trade_id: str, chain: str) -> tuple[int, dict[str, Any]]:
+def _run_resume_spot_inline(rt: ApprovalsRuntimeAdapter, trade_id: str, chain: str) -> tuple[int, dict[str, Any]]:
     nested = argparse.Namespace(trade_id=trade_id, chain=chain, json=True)
     return runtime_state_machine.run_json_command(
         lambda nested_args: rt.cmd_approvals_resume_spot(nested_args),
@@ -157,7 +160,7 @@ def _run_resume_spot_inline(rt: Any, trade_id: str, chain: str) -> tuple[int, di
 
 
 
-def cmd_approvals_sync(rt: Any, args: Any) -> int:
+def cmd_approvals_sync(rt: ApprovalsRuntimeAdapter, args: Any) -> int:
     chk = rt.require_json_flag(args)
     if chk is not None:
         return chk
@@ -284,7 +287,7 @@ def cmd_approvals_sync(rt: Any, args: Any) -> int:
 
 
 
-def cmd_approvals_run_loop(rt: Any, args: Any) -> int:
+def cmd_approvals_run_loop(rt: ApprovalsRuntimeAdapter, args: Any) -> int:
     chk = rt.require_json_flag(args)
     if chk is not None:
         return chk
@@ -360,7 +363,7 @@ def cmd_approvals_run_loop(rt: Any, args: Any) -> int:
 
 
 
-def cmd_approvals_cleanup_spot(rt: Any, args: Any) -> int:
+def cmd_approvals_cleanup_spot(rt: ApprovalsRuntimeAdapter, args: Any) -> int:
     chk = rt.require_json_flag(args)
     if chk is not None:
         return chk
@@ -379,7 +382,7 @@ def cmd_approvals_cleanup_spot(rt: Any, args: Any) -> int:
 
 
 
-def cmd_approvals_clear_prompt(rt: Any, args: Any) -> int:
+def cmd_approvals_clear_prompt(rt: ApprovalsRuntimeAdapter, args: Any) -> int:
     chk = rt.require_json_flag(args)
     if chk is not None:
         return chk
@@ -412,7 +415,7 @@ def cmd_approvals_clear_prompt(rt: Any, args: Any) -> int:
 
 
 
-def cmd_approvals_resume_spot(rt: Any, args: Any) -> int:
+def cmd_approvals_resume_spot(rt: ApprovalsRuntimeAdapter, args: Any) -> int:
     chk = rt.require_json_flag(args)
     if chk is not None:
         return chk
@@ -520,7 +523,7 @@ def cmd_approvals_resume_spot(rt: Any, args: Any) -> int:
 
 
 
-def cmd_approvals_resume_transfer(rt: Any, args: Any) -> int:
+def cmd_approvals_resume_transfer(rt: ApprovalsRuntimeAdapter, args: Any) -> int:
     chk = rt.require_json_flag(args)
     if chk is not None:
         return chk
@@ -591,7 +594,7 @@ def cmd_approvals_resume_transfer(rt: Any, args: Any) -> int:
 
 
 
-def cmd_approvals_decide_spot(rt: Any, args: Any) -> int:
+def cmd_approvals_decide_spot(rt: ApprovalsRuntimeAdapter, args: Any) -> int:
     chk = rt.require_json_flag(args)
     if chk is not None:
         return chk
@@ -740,7 +743,7 @@ def cmd_approvals_decide_spot(rt: Any, args: Any) -> int:
 
 
 
-def cmd_approvals_decide_liquidity(rt: Any, args: Any) -> int:
+def cmd_approvals_decide_liquidity(rt: ApprovalsRuntimeAdapter, args: Any) -> int:
     chk = rt.require_json_flag(args)
     if chk is not None:
         return chk
@@ -838,7 +841,7 @@ def cmd_approvals_decide_liquidity(rt: Any, args: Any) -> int:
 
 
 
-def cmd_approvals_decide_policy(rt: Any, args: Any) -> int:
+def cmd_approvals_decide_policy(rt: ApprovalsRuntimeAdapter, args: Any) -> int:
     chk = rt.require_json_flag(args)
     if chk is not None:
         return chk
@@ -898,7 +901,7 @@ def cmd_approvals_decide_policy(rt: Any, args: Any) -> int:
 
 
 
-def cmd_approvals_decide_transfer(rt: Any, args: Any) -> int:
+def cmd_approvals_decide_transfer(rt: ApprovalsRuntimeAdapter, args: Any) -> int:
     chk = rt.require_json_flag(args)
     if chk is not None:
         return chk
@@ -1132,7 +1135,7 @@ def cmd_approvals_decide_transfer(rt: Any, args: Any) -> int:
 
 
 
-def cmd_approvals_request_token(rt: Any, args: Any) -> int:
+def cmd_approvals_request_token(rt: ApprovalsRuntimeAdapter, args: Any) -> int:
     chk = rt.require_json_flag(args)
     if chk is not None:
         return chk
@@ -1215,7 +1218,7 @@ def cmd_approvals_request_token(rt: Any, args: Any) -> int:
 
 
 
-def cmd_approvals_request_global(rt: Any, args: Any) -> int:
+def cmd_approvals_request_global(rt: ApprovalsRuntimeAdapter, args: Any) -> int:
     chk = rt.require_json_flag(args)
     if chk is not None:
         return chk
@@ -1270,7 +1273,7 @@ def cmd_approvals_request_global(rt: Any, args: Any) -> int:
 
 
 
-def cmd_approvals_revoke_token(rt: Any, args: Any) -> int:
+def cmd_approvals_revoke_token(rt: ApprovalsRuntimeAdapter, args: Any) -> int:
     chk = rt.require_json_flag(args)
     if chk is not None:
         return chk
@@ -1353,7 +1356,7 @@ def cmd_approvals_revoke_token(rt: Any, args: Any) -> int:
 
 
 
-def cmd_approvals_revoke_global(rt: Any, args: Any) -> int:
+def cmd_approvals_revoke_global(rt: ApprovalsRuntimeAdapter, args: Any) -> int:
     chk = rt.require_json_flag(args)
     if chk is not None:
         return chk
@@ -1408,7 +1411,7 @@ def cmd_approvals_revoke_global(rt: Any, args: Any) -> int:
 
 
 
-def cmd_approvals_check(rt: Any, args: Any) -> int:
+def cmd_approvals_check(rt: ApprovalsRuntimeAdapter, args: Any) -> int:
     chk = rt.require_json_flag(args)
     if chk is not None:
         return chk

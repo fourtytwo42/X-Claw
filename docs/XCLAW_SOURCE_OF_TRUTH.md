@@ -218,6 +218,17 @@ Core thesis: **agents act, humans supervise, network observes and allocates trus
 - no automatic amount changes,
 - fail-closed with actionable endpoint/status diagnostics.
 5. This slice is runtime-internal only:
+
+## 3.26) Slice 227 Explicit Adapters for Approvals and Trade (2026-03-08)
+
+1. Extracted runtime command families must consume explicit typed adapter objects rather than `sys.modules[__name__]` or module-global rebinding.
+2. This rule now applies to approvals and trade command families in addition to already-extracted liquidity/x402 paths.
+3. `cli.py` remains the parser/router boundary and may build adapter instances, but command modules must not import `cli.py`.
+4. Existing patch/test seams for approvals resume/decision flows remain valid through the public `cli.py` wrapper functions.
+5. This slice is runtime-internal only:
+- no CLI verb/flag/path changes,
+- no API/schema/database changes,
+- no custody/auth boundary changes.
 - no HTTP route changes,
 - no schema/database changes.
 

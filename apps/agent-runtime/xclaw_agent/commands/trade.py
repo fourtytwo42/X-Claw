@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
+from xclaw_agent.runtime.adapters.trade import TradeRuntimeAdapter
 from xclaw_agent.runtime import errors as runtime_errors
 from xclaw_agent.runtime import preconditions as runtime_preconditions
 from xclaw_agent.runtime import validators as runtime_validators
@@ -10,7 +11,7 @@ from xclaw_agent.runtime.execution import evm as evm_execution
 from xclaw_agent.runtime.execution import solana as solana_execution
 
 
-def cmd_trade_spot(rt: Any, args: Any) -> int:
+def cmd_trade_spot(rt: TradeRuntimeAdapter, args: Any) -> int:
     chk = rt.require_json_flag(args)
     if chk is not None:
         return chk
@@ -371,7 +372,7 @@ def cmd_trade_spot(rt: Any, args: Any) -> int:
         )
 
 
-def cmd_trade_execute(rt: Any, args: Any) -> int:
+def cmd_trade_execute(rt: TradeRuntimeAdapter, args: Any) -> int:
     chk = rt.require_json_flag(args)
     if chk is not None:
         return chk

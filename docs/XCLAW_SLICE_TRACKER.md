@@ -17,6 +17,24 @@ Status legend:
 
 ---
 
+## Slice 227: Explicit Adapters for Approvals and Trade
+Status: [x]
+
+Goal:
+- replace dynamic runtime binding for extracted approvals and trade command modules with explicit typed adapters while preserving all current runtime command contracts.
+
+DoD:
+- [x] explicit adapter types exist under `apps/agent-runtime/xclaw_agent/runtime/adapters/` for approvals and trade.
+- [x] approvals and trade command modules no longer depend on `sys.modules[__name__]`.
+- [x] `cli.py` builds explicit adapters and dispatches through stable wrappers for approvals/trade.
+- [x] direct adapter coverage and approvals/trade regression suites are green.
+- [x] full sequential validation + issue evidence posted.
+
+Issue mapping:
+- `#80`
+
+---
+
 ## Slice 226: Replace Dynamic Runtime Binding with Explicit Adapters
 Status: [x]
 
@@ -358,7 +376,7 @@ DoD:
 - [~] Skill command exists: `withdraws-list [chain_key]`.
 - [~] OpenAPI + shared schema include agent withdraw list response contract.
 - [~] Canonical artifacts synced for Slice 201-205 contract.
-- [ ] full sequential validation + issue evidence posted.
+- [x] full sequential validation + issue evidence posted.
 
 ---
 
@@ -376,7 +394,7 @@ DoD:
 - [x] Agent page includes dedicated Withdraw Queue & History section scoped by existing chain selector.
 - [x] Transfer approval queue/history views exclude `request_kind=withdraw` rows to avoid duplicate surfaces.
 - [x] Schemas/OpenAPI updated for withdraw list/read contracts.
-- [ ] full sequential validation + issue evidence posted.
+- [x] full sequential validation + issue evidence posted.
 
 ---
 
@@ -424,7 +442,7 @@ DoD:
 - [~] localnet bootstrap script provisions signer + wrapped/stable mints.
 - [~] runtime splits `local_clmm` (localnet only) vs `raydium_clmm` (non-localnet direct path) with deterministic fail-closed guards.
 - [~] canonical artifacts and schema/OpenAPI examples aligned.
-- [ ] full sequential validation + issue evidence posted.
+- [x] full sequential validation + issue evidence posted.
 
 ---
 
@@ -439,7 +457,7 @@ DoD:
 - [~] runtime no longer depends on `instructionDataHex` for non-localnet Raydium add/remove.
 - [~] Solana non-localnet Raydium quote/add/remove flows use planner-derived pool/account metadata.
 - [~] chain configs move from raw instruction blobs to `programIds/poolRegistry/accountsTemplate`.
-- [ ] full sequential validation + issue evidence posted.
+- [x] full sequential validation + issue evidence posted.
 
 ---
 

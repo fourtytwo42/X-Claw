@@ -11,6 +11,14 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 
 ---
 
+## 0.36) Slice 227 Explicit Adapters for Approvals and Trade
+
+- [x] Add explicit runtime adapter types for extracted approvals and trade command modules.
+- [x] Refactor approvals and trade command modules to consume explicit adapters instead of `sys.modules[__name__]`.
+- [x] Update `cli.py` to build adapters and dispatch without module-as-service coupling for approvals/trade.
+- [x] Extract shared agent API helper functions used by these adapters into runtime services.
+- [x] Run full sequential validation chain and capture evidence + issue comment.
+
 ## 0.35) Slice 226 Replace Dynamic Runtime Binding with Explicit Adapters
 
 - [x] Add explicit runtime adapter types for extracted liquidity and x402 command modules.

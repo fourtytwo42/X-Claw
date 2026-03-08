@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from typing import Any
 
+from xclaw_agent.runtime.adapters.wallet import WalletRuntimeAdapter
 from xclaw_agent.runtime import errors as runtime_errors
 from xclaw_agent.runtime import preconditions as runtime_preconditions
 from xclaw_agent.runtime import validators as runtime_validators
 
 
-def cmd_wallet_rpc_health(rt: Any, args: Any) -> int:
+def cmd_wallet_rpc_health(rt: WalletRuntimeAdapter, args: Any) -> int:
     chk = rt.require_json_flag(args)
     if chk is not None:
         return chk
@@ -44,7 +45,7 @@ def cmd_wallet_rpc_health(rt: Any, args: Any) -> int:
         return rt.fail("rpc_unavailable", str(exc), "Inspect Solana RPC health path and retry.", {"chain": chain}, exit_code=1)
 
 
-def cmd_wallet_address(rt: Any, args: Any) -> int:
+def cmd_wallet_address(rt: WalletRuntimeAdapter, args: Any) -> int:
     chk = rt.require_json_flag(args)
     if chk is not None:
         return chk
@@ -67,7 +68,7 @@ def cmd_wallet_address(rt: Any, args: Any) -> int:
     return rt.ok("Wallet address fetched.", chain=chain, address=addr)
 
 
-def cmd_wallet_sign_challenge(rt: Any, args: Any) -> int:
+def cmd_wallet_sign_challenge(rt: WalletRuntimeAdapter, args: Any) -> int:
     chk = rt.require_json_flag(args)
     if chk is not None:
         return chk
@@ -127,7 +128,7 @@ def cmd_wallet_sign_challenge(rt: Any, args: Any) -> int:
         return rt.fail("sign_failed", str(exc), "Inspect runtime wallet/signing configuration and retry.", {"chain": chain}, exit_code=1)
 
 
-def cmd_wallet_send(rt: Any, args: Any) -> int:
+def cmd_wallet_send(rt: WalletRuntimeAdapter, args: Any) -> int:
     chk = rt.require_json_flag(args)
     if chk is not None:
         return chk
@@ -240,7 +241,7 @@ def cmd_wallet_send(rt: Any, args: Any) -> int:
         return rt.fail("send_failed", str(exc), "Inspect runtime send configuration and retry.", {"chain": chain}, exit_code=1)
 
 
-def cmd_wallet_send_token(rt: Any, args: Any) -> int:
+def cmd_wallet_send_token(rt: WalletRuntimeAdapter, args: Any) -> int:
     chk = rt.require_json_flag(args)
     if chk is not None:
         return chk
