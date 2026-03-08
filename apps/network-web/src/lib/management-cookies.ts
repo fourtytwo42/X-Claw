@@ -10,8 +10,38 @@ function isLoopbackHost(hostname: string): boolean {
   return host === 'localhost' || host === '127.0.0.1' || host === '::1';
 }
 
+function normalizeHostHeader(value: string): string {
+  const first = String(value || "")
+    .split(",")[0]
+    ?.trim() ?? "";
+  if (!first) {
+    return "";
+  }
+  if (first.startsWith("[")) {
+    const closing = first.indexOf("]");
+    return closing > 0 ? first.slice(1, closing).trim().toLowerCase() : first.trim().toLowerCase();
+  }
+  const colonCount = first.split(":").length - 1;
+  if (colonCount === 1) {
+    return first.split(":")[0]?.trim().toLowerCase() ?? "";
+  }
+  return first.trim().toLowerCase();
+}
+
+function resolveRequestHostname(req: NextRequest): string {
+  const forwardedHost = normalizeHostHeader(req.headers.get("x-forwarded-host") ?? "");
+  if (forwardedHost) {
+    return forwardedHost;
+  }
+  const host = normalizeHostHeader(req.headers.get("host") ?? "");
+  if (host) {
+    return host;
+  }
+  return String(req.nextUrl.hostname || "").trim().toLowerCase();
+}
+
 export function shouldUseSecureCookies(req: NextRequest): boolean {
-  return !isLoopbackHost(req.nextUrl.hostname);
+  return !isLoopbackHost(resolveRequestHostname(req));
 }
 
 export function setManagementCookie(res: NextResponse, req: NextRequest, value: string): void {

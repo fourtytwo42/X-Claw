@@ -24,7 +24,7 @@ Issue mapping: `#96`
   - extend the approval matrix to `solana_localnet` then `solana_devnet`,
   - generate truthful per-chain and aggregate evidence artifacts without changing public runtime contracts.
 - Scope guard:
-  - harness/matrix/report/evidence work only,
+  - harness/matrix/report/evidence work only, plus the minimum management bootstrap host/cookie fixes required to make local live evidence truthful,
   - no API/schema/database changes,
   - Hedera explicitly deferred.
 
@@ -33,6 +33,9 @@ Issue mapping: `#96`
 - `apps/agent-runtime/scripts/wallet_approval_chain_matrix.py`
 - `apps/agent-runtime/tests/test_wallet_approval_harness.py`
 - `apps/agent-runtime/tests/test_wallet_approval_chain_matrix.py`
+- `apps/network-web/src/lib/management-cookies.ts`
+- `apps/network-web/src/app/api/v1/agent/management-link/route.ts`
+- `apps/network-web/src/app/api/v1/management/owner-link/route.ts`
 - `infrastructure/scripts/management-solana-contract-tests.mjs`
 - `docs/XCLAW_SOURCE_OF_TRUTH.md`
 - `docs/XCLAW_SLICE_TRACKER.md`

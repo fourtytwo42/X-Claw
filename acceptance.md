@@ -14,7 +14,7 @@ Issue mapping: `#96`
 ### Behavior Checks
 - [x] chain-matrix order includes `solana_localnet` and `solana_devnet` after the existing EVM legs.
 - [x] Solana harness scenarios report truthful supported/unsupported outcomes.
-- [ ] chain-specific reports plus an aggregate matrix report are generated.
+- [x] chain-specific reports plus an aggregate matrix report are generated.
 - [x] existing EVM harness behavior remains unchanged.
 
 ### Required Validation Gates
@@ -77,14 +77,42 @@ Issue mapping: `#96`
   - `pm2 restart all`
     - `xclaw-web` restarted
     - status `online`
-- Live matrix blocker:
-  - current environment has no discovered `XCLAW_*` live harness credentials and no bootstrap token JSON candidate file
-  - required matrix inputs are not provisioned:
-    - `--agent-id`
-    - `--bootstrap-token-file`
-    - `--harvy-address`
-  - optional Solana address inputs are also absent:
-    - `--solana-wallet-address`
-    - `--solana-recipient-address`
-  - exact command to unblock:
-    - `python3 apps/agent-runtime/scripts/wallet_approval_chain_matrix.py --agent-id <agent_id> --bootstrap-token-file <bootstrap_token.json> --harvy-address <evm_wallet_address> --solana-wallet-address <solana_wallet_address> --solana-recipient-address <solana_recipient_address> --json-report /tmp/xclaw-slice243-matrix.json --reports-dir /tmp/xclaw-slice243-reports`
+- Live matrix execution evidence:
+  - skill-derived runtime inputs were recovered and written locally:
+    - agent id: `ag_a123e3bc428c12675f93`
+    - bootstrap token file: `/home/hendo420/.xclaw-secrets/management/ag_a123e3bc428c12675f93-bootstrap-token.json`
+    - EVM wallet: `0x582f6f293e0f49855bb752ae29d6b0565c500d87`
+    - Solana localnet wallet: `9F4znU1PsW5yBK5TAfR9x8C9q3yVGNHUMuaXY35uCEXT`
+    - Solana recipient: `Gjgssop34eL6h6StEuFvMGqXNjfekzEJhAB2hANKdtHA`
+  - local management bootstrap/session persistence fix:
+    - `apps/network-web/src/lib/management-cookies.ts`
+      - loopback requests now omit `Secure` by resolving hostname from forwarded/host headers before `req.nextUrl.hostname`
+    - `apps/network-web/src/app/api/v1/agent/management-link/route.ts`
+    - `apps/network-web/src/app/api/v1/management/owner-link/route.ts`
+      - local evidence runs now preserve request-origin management URLs instead of force-rewriting loopback issuers to `https://xclaw.trade`
+  - direct loopback bootstrap proof after rebuild + restart:
+    - `POST /api/v1/management/session/bootstrap` returned `200`
+    - cookies were set without `Secure` on `127.0.0.1`
+    - follow-up `GET /api/v1/management/agent-state?...chainKey=hardhat_local` returned `200`
+  - exact matrix command run:
+    - `python3 apps/agent-runtime/scripts/wallet_approval_chain_matrix.py --base-url http://127.0.0.1:3000 --agent-id ag_a123e3bc428c12675f93 --bootstrap-token-file /home/hendo420/.xclaw-secrets/management/ag_a123e3bc428c12675f93-bootstrap-token.json --runtime-bin apps/agent-runtime/bin/xclaw-agent --agent-api-key <installed-skill-api-key> --wallet-passphrase <installed-skill-passphrase> --harvy-address 0x582f6f293e0f49855bb752ae29d6b0565c500d87 --solana-wallet-address 9F4znU1PsW5yBK5TAfR9x8C9q3yVGNHUMuaXY35uCEXT --solana-recipient-address Gjgssop34eL6h6StEuFvMGqXNjfekzEJhAB2hANKdtHA --reports-dir /tmp/xclaw-slice243-reports --json-report /tmp/xclaw-slice243-matrix.json`
+  - generated reports:
+    - aggregate: `/tmp/xclaw-slice243-matrix.json`
+    - hardhat local: `/tmp/xclaw-slice243-reports/xclaw-slice117-hardhat-smoke.json`
+    - base sepolia: `/tmp/xclaw-slice243-reports/xclaw-slice117-base-full.json`
+  - live matrix result:
+    - `hardhat_local`: `ok=true`
+    - `base_sepolia`: `ok=false`
+      - `trade_pending_approve` failed with `builder_code_missing`
+      - `global_and_allowlist` failed with `builder_code_missing`
+      - unresolved pending approvals remained:
+        - `xfr_30b4d0d3d06d21055d49`
+        - `xfr_334558518af821b96d4e`
+        - `xfr_e29b055f0e831b658b05`
+      - retry failure:
+        - request id `req_741d5893145f2f8d`
+        - path `/management/transfer-approvals/decision`
+        - response `404 payload_invalid`
+  - remaining unblockers:
+    - configure `XCLAW_BUILDER_CODE_BASE_SEPOLIA` or `XCLAW_BUILDER_CODE_BASE` in the active runtime/web environment
+    - debug the Base Sepolia x402 transfer-approval decision path returning `404 payload_invalid` for generated approval ids before rerunning the matrix beyond `base_sepolia`

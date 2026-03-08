@@ -20,11 +20,6 @@ function resolvePublicBaseUrl(req: NextRequest): string {
   if (configured) {
     return configured.replace(/\/+$/, '');
   }
-
-  const host = req.nextUrl.hostname;
-  if (host === '0.0.0.0' || host === '::' || host === '[::]' || host === '127.0.0.1' || host === 'localhost' || host === '::1') {
-    return 'https://xclaw.trade';
-  }
   return req.nextUrl.origin.replace(/\/+$/, '');
 }
 

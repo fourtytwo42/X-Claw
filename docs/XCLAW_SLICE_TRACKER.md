@@ -26,12 +26,12 @@ Goal:
 DoD:
 - [x] chain-matrix harness includes `solana_localnet` and `solana_devnet` in deterministic order after the existing EVM legs.
 - [x] Solana harness scenarios report supported vs unsupported live paths truthfully with no synthetic success.
-- [ ] chain-specific JSON reports and aggregate matrix report are produced and acceptance evidence records exact commands/outcomes.
+- [x] chain-specific JSON reports and aggregate matrix report are produced and acceptance evidence records exact commands/outcomes.
 - [x] existing EVM harness behavior remains unchanged.
 - [ ] full sequential validation + issue evidence posted.
 
-Blocker:
-- live matrix execution is blocked by missing valid runtime inputs for `--agent-id`, `--bootstrap-token-file`, and `--harvy-address` in the current environment; Solana expected wallet/recipient inputs are also not provisioned.
+Current blocker:
+- local loopback bootstrap is fixed and `hardhat_local` evidence is green, but the sequential live matrix now stops at `base_sepolia` because active trade paths require `XCLAW_BUILDER_CODE_BASE_SEPOLIA` (or `XCLAW_BUILDER_CODE_BASE`) and the current environment does not provide it; x402 transfer-approval follow-up also returns `404 payload_invalid` for the generated approval id in this run.
 
 Issue mapping:
 - `#96`

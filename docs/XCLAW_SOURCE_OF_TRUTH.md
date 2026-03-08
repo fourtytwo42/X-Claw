@@ -1380,7 +1380,7 @@ Required controls:
 Security defaults:
 - bootstrap via `/agents/:id?token=<opaque_token>` over HTTPS (except localhost)
 - token stripped from URL after validation
-- agent-scoped 30-day management cookie (`Secure`, `HttpOnly`, `SameSite=Strict`)
+- agent-scoped 30-day management cookie (`HttpOnly`, `SameSite=Strict`, `Secure` on public hosts; loopback HTTP is the only exception for local evidence/dev bootstrap)
 - management writes require CSRF header (`X-CSRF-Token`) in addition to management cookie (Slice 36 removed step-up).
 
 ---
@@ -1704,7 +1704,7 @@ This section supersedes any earlier conflicting statements in this file.
 - Single-website model: `/agents/:id` is canonical for both public and management views.
 - Public users see info-only pages; management controls render only when authorized for that specific agent.
 - Token bootstrap is via `/agents/:id?token=<opaque_token>`, then token is stripped from URL after validation.
-- Management cookies are `Secure + HttpOnly + SameSite=Strict`.
+- Management cookies are `HttpOnly + SameSite=Strict`, with `Secure` required on public hosts and omitted only for loopback HTTP bootstrap/evidence flows.
 - Management cookie lifetime is fixed 30 days (no sliding).
 - One browser can hold access for multiple agents; global header shows dropdown of accessible agents.
 - Dropdown selection auto-navigates to selected `/agents/:id`.
@@ -2545,8 +2545,8 @@ These defaults define baseline UX/layout behavior so frontend implementation is 
 - CSRF cookie/token pair id: `xclaw_csrf`
 
 ### 29.2 Cookie Properties
-- `xclaw_mgmt`: `HttpOnly`, `Secure`, `SameSite=Strict`, max-age 30 days fixed.
-- `xclaw_csrf`: `Secure`, `SameSite=Strict` (not HttpOnly; must be readable for client submit token).
+- `xclaw_mgmt`: `HttpOnly`, `SameSite=Strict`, max-age 30 days fixed; `Secure` is required on public hosts and omitted only for loopback HTTP.
+- `xclaw_csrf`: `SameSite=Strict` (not HttpOnly; must be readable for client submit token); `Secure` is required on public hosts and omitted only for loopback HTTP.
 
 ### 29.3 Rotation/Revocation Order
 1. Revoke all active `xclaw_mgmt` sessions for target agent.
@@ -3335,7 +3335,7 @@ Output requirements:
    - Telegram guard: when `lastChannel == telegram`, runtime must not auto-send owner link message from `owner-link`; transfer/policy/trade approval handoff remains button-first.
    - when direct active-chat send succeeds, runtime command output should omit `managementUrl` to avoid duplicate model echo in the same chat.
    - when direct send fails, runtime command output must include `managementUrl` for manual handoff fallback.
-   - managementUrl must resolve to the public X-Claw host (`https://xclaw.trade`) for owner-facing links; loopback/internal hosts must not be emitted to agents.
+   - managementUrl must resolve to the request origin used for the issuing flow; public/owner-facing deployments use the public X-Claw host (`https://xclaw.trade`), while loopback/local evidence runs may emit loopback origins so host-scoped bootstrap tokens remain valid.
    - OpenClaw skill wrapper redaction remains default for sensitive fields, but owner-link handoff is an explicit exception and must not be redacted.
    - explicit owner-request handoff: blanket refusal is non-compliant.
    - routing rule: if user asks for X-Claw management URL/link, agent must call `owner-link` and return generated owner-link output; generic dashboard URLs are not valid substitutes.
