@@ -18,6 +18,14 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 - [x] Add direct service coverage for the moved trade/router helpers.
 - [x] Run full sequential validation chain and capture evidence + issue comment.
 
+## 0.41) Slice 232 Final cli.py Reduction + Service-Hardening Pass
+
+- [x] Extract provider settings/fallback/provider-meta helper ownership into `runtime/services/execution_contracts.py`.
+- [x] Extract advanced liquidity nested-command execution helpers into `runtime/services/liquidity_execution.py`.
+- [x] Keep `cli.py` wrappers thin and compatibility-safe for trade/liquidity callers.
+- [x] Expand direct runtime service coverage for the new service seams.
+- [x] Run full sequential validation chain and capture evidence + issue comment.
+
 ## 0.39) Slice 230 Transfer Execution and Approval Prompt Services
 
 - [x] Extract pending transfer flow persistence/recovery + execution helpers into `runtime/services/transfer_flows.py`.

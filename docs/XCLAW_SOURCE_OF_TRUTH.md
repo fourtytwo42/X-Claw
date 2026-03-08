@@ -241,6 +241,30 @@ Core thesis: **agents act, humans supervise, network observes and allocates trus
 - no API/schema/database changes,
 - no custody/auth boundary changes.
 
+## 3.31) Slice 232 Final cli.py Reduction + Service-Hardening Pass (2026-03-08)
+
+1. `apps/agent-runtime/xclaw_agent/cli.py` remains the canonical public CLI router:
+- parser wiring,
+- command registration,
+- thin adapter/wrapper dispatch only.
+2. Remaining provider/liquidity execution helper ownership must live under `apps/agent-runtime/xclaw_agent/runtime/services/`:
+- `execution_contracts.py`
+- `liquidity_execution.py`
+3. Slice 232 preserves all public runtime compatibility requirements:
+- no CLI verb/flag/path changes,
+- no JSON field-name contract changes,
+- no exit-code contract changes,
+- no custody/auth boundary changes.
+4. Compatibility wrappers in `cli.py` may remain for tests and entrypoints, but behavior-heavy ownership for:
+- provider settings resolution,
+- provider metadata shaping,
+- bounded fallback reason shaping,
+- advanced liquidity nested command execution
+must live in runtime services.
+5. Existing trade/liquidity response vocabulary remains unchanged:
+- `providerRequested|providerUsed|fallbackUsed|fallbackReason|routeKind|liquidityOperation`
+- all prior EVM/Solana trade and liquidity reason codes remain stable.
+
 ## 3.30) Slice 231 Trade Router Execution Service Extraction (2026-03-08)
 
 1. Shared trade/router helper ownership must live under `apps/agent-runtime/xclaw_agent/runtime/services/trade_execution.py`, not directly in `cli.py`.
@@ -375,7 +399,7 @@ must contain active-slice summaries only, not multi-slice historical ledgers.
 - x402 policy/network contracts remain unchanged.
 5. Shared runtime lifecycle/state-machine helpers from earlier runtime slices may be reused, but this slice does not redesign x402 runtime engines; it moves command orchestration ownership only.
 
-## 3.31) Slice 223 Liquidity Extraction (2026-03-08)
+## 3.31-h) Slice 223 Liquidity Extraction (2026-03-08)
 
 1. `apps/agent-runtime/xclaw_agent/cli.py` must remain the canonical public router for liquidity entrypoints:
 - parser wiring,

@@ -9,6 +9,18 @@ from xclaw_agent.runtime.services.trade_execution import (
     router_action_executor,
     wait_for_tx_receipt_success,
 )
+from xclaw_agent.runtime.services.execution_contracts import (
+    ExecutionContractContext,
+    build_liquidity_provider_meta,
+    build_provider_meta,
+    fallback_reason,
+    provider_settings,
+)
+from xclaw_agent.runtime.services.liquidity_execution import (
+    LiquidityExecutionServiceContext,
+    execute_liquidity_advanced_intent,
+    invoke_liquidity_command_payload,
+)
 from xclaw_agent.runtime.services.transfer_flows import (
     TransferFlowContext,
     assert_transfer_balance_preconditions,
@@ -58,6 +70,14 @@ __all__ = [
     "quote_trade_via_router_adapter",
     "router_action_executor",
     "wait_for_tx_receipt_success",
+    "ExecutionContractContext",
+    "build_liquidity_provider_meta",
+    "build_provider_meta",
+    "fallback_reason",
+    "provider_settings",
+    "LiquidityExecutionServiceContext",
+    "execute_liquidity_advanced_intent",
+    "invoke_liquidity_command_payload",
     "TransferFlowContext",
     "assert_transfer_balance_preconditions",
     "execute_pending_transfer_flow",

@@ -11,8 +11,7 @@ AGENT_RUNTIME_ROOT = REPO_ROOT / "apps" / "agent-runtime"
 if str(AGENT_RUNTIME_ROOT) not in sys.path:
     sys.path.insert(0, str(AGENT_RUNTIME_ROOT))
 
-from xclaw_agent.runtime.services import approval_prompts, transfer_flows  # noqa: E402
-from xclaw_agent.runtime.services import trade_execution  # noqa: E402
+from xclaw_agent.runtime.services import approval_prompts, execution_contracts, liquidity_execution, trade_execution, transfer_flows  # noqa: E402
 from xclaw_agent import cli  # noqa: E402
 
 
@@ -156,6 +155,66 @@ class RuntimeServicesTests(unittest.TestCase):
         )
         self.assertEqual(out.get("amountOutUnits"), "123")
         self.assertEqual(quote_mock.call_args.kwargs["chain"], "base_sepolia")
+
+    def test_trade_execution_wait_for_receipt_success_parses_status(self) -> None:
+        ctx = trade_execution.TradeExecutionServiceContext(
+            require_cast_bin=lambda: "cast",
+            chain_rpc_url=lambda chain: "https://rpc.example",
+            run_subprocess=lambda *args, **kwargs: SimpleNamespace(returncode=0, stdout='{\"status\":\"0x1\"}', stderr=""),
+            cast_receipt_timeout_sec=lambda: 5,
+            json_module=cli.json,
+            wallet_store_error=cli.WalletStoreError,
+            fetch_token_allowance_wei=lambda *args: "0",
+            cast_calldata=lambda *args, **kwargs: "0xdeadbeef",
+            cast_rpc_send_transaction=lambda *args, **kwargs: "0x" + "ab" * 32,
+            quote_trade=lambda **kwargs: {},
+            build_trade_plan=lambda **kwargs: kwargs,
+            execute_trade_plan=lambda **kwargs: None,
+            router_get_amount_out=lambda chain, value, token_a, token_b: 0,
+        )
+        receipt = trade_execution.wait_for_tx_receipt_success(ctx, "base_sepolia", "0x" + "ab" * 32)
+        self.assertEqual(receipt.get("status"), "0x1")
+
+    def test_execution_contracts_provider_meta_normalizes_legacy_values(self) -> None:
+        provider_meta = execution_contracts.build_provider_meta(
+            provider_requested="legacy_router",
+            provider_used="uniswap_api",
+            fallback_used=True,
+            fallback_reason_value={"code": "quote_failed", "message": "x" * 600},
+            route_kind="router_path",
+        )
+        self.assertEqual(provider_meta["providerRequested"], "router_adapter")
+        self.assertEqual(provider_meta["providerUsed"], "router_adapter")
+        self.assertEqual(provider_meta["routeKind"], "router_path")
+        reason = execution_contracts.fallback_reason("quote_failed", "y" * 700)
+        self.assertEqual(reason["code"], "quote_failed")
+        self.assertEqual(len(reason["message"]), 500)
+
+    def test_liquidity_execution_service_dispatches_advanced_intent(self) -> None:
+        def claim_fees_cmd(args: object) -> int:
+            print('{"txHash":"sig","liquidityOperation":"claim_fees"}')
+            return 0
+
+        ctx = liquidity_execution.LiquidityExecutionServiceContext(
+            argparse_module=cli.argparse,
+            json_module=cli.json,
+            wallet_store_error=cli.WalletStoreError,
+            build_liquidity_adapter_for_request=lambda **kwargs: SimpleNamespace(protocol_family="raydium_clmm"),
+            intent_details_dict=lambda intent: {"collectAsWeth": True},
+            v3_details_dict=lambda details: {},
+            cmd_liquidity_increase=mock.Mock(),
+            cmd_liquidity_claim_fees=claim_fees_cmd,
+            cmd_liquidity_claim_rewards=mock.Mock(),
+            cmd_liquidity_migrate=mock.Mock(),
+        )
+        payload, family = liquidity_execution.execute_liquidity_advanced_intent(
+            ctx,
+            {"dex": "raydium", "positionId": "pos_1"},
+            "solana_mainnet_beta",
+            "claim_fees",
+        )
+        self.assertEqual(family, "raydium_clmm")
+        self.assertEqual(payload["txHash"], "sig")
 
 
 if __name__ == "__main__":

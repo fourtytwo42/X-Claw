@@ -14,15 +14,15 @@
   - `routeKind`
   - `liquidityOperation`
 
-## Active Context: Slice 231 Trade Router Execution Service Extraction
+## Active Context: Slice 232 Final cli.py Reduction + Service-Hardening Pass
 
-Issue mapping: `#84`
+Issue mapping: `#85`
 
 ### Objective + scope lock
 - Objective:
-  - move shared trade/router receipt, allowance, quote, and execute helper ownership out of `cli.py`,
-  - preserve trade/liquidity runtime JSON/CLI behavior,
-  - keep thin compatibility wrappers in `cli.py` for existing tests and command entrypoints.
+  - move the remaining provider/liquidity execution helper ownership out of `cli.py`,
+  - preserve runtime JSON/CLI behavior for trade and liquidity surfaces,
+  - keep `cli.py` as parser/router + thin compatibility wrappers only.
 - Scope guard:
   - runtime internal hardening only,
   - no API/schema/database changes.
@@ -30,10 +30,14 @@ Issue mapping: `#84`
 ### Expected touched files
 - `apps/agent-runtime/xclaw_agent/cli.py`
 - `apps/agent-runtime/xclaw_agent/runtime/services/__init__.py`
-- `apps/agent-runtime/xclaw_agent/runtime/services/trade_execution.py`
+- `apps/agent-runtime/xclaw_agent/runtime/services/execution_contracts.py`
+- `apps/agent-runtime/xclaw_agent/runtime/services/liquidity_execution.py`
 - `apps/agent-runtime/tests/test_runtime_services.py`
 - `apps/agent-runtime/tests/test_liquidity_cli.py`
 - `apps/agent-runtime/tests/test_trade_path.py`
+- `apps/agent-runtime/tests/test_runtime_adapters.py`
+- `apps/agent-runtime/tests/test_approvals_run_loop.py`
+- `apps/agent-runtime/tests/test_x402_cli.py`
 - `docs/XCLAW_SOURCE_OF_TRUTH.md`
 - `docs/XCLAW_SLICE_TRACKER.md`
 - `docs/XCLAW_BUILD_ROADMAP.md`

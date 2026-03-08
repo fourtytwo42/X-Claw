@@ -5851,87 +5851,27 @@ def cmd_liquidity_claim_rewards(args: argparse.Namespace) -> int:
     return liquidity_commands.cmd_liquidity_claim_rewards(_build_liquidity_runtime_adapter(), args)
 
 
+def _build_liquidity_execution_service_ctx() -> runtime_services.LiquidityExecutionServiceContext:
+    return runtime_services.LiquidityExecutionServiceContext(
+        argparse_module=argparse,
+        json_module=json,
+        wallet_store_error=WalletStoreError,
+        build_liquidity_adapter_for_request=build_liquidity_adapter_for_request,
+        intent_details_dict=_intent_details_dict,
+        v3_details_dict=_v3_details_dict,
+        cmd_liquidity_increase=cmd_liquidity_increase,
+        cmd_liquidity_claim_fees=cmd_liquidity_claim_fees,
+        cmd_liquidity_claim_rewards=cmd_liquidity_claim_rewards,
+        cmd_liquidity_migrate=cmd_liquidity_migrate,
+    )
+
+
 def _invoke_liquidity_command_payload(command: Callable[[argparse.Namespace], int], args: argparse.Namespace) -> dict[str, Any]:
-    buf = io.StringIO()
-    with redirect_stdout(buf):
-        code = command(args)
-    raw = buf.getvalue().strip()
-    payload: dict[str, Any] = {}
-    if raw:
-        try:
-            decoded = json.loads(raw)
-            if isinstance(decoded, dict):
-                payload = decoded
-        except Exception:
-            payload = {"ok": False, "code": "liquidity_execute_parse_failed", "message": raw[:400]}
-    if code != 0:
-        error_code = str(payload.get("code") or "liquidity_execution_failed")
-        error_message = str(payload.get("message") or "Advanced liquidity command failed.")
-        raise WalletStoreError(f"{error_code}: {error_message}")
-    return payload
+    return runtime_services.invoke_liquidity_command_payload(_build_liquidity_execution_service_ctx(), command, args)
 
 
 def _execute_liquidity_advanced_intent(intent: dict[str, Any], chain: str, action: str) -> tuple[dict[str, Any], str]:
-    dex = str(intent.get("dex") or "").strip().lower()
-    adapter = build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type="v3")
-    details = _intent_details_dict(intent)
-    v3_details = _v3_details_dict(details)
-    position_id = str(intent.get("positionId") or intent.get("positionRef") or "").strip()
-    slippage_bps = int(intent.get("slippageBps") or details.get("slippageBps") or 100)
-
-    if action == "increase":
-        args = argparse.Namespace(
-            chain=chain,
-            dex=dex,
-            position_id=position_id,
-            token_a=str(intent.get("tokenA") or v3_details.get("tokenA") or ""),
-            token_b=str(intent.get("tokenB") or v3_details.get("tokenB") or ""),
-            amount_a=str(intent.get("amountA") or v3_details.get("amountA") or ""),
-            amount_b=str(intent.get("amountB") or v3_details.get("amountB") or ""),
-            slippage_bps=slippage_bps,
-            json=True,
-        )
-        payload = _invoke_liquidity_command_payload(cmd_liquidity_increase, args)
-        return payload, adapter.protocol_family
-
-    if action in {"claim_fees", "claim-fees"}:
-        args = argparse.Namespace(
-            chain=chain,
-            dex=dex,
-            position_id=position_id,
-            collect_as_weth=bool(details.get("collectAsWeth") or False),
-            json=True,
-        )
-        payload = _invoke_liquidity_command_payload(cmd_liquidity_claim_fees, args)
-        return payload, adapter.protocol_family
-
-    if action in {"claim_rewards", "claim-rewards"}:
-        args = argparse.Namespace(
-            chain=chain,
-            dex=dex,
-            position_id=position_id,
-            reward_token=str(details.get("rewardToken") or ""),
-            request_json=json.dumps(details.get("request") or {}) if isinstance(details.get("request"), dict) else None,
-            json=True,
-        )
-        payload = _invoke_liquidity_command_payload(cmd_liquidity_claim_rewards, args)
-        return payload, adapter.protocol_family
-
-    if action == "migrate":
-        args = argparse.Namespace(
-            chain=chain,
-            dex=dex,
-            position_id=position_id,
-            from_protocol=str(details.get("fromProtocol") or "V3"),
-            to_protocol=str(details.get("toProtocol") or "V3"),
-            slippage_bps=slippage_bps,
-            request_json=json.dumps(details.get("request") or {}) if isinstance(details.get("request"), dict) else None,
-            json=True,
-        )
-        payload = _invoke_liquidity_command_payload(cmd_liquidity_migrate, args)
-        return payload, adapter.protocol_family
-
-    raise WalletStoreError(f"Unsupported liquidity action '{action}'.")
+    return runtime_services.execute_liquidity_advanced_intent(_build_liquidity_execution_service_ctx(), intent, chain, action)
 
 
 def _run_liquidity_execute_inline(liquidity_intent_id: str, chain: str) -> tuple[int, dict[str, Any]]:
@@ -5950,32 +5890,20 @@ def cmd_liquidity_positions(args: argparse.Namespace) -> int:
     return liquidity_commands.cmd_liquidity_positions(_build_liquidity_runtime_adapter(), args)
 
 
+def _build_execution_contract_service_ctx() -> runtime_services.ExecutionContractContext:
+    return runtime_services.ExecutionContractContext(load_chain_config=_load_chain_config)
+
+
 def _trade_provider_settings(chain: str) -> tuple[str, str]:
-    cfg = _load_chain_config(chain)
-    execution = cfg.get("execution")
-    if isinstance(execution, dict):
-        trade_cfg = execution.get("trade")
-        if isinstance(trade_cfg, dict):
-            default_provider = str(trade_cfg.get("defaultProvider") or "").strip().lower()
-            if default_provider in {"router_adapter", "quote_only", "none"}:
-                return default_provider, "none"
-    return "router_adapter", "none"
+    return runtime_services.provider_settings(_build_execution_contract_service_ctx(), chain, "trade")
 
 
 def _liquidity_provider_settings(chain: str) -> tuple[str, str]:
-    cfg = _load_chain_config(chain)
-    execution = cfg.get("execution")
-    if isinstance(execution, dict):
-        liquidity_cfg = execution.get("liquidity")
-        if isinstance(liquidity_cfg, dict):
-            default_provider = str(liquidity_cfg.get("defaultProvider") or "").strip().lower()
-            if default_provider in {"router_adapter", "quote_only", "none"}:
-                return default_provider, "none"
-    return "router_adapter", "none"
+    return runtime_services.provider_settings(_build_execution_contract_service_ctx(), chain, "liquidity")
 
 
 def _fallback_reason(code: str, message: str) -> dict[str, str]:
-    return {"code": code, "message": message[:500]}
+    return runtime_services.fallback_reason(code, message)
 
 
 def _build_provider_meta(
@@ -5985,15 +5913,13 @@ def _build_provider_meta(
     fallback_reason: dict[str, str] | None,
     route_kind: str | None,
 ) -> dict[str, Any]:
-    normalized_requested = "router_adapter" if provider_requested in {"legacy_router", "uniswap_api"} else provider_requested
-    normalized_used = "router_adapter" if provider_used in {"legacy_router", "uniswap_api"} else provider_used
-    return {
-        "providerRequested": normalized_requested,
-        "providerUsed": normalized_used,
-        "fallbackUsed": bool(fallback_used),
-        "fallbackReason": fallback_reason if fallback_used and isinstance(fallback_reason, dict) else None,
-        "routeKind": (str(route_kind or "").strip() or None),
-    }
+    return runtime_services.build_provider_meta(
+        provider_requested=provider_requested,
+        provider_used=provider_used,
+        fallback_used=fallback_used,
+        fallback_reason_value=fallback_reason,
+        route_kind=route_kind,
+    )
 
 
 def _build_liquidity_provider_meta(
@@ -6003,15 +5929,13 @@ def _build_liquidity_provider_meta(
     fallback_reason: dict[str, str] | None,
     liquidity_operation: str | None,
 ) -> dict[str, Any]:
-    normalized_requested = "router_adapter" if provider_requested in {"legacy_router", "uniswap_api"} else provider_requested
-    normalized_used = "router_adapter" if provider_used in {"legacy_router", "uniswap_api"} else provider_used
-    return {
-        "providerRequested": normalized_requested,
-        "providerUsed": normalized_used,
-        "fallbackUsed": bool(fallback_used),
-        "fallbackReason": fallback_reason if fallback_used and isinstance(fallback_reason, dict) else None,
-        "liquidityOperation": (str(liquidity_operation or "").strip().lower() or None),
-    }
+    return runtime_services.build_liquidity_provider_meta(
+        provider_requested=provider_requested,
+        provider_used=provider_used,
+        fallback_used=fallback_used,
+        fallback_reason_value=fallback_reason,
+        liquidity_operation=liquidity_operation,
+    )
 
 
 def _build_trade_execution_service_ctx() -> runtime_services.TradeExecutionServiceContext:

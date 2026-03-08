@@ -17,8 +17,26 @@ Status legend:
 
 ---
 
+## Slice 232: Final cli.py Reduction + Service-Hardening Pass
+Status: [x]
+
+Goal:
+- move the remaining provider/liquidity execution helper ownership out of `cli.py` into narrow runtime services, preserve command/test seams, and keep `cli.py` as parser/router + thin wrapper surface only.
+
+DoD:
+- [x] provider settings/fallback/provider-meta helpers live under `apps/agent-runtime/xclaw_agent/runtime/services/execution_contracts.py`.
+- [x] advanced liquidity nested-command execution helpers live under `apps/agent-runtime/xclaw_agent/runtime/services/liquidity_execution.py`.
+- [x] `cli.py` keeps thin wrappers for the moved helpers and remains compatibility-safe for extracted command families.
+- [x] direct runtime service coverage is expanded for the new service seams.
+- [x] full sequential validation + issue evidence posted.
+
+Issue mapping:
+- `#85`
+
+---
+
 ## Slice 231: Trade Router Execution Service Extraction
-Status: [~]
+Status: [x]
 
 Goal:
 - move shared trade/router receipt, allowance, quote, and execute helper ownership out of `cli.py` into runtime services while preserving current runtime command/test contracts.
