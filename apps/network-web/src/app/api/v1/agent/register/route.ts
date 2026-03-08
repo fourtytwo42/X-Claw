@@ -37,6 +37,51 @@ class NameChangeTooSoonError extends Error {
   }
 }
 
+function isMissingLastNameChangeColumn(error: unknown): boolean {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+  const code = String((error as { code?: unknown }).code ?? '');
+  const column = String((error as { column?: unknown }).column ?? '');
+  const message = String((error as { message?: unknown }).message ?? '');
+  return code === '42703' && (column === 'last_name_change_at' || message.includes('last_name_change_at'));
+}
+
+async function readExistingAgentForUpdate(
+  client: { query: <T = { agent_name: string; last_name_change_at: string | null }>(text: string, values: unknown[]) => Promise<{ rows: T[] }> },
+  agentId: string
+): Promise<{ agent_name: string; last_name_change_at: string | null } | null> {
+  try {
+    const existing = await client.query<{ agent_name: string; last_name_change_at: string | null }>(
+      `
+      select agent_name, last_name_change_at::text
+      from agents
+      where agent_id = $1
+      for update
+      `,
+      [agentId]
+    );
+    return existing.rows[0] ?? null;
+  } catch (error) {
+    if (!isMissingLastNameChangeColumn(error)) {
+      throw error;
+    }
+    const existingLegacy = await client.query<{ agent_name: string }>(
+      `
+      select agent_name
+      from agents
+      where agent_id = $1
+      for update
+      `,
+      [agentId]
+    );
+    if (existingLegacy.rows.length === 0) {
+      return null;
+    }
+    return { agent_name: existingLegacy.rows[0].agent_name, last_name_change_at: null };
+  }
+}
+
 async function upsertWallets(client: { query: (text: string, values: unknown[]) => Promise<unknown> }, body: RegisterRequest): Promise<void> {
   for (const wallet of body.wallets) {
     await client.query(
@@ -107,19 +152,10 @@ export async function POST(req: NextRequest) {
     }
 
     await withTransaction(async (client) => {
-      const existing = await client.query<{ agent_name: string; last_name_change_at: string | null }>(
-        `
-        select agent_name, last_name_change_at::text
-        from agents
-        where agent_id = $1
-        for update
-        `,
-        [body.agentId]
-      );
-
-      if (existing.rows.length > 0) {
-        const currentName = existing.rows[0].agent_name;
-        const lastNameChangeAt = existing.rows[0].last_name_change_at;
+      const existing = await readExistingAgentForUpdate(client, body.agentId);
+      if (existing) {
+        const currentName = existing.agent_name;
+        const lastNameChangeAt = existing.last_name_change_at;
         const requestedDifferentName = currentName !== agentName;
         if (requestedDifferentName && lastNameChangeAt) {
           const parsedLastChange = new Date(lastNameChangeAt);

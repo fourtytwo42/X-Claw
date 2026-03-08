@@ -18,11 +18,24 @@ type ChainOption = { key: string; label: string };
 function isTestnetOption(option: ChainOption): boolean {
   const key = option.key.toLowerCase();
   const label = option.label.toLowerCase();
-  return key.includes('testnet') || key.includes('sepolia') || label.includes('testnet') || label.includes('sepolia');
+  const solanaNonMainnet = key === 'solana_devnet' || key === 'solana_testnet' || key === 'solana_localnet';
+  return (
+    solanaNonMainnet ||
+    key.includes('testnet') ||
+    key.includes('sepolia') ||
+    key.includes('devnet') ||
+    key.includes('localnet') ||
+    label.includes('testnet') ||
+    label.includes('sepolia') ||
+    label.includes('devnet') ||
+    label.includes('localnet')
+  );
 }
 
 function sortAndGroupOptions<T extends ChainOption>(options: T[]): { mainnets: T[]; testnets: T[] } {
-  const sorted = [...options].sort((a, b) => a.label.localeCompare(b.label));
+  const sorted = [...options]
+    .filter((opt) => opt.key !== 'solana_localnet')
+    .sort((a, b) => a.label.localeCompare(b.label));
   const mainnets = sorted.filter((opt) => !isTestnetOption(opt));
   const testnets = sorted.filter((opt) => isTestnetOption(opt));
   return { mainnets, testnets };

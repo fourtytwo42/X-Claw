@@ -23,6 +23,7 @@ Use this page as the entry point for understanding, running, and validating X-Cl
 ## Build Control and Delivery Tracking
 - Build roadmap: `docs/XCLAW_BUILD_ROADMAP.md`
 - Slice tracker: `docs/XCLAW_SLICE_TRACKER.md`
+- Consumer growth roadmap (Mar-Aug 2026): `docs/GROWTH_ROADMAP_2026H1.md`
 - Best-practices rulebook: `docs/BEST_PRACTICES_RULEBOOK.md`
 
 ## Data and Test References

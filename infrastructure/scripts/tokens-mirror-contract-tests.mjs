@@ -55,6 +55,19 @@ async function main() {
     process.exit(1);
   }
 
+  const register = await requestAgent({
+    method: 'POST',
+    routePath: '/agent/register',
+    body: {
+      schemaVersion: 1,
+      agentId: AGENT_ID,
+      agentName: 'Token Mirror Contract Runner',
+      runtimePlatform: 'linux',
+      wallets: [{ chainKey: CHAIN_KEY, address: '0x1111111111111111111111111111111111111111' }],
+    },
+  });
+  expect(register.status === 200, 'agent_register_status_200', register);
+
   const badPayload = await requestAgent({
     method: 'POST',
     routePath: '/agent/tokens/mirror',
@@ -66,6 +79,18 @@ async function main() {
   });
   expect(badPayload.status === 400, 'mirror_rejects_bad_token_status', badPayload);
   expect(badPayload.body?.code === 'payload_invalid', 'mirror_rejects_bad_token_code', badPayload.body);
+
+  const mismatchedAgent = await requestAgent({
+    method: 'POST',
+    routePath: '/agent/tokens/mirror',
+    body: {
+      agentId: 'ag_not_authenticated',
+      chainKey: CHAIN_KEY,
+      tokens: [{ token: TOKEN_ADDRESS }],
+    },
+  });
+  expect(mismatchedAgent.status === 401, 'mirror_rejects_agent_mismatch_status', mismatchedAgent);
+  expect(mismatchedAgent.body?.code === 'auth_invalid', 'mirror_rejects_agent_mismatch_code', mismatchedAgent.body);
 
   const mirror = await requestAgent({
     method: 'POST',

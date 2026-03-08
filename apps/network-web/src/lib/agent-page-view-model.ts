@@ -450,13 +450,25 @@ export function normalizeHexAddress(value: string): string {
   return raw.toLowerCase();
 }
 
+export function isLikelyEvmAddress(value: string): boolean {
+  return /^0x[a-fA-F0-9]{40}$/.test(String(value ?? '').trim());
+}
+
+export function normalizeTokenAddressKey(value: string): string {
+  const raw = String(value ?? '').trim();
+  if (!raw) {
+    return '';
+  }
+  return isLikelyEvmAddress(raw) ? raw.toLowerCase() : raw;
+}
+
 export function tokenSymbolByAddress(chainTokens?: Array<{ symbol: string; address: string }>): Map<string, string> {
   const map = new Map<string, string>();
   for (const token of chainTokens ?? []) {
     if (!token.address || !token.symbol) {
       continue;
     }
-    map.set(normalizeHexAddress(token.address), token.symbol);
+    map.set(normalizeTokenAddressKey(token.address), token.symbol);
   }
   return map;
 }
@@ -466,7 +478,7 @@ export function resolveTokenLabel(value: string | null | undefined, byAddress: M
   if (!raw) {
     return 'token';
   }
-  const direct = byAddress.get(normalizeHexAddress(raw));
+  const direct = byAddress.get(normalizeTokenAddressKey(raw));
   if (direct) {
     return direct;
   }

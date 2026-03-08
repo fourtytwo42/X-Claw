@@ -204,8 +204,10 @@ async function main() {
     body: registerPayload,
     headers: { 'idempotency-key': `liq-register-${Date.now()}` },
   });
-  expect(register.status === 200, 'agent_register_status_200', { got: register.status, body: register.body });
-  if (register.status !== 200) {
+  const registerRateLimited =
+    register.status === 429 && String(register.body?.code || '') === 'rate_limited' && String(register.body?.details?.field || '') === 'agentName';
+  expect(register.status === 200 || registerRateLimited, 'agent_register_status_200_or_name_cooldown', { got: register.status, body: register.body });
+  if (register.status !== 200 && !registerRateLimited) {
     const output = {
       ok: false,
       apiBase: API_BASE,

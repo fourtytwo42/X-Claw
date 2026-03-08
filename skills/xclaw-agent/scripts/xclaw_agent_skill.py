@@ -38,7 +38,54 @@ def _maybe_patch_openclaw_gateway() -> None:
 
 
 def _print_json(data: dict) -> None:
-    print(json.dumps(data, separators=(",", ":")))
+    print(json.dumps(_normalize_chain_display_payload(data), separators=(",", ":")))
+
+
+def _display_chain_key(value: str) -> str:
+    normalized = str(value or "").strip().lower()
+    if normalized == "solana_mainnet_beta":
+        return "solana_mainnet"
+    return str(value or "")
+
+
+def _normalize_chain_display_payload(value):
+    if isinstance(value, dict):
+        out = {}
+        for key, item in value.items():
+            normalized_item = _normalize_chain_display_payload(item)
+            if key in {"chain", "chainKey", "defaultChain"} and isinstance(normalized_item, str):
+                out[key] = _display_chain_key(normalized_item)
+            else:
+                out[key] = normalized_item
+        return out
+    if isinstance(value, list):
+        return [_normalize_chain_display_payload(item) for item in value]
+    return value
+
+
+def _normalize_chain_display_stdout(stdout: str) -> str:
+    lines = (stdout or "").splitlines()
+    out_lines: list[str] = []
+    alias_pattern = re.compile(r"\bsolana_mainnet_beta\b")
+    for line in lines:
+        trimmed = line.strip()
+        if not trimmed:
+            out_lines.append(line)
+            continue
+        try:
+            payload = json.loads(trimmed)
+        except json.JSONDecodeError:
+            out_lines.append(alias_pattern.sub("solana_mainnet", line))
+            continue
+        if isinstance(payload, dict):
+            payload = _normalize_chain_display_payload(payload)
+            out_lines.append(json.dumps(payload, separators=(",", ":")))
+        else:
+            out_lines.append(alias_pattern.sub("solana_mainnet", line))
+            continue
+        # Best-effort normalization for non-JSON output lines.
+        out_lines[-1] = alias_pattern.sub("solana_mainnet", out_lines[-1])
+    return "\n".join(out_lines)
 
 
 def _err(code: str, message: str, action_hint: Optional[str] = None, details: Optional[dict] = None, exit_code: int = 1) -> int:
@@ -555,6 +602,7 @@ def _run_agent(args: Iterable[str]) -> int:
                 return 0
         if out and not _show_sensitive() and _should_redact_sensitive(args):
             out = _redact_sensitive_stdout(out)
+        out = _normalize_chain_display_stdout(out)
         if out:
             print(out)
         else:
@@ -1420,7 +1468,15 @@ def main(argv: List[str]) -> int:
         assets = argv[2:]
         if assets:
             first = str(assets[0] or "").strip().lower()
-            if first in {"base_sepolia", "kite_ai_testnet", "solana_localnet", "solana_devnet", "solana_testnet", "solana_mainnet_beta"}:
+            if first in {
+                "base_sepolia",
+                "kite_ai_testnet",
+                "solana_localnet",
+                "solana_devnet",
+                "solana_testnet",
+                "solana_mainnet",
+                "solana_mainnet_beta",
+            }:
                 request_chain = first
                 assets = assets[1:]
         args = ["faucet-request", "--chain", request_chain]

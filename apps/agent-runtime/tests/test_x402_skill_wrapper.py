@@ -794,6 +794,36 @@ class X402SkillWrapperTests(unittest.TestCase):
         emitted = json.loads(buf.getvalue().strip())
         self.assertEqual(emitted.get("code"), "send_failed")
 
+    def test_run_agent_normalizes_solana_mainnet_beta_in_success_stdout(self) -> None:
+        payload = {"ok": True, "code": "ok", "chainKey": "solana_mainnet_beta", "chain": "solana_mainnet_beta"}
+        child = mock.Mock()
+        child.returncode = 0
+        child.communicate.return_value = (json.dumps(payload), "")
+        with mock.patch.object(skill, "_resolve_agent_binary", return_value="/usr/bin/xclaw-agent"):
+            with mock.patch.object(skill, "_maybe_patch_openclaw_gateway"):
+                with mock.patch.object(skill.subprocess, "Popen", return_value=child):
+                    buf = io.StringIO()
+                    with redirect_stdout(buf):
+                        code = skill._run_agent(["wallet", "balance"])
+        self.assertEqual(code, 0)
+        emitted = json.loads(buf.getvalue().strip())
+        self.assertEqual(emitted.get("chainKey"), "solana_mainnet")
+        self.assertEqual(emitted.get("chain"), "solana_mainnet")
+
+    def test_run_agent_normalizes_solana_mainnet_beta_in_plain_stdout(self) -> None:
+        child = mock.Mock()
+        child.returncode = 0
+        child.communicate.return_value = ("Chain: solana_mainnet_beta\n", "")
+        with mock.patch.object(skill, "_resolve_agent_binary", return_value="/usr/bin/xclaw-agent"):
+            with mock.patch.object(skill, "_maybe_patch_openclaw_gateway"):
+                with mock.patch.object(skill.subprocess, "Popen", return_value=child):
+                    buf = io.StringIO()
+                    with redirect_stdout(buf):
+                        code = skill._run_agent(["wallet", "balance"])
+        self.assertEqual(code, 0)
+        self.assertIn("solana_mainnet", buf.getvalue())
+        self.assertNotIn("solana_mainnet_beta", buf.getvalue())
+
     def test_run_agent_keeps_approval_sync_failed_nonzero(self) -> None:
         payload = {
             "ok": False,

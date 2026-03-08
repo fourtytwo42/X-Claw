@@ -41,6 +41,7 @@ from xclaw_agent.chains import (
     chain_enabled,
     chain_capability,
     list_chains as list_chain_registry,
+    normalize_chain_key,
     supported_chain_hint as chain_supported_hint,
 )
 from xclaw_agent.x402_policy import get_policy as x402_get_policy
@@ -837,6 +838,13 @@ def _is_solana_chain(chain: str) -> bool:
     return _chain_family(chain) == "solana"
 
 
+def _display_chain_key(chain: str) -> str:
+    normalized = str(chain or "").strip()
+    if normalized == "solana_mainnet_beta":
+        return "solana_mainnet"
+    return normalized
+
+
 def _normalize_private_key_hex(value: str) -> str | None:
     stripped = value.strip()
     if stripped.startswith("0x"):
@@ -887,10 +895,11 @@ def _require_cast_bin() -> str:
 
 
 def _load_chain_config(chain: str) -> dict[str, Any]:
-    assert_chain_supported(chain)
-    path = CHAIN_CONFIG_DIR / f"{chain}.json"
+    chain_key = normalize_chain_key(chain)
+    assert_chain_supported(chain_key)
+    path = CHAIN_CONFIG_DIR / f"{chain_key}.json"
     if not path.exists():
-        raise WalletStoreError(f"Chain config not found for '{chain}' at '{path}'.")
+        raise WalletStoreError(f"Chain config not found for '{chain_key}' at '{path}'.")
     data = _read_json(path)
     if not isinstance(data, dict):
         raise WalletStoreError(f"Chain config '{path}' must be a JSON object.")
@@ -3399,6 +3408,7 @@ def _maybe_send_telegram_approval_prompt(trade_id: str, chain: str, summary: dic
         # Fail closed: do not send a prompt we can't action safely.
         return
 
+    display_chain = _display_chain_key(chain)
     summary = summary or {}
     amount = str(summary.get("amountInHuman") or "").strip() or "?"
     token_in_symbol = str(summary.get("tokenInSymbol") or "").strip() or "TOKEN_IN"
@@ -3406,7 +3416,7 @@ def _maybe_send_telegram_approval_prompt(trade_id: str, chain: str, summary: dic
     text = (
         "Approve swap\n"
         f"{amount} {token_in_symbol} -> {token_out_symbol}\n"
-        f"Chain: `{chain}`\n"
+        f"Chain: `{display_chain}`\n"
         f"Trade: `{trade_id}`\n\n"
         "Tap Approve to continue (or Deny to reject). This will submit an on-chain transaction from the agent wallet."
     )
@@ -3480,6 +3490,7 @@ def _maybe_send_telegram_transfer_approval_prompt(flow: dict[str, Any]) -> None:
     if len(callback_approve.encode("utf-8")) > 64 or len(callback_deny.encode("utf-8")) > 64:
         return
 
+    display_chain = _display_chain_key(chain)
     transfer_type = str(flow.get("transferType") or "token").strip().lower()
     token_symbol = str(flow.get("tokenSymbol") or ("ETH" if transfer_type == "native" else "TOKEN")).strip() or "TOKEN"
     token_decimals = 18
@@ -3496,7 +3507,7 @@ def _maybe_send_telegram_transfer_approval_prompt(flow: dict[str, Any]) -> None:
         "Approve transfer\n"
         f"Amount: {amount_display}\n"
         f"To: `{to_address}`\n"
-        f"Chain: `{chain}`\n"
+        f"Chain: `{display_chain}`\n"
         f"Approval: `{approval_id}`\n\n"
         "Tap Approve to execute (or Deny to reject)."
     )
@@ -3567,6 +3578,7 @@ def _maybe_send_telegram_policy_approval_prompt(flow: dict[str, Any]) -> None:
     if len(callback_approve.encode("utf-8")) > 64 or len(callback_deny.encode("utf-8")) > 64:
         return
 
+    display_chain = _display_chain_key(chain)
     request_type = str(flow.get("requestType") or "").strip().lower()
     token_display = str(flow.get("tokenDisplay") or "").strip()
     request_label = "Policy update"
@@ -3587,7 +3599,7 @@ def _maybe_send_telegram_policy_approval_prompt(flow: dict[str, Any]) -> None:
         lines.append(f"Token: {token_display}")
     lines.extend(
         [
-            f"Chain: {chain}",
+            f"Chain: {display_chain}",
             f"Approval ID: {approval_id}",
             "Status: approval_pending",
             "",
@@ -3655,6 +3667,7 @@ def _maybe_send_telegram_liquidity_approval_prompt(flow: dict[str, Any]) -> None
     if len(callback_approve.encode("utf-8")) > 64 or len(callback_deny.encode("utf-8")) > 64:
         return
 
+    display_chain = _display_chain_key(chain)
     action = str(flow.get("action") or "remove").strip().lower()
     dex = str(flow.get("dex") or "unknown").strip().lower() or "unknown"
     token_a = str(flow.get("tokenASymbol") or _token_symbol_for_display(chain, str(flow.get("tokenA") or "")) or "TOKEN").strip() or "TOKEN"
@@ -3668,7 +3681,7 @@ def _maybe_send_telegram_liquidity_approval_prompt(flow: dict[str, Any]) -> None
         "Approve liquidity action",
         f"Action: {action}",
         f"Pair: {token_a}/{token_b}",
-        f"Chain: `{chain}`",
+        f"Chain: `{display_chain}`",
         f"DEX: `{dex}`",
         f"Intent ID: `{liquidity_intent_id}`",
         "Status: approval_pending",
@@ -3749,6 +3762,7 @@ def _maybe_send_telegram_decision_message(
         elif isinstance(thread_raw, str) and thread_raw.strip():
             thread_id = thread_raw.strip()
 
+    display_chain = _display_chain_key(chain)
     summary = summary or {}
     trade = trade or {}
     amount = str(summary.get("amountInHuman") or "").strip() or str(trade.get("amountIn") or "").strip() or "?"
@@ -3782,7 +3796,7 @@ def _maybe_send_telegram_decision_message(
             "Approval received.\n\n"
             f"• Pair: {amount} {token_in} -> {token_out}{slip_str}\n"
             f"• Trade ID: `{trade_id}`\n"
-            f"• Chain: `{chain}`\n\n"
+            f"• Chain: `{display_chain}`\n\n"
             "Executing now. I will send a final success/failure update after on-chain outcome is known."
         )
     else:
@@ -3792,7 +3806,7 @@ def _maybe_send_telegram_decision_message(
         text = (
             "Denied swap\n"
             f"{amount} {token_in} -> {token_out}{slip_str}\n"
-            f"Chain: {chain}\n"
+            f"Chain: {display_chain}\n"
             f"Trade: {trade_id}\n\n"
             f"Reason: {reason}"
         )
@@ -3844,6 +3858,7 @@ def _maybe_send_telegram_trade_terminal_message(
         elif isinstance(thread_raw, str) and thread_raw.strip():
             thread_id = thread_raw.strip()
 
+    display_chain = _display_chain_key(chain)
     tx_hash_clean = str(tx_hash or "").strip()
     # Fail closed for owner UX truthfulness: do not send a success terminal message
     # when runtime cannot provide a transaction hash.
@@ -3856,7 +3871,7 @@ def _maybe_send_telegram_trade_terminal_message(
         text = (
             "Swap completed.\n\n"
             f"Trade: `{trade_id}`\n"
-            f"Chain: `{chain}`"
+            f"Chain: `{display_chain}`"
             f"{tx_line}"
         )
     else:
@@ -3864,7 +3879,7 @@ def _maybe_send_telegram_trade_terminal_message(
         text = (
             "Swap failed.\n\n"
             f"Trade: `{trade_id}`\n"
-            f"Chain: `{chain}`\n"
+            f"Chain: `{display_chain}`\n"
             f"Reason: {reason}"
             f"{tx_line}"
         )
@@ -15205,7 +15220,8 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     chain = getattr(args, "chain", None)
     if isinstance(chain, str) and chain.strip():
-        normalized_chain = chain.strip()
+        normalized_chain = normalize_chain_key(chain.strip())
+        args.chain = normalized_chain
         try:
             assert_chain_supported(normalized_chain)
         except ChainRegistryError as exc:

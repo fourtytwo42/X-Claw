@@ -26,6 +26,15 @@ function normalizeAddress(value: unknown): string {
   return /^0x[a-f0-9]{40}$/.test(normalized) ? normalized : '';
 }
 
+function isMissingAgentForeignKey(error: unknown): boolean {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+  const code = String((error as { code?: unknown }).code ?? '');
+  const constraint = String((error as { constraint?: unknown }).constraint ?? '');
+  return code === '23503' && constraint.includes('agent_tracked_tokens_agent_id_fkey');
+}
+
 export async function POST(req: NextRequest) {
   const requestId = getRequestId(req);
   try {
@@ -67,6 +76,28 @@ export async function POST(req: NextRequest) {
     }
 
     const chainKey = String(body.chainKey || '').trim();
+    const agentExists = await dbQuery<{ exists: boolean }>(
+      `
+      select exists(
+        select 1
+        from agents
+        where agent_id = $1
+      ) as exists
+      `,
+      [auth.agentId]
+    );
+    if (!agentExists.rows[0]?.exists) {
+      return errorResponse(
+        404,
+        {
+          code: 'payload_invalid',
+          message: 'Agent is not registered for tracked-token mirror updates.',
+          actionHint: 'Run agent register/bootstrap first, then retry token mirror sync.',
+          details: { agentId: auth.agentId, chainKey }
+        },
+        requestId
+      );
+    }
     const deduped = new Map<string, { symbol: string | null; name: string | null; decimals: number | null }>();
     for (const row of body.tokens ?? []) {
       const tokenAddress = normalizeAddress(row?.token);
@@ -129,7 +160,18 @@ export async function POST(req: NextRequest) {
       200,
       requestId
     );
-  } catch {
+  } catch (error) {
+    if (isMissingAgentForeignKey(error)) {
+      return errorResponse(
+        404,
+        {
+          code: 'payload_invalid',
+          message: 'Agent is not registered for tracked-token mirror updates.',
+          actionHint: 'Run agent register/bootstrap first, then retry token mirror sync.'
+        },
+        requestId
+      );
+    }
     return internalErrorResponse(requestId);
   }
 }

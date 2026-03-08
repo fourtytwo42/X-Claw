@@ -202,7 +202,7 @@ main() {
   idem="e2e-propose-$(date +%s)"
   trade_resp="${WORK_DIR}/trade_proposed.json"
   code="$(post_json "POST" "${API_BASE}/trades/proposed" \
-    "{\"schemaVersion\":1,\"agentId\":\"${AGENT_ID}\",\"chainKey\":\"base_sepolia\",\"mode\":\"mock\",\"tokenIn\":\"WETH\",\"tokenOut\":\"USDC\",\"amountIn\":\"1.0\",\"slippageBps\":50,\"reason\":\"e2e-full-pass\"}" \
+    "{\"schemaVersion\":1,\"agentId\":\"${AGENT_ID}\",\"chainKey\":\"base_sepolia\",\"mode\":\"real\",\"tokenIn\":\"WETH\",\"tokenOut\":\"USDC\",\"amountIn\":\"1.0\",\"slippageBps\":50,\"reason\":\"e2e-full-pass\"}" \
     "$trade_resp" \
     -H "Authorization: Bearer ${AGENT_API_KEY}" \
     -H "Idempotency-Key: ${idem}")"
@@ -382,7 +382,7 @@ main() {
   if [ "$ENABLE_LIMIT_ORDERS" = "1" ] && [ -n "${csrf}" ]; then
     local limit_order_id
     code="$(post_json "POST" "${API_BASE}/management/limit-orders" \
-      "{\"agentId\":\"${AGENT_ID}\",\"chainKey\":\"${DEFAULT_CHAIN}\",\"mode\":\"mock\",\"side\":\"buy\",\"tokenIn\":\"0x4200000000000000000000000000000000000006\",\"tokenOut\":\"0x036CbD53842c5426634e7929541eC2318f3dCF7e\",\"amountIn\":\"0.01\",\"limitPrice\":\"999999999\",\"slippageBps\":50}" \
+      "{\"agentId\":\"${AGENT_ID}\",\"chainKey\":\"${DEFAULT_CHAIN}\",\"mode\":\"real\",\"side\":\"buy\",\"tokenIn\":\"0x4200000000000000000000000000000000000006\",\"tokenOut\":\"0x036CbD53842c5426634e7929541eC2318f3dCF7e\",\"amountIn\":\"0.01\",\"limitPrice\":\"999999999\",\"slippageBps\":50}" \
       "${WORK_DIR}/limit_create.json" \
       -b "$COOKIE_JAR" \
       -H "X-CSRF-Token: ${csrf}")"
@@ -422,7 +422,7 @@ main() {
     if [ "$SIMULATE_API_OUTAGE" = "1" ]; then
       local outage_order_id
       code="$(post_json "POST" "${API_BASE}/management/limit-orders" \
-        "{\"agentId\":\"${AGENT_ID}\",\"chainKey\":\"${DEFAULT_CHAIN}\",\"mode\":\"mock\",\"side\":\"buy\",\"tokenIn\":\"0x4200000000000000000000000000000000000006\",\"tokenOut\":\"0x036CbD53842c5426634e7929541eC2318f3dCF7e\",\"amountIn\":\"0.02\",\"limitPrice\":\"999999999\",\"slippageBps\":50}" \
+        "{\"agentId\":\"${AGENT_ID}\",\"chainKey\":\"${DEFAULT_CHAIN}\",\"mode\":\"real\",\"side\":\"buy\",\"tokenIn\":\"0x4200000000000000000000000000000000000006\",\"tokenOut\":\"0x036CbD53842c5426634e7929541eC2318f3dCF7e\",\"amountIn\":\"0.02\",\"limitPrice\":\"999999999\",\"slippageBps\":50}" \
         "${WORK_DIR}/limit_create_outage.json" \
         -b "$COOKIE_JAR" \
         -H "X-CSRF-Token: ${csrf}")"

@@ -13,6 +13,16 @@ REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
 CHAIN_CONFIG_DIR = REPO_ROOT / "config" / "chains"
 
 CapabilityKey = str
+CHAIN_KEY_ALIASES: dict[str, str] = {
+    "solana_mainnet": "solana_mainnet_beta",
+}
+
+
+def normalize_chain_key(chain: str) -> str:
+    raw = str(chain or "").strip()
+    if not raw:
+        return raw
+    return CHAIN_KEY_ALIASES.get(raw, raw)
 
 
 def _read_chain_file(path: pathlib.Path) -> dict[str, Any]:
@@ -48,8 +58,9 @@ def list_chains(include_disabled: bool = False) -> list[dict[str, Any]]:
 
 
 def get_chain(chain: str, include_disabled: bool = False) -> dict[str, Any] | None:
+    normalized = normalize_chain_key(chain)
     for cfg in list_chains(include_disabled=include_disabled):
-        if str(cfg.get("chainKey") or "").strip() == chain:
+        if str(cfg.get("chainKey") or "").strip() == normalized:
             return cfg
     return None
 
