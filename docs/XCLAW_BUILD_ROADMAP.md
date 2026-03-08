@@ -11,6 +11,13 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 
 ---
 
+## 0.38) Slice 229 Service Extraction from cli and Final Router Reduction
+
+- [x] Extract shared transfer/x402 mirror helpers from `cli.py` into runtime services.
+- [x] Extract shared reporting/status helper functions from `cli.py` into runtime services.
+- [x] Keep `cli.py` wrappers thin and preserve command-module independence from `cli.py` internals.
+- [x] Run full sequential validation chain and capture evidence + issue comment.
+
 ## 0.37) Slice 228 Explicit Adapters for Wallet and Limit-Orders
 
 - [x] Add explicit runtime adapter types for extracted wallet and limit-order command modules.

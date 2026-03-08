@@ -17,6 +17,23 @@ Status legend:
 
 ---
 
+## Slice 229: Service Extraction from cli and Final Router Reduction
+Status: [x]
+
+Goal:
+- move remaining shared helper graphs used by extracted command families out of `cli.py` into runtime service modules while preserving all runtime command contracts.
+
+DoD:
+- [x] shared mirror/report helper groups used by extracted command families live under `apps/agent-runtime/xclaw_agent/runtime/services/`.
+- [x] `cli.py` wraps those service helpers without changing public command/test seams.
+- [x] command modules remain independent from `cli.py` internals through adapters and service-backed wrappers.
+- [x] full sequential validation + issue evidence posted.
+
+Issue mapping:
+- `#82`
+
+---
+
 ## Slice 228: Explicit Adapters for Wallet and Limit-Orders
 Status: [x]
 

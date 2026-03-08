@@ -14,27 +14,29 @@
   - `routeKind`
   - `liquidityOperation`
 
-## Active Context: Slice 228 Explicit Adapters for Wallet and Limit-Orders
+## Active Context: Slice 229 Service Extraction from cli and Final Router Reduction
 
-Issue mapping: `#81`
+Issue mapping: `#82`
 
 ### Objective + scope lock
 - Objective:
-  - replace dynamic runtime binding for wallet and limit-order command modules with explicit typed adapters,
+  - move remaining shared helper graphs used by extracted command families out of `cli.py`,
   - preserve all existing runtime JSON/CLI behavior,
-  - keep approvals/trade/liquidity/x402 behavior unchanged in this slice.
+  - keep command modules independent from `cli.py` internals.
 - Scope guard:
   - runtime internal hardening only,
   - no API/schema/database changes.
 
 ### Expected touched files
 - `apps/agent-runtime/xclaw_agent/cli.py`
-- `apps/agent-runtime/xclaw_agent/commands/wallet.py`
-- `apps/agent-runtime/xclaw_agent/commands/limit_orders.py`
-- `apps/agent-runtime/xclaw_agent/runtime/adapters/wallet.py`
-- `apps/agent-runtime/xclaw_agent/runtime/adapters/limit_orders.py`
+- `apps/agent-runtime/xclaw_agent/runtime/services/__init__.py`
+- `apps/agent-runtime/xclaw_agent/runtime/services/agent_api.py`
+- `apps/agent-runtime/xclaw_agent/runtime/services/mirroring.py`
+- `apps/agent-runtime/xclaw_agent/runtime/services/reporting.py`
 - `apps/agent-runtime/tests/test_runtime_adapters.py`
-- `apps/agent-runtime/tests/test_wallet_core.py`
+- `apps/agent-runtime/tests/test_approvals_run_loop.py`
+- `apps/agent-runtime/tests/test_liquidity_cli.py`
+- `apps/agent-runtime/tests/test_x402_cli.py`
 - `apps/agent-runtime/tests/test_trade_path.py`
 - `docs/XCLAW_SOURCE_OF_TRUTH.md`
 - `docs/XCLAW_SLICE_TRACKER.md`

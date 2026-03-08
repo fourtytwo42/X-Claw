@@ -1,29 +1,30 @@
-# Slice 228 Acceptance Evidence: Explicit Adapters for Wallet and Limit-Orders
+# Slice 229 Acceptance Evidence: Service Extraction from cli and Final Router Reduction
 
 Date (UTC): 2026-03-08  
-Active slice context: `Slice 228`.
+Active slice context: `Slice 229`.
 
-Issue mapping: `#81`
+Issue mapping: `#82`
 
 ### Objective + Scope Lock
 - Objective:
-  - replace dynamic runtime binding for extracted wallet and limit-order command modules,
+  - move remaining shared helper graphs used by extracted command families out of `cli.py`,
   - preserve existing runtime JSON/CLI behavior,
-  - keep current patch/test seams intact through `cli.py`.
+  - keep `cli.py` as parser/router + adapter factory + thin service wrappers.
 
 ### Behavior Checks
-- [x] explicit adapter types exist under `apps/agent-runtime/xclaw_agent/runtime/adapters/` for wallet and limit-orders.
-- [x] wallet and limit-order command modules no longer depend on `sys.modules[__name__]` dispatch.
-- [x] `cli.py` builds explicit wallet/limit-order adapters and routes command calls through them.
-- [x] direct adapter tests assert wallet/limit-order wrappers receive typed adapters.
+- [x] mirror/report helper groups used by extracted command families live in runtime services.
+- [x] `cli.py` wrappers remain thin and continue exposing the same command/test seams.
+- [x] command modules remain independent from `cli.py` internals via adapters and service-backed wrappers.
 
 ### Required Validation Gates
-- [x] `npm run db:parity` -> PASS (`ok: true`, `checkedAt=2026-03-08T17:38:26.472Z`)
+- [x] `npm run db:parity` -> PASS (`ok: true`, `checkedAt=2026-03-08T17:41:47.703Z`)
 - [x] `npm run seed:reset` -> PASS
 - [x] `npm run seed:load` -> PASS
 - [x] `npm run seed:verify` -> PASS
 - [x] `python3 -m unittest -v apps/agent-runtime/tests/test_runtime_adapters.py` -> PASS (`Ran 13 tests`, `OK`)
-- [x] `python3 -m unittest -v apps/agent-runtime/tests/test_wallet_core.py` -> PASS (`Ran 12 tests`, `OK`)
+- [x] `python3 -m unittest -v apps/agent-runtime/tests/test_approvals_run_loop.py` -> PASS (`Ran 3 tests`, `OK`)
+- [x] `python3 -m unittest -v apps/agent-runtime/tests/test_liquidity_cli.py` -> PASS (`Ran 20 tests`, `OK`)
+- [x] `python3 -m unittest -v apps/agent-runtime/tests/test_x402_cli.py` -> PASS (`Ran 3 tests`, `OK`)
 - [x] `python3 -m unittest -v apps/agent-runtime/tests/test_trade_path.py` -> PASS (`Ran 147 tests`, `OK`)
 - [x] `npm run build` -> PASS (Next.js build completed successfully)
 - [x] `pm2 restart all` -> PASS (`xclaw-web online`)

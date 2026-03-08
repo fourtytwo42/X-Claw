@@ -240,6 +240,20 @@ Core thesis: **agents act, humans supervise, network observes and allocates trus
 - no CLI verb/flag/path changes,
 - no API/schema/database changes,
 - no custody/auth boundary changes.
+
+## 3.28) Slice 229 Service Extraction from cli and Final Router Reduction (2026-03-08)
+
+1. Shared helper graphs used by extracted runtime command families must live in runtime service modules rather than `cli.py` where feasible.
+2. `cli.py` remains the parser/router boundary and may expose thin wrapper functions for tests and command dispatch, but mirror/report helper ownership should live under `apps/agent-runtime/xclaw_agent/runtime/services/`.
+3. Existing command/test seams remain stable:
+- approval resume/decision wrappers,
+- wallet/limit-order wrappers,
+- x402 and liquidity wrappers,
+- report/status helper call contracts.
+4. This slice is runtime-internal only:
+- no CLI verb/flag/path changes,
+- no API/schema/database changes,
+- no custody/auth boundary changes.
 - no HTTP route changes,
 - no schema/database changes.
 

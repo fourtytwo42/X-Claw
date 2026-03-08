@@ -47,7 +47,7 @@ from xclaw_agent.runtime.adapters import (
     WalletRuntimeAdapter,
     X402RuntimeAdapter,
 )
-from xclaw_agent.runtime.services import agent_api as runtime_agent_api
+from xclaw_agent.runtime import services as runtime_services
 from xclaw_agent import x402_state
 from xclaw_agent.chains import (
     ChainRegistryError,
@@ -2469,64 +2469,15 @@ def _sync_transfer_policy_from_remote(chain: str) -> dict[str, Any]:
 
 
 def _mirror_transfer_approval(flow: dict[str, Any], *, require_delivery: bool = False) -> bool:
-    try:
-        approval_id = str(flow.get("approvalId") or "").strip()
-        chain = str(flow.get("chainKey") or "").strip()
-        if not approval_id or not chain:
-            return False
-        payload = {
-            "schemaVersion": 1,
-            "approvalId": approval_id,
-            "chainKey": chain,
-            "status": str(flow.get("status") or "approval_pending"),
-            "transferType": str(flow.get("transferType") or "native"),
-            "tokenAddress": flow.get("tokenAddress"),
-            "tokenSymbol": flow.get("tokenSymbol"),
-            "toAddress": flow.get("toAddress"),
-            "amountWei": str(flow.get("amountWei") or "0"),
-            "txHash": flow.get("txHash"),
-            "reasonCode": flow.get("reasonCode"),
-            "reasonMessage": flow.get("reasonMessage"),
-            "policyBlockedAtCreate": bool(flow.get("policyBlockedAtCreate", False)),
-            "policyBlockReasonCode": flow.get("policyBlockReasonCode"),
-            "policyBlockReasonMessage": flow.get("policyBlockReasonMessage"),
-            "executionMode": flow.get("executionMode"),
-            "observedBy": str(flow.get("observedBy") or "agent_watcher"),
-            "observationSource": str(flow.get("observationSource") or "local_send_result"),
-            "confirmationCount": flow.get("confirmationCount"),
-            "observedAt": flow.get("observedAt") or utc_now(),
-            "watcherRunId": str(flow.get("watcherRunId") or _watcher_run_id()),
-            "createdAt": flow.get("createdAt") or utc_now(),
-            "updatedAt": flow.get("updatedAt") or utc_now(),
-            "decidedAt": flow.get("decidedAt"),
-            "terminalAt": flow.get("terminalAt"),
-        }
-
-        attempts = 2 if require_delivery else 1
-        last_error: str | None = None
-        for attempt in range(attempts):
-            status_code, body = _api_request(
-                "POST",
-                "/agent/transfer-approvals/mirror",
-                payload=payload,
-                include_idempotency=True,
-                idempotency_key=f"rt-transfer-mirror-{approval_id}-{secrets.token_hex(8)}",
-            )
-            if 200 <= status_code < 300:
-                return True
-            code = str(body.get("code", "api_error"))
-            message = str(body.get("message", f"transfer mirror failed ({status_code})"))
-            last_error = f"{code}: {message}"
-            if attempt < (attempts - 1):
-                time.sleep(0.2)
-
-        if require_delivery:
-            raise WalletStoreError(last_error or "transfer approval mirror failed.")
-        return False
-    except Exception as exc:
-        if require_delivery:
-            raise WalletStoreError(str(exc) or "transfer approval mirror failed.") from exc
-        return False
+    return runtime_services.mirror_transfer_approval(
+        flow=flow,
+        require_delivery=require_delivery,
+        api_request=_api_request,
+        utc_now=utc_now,
+        watcher_run_id=_watcher_run_id,
+        token_hex=secrets.token_hex,
+        wallet_store_error=WalletStoreError,
+    )
 
 
 def _mirror_transfer_policy(chain: str, policy: dict[str, Any]) -> None:
@@ -2548,83 +2499,12 @@ def _mirror_transfer_policy(chain: str, policy: dict[str, Any]) -> None:
 
 
 def _mirror_x402_outbound(flow: dict[str, Any]) -> None:
-    try:
-        approval_id = str(flow.get("approvalId") or "").strip()
-        network = str(flow.get("network") or "").strip()
-        facilitator = str(flow.get("facilitator") or "").strip()
-        url = str(flow.get("url") or "").strip()
-        amount_atomic = str(flow.get("amountAtomic") or "").strip()
-        if not approval_id or not network or not facilitator or not url or not amount_atomic:
-            return
-
-        payment_id = str(flow.get("paymentId") or "").strip() or f"xpm_{secrets.token_hex(10)}"
-        flow["paymentId"] = payment_id
-        payload = {
-            "schemaVersion": 1,
-            "paymentId": payment_id,
-            "approvalId": approval_id,
-            "networkKey": network,
-            "facilitatorKey": facilitator,
-            "status": str(flow.get("status") or "approval_pending"),
-            "assetKind": "token" if str(flow.get("assetKind") or "").strip().lower() in {"erc20", "token"} else "native",
-            "assetAddress": flow.get("assetAddress"),
-            "assetSymbol": flow.get("assetSymbol"),
-            "amountAtomic": amount_atomic,
-            "url": url,
-            "txHash": flow.get("txHash"),
-            "reasonCode": flow.get("reasonCode"),
-            "reasonMessage": flow.get("reasonMessage"),
-            "createdAt": flow.get("createdAt") or utc_now(),
-            "updatedAt": flow.get("updatedAt") or utc_now(),
-            "terminalAt": flow.get("terminalAt"),
-        }
-        _api_request(
-            "POST",
-            "/agent/x402/outbound/mirror",
-            payload=payload,
-            include_idempotency=True,
-            idempotency_key=f"rt-x402-mirror-{approval_id}-{secrets.token_hex(8)}",
-        )
-
-        approval_payload = {
-            "schemaVersion": 1,
-            "approvalId": approval_id,
-            "chainKey": network,
-            "approvalSource": "x402",
-            "status": str(flow.get("status") or "approval_pending"),
-            "transferType": "token" if str(flow.get("assetKind") or "").strip().lower() in {"erc20", "token"} else "native",
-            "tokenAddress": flow.get("assetAddress"),
-            "tokenSymbol": str(flow.get("assetSymbol") or "X402"),
-            "toAddress": str(flow.get("toAddress") or flow.get("recipientAddress") or ("11111111111111111111111111111111" if network.startswith("solana_") else "0x0000000000000000000000000000000000000000")),
-            "amountWei": amount_atomic,
-            "txHash": flow.get("txHash"),
-            "reasonCode": flow.get("reasonCode"),
-            "reasonMessage": flow.get("reasonMessage"),
-            "policyBlockedAtCreate": False,
-            "policyBlockReasonCode": None,
-            "policyBlockReasonMessage": None,
-            "executionMode": "normal",
-            "x402Url": url,
-            "x402NetworkKey": network,
-            "x402FacilitatorKey": facilitator,
-            "x402AssetKind": "token" if str(flow.get("assetKind") or "").strip().lower() in {"erc20", "token"} else "native",
-            "x402AssetAddress": flow.get("assetAddress"),
-            "x402AmountAtomic": amount_atomic,
-            "x402PaymentId": payment_id,
-            "createdAt": flow.get("createdAt") or utc_now(),
-            "updatedAt": flow.get("updatedAt") or utc_now(),
-            "decidedAt": flow.get("decidedAt"),
-            "terminalAt": flow.get("terminalAt"),
-        }
-        _api_request(
-            "POST",
-            "/agent/transfer-approvals/mirror",
-            payload=approval_payload,
-            include_idempotency=True,
-            idempotency_key=f"rt-x402-transfer-mirror-{approval_id}-{secrets.token_hex(8)}",
-        )
-    except Exception:
-        pass
+    runtime_services.mirror_x402_outbound(
+        flow=flow,
+        api_request=_api_request,
+        utc_now=utc_now,
+        token_hex=secrets.token_hex,
+    )
 
 
 def _x402_settlement_amount_units(chain: str, asset_kind: str, amount_atomic: str, asset_address: str | None) -> int:
@@ -4195,7 +4075,7 @@ def _ack_transfer_decision_inbox(
     reason_code: str | None = None,
     reason_message: str | None = None,
 ) -> tuple[int, dict[str, Any]]:
-    return runtime_agent_api.ack_transfer_decision_inbox(
+    return runtime_services.ack_transfer_decision_inbox(
         _api_request,
         decision_id,
         status,
@@ -4229,7 +4109,7 @@ def _run_approvals_sync_inline(chain: str) -> tuple[int, dict[str, Any]]:
 
 
 def _publish_runtime_signing_readiness(chain: str, readiness: dict[str, Any]) -> tuple[int, dict[str, Any]]:
-    return runtime_agent_api.publish_runtime_signing_readiness(_api_request, chain, readiness)
+    return runtime_services.publish_runtime_signing_readiness(_api_request, chain, readiness)
 
 
 def _maybe_send_owner_link_to_active_chat(management_url: str, expires_at: str | None) -> dict[str, Any]:
@@ -5836,17 +5716,14 @@ def _queue_limit_order_action(method: str, path: str, payload: dict[str, Any]) -
 
 
 def _post_limit_order_status(order_id: str, payload: dict[str, Any], queue_on_failure: bool = True) -> None:
-    try:
-        status_code, body = _api_request("POST", f"/limit-orders/{order_id}/status", payload=payload, include_idempotency=True)
-        if status_code < 200 or status_code >= 300:
-            code = str(body.get("code", "api_error"))
-            message = str(body.get("message", f"limit-order status update failed ({status_code})"))
-            raise WalletStoreError(f"{code}: {message}")
-    except Exception:
-        if queue_on_failure:
-            _queue_limit_order_action("POST", f"/limit-orders/{order_id}/status", payload)
-            return
-        raise
+    runtime_services.post_limit_order_status(
+        order_id=order_id,
+        payload=payload,
+        queue_on_failure=queue_on_failure,
+        api_request=_api_request,
+        queue_limit_order_action=_queue_limit_order_action,
+        wallet_store_error=WalletStoreError,
+    )
 
 
 def _replay_limit_order_outbox() -> tuple[int, int]:
@@ -6296,7 +6173,7 @@ def _resolve_raydium_pool_id(adapter: Any, explicit_pool_id: str) -> str:
 
 
 def _resolve_agent_id_or_fail(chain: str) -> str:
-    return runtime_agent_api.resolve_agent_id_or_fail(_resolve_api_key, _resolve_agent_id, WalletStoreError)
+    return runtime_services.resolve_agent_id_or_fail(_resolve_api_key, _resolve_agent_id, WalletStoreError)
 
 
 def _build_liquidity_runtime_adapter() -> LiquidityRuntimeAdapter:
@@ -7786,28 +7663,13 @@ def cmd_approvals_check(args: argparse.Namespace) -> int:
 def cmd_trade_execute(args: argparse.Namespace) -> int:
     return trade_commands.cmd_trade_execute(_build_trade_runtime_adapter(), args)
 def _send_trade_execution_report(trade_id: str) -> dict[str, Any]:
-    trade = _read_trade_details(trade_id)
-    event_type = _canonical_event_for_trade_status(str(trade.get("status")))
-    payload = {
-        "schemaVersion": 1,
-        "agentId": trade.get("agentId"),
-        "tradeId": trade_id,
-        "eventType": event_type,
-        "payload": {
-            "status": trade.get("status"),
-            "mode": trade.get("mode"),
-            "chainKey": trade.get("chainKey"),
-            "reasonCode": trade.get("reasonCode"),
-            "reportedBy": "xclaw-agent-runtime",
-        },
-        "createdAt": datetime.now(timezone.utc).isoformat(),
-    }
-    status_code, body = _api_request("POST", "/events", payload=payload, include_idempotency=True)
-    if status_code < 200 or status_code >= 300:
-        code = str(body.get("code", "api_error"))
-        message = str(body.get("message", f"report send failed ({status_code})"))
-        raise WalletStoreError(f"{code}: {message}")
-    return {"ok": True, "eventType": event_type}
+    return runtime_services.send_trade_execution_report(
+        trade_id=trade_id,
+        read_trade_details=_read_trade_details,
+        canonical_event_for_trade_status=_canonical_event_for_trade_status,
+        api_request=_api_request,
+        wallet_store_error=WalletStoreError,
+    )
 
 
 def cmd_report_send(args: argparse.Namespace) -> int:
