@@ -14,28 +14,33 @@
   - `routeKind`
   - `liquidityOperation`
 
-## Active Context: Slice 225 Process Doc Compression
+## Active Context: Slice 226 Replace Dynamic Runtime Binding with Explicit Adapters
 
-Issue mapping: `#76`
+Issue mapping: `#79`
 
 ### Objective + scope lock
 - Objective:
-  - keep `docs/XCLAW_SOURCE_OF_TRUTH.md` canonical,
-  - reduce `spec.md`, `tasks.md`, and `acceptance.md` to thin active-slice handoff docs,
-  - preserve historical slice ledgers under `docs/history/`.
+  - replace dynamic runtime binding for extracted liquidity and x402 command modules with explicit typed adapters,
+  - preserve all existing runtime JSON/CLI behavior,
+  - keep other extracted command families unchanged in this slice.
 - Scope guard:
-  - docs/process only,
-  - no runtime behavior changes,
+  - runtime internal hardening only,
   - no API/schema/database changes.
 
 ### Expected touched files
+- `apps/agent-runtime/xclaw_agent/cli.py`
+- `apps/agent-runtime/xclaw_agent/commands/liquidity.py`
+- `apps/agent-runtime/xclaw_agent/commands/x402.py`
+- `apps/agent-runtime/xclaw_agent/runtime/adapters/liquidity.py`
+- `apps/agent-runtime/xclaw_agent/runtime/adapters/x402.py`
+- `apps/agent-runtime/tests/test_liquidity_cli.py`
+- `apps/agent-runtime/tests/test_x402_cli.py`
+- `apps/agent-runtime/tests/test_trade_path.py`
+- `apps/agent-runtime/tests/test_runtime_adapters.py`
 - `docs/XCLAW_SOURCE_OF_TRUTH.md`
 - `docs/XCLAW_SLICE_TRACKER.md`
 - `docs/XCLAW_BUILD_ROADMAP.md`
 - `docs/CONTEXT_PACK.md`
-- `docs/history/SPEC_HISTORY.md`
-- `docs/history/TASKS_HISTORY.md`
-- `docs/history/ACCEPTANCE_HISTORY.md`
 - `spec.md`
 - `tasks.md`
 - `acceptance.md`

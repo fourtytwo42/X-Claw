@@ -39,6 +39,7 @@ from xclaw_agent.commands import liquidity as liquidity_commands
 from xclaw_agent.commands import trade as trade_commands
 from xclaw_agent.commands import wallet as wallet_commands
 from xclaw_agent.commands import x402 as x402_commands
+from xclaw_agent.runtime.adapters import LiquidityRuntimeAdapter, X402RuntimeAdapter
 from xclaw_agent import x402_state
 from xclaw_agent.chains import (
     ChainRegistryError,
@@ -6304,40 +6305,149 @@ def _resolve_agent_id_or_fail(chain: str) -> str:
     return agent_id
 
 
+def _build_liquidity_runtime_adapter() -> LiquidityRuntimeAdapter:
+    return LiquidityRuntimeAdapter(
+        require_json_flag=require_json_flag,
+        fail=fail,
+        ok=ok,
+        emit=emit,
+        assert_chain_capability=assert_chain_capability,
+        chain_supported_hint=chain_supported_hint,
+        build_liquidity_adapter_for_request=build_liquidity_adapter_for_request,
+        build_liquidity_increase_plan=build_liquidity_increase_plan,
+        build_liquidity_claim_fees_plan=build_liquidity_claim_fees_plan,
+        build_liquidity_migrate_plan=build_liquidity_migrate_plan,
+        build_liquidity_claim_rewards_plan=build_liquidity_claim_rewards_plan,
+        execute_liquidity_plan=execute_liquidity_plan,
+        LiquidityAdapterError=LiquidityAdapterError,
+        UnsupportedLiquidityAdapter=UnsupportedLiquidityAdapter,
+        UnsupportedLiquidityOperation=UnsupportedLiquidityOperation,
+        LiquidityExecutionError=LiquidityExecutionError,
+        ChainRegistryError=ChainRegistryError,
+        WalletStoreError=WalletStoreError,
+        SubprocessTimeout=SubprocessTimeout,
+        _cast_call_stdout=_cast_call_stdout,
+        _parse_address_from_cast_output=_parse_address_from_cast_output,
+        _parse_uint_from_cast_output=_parse_uint_from_cast_output,
+        _parse_uint_tuple_from_cast_output=_parse_uint_tuple_from_cast_output,
+        _require_chain_contract_address=_require_chain_contract_address,
+        _decimal_text=_decimal_text,
+        _fetch_erc20_metadata=_fetch_erc20_metadata,
+        _format_units=_format_units,
+        _is_solana_chain=_is_solana_chain,
+        _parse_positive_amount_text=_parse_positive_amount_text,
+        _parse_v3_range_text=_parse_v3_range_text,
+        _resolve_raydium_pool_id=_resolve_raydium_pool_id,
+        _resolve_token_address=_resolve_token_address,
+        _router_get_amount_out=_router_get_amount_out,
+        _to_non_negative_decimal=_to_non_negative_decimal,
+        _to_units_uint=_to_units_uint,
+        solana_local_quote_add=solana_local_quote_add,
+        solana_raydium_quote_add=solana_raydium_quote_add,
+        solana_raydium_quote_remove=solana_raydium_quote_remove,
+        _api_error_details=_api_error_details,
+        _api_request=_api_request,
+        _liquidity_provider_settings=_liquidity_provider_settings,
+        _maybe_send_telegram_liquidity_approval_prompt=_maybe_send_telegram_liquidity_approval_prompt,
+        _resolve_agent_id_or_fail=_resolve_agent_id_or_fail,
+        _run_liquidity_execute_inline=_run_liquidity_execute_inline,
+        _compute_v2_remove_liquidity_units=_compute_v2_remove_liquidity_units,
+        _read_v3_position_snapshot=_read_v3_position_snapshot,
+        _resolve_liquidity_remove_tokens=_resolve_liquidity_remove_tokens,
+        _token_symbol_for_display=_token_symbol_for_display,
+        _builder_output_from_hashes=_builder_output_from_hashes,
+        _cast_calldata=_cast_calldata,
+        _chain_rpc_url=_chain_rpc_url,
+        _execution_wallet=_execution_wallet,
+        _execution_wallet_solana_secret=_execution_wallet_solana_secret,
+        _router_action_executor=_router_action_executor,
+        load_wallet_store=load_wallet_store,
+        solana_local_increase_position=solana_local_increase_position,
+        solana_raydium_execute_instruction=solana_raydium_execute_instruction,
+        solana_local_claim_fees=solana_local_claim_fees,
+        solana_local_migrate_position=solana_local_migrate_position,
+        solana_local_claim_rewards=solana_local_claim_rewards,
+        _intent_details_dict=_intent_details_dict,
+        _v3_details_dict=_v3_details_dict,
+        cmd_liquidity_increase=cmd_liquidity_increase,
+        cmd_liquidity_claim_fees=cmd_liquidity_claim_fees,
+        cmd_liquidity_claim_rewards=cmd_liquidity_claim_rewards,
+        cmd_liquidity_migrate=cmd_liquidity_migrate,
+        cmd_liquidity_execute=cmd_liquidity_execute,
+        _read_liquidity_intent=_read_liquidity_intent,
+        _post_liquidity_status=_post_liquidity_status,
+        _execute_liquidity_v2_add=_execute_liquidity_v2_add,
+        _execute_liquidity_v2_remove=_execute_liquidity_v2_remove,
+        _execute_liquidity_v3_add=_execute_liquidity_v3_add,
+        _execute_liquidity_v3_remove=_execute_liquidity_v3_remove,
+        _wait_for_tx_receipt_success=_wait_for_tx_receipt_success,
+        _build_liquidity_provider_meta=_build_liquidity_provider_meta,
+        is_hex_address=is_hex_address,
+        _is_placeholder_liquidity_token=_is_placeholder_liquidity_token,
+        _resolve_pair_tokens_from_contract=_resolve_pair_tokens_from_contract,
+        _execute_liquidity_advanced_intent=_execute_liquidity_advanced_intent,
+    )
+
+
+def _build_x402_runtime_adapter() -> X402RuntimeAdapter:
+    return X402RuntimeAdapter(
+        require_json_flag=require_json_flag,
+        fail=fail,
+        ok=ok,
+        emit=emit,
+        assert_chain_capability=assert_chain_capability,
+        chain_supported_hint=chain_supported_hint,
+        ChainRegistryError=ChainRegistryError,
+        WalletStoreError=WalletStoreError,
+        X402RuntimeError=X402RuntimeError,
+        _api_request=_api_request,
+        _api_error_details=_api_error_details,
+        _execute_x402_settlement=_execute_x402_settlement,
+        _mirror_x402_outbound=_mirror_x402_outbound,
+        x402_pay_create_or_execute=x402_pay_create_or_execute,
+        x402_pay_resume=x402_pay_resume,
+        x402_pay_decide=x402_pay_decide,
+        x402_get_policy=x402_get_policy,
+        x402_set_policy=x402_set_policy,
+        x402_list_networks=x402_list_networks,
+        utc_now=utc_now,
+    )
+
+
 def cmd_liquidity_discover_pairs(args: argparse.Namespace) -> int:
-    return liquidity_commands.cmd_liquidity_discover_pairs(sys.modules[__name__], args)
+    return liquidity_commands.cmd_liquidity_discover_pairs(_build_liquidity_runtime_adapter(), args)
 
 
 def cmd_liquidity_quote_add(args: argparse.Namespace) -> int:
-    return liquidity_commands.cmd_liquidity_quote_add(sys.modules[__name__], args)
+    return liquidity_commands.cmd_liquidity_quote_add(_build_liquidity_runtime_adapter(), args)
 
 
 def cmd_liquidity_quote_remove(args: argparse.Namespace) -> int:
-    return liquidity_commands.cmd_liquidity_quote_remove(sys.modules[__name__], args)
+    return liquidity_commands.cmd_liquidity_quote_remove(_build_liquidity_runtime_adapter(), args)
 
 
 def cmd_liquidity_add(args: argparse.Namespace) -> int:
-    return liquidity_commands.cmd_liquidity_add(sys.modules[__name__], args)
+    return liquidity_commands.cmd_liquidity_add(_build_liquidity_runtime_adapter(), args)
 
 
 def cmd_liquidity_remove(args: argparse.Namespace) -> int:
-    return liquidity_commands.cmd_liquidity_remove(sys.modules[__name__], args)
+    return liquidity_commands.cmd_liquidity_remove(_build_liquidity_runtime_adapter(), args)
 
 
 def cmd_liquidity_increase(args: argparse.Namespace) -> int:
-    return liquidity_commands.cmd_liquidity_increase(sys.modules[__name__], args)
+    return liquidity_commands.cmd_liquidity_increase(_build_liquidity_runtime_adapter(), args)
 
 
 def cmd_liquidity_claim_fees(args: argparse.Namespace) -> int:
-    return liquidity_commands.cmd_liquidity_claim_fees(sys.modules[__name__], args)
+    return liquidity_commands.cmd_liquidity_claim_fees(_build_liquidity_runtime_adapter(), args)
 
 
 def cmd_liquidity_migrate(args: argparse.Namespace) -> int:
-    return liquidity_commands.cmd_liquidity_migrate(sys.modules[__name__], args)
+    return liquidity_commands.cmd_liquidity_migrate(_build_liquidity_runtime_adapter(), args)
 
 
 def cmd_liquidity_claim_rewards(args: argparse.Namespace) -> int:
-    return liquidity_commands.cmd_liquidity_claim_rewards(sys.modules[__name__], args)
+    return liquidity_commands.cmd_liquidity_claim_rewards(_build_liquidity_runtime_adapter(), args)
 
 
 def _invoke_liquidity_command_payload(command: Callable[[argparse.Namespace], int], args: argparse.Namespace) -> dict[str, Any]:
@@ -6424,19 +6534,19 @@ def _execute_liquidity_advanced_intent(intent: dict[str, Any], chain: str, actio
 
 
 def _run_liquidity_execute_inline(liquidity_intent_id: str, chain: str) -> tuple[int, dict[str, Any]]:
-    return liquidity_commands._run_liquidity_execute_inline(sys.modules[__name__], liquidity_intent_id, chain)
+    return liquidity_commands._run_liquidity_execute_inline(_build_liquidity_runtime_adapter(), liquidity_intent_id, chain)
 
 
 def cmd_liquidity_execute(args: argparse.Namespace) -> int:
-    return liquidity_commands.cmd_liquidity_execute(sys.modules[__name__], args)
+    return liquidity_commands.cmd_liquidity_execute(_build_liquidity_runtime_adapter(), args)
 
 
 def cmd_liquidity_resume(args: argparse.Namespace) -> int:
-    return liquidity_commands.cmd_liquidity_resume(sys.modules[__name__], args)
+    return liquidity_commands.cmd_liquidity_resume(_build_liquidity_runtime_adapter(), args)
 
 
 def cmd_liquidity_positions(args: argparse.Namespace) -> int:
-    return liquidity_commands.cmd_liquidity_positions(sys.modules[__name__], args)
+    return liquidity_commands.cmd_liquidity_positions(_build_liquidity_runtime_adapter(), args)
 
 
 def _trade_provider_settings(chain: str) -> tuple[str, str]:
@@ -9468,31 +9578,31 @@ def cmd_wallet_remove(args: argparse.Namespace) -> int:
 
 
 def cmd_x402_receive_request(args: argparse.Namespace) -> int:
-    return x402_commands.cmd_x402_receive_request(sys.modules[__name__], args)
+    return x402_commands.cmd_x402_receive_request(_build_x402_runtime_adapter(), args)
 
 
 def cmd_x402_pay(args: argparse.Namespace) -> int:
-    return x402_commands.cmd_x402_pay(sys.modules[__name__], args)
+    return x402_commands.cmd_x402_pay(_build_x402_runtime_adapter(), args)
 
 
 def cmd_x402_pay_resume(args: argparse.Namespace) -> int:
-    return x402_commands.cmd_x402_pay_resume(sys.modules[__name__], args)
+    return x402_commands.cmd_x402_pay_resume(_build_x402_runtime_adapter(), args)
 
 
 def cmd_x402_pay_decide(args: argparse.Namespace) -> int:
-    return x402_commands.cmd_x402_pay_decide(sys.modules[__name__], args)
+    return x402_commands.cmd_x402_pay_decide(_build_x402_runtime_adapter(), args)
 
 
 def cmd_x402_policy_get(args: argparse.Namespace) -> int:
-    return x402_commands.cmd_x402_policy_get(sys.modules[__name__], args)
+    return x402_commands.cmd_x402_policy_get(_build_x402_runtime_adapter(), args)
 
 
 def cmd_x402_policy_set(args: argparse.Namespace) -> int:
-    return x402_commands.cmd_x402_policy_set(sys.modules[__name__], args)
+    return x402_commands.cmd_x402_policy_set(_build_x402_runtime_adapter(), args)
 
 
 def cmd_x402_networks(args: argparse.Namespace) -> int:
-    return x402_commands.cmd_x402_networks(sys.modules[__name__], args)
+    return x402_commands.cmd_x402_networks(_build_x402_runtime_adapter(), args)
 
 
 def build_parser() -> argparse.ArgumentParser:

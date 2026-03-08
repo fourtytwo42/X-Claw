@@ -10,114 +10,20 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, Callable
 
-
-def _bind_runtime(rt: Any) -> None:
-    globals().update({
-        'Any': Any,
-        'Callable': Callable,
-        'argparse': argparse,
-        'io': io,
-        'json': json,
-        'time': time,
-        'urllib': urllib,
-        'Decimal': Decimal,
-        'datetime': datetime,
-        'timezone': timezone,
-        'redirect_stdout': redirect_stdout,
-        'require_json_flag': rt.require_json_flag,
-        'fail': rt.fail,
-        'ok': rt.ok,
-        'emit': rt.emit,
-        'assert_chain_capability': rt.assert_chain_capability,
-        'chain_supported_hint': rt.chain_supported_hint,
-        'build_liquidity_adapter_for_request': rt.build_liquidity_adapter_for_request,
-        'build_liquidity_increase_plan': rt.build_liquidity_increase_plan,
-        'build_liquidity_claim_fees_plan': rt.build_liquidity_claim_fees_plan,
-        'build_liquidity_migrate_plan': rt.build_liquidity_migrate_plan,
-        'build_liquidity_claim_rewards_plan': rt.build_liquidity_claim_rewards_plan,
-        'execute_liquidity_plan': rt.execute_liquidity_plan,
-        'LiquidityAdapterError': rt.LiquidityAdapterError,
-        'UnsupportedLiquidityAdapter': rt.UnsupportedLiquidityAdapter,
-        'UnsupportedLiquidityOperation': rt.UnsupportedLiquidityOperation,
-        'LiquidityExecutionError': rt.LiquidityExecutionError,
-        'ChainRegistryError': rt.ChainRegistryError,
-        'WalletStoreError': rt.WalletStoreError,
-        'SubprocessTimeout': rt.SubprocessTimeout,
-        '_cast_call_stdout': rt._cast_call_stdout,
-        '_parse_address_from_cast_output': rt._parse_address_from_cast_output,
-        '_parse_uint_from_cast_output': rt._parse_uint_from_cast_output,
-        '_parse_uint_tuple_from_cast_output': rt._parse_uint_tuple_from_cast_output,
-        '_require_chain_contract_address': rt._require_chain_contract_address,
-        '_decimal_text': rt._decimal_text,
-        '_fetch_erc20_metadata': rt._fetch_erc20_metadata,
-        '_format_units': rt._format_units,
-        '_is_solana_chain': rt._is_solana_chain,
-        '_parse_positive_amount_text': rt._parse_positive_amount_text,
-        '_parse_v3_range_text': rt._parse_v3_range_text,
-        '_resolve_raydium_pool_id': rt._resolve_raydium_pool_id,
-        '_resolve_token_address': rt._resolve_token_address,
-        '_router_get_amount_out': rt._router_get_amount_out,
-        '_to_non_negative_decimal': rt._to_non_negative_decimal,
-        '_to_units_uint': rt._to_units_uint,
-        'solana_local_quote_add': rt.solana_local_quote_add,
-        'solana_raydium_quote_add': rt.solana_raydium_quote_add,
-        'solana_raydium_quote_remove': rt.solana_raydium_quote_remove,
-        '_api_error_details': rt._api_error_details,
-        '_api_request': rt._api_request,
-        '_liquidity_provider_settings': rt._liquidity_provider_settings,
-        '_maybe_send_telegram_liquidity_approval_prompt': rt._maybe_send_telegram_liquidity_approval_prompt,
-        '_resolve_agent_id_or_fail': rt._resolve_agent_id_or_fail,
-        '_run_liquidity_execute_inline': rt._run_liquidity_execute_inline,
-        '_compute_v2_remove_liquidity_units': rt._compute_v2_remove_liquidity_units,
-        '_read_v3_position_snapshot': rt._read_v3_position_snapshot,
-        '_resolve_liquidity_remove_tokens': rt._resolve_liquidity_remove_tokens,
-        '_token_symbol_for_display': rt._token_symbol_for_display,
-        '_builder_output_from_hashes': rt._builder_output_from_hashes,
-        '_cast_calldata': rt._cast_calldata,
-        '_chain_rpc_url': rt._chain_rpc_url,
-        '_execution_wallet': rt._execution_wallet,
-        '_execution_wallet_solana_secret': rt._execution_wallet_solana_secret,
-        '_router_action_executor': rt._router_action_executor,
-        'load_wallet_store': rt.load_wallet_store,
-        'solana_local_increase_position': rt.solana_local_increase_position,
-        'solana_raydium_execute_instruction': rt.solana_raydium_execute_instruction,
-        'solana_local_claim_fees': rt.solana_local_claim_fees,
-        'solana_local_migrate_position': rt.solana_local_migrate_position,
-        'solana_local_claim_rewards': rt.solana_local_claim_rewards,
-        '_intent_details_dict': rt._intent_details_dict,
-        '_v3_details_dict': rt._v3_details_dict,
-        '_cmd_liquidity_increase': rt.cmd_liquidity_increase,
-        '_cmd_liquidity_claim_fees': rt.cmd_liquidity_claim_fees,
-        '_cmd_liquidity_claim_rewards': rt.cmd_liquidity_claim_rewards,
-        '_cmd_liquidity_migrate': rt.cmd_liquidity_migrate,
-        '_cmd_liquidity_execute': rt.cmd_liquidity_execute,
-        '_read_liquidity_intent': rt._read_liquidity_intent,
-        '_post_liquidity_status': rt._post_liquidity_status,
-        '_execute_liquidity_v2_add': rt._execute_liquidity_v2_add,
-        '_execute_liquidity_v2_remove': rt._execute_liquidity_v2_remove,
-        '_execute_liquidity_v3_add': rt._execute_liquidity_v3_add,
-        '_execute_liquidity_v3_remove': rt._execute_liquidity_v3_remove,
-        '_wait_for_tx_receipt_success': rt._wait_for_tx_receipt_success,
-        '_build_liquidity_provider_meta': rt._build_liquidity_provider_meta,
-        'is_hex_address': rt.is_hex_address,
-        '_is_placeholder_liquidity_token': rt._is_placeholder_liquidity_token,
-        '_resolve_pair_tokens_from_contract': rt._resolve_pair_tokens_from_contract,
-        '_invoke_liquidity_command_payload': _invoke_liquidity_command_payload_impl,
-        '_execute_liquidity_advanced_intent': rt._execute_liquidity_advanced_intent,
-    })
+from xclaw_agent.runtime.adapters.liquidity import LiquidityRuntimeAdapter
 
 
-def cmd_liquidity_discover_pairs_impl(args: argparse.Namespace) -> int:
-    chk = require_json_flag(args)
+def cmd_liquidity_discover_pairs_impl(rt: LiquidityRuntimeAdapter, args: argparse.Namespace) -> int:
+    chk = rt.require_json_flag(args)
     if chk is not None:
         return chk
     chain = str(args.chain or "").strip()
     dex = str(args.dex or "").strip().lower()
     try:
-        assert_chain_capability(chain, "liquidity")
-        adapter = build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type="v2")
+        rt.assert_chain_capability(chain, "liquidity")
+        adapter = rt.build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type="v2")
         if adapter.protocol_family != "amm_v2":
-            return fail(
+            return rt.fail(
                 "unsupported_liquidity_adapter",
                 f"Pair discovery currently supports v2-family adapters only. Resolved adapter family: {adapter.protocol_family}.",
                 "Use a v2-family DEX for discovery and retry.",
@@ -129,17 +35,17 @@ def cmd_liquidity_discover_pairs_impl(args: argparse.Namespace) -> int:
         limit = int(str(args.limit or "10"))
         scan_max = int(str(getattr(args, "scan_max", None) or "50"))
         if min_reserve < 0:
-            return fail("invalid_input", "min-reserve must be >= 0.", "Provide a non-negative integer.", {"minReserve": args.min_reserve}, exit_code=2)
+            return rt.fail("invalid_input", "min-reserve must be >= 0.", "Provide a non-negative integer.", {"minReserve": args.min_reserve}, exit_code=2)
         if limit < 1 or limit > 100:
-            return fail("invalid_input", "limit must be between 1 and 100.", "Use --limit in [1..100].", {"limit": args.limit}, exit_code=2)
+            return rt.fail("invalid_input", "limit must be between 1 and 100.", "Use --limit in [1..100].", {"limit": args.limit}, exit_code=2)
         if scan_max < 1 or scan_max > 2000:
-            return fail("invalid_input", "scan-max must be between 1 and 2000.", "Use --scan-max in [1..2000].", {"scanMax": args.scan_max}, exit_code=2)
+            return rt.fail("invalid_input", "scan-max must be between 1 and 2000.", "Use --scan-max in [1..2000].", {"scanMax": args.scan_max}, exit_code=2)
 
-        router = _require_chain_contract_address(chain, "router")
-        factory_raw = _cast_call_stdout(chain, router, "factory()(address)")
-        factory = _parse_address_from_cast_output(factory_raw)
+        router = rt._require_chain_contract_address(chain, "router")
+        factory_raw = rt._cast_call_stdout(chain, router, "factory()(address)")
+        factory = rt._parse_address_from_cast_output(factory_raw)
         if factory.lower() == "0x0000000000000000000000000000000000000000":
-            return fail(
+            return rt.fail(
                 "liquidity_pair_discovery_failed",
                 f"Factory address resolved to zero for router {router}.",
                 "Verify chain router/factory contract metadata and retry.",
@@ -147,10 +53,10 @@ def cmd_liquidity_discover_pairs_impl(args: argparse.Namespace) -> int:
                 exit_code=1,
             )
 
-        pair_len_raw = _cast_call_stdout(chain, factory, "allPairsLength()(uint256)")
-        pair_count = _parse_uint_from_cast_output(pair_len_raw)
+        pair_len_raw = rt._cast_call_stdout(chain, factory, "allPairsLength()(uint256)")
+        pair_count = rt._parse_uint_from_cast_output(pair_len_raw)
         if pair_count <= 0:
-            return fail(
+            return rt.fail(
                 "liquidity_no_viable_pair",
                 "Factory returned zero pairs.",
                 "Try another DEX on this chain or verify deployment state.",
@@ -165,14 +71,14 @@ def cmd_liquidity_discover_pairs_impl(args: argparse.Namespace) -> int:
         error_samples: list[str] = []
         for idx in range(scan_cap):
             try:
-                pair_out = _cast_call_stdout(chain, factory, "allPairs(uint256)(address)", str(idx))
-                pair_addr = _parse_address_from_cast_output(pair_out)
-                token0 = _parse_address_from_cast_output(_cast_call_stdout(chain, pair_addr, "token0()(address)"))
-                token1 = _parse_address_from_cast_output(_cast_call_stdout(chain, pair_addr, "token1()(address)"))
-                reserves_out = _cast_call_stdout(chain, pair_addr, "getReserves()(uint112,uint112,uint32)")
-                reserve_values = _parse_uint_tuple_from_cast_output(reserves_out)
+                pair_out = rt._cast_call_stdout(chain, factory, "allPairs(uint256)(address)", str(idx))
+                pair_addr = rt._parse_address_from_cast_output(pair_out)
+                token0 = rt._parse_address_from_cast_output(rt._cast_call_stdout(chain, pair_addr, "token0()(address)"))
+                token1 = rt._parse_address_from_cast_output(rt._cast_call_stdout(chain, pair_addr, "token1()(address)"))
+                reserves_out = rt._cast_call_stdout(chain, pair_addr, "getReserves()(uint112,uint112,uint32)")
+                reserve_values = rt._parse_uint_tuple_from_cast_output(reserves_out)
                 if len(reserve_values) < 2:
-                    raise WalletStoreError("Unable to parse reserves from getReserves output.")
+                    raise rt.WalletStoreError("Unable to parse reserves from getReserves output.")
                 reserve0 = int(reserve_values[0])
                 reserve1 = int(reserve_values[1])
                 if reserve0 < min_reserve or reserve1 < min_reserve:
@@ -195,7 +101,7 @@ def cmd_liquidity_discover_pairs_impl(args: argparse.Namespace) -> int:
                 continue
 
         if not candidates:
-            return fail(
+            return rt.fail(
                 "liquidity_no_viable_pair",
                 "No viable pair matched reserve filters during discovery scan.",
                 "Lower --min-reserve, try another DEX, or verify pair liquidity.",
@@ -215,7 +121,7 @@ def cmd_liquidity_discover_pairs_impl(args: argparse.Namespace) -> int:
 
         candidates.sort(key=lambda row: int(str(row.get("minReserve") or "0")), reverse=True)
         selected = candidates[:limit]
-        return ok(
+        return rt.ok(
             "Liquidity pair discovery complete.",
             chain=chain,
             dex=dex,
@@ -232,18 +138,18 @@ def cmd_liquidity_discover_pairs_impl(args: argparse.Namespace) -> int:
             pairs=selected,
             errorSamples=error_samples,
         )
-    except ChainRegistryError as exc:
-        return fail("unsupported_chain_capability", str(exc), chain_supported_hint(), {"chain": chain, "requiredCapability": "liquidity"}, exit_code=2)
-    except UnsupportedLiquidityAdapter as exc:
-        return fail(
+    except rt.ChainRegistryError as exc:
+        return rt.fail("unsupported_chain_capability", str(exc), rt.chain_supported_hint(), {"chain": chain, "requiredCapability": "liquidity"}, exit_code=2)
+    except rt.UnsupportedLiquidityAdapter as exc:
+        return rt.fail(
             "unsupported_liquidity_adapter",
             str(exc),
             "Choose a supported chain/dex combination and retry.",
             {"chain": chain, "dex": dex},
             exit_code=2,
         )
-    except WalletStoreError as exc:
-        return fail(
+    except rt.WalletStoreError as exc:
+        return rt.fail(
             "liquidity_pair_discovery_failed",
             str(exc),
             "Verify router/factory metadata, chain RPC availability, and retry.",
@@ -251,7 +157,7 @@ def cmd_liquidity_discover_pairs_impl(args: argparse.Namespace) -> int:
             exit_code=1,
         )
     except Exception as exc:
-        return fail(
+        return rt.fail(
             "liquidity_pair_discovery_failed",
             str(exc),
             "Inspect runtime pair discovery path and retry.",
@@ -259,35 +165,35 @@ def cmd_liquidity_discover_pairs_impl(args: argparse.Namespace) -> int:
             exit_code=1,
         )
 
-def cmd_liquidity_quote_add_impl(args: argparse.Namespace) -> int:
-    chk = require_json_flag(args)
+def cmd_liquidity_quote_add_impl(rt: LiquidityRuntimeAdapter, args: argparse.Namespace) -> int:
+    chk = rt.require_json_flag(args)
     if chk is not None:
         return chk
     chain = str(args.chain or "").strip()
     dex = str(args.dex or "").strip().lower()
     try:
-        assert_chain_capability(chain, "liquidity")
-        default_position_type = "v3" if _is_solana_chain(chain) else "v2"
+        rt.assert_chain_capability(chain, "liquidity")
+        default_position_type = "v3" if rt._is_solana_chain(chain) else "v2"
         position_type = str(args.position_type or default_position_type).strip().lower()
-        adapter = build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type=position_type)
-        token_a = _resolve_token_address(chain, args.token_a)
-        token_b = _resolve_token_address(chain, args.token_b)
+        adapter = rt.build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type=position_type)
+        token_a = rt._resolve_token_address(chain, args.token_a)
+        token_b = rt._resolve_token_address(chain, args.token_b)
         if token_a.lower() == token_b.lower():
-            return fail("invalid_input", "token-a and token-b must be different.", "Provide distinct token values.", {"chain": chain}, exit_code=2)
-        amount_a_h = _parse_positive_amount_text(str(args.amount_a), "amount-a")
-        amount_b_h = _parse_positive_amount_text(str(args.amount_b), "amount-b")
+            return rt.fail("invalid_input", "token-a and token-b must be different.", "Provide distinct token values.", {"chain": chain}, exit_code=2)
+        amount_a_h = rt._parse_positive_amount_text(str(args.amount_a), "amount-a")
+        amount_b_h = rt._parse_positive_amount_text(str(args.amount_b), "amount-b")
         slippage_bps = int(args.slippage_bps)
         if slippage_bps < 0 or slippage_bps > 5000:
-            return fail("invalid_input", "slippage-bps must be between 0 and 5000.", "Use integer bps in range.", {"slippageBps": args.slippage_bps}, exit_code=2)
+            return rt.fail("invalid_input", "slippage-bps must be between 0 and 5000.", "Use integer bps in range.", {"slippageBps": args.slippage_bps}, exit_code=2)
         v3_meta: dict[str, Any] = {}
         if position_type == "v3":
             v3_range_text = str(args.v3_range or "").strip()
-            if not v3_range_text and _is_solana_chain(chain):
+            if not v3_range_text and rt._is_solana_chain(chain):
                 v3_range_text = "100:0:0"
             try:
-                fee, tick_lower, tick_upper = _parse_v3_range_text(v3_range_text)
-            except WalletStoreError as exc:
-                return fail("invalid_input", str(exc), "Provide --v3-range fee:tickLower:tickUpper.", {"chain": chain, "dex": dex}, exit_code=2)
+                fee, tick_lower, tick_upper = rt._parse_v3_range_text(v3_range_text)
+            except rt.WalletStoreError as exc:
+                return rt.fail("invalid_input", str(exc), "Provide --v3-range fee:tickLower:tickUpper.", {"chain": chain, "dex": dex}, exit_code=2)
             v3_meta = {
                 "fee": fee,
                 "tickLower": tick_lower,
@@ -298,51 +204,51 @@ def cmd_liquidity_quote_add_impl(args: argparse.Namespace) -> int:
             {
                 "tokenA": token_a,
                 "tokenB": token_b,
-                "amountA": _decimal_text(amount_a_h),
-                "amountB": _decimal_text(amount_b_h),
+                "amountA": rt._decimal_text(amount_a_h),
+                "amountB": rt._decimal_text(amount_b_h),
                 "slippageBps": slippage_bps,
             }
         )
-        if _is_solana_chain(chain):
+        if rt._is_solana_chain(chain):
             if adapter.protocol_family == "local_clmm":
-                local_quote = solana_local_quote_add(
-                    amount_a=_decimal_text(amount_a_h),
-                    amount_b=_decimal_text(amount_b_h),
+                local_quote = rt.solana_local_quote_add(
+                    amount_a=rt._decimal_text(amount_a_h),
+                    amount_b=rt._decimal_text(amount_b_h),
                     slippage_bps=slippage_bps,
                 )
             elif adapter.protocol_family == "raydium_clmm":
-                pool_id = _resolve_raydium_pool_id(adapter, str(getattr(args, "pool_id", "") or ""))
+                pool_id = rt._resolve_raydium_pool_id(adapter, str(getattr(args, "pool_id", "") or ""))
                 if not pool_id:
-                    return fail(
+                    return rt.fail(
                         "invalid_input",
                         "Raydium quote-add requires --pool-id when no single default pool is configured.",
                         "Provide --pool-id for the target Raydium CLMM pool.",
                         {"chain": chain, "dex": dex},
                         exit_code=2,
                     )
-                local_quote = solana_raydium_quote_add(
-                    amount_a=_decimal_text(amount_a_h),
-                    amount_b=_decimal_text(amount_b_h),
+                local_quote = rt.solana_raydium_quote_add(
+                    amount_a=rt._decimal_text(amount_a_h),
+                    amount_b=rt._decimal_text(amount_b_h),
                     slippage_bps=slippage_bps,
                     pool_id=pool_id,
                 )
             else:
-                return fail(
+                return rt.fail(
                     "unsupported_liquidity_execution_family",
                     f"Unsupported Solana liquidity adapter family '{adapter.protocol_family}' for quote-add.",
                     "Use local_clmm or raydium_clmm adapter.",
                     {"chain": chain, "dex": dex, "positionType": position_type},
                     exit_code=2,
                 )
-            return ok(
+            return rt.ok(
                 "Liquidity add quote ready.",
                 chain=chain,
                 dex=dex,
                 positionType=position_type,
                 tokenA=token_a,
                 tokenB=token_b,
-                amountA=_decimal_text(amount_a_h),
-                amountB=_decimal_text(amount_b_h),
+                amountA=rt._decimal_text(amount_a_h),
+                amountB=rt._decimal_text(amount_b_h),
                 quoteAmountB=local_quote.get("amountB"),
                 minAmountB=local_quote.get("minAmountB"),
                 slippageBps=slippage_bps,
@@ -354,23 +260,23 @@ def cmd_liquidity_quote_add_impl(args: argparse.Namespace) -> int:
                 preflight={**preflight.get("simulation", {}), **local_quote},
                 simulationOnly=True,
             )
-        token_a_meta = _fetch_erc20_metadata(chain, token_a)
-        token_b_meta = _fetch_erc20_metadata(chain, token_b)
+        token_a_meta = rt._fetch_erc20_metadata(chain, token_a)
+        token_b_meta = rt._fetch_erc20_metadata(chain, token_b)
         token_a_decimals = int(token_a_meta.get("decimals", 18))
         token_b_decimals = int(token_b_meta.get("decimals", 18))
-        amount_a_units = _to_units_uint(_decimal_text(amount_a_h), token_a_decimals)
-        quote_out_units = _router_get_amount_out(chain, amount_a_units, token_a, token_b)
-        quote_out_h = _format_units(int(quote_out_units), token_b_decimals)
-        min_b_h = _decimal_text(_to_non_negative_decimal(quote_out_h) * Decimal(max(0, 10000 - slippage_bps)) / Decimal(10000))
-        return ok(
+        amount_a_units = rt._to_units_uint(rt._decimal_text(amount_a_h), token_a_decimals)
+        quote_out_units = rt._router_get_amount_out(chain, amount_a_units, token_a, token_b)
+        quote_out_h = rt._format_units(int(quote_out_units), token_b_decimals)
+        min_b_h = rt._decimal_text(rt._to_non_negative_decimal(quote_out_h) * Decimal(max(0, 10000 - slippage_bps)) / Decimal(10000))
+        return rt.ok(
             "Liquidity add quote ready.",
             chain=chain,
             dex=dex,
             positionType=position_type,
             tokenA=token_a,
             tokenB=token_b,
-            amountA=_decimal_text(amount_a_h),
-            amountB=_decimal_text(amount_b_h),
+            amountA=rt._decimal_text(amount_a_h),
+            amountB=rt._decimal_text(amount_b_h),
             quoteAmountB=quote_out_h,
             minAmountB=min_b_h,
             slippageBps=slippage_bps,
@@ -382,53 +288,53 @@ def cmd_liquidity_quote_add_impl(args: argparse.Namespace) -> int:
             preflight=preflight.get("simulation", {}),
             simulationOnly=True,
         )
-    except ChainRegistryError as exc:
-        return fail("unsupported_chain_capability", str(exc), chain_supported_hint(), {"chain": chain, "requiredCapability": "liquidity"}, exit_code=2)
-    except UnsupportedLiquidityAdapter as exc:
-        return fail(
+    except rt.ChainRegistryError as exc:
+        return rt.fail("unsupported_chain_capability", str(exc), rt.chain_supported_hint(), {"chain": chain, "requiredCapability": "liquidity"}, exit_code=2)
+    except rt.UnsupportedLiquidityAdapter as exc:
+        return rt.fail(
             "unsupported_liquidity_adapter",
             str(exc),
             "Choose a supported chain/dex/position-type combination and retry.",
             {"chain": chain, "dex": dex, "positionType": str(args.position_type or "v2")},
             exit_code=2,
         )
-    except LiquidityAdapterError as exc:
-        return fail("liquidity_preflight_failed", str(exc), "Fix the request payload and retry.", {"chain": chain, "dex": dex}, exit_code=2)
-    except WalletStoreError as exc:
-        return fail("liquidity_quote_add_failed", str(exc), "Verify tokens/amounts and retry.", {"chain": chain, "dex": dex}, exit_code=1)
+    except rt.LiquidityAdapterError as exc:
+        return rt.fail("liquidity_preflight_failed", str(exc), "Fix the request payload and retry.", {"chain": chain, "dex": dex}, exit_code=2)
+    except rt.WalletStoreError as exc:
+        return rt.fail("liquidity_quote_add_failed", str(exc), "Verify tokens/amounts and retry.", {"chain": chain, "dex": dex}, exit_code=1)
     except Exception as exc:
-        return fail("liquidity_quote_add_failed", str(exc), "Inspect runtime liquidity quote-add path and retry.", {"chain": chain, "dex": dex}, exit_code=1)
+        return rt.fail("liquidity_quote_add_failed", str(exc), "Inspect runtime liquidity quote-add path and retry.", {"chain": chain, "dex": dex}, exit_code=1)
 
-def cmd_liquidity_quote_remove_impl(args: argparse.Namespace) -> int:
-    chk = require_json_flag(args)
+def cmd_liquidity_quote_remove_impl(rt: LiquidityRuntimeAdapter, args: argparse.Namespace) -> int:
+    chk = rt.require_json_flag(args)
     if chk is not None:
         return chk
     chain = str(args.chain or "").strip()
     dex = str(args.dex or "").strip().lower()
     try:
-        assert_chain_capability(chain, "liquidity")
-        default_position_type = "v3" if _is_solana_chain(chain) else "v2"
+        rt.assert_chain_capability(chain, "liquidity")
+        default_position_type = "v3" if rt._is_solana_chain(chain) else "v2"
         position_type = str(args.position_type or default_position_type).strip().lower()
-        adapter = build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type=position_type)
+        adapter = rt.build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type=position_type)
         position_id = str(args.position_id or "").strip()
         if not position_id:
-            return fail("invalid_input", "position-id is required.", "Provide --position-id and retry.", {"chain": chain, "dex": dex}, exit_code=2)
+            return rt.fail("invalid_input", "position-id is required.", "Provide --position-id and retry.", {"chain": chain, "dex": dex}, exit_code=2)
         percent = int(args.percent)
         if percent < 1 or percent > 100:
-            return fail("invalid_input", "percent must be between 1 and 100.", "Use --percent in [1..100].", {"percent": args.percent}, exit_code=2)
+            return rt.fail("invalid_input", "percent must be between 1 and 100.", "Use --percent in [1..100].", {"percent": args.percent}, exit_code=2)
         preflight = adapter.quote_remove({"positionId": position_id, "percent": percent})
-        if _is_solana_chain(chain) and adapter.protocol_family == "raydium_clmm":
-            pool_id = _resolve_raydium_pool_id(adapter, str(getattr(args, "pool_id", "") or ""))
+        if rt._is_solana_chain(chain) and adapter.protocol_family == "raydium_clmm":
+            pool_id = rt._resolve_raydium_pool_id(adapter, str(getattr(args, "pool_id", "") or ""))
             if not pool_id:
-                return fail(
+                return rt.fail(
                     "invalid_input",
                     "Raydium quote-remove requires --pool-id when no single default pool is configured.",
                     "Provide --pool-id for the target Raydium CLMM pool.",
                     {"chain": chain, "dex": dex, "positionId": position_id},
                     exit_code=2,
                 )
-            preflight = {"simulation": solana_raydium_quote_remove(percent=percent, pool_id=pool_id)}
-        return ok(
+            preflight = {"simulation": rt.solana_raydium_quote_remove(percent=percent, pool_id=pool_id)}
+        return rt.ok(
             "Liquidity remove quote ready.",
             chain=chain,
             dex=dex,
@@ -440,68 +346,68 @@ def cmd_liquidity_quote_remove_impl(args: argparse.Namespace) -> int:
             simulationOnly=True,
             note="Exact remove outputs are adapter-specific; runtime will recompute pre-execution.",
         )
-    except ChainRegistryError as exc:
-        return fail("unsupported_chain_capability", str(exc), chain_supported_hint(), {"chain": chain, "requiredCapability": "liquidity"}, exit_code=2)
-    except UnsupportedLiquidityAdapter as exc:
-        return fail(
+    except rt.ChainRegistryError as exc:
+        return rt.fail("unsupported_chain_capability", str(exc), rt.chain_supported_hint(), {"chain": chain, "requiredCapability": "liquidity"}, exit_code=2)
+    except rt.UnsupportedLiquidityAdapter as exc:
+        return rt.fail(
             "unsupported_liquidity_adapter",
             str(exc),
             "Choose a supported chain/dex/position-type combination and retry.",
             {"chain": chain, "dex": dex, "positionType": str(args.position_type or "v2")},
             exit_code=2,
         )
-    except LiquidityAdapterError as exc:
-        return fail("liquidity_preflight_failed", str(exc), "Fix the request payload and retry.", {"chain": chain, "dex": dex}, exit_code=2)
+    except rt.LiquidityAdapterError as exc:
+        return rt.fail("liquidity_preflight_failed", str(exc), "Fix the request payload and retry.", {"chain": chain, "dex": dex}, exit_code=2)
     except Exception as exc:
-        return fail("liquidity_quote_remove_failed", str(exc), "Inspect runtime liquidity quote-remove path and retry.", {"chain": chain, "dex": dex}, exit_code=1)
+        return rt.fail("liquidity_quote_remove_failed", str(exc), "Inspect runtime liquidity quote-remove path and retry.", {"chain": chain, "dex": dex}, exit_code=1)
 
-def cmd_liquidity_add_impl(args: argparse.Namespace) -> int:
-    chk = require_json_flag(args)
+def cmd_liquidity_add_impl(rt: LiquidityRuntimeAdapter, args: argparse.Namespace) -> int:
+    chk = rt.require_json_flag(args)
     if chk is not None:
         return chk
     chain = str(args.chain or "").strip()
     dex = str(args.dex or "").strip().lower()
     try:
-        assert_chain_capability(chain, "liquidity")
-        default_position_type = "v3" if _is_solana_chain(chain) else "v2"
+        rt.assert_chain_capability(chain, "liquidity")
+        default_position_type = "v3" if rt._is_solana_chain(chain) else "v2"
         position_type = str(args.position_type or default_position_type).strip().lower()
-        token_a = _resolve_token_address(chain, args.token_a)
-        token_b = _resolve_token_address(chain, args.token_b)
+        token_a = rt._resolve_token_address(chain, args.token_a)
+        token_b = rt._resolve_token_address(chain, args.token_b)
         if token_a.lower() == token_b.lower():
-            return fail("invalid_input", "token-a and token-b must be different.", "Provide distinct token values.", {"chain": chain}, exit_code=2)
-        amount_a_h = _parse_positive_amount_text(str(args.amount_a), "amount-a")
-        amount_b_h = _parse_positive_amount_text(str(args.amount_b), "amount-b")
+            return rt.fail("invalid_input", "token-a and token-b must be different.", "Provide distinct token values.", {"chain": chain}, exit_code=2)
+        amount_a_h = rt._parse_positive_amount_text(str(args.amount_a), "amount-a")
+        amount_b_h = rt._parse_positive_amount_text(str(args.amount_b), "amount-b")
         slippage_bps = int(args.slippage_bps)
         if slippage_bps < 0 or slippage_bps > 5000:
-            return fail("invalid_input", "slippage-bps must be between 0 and 5000.", "Use integer bps in range.", {"slippageBps": args.slippage_bps}, exit_code=2)
+            return rt.fail("invalid_input", "slippage-bps must be between 0 and 5000.", "Use integer bps in range.", {"slippageBps": args.slippage_bps}, exit_code=2)
         v3_meta: dict[str, Any] = {}
         if position_type == "v3":
             v3_range_text = str(args.v3_range or "").strip()
-            if not v3_range_text and _is_solana_chain(chain):
+            if not v3_range_text and rt._is_solana_chain(chain):
                 v3_range_text = "100:0:0"
             try:
-                fee, tick_lower, tick_upper = _parse_v3_range_text(v3_range_text)
-            except WalletStoreError as exc:
-                return fail("invalid_input", str(exc), "Provide --v3-range fee:tickLower:tickUpper.", {"chain": chain, "dex": dex}, exit_code=2)
+                fee, tick_lower, tick_upper = rt._parse_v3_range_text(v3_range_text)
+            except rt.WalletStoreError as exc:
+                return rt.fail("invalid_input", str(exc), "Provide --v3-range fee:tickLower:tickUpper.", {"chain": chain, "dex": dex}, exit_code=2)
             v3_meta = {"fee": fee, "tickLower": tick_lower, "tickUpper": tick_upper, "deadlineSec": 120}
 
-        provider_requested, _ = _liquidity_provider_settings(chain)
-        adapter = build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type=position_type)
+        provider_requested, _ = rt._liquidity_provider_settings(chain)
+        adapter = rt.build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type=position_type)
         adapter_preflight = adapter.quote_add(
             {
                 "tokenA": token_a,
                 "tokenB": token_b,
-                "amountA": _decimal_text(amount_a_h),
-                "amountB": _decimal_text(amount_b_h),
+                "amountA": rt._decimal_text(amount_a_h),
+                "amountB": rt._decimal_text(amount_b_h),
                 "slippageBps": slippage_bps,
             }
         )
         adapter_family = adapter.protocol_family
         adapter_dex = adapter.dex
-        if _is_solana_chain(chain) and adapter.protocol_family == "raydium_clmm":
-            pool_id = _resolve_raydium_pool_id(adapter, str(getattr(args, "pool_id", "") or ""))
+        if rt._is_solana_chain(chain) and adapter.protocol_family == "raydium_clmm":
+            pool_id = rt._resolve_raydium_pool_id(adapter, str(getattr(args, "pool_id", "") or ""))
             if not pool_id:
-                return fail(
+                return rt.fail(
                     "invalid_input",
                     "Raydium liquidity add requires --pool-id when no single default pool is configured.",
                     "Provide --pool-id for the target Raydium CLMM pool.",
@@ -509,7 +415,7 @@ def cmd_liquidity_add_impl(args: argparse.Namespace) -> int:
                     exit_code=2,
                 )
             v3_meta["poolId"] = pool_id
-        agent_id = _resolve_agent_id_or_fail(chain)
+        agent_id = rt._resolve_agent_id_or_fail(chain)
         preflight = adapter_preflight
         payload = {
             "schemaVersion": 1,
@@ -520,8 +426,8 @@ def cmd_liquidity_add_impl(args: argparse.Namespace) -> int:
             "positionType": position_type,
             "tokenA": token_a,
             "tokenB": token_b,
-            "amountA": _decimal_text(amount_a_h),
-            "amountB": _decimal_text(amount_b_h),
+            "amountA": rt._decimal_text(amount_a_h),
+            "amountB": rt._decimal_text(amount_b_h),
             "slippageBps": slippage_bps,
             "details": {
                 "v3Range": str(args.v3_range or "").strip() or None,
@@ -532,13 +438,13 @@ def cmd_liquidity_add_impl(args: argparse.Namespace) -> int:
                 "source": "runtime_liquidity_add",
             },
         }
-        status_code, body = _api_request("POST", "/liquidity/proposed", payload=payload, include_idempotency=True)
+        status_code, body = rt._api_request("POST", "/liquidity/proposed", payload=payload, include_idempotency=True)
         if status_code < 200 or status_code >= 300:
-            return fail(
+            return rt.fail(
                 str(body.get("code", "api_error")),
                 str(body.get("message", f"liquidity proposed failed ({status_code})")),
                 str(body.get("actionHint", "Verify policy/approval settings and retry.")),
-                _api_error_details(status_code, body, "/liquidity/proposed", chain=chain),
+                rt._api_error_details(status_code, body, "/liquidity/proposed", chain=chain),
                 exit_code=1,
             )
         liquidity_intent_id = str(body.get("liquidityIntentId") or "").strip()
@@ -551,25 +457,25 @@ def cmd_liquidity_add_impl(args: argparse.Namespace) -> int:
                 "action": "add",
                 "tokenA": token_a,
                 "tokenB": token_b,
-                "amountA": _decimal_text(amount_a_h),
-                "amountB": _decimal_text(amount_b_h),
+                "amountA": rt._decimal_text(amount_a_h),
+                "amountB": rt._decimal_text(amount_b_h),
             }
             try:
-                _maybe_send_telegram_liquidity_approval_prompt(flow)
+                rt._maybe_send_telegram_liquidity_approval_prompt(flow)
             except Exception:
                 pass
             queued_message = (
                 "Approval required (liquidity)\n\n"
                 "Request: Add liquidity\n"
                 f"Pair: {token_a}/{token_b}\n"
-                f"Amounts: {_decimal_text(amount_a_h)} / {_decimal_text(amount_b_h)}\n"
+                f"Amounts: {rt._decimal_text(amount_a_h)} / {rt._decimal_text(amount_b_h)}\n"
                 f"Chain: `{chain}`\n"
                 f"DEX: `{adapter_dex}`\n"
                 f"Intent ID: `{liquidity_intent_id}`\n"
                 "Status: approval_pending\n\n"
                 "Tap Approve or Deny."
             )
-            return fail(
+            return rt.fail(
                 "approval_required",
                 "Liquidity add is waiting for management approval.",
                 "Send queuedMessage verbatim so Telegram buttons can attach, then wait for Approve/Deny.",
@@ -584,14 +490,14 @@ def cmd_liquidity_add_impl(args: argparse.Namespace) -> int:
                 exit_code=1,
             )
         if status == "approved":
-            code, payload = _run_liquidity_execute_inline(liquidity_intent_id, chain)
+            code, payload = rt._run_liquidity_execute_inline(liquidity_intent_id, chain)
             if isinstance(payload, dict):
                 payload.setdefault("liquidityIntentId", liquidity_intent_id)
                 payload.setdefault("chain", chain)
                 payload.setdefault("dex", adapter_dex)
                 payload.setdefault("adapterFamily", adapter_family)
-            return emit(payload) if isinstance(payload, dict) else code
-        return ok(
+            return rt.emit(payload) if isinstance(payload, dict) else code
+        return rt.ok(
             "Liquidity add intent created.",
             chain=chain,
             dex=adapter_dex,
@@ -602,48 +508,48 @@ def cmd_liquidity_add_impl(args: argparse.Namespace) -> int:
             preflight=preflight.get("simulation", {}) if isinstance(preflight, dict) else {},
             providerRequested=provider_requested,
         )
-    except ChainRegistryError as exc:
-        return fail("unsupported_chain_capability", str(exc), chain_supported_hint(), {"chain": chain, "requiredCapability": "liquidity"}, exit_code=2)
-    except UnsupportedLiquidityAdapter as exc:
-        return fail(
+    except rt.ChainRegistryError as exc:
+        return rt.fail("unsupported_chain_capability", str(exc), rt.chain_supported_hint(), {"chain": chain, "requiredCapability": "liquidity"}, exit_code=2)
+    except rt.UnsupportedLiquidityAdapter as exc:
+        return rt.fail(
             "unsupported_liquidity_adapter",
             str(exc),
             "Choose a supported chain/dex/position-type combination and retry.",
             {"chain": chain, "dex": dex, "positionType": str(args.position_type or "v2")},
             exit_code=2,
         )
-    except LiquidityAdapterError as exc:
-        return fail("liquidity_preflight_failed", str(exc), "Fix preflight parameters and retry.", {"chain": chain, "dex": dex}, exit_code=2)
-    except WalletStoreError as exc:
-        return fail("liquidity_add_failed", str(exc), "Verify API env/auth, chain capability, and inputs.", {"chain": chain, "dex": dex}, exit_code=1)
+    except rt.LiquidityAdapterError as exc:
+        return rt.fail("liquidity_preflight_failed", str(exc), "Fix preflight parameters and retry.", {"chain": chain, "dex": dex}, exit_code=2)
+    except rt.WalletStoreError as exc:
+        return rt.fail("liquidity_add_failed", str(exc), "Verify API env/auth, chain capability, and inputs.", {"chain": chain, "dex": dex}, exit_code=1)
     except Exception as exc:
-        return fail("liquidity_add_failed", str(exc), "Inspect runtime liquidity add path and retry.", {"chain": chain, "dex": dex}, exit_code=1)
+        return rt.fail("liquidity_add_failed", str(exc), "Inspect runtime liquidity add path and retry.", {"chain": chain, "dex": dex}, exit_code=1)
 
-def cmd_liquidity_remove_impl(args: argparse.Namespace) -> int:
-    chk = require_json_flag(args)
+def cmd_liquidity_remove_impl(rt: LiquidityRuntimeAdapter, args: argparse.Namespace) -> int:
+    chk = rt.require_json_flag(args)
     if chk is not None:
         return chk
     chain = str(args.chain or "").strip()
     dex = str(args.dex or "").strip().lower()
     try:
-        assert_chain_capability(chain, "liquidity")
-        default_position_type = "v3" if _is_solana_chain(chain) else "v2"
+        rt.assert_chain_capability(chain, "liquidity")
+        default_position_type = "v3" if rt._is_solana_chain(chain) else "v2"
         position_type = str(args.position_type or default_position_type).strip().lower()
-        provider_requested, _ = _liquidity_provider_settings(chain)
-        adapter = build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type=position_type)
+        provider_requested, _ = rt._liquidity_provider_settings(chain)
+        adapter = rt.build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type=position_type)
         adapter_preflight: dict[str, Any] = {}
         adapter_dex = adapter.dex
         adapter_family = adapter.protocol_family
-        agent_id = _resolve_agent_id_or_fail(chain)
+        agent_id = rt._resolve_agent_id_or_fail(chain)
         position_id = str(args.position_id or "").strip()
         if not position_id:
-            return fail("invalid_input", "position-id is required.", "Provide --position-id and retry.", {"chain": chain, "dex": dex}, exit_code=2)
+            return rt.fail("invalid_input", "position-id is required.", "Provide --position-id and retry.", {"chain": chain, "dex": dex}, exit_code=2)
         percent = int(args.percent)
         if percent < 1 or percent > 100:
-            return fail("invalid_input", "percent must be between 1 and 100.", "Use --percent in [1..100].", {"percent": args.percent}, exit_code=2)
+            return rt.fail("invalid_input", "percent must be between 1 and 100.", "Use --percent in [1..100].", {"percent": args.percent}, exit_code=2)
         slippage_bps = int(args.slippage_bps)
         if slippage_bps < 0 or slippage_bps > 5000:
-            return fail("invalid_input", "slippage-bps must be between 0 and 5000.", "Use integer bps in range.", {"slippageBps": args.slippage_bps}, exit_code=2)
+            return rt.fail("invalid_input", "slippage-bps must be between 0 and 5000.", "Use integer bps in range.", {"slippageBps": args.slippage_bps}, exit_code=2)
         adapter_preflight = adapter.quote_remove(
             {
                 "positionId": position_id,
@@ -652,42 +558,42 @@ def cmd_liquidity_remove_impl(args: argparse.Namespace) -> int:
             }
         )
         preflight = adapter_preflight
-        if _is_solana_chain(chain):
+        if rt._is_solana_chain(chain):
             token_a_in = str(args.token_a or "").strip()
             token_b_in = str(args.token_b or "").strip()
             if not token_a_in or not token_b_in:
-                return fail(
+                return rt.fail(
                     "invalid_input",
                     "token-a and token-b are required for Solana liquidity remove intents.",
                     "Provide --token-a <mint> --token-b <mint> and retry.",
                     {"chain": chain, "dex": adapter_dex, "positionId": position_id},
                     exit_code=2,
                 )
-            resolved_token_a = _resolve_token_address(chain, token_a_in)
-            resolved_token_b = _resolve_token_address(chain, token_b_in)
+            resolved_token_a = rt._resolve_token_address(chain, token_a_in)
+            resolved_token_b = rt._resolve_token_address(chain, token_b_in)
         elif adapter_family == "position_manager_v3":
             if not adapter.position_manager:
-                return fail(
+                return rt.fail(
                     "chain_config_invalid",
                     "Concentrated-liquidity execution metadata is incomplete for this chain.",
                     "Add execution.liquidity adapter position-manager metadata and retry.",
                     {"chain": chain, "dex": adapter_dex, "positionId": position_id},
                     exit_code=2,
                 )
-            snapshot = _read_v3_position_snapshot(chain, adapter.position_manager, position_id)
+            snapshot = rt._read_v3_position_snapshot(chain, adapter.position_manager, position_id)
             resolved_token_a = str(snapshot.get("token0") or "").strip()
             resolved_token_b = str(snapshot.get("token1") or "").strip()
         else:
-            resolved_token_a, resolved_token_b = _resolve_liquidity_remove_tokens(
+            resolved_token_a, resolved_token_b = rt._resolve_liquidity_remove_tokens(
                 chain,
                 position_id,
                 str(args.token_a or "").strip(),
                 str(args.token_b or "").strip(),
             )
-        display_token_a = _token_symbol_for_display(chain, resolved_token_a) or resolved_token_a
-        display_token_b = _token_symbol_for_display(chain, resolved_token_b) or resolved_token_b
+        display_token_a = rt._token_symbol_for_display(chain, resolved_token_a) or resolved_token_a
+        display_token_b = rt._token_symbol_for_display(chain, resolved_token_b) or resolved_token_b
         if adapter_family == "amm_v2":
-            remove_context = _compute_v2_remove_liquidity_units(
+            remove_context = rt._compute_v2_remove_liquidity_units(
                 chain=chain,
                 position_id=position_id,
                 token_a=resolved_token_a,
@@ -696,7 +602,7 @@ def cmd_liquidity_remove_impl(args: argparse.Namespace) -> int:
             )
             liquidity_units = int(remove_context.get("liquidityUnits") or 0)
             if liquidity_units <= 0:
-                return fail(
+                return rt.fail(
                     "liquidity_preflight_zero_lp_balance",
                     "Position has no removable LP token balance for the requested percent.",
                     "Refresh liquidity positions or choose a position with non-zero LP balance.",
@@ -743,13 +649,13 @@ def cmd_liquidity_remove_impl(args: argparse.Namespace) -> int:
                 "source": "runtime_liquidity_remove",
             },
         }
-        status_code, body = _api_request("POST", "/liquidity/proposed", payload=payload, include_idempotency=True)
+        status_code, body = rt._api_request("POST", "/liquidity/proposed", payload=payload, include_idempotency=True)
         if status_code < 200 or status_code >= 300:
-            return fail(
+            return rt.fail(
                 str(body.get("code", "api_error")),
                 str(body.get("message", f"liquidity proposed failed ({status_code})")),
                 str(body.get("actionHint", "Verify policy/approval settings and retry.")),
-                _api_error_details(status_code, body, "/liquidity/proposed", chain=chain),
+                rt._api_error_details(status_code, body, "/liquidity/proposed", chain=chain),
                 exit_code=1,
             )
         liquidity_intent_id = str(body.get("liquidityIntentId") or "").strip()
@@ -770,7 +676,7 @@ def cmd_liquidity_remove_impl(args: argparse.Namespace) -> int:
                 "amountB": "0",
             }
             try:
-                _maybe_send_telegram_liquidity_approval_prompt(flow)
+                rt._maybe_send_telegram_liquidity_approval_prompt(flow)
             except Exception:
                 pass
             queued_message = (
@@ -785,7 +691,7 @@ def cmd_liquidity_remove_impl(args: argparse.Namespace) -> int:
                 "Status: approval_pending\n\n"
                 "Tap Approve or Deny."
             )
-            return fail(
+            return rt.fail(
                 "approval_required",
                 "Liquidity remove is waiting for management approval.",
                 "Send queuedMessage verbatim so Telegram buttons can attach, then wait for Approve/Deny.",
@@ -804,14 +710,14 @@ def cmd_liquidity_remove_impl(args: argparse.Namespace) -> int:
                 exit_code=1,
             )
         if status == "approved":
-            code, payload = _run_liquidity_execute_inline(liquidity_intent_id, chain)
+            code, payload = rt._run_liquidity_execute_inline(liquidity_intent_id, chain)
             if isinstance(payload, dict):
                 payload.setdefault("liquidityIntentId", liquidity_intent_id)
                 payload.setdefault("chain", chain)
                 payload.setdefault("dex", adapter_dex)
                 payload.setdefault("adapterFamily", adapter_family)
-            return emit(payload) if isinstance(payload, dict) else code
-        return ok(
+            return rt.emit(payload) if isinstance(payload, dict) else code
+        return rt.ok(
             "Liquidity remove intent created.",
             chain=chain,
             dex=adapter_dex,
@@ -823,42 +729,42 @@ def cmd_liquidity_remove_impl(args: argparse.Namespace) -> int:
             preflight=preflight.get("simulation", {}) if isinstance(preflight, dict) else {},
             providerRequested=provider_requested,
         )
-    except ChainRegistryError as exc:
-        return fail("unsupported_chain_capability", str(exc), chain_supported_hint(), {"chain": chain, "requiredCapability": "liquidity"}, exit_code=2)
-    except UnsupportedLiquidityAdapter as exc:
-        return fail(
+    except rt.ChainRegistryError as exc:
+        return rt.fail("unsupported_chain_capability", str(exc), rt.chain_supported_hint(), {"chain": chain, "requiredCapability": "liquidity"}, exit_code=2)
+    except rt.UnsupportedLiquidityAdapter as exc:
+        return rt.fail(
             "unsupported_liquidity_adapter",
             str(exc),
             "Choose a supported chain/dex/position-type combination and retry.",
             {"chain": chain, "dex": dex, "positionType": str(args.position_type or "v2")},
             exit_code=2,
         )
-    except LiquidityAdapterError as exc:
-        return fail("liquidity_preflight_failed", str(exc), "Fix preflight parameters and retry.", {"chain": chain, "dex": dex}, exit_code=2)
-    except WalletStoreError as exc:
-        return fail("liquidity_remove_failed", str(exc), "Verify API env/auth, chain capability, and inputs.", {"chain": chain, "dex": dex}, exit_code=1)
+    except rt.LiquidityAdapterError as exc:
+        return rt.fail("liquidity_preflight_failed", str(exc), "Fix preflight parameters and retry.", {"chain": chain, "dex": dex}, exit_code=2)
+    except rt.WalletStoreError as exc:
+        return rt.fail("liquidity_remove_failed", str(exc), "Verify API env/auth, chain capability, and inputs.", {"chain": chain, "dex": dex}, exit_code=1)
     except Exception as exc:
-        return fail("liquidity_remove_failed", str(exc), "Inspect runtime liquidity remove path and retry.", {"chain": chain, "dex": dex}, exit_code=1)
+        return rt.fail("liquidity_remove_failed", str(exc), "Inspect runtime liquidity remove path and retry.", {"chain": chain, "dex": dex}, exit_code=1)
 
-def cmd_liquidity_increase_impl(args: argparse.Namespace) -> int:
-    chk = require_json_flag(args)
+def cmd_liquidity_increase_impl(rt: LiquidityRuntimeAdapter, args: argparse.Namespace) -> int:
+    chk = rt.require_json_flag(args)
     if chk is not None:
         return chk
     chain = str(args.chain or "").strip()
     dex = str(args.dex or "").strip().lower()
     position_id = str(args.position_id or "").strip()
     try:
-        assert_chain_capability(chain, "liquidity")
+        rt.assert_chain_capability(chain, "liquidity")
         if not position_id:
-            return fail("invalid_input", "position-id is required.", "Provide --position-id and retry.", {"chain": chain}, exit_code=2)
+            return rt.fail("invalid_input", "position-id is required.", "Provide --position-id and retry.", {"chain": chain}, exit_code=2)
         slippage_bps = int(args.slippage_bps)
         if slippage_bps < 0 or slippage_bps > 5000:
-            return fail("invalid_input", "slippage-bps must be between 0 and 5000.", "Use integer bps in range.", {"slippageBps": args.slippage_bps}, exit_code=2)
+            return rt.fail("invalid_input", "slippage-bps must be between 0 and 5000.", "Use integer bps in range.", {"slippageBps": args.slippage_bps}, exit_code=2)
 
-        provider_requested, _ = _liquidity_provider_settings(chain)
-        adapter = build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type="v3")
+        provider_requested, _ = rt._liquidity_provider_settings(chain)
+        adapter = rt.build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type="v3")
         if adapter.protocol_family not in {"position_manager_v3", "local_clmm", "raydium_clmm"}:
-            return fail(
+            return rt.fail(
                 "unsupported_liquidity_execution_family",
                 f"Liquidity increase requires a concentrated-liquidity execution adapter, got '{adapter.protocol_family}'.",
                 "Use a chain/dex with advanced concentrated-liquidity support and retry.",
@@ -866,36 +772,36 @@ def cmd_liquidity_increase_impl(args: argparse.Namespace) -> int:
                 exit_code=2,
             )
         if not adapter.supports_operation("increase"):
-            return fail(
+            return rt.fail(
                 "unsupported_liquidity_operation",
                 f"Adapter '{adapter.dex}' does not support liquidity increase on chain '{chain}'.",
                 "Choose a supported chain/dex combination and retry.",
                 {"chain": chain, "dex": adapter.dex, "positionId": position_id},
                 exit_code=2,
             )
-        token_a = _resolve_token_address(chain, str(args.token_a or ""))
-        token_b = _resolve_token_address(chain, str(args.token_b or ""))
-        amount_a_text = _decimal_text(_parse_positive_amount_text(str(args.amount_a), "amount-a"))
-        amount_b_text = _decimal_text(_parse_positive_amount_text(str(args.amount_b), "amount-b"))
+        token_a = rt._resolve_token_address(chain, str(args.token_a or ""))
+        token_b = rt._resolve_token_address(chain, str(args.token_b or ""))
+        amount_a_text = rt._decimal_text(rt._parse_positive_amount_text(str(args.amount_a), "amount-a"))
+        amount_b_text = rt._decimal_text(rt._parse_positive_amount_text(str(args.amount_b), "amount-b"))
         deadline = str(int(datetime.now(timezone.utc).timestamp()) + 120)
 
-        if _is_solana_chain(chain) and adapter.protocol_family in {"local_clmm", "raydium_clmm"}:
-            store = load_wallet_store()
-            wallet_address, secret = _execution_wallet_solana_secret(store, chain)
-            amount_a_units = str(_to_units_uint(amount_a_text, 9))
-            amount_b_units = str(_to_units_uint(amount_b_text, 9))
+        if rt._is_solana_chain(chain) and adapter.protocol_family in {"local_clmm", "raydium_clmm"}:
+            store = rt.load_wallet_store()
+            wallet_address, secret = rt._execution_wallet_solana_secret(store, chain)
+            amount_a_units = str(rt._to_units_uint(amount_a_text, 9))
+            amount_b_units = str(rt._to_units_uint(amount_b_text, 9))
             min_a_units = str((int(amount_a_units) * max(0, 10000 - slippage_bps)) // 10000)
             min_b_units = str((int(amount_b_units) * max(0, 10000 - slippage_bps)) // 10000)
             if adapter.protocol_family == "local_clmm":
                 if chain != "solana_localnet":
-                    return fail(
+                    return rt.fail(
                         "unsupported_liquidity_adapter",
                         "local_clmm adapter is only supported on solana_localnet.",
                         "Switch to solana_localnet or use raydium_clmm.",
                         {"chain": chain, "dex": dex, "positionId": position_id},
                         exit_code=2,
                     )
-                increased = solana_local_increase_position(
+                increased = rt.solana_local_increase_position(
                     chain=chain,
                     dex=adapter.dex,
                     owner=wallet_address,
@@ -915,7 +821,7 @@ def cmd_liquidity_increase_impl(args: argparse.Namespace) -> int:
                     "routeKind": "adapter_default",
                     **increased,
                 }
-                return ok(
+                return rt.ok(
                     "Liquidity position increased.",
                     chain=chain,
                     dex=adapter.dex,
@@ -934,18 +840,18 @@ def cmd_liquidity_increase_impl(args: argparse.Namespace) -> int:
                     details=details,
                 )
 
-            pool_id = _resolve_raydium_pool_id(adapter, "")
+            pool_id = rt._resolve_raydium_pool_id(adapter, "")
             if not pool_id:
-                return fail(
+                return rt.fail(
                     "invalid_input",
                     "Raydium liquidity increase requires configured pool metadata.",
                     "Provide pool metadata in chain config or include a single default pool.",
                     {"chain": chain, "dex": dex, "positionId": position_id},
                     exit_code=2,
                 )
-            execution = solana_raydium_execute_instruction(
+            execution = rt.solana_raydium_execute_instruction(
                 chain=chain,
-                rpc_url=_chain_rpc_url(chain),
+                rpc_url=rt._chain_rpc_url(chain),
                 private_key_bytes=secret,
                 owner=wallet_address,
                 adapter_metadata=dict(adapter.adapter_metadata or {}),
@@ -973,7 +879,7 @@ def cmd_liquidity_increase_impl(args: argparse.Namespace) -> int:
                 "operationTxHashes": [tx_hash] if tx_hash else [],
                 **execution.details,
             }
-            return ok(
+            return rt.ok(
                 "Liquidity position increased.",
                 chain=chain,
                 dex=adapter.dex,
@@ -992,15 +898,15 @@ def cmd_liquidity_increase_impl(args: argparse.Namespace) -> int:
                 details=details,
             )
 
-        store = load_wallet_store()
-        wallet_address, private_key_hex = _execution_wallet(store, chain)
-        token_a_meta = _fetch_erc20_metadata(chain, token_a)
-        token_b_meta = _fetch_erc20_metadata(chain, token_b)
-        amount_a_units = str(_to_units_uint(amount_a_text, int(token_a_meta.get("decimals", 18))))
-        amount_b_units = str(_to_units_uint(amount_b_text, int(token_b_meta.get("decimals", 18))))
+        store = rt.load_wallet_store()
+        wallet_address, private_key_hex = rt._execution_wallet(store, chain)
+        token_a_meta = rt._fetch_erc20_metadata(chain, token_a)
+        token_b_meta = rt._fetch_erc20_metadata(chain, token_b)
+        amount_a_units = str(rt._to_units_uint(amount_a_text, int(token_a_meta.get("decimals", 18))))
+        amount_b_units = str(rt._to_units_uint(amount_b_text, int(token_b_meta.get("decimals", 18))))
         min_a_units = str((int(amount_a_units) * max(0, 10000 - slippage_bps)) // 10000)
         min_b_units = str((int(amount_b_units) * max(0, 10000 - slippage_bps)) // 10000)
-        plan = build_liquidity_increase_plan(
+        plan = rt.build_liquidity_increase_plan(
             chain=chain,
             dex=adapter.dex,
             position_type="v3",
@@ -1015,10 +921,10 @@ def cmd_liquidity_increase_impl(args: argparse.Namespace) -> int:
                 "deadline": deadline,
             },
             wallet_address=wallet_address,
-            build_calldata=_cast_calldata,
+            build_calldata=rt._cast_calldata,
         )
-        execution = execute_liquidity_plan(
-            executor=_router_action_executor(),
+        execution = rt.execute_liquidity_plan(
+            executor=rt._router_action_executor(),
             plan=plan,
             wallet_address=wallet_address,
             private_key_hex=private_key_hex,
@@ -1026,8 +932,8 @@ def cmd_liquidity_increase_impl(args: argparse.Namespace) -> int:
             liquidity_operation="increase",
         )
         tx_hash = str(execution.tx_hash or "")
-        builder_meta = _builder_output_from_hashes(chain, [*execution.approve_tx_hashes, *execution.operation_tx_hashes])
-        return ok(
+        builder_meta = rt._builder_output_from_hashes(chain, [*execution.approve_tx_hashes, *execution.operation_tx_hashes])
+        return rt.ok(
             "Liquidity position increased.",
             chain=chain,
             dex=adapter.dex,
@@ -1046,24 +952,24 @@ def cmd_liquidity_increase_impl(args: argparse.Namespace) -> int:
             details={**execution.details, **builder_meta},
             **builder_meta,
         )
-    except ChainRegistryError as exc:
-        return fail("unsupported_chain_capability", str(exc), chain_supported_hint(), {"chain": chain, "requiredCapability": "liquidity"}, exit_code=2)
-    except UnsupportedLiquidityAdapter as exc:
-        return fail("unsupported_liquidity_adapter", str(exc), "Choose a supported chain/dex/position-type combination and retry.", {"chain": chain, "dex": dex}, exit_code=2)
-    except UnsupportedLiquidityOperation as exc:
-        return fail("unsupported_liquidity_operation", str(exc), "Use a chain/dex with concentrated-liquidity increase support.", {"chain": chain, "dex": dex, "positionId": position_id}, exit_code=2)
+    except rt.ChainRegistryError as exc:
+        return rt.fail("unsupported_chain_capability", str(exc), rt.chain_supported_hint(), {"chain": chain, "requiredCapability": "liquidity"}, exit_code=2)
+    except rt.UnsupportedLiquidityAdapter as exc:
+        return rt.fail("unsupported_liquidity_adapter", str(exc), "Choose a supported chain/dex/position-type combination and retry.", {"chain": chain, "dex": dex}, exit_code=2)
+    except rt.UnsupportedLiquidityOperation as exc:
+        return rt.fail("unsupported_liquidity_operation", str(exc), "Use a chain/dex with concentrated-liquidity increase support.", {"chain": chain, "dex": dex, "positionId": position_id}, exit_code=2)
     except ValueError as exc:
         code = str(exc)
         if code == "chain_config_invalid":
-            return fail("chain_config_invalid", "Concentrated-liquidity execution metadata is incomplete for this chain.", "Add execution.liquidity adapter position-manager metadata and retry.", {"chain": chain, "dex": dex, "positionId": position_id}, exit_code=2)
-        return fail("liquidity_increase_failed", str(exc), "Verify local router-adapter configuration and retry.", {"chain": chain, "dex": dex, "positionId": position_id}, exit_code=1)
-    except WalletStoreError as exc:
-        return fail("liquidity_increase_failed", str(exc), "Verify local router-adapter configuration and retry.", {"chain": chain, "dex": dex, "positionId": position_id}, exit_code=1)
+            return rt.fail("chain_config_invalid", "Concentrated-liquidity execution metadata is incomplete for this chain.", "Add execution.liquidity adapter position-manager metadata and retry.", {"chain": chain, "dex": dex, "positionId": position_id}, exit_code=2)
+        return rt.fail("liquidity_increase_failed", str(exc), "Verify local router-adapter configuration and retry.", {"chain": chain, "dex": dex, "positionId": position_id}, exit_code=1)
+    except rt.WalletStoreError as exc:
+        return rt.fail("liquidity_increase_failed", str(exc), "Verify local router-adapter configuration and retry.", {"chain": chain, "dex": dex, "positionId": position_id}, exit_code=1)
     except Exception as exc:
-        return fail("liquidity_increase_failed", str(exc), "Inspect runtime liquidity increase path and retry.", {"chain": chain, "dex": dex, "positionId": position_id}, exit_code=1)
+        return rt.fail("liquidity_increase_failed", str(exc), "Inspect runtime liquidity increase path and retry.", {"chain": chain, "dex": dex, "positionId": position_id}, exit_code=1)
 
-def cmd_liquidity_claim_fees_impl(args: argparse.Namespace) -> int:
-    chk = require_json_flag(args)
+def cmd_liquidity_claim_fees_impl(rt: LiquidityRuntimeAdapter, args: argparse.Namespace) -> int:
+    chk = rt.require_json_flag(args)
     if chk is not None:
         return chk
     chain = str(args.chain or "").strip()
@@ -1089,13 +995,13 @@ def cmd_liquidity_claim_fees_impl(args: argparse.Namespace) -> int:
         return details
 
     try:
-        assert_chain_capability(chain, "liquidity")
+        rt.assert_chain_capability(chain, "liquidity")
         if not position_id:
-            return fail("invalid_input", "position-id is required.", "Provide --position-id and retry.", _claim_failure_details(), exit_code=2)
-        provider_requested, _ = _liquidity_provider_settings(chain)
-        adapter = build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type="v3")
+            return rt.fail("invalid_input", "position-id is required.", "Provide --position-id and retry.", _claim_failure_details(), exit_code=2)
+        provider_requested, _ = rt._liquidity_provider_settings(chain)
+        adapter = rt.build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type="v3")
         if adapter.protocol_family not in {"position_manager_v3", "local_clmm", "raydium_clmm"}:
-            return fail(
+            return rt.fail(
                 "unsupported_liquidity_execution_family",
                 f"Liquidity claim-fees requires a concentrated-liquidity execution adapter, got '{adapter.protocol_family}'.",
                 "Use a chain/dex with advanced concentrated-liquidity support and retry.",
@@ -1103,26 +1009,26 @@ def cmd_liquidity_claim_fees_impl(args: argparse.Namespace) -> int:
                 exit_code=2,
             )
         if not adapter.supports_operation("claim_fees"):
-            return fail(
+            return rt.fail(
                 "unsupported_liquidity_operation",
                 f"Adapter '{adapter.dex}' does not support claim-fees on chain '{chain}'.",
                 "Choose a supported chain/dex combination and retry.",
                 _claim_failure_details(),
                 exit_code=2,
             )
-        if _is_solana_chain(chain) and adapter.protocol_family in {"local_clmm", "raydium_clmm"}:
-            store = load_wallet_store()
-            wallet_address, secret = _execution_wallet_solana_secret(store, chain)
+        if rt._is_solana_chain(chain) and adapter.protocol_family in {"local_clmm", "raydium_clmm"}:
+            store = rt.load_wallet_store()
+            wallet_address, secret = rt._execution_wallet_solana_secret(store, chain)
             if adapter.protocol_family == "local_clmm":
                 if chain != "solana_localnet":
-                    return fail(
+                    return rt.fail(
                         "unsupported_liquidity_adapter",
                         "local_clmm adapter is only supported on solana_localnet.",
                         "Switch to solana_localnet or use raydium_clmm.",
                         _claim_failure_details(),
                         exit_code=2,
                     )
-                claimed = solana_local_claim_fees(
+                claimed = rt.solana_local_claim_fees(
                     chain=chain,
                     dex=adapter.dex,
                     owner=wallet_address,
@@ -1136,7 +1042,7 @@ def cmd_liquidity_claim_fees_impl(args: argparse.Namespace) -> int:
                     "simulationMode": True,
                     **claimed,
                 }
-                return ok(
+                return rt.ok(
                     "Liquidity fees claimed.",
                     chain=chain,
                     dex=adapter.dex,
@@ -1154,18 +1060,18 @@ def cmd_liquidity_claim_fees_impl(args: argparse.Namespace) -> int:
                     liquidityOperation="claim_fees",
                     details=details,
                 )
-            pool_id = _resolve_raydium_pool_id(adapter, "")
+            pool_id = rt._resolve_raydium_pool_id(adapter, "")
             if not pool_id:
-                return fail(
+                return rt.fail(
                     "invalid_input",
                     "Raydium claim-fees requires configured pool metadata.",
                     "Provide pool metadata in chain config or include a single default pool.",
                     _claim_failure_details(),
                     exit_code=2,
                 )
-            execution = solana_raydium_execute_instruction(
+            execution = rt.solana_raydium_execute_instruction(
                 chain=chain,
-                rpc_url=_chain_rpc_url(chain),
+                rpc_url=rt._chain_rpc_url(chain),
                 private_key_bytes=secret,
                 owner=wallet_address,
                 adapter_metadata=dict(adapter.adapter_metadata or {}),
@@ -1179,7 +1085,7 @@ def cmd_liquidity_claim_fees_impl(args: argparse.Namespace) -> int:
                 "operationTxHashes": [tx_hash] if tx_hash else [],
                 **execution.details,
             }
-            return ok(
+            return rt.ok(
                 "Liquidity fees claimed.",
                 chain=chain,
                 dex=adapter.dex,
@@ -1198,9 +1104,9 @@ def cmd_liquidity_claim_fees_impl(args: argparse.Namespace) -> int:
                 details=details,
             )
 
-        store = load_wallet_store()
-        wallet_address, private_key_hex = _execution_wallet(store, chain)
-        plan = build_liquidity_claim_fees_plan(
+        store = rt.load_wallet_store()
+        wallet_address, private_key_hex = rt._execution_wallet(store, chain)
+        plan = rt.build_liquidity_claim_fees_plan(
             chain=chain,
             dex=adapter.dex,
             position_type="v3",
@@ -1210,10 +1116,10 @@ def cmd_liquidity_claim_fees_impl(args: argparse.Namespace) -> int:
                 "collectAsWeth": bool(args.collect_as_weth),
             },
             wallet_address=wallet_address,
-            build_calldata=_cast_calldata,
+            build_calldata=rt._cast_calldata,
         )
-        execution = execute_liquidity_plan(
-            executor=_router_action_executor(),
+        execution = rt.execute_liquidity_plan(
+            executor=rt._router_action_executor(),
             plan=plan,
             wallet_address=wallet_address,
             private_key_hex=private_key_hex,
@@ -1222,9 +1128,9 @@ def cmd_liquidity_claim_fees_impl(args: argparse.Namespace) -> int:
         )
         tx_hash = str(execution.tx_hash or "").strip()
         if not tx_hash:
-            raise WalletStoreError("liquidity_claim_fees_failed: claim execution returned empty txHash.")
-        builder_meta = _builder_output_from_hashes(chain, [*execution.approve_tx_hashes, *execution.operation_tx_hashes])
-        return ok(
+            raise rt.WalletStoreError("liquidity_claim_fees_failed: claim execution returned empty txHash.")
+        builder_meta = rt._builder_output_from_hashes(chain, [*execution.approve_tx_hashes, *execution.operation_tx_hashes])
+        return rt.ok(
             "Liquidity fees claimed.",
             chain=chain,
             dex=adapter.dex,
@@ -1243,28 +1149,28 @@ def cmd_liquidity_claim_fees_impl(args: argparse.Namespace) -> int:
             details={**execution.details, **builder_meta},
             **builder_meta,
         )
-    except ChainRegistryError as exc:
-        return fail("unsupported_chain_capability", str(exc), chain_supported_hint(), {"chain": chain, "requiredCapability": "liquidity"}, exit_code=2)
-    except UnsupportedLiquidityAdapter as exc:
-        return fail("unsupported_liquidity_adapter", str(exc), "Choose a supported chain/dex/position-type combination and retry.", _claim_failure_details(), exit_code=2)
-    except UnsupportedLiquidityOperation as exc:
-        return fail("unsupported_liquidity_operation", str(exc), "Use a chain/dex with concentrated-liquidity fee-claim support.", _claim_failure_details(), exit_code=2)
+    except rt.ChainRegistryError as exc:
+        return rt.fail("unsupported_chain_capability", str(exc), rt.chain_supported_hint(), {"chain": chain, "requiredCapability": "liquidity"}, exit_code=2)
+    except rt.UnsupportedLiquidityAdapter as exc:
+        return rt.fail("unsupported_liquidity_adapter", str(exc), "Choose a supported chain/dex/position-type combination and retry.", _claim_failure_details(), exit_code=2)
+    except rt.UnsupportedLiquidityOperation as exc:
+        return rt.fail("unsupported_liquidity_operation", str(exc), "Use a chain/dex with concentrated-liquidity fee-claim support.", _claim_failure_details(), exit_code=2)
     except ValueError as exc:
         code = str(exc)
         if code == "chain_config_invalid":
-            return fail("chain_config_invalid", "Concentrated-liquidity execution metadata is incomplete for this chain.", "Add execution.liquidity adapter position-manager metadata and retry.", _claim_failure_details(), exit_code=2)
-        return fail("liquidity_claim_fees_failed", str(exc), "Verify local router-adapter configuration and retry.", _claim_failure_details(), exit_code=1)
-    except WalletStoreError as exc:
+            return rt.fail("chain_config_invalid", "Concentrated-liquidity execution metadata is incomplete for this chain.", "Add execution.liquidity adapter position-manager metadata and retry.", _claim_failure_details(), exit_code=2)
+        return rt.fail("liquidity_claim_fees_failed", str(exc), "Verify local router-adapter configuration and retry.", _claim_failure_details(), exit_code=1)
+    except rt.WalletStoreError as exc:
         err = str(exc)
         for code in {"claim_fees_not_supported_for_protocol", "unsupported_liquidity_operation", "no_execution_provider_available"}:
             if err.startswith(f"{code}:"):
-                return fail(code, err.split(":", 1)[1].strip(), "Verify chain claim-fees support and retry.", _claim_failure_details(), exit_code=1)
-        return fail("liquidity_claim_fees_failed", str(exc), "Verify local router-adapter configuration and retry.", _claim_failure_details(), exit_code=1)
+                return rt.fail(code, err.split(":", 1)[1].strip(), "Verify chain claim-fees support and retry.", _claim_failure_details(), exit_code=1)
+        return rt.fail("liquidity_claim_fees_failed", str(exc), "Verify local router-adapter configuration and retry.", _claim_failure_details(), exit_code=1)
     except Exception as exc:
-        return fail("liquidity_claim_fees_failed", str(exc), "Inspect runtime liquidity fee-claim path and retry.", _claim_failure_details(), exit_code=1)
+        return rt.fail("liquidity_claim_fees_failed", str(exc), "Inspect runtime liquidity fee-claim path and retry.", _claim_failure_details(), exit_code=1)
 
-def cmd_liquidity_migrate_impl(args: argparse.Namespace) -> int:
-    chk = require_json_flag(args)
+def cmd_liquidity_migrate_impl(rt: LiquidityRuntimeAdapter, args: argparse.Namespace) -> int:
+    chk = rt.require_json_flag(args)
     if chk is not None:
         return chk
     chain = str(args.chain or "").strip()
@@ -1273,11 +1179,11 @@ def cmd_liquidity_migrate_impl(args: argparse.Namespace) -> int:
     from_protocol = str(args.from_protocol or "").strip().upper()
     to_protocol = str(args.to_protocol or "").strip().upper()
     try:
-        assert_chain_capability(chain, "liquidity")
+        rt.assert_chain_capability(chain, "liquidity")
         if not position_id:
-            return fail("invalid_input", "position-id is required.", "Provide --position-id and retry.", {"chain": chain}, exit_code=2)
+            return rt.fail("invalid_input", "position-id is required.", "Provide --position-id and retry.", {"chain": chain}, exit_code=2)
         if from_protocol not in {"V2", "V3", "V4"} or to_protocol not in {"V2", "V3", "V4"}:
-            return fail(
+            return rt.fail(
                 "invalid_input",
                 "from-protocol and to-protocol must be one of V2|V3|V4.",
                 "Provide valid protocol versions and retry.",
@@ -1286,13 +1192,13 @@ def cmd_liquidity_migrate_impl(args: argparse.Namespace) -> int:
             )
         slippage_bps = int(args.slippage_bps)
         if slippage_bps < 0 or slippage_bps > 5000:
-            return fail("invalid_input", "slippage-bps must be between 0 and 5000.", "Use integer bps in range.", {"slippageBps": args.slippage_bps}, exit_code=2)
-        provider_requested, _ = _liquidity_provider_settings(chain)
+            return rt.fail("invalid_input", "slippage-bps must be between 0 and 5000.", "Use integer bps in range.", {"slippageBps": args.slippage_bps}, exit_code=2)
+        provider_requested, _ = rt._liquidity_provider_settings(chain)
         fallback_used = False
         fallback_reason: dict[str, str] | None = None
-        adapter = build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type="v3")
+        adapter = rt.build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type="v3")
         if adapter.protocol_family not in {"position_manager_v3", "local_clmm", "raydium_clmm"}:
-            return fail(
+            return rt.fail(
                 "unsupported_liquidity_execution_family",
                 f"Liquidity migrate requires a concentrated-liquidity execution adapter, got '{adapter.protocol_family}'.",
                 "Use a chain/dex with advanced concentrated-liquidity support and retry.",
@@ -1300,7 +1206,7 @@ def cmd_liquidity_migrate_impl(args: argparse.Namespace) -> int:
                 exit_code=2,
             )
         if not adapter.supports_operation("migrate"):
-            return fail(
+            return rt.fail(
                 "unsupported_liquidity_operation",
                 f"Adapter '{adapter.dex}' does not support migrate on chain '{chain}'.",
                 "Choose a supported chain/dex combination and retry.",
@@ -1313,19 +1219,19 @@ def cmd_liquidity_migrate_impl(args: argparse.Namespace) -> int:
         if request_json:
             extra = json.loads(request_json)
             if not isinstance(extra, dict):
-                raise WalletStoreError("request-json must decode to an object.")
+                raise rt.WalletStoreError("request-json must decode to an object.")
             request_payload.update(extra)
 
-        if _is_solana_chain(chain) and adapter.protocol_family in {"local_clmm", "raydium_clmm"}:
-            store = load_wallet_store()
-            wallet_address, secret = _execution_wallet_solana_secret(store, chain)
+        if rt._is_solana_chain(chain) and adapter.protocol_family in {"local_clmm", "raydium_clmm"}:
+            store = rt.load_wallet_store()
+            wallet_address, secret = rt._execution_wallet_solana_secret(store, chain)
             target_adapter_key = str(
                 request_payload.get("targetAdapterKey")
                 or ((adapter.operations or {}).get("migrate") or {}).get("targetAdapterKey")
                 or ""
             ).strip()
             if not target_adapter_key:
-                return fail(
+                return rt.fail(
                     "migration_target_not_configured",
                     "Migration target adapter is not configured for this chain/dex.",
                     "Add execution.liquidity adapter migrate target metadata and retry.",
@@ -1334,14 +1240,14 @@ def cmd_liquidity_migrate_impl(args: argparse.Namespace) -> int:
                 )
             if adapter.protocol_family == "local_clmm":
                 if chain != "solana_localnet":
-                    return fail(
+                    return rt.fail(
                         "unsupported_liquidity_adapter",
                         "local_clmm adapter is only supported on solana_localnet.",
                         "Switch to solana_localnet or use raydium_clmm.",
                         {"chain": chain, "dex": dex, "positionId": position_id},
                         exit_code=2,
                     )
-                migrated = solana_local_migrate_position(
+                migrated = rt.solana_local_migrate_position(
                     chain=chain,
                     dex=adapter.dex,
                     owner=wallet_address,
@@ -1359,7 +1265,7 @@ def cmd_liquidity_migrate_impl(args: argparse.Namespace) -> int:
                     "simulationMode": True,
                     **migrated,
                 }
-                return ok(
+                return rt.ok(
                     "Liquidity position migrated.",
                     chain=chain,
                     dex=adapter.dex,
@@ -1379,18 +1285,18 @@ def cmd_liquidity_migrate_impl(args: argparse.Namespace) -> int:
                     toProtocol=to_protocol,
                     details=details,
                 )
-            pool_id = _resolve_raydium_pool_id(adapter, str(request_payload.get("poolId") or ""))
+            pool_id = rt._resolve_raydium_pool_id(adapter, str(request_payload.get("poolId") or ""))
             if not pool_id:
-                return fail(
+                return rt.fail(
                     "invalid_input",
                     "Raydium migrate requires configured pool metadata.",
                     "Provide pool metadata in chain config or include a single default pool.",
                     {"chain": chain, "dex": dex, "positionId": position_id},
                     exit_code=2,
                 )
-            execution = solana_raydium_execute_instruction(
+            execution = rt.solana_raydium_execute_instruction(
                 chain=chain,
-                rpc_url=_chain_rpc_url(chain),
+                rpc_url=rt._chain_rpc_url(chain),
                 private_key_bytes=secret,
                 owner=wallet_address,
                 adapter_metadata=dict(adapter.adapter_metadata or {}),
@@ -1405,7 +1311,7 @@ def cmd_liquidity_migrate_impl(args: argparse.Namespace) -> int:
                 operation_key="migrate",
             )
             tx_hash = str(execution.tx_hash or "")
-            return ok(
+            return rt.ok(
                 "Liquidity position migrated.",
                 chain=chain,
                 dex=adapter.dex,
@@ -1432,12 +1338,12 @@ def cmd_liquidity_migrate_impl(args: argparse.Namespace) -> int:
                 },
             )
 
-        store = load_wallet_store()
-        wallet_address, private_key_hex = _execution_wallet(store, chain)
-        position_snapshot = _read_v3_position_snapshot(chain, adapter.position_manager, position_id)
+        store = rt.load_wallet_store()
+        wallet_address, private_key_hex = rt._execution_wallet(store, chain)
+        position_snapshot = rt._read_v3_position_snapshot(chain, adapter.position_manager, position_id)
         liquidity_total = int(position_snapshot.get("liquidityUnits") or 0)
         if liquidity_total <= 0:
-            return fail(
+            return rt.fail(
                 "liquidity_preflight_zero_position_liquidity",
                 "Position has no removable concentrated liquidity for migration.",
                 "Choose a position with non-zero liquidity and retry.",
@@ -1459,14 +1365,14 @@ def cmd_liquidity_migrate_impl(args: argparse.Namespace) -> int:
         if request_json:
             extra = json.loads(request_json)
             if not isinstance(extra, dict):
-                raise WalletStoreError("request-json must decode to an object.")
+                raise rt.WalletStoreError("request-json must decode to an object.")
             request_payload.update(extra)
         migrate_cfg = dict((adapter.operations or {}).get("migrate") or {})
         target_adapter_key = str(request_payload.get("targetAdapterKey") or migrate_cfg.get("targetAdapterKey") or "").strip()
         if target_adapter_key:
             request_payload["targetAdapterKey"] = target_adapter_key
             try:
-                target_adapter = build_liquidity_adapter_for_request(chain=chain, dex=target_adapter_key, position_type="v3")
+                target_adapter = rt.build_liquidity_adapter_for_request(chain=chain, dex=target_adapter_key, position_type="v3")
                 request_payload["targetPositionManager"] = str(target_adapter.position_manager or "").strip()
                 target_ops = dict(target_adapter.operations or {})
                 target_add = dict(target_ops.get("add") or {})
@@ -1474,16 +1380,16 @@ def cmd_liquidity_migrate_impl(args: argparse.Namespace) -> int:
                     request_payload["targetAddMethod"] = str(target_add.get("method") or "mint").strip() or "mint"
             except Exception:
                 pass
-        plan = build_liquidity_migrate_plan(
+        plan = rt.build_liquidity_migrate_plan(
             chain=chain,
             dex=adapter.dex,
             position_type="v3",
             request=request_payload,
             wallet_address=wallet_address,
-            build_calldata=_cast_calldata,
+            build_calldata=rt._cast_calldata,
         )
-        execution = execute_liquidity_plan(
-            executor=_router_action_executor(),
+        execution = rt.execute_liquidity_plan(
+            executor=rt._router_action_executor(),
             plan=plan,
             wallet_address=wallet_address,
             private_key_hex=private_key_hex,
@@ -1491,8 +1397,8 @@ def cmd_liquidity_migrate_impl(args: argparse.Namespace) -> int:
             liquidity_operation="migrate",
         )
         tx_hash = str(execution.tx_hash or "")
-        builder_meta = _builder_output_from_hashes(chain, [*execution.approve_tx_hashes, *execution.operation_tx_hashes])
-        return ok(
+        builder_meta = rt._builder_output_from_hashes(chain, [*execution.approve_tx_hashes, *execution.operation_tx_hashes])
+        return rt.ok(
             "Liquidity position migrated.",
             chain=chain,
             dex=adapter.dex,
@@ -1513,26 +1419,26 @@ def cmd_liquidity_migrate_impl(args: argparse.Namespace) -> int:
             details={**execution.details, **builder_meta},
             **builder_meta,
         )
-    except ChainRegistryError as exc:
-        return fail("unsupported_chain_capability", str(exc), chain_supported_hint(), {"chain": chain, "requiredCapability": "liquidity"}, exit_code=2)
-    except UnsupportedLiquidityAdapter as exc:
-        return fail("unsupported_liquidity_adapter", str(exc), "Choose a supported chain/dex/position-type combination and retry.", {"chain": chain, "dex": dex, "positionId": position_id}, exit_code=2)
-    except UnsupportedLiquidityOperation as exc:
-        return fail("unsupported_liquidity_operation", str(exc), "Use a chain/dex with concentrated-liquidity migrate support.", {"chain": chain, "dex": dex, "positionId": position_id}, exit_code=2)
+    except rt.ChainRegistryError as exc:
+        return rt.fail("unsupported_chain_capability", str(exc), rt.chain_supported_hint(), {"chain": chain, "requiredCapability": "liquidity"}, exit_code=2)
+    except rt.UnsupportedLiquidityAdapter as exc:
+        return rt.fail("unsupported_liquidity_adapter", str(exc), "Choose a supported chain/dex/position-type combination and retry.", {"chain": chain, "dex": dex, "positionId": position_id}, exit_code=2)
+    except rt.UnsupportedLiquidityOperation as exc:
+        return rt.fail("unsupported_liquidity_operation", str(exc), "Use a chain/dex with concentrated-liquidity migrate support.", {"chain": chain, "dex": dex, "positionId": position_id}, exit_code=2)
     except ValueError as exc:
         code = str(exc)
         if code == "chain_config_invalid":
-            return fail("chain_config_invalid", "Concentrated-liquidity execution metadata is incomplete for this chain.", "Add execution.liquidity adapter position-manager metadata and retry.", {"chain": chain, "dex": dex, "positionId": position_id}, exit_code=2)
+            return rt.fail("chain_config_invalid", "Concentrated-liquidity execution metadata is incomplete for this chain.", "Add execution.liquidity adapter position-manager metadata and retry.", {"chain": chain, "dex": dex, "positionId": position_id}, exit_code=2)
         if code == "migration_target_not_configured":
-            return fail("migration_target_not_configured", "Migration target adapter is not configured for this chain/dex.", "Add execution.liquidity adapter migrate target metadata and retry.", {"chain": chain, "dex": dex, "positionId": position_id}, exit_code=2)
-        return fail("liquidity_migrate_failed", str(exc), "Verify local router-adapter migrate configuration and retry.", {"chain": chain, "dex": dex, "positionId": position_id}, exit_code=1)
-    except WalletStoreError as exc:
-        return fail("liquidity_migrate_failed", str(exc), "Verify local router-adapter migrate configuration and retry.", {"chain": chain, "dex": dex, "positionId": position_id}, exit_code=1)
+            return rt.fail("migration_target_not_configured", "Migration target adapter is not configured for this chain/dex.", "Add execution.liquidity adapter migrate target metadata and retry.", {"chain": chain, "dex": dex, "positionId": position_id}, exit_code=2)
+        return rt.fail("liquidity_migrate_failed", str(exc), "Verify local router-adapter migrate configuration and retry.", {"chain": chain, "dex": dex, "positionId": position_id}, exit_code=1)
+    except rt.WalletStoreError as exc:
+        return rt.fail("liquidity_migrate_failed", str(exc), "Verify local router-adapter migrate configuration and retry.", {"chain": chain, "dex": dex, "positionId": position_id}, exit_code=1)
     except Exception as exc:
-        return fail("liquidity_migrate_failed", str(exc), "Inspect runtime liquidity migrate path and retry.", {"chain": chain, "dex": dex, "positionId": position_id}, exit_code=1)
+        return rt.fail("liquidity_migrate_failed", str(exc), "Inspect runtime liquidity migrate path and retry.", {"chain": chain, "dex": dex, "positionId": position_id}, exit_code=1)
 
-def cmd_liquidity_claim_rewards_impl(args: argparse.Namespace) -> int:
-    chk = require_json_flag(args)
+def cmd_liquidity_claim_rewards_impl(rt: LiquidityRuntimeAdapter, args: argparse.Namespace) -> int:
+    chk = rt.require_json_flag(args)
     if chk is not None:
         return chk
     chain = str(args.chain or "").strip()
@@ -1558,15 +1464,15 @@ def cmd_liquidity_claim_rewards_impl(args: argparse.Namespace) -> int:
         return details
 
     try:
-        assert_chain_capability(chain, "liquidity")
+        rt.assert_chain_capability(chain, "liquidity")
         if not position_id:
-            return fail("invalid_input", "position-id is required.", "Provide --position-id and retry.", _claim_failure_details(), exit_code=2)
-        provider_requested, _ = _liquidity_provider_settings(chain)
+            return rt.fail("invalid_input", "position-id is required.", "Provide --position-id and retry.", _claim_failure_details(), exit_code=2)
+        provider_requested, _ = rt._liquidity_provider_settings(chain)
         fallback_used = False
         fallback_reason = None
-        adapter = build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type="v3")
+        adapter = rt.build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type="v3")
         if adapter.protocol_family not in {"position_manager_v3", "local_clmm", "raydium_clmm"}:
-            return fail(
+            return rt.fail(
                 "unsupported_liquidity_execution_family",
                 f"Liquidity claim-rewards requires a concentrated-liquidity execution adapter, got '{adapter.protocol_family}'.",
                 "Use a chain/dex with advanced concentrated-liquidity support and retry.",
@@ -1574,7 +1480,7 @@ def cmd_liquidity_claim_rewards_impl(args: argparse.Namespace) -> int:
                 exit_code=2,
             )
         if not adapter.supports_operation("claim_rewards"):
-            return fail(
+            return rt.fail(
                 "unsupported_liquidity_operation",
                 f"Adapter '{adapter.dex}' does not support claim-rewards on chain '{chain}'.",
                 "Choose a supported chain/dex combination and retry.",
@@ -1584,42 +1490,42 @@ def cmd_liquidity_claim_rewards_impl(args: argparse.Namespace) -> int:
         request_payload: dict[str, Any] = {"positionId": position_id}
         reward_token = str(args.reward_token or "").strip()
         if reward_token:
-            request_payload["tokens"] = [_resolve_token_address(chain, reward_token)]
+            request_payload["tokens"] = [rt._resolve_token_address(chain, reward_token)]
         request_json = str(args.request_json or "").strip()
         if request_json:
             extra = json.loads(request_json)
             if not isinstance(extra, dict):
-                raise WalletStoreError("request-json must decode to an object.")
+                raise rt.WalletStoreError("request-json must decode to an object.")
             request_payload.update(extra)
 
-        if _is_solana_chain(chain) and adapter.protocol_family in {"local_clmm", "raydium_clmm"}:
+        if rt._is_solana_chain(chain) and adapter.protocol_family in {"local_clmm", "raydium_clmm"}:
             reward_contracts: list[str] = []
             reward_cfg = ((adapter.operations or {}).get("claimRewards") or {}) if isinstance(adapter.operations, dict) else {}
             configured_rewards = reward_cfg.get("rewardContracts") if isinstance(reward_cfg, dict) else None
             if isinstance(configured_rewards, list):
                 reward_contracts = [str(item or "").strip() for item in configured_rewards if str(item or "").strip()]
             if reward_token:
-                reward_contracts = [str(_resolve_token_address(chain, reward_token))]
+                reward_contracts = [str(rt._resolve_token_address(chain, reward_token))]
             if not reward_contracts:
-                return fail(
+                return rt.fail(
                     "claim_rewards_not_configured",
                     "Reward contracts are not configured for this chain/dex.",
                     "Add execution.liquidity adapter claimRewards.rewardContracts and retry.",
                     _claim_failure_details(),
                     exit_code=1,
                 )
-            store = load_wallet_store()
-            wallet_address, secret = _execution_wallet_solana_secret(store, chain)
+            store = rt.load_wallet_store()
+            wallet_address, secret = rt._execution_wallet_solana_secret(store, chain)
             if adapter.protocol_family == "local_clmm":
                 if chain != "solana_localnet":
-                    return fail(
+                    return rt.fail(
                         "unsupported_liquidity_adapter",
                         "local_clmm adapter is only supported on solana_localnet.",
                         "Switch to solana_localnet or use raydium_clmm.",
                         _claim_failure_details(),
                         exit_code=2,
                     )
-                claimed = solana_local_claim_rewards(
+                claimed = rt.solana_local_claim_rewards(
                     chain=chain,
                     dex=adapter.dex,
                     owner=wallet_address,
@@ -1635,7 +1541,7 @@ def cmd_liquidity_claim_rewards_impl(args: argparse.Namespace) -> int:
                     "simulationMode": True,
                     **claimed,
                 }
-                return ok(
+                return rt.ok(
                     "Liquidity rewards claimed.",
                     chain=chain,
                     dex=adapter.dex,
@@ -1653,18 +1559,18 @@ def cmd_liquidity_claim_rewards_impl(args: argparse.Namespace) -> int:
                     liquidityOperation="claim_rewards",
                     details=details,
                 )
-            pool_id = _resolve_raydium_pool_id(adapter, "")
+            pool_id = rt._resolve_raydium_pool_id(adapter, "")
             if not pool_id:
-                return fail(
+                return rt.fail(
                     "invalid_input",
                     "Raydium claim-rewards requires configured pool metadata.",
                     "Provide pool metadata in chain config or include a single default pool.",
                     _claim_failure_details(),
                     exit_code=2,
                 )
-            execution = solana_raydium_execute_instruction(
+            execution = rt.solana_raydium_execute_instruction(
                 chain=chain,
-                rpc_url=_chain_rpc_url(chain),
+                rpc_url=rt._chain_rpc_url(chain),
                 private_key_bytes=secret,
                 owner=wallet_address,
                 adapter_metadata=dict(adapter.adapter_metadata or {}),
@@ -1684,7 +1590,7 @@ def cmd_liquidity_claim_rewards_impl(args: argparse.Namespace) -> int:
                 "operationTxHashes": [tx_hash] if tx_hash else [],
                 **execution.details,
             }
-            return ok(
+            return rt.ok(
                 "Liquidity rewards claimed.",
                 chain=chain,
                 dex=adapter.dex,
@@ -1703,18 +1609,18 @@ def cmd_liquidity_claim_rewards_impl(args: argparse.Namespace) -> int:
                 details=details,
             )
 
-        store = load_wallet_store()
-        wallet_address, private_key_hex = _execution_wallet(store, chain)
-        plan = build_liquidity_claim_rewards_plan(
+        store = rt.load_wallet_store()
+        wallet_address, private_key_hex = rt._execution_wallet(store, chain)
+        plan = rt.build_liquidity_claim_rewards_plan(
             chain=chain,
             dex=adapter.dex,
             position_type="v3",
             request=request_payload,
             wallet_address=wallet_address,
-            build_calldata=_cast_calldata,
+            build_calldata=rt._cast_calldata,
         )
-        execution = execute_liquidity_plan(
-            executor=_router_action_executor(),
+        execution = rt.execute_liquidity_plan(
+            executor=rt._router_action_executor(),
             plan=plan,
             wallet_address=wallet_address,
             private_key_hex=private_key_hex,
@@ -1723,9 +1629,9 @@ def cmd_liquidity_claim_rewards_impl(args: argparse.Namespace) -> int:
         )
         tx_hash = str(execution.tx_hash or "").strip()
         if not tx_hash:
-            raise WalletStoreError("liquidity_claim_rewards_failed: claim execution returned empty txHash.")
-        builder_meta = _builder_output_from_hashes(chain, [*execution.approve_tx_hashes, *execution.operation_tx_hashes])
-        return ok(
+            raise rt.WalletStoreError("liquidity_claim_rewards_failed: claim execution returned empty txHash.")
+        builder_meta = rt._builder_output_from_hashes(chain, [*execution.approve_tx_hashes, *execution.operation_tx_hashes])
+        return rt.ok(
             "Liquidity rewards claimed.",
             chain=chain,
             dex=adapter.dex,
@@ -1744,29 +1650,29 @@ def cmd_liquidity_claim_rewards_impl(args: argparse.Namespace) -> int:
             details={**execution.details, **builder_meta},
             **builder_meta,
         )
-    except ChainRegistryError as exc:
-        return fail("unsupported_chain_capability", str(exc), chain_supported_hint(), {"chain": chain, "requiredCapability": "liquidity"}, exit_code=2)
-    except UnsupportedLiquidityAdapter as exc:
-        return fail("unsupported_liquidity_adapter", str(exc), "Choose a supported chain/dex/position-type combination and retry.", _claim_failure_details(), exit_code=2)
-    except UnsupportedLiquidityOperation as exc:
-        return fail("unsupported_liquidity_operation", str(exc), "Use a chain/dex with concentrated-liquidity rewards-claim support.", _claim_failure_details(), exit_code=2)
+    except rt.ChainRegistryError as exc:
+        return rt.fail("unsupported_chain_capability", str(exc), rt.chain_supported_hint(), {"chain": chain, "requiredCapability": "liquidity"}, exit_code=2)
+    except rt.UnsupportedLiquidityAdapter as exc:
+        return rt.fail("unsupported_liquidity_adapter", str(exc), "Choose a supported chain/dex/position-type combination and retry.", _claim_failure_details(), exit_code=2)
+    except rt.UnsupportedLiquidityOperation as exc:
+        return rt.fail("unsupported_liquidity_operation", str(exc), "Use a chain/dex with concentrated-liquidity rewards-claim support.", _claim_failure_details(), exit_code=2)
     except ValueError as exc:
         code = str(exc)
         if code == "chain_config_invalid":
-            return fail("chain_config_invalid", "Concentrated-liquidity execution metadata is incomplete for this chain.", "Add execution.liquidity adapter position-manager metadata and retry.", _claim_failure_details(), exit_code=2)
+            return rt.fail("chain_config_invalid", "Concentrated-liquidity execution metadata is incomplete for this chain.", "Add execution.liquidity adapter position-manager metadata and retry.", _claim_failure_details(), exit_code=2)
         if code == "claim_rewards_not_configured":
-            return fail("claim_rewards_not_configured", "Reward contracts are not configured for this chain/dex.", "Add execution.liquidity adapter claimRewards.rewardContracts and retry.", _claim_failure_details(), exit_code=1)
-        return fail("liquidity_claim_rewards_failed", str(exc), "Verify local router-adapter claim-rewards configuration and retry.", _claim_failure_details(), exit_code=1)
-    except WalletStoreError as exc:
+            return rt.fail("claim_rewards_not_configured", "Reward contracts are not configured for this chain/dex.", "Add execution.liquidity adapter claimRewards.rewardContracts and retry.", _claim_failure_details(), exit_code=1)
+        return rt.fail("liquidity_claim_rewards_failed", str(exc), "Verify local router-adapter claim-rewards configuration and retry.", _claim_failure_details(), exit_code=1)
+    except rt.WalletStoreError as exc:
         err = str(exc)
         for code in {"claim_rewards_not_configured", "claim_rewards_not_supported_for_protocol", "unsupported_liquidity_operation", "no_execution_provider_available"}:
             if err.startswith(f"{code}:"):
-                return fail(code, err.split(":", 1)[1].strip(), "Verify chain claim-rewards support and retry.", _claim_failure_details(), exit_code=1)
-        return fail("liquidity_claim_rewards_failed", str(exc), "Verify local router-adapter claim-rewards configuration and retry.", _claim_failure_details(), exit_code=1)
+                return rt.fail(code, err.split(":", 1)[1].strip(), "Verify chain claim-rewards support and retry.", _claim_failure_details(), exit_code=1)
+        return rt.fail("liquidity_claim_rewards_failed", str(exc), "Verify local router-adapter claim-rewards configuration and retry.", _claim_failure_details(), exit_code=1)
     except Exception as exc:
-        return fail("liquidity_claim_rewards_failed", str(exc), "Inspect runtime liquidity claim-rewards path and retry.", _claim_failure_details(), exit_code=1)
+        return rt.fail("liquidity_claim_rewards_failed", str(exc), "Inspect runtime liquidity claim-rewards path and retry.", _claim_failure_details(), exit_code=1)
 
-def _invoke_liquidity_command_payload_impl(command: Callable[[argparse.Namespace], int], args: argparse.Namespace) -> dict[str, Any]:
+def _invoke_liquidity_command_payload_impl(rt: LiquidityRuntimeAdapter, command: Callable[[argparse.Namespace], int], args: argparse.Namespace) -> dict[str, Any]:
     buf = io.StringIO()
     with redirect_stdout(buf):
         code = command(args)
@@ -1782,14 +1688,14 @@ def _invoke_liquidity_command_payload_impl(command: Callable[[argparse.Namespace
     if code != 0:
         error_code = str(payload.get("code") or "liquidity_execution_failed")
         error_message = str(payload.get("message") or "Advanced liquidity command failed.")
-        raise WalletStoreError(f"{error_code}: {error_message}")
+        raise rt.WalletStoreError(f"{error_code}: {error_message}")
     return payload
 
-def _execute_liquidity_advanced_intent_impl(intent: dict[str, Any], chain: str, action: str) -> tuple[dict[str, Any], str]:
+def _execute_liquidity_advanced_intent_impl(rt: LiquidityRuntimeAdapter, intent: dict[str, Any], chain: str, action: str) -> tuple[dict[str, Any], str]:
     dex = str(intent.get("dex") or "").strip().lower()
-    adapter = build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type="v3")
-    details = _intent_details_dict(intent)
-    v3_details = _v3_details_dict(details)
+    adapter = rt.build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type="v3")
+    details = rt._intent_details_dict(intent)
+    v3_details = rt._v3_details_dict(details)
     position_id = str(intent.get("positionId") or intent.get("positionRef") or "").strip()
     slippage_bps = int(intent.get("slippageBps") or details.get("slippageBps") or 100)
 
@@ -1805,7 +1711,7 @@ def _execute_liquidity_advanced_intent_impl(intent: dict[str, Any], chain: str, 
             slippage_bps=slippage_bps,
             json=True,
         )
-        payload = _invoke_liquidity_command_payload(_cmd_liquidity_increase, args)
+        payload = _invoke_liquidity_command_payload_impl(rt, rt.cmd_liquidity_increase, args)
         return payload, adapter.protocol_family
 
     if action in {"claim_fees", "claim-fees"}:
@@ -1816,7 +1722,7 @@ def _execute_liquidity_advanced_intent_impl(intent: dict[str, Any], chain: str, 
             collect_as_weth=bool(details.get("collectAsWeth") or False),
             json=True,
         )
-        payload = _invoke_liquidity_command_payload(_cmd_liquidity_claim_fees, args)
+        payload = _invoke_liquidity_command_payload_impl(rt, rt.cmd_liquidity_claim_fees, args)
         return payload, adapter.protocol_family
 
     if action in {"claim_rewards", "claim-rewards"}:
@@ -1828,7 +1734,7 @@ def _execute_liquidity_advanced_intent_impl(intent: dict[str, Any], chain: str, 
             request_json=json.dumps(details.get("request") or {}) if isinstance(details.get("request"), dict) else None,
             json=True,
         )
-        payload = _invoke_liquidity_command_payload(_cmd_liquidity_claim_rewards, args)
+        payload = _invoke_liquidity_command_payload_impl(rt, rt.cmd_liquidity_claim_rewards, args)
         return payload, adapter.protocol_family
 
     if action == "migrate":
@@ -1842,16 +1748,16 @@ def _execute_liquidity_advanced_intent_impl(intent: dict[str, Any], chain: str, 
             request_json=json.dumps(details.get("request") or {}) if isinstance(details.get("request"), dict) else None,
             json=True,
         )
-        payload = _invoke_liquidity_command_payload(_cmd_liquidity_migrate, args)
+        payload = _invoke_liquidity_command_payload_impl(rt, rt.cmd_liquidity_migrate, args)
         return payload, adapter.protocol_family
 
-    raise WalletStoreError(f"Unsupported liquidity action '{action}'.")
+    raise rt.WalletStoreError(f"Unsupported liquidity action '{action}'.")
 
-def _run_liquidity_execute_inline_impl(liquidity_intent_id: str, chain: str) -> tuple[int, dict[str, Any]]:
+def _run_liquidity_execute_inline_impl(rt: LiquidityRuntimeAdapter, liquidity_intent_id: str, chain: str) -> tuple[int, dict[str, Any]]:
     nested = argparse.Namespace(intent=liquidity_intent_id, chain=chain, json=True)
     buf = io.StringIO()
     with redirect_stdout(buf):
-        code = _cmd_liquidity_execute(nested)
+        code = rt.cmd_liquidity_execute(nested)
     raw = buf.getvalue().strip()
     payload: dict[str, Any] = {
         "ok": bool(code == 0),
@@ -1875,31 +1781,31 @@ def _run_liquidity_execute_inline_impl(liquidity_intent_id: str, chain: str) -> 
             }
     return code, payload
 
-def cmd_liquidity_execute_impl(args: argparse.Namespace) -> int:
-    chk = require_json_flag(args)
+def cmd_liquidity_execute_impl(rt: LiquidityRuntimeAdapter, args: argparse.Namespace) -> int:
+    chk = rt.require_json_flag(args)
     if chk is not None:
         return chk
     liquidity_intent_id = str(args.intent or "").strip()
     chain = str(args.chain or "").strip()
     if not liquidity_intent_id:
-        return fail("invalid_input", "intent is required.", "Provide --intent liq_... and retry.", exit_code=2)
+        return rt.fail("invalid_input", "intent is required.", "Provide --intent liq_... and retry.", exit_code=2)
     if not chain:
-        return fail("invalid_input", "chain is required.", "Provide --chain <chainKey> and retry.", {"liquidityIntentId": liquidity_intent_id}, exit_code=2)
+        return rt.fail("invalid_input", "chain is required.", "Provide --chain <chainKey> and retry.", {"liquidityIntentId": liquidity_intent_id}, exit_code=2)
 
     transition_state = "init"
     last_tx_hash: str | None = None
-    provider_requested = _liquidity_provider_settings(chain)[0]
+    provider_requested = rt._liquidity_provider_settings(chain)[0]
     provider_used = "router_adapter"
     fallback_used = False
     fallback_reason: dict[str, str] | None = None
     try:
-        intent = _read_liquidity_intent(liquidity_intent_id, chain)
+        intent = rt._read_liquidity_intent(liquidity_intent_id, chain)
         status = str(intent.get("status") or "").strip().lower()
         action = str(intent.get("action") or "").strip().lower()
         dex = str(intent.get("dex") or "").strip().lower()
         position_type = str(intent.get("positionType") or "v2").strip().lower()
         if status != "approved":
-            return fail(
+            return rt.fail(
                 "liquidity_not_actionable",
                 f"Liquidity intent is not actionable from status '{status}'.",
                 "Execute only approved liquidity intents in this slice.",
@@ -1911,28 +1817,28 @@ def cmd_liquidity_execute_impl(args: argparse.Namespace) -> int:
         adapter_family = "unknown"
 
         def _execute_local() -> tuple[dict[str, Any], str]:
-            adapter = build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type=position_type)
+            adapter = rt.build_liquidity_adapter_for_request(chain=chain, dex=dex, position_type=position_type)
             if action == "add":
                 if adapter.protocol_family == "amm_v2":
-                    return _execute_liquidity_v2_add(intent, chain), adapter.protocol_family
+                    return rt._execute_liquidity_v2_add(intent, chain), adapter.protocol_family
                 if adapter.protocol_family in {"position_manager_v3", "local_clmm", "raydium_clmm"}:
-                    return _execute_liquidity_v3_add(intent, chain), adapter.protocol_family
-                raise WalletStoreError(
+                    return rt._execute_liquidity_v3_add(intent, chain), adapter.protocol_family
+                raise rt.WalletStoreError(
                     f"unsupported_liquidity_execution_family: Liquidity intent add requires supported local execution family, got '{adapter.protocol_family}'."
                 )
             if action == "remove":
                 if adapter.protocol_family == "amm_v2":
-                    return _execute_liquidity_v2_remove(intent, chain), adapter.protocol_family
+                    return rt._execute_liquidity_v2_remove(intent, chain), adapter.protocol_family
                 if adapter.protocol_family in {"position_manager_v3", "local_clmm", "raydium_clmm"}:
-                    return _execute_liquidity_v3_remove(intent, chain), adapter.protocol_family
-                raise WalletStoreError(
+                    return rt._execute_liquidity_v3_remove(intent, chain), adapter.protocol_family
+                raise rt.WalletStoreError(
                     f"unsupported_liquidity_execution_family: Liquidity intent remove requires supported local execution family, got '{adapter.protocol_family}'."
                 )
             if action in {"increase", "claim_fees", "claim-fees", "claim_rewards", "claim-rewards", "migrate"}:
-                return _execute_liquidity_advanced_intent(intent, chain, action)
-            raise WalletStoreError(f"Unsupported liquidity action '{action}'.")
+                return rt._execute_liquidity_advanced_intent(intent, chain, action)
+            raise rt.WalletStoreError(f"Unsupported liquidity action '{action}'.")
 
-        _post_liquidity_status(liquidity_intent_id, "executing")
+        rt._post_liquidity_status(liquidity_intent_id, "executing")
         transition_state = "executing"
 
         execution, adapter_family = _execute_local()
@@ -1940,10 +1846,10 @@ def cmd_liquidity_execute_impl(args: argparse.Namespace) -> int:
 
         tx_hash = str(execution.get("txHash") or "").strip()
         if not tx_hash:
-            raise WalletStoreError("Liquidity execution did not return txHash.")
+            raise rt.WalletStoreError("Liquidity execution did not return txHash.")
         last_tx_hash = tx_hash
         liquidity_operation = str(execution.get("liquidityOperation") or action).strip().lower() or None
-        provider_meta = _build_liquidity_provider_meta(
+        provider_meta = rt._build_liquidity_provider_meta(
             provider_requested=provider_requested,
             provider_used=provider_used,
             fallback_used=fallback_used,
@@ -1964,11 +1870,11 @@ def cmd_liquidity_execute_impl(args: argparse.Namespace) -> int:
         operation_hashes = status_details.get("operationTxHashes")
         if isinstance(operation_hashes, list):
             builder_hashes.extend([str(item or "").strip() for item in operation_hashes if str(item or "").strip()])
-        builder_meta = _builder_output_from_hashes(chain, builder_hashes)
+        builder_meta = rt._builder_output_from_hashes(chain, builder_hashes)
         status_details = {**status_details, **builder_meta}
         status_details = {**status_details, **provider_meta}
 
-        _post_liquidity_status(
+        rt._post_liquidity_status(
             liquidity_intent_id,
             "verifying",
             {
@@ -1980,9 +1886,9 @@ def cmd_liquidity_execute_impl(args: argparse.Namespace) -> int:
         transition_state = "verifying"
 
         if adapter_family in {"amm_v2", "position_manager_v3"}:
-            _wait_for_tx_receipt_success(chain, tx_hash)
+            rt._wait_for_tx_receipt_success(chain, tx_hash)
 
-        _post_liquidity_status(
+        rt._post_liquidity_status(
             liquidity_intent_id,
             "filled",
             {
@@ -1991,7 +1897,7 @@ def cmd_liquidity_execute_impl(args: argparse.Namespace) -> int:
                 "details": status_details,
             },
         )
-        return ok(
+        return rt.ok(
             "Liquidity intent executed.",
             liquidityIntentId=liquidity_intent_id,
             chain=chain,
@@ -2010,29 +1916,29 @@ def cmd_liquidity_execute_impl(args: argparse.Namespace) -> int:
             liquidityOperation=liquidity_operation,
             **builder_meta,
         )
-    except SubprocessTimeout as exc:
+    except rt.SubprocessTimeout as exc:
         if transition_state == "verifying":
             try:
-                _post_liquidity_status(
+                rt._post_liquidity_status(
                     liquidity_intent_id,
                     "verification_timeout",
                     {"reasonCode": "verification_timeout", "reasonMessage": str(exc), "txHash": last_tx_hash},
                 )
             except Exception:
                 pass
-        return fail(
+        return rt.fail(
             "liquidity_verification_failed",
             str(exc),
             "Receipt timed out; inspect explorer and retry if needed.",
             {"liquidityIntentId": liquidity_intent_id, "chain": chain, "txHash": last_tx_hash},
             exit_code=1,
         )
-    except LiquidityExecutionError as exc:
+    except rt.LiquidityExecutionError as exc:
         reason_code = str(exc.reason_code or "liquidity_execution_failed")
         failure_details = exc.details if isinstance(getattr(exc, "details", None), dict) else {}
         if transition_state in {"executing", "verifying"}:
             try:
-                _post_liquidity_status(
+                rt._post_liquidity_status(
                     liquidity_intent_id,
                     "failed",
                     {
@@ -2044,7 +1950,7 @@ def cmd_liquidity_execute_impl(args: argparse.Namespace) -> int:
                 )
             except Exception:
                 pass
-        return fail(
+        return rt.fail(
             "liquidity_execution_failed",
             str(exc),
             "Verify intent payload, wallet balances, pair liquidity, and chain contracts, then retry.",
@@ -2057,10 +1963,10 @@ def cmd_liquidity_execute_impl(args: argparse.Namespace) -> int:
             },
             exit_code=1,
         )
-    except (LiquidityAdapterError, WalletStoreError) as exc:
+    except (rt.LiquidityAdapterError, rt.WalletStoreError) as exc:
         err_text = str(exc)
         if err_text.startswith("invalid_input:"):
-            return fail(
+            return rt.fail(
                 "invalid_input",
                 err_text.split(":", 1)[1].strip(),
                 "Update intent payload and retry.",
@@ -2068,7 +1974,7 @@ def cmd_liquidity_execute_impl(args: argparse.Namespace) -> int:
                 exit_code=2,
             )
         if err_text.startswith("unsupported_liquidity_execution_family:"):
-            return fail(
+            return rt.fail(
                 "unsupported_liquidity_execution_family",
                 err_text.split(":", 1)[1].strip(),
                 "Use a supported liquidity execution family and retry.",
@@ -2076,7 +1982,7 @@ def cmd_liquidity_execute_impl(args: argparse.Namespace) -> int:
                 exit_code=2,
             )
         if err_text.startswith("unsupported_liquidity_operation"):
-            return fail(
+            return rt.fail(
                 "unsupported_liquidity_operation",
                 "Requested liquidity operation is not supported by the resolved adapter.",
                 "Use a chain/dex with matching operation capability and retry.",
@@ -2086,10 +1992,10 @@ def cmd_liquidity_execute_impl(args: argparse.Namespace) -> int:
         if transition_state in {"executing", "verifying"}:
             fail_status = "failed" if transition_state == "executing" else "failed"
             try:
-                _post_liquidity_status(liquidity_intent_id, fail_status, {"reasonCode": "liquidity_execution_failed", "reasonMessage": err_text, "txHash": last_tx_hash})
+                rt._post_liquidity_status(liquidity_intent_id, fail_status, {"reasonCode": "liquidity_execution_failed", "reasonMessage": err_text, "txHash": last_tx_hash})
             except Exception:
                 pass
-        return fail(
+        return rt.fail(
             "liquidity_execution_failed",
             err_text,
             "Verify intent payload, wallet configuration, and chain contracts, then retry.",
@@ -2099,10 +2005,10 @@ def cmd_liquidity_execute_impl(args: argparse.Namespace) -> int:
     except Exception as exc:
         if transition_state in {"executing", "verifying"}:
             try:
-                _post_liquidity_status(liquidity_intent_id, "failed", {"reasonCode": "liquidity_execution_failed", "reasonMessage": str(exc), "txHash": last_tx_hash})
+                rt._post_liquidity_status(liquidity_intent_id, "failed", {"reasonCode": "liquidity_execution_failed", "reasonMessage": str(exc), "txHash": last_tx_hash})
             except Exception:
                 pass
-        return fail(
+        return rt.fail(
             "liquidity_execution_failed",
             str(exc),
             "Inspect runtime liquidity execution path and retry.",
@@ -2110,17 +2016,17 @@ def cmd_liquidity_execute_impl(args: argparse.Namespace) -> int:
             exit_code=1,
         )
 
-def cmd_liquidity_resume_impl(args: argparse.Namespace) -> int:
-    chk = require_json_flag(args)
+def cmd_liquidity_resume_impl(rt: LiquidityRuntimeAdapter, args: argparse.Namespace) -> int:
+    chk = rt.require_json_flag(args)
     if chk is not None:
         return chk
     liquidity_intent_id = str(args.intent or "").strip()
     chain = str(args.chain or "").strip()
     nested = argparse.Namespace(intent=liquidity_intent_id, chain=chain, json=True)
-    return _cmd_liquidity_execute(nested)
+    return rt.cmd_liquidity_execute(nested)
 
-def cmd_liquidity_positions_impl(args: argparse.Namespace) -> int:
-    chk = require_json_flag(args)
+def cmd_liquidity_positions_impl(rt: LiquidityRuntimeAdapter, args: argparse.Namespace) -> int:
+    chk = rt.require_json_flag(args)
     if chk is not None:
         return chk
     chain = str(args.chain or "").strip()
@@ -2133,18 +2039,18 @@ def cmd_liquidity_positions_impl(args: argparse.Namespace) -> int:
     }
     status_filter = status_aliases.get(status_filter, status_filter)
     try:
-        assert_chain_capability(chain, "liquidity")
-        agent_id = _resolve_agent_id_or_fail(chain)
-        status_code, body = _api_request(
+        rt.assert_chain_capability(chain, "liquidity")
+        agent_id = rt._resolve_agent_id_or_fail(chain)
+        status_code, body = rt._api_request(
             "GET",
             f"/liquidity/positions?agentId={urllib.parse.quote(agent_id)}&chainKey={urllib.parse.quote(chain)}",
         )
         if status_code < 200 or status_code >= 300:
-            return fail(
+            return rt.fail(
                 str(body.get("code", "api_error")),
                 str(body.get("message", f"liquidity positions request failed ({status_code})")),
                 str(body.get("actionHint", "Verify API auth and retry.")),
-                _api_error_details(status_code, body, "/liquidity/positions", chain=chain),
+                rt._api_error_details(status_code, body, "/liquidity/positions", chain=chain),
                 exit_code=1,
             )
         items = body.get("items")
@@ -2159,19 +2065,19 @@ def cmd_liquidity_positions_impl(args: argparse.Namespace) -> int:
             token_b_raw = str(item.get("tokenB") or "").strip()
             token_a = token_a_raw
             token_b = token_b_raw
-            if _is_placeholder_liquidity_token(token_a_raw) or _is_placeholder_liquidity_token(token_b_raw):
+            if rt._is_placeholder_liquidity_token(token_a_raw) or rt._is_placeholder_liquidity_token(token_b_raw):
                 pair_ref = str(item.get("pool") or item.get("poolRef") or item.get("pair") or "").strip()
-                if is_hex_address(pair_ref):
+                if rt.is_hex_address(pair_ref):
                     try:
-                        pair_token_a, pair_token_b = _resolve_pair_tokens_from_contract(chain, pair_ref)
-                        if _is_placeholder_liquidity_token(token_a_raw):
+                        pair_token_a, pair_token_b = rt._resolve_pair_tokens_from_contract(chain, pair_ref)
+                        if rt._is_placeholder_liquidity_token(token_a_raw):
                             token_a = pair_token_a
-                        if _is_placeholder_liquidity_token(token_b_raw):
+                        if rt._is_placeholder_liquidity_token(token_b_raw):
                             token_b = pair_token_b
                     except Exception:
                         pass
-            token_a_symbol = _token_symbol_for_display(chain, token_a) or token_a
-            token_b_symbol = _token_symbol_for_display(chain, token_b) or token_b
+            token_a_symbol = rt._token_symbol_for_display(chain, token_a) or token_a
+            token_b_symbol = rt._token_symbol_for_display(chain, token_b) or token_b
             item["tokenA"] = token_a
             item["tokenB"] = token_b
             item["tokenASymbol"] = token_a_symbol
@@ -2183,7 +2089,7 @@ def cmd_liquidity_positions_impl(args: argparse.Namespace) -> int:
             items = [row for row in items if str((row or {}).get("dex") or "").strip().lower() == dex]
         if status_filter:
             items = [row for row in items if str((row or {}).get("status") or "").strip().lower() == status_filter]
-        return ok(
+        return rt.ok(
             "Liquidity positions loaded.",
             chain=chain,
             dex=dex or None,
@@ -2191,74 +2097,61 @@ def cmd_liquidity_positions_impl(args: argparse.Namespace) -> int:
             count=len(items),
             positions=items,
         )
-    except ChainRegistryError as exc:
-        return fail("unsupported_chain_capability", str(exc), chain_supported_hint(), {"chain": chain, "requiredCapability": "liquidity"}, exit_code=2)
-    except WalletStoreError as exc:
-        return fail("liquidity_positions_failed", str(exc), "Verify API env/auth and retry.", {"chain": chain, "dex": dex}, exit_code=1)
+    except rt.ChainRegistryError as exc:
+        return rt.fail("unsupported_chain_capability", str(exc), rt.chain_supported_hint(), {"chain": chain, "requiredCapability": "liquidity"}, exit_code=2)
+    except rt.WalletStoreError as exc:
+        return rt.fail("liquidity_positions_failed", str(exc), "Verify API env/auth and retry.", {"chain": chain, "dex": dex}, exit_code=1)
     except Exception as exc:
-        return fail("liquidity_positions_failed", str(exc), "Inspect runtime liquidity positions path and retry.", {"chain": chain, "dex": dex}, exit_code=1)
+        return rt.fail("liquidity_positions_failed", str(exc), "Inspect runtime liquidity positions path and retry.", {"chain": chain, "dex": dex}, exit_code=1)
 
 
-def cmd_liquidity_discover_pairs(rt: Any, args: Any) -> int:
-    _bind_runtime(rt)
-    return cmd_liquidity_discover_pairs_impl(args)
+def cmd_liquidity_discover_pairs(rt: LiquidityRuntimeAdapter, args: Any) -> int:
+    return cmd_liquidity_discover_pairs_impl(rt, args)
 
 
-def cmd_liquidity_quote_add(rt: Any, args: Any) -> int:
-    _bind_runtime(rt)
-    return cmd_liquidity_quote_add_impl(args)
+def cmd_liquidity_quote_add(rt: LiquidityRuntimeAdapter, args: Any) -> int:
+    return cmd_liquidity_quote_add_impl(rt, args)
 
 
-def cmd_liquidity_quote_remove(rt: Any, args: Any) -> int:
-    _bind_runtime(rt)
-    return cmd_liquidity_quote_remove_impl(args)
+def cmd_liquidity_quote_remove(rt: LiquidityRuntimeAdapter, args: Any) -> int:
+    return cmd_liquidity_quote_remove_impl(rt, args)
 
 
-def cmd_liquidity_add(rt: Any, args: Any) -> int:
-    _bind_runtime(rt)
-    return cmd_liquidity_add_impl(args)
+def cmd_liquidity_add(rt: LiquidityRuntimeAdapter, args: Any) -> int:
+    return cmd_liquidity_add_impl(rt, args)
 
 
-def cmd_liquidity_remove(rt: Any, args: Any) -> int:
-    _bind_runtime(rt)
-    return cmd_liquidity_remove_impl(args)
+def cmd_liquidity_remove(rt: LiquidityRuntimeAdapter, args: Any) -> int:
+    return cmd_liquidity_remove_impl(rt, args)
 
 
-def cmd_liquidity_increase(rt: Any, args: Any) -> int:
-    _bind_runtime(rt)
-    return cmd_liquidity_increase_impl(args)
+def cmd_liquidity_increase(rt: LiquidityRuntimeAdapter, args: Any) -> int:
+    return cmd_liquidity_increase_impl(rt, args)
 
 
-def cmd_liquidity_claim_fees(rt: Any, args: Any) -> int:
-    _bind_runtime(rt)
-    return cmd_liquidity_claim_fees_impl(args)
+def cmd_liquidity_claim_fees(rt: LiquidityRuntimeAdapter, args: Any) -> int:
+    return cmd_liquidity_claim_fees_impl(rt, args)
 
 
-def cmd_liquidity_migrate(rt: Any, args: Any) -> int:
-    _bind_runtime(rt)
-    return cmd_liquidity_migrate_impl(args)
+def cmd_liquidity_migrate(rt: LiquidityRuntimeAdapter, args: Any) -> int:
+    return cmd_liquidity_migrate_impl(rt, args)
 
 
-def cmd_liquidity_claim_rewards(rt: Any, args: Any) -> int:
-    _bind_runtime(rt)
-    return cmd_liquidity_claim_rewards_impl(args)
+def cmd_liquidity_claim_rewards(rt: LiquidityRuntimeAdapter, args: Any) -> int:
+    return cmd_liquidity_claim_rewards_impl(rt, args)
 
 
-def _run_liquidity_execute_inline(rt: Any, liquidity_intent_id: str, chain: str) -> tuple[int, dict[str, Any]]:
-    _bind_runtime(rt)
-    return _run_liquidity_execute_inline_impl(liquidity_intent_id, chain)
+def _run_liquidity_execute_inline(rt: LiquidityRuntimeAdapter, liquidity_intent_id: str, chain: str) -> tuple[int, dict[str, Any]]:
+    return _run_liquidity_execute_inline_impl(rt, liquidity_intent_id, chain)
 
 
-def cmd_liquidity_execute(rt: Any, args: Any) -> int:
-    _bind_runtime(rt)
-    return cmd_liquidity_execute_impl(args)
+def cmd_liquidity_execute(rt: LiquidityRuntimeAdapter, args: Any) -> int:
+    return cmd_liquidity_execute_impl(rt, args)
 
 
-def cmd_liquidity_resume(rt: Any, args: Any) -> int:
-    _bind_runtime(rt)
-    return cmd_liquidity_resume_impl(args)
+def cmd_liquidity_resume(rt: LiquidityRuntimeAdapter, args: Any) -> int:
+    return cmd_liquidity_resume_impl(rt, args)
 
 
-def cmd_liquidity_positions(rt: Any, args: Any) -> int:
-    _bind_runtime(rt)
-    return cmd_liquidity_positions_impl(args)
+def cmd_liquidity_positions(rt: LiquidityRuntimeAdapter, args: Any) -> int:
+    return cmd_liquidity_positions_impl(rt, args)

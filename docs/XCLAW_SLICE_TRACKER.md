@@ -17,6 +17,23 @@ Status legend:
 
 ---
 
+## Slice 226: Replace Dynamic Runtime Binding with Explicit Adapters
+Status: [x]
+
+Goal:
+- replace dynamic module-global runtime binding for extracted liquidity and x402 command modules with explicit typed adapters while preserving all current runtime command contracts.
+
+DoD:
+- [x] explicit adapter types exist under `apps/agent-runtime/xclaw_agent/runtime/adapters/` for liquidity and x402 command modules.
+- [x] liquidity and x402 command modules no longer mutate module globals or depend on `sys.modules[__name__]`.
+- [x] `cli.py` builds explicit adapters and dispatches through stable wrappers for liquidity/x402.
+- [x] direct adapter contract tests and required sequential validations pass, with issue evidence posted.
+
+Issue mapping:
+- `#79`
+
+---
+
 ## Slice 225: Process Doc Compression
 Status: [x]
 

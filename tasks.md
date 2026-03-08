@@ -1,9 +1,9 @@
-# Slice 225 Tasks: Process Doc Compression (2026-03-08)
+# Slice 226 Tasks: Replace Dynamic Runtime Binding with Explicit Adapters (2026-03-08)
 
-Issue mapping: `#76`
+Issue mapping: `#79`
 
-- [x] Archive historical `spec.md` ledger to `docs/history/SPEC_HISTORY.md`.
-- [x] Archive historical `tasks.md` ledger to `docs/history/TASKS_HISTORY.md`.
-- [x] Archive historical `acceptance.md` ledger to `docs/history/ACCEPTANCE_HISTORY.md`.
-- [x] Reduce `spec.md`, `tasks.md`, and `acceptance.md` to active-slice summaries only.
-- [x] Run doc consistency checks plus required build/restart validation and capture evidence in `acceptance.md`.
+- [x] Add explicit runtime adapter types for liquidity and x402 under `runtime/adapters/`.
+- [x] Refactor liquidity and x402 command modules to consume explicit adapters instead of dynamic module-global binding.
+- [x] Update `cli.py` to build typed adapters and dispatch without `sys.modules[__name__]` for liquidity/x402.
+- [x] Add direct adapter contract coverage in `test_runtime_adapters.py`.
+- [x] Run full sequential validations + capture evidence in `acceptance.md`.

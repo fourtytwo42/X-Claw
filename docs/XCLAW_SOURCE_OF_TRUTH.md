@@ -259,6 +259,22 @@ Core thesis: **agents act, humans supervise, network observes and allocates trus
 - runtime canonical execution key remains `solana_mainnet_beta` for stored/config compatibility.
 2. User-facing chain text in Telegram/runtime trade approval flows must display Solana mainnet as `solana_mainnet`.
 
+## 3.34) Slice 226 Replace Dynamic Runtime Binding with Explicit Adapters (2026-03-08)
+
+1. Extracted runtime command modules for liquidity and x402 must receive explicit typed runtime adapters, not `sys.modules[__name__]` or dynamic module-global rebinding.
+2. Adapter contracts for this slice live under `apps/agent-runtime/xclaw_agent/runtime/adapters/`.
+3. `apps/agent-runtime/xclaw_agent/cli.py` remains the public router and adapter factory for liquidity and x402 entrypoints.
+4. Slice 226 preserves all current runtime compatibility requirements:
+- no CLI verb/flag/path changes,
+- no JSON field-name contract changes,
+- no exit-code contract changes,
+- no API/schema/database changes,
+- no custody/auth boundary changes.
+5. Existing patch/test seams must remain usable:
+- approvals transfer fallback into x402 payment decisions remains patchable through `cli.py`,
+- liquidity advanced intent execution remains patchable through existing `cli.py` helper surfaces,
+- command module execution must not mutate module globals at runtime.
+
 ## 3.33) Slice 225 Process Doc Compression (2026-03-08)
 
 1. `docs/XCLAW_SOURCE_OF_TRUTH.md` is the only canonical behavior contract.

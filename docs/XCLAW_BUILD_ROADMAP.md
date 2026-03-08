@@ -11,6 +11,14 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 
 ---
 
+## 0.35) Slice 226 Replace Dynamic Runtime Binding with Explicit Adapters
+
+- [x] Add explicit runtime adapter types for extracted liquidity and x402 command modules.
+- [x] Refactor liquidity and x402 command modules to consume explicit adapters instead of dynamic global binding.
+- [x] Update `cli.py` to build adapters and dispatch without `sys.modules[__name__]` for liquidity/x402.
+- [x] Add direct adapter contract tests and keep liquidity/x402/trade regression suites green.
+- [x] Run full sequential validation chain and capture evidence + issue comment.
+
 ## 0.34) Slice 225 Process Doc Compression
 
 - [x] Keep `docs/XCLAW_SOURCE_OF_TRUTH.md` as the only canonical behavior contract.
