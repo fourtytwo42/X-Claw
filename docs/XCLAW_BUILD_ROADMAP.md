@@ -11,6 +11,13 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 
 ---
 
+## 0.40) Slice 231 Trade Router Execution Service Extraction
+
+- [x] Extract shared trade/router receipt, allowance, quote, and execute helpers into `runtime/services/trade_execution.py`.
+- [x] Keep `cli.py` wrappers thin and preserve current patch/test seams for trade + liquidity callers.
+- [x] Add direct service coverage for the moved trade/router helpers.
+- [x] Run full sequential validation chain and capture evidence + issue comment.
+
 ## 0.39) Slice 230 Transfer Execution and Approval Prompt Services
 
 - [x] Extract pending transfer flow persistence/recovery + execution helpers into `runtime/services/transfer_flows.py`.

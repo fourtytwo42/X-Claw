@@ -241,6 +241,18 @@ Core thesis: **agents act, humans supervise, network observes and allocates trus
 - no API/schema/database changes,
 - no custody/auth boundary changes.
 
+## 3.30) Slice 231 Trade Router Execution Service Extraction (2026-03-08)
+
+1. Shared trade/router helper ownership must live under `apps/agent-runtime/xclaw_agent/runtime/services/trade_execution.py`, not directly in `cli.py`.
+2. This includes receipt wait handling, ERC-20 allowance preparation, router quote helper plumbing, and router trade execution helper plumbing.
+3. `cli.py` remains the public parser/router boundary and may expose thin wrapper functions so existing tests and command entrypoints keep the same seams.
+4. Slice 231 preserves current runtime compatibility requirements:
+- no CLI verb/flag/path changes,
+- no JSON response field changes,
+- no exit-code changes,
+- no API/schema/database changes,
+- no custody/auth boundary changes.
+
 ## 3.29) Slice 230 Transfer Execution and Approval Prompt Services (2026-03-08)
 
 1. Transfer-flow persistence/recovery and transfer execution helper ownership must live under `apps/agent-runtime/xclaw_agent/runtime/services/transfer_flows.py`, not directly in `cli.py`.

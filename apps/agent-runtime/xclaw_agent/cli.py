@@ -3762,22 +3762,7 @@ def _read_liquidity_position(chain: str, position_id: str) -> dict[str, Any]:
 
 
 def _wait_for_tx_receipt_success(chain: str, tx_hash: str) -> dict[str, Any]:
-    cast_bin = _require_cast_bin()
-    rpc_url = _chain_rpc_url(chain)
-    receipt_proc = _run_subprocess(
-        [cast_bin, "receipt", "--json", "--rpc-url", rpc_url, tx_hash],
-        timeout_sec=_cast_receipt_timeout_sec(),
-        kind="cast_receipt",
-    )
-    if receipt_proc.returncode != 0:
-        stderr = (receipt_proc.stderr or "").strip()
-        stdout = (receipt_proc.stdout or "").strip()
-        raise WalletStoreError(stderr or stdout or "cast receipt failed.")
-    receipt_payload = json.loads((receipt_proc.stdout or "{}").strip() or "{}")
-    receipt_status = str(receipt_payload.get("status", "0x0")).lower()
-    if receipt_status not in {"0x1", "1"}:
-        raise WalletStoreError(f"On-chain receipt indicates failure status '{receipt_status}'.")
-    return receipt_payload
+    return runtime_services.wait_for_tx_receipt_success(_build_trade_execution_service_ctx(), chain, tx_hash)
 
 
 def _ensure_token_allowance(
@@ -3789,18 +3774,15 @@ def _ensure_token_allowance(
     required_units: int,
     private_key_hex: str,
 ) -> str | None:
-    allowance_wei = int(_fetch_token_allowance_wei(chain, token_address, owner, spender))
-    if allowance_wei >= required_units:
-        return None
-    approve_data = _cast_calldata("approve(address,uint256)(bool)", [spender, str(required_units)])
-    tx_hash = _cast_rpc_send_transaction(
-        _chain_rpc_url(chain),
-        {"from": owner, "to": token_address, "data": approve_data},
-        private_key_hex,
+    return runtime_services.ensure_token_allowance(
+        _build_trade_execution_service_ctx(),
         chain=chain,
+        token_address=token_address,
+        owner=owner,
+        spender=spender,
+        required_units=required_units,
+        private_key_hex=private_key_hex,
     )
-    _wait_for_tx_receipt_success(chain, tx_hash)
-    return tx_hash
 
 
 def _resolve_factory_from_router(chain: str, router: str) -> str:
@@ -6032,6 +6014,24 @@ def _build_liquidity_provider_meta(
     }
 
 
+def _build_trade_execution_service_ctx() -> runtime_services.TradeExecutionServiceContext:
+    return runtime_services.TradeExecutionServiceContext(
+        require_cast_bin=_require_cast_bin,
+        chain_rpc_url=_chain_rpc_url,
+        run_subprocess=_run_subprocess,
+        cast_receipt_timeout_sec=_cast_receipt_timeout_sec,
+        json_module=json,
+        wallet_store_error=WalletStoreError,
+        fetch_token_allowance_wei=_fetch_token_allowance_wei,
+        cast_calldata=_cast_calldata,
+        cast_rpc_send_transaction=_cast_rpc_send_transaction,
+        quote_trade=quote_trade,
+        build_trade_plan=build_trade_plan,
+        execute_trade_plan=execute_trade_plan,
+        router_get_amount_out=_router_get_amount_out,
+    )
+
+
 def _router_action_executor() -> EvmActionExecutor:
     return EvmActionExecutor(
         ensure_token_allowance=_ensure_token_allowance,
@@ -6054,15 +6054,13 @@ def _quote_trade_via_router_adapter(
     token_out: str,
     amount_in_units: str,
 ) -> dict[str, Any]:
-    return quote_trade(
+    return runtime_services.quote_trade_via_router_adapter(
+        _build_trade_execution_service_ctx(),
         chain=chain,
         adapter_key=adapter_key,
-        request={
-            "tokenIn": token_in,
-            "tokenOut": token_out,
-            "amountInUnits": amount_in_units,
-        },
-        get_amount_out=lambda value, token_a, token_b: _router_get_amount_out(chain, value, token_a, token_b),
+        token_in=token_in,
+        token_out=token_out,
+        amount_in_units=amount_in_units,
     )
 
 
@@ -6080,36 +6078,20 @@ def _execute_trade_via_router_adapter(
     recipient: str,
     wait_for_receipt: bool,
 ) -> dict[str, Any]:
-    plan = build_trade_plan(
+    return runtime_services.execute_trade_via_router_adapter(
+        _build_trade_execution_service_ctx(),
         chain=chain,
         adapter_key=adapter_key,
-        request={
-            "tokenIn": token_in,
-            "tokenOut": token_out,
-            "amountInUnits": amount_in_units,
-            "amountOutMinUnits": min_out_units,
-            "recipient": recipient,
-            "deadline": deadline,
-            "routeKind": "router_path",
-        },
-        wallet_address=wallet_address,
-        build_calldata=_cast_calldata,
-    )
-    execution = execute_trade_plan(
-        executor=_router_action_executor(),
-        plan=plan,
         wallet_address=wallet_address,
         private_key_hex=private_key_hex,
-        wait_for_operation_receipts=wait_for_receipt,
+        token_in=token_in,
+        token_out=token_out,
+        amount_in_units=amount_in_units,
+        min_out_units=min_out_units,
+        deadline=deadline,
+        recipient=recipient,
+        wait_for_receipt=wait_for_receipt,
     )
-    return {
-        "txHash": execution.tx_hash,
-        "approveTxHashes": execution.approve_tx_hashes,
-        "operationTxHashes": execution.operation_tx_hashes,
-        "executionFamily": execution.execution_family,
-        "executionAdapter": execution.execution_adapter,
-        "routeKind": execution.route_kind,
-    }
 
 
 def _uniswap_quote_via_proxy(

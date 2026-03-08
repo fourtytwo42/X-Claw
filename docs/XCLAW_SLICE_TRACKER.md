@@ -17,6 +17,23 @@ Status legend:
 
 ---
 
+## Slice 231: Trade Router Execution Service Extraction
+Status: [~]
+
+Goal:
+- move shared trade/router receipt, allowance, quote, and execute helper ownership out of `cli.py` into runtime services while preserving current runtime command/test contracts.
+
+DoD:
+- [x] shared trade/router helpers live under `apps/agent-runtime/xclaw_agent/runtime/services/trade_execution.py`.
+- [x] `cli.py` keeps thin wrappers for the moved trade/router helpers.
+- [x] direct service coverage + targeted trade/liquidity runtime suites are green.
+- [x] full sequential validation + issue evidence posted.
+
+Issue mapping:
+- `#84`
+
+---
+
 ## Slice 230: Transfer Execution and Approval Prompt Services
 Status: [x]
 

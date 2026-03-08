@@ -12,6 +12,7 @@ if str(AGENT_RUNTIME_ROOT) not in sys.path:
     sys.path.insert(0, str(AGENT_RUNTIME_ROOT))
 
 from xclaw_agent.runtime.services import approval_prompts, transfer_flows  # noqa: E402
+from xclaw_agent.runtime.services import trade_execution  # noqa: E402
 from xclaw_agent import cli  # noqa: E402
 
 
@@ -120,6 +121,41 @@ class RuntimeServicesTests(unittest.TestCase):
             approval_prompts.wait_for_trade_approval(ctx, "trd_1", "base_sepolia", {"tokenInSymbol": "WETH", "tokenOutSymbol": "USDC"})
         self.assertEqual(caught.exception.code, "approval_required")
         ctx.maybe_send_telegram_approval_prompt.assert_called_once()
+
+    def test_trade_execution_service_builds_router_quote_request(self) -> None:
+        quote_mock = mock.Mock(return_value={"amountOutUnits": "123", "routeKind": "router_path"})
+        ctx = trade_execution.TradeExecutionServiceContext(
+            require_cast_bin=lambda: "cast",
+            chain_rpc_url=lambda chain: "https://rpc.example",
+            run_subprocess=lambda *args, **kwargs: None,
+            cast_receipt_timeout_sec=lambda: 5,
+            json_module=cli.json,
+            wallet_store_error=cli.WalletStoreError,
+            fetch_token_allowance_wei=lambda *args: "0",
+            cast_calldata=lambda *args, **kwargs: "0xdeadbeef",
+            cast_rpc_send_transaction=lambda *args, **kwargs: "0x" + "ab" * 32,
+            quote_trade=quote_mock,
+            build_trade_plan=lambda **kwargs: kwargs,
+            execute_trade_plan=lambda **kwargs: SimpleNamespace(
+                tx_hash="0x" + "ab" * 32,
+                approve_tx_hashes=[],
+                operation_tx_hashes=["0x" + "ab" * 32],
+                execution_family="amm_v2",
+                execution_adapter="router",
+                route_kind="router_path",
+            ),
+            router_get_amount_out=lambda chain, value, token_a, token_b: 123,
+        )
+        out = trade_execution.quote_trade_via_router_adapter(
+            ctx,
+            chain="base_sepolia",
+            adapter_key="router",
+            token_in="0x" + "11" * 20,
+            token_out="0x" + "22" * 20,
+            amount_in_units="100",
+        )
+        self.assertEqual(out.get("amountOutUnits"), "123")
+        self.assertEqual(quote_mock.call_args.kwargs["chain"], "base_sepolia")
 
 
 if __name__ == "__main__":

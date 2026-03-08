@@ -14,15 +14,14 @@
   - `routeKind`
   - `liquidityOperation`
 
-## Active Context: Slice 230 Transfer Execution and Approval Prompt Services
+## Active Context: Slice 231 Trade Router Execution Service Extraction
 
-Issue mapping: `#83`
+Issue mapping: `#84`
 
 ### Objective + scope lock
 - Objective:
-  - move transfer-flow persistence/recovery + execution helper ownership out of `cli.py`,
-  - move approval prompt persistence/wait-loop/cleanup helper ownership out of `cli.py`,
-  - preserve all existing runtime JSON/CLI behavior,
+  - move shared trade/router receipt, allowance, quote, and execute helper ownership out of `cli.py`,
+  - preserve trade/liquidity runtime JSON/CLI behavior,
   - keep thin compatibility wrappers in `cli.py` for existing tests and command entrypoints.
 - Scope guard:
   - runtime internal hardening only,
@@ -31,10 +30,9 @@ Issue mapping: `#83`
 ### Expected touched files
 - `apps/agent-runtime/xclaw_agent/cli.py`
 - `apps/agent-runtime/xclaw_agent/runtime/services/__init__.py`
-- `apps/agent-runtime/xclaw_agent/runtime/services/transfer_flows.py`
-- `apps/agent-runtime/xclaw_agent/runtime/services/approval_prompts.py`
+- `apps/agent-runtime/xclaw_agent/runtime/services/trade_execution.py`
 - `apps/agent-runtime/tests/test_runtime_services.py`
-- `apps/agent-runtime/tests/test_approvals_run_loop.py`
+- `apps/agent-runtime/tests/test_liquidity_cli.py`
 - `apps/agent-runtime/tests/test_trade_path.py`
 - `docs/XCLAW_SOURCE_OF_TRUTH.md`
 - `docs/XCLAW_SLICE_TRACKER.md`
