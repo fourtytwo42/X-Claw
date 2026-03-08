@@ -241,6 +241,23 @@ Core thesis: **agents act, humans supervise, network observes and allocates trus
 - no API/schema/database changes,
 - no custody/auth boundary changes.
 
+## 3.35) Slice 236 API/Mirroring/Reporting Failure-Injection Hardening (2026-03-08)
+
+1. Runtime API, mirroring, and reporting service helpers must fail closed deterministically on malformed or non-2xx server responses.
+2. Required-delivery mirror paths must raise explicit errors; best-effort mirror paths must not destabilize callers.
+3. Reporting/status payload shaping must remain stable under degraded conditions:
+- same endpoints,
+- same idempotency usage,
+- same status vocabulary,
+- same event-type mapping.
+4. Slice 236 preserves all public runtime compatibility requirements:
+- no CLI verb/flag/path changes,
+- no JSON response field changes,
+- no exit-code changes,
+- no API/schema/database changes,
+- no custody/auth boundary changes.
+5. This slice is runtime-internal hardening only and must preserve current `cli.py` wrapper/test seams.
+
 ## 3.34) Slice 235 Status/Reporting Services + Final cli.py Audit (2026-03-08)
 
 1. Trade/liquidity status posting helper ownership must live under `apps/agent-runtime/xclaw_agent/runtime/services/reporting.py`, not directly in `cli.py`.

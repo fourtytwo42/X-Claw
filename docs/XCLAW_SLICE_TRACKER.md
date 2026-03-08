@@ -17,6 +17,24 @@ Status legend:
 
 ---
 
+## Slice 236: API/Mirroring/Reporting Failure-Injection Hardening
+Status: [x]
+
+Goal:
+- harden runtime API, mirroring, and reporting service seams with deterministic negative-path behavior while preserving all current runtime command/test contracts.
+
+DoD:
+- [x] direct negative-path coverage exists for `agent_api.py`, `mirroring.py`, and `reporting.py`.
+- [x] required-delivery vs best-effort mirror behavior is deterministic and preserved.
+- [x] reporting/status helpers fail closed on malformed or non-2xx API responses without payload drift.
+- [x] `cli.py` public wrapper/test seams remain unchanged for affected callers.
+- [x] full sequential validation + issue evidence posted.
+
+Issue mapping:
+- `#90`
+
+---
+
 ## Slice 235: Status/Reporting Services + Final cli.py Audit
 Status: [x]
 

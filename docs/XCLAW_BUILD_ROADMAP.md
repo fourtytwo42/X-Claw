@@ -11,6 +11,14 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 
 ---
 
+## 0.45) Slice 236 API/Mirroring/Reporting Failure-Injection Hardening
+
+- [x] Add direct negative-path coverage for `runtime/services/agent_api.py`.
+- [x] Add direct negative-path coverage for `runtime/services/mirroring.py`.
+- [x] Add direct negative-path coverage for `runtime/services/reporting.py`.
+- [x] Keep current wrapper/test seams and public runtime contracts unchanged.
+- [x] Run full sequential validation chain and capture evidence + issue comment.
+
 ## 0.44) Slice 235 Status/Reporting Services + Final cli.py Audit
 
 - [x] Extract trade/liquidity status posting helpers into `runtime/services/reporting.py`.

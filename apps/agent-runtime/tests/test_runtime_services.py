@@ -13,7 +13,7 @@ AGENT_RUNTIME_ROOT = REPO_ROOT / "apps" / "agent-runtime"
 if str(AGENT_RUNTIME_ROOT) not in sys.path:
     sys.path.insert(0, str(AGENT_RUNTIME_ROOT))
 
-from xclaw_agent.runtime.services import approval_prompts, execution_contracts, liquidity_execution, owner_link_delivery, reporting, runtime_state, telegram_delivery, trade_caps, trade_execution, transfer_flows, transfer_policy  # noqa: E402
+from xclaw_agent.runtime.services import agent_api, approval_prompts, execution_contracts, liquidity_execution, mirroring, owner_link_delivery, reporting, runtime_state, telegram_delivery, trade_caps, trade_execution, transfer_flows, transfer_policy  # noqa: E402
 from xclaw_agent import cli  # noqa: E402
 
 
@@ -370,6 +370,145 @@ class RuntimeServicesTests(unittest.TestCase):
         result = owner_link_delivery.maybe_send_owner_link_to_active_chat(ctx, "https://xclaw.trade/agents/ag_1?token=ol1.test", "2026-02-18T16:39:52.313Z")
         self.assertFalse(bool(result.get("sent")))
         self.assertEqual(result.get("reason"), "telegram_channel_skipped")
+
+    def test_agent_api_ack_transfer_decision_inbox_includes_reason_fields(self) -> None:
+        api_request = mock.Mock(return_value=(200, {"ok": True}))
+        agent_api.ack_transfer_decision_inbox(api_request, "dec_1", "applied", "ok", "done")
+        self.assertEqual(api_request.call_args.args[:2], ("POST", "/agent/transfer-decisions/inbox"))
+        payload = api_request.call_args.kwargs["payload"]
+        self.assertEqual(payload["decisionId"], "dec_1")
+        self.assertEqual(payload["reasonCode"], "ok")
+        self.assertEqual(payload["reasonMessage"], "done")
+
+    def test_agent_api_publish_runtime_signing_readiness_normalizes_fields(self) -> None:
+        api_request = mock.Mock(return_value=(200, {"ok": True}))
+        agent_api.publish_runtime_signing_readiness(
+            api_request,
+            "base_sepolia",
+            {"walletSigningReady": 1, "walletSigningReasonCode": "missing_passphrase", "walletSigningCheckedAt": "2026-03-08T00:00:00+00:00"},
+        )
+        self.assertEqual(api_request.call_args.args[:2], ("POST", "/agent/runtime-readiness"))
+        payload = api_request.call_args.kwargs["payload"]
+        self.assertTrue(payload["walletSigningReady"])
+        self.assertEqual(payload["walletSigningReasonCode"], "missing_passphrase")
+
+    def test_agent_api_resolve_agent_id_or_fail_raises_when_missing(self) -> None:
+        with self.assertRaises(cli.WalletStoreError):
+            agent_api.resolve_agent_id_or_fail(lambda: "xak_test", lambda api_key: "", cli.WalletStoreError)
+
+    def test_mirroring_required_delivery_retries_then_raises_deterministically(self) -> None:
+        api_request = mock.Mock(side_effect=[(500, "bad-body"), (500, {"message": "still down"})])
+        with self.assertRaises(cli.WalletStoreError) as caught:
+            mirroring.mirror_transfer_approval(
+                flow={"approvalId": "xfr_1", "chainKey": "base_sepolia"},
+                require_delivery=True,
+                api_request=api_request,
+                utc_now=lambda: "2026-03-08T00:00:00+00:00",
+                watcher_run_id=lambda: "wrun_test",
+                token_hex=lambda n: "abc12345",
+                wallet_store_error=cli.WalletStoreError,
+            )
+        self.assertEqual(str(caught.exception), "api_error: still down")
+        self.assertEqual(api_request.call_count, 2)
+
+    def test_mirroring_best_effort_swallows_failures(self) -> None:
+        api_request = mock.Mock(side_effect=RuntimeError("network down"))
+        ok = mirroring.mirror_transfer_approval(
+            flow={"approvalId": "xfr_1", "chainKey": "base_sepolia"},
+            require_delivery=False,
+            api_request=api_request,
+            utc_now=lambda: "2026-03-08T00:00:00+00:00",
+            watcher_run_id=lambda: "wrun_test",
+            token_hex=lambda n: "abc12345",
+            wallet_store_error=cli.WalletStoreError,
+        )
+        self.assertFalse(ok)
+
+    def test_mirroring_x402_outbound_sets_payment_id_and_swallows_errors(self) -> None:
+        flow = {
+            "approvalId": "x402_1",
+            "network": "base_sepolia",
+            "facilitator": "cdp",
+            "url": "https://example.com",
+            "amountAtomic": "123",
+        }
+        api_request = mock.Mock(side_effect=[RuntimeError("down")])
+        mirroring.mirror_x402_outbound(
+            flow=flow,
+            api_request=api_request,
+            utc_now=lambda: "2026-03-08T00:00:00+00:00",
+            token_hex=lambda n: "abcd123456",
+        )
+        self.assertEqual(flow["paymentId"], "xpm_abcd123456")
+
+    def test_reporting_service_trade_status_non_2xx_with_malformed_body_is_deterministic(self) -> None:
+        ctx = reporting.ReportingServiceContext(
+            api_request=mock.Mock(return_value=(500, "nope")),
+            wallet_store_error=cli.WalletStoreError,
+            parse_decision_at=lambda value: value or "2026-03-08T00:00:00+00:00",
+            utc_now=lambda: "2026-03-08T00:00:01+00:00",
+            watcher_run_id=lambda: "wrun_test",
+            canonical_event_for_trade_status=lambda status: f"trade.{status}",
+        )
+        with self.assertRaises(cli.WalletStoreError) as caught:
+            reporting.post_trade_status(ctx, trade_id="trd_1", from_status="approved", to_status="failed")
+        self.assertIn("trade status update failed (500)", str(caught.exception))
+
+    def test_reporting_service_liquidity_status_non_2xx_with_malformed_body_is_deterministic(self) -> None:
+        ctx = reporting.ReportingServiceContext(
+            api_request=mock.Mock(return_value=(502, "nope")),
+            wallet_store_error=cli.WalletStoreError,
+            parse_decision_at=lambda value: value or "2026-03-08T00:00:00+00:00",
+            utc_now=lambda: "2026-03-08T00:00:01+00:00",
+            watcher_run_id=lambda: "wrun_test",
+            canonical_event_for_trade_status=lambda status: f"trade.{status}",
+        )
+        with self.assertRaises(cli.WalletStoreError) as caught:
+            reporting.post_liquidity_status(ctx, liquidity_intent_id="liq_1", to_status="failed")
+        self.assertIn("liquidity status update failed (502)", str(caught.exception))
+
+    def test_reporting_service_read_trade_details_fails_closed_on_missing_trade(self) -> None:
+        ctx = reporting.ReportingServiceContext(
+            api_request=mock.Mock(return_value=(200, {"notTrade": {}})),
+            wallet_store_error=cli.WalletStoreError,
+            parse_decision_at=lambda value: value or "2026-03-08T00:00:00+00:00",
+            utc_now=lambda: "2026-03-08T00:00:01+00:00",
+            watcher_run_id=lambda: "wrun_test",
+            canonical_event_for_trade_status=lambda status: f"trade.{status}",
+        )
+        with self.assertRaises(cli.WalletStoreError) as caught:
+            reporting.read_trade_details(ctx, "trd_1")
+        self.assertIn("missing trade object", str(caught.exception).lower())
+
+    def test_reporting_service_limit_order_status_queues_on_failure(self) -> None:
+        queue = mock.Mock()
+        reporting.post_limit_order_status(
+            order_id="ord_1",
+            payload={"status": "filled"},
+            queue_on_failure=True,
+            api_request=mock.Mock(return_value=(503, {"message": "down"})),
+            queue_limit_order_action=queue,
+            wallet_store_error=cli.WalletStoreError,
+        )
+        queue.assert_called_once()
+
+    def test_reporting_service_execution_report_non_2xx_is_deterministic(self) -> None:
+        ctx = reporting.ReportingServiceContext(
+            api_request=mock.Mock(
+                side_effect=[
+                    (200, {"trade": {"tradeId": "trd_1", "agentId": "ag_1", "status": "failed", "mode": "real", "chainKey": "base_sepolia"}}),
+                    (500, "bad-body"),
+                ]
+            ),
+            wallet_store_error=cli.WalletStoreError,
+            parse_decision_at=lambda value: value or "2026-03-08T00:00:00+00:00",
+            utc_now=lambda: "2026-03-08T00:00:01+00:00",
+            watcher_run_id=lambda: "wrun_test",
+            canonical_event_for_trade_status=lambda status: f"trade.{status}",
+        )
+        with self.assertRaises(cli.WalletStoreError) as caught:
+            reporting.send_trade_execution_report_via_context(ctx, trade_id="trd_1")
+        self.assertIn("report send failed (500)", str(caught.exception))
 
     def test_reporting_service_posts_trade_status_with_watcher_metadata(self) -> None:
         api_request = mock.Mock(return_value=(200, {"ok": True}))

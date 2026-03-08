@@ -1,27 +1,25 @@
-# Slice 235 Acceptance Evidence: Status/Reporting Services + Final cli.py Audit
+# Slice 236 Acceptance Evidence: API/Mirroring/Reporting Failure-Injection Hardening
 
 Date (UTC): 2026-03-08  
-Active slice context: `Slice 235`.
+Active slice context: `Slice 236`.
 
-Issue mapping: `#88`
+Issue mapping: `#90`
 
 ### Objective + Scope Lock
 - Objective:
-  - move trade/liquidity status posting and trade-detail/report helper ownership out of `cli.py`,
-  - preserve runtime JSON/CLI behavior and reporting/status contracts,
-  - keep patch/test seams stable through `cli.py` wrappers.
+  - harden runtime API, mirroring, and reporting services against malformed and non-2xx responses,
+  - preserve runtime JSON/CLI behavior and delivery/reporting contracts,
+  - keep patch/test seams stable.
 
 ### Behavior Checks
-- [x] trade/liquidity status posting helper ownership lives in runtime services.
-- [x] trade-detail read + trade execution report helper ownership lives in runtime services.
-- [x] `cli.py` preserves wrapper/test seams for affected callers.
-- [x] direct runtime service tests cover the moved service seams.
+- [x] direct negative-path coverage exists for `agent_api.py`, `mirroring.py`, and `reporting.py`.
+- [x] required-delivery vs best-effort mirror behavior is deterministic and preserved.
+- [x] reporting/status helpers fail closed on malformed or non-2xx API responses without payload drift.
+- [x] `cli.py` public wrapper/test seams remain unchanged for affected callers.
 
 ### Required Validation Gates
 - [x] `python3 -m unittest -v apps/agent-runtime/tests/test_runtime_services.py`
-- [x] `python3 -m unittest -v apps/agent-runtime/tests/test_runtime_adapters.py`
 - [x] `python3 -m unittest -v apps/agent-runtime/tests/test_trade_path.py`
-- [x] `python3 -m unittest -v apps/agent-runtime/tests/test_liquidity_cli.py`
 - [x] `python3 -m unittest -v apps/agent-runtime/tests/test_x402_cli.py`
 - [x] `npm run db:parity`
 - [x] `npm run seed:reset`
@@ -31,12 +29,10 @@ Issue mapping: `#88`
 - [x] `pm2 restart all`
 
 ### Evidence
-- `python3 -m unittest -v apps/agent-runtime/tests/test_runtime_services.py` -> `Ran 15 tests`, `OK`
-- `python3 -m unittest -v apps/agent-runtime/tests/test_runtime_adapters.py` -> `Ran 13 tests`, `OK`
+- `python3 -m unittest -v apps/agent-runtime/tests/test_runtime_services.py` -> `Ran 26 tests`, `OK`
 - `python3 -m unittest -v apps/agent-runtime/tests/test_trade_path.py` -> `Ran 147 tests`, `OK`
-- `python3 -m unittest -v apps/agent-runtime/tests/test_liquidity_cli.py` -> `Ran 20 tests`, `OK`
 - `python3 -m unittest -v apps/agent-runtime/tests/test_x402_cli.py` -> `Ran 3 tests`, `OK`
-- `npm run db:parity` -> `ok: true`, `checkedAt=2026-03-08T20:03:18.925Z`
+- `npm run db:parity` -> `ok: true`, `checkedAt=2026-03-08T20:18:34.609Z`
 - `npm run seed:reset` -> `ok: true`
 - `npm run seed:load` -> `ok: true`
 - `npm run seed:verify` -> `ok: true`

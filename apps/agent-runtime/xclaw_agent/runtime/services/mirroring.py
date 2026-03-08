@@ -4,6 +4,14 @@ import time
 from typing import Any, Callable
 
 
+def _response_error(body: dict[str, Any] | Any, fallback_message: str) -> str:
+    if isinstance(body, dict):
+        code = str(body.get("code", "api_error"))
+        message = str(body.get("message", fallback_message))
+        return f"{code}: {message}"
+    return f"api_error: {fallback_message}"
+
+
 def mirror_transfer_approval(
     *,
     flow: dict[str, Any],
@@ -59,9 +67,7 @@ def mirror_transfer_approval(
             )
             if 200 <= status_code < 300:
                 return True
-            code = str(body.get("code", "api_error"))
-            message = str(body.get("message", f"transfer mirror failed ({status_code})"))
-            last_error = f"{code}: {message}"
+            last_error = _response_error(body, f"transfer mirror failed ({status_code})")
             if attempt < (attempts - 1):
                 time.sleep(0.2)
 
