@@ -11,6 +11,15 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 
 ---
 
+## 0.58) Slice 249 Canonical Chain Capability Matrix Reconciliation
+
+- [x] Add one machine-readable current chain capability matrix near the top of `docs/XCLAW_SOURCE_OF_TRUTH.md`.
+- [x] Reconcile that current matrix against all enabled chain configs in `config/chains/*.json`.
+- [x] Mark older contradictory chain-capability slice sections as historical/superseded.
+- [x] Add a single contract test that locks config, source-of-truth, and public chain route capability mapping together.
+- [x] Capture Slice 249 evidence in `acceptance.md`.
+- [x] Run the required sequential validation chain and post issue evidence.
+
 ## 0.57) Slice 248 Solana Devnet Capability Boundary Alignment
 
 - [x] Disable `trade`, `liquidity`, and `limitOrders` in `config/chains/solana_devnet.json`.

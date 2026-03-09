@@ -1,28 +1,24 @@
-# Slice 248 Acceptance Evidence: Solana Devnet Capability Boundary Alignment
+# Slice 249 Acceptance Evidence: Canonical Chain Capability Matrix Reconciliation
 
 Date (UTC): 2026-03-09  
-Active slice context: `Slice 248`.
-
-Issue mapping: `#101`
+Active slice context: `Slice 249`  
+Issue mapping: `#102`
 
 ### Objective + Scope Lock
 - Objective:
-  - align `solana_devnet` advertised capabilities with the truthful live-evidence boundary the app can prove today,
-  - keep wallet/faucet/deposits/x402 green on Solana devnet,
-  - stop advertising unsupported trade/liquidity/limit-order execution features on Solana devnet,
-  - keep the slice limited to capability-boundary alignment with no public runtime contract drift.
+  - establish one canonical current chain capability matrix,
+  - reconcile it across enabled chain config and public chain metadata behavior,
+  - demote contradictory older capability sections to explicit historical records,
+  - keep the slice limited to truth reconciliation with no new chain enablement.
 
 ### Behavior Checks
-- [x] `solana_devnet` no longer advertises `trade`, `liquidity`, or `limitOrders`.
-- [x] `solana_devnet` still advertises `wallet`, `faucet`, `deposits`, and `x402`.
-- [x] Solana devnet full harness evidence no longer requires trade scenarios when trade capability is disabled.
-- [x] Targeted Solana devnet evidence remains green for the supported boundary.
+- [x] one current capability matrix exists near the top of source-of-truth.
+- [x] the current matrix matches enabled chain configs exactly.
+- [x] older contradictory chain-capability sections are explicitly historical/superseded.
+- [x] public chain metadata remains config-driven and matches the canonical matrix for priority chains.
 
 ### Required Validation Gates
-- [x] `python3 -m unittest -v apps/agent-runtime/tests/test_wallet_approval_harness.py`
-- [x] `python3 -m unittest -v apps/agent-runtime/tests/test_wallet_approval_chain_matrix.py`
-- [x] `python3 -m unittest -v apps/agent-runtime/tests/test_trade_path.py apps/agent-runtime/tests/test_wallet_approval_harness.py apps/agent-runtime/tests/test_wallet_approval_chain_matrix.py`
-- [x] `npm run test:faucet:contract`
+- [x] `npm run test:chains:contract`
 - [x] `npm run test:management:solana:contract`
 - [x] `npm run test:x402:solana:contract`
 - [x] `npm run db:parity`
@@ -30,47 +26,31 @@ Issue mapping: `#101`
 - [x] `npm run seed:load`
 - [x] `npm run seed:verify`
 - [x] tracked `infrastructure/seed-data/.seed-state.json` restore
-- [x] targeted live `solana_devnet` rerun
 - [x] `npm run build`
 - [x] `pm2 restart all`
 
 ### Evidence
-- Capability boundary:
-  - [solana_devnet.json](/home/hendo420/ETHDenver2026/config/chains/solana_devnet.json)
-    - `trade=false`
-    - `liquidity=false`
-    - `limitOrders=false`
-    - `wallet=true`
-    - `faucet=true`
-    - `deposits=true`
-    - `x402=true`
-- Harness boundary handling:
-  - [wallet_approval_harness.py](/home/hendo420/ETHDenver2026/apps/agent-runtime/scripts/wallet_approval_harness.py)
-    - `solana_devnet` full runs now record `preflight.solanaDevnetTradePair.reason=solana_devnet_trade_disabled`
-    - supported boundary scenarios remain `transfer_only` and `x402_or_capability_assertion`
-- Contract alignment:
-  - [management-solana-contract-tests.mjs](/home/hendo420/ETHDenver2026/infrastructure/scripts/management-solana-contract-tests.mjs)
-    - `solana_devnet_trade_disabled`
-    - `solana_devnet_liquidity_disabled`
-    - `solana_devnet_limit_orders_disabled`
-- Targeted live Solana devnet report:
-  - `/tmp/xclaw-slice248-solana-devnet-full.json`
-  - Outcome:
-    - `ok=true`
-    - `preflight.walletDecryptProbe.passphraseSource=skill_config`
-    - `preflight.solanaDevnetTradePair.reason=solana_devnet_trade_disabled`
-    - `transfer_only` passed
-    - `x402_or_capability_assertion` passed
+- Canonical current capability matrix:
+  - [XCLAW_SOURCE_OF_TRUTH.md](/home/hendo420/ETHDenver2026/docs/XCLAW_SOURCE_OF_TRUTH.md)
+  - machine-readable matrix lives under `CURRENT_CHAIN_CAPABILITY_MATRIX_START/END`
+  - matrix entry count matches enabled chain config count: `23`
+- Historical demotion:
+  - Slice 97 and Slice 98 chain-capability sections are explicitly marked historical/superseded in [XCLAW_SOURCE_OF_TRUTH.md](/home/hendo420/ETHDenver2026/docs/XCLAW_SOURCE_OF_TRUTH.md)
+- Contract lock:
+  - [chain-capability-contract-tests.mjs](/home/hendo420/ETHDenver2026/infrastructure/scripts/chain-capability-contract-tests.mjs)
+  - [package.json](/home/hendo420/ETHDenver2026/package.json) -> `npm run test:chains:contract`
+  - checks:
+    - source-of-truth matrix equals enabled chain configs
+    - priority chains match expected capability boundary
+    - public chain route maps all capability flags from config
+    - old Slice 97/98 capability sections are marked historical
 - Validation results:
-  - `python3 -m unittest -v apps/agent-runtime/tests/test_wallet_approval_harness.py` -> `Ran 65 tests`, `OK`
-  - `python3 -m unittest -v apps/agent-runtime/tests/test_wallet_approval_chain_matrix.py` -> `Ran 10 tests`, `OK`
-  - `python3 -m unittest -v apps/agent-runtime/tests/test_trade_path.py apps/agent-runtime/tests/test_wallet_approval_harness.py apps/agent-runtime/tests/test_wallet_approval_chain_matrix.py` -> `Ran 230 tests`, `OK`
-  - `npm run test:faucet:contract` -> `passed: 10`, `failed: 0`
+  - `npm run test:chains:contract` -> `passed: 16`, `failed: 0`
   - `npm run test:management:solana:contract` -> `passed: 28`, `failed: 0`
   - `npm run test:x402:solana:contract` -> `count: 17`, `ok: true`
-  - `npm run db:parity` -> `ok: true`, `checkedAt: 2026-03-09T19:17:36.043Z`
+  - `npm run db:parity` -> `ok: true`, `checkedAt: 2026-03-09T19:48:06.675Z`
   - `npm run seed:reset` -> `ok: true`
-  - `npm run seed:load` -> `ok: true`, `loadedAt: 2026-03-09T19:17:36.250Z`
+  - `npm run seed:load` -> `ok: true`, `loadedAt: 2026-03-09T19:48:06.862Z`
   - `npm run seed:verify` -> `ok: true`
   - tracked `infrastructure/seed-data/.seed-state.json` restored from `HEAD`
   - `npm run build` -> success

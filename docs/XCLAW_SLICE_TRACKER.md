@@ -17,6 +17,30 @@ Status legend:
 
 ---
 
+## Slice 249: Canonical Chain Capability Matrix Reconciliation
+Status: [x]
+
+Goal:
+- reconcile the current chain-capability truth across config, source-of-truth, and public capability surfaces so only one canonical current matrix remains normative.
+
+DoD:
+- [x] one current capability matrix exists near the top of source-of-truth and matches enabled chain config exactly.
+- [x] contradictory older chain-capability sections are explicitly marked historical/superseded.
+- [x] priority chain public capability metadata remains config-driven and aligned with the canonical matrix.
+- [x] one contract test locks config + source-of-truth + public chain route capability behavior.
+- [x] full sequential validation + issue evidence posted.
+
+Closeout note:
+- Slice 249 is complete.
+- Source-of-truth now contains one machine-readable current capability matrix for all enabled `evm` and `solana` chains.
+- The public chain route remains config-driven, and a dedicated contract test now locks config, source-of-truth, and route mapping together for the priority chains.
+- Older contradictory capability sections for the Ethereum onboarding/normalization slices are explicitly historical and no longer act as active contract text.
+
+Issue mapping:
+- `#102`
+
+---
+
 ## Slice 248: Solana Devnet Capability Boundary Alignment
 Status: [x]
 

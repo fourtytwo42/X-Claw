@@ -1,35 +1,33 @@
-# Slice 248 Spec: Solana Devnet Capability Boundary Alignment (2026-03-09)
+# Slice 249 Spec: Canonical Chain Capability Matrix Reconciliation (2026-03-09)
 
-Issue mapping: `#101`
+Issue mapping: `#102`
 
 ## Goal
-1. Align `solana_devnet` advertised capabilities with the truthful live-evidence boundary the app can prove today.
-2. Keep Solana devnet green for supported wallet/faucet/deposits/x402 evidence.
-3. Stop advertising unsupported Solana devnet trade, liquidity, and limit-order execution surfaces.
-4. Preserve all public runtime and API contracts.
+1. Establish one canonical current chain capability matrix near the top of source-of-truth.
+2. Reconcile that matrix against enabled chain config and public chain capability surfaces.
+3. Demote older contradictory chain-capability slice sections to explicit historical records.
+4. Add one contract test that locks config, source-of-truth, and public chain metadata capability mapping together.
 
 ## Outcome
-1. `config/chains/solana_devnet.json` advertises `trade=false`, `liquidity=false`, and `limitOrders=false` while keeping `wallet`, `faucet`, `deposits`, and `x402` enabled.
-2. `wallet_approval_harness.py` no longer requires Solana devnet trade scenarios for green full evidence when trade capability is disabled.
-3. Contract rails assert the updated Solana devnet capability boundary directly.
-4. Canonical docs and acceptance evidence reflect the supported Solana devnet boundary.
+1. `docs/XCLAW_SOURCE_OF_TRUTH.md` contains a machine-readable current capability matrix for all enabled `evm` and `solana` chains.
+2. The current matrix matches `config/chains/*.json` exactly for enabled chains.
+3. `GET /api/v1/public/chains` remains config-driven and capability-faithful for the current matrix.
+4. Older contradictory capability sections are explicitly historical/superseded rather than normative.
 
 ## Non-goals
-1. No API schema/database changes.
-2. No runtime command contract changes.
-3. No new Solana faucet/bootstrap redesign.
-4. No re-enabling Solana devnet trade execution without a real quoteable market.
+1. No new chain capability enablement.
+2. No API schema/database changes.
+3. No runtime command behavior changes.
+4. No UI redesign.
 
 ## Locked scope
-1. `apps/agent-runtime/scripts/wallet_approval_harness.py`
-2. `config/chains/solana_devnet.json`
-3. `infrastructure/scripts/management-solana-contract-tests.mjs`
-4. `apps/agent-runtime/tests/test_wallet_approval_harness.py`
-5. `apps/agent-runtime/tests/test_wallet_approval_chain_matrix.py`
-6. `docs/XCLAW_SOURCE_OF_TRUTH.md`
-7. `docs/XCLAW_SLICE_TRACKER.md`
-8. `docs/XCLAW_BUILD_ROADMAP.md`
-9. `docs/CONTEXT_PACK.md`
-10. `spec.md`
-11. `tasks.md`
-12. `acceptance.md`
+1. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+2. `docs/XCLAW_SLICE_TRACKER.md`
+3. `docs/XCLAW_BUILD_ROADMAP.md`
+4. `docs/CONTEXT_PACK.md`
+5. `spec.md`
+6. `tasks.md`
+7. `acceptance.md`
+8. `infrastructure/scripts/chain-capability-contract-tests.mjs`
+9. `package.json`
+10. `apps/network-web/src/app/api/v1/public/chains/route.ts` only if public capability mapping requires correction

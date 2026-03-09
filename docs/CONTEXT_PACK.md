@@ -14,7 +14,37 @@
   - `routeKind`
   - `liquidityOperation`
 
-## Active Context: Slice 248 Solana Devnet Capability Boundary Alignment
+## Active Context: Slice 249 Canonical Chain Capability Matrix Reconciliation
+
+Issue mapping: `#102`
+
+### Objective + scope lock
+- Objective:
+  - establish one canonical current chain capability matrix,
+  - reconcile that matrix across enabled chain config and public chain metadata behavior,
+  - demote contradictory older chain-capability sections to explicit historical records,
+  - keep the slice limited to truth reconciliation with no new chain enablement.
+- Scope guard:
+  - chain capability truth reconciliation only,
+  - no API/schema/database changes,
+  - no runtime command changes.
+
+### Expected touched files
+- `docs/XCLAW_SOURCE_OF_TRUTH.md`
+- `docs/XCLAW_SLICE_TRACKER.md`
+- `docs/XCLAW_BUILD_ROADMAP.md`
+- `docs/CONTEXT_PACK.md`
+- `spec.md`
+- `tasks.md`
+- `acceptance.md`
+- `infrastructure/scripts/chain-capability-contract-tests.mjs`
+- `package.json`
+- `apps/network-web/src/app/api/v1/public/chains/route.ts` only if public capability mapping requires correction
+
+### Completion note
+- Completed 2026-03-09 with a machine-readable current capability matrix, historical demotion of conflicting older capability sections, a dedicated contract lock for config + source-of-truth + public chain metadata, and the required sequential validation chain (`db:parity`, `seed:reset/load/verify`, `build`, `pm2 restart all`).
+ 
+## Completed Context: Slice 248 Solana Devnet Capability Boundary Alignment
 
 Issue mapping: `#101`
 
@@ -45,8 +75,7 @@ Issue mapping: `#101`
 - `acceptance.md`
 
 ### Completion note
-- Pending validation for Slice 248.
-
+- Completed 2026-03-09 with Solana devnet capability-boundary alignment, supported-boundary live evidence, and the required sequential validation chain (`db:parity`, `seed:reset/load/verify`, `build`, `pm2 restart all`).
 ## Completed Context: Slice 241 Command-Surface Failure Injection Sweep
 
 Issue mapping: `#94`

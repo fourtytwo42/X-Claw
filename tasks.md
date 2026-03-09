@@ -1,11 +1,10 @@
-# Slice 248 Tasks: Solana Devnet Capability Boundary Alignment (2026-03-09)
+# Slice 249 Tasks: Canonical Chain Capability Matrix Reconciliation (2026-03-09)
 
-Issue mapping: `#101`
+Issue mapping: `#102`
 
-- [x] Disable Solana devnet `trade`, `liquidity`, and `limitOrders` capability flags in chain config.
-- [x] Keep Solana devnet `wallet`, `faucet`, `deposits`, and `x402` capability flags enabled.
-- [x] Update the harness so Solana devnet full evidence skips disabled execution families and remains green for the supported boundary.
-- [x] Add direct unit coverage proving disabled Solana devnet trade no longer creates a required failing scenario.
-- [x] Add contract assertions proving Solana devnet capability flags are aligned.
-- [x] Capture targeted Solana devnet supported-boundary evidence in `acceptance.md`.
+- [x] Add one machine-readable current chain capability matrix near the top of source-of-truth.
+- [x] Reconcile the current matrix against all enabled chain configs.
+- [x] Mark older contradictory chain-capability sections as historical/superseded.
+- [x] Add one contract test locking config + source-of-truth + public chain route capability mapping together.
+- [x] Capture Slice 249 evidence in `acceptance.md`.
 - [x] Run the required sequential validation chain, then commit/push and post issue evidence.

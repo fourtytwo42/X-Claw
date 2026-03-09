@@ -2,7 +2,7 @@
 ## Source of Truth (Canonical Build + Execution Spec)
 
 **Status:** Canonical and authoritative  
-**Last updated:** 2026-03-08  
+**Last updated:** 2026-03-09  
 **Owner:** X-Claw core team  
 **Purpose:** This is the only planning/build document to execute from.
 
@@ -100,6 +100,157 @@ Core thesis: **agents act, humans supervise, network observes and allocates trus
 - `executionAdapter`
 - `routeKind`
 - `liquidityOperation`
+
+## 3.3) Current Chain Capability Matrix (Slice 249, 2026-03-09)
+
+1. This section is the single canonical current capability matrix for all enabled `evm` and `solana` chains.
+2. Public chain metadata, management capability readers, harness capability expectations, and contract tests must match this matrix exactly.
+3. If any older section below states different current capabilities for one of these chains, that older statement is historical/superseded and must not be treated as active contract text.
+
+<!-- CURRENT_CHAIN_CAPABILITY_MATRIX_START -->
+```json
+[
+  {
+    "chainKey": "adi_mainnet",
+    "family": "evm",
+    "uiVisible": true,
+    "capabilities": {"wallet": true, "trade": false, "liquidity": false, "limitOrders": false, "x402": false, "faucet": false, "deposits": false}
+  },
+  {
+    "chainKey": "adi_testnet",
+    "family": "evm",
+    "uiVisible": true,
+    "capabilities": {"wallet": true, "trade": false, "liquidity": false, "limitOrders": false, "x402": false, "faucet": false, "deposits": false}
+  },
+  {
+    "chainKey": "arbitrum_mainnet",
+    "family": "evm",
+    "uiVisible": true,
+    "capabilities": {"wallet": true, "trade": true, "liquidity": true, "limitOrders": false, "x402": false, "faucet": false, "deposits": false}
+  },
+  {
+    "chainKey": "avalanche_mainnet",
+    "family": "evm",
+    "uiVisible": true,
+    "capabilities": {"wallet": true, "trade": true, "liquidity": true, "limitOrders": false, "x402": false, "faucet": false, "deposits": false}
+  },
+  {
+    "chainKey": "base_mainnet",
+    "family": "evm",
+    "uiVisible": true,
+    "capabilities": {"wallet": true, "trade": true, "liquidity": true, "limitOrders": false, "x402": false, "faucet": false, "deposits": false}
+  },
+  {
+    "chainKey": "base_sepolia",
+    "family": "evm",
+    "uiVisible": true,
+    "capabilities": {"wallet": true, "trade": true, "liquidity": true, "limitOrders": true, "x402": true, "faucet": true, "deposits": true}
+  },
+  {
+    "chainKey": "bnb_mainnet",
+    "family": "evm",
+    "uiVisible": true,
+    "capabilities": {"wallet": true, "trade": true, "liquidity": true, "limitOrders": false, "x402": false, "faucet": false, "deposits": false}
+  },
+  {
+    "chainKey": "ethereum",
+    "family": "evm",
+    "uiVisible": true,
+    "capabilities": {"wallet": true, "trade": true, "liquidity": true, "limitOrders": false, "x402": false, "faucet": false, "deposits": false}
+  },
+  {
+    "chainKey": "ethereum_sepolia",
+    "family": "evm",
+    "uiVisible": true,
+    "capabilities": {"wallet": true, "trade": true, "liquidity": true, "limitOrders": false, "x402": false, "faucet": false, "deposits": false}
+  },
+  {
+    "chainKey": "hardhat_local",
+    "family": "evm",
+    "uiVisible": false,
+    "capabilities": {"wallet": true, "trade": true, "liquidity": true, "limitOrders": true, "x402": false, "faucet": false, "deposits": true}
+  },
+  {
+    "chainKey": "kite_ai_mainnet",
+    "family": "evm",
+    "uiVisible": true,
+    "capabilities": {"wallet": true, "trade": false, "liquidity": false, "limitOrders": false, "x402": false, "faucet": false, "deposits": false}
+  },
+  {
+    "chainKey": "kite_ai_testnet",
+    "family": "evm",
+    "uiVisible": true,
+    "capabilities": {"wallet": true, "trade": true, "liquidity": true, "limitOrders": true, "x402": true, "faucet": true, "deposits": true}
+  },
+  {
+    "chainKey": "monad_mainnet",
+    "family": "evm",
+    "uiVisible": true,
+    "capabilities": {"wallet": true, "trade": true, "liquidity": true, "limitOrders": false, "x402": false, "faucet": false, "deposits": false}
+  },
+  {
+    "chainKey": "og_mainnet",
+    "family": "evm",
+    "uiVisible": true,
+    "capabilities": {"wallet": true, "trade": false, "liquidity": false, "limitOrders": false, "x402": false, "faucet": false, "deposits": false}
+  },
+  {
+    "chainKey": "og_testnet",
+    "family": "evm",
+    "uiVisible": true,
+    "capabilities": {"wallet": true, "trade": false, "liquidity": false, "limitOrders": false, "x402": false, "faucet": false, "deposits": false}
+  },
+  {
+    "chainKey": "op_mainnet",
+    "family": "evm",
+    "uiVisible": true,
+    "capabilities": {"wallet": true, "trade": true, "liquidity": true, "limitOrders": false, "x402": false, "faucet": false, "deposits": false}
+  },
+  {
+    "chainKey": "polygon_mainnet",
+    "family": "evm",
+    "uiVisible": true,
+    "capabilities": {"wallet": true, "trade": true, "liquidity": true, "limitOrders": false, "x402": false, "faucet": false, "deposits": false}
+  },
+  {
+    "chainKey": "solana_devnet",
+    "family": "solana",
+    "uiVisible": true,
+    "capabilities": {"wallet": true, "trade": false, "liquidity": false, "limitOrders": false, "x402": true, "faucet": true, "deposits": true}
+  },
+  {
+    "chainKey": "solana_localnet",
+    "family": "solana",
+    "uiVisible": true,
+    "capabilities": {"wallet": true, "trade": true, "liquidity": true, "limitOrders": true, "x402": true, "faucet": true, "deposits": true}
+  },
+  {
+    "chainKey": "solana_mainnet_beta",
+    "family": "solana",
+    "uiVisible": true,
+    "capabilities": {"wallet": true, "trade": true, "liquidity": true, "limitOrders": true, "x402": true, "faucet": false, "deposits": true}
+  },
+  {
+    "chainKey": "solana_testnet",
+    "family": "solana",
+    "uiVisible": true,
+    "capabilities": {"wallet": true, "trade": true, "liquidity": false, "limitOrders": false, "x402": false, "faucet": false, "deposits": false}
+  },
+  {
+    "chainKey": "unichain_mainnet",
+    "family": "evm",
+    "uiVisible": true,
+    "capabilities": {"wallet": true, "trade": true, "liquidity": true, "limitOrders": false, "x402": false, "faucet": false, "deposits": false}
+  },
+  {
+    "chainKey": "zksync_mainnet",
+    "family": "evm",
+    "uiVisible": true,
+    "capabilities": {"wallet": true, "trade": true, "liquidity": true, "limitOrders": false, "x402": false, "faucet": false, "deposits": false}
+  }
+]
+```
+<!-- CURRENT_CHAIN_CAPABILITY_MATRIX_END -->
 
 ## 3.14) Slice 195-200 Canonical Cleanup + Integrated Withdraw Queue/Status
 
@@ -343,6 +494,13 @@ Core thesis: **agents act, humans supervise, network observes and allocates trus
 - no API/schema/database changes,
 - no runtime command contract changes,
 - no synthetic trade success.
+
+## 3.48) Slice 249 Canonical Chain Capability Matrix Reconciliation (2026-03-09)
+
+1. Section 3.3 is the single canonical current capability matrix for all enabled `evm` and `solana` chains.
+2. `config/chains/*.json`, public chain metadata, and capability contract tests must match Section 3.3 exactly for current behavior.
+3. Older slice sections that describe different current chain capabilities are historical records only and must be marked superseded where they would otherwise conflict with Section 3.3.
+4. Slice 249 does not enable new chain behavior; it reconciles and locks the current truth.
 
 ## 3.46) Slice 247 Solana Devnet Quoted-Pair Discovery and Evidence Boundary (2026-03-09)
 
@@ -4950,7 +5108,10 @@ Supersession note (Slice 117 Hotfix D):
 - Wallet decrypt preflight must fail fast with deterministic `wallet_passphrase_mismatch` (instead of late `InvalidTag` in scenarios) and include actionable details (`walletStorePath`, `passphraseSource`, `chain`).
 - Management write retries must use bounded exponential backoff + jitter and include request diagnostics (`requestId`, `status`, `code`, `attempts`, `path`, `payloadHash`) on terminal failure.
 
-## 79) Slice 97 Ethereum + Ethereum Sepolia Wallet-First Onboarding Contract (Locked)
+## 79) Slice 97 Ethereum + Ethereum Sepolia Wallet-First Onboarding Contract (Historical, Superseded by 3.3 Current Chain Capability Matrix)
+
+Historical note:
+- The wallet-first capability statements in this section are superseded by the current capability matrix in Section 3.3 and remain only as implementation history for Slice 97.
 
 1. Scope boundary:
 - Add `ethereum` and `ethereum_sepolia` as config-driven EVM chains with wallet/send readiness only.
@@ -5003,7 +5164,10 @@ Supersession note (Slice 117 Hotfix D):
 - Source for Uniswap V2 router/factory references:
   - `https://docs.uniswap.org/contracts/v2/reference/smart-contracts/v2-deployments`
 
-## 80) Slice 98 Chain Metadata Normalization + Truthful Capability Gating Contract (Locked)
+## 80) Slice 98 Chain Metadata Normalization + Truthful Capability Gating Contract (Historical, Superseded by 3.3 Current Chain Capability Matrix)
+
+Historical note:
+- This section remains as build history. Current chain capability truth is defined only by Section 3.3 plus later active override sections.
 
 1. Scope boundary:
 - Normalize all enabled+visible chain entries so UI/runtime only advertise capabilities that are actually integrated.
