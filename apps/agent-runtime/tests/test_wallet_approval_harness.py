@@ -695,6 +695,14 @@ class WalletApprovalHarnessUnitTests(unittest.TestCase):
             clear=False,
         ), mock.patch.object(
             runner,
+            "_chain_config",
+            return_value={"capabilities": {"wallet": True, "trade": True, "faucet": True, "x402": True}},
+        ), mock.patch.object(
+            runner,
+            "_canonical_token_address",
+            return_value="BzvD2GmhsV3iDsRdiSECWcZX3JpVAKTE4rrFAqnuTCw3",
+        ), mock.patch.object(
+            runner,
             "_balance_snapshot",
             return_value={"NATIVE": Decimal("1000"), "bzvd2gmhsv3idsrdisecwczx3jpvakte4rrfaqnutcw3": Decimal("0")},
         ), mock.patch.object(
@@ -815,6 +823,33 @@ class WalletApprovalHarnessUnitTests(unittest.TestCase):
         self.assertEqual(ctx.exception.details.get("walletAddress"), "8GpQWRfcsyeNh1SeZna6Ah5dRrMotnm63pF2iNaHapeQ")
         self.assertEqual(ctx.exception.details.get("stableMint"), "BzvD2GmhsV3iDsRdiSECWcZX3JpVAKTE4rrFAqnuTCw3")
         self.assertEqual(ctx.exception.details.get("wrappedMint"), "BDPkyPPmKVtQw1Xg7WF3yrUz5SLXu2u7pp3wAyfusPA6")
+
+    def test_prepare_trade_pair_records_devnet_trade_disabled_boundary(self) -> None:
+        args = self._args()
+        args.chain = "solana_devnet"
+        runner = harness.WalletApprovalHarness(args)
+        with mock.patch.object(
+            runner,
+            "_chain_config",
+            return_value={"capabilities": {"wallet": True, "trade": False, "faucet": True, "x402": True}},
+        ), mock.patch.dict(
+            harness.os.environ,
+            {
+                "XCLAW_SOLANA_FAUCET_STABLE_MINT_SOLANA_DEVNET": "BzvD2GmhsV3iDsRdiSECWcZX3JpVAKTE4rrFAqnuTCw3",
+                "XCLAW_SOLANA_FAUCET_WRAPPED_MINT_SOLANA_DEVNET": "BDPkyPPmKVtQw1Xg7WF3yrUz5SLXu2u7pp3wAyfusPA6",
+            },
+            clear=False,
+        ), mock.patch.object(
+            runner, "_canonical_token_address", return_value="BzvD2GmhsV3iDsRdiSECWcZX3JpVAKTE4rrFAQnuTCw3"
+        ), mock.patch.object(
+            runner,
+            "_balance_snapshot",
+            return_value={"NATIVE": Decimal("1"), "bzvd2gmhsv3idsrdisecwczx3jpvakte4rrfaqnutcw3": Decimal("25")},
+        ):
+            runner._prepare_trade_pair_and_amounts()
+        self.assertEqual(runner.preflight.get("solanaDevnetTradePair", {}).get("reason"), "solana_devnet_trade_disabled")
+        self.assertEqual(runner.trade_token_in, "BzvD2GmhsV3iDsRdiSECWcZX3JpVAKTE4rrFAqnuTCw3")
+        self.assertEqual(runner.trade_token_out, "SOL")
 
     def test_prepare_trade_pair_uses_localnet_bootstrap_stable_balance(self) -> None:
         args = self._args()
@@ -1005,6 +1040,10 @@ class WalletApprovalHarnessUnitTests(unittest.TestCase):
         runner = harness.WalletApprovalHarness(args)
         with mock.patch.object(
             runner,
+            "_chain_config",
+            return_value={"capabilities": {"wallet": True, "trade": True, "faucet": True, "x402": True}},
+        ), mock.patch.object(
+            runner,
             "_balance_snapshot",
             return_value={"NATIVE": Decimal("1"), "mintstabledevnet": Decimal("1000000"), "mintwrappeddevnet": Decimal("1000000000")},
         ), mock.patch.object(
@@ -1026,6 +1065,10 @@ class WalletApprovalHarnessUnitTests(unittest.TestCase):
         args.chain = "solana_devnet"
         runner = harness.WalletApprovalHarness(args)
         with mock.patch.object(
+            runner,
+            "_chain_config",
+            return_value={"capabilities": {"wallet": True, "trade": True, "faucet": True, "x402": True}},
+        ), mock.patch.object(
             runner,
             "_balance_snapshot",
             return_value={"NATIVE": Decimal("1"), "mintstabledevnet": Decimal("1000000"), "mintwrappeddevnet": Decimal("1000000000")},
@@ -1138,7 +1181,7 @@ class WalletApprovalHarnessUnitTests(unittest.TestCase):
         self.assertEqual(set_chain_mock.call_args_list[1].kwargs, {"label": "restore_chain_policy"})
         self.assertEqual(set_chain_mock.call_args_list[1].args, (False,))
 
-    def test_run_continues_non_trade_devnet_scenarios_after_trade_boundary_unsupported(self) -> None:
+    def test_run_continues_supported_devnet_scenarios_when_trade_capability_disabled(self) -> None:
         args = self._args()
         args.chain = "solana_devnet"
         args.scenario_set = "full"
@@ -1165,15 +1208,19 @@ class WalletApprovalHarnessUnitTests(unittest.TestCase):
             ), mock.patch.object(
                 runner, "_ensure_local_wallet_policy_chain_enabled"
             ), mock.patch.object(
+                runner,
+                "_chain_config",
+                return_value={"capabilities": {"wallet": True, "trade": False, "liquidity": False, "limitOrders": False, "x402": True, "faucet": True}},
+            ), mock.patch.object(
                 runner, "_balance_snapshot", return_value={"NATIVE": Decimal("1")}
             ), mock.patch.object(
                 runner, "_prepare_trade_pair_and_amounts", side_effect=lambda: setattr(
                     runner,
                     "_solana_devnet_trade_pair_discovery",
-                    {"quoteable": False, "reason": "solana_devnet_trade_pair_unavailable", "candidatePairs": []},
+                    {"quoteable": False, "reason": "solana_devnet_trade_disabled", "capabilityDisabled": True},
                 ) or runner.preflight.__setitem__(
                     "solanaDevnetTradePair",
-                    {"quoteable": False, "reason": "solana_devnet_trade_pair_unavailable", "candidatePairs": []},
+                    {"quoteable": False, "reason": "solana_devnet_trade_disabled", "capabilityDisabled": True},
                 )
             ), mock.patch.object(
                 runner, "_scenario_trade_pending_approve"
@@ -1193,7 +1240,7 @@ class WalletApprovalHarnessUnitTests(unittest.TestCase):
                 runner, "_resolve_pending_best_effort", return_value=[]
             ):
                 rc = runner.run()
-        self.assertEqual(rc, 1)
+        self.assertEqual(rc, 0)
         reject_mock.assert_not_called()
         dedupe_mock.assert_not_called()
         dedupe_trade_mock.assert_not_called()

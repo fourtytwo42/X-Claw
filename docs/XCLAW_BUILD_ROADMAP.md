@@ -11,6 +11,16 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 
 ---
 
+## 0.57) Slice 248 Solana Devnet Capability Boundary Alignment
+
+- [x] Disable `trade`, `liquidity`, and `limitOrders` in `config/chains/solana_devnet.json`.
+- [x] Keep `wallet`, `faucet`, `deposits`, and `x402` enabled for `solana_devnet`.
+- [x] Update `wallet_approval_harness.py` so Solana devnet full evidence skips disabled execution families and remains green for the supported boundary.
+- [x] Add direct unit coverage proving Solana devnet full evidence no longer requires trade scenarios when trade capability is disabled.
+- [x] Add contract assertions proving Solana devnet capability flags are aligned.
+- [x] Capture targeted Solana devnet evidence for the supported boundary in `acceptance.md`.
+- [x] Run the required sequential validation chain and post issue evidence.
+
 ## 0.56) Slice 247 Solana Devnet Quoted-Pair Discovery and Evidence Boundary
 
 - [x] Add a Solana devnet quoteable-pair discovery path to `wallet_approval_harness.py` that checks a small allowlisted candidate set against live Jupiter quoteability.

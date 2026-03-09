@@ -20,9 +20,9 @@
   },
   "capabilities": {
     "wallet": true,
-    "trade": true,
-    "liquidity": true,
-    "limitOrders": true,
+    "trade": false,
+    "liquidity": false,
+    "limitOrders": false,
     "x402": true,
     "faucet": true,
     "deposits": true

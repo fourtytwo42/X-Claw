@@ -34,6 +34,9 @@ async function main() {
   const testnet = readJson('config/chains/solana_testnet.json');
 
   expect(devnet?.capabilities?.deposits === true, 'solana_devnet_deposits_enabled');
+  expect(devnet?.capabilities?.trade === false, 'solana_devnet_trade_disabled');
+  expect(devnet?.capabilities?.liquidity === false, 'solana_devnet_liquidity_disabled');
+  expect(devnet?.capabilities?.limitOrders === false, 'solana_devnet_limit_orders_disabled');
   expect(mainnet?.capabilities?.deposits === true, 'solana_mainnet_deposits_enabled');
   expect(testnet?.capabilities?.deposits === false, 'solana_testnet_deposits_deferred');
 

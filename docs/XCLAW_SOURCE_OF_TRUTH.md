@@ -317,6 +317,33 @@ Core thesis: **agents act, humans supervise, network observes and allocates trus
 - no custody/auth boundary changes.
 5. This slice is restart/replay/watchdog hardening only and must preserve current command-surface behavior.
 
+## 3.47) Slice 248 Solana Devnet Capability Boundary Alignment (2026-03-09)
+
+1. `solana_devnet` must advertise only the capabilities that current live evidence can prove truthfully.
+2. The supported Solana devnet capability boundary is:
+- `wallet=true`
+- `faucet=true`
+- `deposits=true`
+- `x402=true`
+3. The disabled Solana devnet capability boundary is:
+- `trade=false`
+- `liquidity=false`
+- `limitOrders=false`
+4. Solana devnet trade execution remains out of scope until a real Jupiter-quotable devnet market is proven through live evidence.
+5. When `solana_devnet` trade capability is disabled, harness full evidence must not require trade, liquidity, or limit-order scenarios for a green supported-boundary result.
+6. When Solana devnet trade capability is disabled, the harness may still record the preflight trade boundary diagnostically, but it must not surface it as a required failing scenario in full evidence.
+7. Solana devnet supported live evidence must continue to cover:
+- wallet preflight
+- faucet funding
+- deposits-capable chain metadata
+- transfer-only proof where valid
+- x402/capability proof
+8. Public and management chain-metadata surfaces must report the Solana devnet capability boundary directly from chain config with no synthetic enablement.
+9. This slice preserves all public compatibility requirements:
+- no API/schema/database changes,
+- no runtime command contract changes,
+- no synthetic trade success.
+
 ## 3.46) Slice 247 Solana Devnet Quoted-Pair Discovery and Evidence Boundary (2026-03-09)
 
 1. Best practice for Solana devnet live trade evidence is to prefer a real Jupiter-quotable pair over funded custom mints that are not discoverably tradable.

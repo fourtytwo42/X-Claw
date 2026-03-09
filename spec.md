@@ -1,33 +1,35 @@
-# Slice 247 Spec: Solana Devnet Quoted-Pair Discovery and Evidence Boundary (2026-03-09)
+# Slice 248 Spec: Solana Devnet Capability Boundary Alignment (2026-03-09)
 
-Issue mapping: `#100`
+Issue mapping: `#101`
 
 ## Goal
-1. Determine whether Solana devnet has a truthful Jupiter-quotable pair available for live trade evidence.
-2. Use that pair if it exists; otherwise record deterministic unsupported trade evidence without forcing a green trade leg.
-3. Keep wallet/faucet/capability proof in scope on Solana devnet even when trade execution is unsupported.
+1. Align `solana_devnet` advertised capabilities with the truthful live-evidence boundary the app can prove today.
+2. Keep Solana devnet green for supported wallet/faucet/deposits/x402 evidence.
+3. Stop advertising unsupported Solana devnet trade, liquidity, and limit-order execution surfaces.
 4. Preserve all public runtime and API contracts.
 
 ## Outcome
-1. `wallet_approval_harness.py` performs a deterministic Solana devnet quoteable-pair discovery step against a small allowlisted candidate set.
-2. Harness preflight/report output records machine-readable Solana devnet trade-pair discovery evidence.
-3. Solana devnet trade scenarios either use a real quoteable pair or stop with deterministic `unsupported_live_evidence` using `solana_devnet_trade_pair_unavailable`.
-4. Non-trade Solana devnet evidence continues after the explicit trade-evidence boundary.
+1. `config/chains/solana_devnet.json` advertises `trade=false`, `liquidity=false`, and `limitOrders=false` while keeping `wallet`, `faucet`, `deposits`, and `x402` enabled.
+2. `wallet_approval_harness.py` no longer requires Solana devnet trade scenarios for green full evidence when trade capability is disabled.
+3. Contract rails assert the updated Solana devnet capability boundary directly.
+4. Canonical docs and acceptance evidence reflect the supported Solana devnet boundary.
 
 ## Non-goals
 1. No API schema/database changes.
 2. No runtime command contract changes.
 3. No new Solana faucet/bootstrap redesign.
-4. No synthetic success for Solana devnet trade execution.
+4. No re-enabling Solana devnet trade execution without a real quoteable market.
 
 ## Locked scope
 1. `apps/agent-runtime/scripts/wallet_approval_harness.py`
-2. `apps/agent-runtime/tests/test_wallet_approval_harness.py`
-3. `apps/agent-runtime/tests/test_wallet_approval_chain_matrix.py`
-4. `docs/XCLAW_SOURCE_OF_TRUTH.md`
-5. `docs/XCLAW_SLICE_TRACKER.md`
-6. `docs/XCLAW_BUILD_ROADMAP.md`
-7. `docs/CONTEXT_PACK.md`
-8. `spec.md`
-9. `tasks.md`
-10. `acceptance.md`
+2. `config/chains/solana_devnet.json`
+3. `infrastructure/scripts/management-solana-contract-tests.mjs`
+4. `apps/agent-runtime/tests/test_wallet_approval_harness.py`
+5. `apps/agent-runtime/tests/test_wallet_approval_chain_matrix.py`
+6. `docs/XCLAW_SOURCE_OF_TRUTH.md`
+7. `docs/XCLAW_SLICE_TRACKER.md`
+8. `docs/XCLAW_BUILD_ROADMAP.md`
+9. `docs/CONTEXT_PACK.md`
+10. `spec.md`
+11. `tasks.md`
+12. `acceptance.md`

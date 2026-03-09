@@ -223,7 +223,7 @@ class WalletApprovalChainMatrixTests(unittest.TestCase):
     def test_solana_devnet_remains_final_chain(self) -> None:
         self.assertEqual(runner_mod.CHAIN_ORDER[-1], "solana_devnet")
 
-    def test_matrix_preserves_machine_readable_devnet_unsupported_blocker(self) -> None:
+    def test_matrix_preserves_machine_readable_devnet_supported_boundary(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             pathlib.Path(tmpdir, "bootstrap.json").write_text(json.dumps({"token": "t"}), encoding="utf-8")
 
@@ -234,27 +234,26 @@ class WalletApprovalChainMatrixTests(unittest.TestCase):
                 rc = 0
                 if chain == "solana_devnet":
                     payload = {
-                        "ok": False,
+                        "ok": True,
                         "chain": chain,
                         "results": [
                             {
-                                "name": "solana_devnet_trade_evidence_boundary",
-                                "ok": False,
-                                "message": "scenario failed",
+                                "name": "transfer_only",
+                                "ok": True,
+                                "message": "scenario passed",
                                 "details": {
-                                    "class": "unsupported_live_evidence",
-                                    "error": "No Jupiter-quotable Solana devnet trade pair is available for truthful live evidence.",
+                                    "class": "ok",
                                 },
                             }
                         ],
                         "preflight": {
                             "solanaDevnetTradePair": {
                                 "quoteable": False,
-                                "reason": "solana_devnet_trade_pair_unavailable",
+                                "reason": "solana_devnet_trade_disabled",
+                                "capabilityDisabled": True,
                             }
                         },
                     }
-                    rc = 1
                 report.write_text(json.dumps(payload), encoding="utf-8")
                 return mock.Mock(returncode=rc, stdout="", stderr="")
 
@@ -264,14 +263,14 @@ class WalletApprovalChainMatrixTests(unittest.TestCase):
                 return_value=({"XCLAW_SOLANA_LOCALNET_BOOTSTRAP_ENV_FILE": "/tmp/faucet.env"}, {"ok": True}),
             ), mock.patch.object(runner_mod.subprocess, "run", side_effect=_fake_run):
                 rc = runner_mod.main(self._argv(tmpdir))
-            self.assertEqual(rc, 1)
+            self.assertEqual(rc, 0)
             matrix = json.loads(pathlib.Path(tmpdir, "matrix.json").read_text(encoding="utf-8"))
-            self.assertEqual(matrix.get("failedAt"), "solana_devnet")
+            self.assertIsNone(matrix.get("failedAt"))
             last = matrix.get("steps", [])[-1]
             self.assertEqual(last.get("chain"), "solana_devnet")
             self.assertEqual(
                 last.get("report", {}).get("preflight", {}).get("solanaDevnetTradePair", {}).get("reason"),
-                "solana_devnet_trade_pair_unavailable",
+                "solana_devnet_trade_disabled",
             )
 
 

@@ -17,6 +17,30 @@ Status legend:
 
 ---
 
+## Slice 248: Solana Devnet Capability Boundary Alignment
+Status: [x]
+
+Goal:
+- align `solana_devnet` advertised capabilities with the truthful live-evidence boundary the app can prove today.
+
+DoD:
+- [x] `solana_devnet` advertises `wallet`, `faucet`, `deposits`, and `x402` only.
+- [x] `solana_devnet` no longer advertises `trade`, `liquidity`, or `limitOrders`.
+- [x] harness full devnet evidence stays green for the supported boundary and no longer treats devnet trade as a required failing leg.
+- [x] contract/capability rails and canonical artifacts are synchronized.
+- [x] full sequential validation + issue evidence posted.
+
+Closeout note:
+- Slice 248 is complete.
+- `solana_devnet` capability advertising is now aligned with what the app can prove live today: wallet, faucet, deposits, and x402 stay enabled; trade, liquidity, and limit-orders are intentionally disabled.
+- Targeted live Solana devnet evidence is green for the supported boundary and records `solanaDevnetTradePair.reason=solana_devnet_trade_disabled` instead of treating devnet trade as a required failing leg.
+- Canonical docs, contract rails, and chain capability surfaces are synchronized around that supported boundary.
+
+Issue mapping:
+- `#101`
+
+---
+
 ## Slice 247: Solana Devnet Quoted-Pair Discovery and Evidence Boundary
 Status: [x]
 

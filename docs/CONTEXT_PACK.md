@@ -14,20 +14,20 @@
   - `routeKind`
   - `liquidityOperation`
 
-## Active Context: Slice 247 Solana Devnet Quoted-Pair Discovery and Evidence Boundary
+## Active Context: Slice 248 Solana Devnet Capability Boundary Alignment
 
-Issue mapping: `#100`
+Issue mapping: `#101`
 
 ### Objective + scope lock
 - Objective:
-  - determine whether Solana devnet has a truthful Jupiter-quotable pair for live trade evidence,
-  - use that pair if it exists, otherwise record deterministic unsupported trade evidence without faking a green leg,
-  - rerun the ordered matrix through `solana_devnet`,
-  - keep the slice limited to harness/reporting evidence behavior with no public runtime contract drift.
+  - align `solana_devnet` advertised capabilities with the truthful live-evidence boundary the app can prove today,
+  - keep wallet/faucet/deposits/x402 green on Solana devnet,
+  - stop advertising unsupported trade/liquidity/limit-order execution features on Solana devnet,
+  - keep the slice limited to capability-boundary alignment with no public runtime contract drift.
 - Scope guard:
-  - Solana devnet quoted-pair discovery + evidence-boundary behavior only,
+  - Solana devnet capability-boundary alignment only,
   - no API/schema/database changes,
-  - no matrix CLI changes,
+  - no runtime command contract changes,
   - Hedera explicitly deferred.
 
 ### Expected touched files
@@ -35,6 +35,7 @@ Issue mapping: `#100`
 - `apps/agent-runtime/scripts/wallet_approval_harness.py`
 - `apps/agent-runtime/tests/test_wallet_approval_harness.py`
 - `apps/agent-runtime/tests/test_wallet_approval_chain_matrix.py`
+- `infrastructure/scripts/management-solana-contract-tests.mjs`
 - `docs/XCLAW_SOURCE_OF_TRUTH.md`
 - `docs/XCLAW_SLICE_TRACKER.md`
 - `docs/XCLAW_BUILD_ROADMAP.md`
@@ -44,9 +45,7 @@ Issue mapping: `#100`
 - `acceptance.md`
 
 ### Completion note
-- Completed 2026-03-09 with a discovery-first Solana devnet trade evidence path.
-- Targeted live evidence proves the scoped devnet pair is not tradable on Jupiter and now reports deterministic `unsupported_live_evidence` with `solana_devnet_trade_pair_unavailable`.
-- Earlier live chain evidence remains green for `hardhat_local`, `base_sepolia`, `ethereum_sepolia`, and `solana_localnet`; Slice 247 closes on the truthful later blocker at Solana devnet trade execution rather than forcing synthetic success.
+- Pending validation for Slice 248.
 
 ## Completed Context: Slice 241 Command-Surface Failure Injection Sweep
 

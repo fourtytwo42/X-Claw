@@ -1591,18 +1591,35 @@ class WalletApprovalHarness:
         if chain_normalized.startswith("solana_"):
             bal = self._balance_snapshot()
             native = bal.get("NATIVE", Decimal("0"))
-            stable_mint = self._canonical_token_address("USDC")
+            stable_mint = self._solana_chain_mint("stable")
+            if not stable_mint and chain_normalized != "solana_devnet":
+                stable_mint = self._canonical_token_address("USDC")
             wrapped_mint = self._solana_chain_mint("wrapped")
-            stable = bal.get(stable_mint.lower(), Decimal("0")) or bal.get("USDC", Decimal("0"))
+            stable = (
+                bal.get(stable_mint.lower(), Decimal("0"))
+                if stable_mint
+                else bal.get("USDC", Decimal("0"))
+            )
             wrapped = bal.get(wrapped_mint.lower(), Decimal("0")) if wrapped_mint else Decimal("0")
             if native <= 0 and self._has_chain_capability("faucet"):
                 self._attempt_faucet_topup(require_native_topup=True)
                 bal = self._balance_snapshot()
                 native = bal.get("NATIVE", Decimal("0"))
-                stable = bal.get(stable_mint.lower(), Decimal("0")) or bal.get("USDC", Decimal("0"))
+                stable = (
+                    bal.get(stable_mint.lower(), Decimal("0"))
+                    if stable_mint
+                    else bal.get("USDC", Decimal("0"))
+                )
                 wrapped = bal.get(wrapped_mint.lower(), Decimal("0")) if wrapped_mint else Decimal("0")
             if chain_normalized == "solana_devnet":
-                self._solana_devnet_trade_pair_discovery = self._discover_solana_devnet_trade_pair(bal)
+                if not self._has_chain_capability("trade"):
+                    self._solana_devnet_trade_pair_discovery = {
+                        "quoteable": False,
+                        "reason": "solana_devnet_trade_disabled",
+                        "capabilityDisabled": True,
+                    }
+                else:
+                    self._solana_devnet_trade_pair_discovery = self._discover_solana_devnet_trade_pair(bal)
                 self.preflight["solanaDevnetTradePair"] = self._solana_devnet_trade_pair_discovery
                 if bool(self._solana_devnet_trade_pair_discovery.get("quoteable")):
                     self.trade_token_in = str(self._solana_devnet_trade_pair_discovery.get("tokenIn") or "SOL")
@@ -2305,20 +2322,24 @@ class WalletApprovalHarness:
             and isinstance(self._solana_devnet_trade_pair_discovery, dict)
             and not bool(self._solana_devnet_trade_pair_discovery.get("quoteable"))
         )
+        devnet_trade_disabled = (
+            str(self.chain).strip().lower() == "solana_devnet"
+            and not self._has_chain_capability("trade")
+        )
         scenario_funcs: list[tuple[str, Any]] = []
         if hardhat_smoke:
             scenario_funcs = [("hardhat_local_gate", self._scenario_hardhat_local_gate)]
         else:
-            if devnet_trade_pair_unavailable:
+            if devnet_trade_pair_unavailable and not devnet_trade_disabled:
                 scenario_funcs = [("solana_devnet_trade_evidence_boundary", self._scenario_solana_devnet_trade_evidence_boundary)]
-            else:
+            elif not devnet_trade_disabled:
                 scenario_funcs = [
                     ("trade_pending_approve", self._scenario_trade_pending_approve),
                     ("trade_reject", self._scenario_trade_reject),
                     ("trade_dedupe", self._scenario_trade_dedupe),
                 ]
         if self.args.scenario_set == "full":
-            if devnet_trade_pair_unavailable:
+            if devnet_trade_disabled or devnet_trade_pair_unavailable:
                 scenario_funcs.extend(
                     [
                         ("transfer_only", self._scenario_transfer_only),
@@ -2357,7 +2378,7 @@ class WalletApprovalHarness:
                     if not (devnet_trade_pair_unavailable and name == "solana_devnet_trade_evidence_boundary"):
                         stop_after_unsupported = True
 
-        if not hardhat_smoke and not stop_after_unsupported and not devnet_trade_pair_unavailable:
+        if not hardhat_smoke and not stop_after_unsupported and not devnet_trade_pair_unavailable and not devnet_trade_disabled:
             try:
                 details = self._scenario_balance_reversion(baseline_balances)
                 self._record("balance_reversion", True, "within tolerance window", {"class": "ok", **details})
