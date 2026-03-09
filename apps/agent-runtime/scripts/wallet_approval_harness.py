@@ -42,6 +42,10 @@ SOLANA_CHAIN_SCOPED_MINT_ENV = {
         "wrapped": "XCLAW_SOLANA_FAUCET_WRAPPED_MINT_SOLANA_DEVNET",
     },
 }
+SOLANA_DEVNET_QUOTE_ALLOWLIST: list[tuple[str, str]] = [
+    ("SOL", "USDC"),
+    ("USDC", "SOL"),
+]
 
 
 def _now_iso() -> str:
@@ -312,6 +316,7 @@ class WalletApprovalHarness:
         self._chain_config_cache: dict[str, Any] | None = None
         self._skill_env_cache: dict[str, str] | None = None
         self._solana_localnet_bootstrap_env_cache: dict[str, str] | None = None
+        self._solana_devnet_trade_pair_discovery: dict[str, Any] | None = None
 
     def _solana_devnet_custom_mint_trade_details(self) -> dict[str, Any]:
         return {
@@ -323,8 +328,189 @@ class WalletApprovalHarness:
             "tokenOut": self.trade_token_out,
         }
 
+    def _jupiter_base_urls(self, chain_key: str) -> list[str]:
+        chain_env_key = f"XCLAW_JUPITER_BASE_URLS_{str(chain_key or '').strip().upper()}"
+        raw = str(os.environ.get(chain_env_key) or os.environ.get("XCLAW_JUPITER_BASE_URLS") or "").strip()
+        candidates: list[str] = []
+        if raw:
+            for item in raw.split(","):
+                candidate = str(item or "").strip().rstrip("/")
+                if candidate:
+                    candidates.append(candidate)
+        for default_url in ("https://lite-api.jup.ag/swap/v1", "https://quote-api.jup.ag/v6"):
+            if default_url not in candidates:
+                candidates.append(default_url)
+        deduped: list[str] = []
+        for item in candidates:
+            if item not in deduped:
+                deduped.append(item)
+        return deduped
+
+    def _probe_jupiter_quoteability(self, *, token_in: str, token_out: str, amount_units: str) -> dict[str, Any]:
+        endpoints = self._jupiter_base_urls(self.chain)
+        query = urllib.parse.urlencode(
+            {
+                "inputMint": token_in,
+                "outputMint": token_out,
+                "amount": str(amount_units),
+                "slippageBps": "100",
+                "swapMode": "ExactIn",
+                "onlyDirectRoutes": "false",
+            }
+        )
+        attempts: list[dict[str, Any]] = []
+        for endpoint in endpoints:
+            req = urllib.request.Request(
+                f"{endpoint}/quote?{query}",
+                method="GET",
+                headers={"accept": "application/json"},
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=20) as resp:
+                    payload = json.loads(resp.read().decode("utf-8"))
+                out_amount = str((payload if isinstance(payload, dict) else {}).get("outAmount") or "").strip()
+                if out_amount.isdigit() and out_amount != "0":
+                    return {
+                        "quoteable": True,
+                        "endpoint": endpoint,
+                        "payload": payload if isinstance(payload, dict) else {},
+                        "outAmount": out_amount,
+                    }
+                attempts.append(
+                    {
+                        "endpoint": endpoint,
+                        "status": 200,
+                        "error": "no_executable_out_amount",
+                        "payload": payload if isinstance(payload, dict) else {},
+                    }
+                )
+            except urllib.error.HTTPError as exc:
+                body = ""
+                try:
+                    body = exc.read().decode("utf-8", errors="replace").strip()
+                except Exception:
+                    body = ""
+                attempts.append({"endpoint": endpoint, "status": int(exc.code or 0), "error": _trim_text(body or exc)})
+            except Exception as exc:
+                attempts.append({"endpoint": endpoint, "status": None, "error": _trim_text(exc)})
+        return {"quoteable": False, "attempts": attempts}
+
+    def _solana_balance_for_token(self, balances: dict[str, Decimal], token: str) -> Decimal:
+        normalized = str(token or "").strip()
+        if not normalized:
+            return Decimal("0")
+        if normalized.upper() == "SOL":
+            return balances.get("NATIVE", Decimal("0"))
+        return balances.get(normalized.lower(), Decimal("0")) or balances.get(normalized.upper(), Decimal("0"))
+
+    def _solana_trade_amounts_for_token(self, token_in: str) -> dict[str, str]:
+        normalized = str(token_in or "").strip()
+        stable_mint = str(self._solana_chain_mint("stable") or "").strip().lower()
+        wrapped_mint = str(self._solana_chain_mint("wrapped") or "").strip().lower()
+        if normalized.upper() == "SOL" or normalized.lower() == wrapped_mint or normalized.upper() == "WETH":
+            return {
+                "pending_approve": "0.001",
+                "reject": "0.0008",
+                "dedupe": "0.0007",
+                "global_auto": "0.0006",
+                "allowlist": "0.0005",
+                "rebalance": "0.0004",
+            }
+        return {
+            "pending_approve": "0.5",
+            "reject": "0.4",
+            "dedupe": "0.3",
+            "global_auto": "0.2",
+            "allowlist": "0.15",
+            "rebalance": "0.1",
+        }
+
+    def _discover_solana_devnet_trade_pair(self, balances: dict[str, Decimal]) -> dict[str, Any]:
+        stable_mint = str(self._solana_chain_mint("stable") or "").strip()
+        wrapped_mint = str(self._solana_chain_mint("wrapped") or "").strip()
+        candidates: list[dict[str, Any]] = []
+        seen: set[tuple[str, str, str]] = set()
+
+        def _add_candidate(token_in: str, token_out: str, source: str) -> None:
+            key = (str(token_in).strip(), str(token_out).strip(), str(source).strip())
+            if key in seen or not key[0] or not key[1]:
+                return
+            seen.add(key)
+            candidates.append({"tokenIn": key[0], "tokenOut": key[1], "tradePairSource": key[2]})
+
+        if stable_mint:
+            _add_candidate("SOL", stable_mint, "env_scoped")
+            _add_candidate(stable_mint, "SOL", "env_scoped")
+        if stable_mint and wrapped_mint:
+            _add_candidate(wrapped_mint, stable_mint, "env_scoped")
+            _add_candidate(stable_mint, wrapped_mint, "env_scoped")
+        for token_in, token_out in SOLANA_DEVNET_QUOTE_ALLOWLIST:
+            resolved_in = self._canonical_token_address(token_in) if token_in != "SOL" else "SOL"
+            resolved_out = self._canonical_token_address(token_out) if token_out != "SOL" else "SOL"
+            _add_candidate(resolved_in, resolved_out, "allowlist")
+
+        results: list[dict[str, Any]] = []
+        for candidate in candidates:
+            token_in = candidate["tokenIn"]
+            token_out = candidate["tokenOut"]
+            input_balance = self._solana_balance_for_token(balances, token_in)
+            result = {
+                "tradePairSource": candidate["tradePairSource"],
+                "tokenIn": token_in,
+                "tokenOut": token_out,
+                "inputBalanceAtomic": str(input_balance),
+                "quoteable": False,
+            }
+            if input_balance <= 0:
+                result["skippedReason"] = "input_balance_missing"
+                results.append(result)
+                continue
+            amount_units = "10000" if token_in == "SOL" or token_in.lower() == wrapped_mint.lower() else "1000"
+            probe = self._probe_jupiter_quoteability(
+                token_in=SOLANA_WRAPPED_NATIVE_MINT if token_in == "SOL" else token_in,
+                token_out=SOLANA_WRAPPED_NATIVE_MINT if token_out == "SOL" else token_out,
+                amount_units=amount_units,
+            )
+            result["amountUnits"] = amount_units
+            result["probe"] = probe
+            result["quoteable"] = bool(probe.get("quoteable"))
+            results.append(result)
+            if result["quoteable"]:
+                return {
+                    "quoteable": True,
+                    "tradePairSource": result["tradePairSource"],
+                    "tokenIn": token_in,
+                    "tokenOut": token_out,
+                    "quoteableResults": results,
+                }
+        return {
+            "quoteable": False,
+            "reason": "solana_devnet_trade_pair_unavailable",
+            "walletAddress": self._wallet_address(),
+            "stableMint": stable_mint,
+            "wrappedMint": wrapped_mint,
+            "candidatePairs": results,
+        }
+
+    def _raise_if_solana_devnet_trade_pair_unavailable(self) -> None:
+        if str(self.chain).strip().lower() != "solana_devnet":
+            return
+        if self._solana_devnet_trade_pair_discovery is None:
+            return
+        discovery = self._solana_devnet_trade_pair_discovery or {}
+        if bool(discovery.get("quoteable")):
+            return
+        raise HarnessError(
+            "No Jupiter-quotable Solana devnet trade pair is available for truthful live evidence.",
+            code="solana_devnet_trade_pair_unavailable",
+            category="unsupported_live_evidence",
+            details=discovery if isinstance(discovery, dict) else {},
+        )
+
     def _raise_if_solana_devnet_custom_mint_trade_preflight_unsupported(self, *, phase: str) -> None:
         if str(self.chain).strip().lower() != "solana_devnet":
+            return
+        if self._solana_devnet_trade_pair_discovery is not None:
             return
         stable_mint = str(self._solana_chain_mint("stable") or "").strip()
         wrapped_mint = str(self._solana_chain_mint("wrapped") or "").strip()
@@ -348,6 +534,8 @@ class WalletApprovalHarness:
         stderr: str = "",
     ) -> None:
         if str(self.chain).strip().lower() != "solana_devnet":
+            return
+        if self._solana_devnet_trade_pair_discovery is not None:
             return
         stable_mint = str(self._solana_chain_mint("stable") or "").strip()
         wrapped_mint = str(self._solana_chain_mint("wrapped") or "").strip()
@@ -1141,7 +1329,7 @@ class WalletApprovalHarness:
                 raw = self._solana_chain_mint("stable")
             elif symbol in {"WETH", "WSOL"}:
                 raw = self._solana_chain_mint("wrapped")
-        if not raw and symbol == "USDC" and chain_normalized in {"solana_localnet", "solana_devnet"}:
+        if not raw and symbol == "USDC" and chain_normalized == "solana_localnet":
             raw = SOLANA_USDC_MINT
         if not raw:
             raise HarnessError(
@@ -1413,6 +1601,19 @@ class WalletApprovalHarness:
                 native = bal.get("NATIVE", Decimal("0"))
                 stable = bal.get(stable_mint.lower(), Decimal("0")) or bal.get("USDC", Decimal("0"))
                 wrapped = bal.get(wrapped_mint.lower(), Decimal("0")) if wrapped_mint else Decimal("0")
+            if chain_normalized == "solana_devnet":
+                self._solana_devnet_trade_pair_discovery = self._discover_solana_devnet_trade_pair(bal)
+                self.preflight["solanaDevnetTradePair"] = self._solana_devnet_trade_pair_discovery
+                if bool(self._solana_devnet_trade_pair_discovery.get("quoteable")):
+                    self.trade_token_in = str(self._solana_devnet_trade_pair_discovery.get("tokenIn") or "SOL")
+                    self.trade_token_out = str(self._solana_devnet_trade_pair_discovery.get("tokenOut") or stable_mint)
+                    self.trade_amounts = self._solana_trade_amounts_for_token(self.trade_token_in)
+                    return
+                if native > 0 or stable > 0 or wrapped > 0:
+                    self.trade_token_in = stable_mint or wrapped_mint or "SOL"
+                    self.trade_token_out = "SOL"
+                    self.trade_amounts = self._solana_trade_amounts_for_token(self.trade_token_in)
+                    return
             if native > 0:
                 self.trade_token_in = "SOL"
                 self.trade_token_out = stable_mint
@@ -1510,6 +1711,7 @@ class WalletApprovalHarness:
         )
 
     def _scenario_trade_pending_approve(self) -> dict[str, Any]:
+        self._raise_if_solana_devnet_trade_pair_unavailable()
         self._raise_if_solana_devnet_custom_mint_trade_preflight_unsupported(phase="trade_pending_approve_preflight")
         self._post_permissions_update(
             {
@@ -1562,6 +1764,7 @@ class WalletApprovalHarness:
         return {"tradeId": trade_id, "terminalStatus": terminal.get("status"), "txHash": terminal.get("txHash")}
 
     def _scenario_trade_reject(self) -> dict[str, Any]:
+        self._raise_if_solana_devnet_trade_pair_unavailable()
         self._post_permissions_update(
             {
                 "agentId": self.agent_id,
@@ -1592,6 +1795,7 @@ class WalletApprovalHarness:
         return {"tradeId": trade_id, "terminalStatus": terminal.get("status")}
 
     def _scenario_trade_dedupe(self) -> dict[str, Any]:
+        self._raise_if_solana_devnet_trade_pair_unavailable()
         self._post_permissions_update(
             {
                 "agentId": self.agent_id,
@@ -1662,6 +1866,7 @@ class WalletApprovalHarness:
         return {"firstTradeId": t1, "secondTradeId": t3}
 
     def _scenario_global_and_allowlist(self) -> dict[str, Any]:
+        self._raise_if_solana_devnet_trade_pair_unavailable()
         self._raise_if_solana_devnet_custom_mint_trade_preflight_unsupported(phase="global_auto_preflight")
         # Global auto on
         self._post_permissions_update(
@@ -1730,6 +1935,9 @@ class WalletApprovalHarness:
         recipient = (self.args.recipient_address or self._wallet_address()).strip()
         native_transfer_amount = "1000" if str(self.chain).strip().lower().startswith("solana_") else "1000000000000000"
         token_transfer_amount = "1000" if str(self.chain).strip().lower().startswith("solana_") else "1000000000000000000"
+        transfer_token = self.trade_token_in
+        if str(self.chain).strip().lower().startswith("solana_") and str(transfer_token).strip().upper() == "SOL":
+            transfer_token = self._solana_chain_mint("stable") or self._solana_chain_mint("wrapped") or transfer_token
         self._post_permissions_update(
             {
                 "agentId": self.agent_id,
@@ -1768,7 +1976,7 @@ class WalletApprovalHarness:
                 "wallet",
                 "send-token",
                 "--token",
-                self.trade_token_in,
+                transfer_token,
                 "--to",
                 recipient,
                 "--amount-wei",
@@ -1791,6 +1999,10 @@ class WalletApprovalHarness:
             accepted_conflict_codes={"not_actionable"},
         )
         return {"nativeApprovalId": appr1, "erc20ApprovalId": appr2}
+
+    def _scenario_solana_devnet_trade_evidence_boundary(self) -> dict[str, Any]:
+        self._raise_if_solana_devnet_trade_pair_unavailable()
+        return {"quoteable": True}
 
     def _scenario_x402_or_capability_assertion(self) -> dict[str, Any]:
         if not self._has_chain_capability("x402"):
@@ -2088,24 +2300,40 @@ class WalletApprovalHarness:
             baseline_balances = self._balance_snapshot()
             self._prepare_trade_pair_and_amounts()
 
+        devnet_trade_pair_unavailable = (
+            str(self.chain).strip().lower() == "solana_devnet"
+            and isinstance(self._solana_devnet_trade_pair_discovery, dict)
+            and not bool(self._solana_devnet_trade_pair_discovery.get("quoteable"))
+        )
         scenario_funcs: list[tuple[str, Any]] = []
         if hardhat_smoke:
             scenario_funcs = [("hardhat_local_gate", self._scenario_hardhat_local_gate)]
         else:
-            scenario_funcs = [
-                ("trade_pending_approve", self._scenario_trade_pending_approve),
-                ("trade_reject", self._scenario_trade_reject),
-                ("trade_dedupe", self._scenario_trade_dedupe),
-            ]
-        if self.args.scenario_set == "full":
-            scenario_funcs.extend(
-                [
-                    ("global_and_allowlist", self._scenario_global_and_allowlist),
-                    ("transfer_only", self._scenario_transfer_only),
-                    ("x402_or_capability_assertion", self._scenario_x402_or_capability_assertion),
-                    ("liquidity_and_pause", self._scenario_liquidity_and_pause),
+            if devnet_trade_pair_unavailable:
+                scenario_funcs = [("solana_devnet_trade_evidence_boundary", self._scenario_solana_devnet_trade_evidence_boundary)]
+            else:
+                scenario_funcs = [
+                    ("trade_pending_approve", self._scenario_trade_pending_approve),
+                    ("trade_reject", self._scenario_trade_reject),
+                    ("trade_dedupe", self._scenario_trade_dedupe),
                 ]
-            )
+        if self.args.scenario_set == "full":
+            if devnet_trade_pair_unavailable:
+                scenario_funcs.extend(
+                    [
+                        ("transfer_only", self._scenario_transfer_only),
+                        ("x402_or_capability_assertion", self._scenario_x402_or_capability_assertion),
+                    ]
+                )
+            else:
+                scenario_funcs.extend(
+                    [
+                        ("global_and_allowlist", self._scenario_global_and_allowlist),
+                        ("transfer_only", self._scenario_transfer_only),
+                        ("x402_or_capability_assertion", self._scenario_x402_or_capability_assertion),
+                        ("liquidity_and_pause", self._scenario_liquidity_and_pause),
+                    ]
+                )
 
         stop_after_unsupported = False
         for name, fn in scenario_funcs:
@@ -2119,11 +2347,17 @@ class WalletApprovalHarness:
                 self._record(name, True, "scenario passed", payload)
             except Exception as exc:
                 failure_class = self._classify_error(exc)
-                self._record(name, False, "scenario failed", {"error": str(exc), "class": failure_class})
+                failure_payload: dict[str, Any] = {"error": str(exc), "class": failure_class}
+                if isinstance(exc, HarnessError):
+                    failure_payload["code"] = str(exc.code or "")
+                    if isinstance(exc.details, dict) and exc.details:
+                        failure_payload["details"] = exc.details
+                self._record(name, False, "scenario failed", failure_payload)
                 if failure_class == "unsupported_live_evidence":
-                    stop_after_unsupported = True
+                    if not (devnet_trade_pair_unavailable and name == "solana_devnet_trade_evidence_boundary"):
+                        stop_after_unsupported = True
 
-        if not hardhat_smoke and not stop_after_unsupported:
+        if not hardhat_smoke and not stop_after_unsupported and not devnet_trade_pair_unavailable:
             try:
                 details = self._scenario_balance_reversion(baseline_balances)
                 self._record("balance_reversion", True, "within tolerance window", {"class": "ok", **details})

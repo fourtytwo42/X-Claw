@@ -14,18 +14,18 @@
   - `routeKind`
   - `liquidityOperation`
 
-## Active Context: Slice 246 Solana Devnet Funding Provisioning and Full Matrix Completion
+## Active Context: Slice 247 Solana Devnet Quoted-Pair Discovery and Evidence Boundary
 
-Issue mapping: `#99`
+Issue mapping: `#100`
 
 ### Objective + scope lock
 - Objective:
-  - add explicit Solana devnet funding/provisioning for live evidence,
-  - clear the current deterministic `scenario_funding_missing` blocker,
+  - determine whether Solana devnet has a truthful Jupiter-quotable pair for live trade evidence,
+  - use that pair if it exists, otherwise record deterministic unsupported trade evidence without faking a green leg,
   - rerun the ordered matrix through `solana_devnet`,
-  - keep the slice limited to funding/provisioning/evidence work with no public runtime contract drift.
+  - keep the slice limited to harness/reporting evidence behavior with no public runtime contract drift.
 - Scope guard:
-  - Solana devnet funding/provisioning + evidence only,
+  - Solana devnet quoted-pair discovery + evidence-boundary behavior only,
   - no API/schema/database changes,
   - no matrix CLI changes,
   - Hedera explicitly deferred.
@@ -35,10 +35,6 @@ Issue mapping: `#99`
 - `apps/agent-runtime/scripts/wallet_approval_harness.py`
 - `apps/agent-runtime/tests/test_wallet_approval_harness.py`
 - `apps/agent-runtime/tests/test_wallet_approval_chain_matrix.py`
-- `apps/network-web/src/app/api/v1/agent/faucet/request/route.ts`
-- `apps/network-web/src/app/api/v1/agent/faucet/networks/route.ts`
-- `apps/network-web/src/lib/solana-faucet.ts`
-- `infrastructure/scripts/faucet-contract-tests.mjs`
 - `docs/XCLAW_SOURCE_OF_TRUTH.md`
 - `docs/XCLAW_SLICE_TRACKER.md`
 - `docs/XCLAW_BUILD_ROADMAP.md`
@@ -47,11 +43,10 @@ Issue mapping: `#99`
 - `tasks.md`
 - `acceptance.md`
 
-### Current blocker
-- Solana devnet wallet preflight is already green from Slice 245.
-- The original truthful live blocker was `scenario_funding_missing`.
-- Funding is now repaired through scoped devnet faucet env and live server-side drip proof.
-- The current later blocker is Solana devnet Jupiter incompatibility for the funded custom-mint pair, which should be reported as deterministic `solana_devnet_custom_mint_trade_unsupported` evidence instead of a generic trade wrapper failure.
+### Completion note
+- Completed 2026-03-09 with a discovery-first Solana devnet trade evidence path.
+- Targeted live evidence proves the scoped devnet pair is not tradable on Jupiter and now reports deterministic `unsupported_live_evidence` with `solana_devnet_trade_pair_unavailable`.
+- Earlier live chain evidence remains green for `hardhat_local`, `base_sepolia`, `ethereum_sepolia`, and `solana_localnet`; Slice 247 closes on the truthful later blocker at Solana devnet trade execution rather than forcing synthetic success.
 
 ## Completed Context: Slice 241 Command-Surface Failure Injection Sweep
 

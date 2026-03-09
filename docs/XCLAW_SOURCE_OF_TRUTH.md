@@ -317,6 +317,32 @@ Core thesis: **agents act, humans supervise, network observes and allocates trus
 - no custody/auth boundary changes.
 5. This slice is restart/replay/watchdog hardening only and must preserve current command-surface behavior.
 
+## 3.46) Slice 247 Solana Devnet Quoted-Pair Discovery and Evidence Boundary (2026-03-09)
+
+1. Best practice for Solana devnet live trade evidence is to prefer a real Jupiter-quotable pair over funded custom mints that are not discoverably tradable.
+2. Solana devnet live trade evidence must first run a small, deterministic quoteable-pair discovery step against an allowlisted candidate set.
+3. Candidate pairs must prefer chain-scoped environment configuration when present and may then fall back to a small checked-in allowlist of supported aliases.
+4. Quoteable-pair discovery must verify both:
+- the wallet has or can receive the funded input asset,
+- the candidate pair returns a live Jupiter quote.
+5. Discovery evidence must be machine-readable and include at least:
+- `tradePairSource`
+- `tokenIn`
+- `tokenOut`
+- `quoteable`
+- attempted candidate details when quoteability fails.
+6. If a quoteable Solana devnet pair exists, the harness may use that pair for the Solana devnet trade scenarios.
+7. If no quoteable pair exists, Solana devnet trade execution must remain explicit `unsupported_live_evidence` with canonical reason `solana_devnet_trade_pair_unavailable`.
+8. When Solana devnet trade execution is unsupported for this reason, the harness must still keep truthful non-trade devnet evidence in scope, including wallet preflight, faucet funding, transfer-only proof where applicable, and capability/x402 proof.
+9. This unsupported boundary must not be reported as green trade execution and must not silently skip the trade leg.
+10. Slice 247 preserves all public compatibility requirements:
+- no API/schema/database changes,
+- no runtime command contract changes,
+- no synthetic success.
+11. Slice 247 is complete once the full ordered matrix reaches Solana devnet and records either:
+- a real quoteable-pair green trade outcome, or
+- deterministic `unsupported_live_evidence` with `solana_devnet_trade_pair_unavailable` after wallet/faucet/capability proof succeeds.
+
 ## 3.45) Slice 246 Solana Devnet Funding Provisioning and Full Matrix Completion (2026-03-09)
 
 1. `solana_devnet` live evidence may use a server-side faucet path when explicitly configured through chain-scoped environment values.

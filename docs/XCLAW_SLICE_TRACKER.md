@@ -17,6 +17,30 @@ Status legend:
 
 ---
 
+## Slice 247: Solana Devnet Quoted-Pair Discovery and Evidence Boundary
+Status: [x]
+
+Goal:
+- determine whether a truthful Jupiter-quotable Solana devnet pair exists for live trade evidence and either use it or record deterministic unsupported evidence without faking a green trade leg.
+
+DoD:
+- [x] Solana devnet trade evidence first attempts quoteable-pair discovery against a small allowlisted candidate set.
+- [x] If no quoteable pair exists, Solana devnet trade scenarios stop with deterministic `unsupported_live_evidence` using `solana_devnet_trade_pair_unavailable`.
+- [x] Non-trade Solana devnet evidence remains in scope and continues after the explicit trade-evidence boundary.
+- [x] full sequential validation + issue evidence posted.
+
+Closeout note:
+- Slice 247 is complete.
+- The harness now prefers a discovery-first Solana devnet evidence path rather than assuming funded custom mints are tradable through Jupiter.
+- Targeted live Solana devnet evidence proves the scoped devnet pair is not tradable on Jupiter and is now reported deterministically as `solana_devnet_trade_pair_unavailable` instead of a generic trade wrapper failure.
+- Earlier live matrix legs remain green with refreshed Slice 247 evidence for `hardhat_local`, `base_sepolia`, and direct rerun proof for `ethereum_sepolia`; the existing green `solana_localnet` proof remains unchanged from Slice 244 because Slice 247 does not modify localnet funding logic.
+- Slice 247 closes on the truthful later blocker at Solana devnet trade execution, not on synthetic green evidence.
+
+Issue mapping:
+- `#100`
+
+---
+
 ## Slice 246: Solana Devnet Funding Provisioning and Full Matrix Completion
 Status: [x]
 

@@ -223,6 +223,57 @@ class WalletApprovalChainMatrixTests(unittest.TestCase):
     def test_solana_devnet_remains_final_chain(self) -> None:
         self.assertEqual(runner_mod.CHAIN_ORDER[-1], "solana_devnet")
 
+    def test_matrix_preserves_machine_readable_devnet_unsupported_blocker(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            pathlib.Path(tmpdir, "bootstrap.json").write_text(json.dumps({"token": "t"}), encoding="utf-8")
+
+            def _fake_run(cmd: list[str], text: bool, capture_output: bool, env: dict[str, str] | None = None):
+                chain = cmd[cmd.index("--chain") + 1]
+                report = pathlib.Path(cmd[cmd.index("--json-report") + 1])
+                payload = {"ok": True, "chain": chain}
+                rc = 0
+                if chain == "solana_devnet":
+                    payload = {
+                        "ok": False,
+                        "chain": chain,
+                        "results": [
+                            {
+                                "name": "solana_devnet_trade_evidence_boundary",
+                                "ok": False,
+                                "message": "scenario failed",
+                                "details": {
+                                    "class": "unsupported_live_evidence",
+                                    "error": "No Jupiter-quotable Solana devnet trade pair is available for truthful live evidence.",
+                                },
+                            }
+                        ],
+                        "preflight": {
+                            "solanaDevnetTradePair": {
+                                "quoteable": False,
+                                "reason": "solana_devnet_trade_pair_unavailable",
+                            }
+                        },
+                    }
+                    rc = 1
+                report.write_text(json.dumps(payload), encoding="utf-8")
+                return mock.Mock(returncode=rc, stdout="", stderr="")
+
+            with mock.patch.object(
+                runner_mod,
+                "_ensure_solana_localnet_bootstrap",
+                return_value=({"XCLAW_SOLANA_LOCALNET_BOOTSTRAP_ENV_FILE": "/tmp/faucet.env"}, {"ok": True}),
+            ), mock.patch.object(runner_mod.subprocess, "run", side_effect=_fake_run):
+                rc = runner_mod.main(self._argv(tmpdir))
+            self.assertEqual(rc, 1)
+            matrix = json.loads(pathlib.Path(tmpdir, "matrix.json").read_text(encoding="utf-8"))
+            self.assertEqual(matrix.get("failedAt"), "solana_devnet")
+            last = matrix.get("steps", [])[-1]
+            self.assertEqual(last.get("chain"), "solana_devnet")
+            self.assertEqual(
+                last.get("report", {}).get("preflight", {}).get("solanaDevnetTradePair", {}).get("reason"),
+                "solana_devnet_trade_pair_unavailable",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

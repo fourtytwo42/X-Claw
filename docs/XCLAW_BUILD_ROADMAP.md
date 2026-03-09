@@ -11,6 +11,15 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 
 ---
 
+## 0.56) Slice 247 Solana Devnet Quoted-Pair Discovery and Evidence Boundary
+
+- [x] Add a Solana devnet quoteable-pair discovery path to `wallet_approval_harness.py` that checks a small allowlisted candidate set against live Jupiter quoteability.
+- [x] Record explicit Solana devnet trade-pair discovery evidence in harness preflight/report output.
+- [x] Stop Solana devnet trade scenarios with deterministic `unsupported_live_evidence` when no quoteable pair exists, while continuing non-trade devnet evidence.
+- [x] Add direct unit coverage for quoteable-pair selection and deterministic unsupported evidence.
+- [x] Capture the final Slice 247 outcome in `acceptance.md` using green earlier-chain evidence plus deterministic Solana devnet later-blocker proof.
+- [x] Run the required sequential validation chain and post issue evidence.
+
 ## 0.55) Slice 246 Solana Devnet Funding Provisioning and Full Matrix Completion
 
 - [x] Enable `solana_devnet` faucet capability for live evidence through chain-scoped env.
