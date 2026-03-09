@@ -11,6 +11,14 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 
 ---
 
+## 0.54) Slice 245 Solana Devnet Passphrase-Source Alignment
+
+- [x] Resolve harness wallet passphrase using arg -> env -> installed skill config -> backup.
+- [x] Add direct unit coverage for passphrase-source priority and preflight evidence.
+- [x] Prove Solana devnet wallet preflight no longer fails with `wallet_passphrase_mismatch` when skill-config passphrase is present.
+- [x] Capture the next truthful Solana devnet blocker in `acceptance.md`.
+- [x] Run Solana contract rails plus the required sequential validation chain.
+
 ## 0.53) Slice 244 Solana Localnet Faucet Funding + Ethereum Sepolia Retry Stabilization
 
 - [x] Make `wallet_approval_chain_matrix.py` self-provision `solana_localnet` through the canonical bootstrap path and emit deterministic provisioning failures when validator/bootstrap prerequisites are absent.

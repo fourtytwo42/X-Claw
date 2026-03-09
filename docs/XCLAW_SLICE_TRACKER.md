@@ -17,6 +17,28 @@ Status legend:
 
 ---
 
+## Slice 245: Solana Devnet Passphrase-Source Alignment
+Status: [x]
+
+Goal:
+- clear the Solana devnet wallet-preflight blocker by aligning harness passphrase sourcing with the installed skill config, then record the next truthful later blocker without changing public runtime contracts.
+
+DoD:
+- [x] harness wallet preflight resolves passphrase in canonical order: arg -> env -> skill config -> backup.
+- [x] direct regression coverage proves source priority and deterministic `passphraseSource` evidence.
+- [x] Solana devnet no longer fails at wallet preflight because the harness lacks a passphrase source.
+- [x] full sequential validation + issue evidence posted.
+
+Closeout note:
+- harness wallet preflight now accepts the installed skill config (`~/.openclaw/openclaw.json -> skills.entries["xclaw-agent"].env.XCLAW_WALLET_PASSPHRASE`) as the canonical live-matrix fallback.
+- the original `wallet_passphrase_mismatch` blocker is resolved at the harness layer.
+- direct live Solana devnet evidence now stops later at deterministic `scenario_funding_missing` for the repaired devnet wallet after wallet preflight succeeds; this later blocker is recorded in `acceptance.md`.
+
+Issue mapping:
+- `#98`
+
+---
+
 ## Slice 244: Solana Localnet Faucet Funding + Ethereum Sepolia Retry Stabilization
 Status: [x]
 

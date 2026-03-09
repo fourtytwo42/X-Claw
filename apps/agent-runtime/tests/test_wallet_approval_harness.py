@@ -245,7 +245,9 @@ class WalletApprovalHarnessUnitTests(unittest.TestCase):
         args = self._args()
         args.disable_passphrase_recovery = True
         runner = harness.WalletApprovalHarness(args)
-        with mock.patch.object(
+        with mock.patch.object(harness, "_openclaw_skill_env", return_value={}), mock.patch.object(
+            harness, "_recover_local_passphrase_backup", return_value=""
+        ), mock.patch.object(
             runner,
             "_runtime",
             side_effect=[
@@ -258,6 +260,64 @@ class WalletApprovalHarnessUnitTests(unittest.TestCase):
                 runner._wallet_decrypt_probe()
         self.assertEqual(ctx.exception.code, "wallet_passphrase_mismatch")
         self.assertFalse(bool(runner.preflight["walletDecryptProbe"]["ok"]))
+
+    def test_wallet_decrypt_probe_uses_skill_config_when_env_and_arg_missing(self) -> None:
+        args = self._args()
+        args.chain = "solana_devnet"
+        args.wallet_passphrase = ""
+        runner = harness.WalletApprovalHarness(args)
+        with mock.patch.dict(harness.os.environ, {}, clear=False), mock.patch.object(
+            harness, "_openclaw_skill_env", return_value={"XCLAW_WALLET_PASSPHRASE": "skill-passphrase"}
+        ), mock.patch.object(
+            harness, "_recover_local_passphrase_backup", return_value=""
+        ), mock.patch.object(
+            runner,
+            "_runtime",
+            side_effect=[
+                (0, {"ok": True, "address": "9F4znU1PsW5yBK5TAfR9x8C9q3yVGNHUMuaXY35uCEXT"}, "", ""),
+                (0, {"ok": True, "hasWallet": True}, "", ""),
+                (0, {"ok": True, "signature": "3" * 88}, "", ""),
+            ],
+        ):
+            runner._wallet_decrypt_probe()
+        self.assertEqual(runner.wallet_passphrase, "skill-passphrase")
+        self.assertEqual(runner.preflight["walletDecryptProbe"]["passphraseSource"], "skill_config")
+
+    def test_wallet_decrypt_probe_prefers_arg_over_skill_config(self) -> None:
+        args = self._args()
+        args.wallet_passphrase = "arg-passphrase"
+        runner = harness.WalletApprovalHarness(args)
+        with mock.patch.object(harness, "_openclaw_skill_env", return_value={"XCLAW_WALLET_PASSPHRASE": "skill-passphrase"}), mock.patch.object(
+            runner,
+            "_runtime",
+            side_effect=[
+                (0, {"ok": True, "address": "0x1111111111111111111111111111111111111111"}, "", ""),
+                (0, {"ok": True, "hasWallet": True}, "", ""),
+                (0, {"ok": True, "signature": "0x" + "aa" * 65}, "", ""),
+            ],
+        ):
+            runner._wallet_decrypt_probe()
+        self.assertEqual(runner.wallet_passphrase, "arg-passphrase")
+        self.assertEqual(runner.preflight["walletDecryptProbe"]["passphraseSource"], "arg")
+
+    def test_wallet_decrypt_probe_prefers_env_over_skill_config(self) -> None:
+        args = self._args()
+        args.wallet_passphrase = ""
+        runner = harness.WalletApprovalHarness(args)
+        with mock.patch.dict(harness.os.environ, {"XCLAW_WALLET_PASSPHRASE": "env-passphrase"}, clear=False), mock.patch.object(
+            harness, "_openclaw_skill_env", return_value={"XCLAW_WALLET_PASSPHRASE": "skill-passphrase"}
+        ), mock.patch.object(
+            runner,
+            "_runtime",
+            side_effect=[
+                (0, {"ok": True, "address": "0x1111111111111111111111111111111111111111"}, "", ""),
+                (0, {"ok": True, "hasWallet": True}, "", ""),
+                (0, {"ok": True, "signature": "0x" + "aa" * 65}, "", ""),
+            ],
+        ):
+            runner._wallet_decrypt_probe()
+        self.assertEqual(runner.wallet_passphrase, "env-passphrase")
+        self.assertEqual(runner.preflight["walletDecryptProbe"]["passphraseSource"], "env")
 
     def test_wallet_decrypt_probe_allows_hardhat_wallet_health_soft_fail(self) -> None:
         args = self._args()
@@ -364,14 +424,14 @@ class WalletApprovalHarnessUnitTests(unittest.TestCase):
     def test_wallet_decrypt_probe_recovers_passphrase_from_backup(self) -> None:
         args = self._args()
         args.chain = "base_sepolia"
+        args.wallet_passphrase = ""
         runner = harness.WalletApprovalHarness(args)
-        with mock.patch.object(
+        with mock.patch.dict(harness.os.environ, {}, clear=False), mock.patch.object(
+            harness, "_openclaw_skill_env", return_value={}
+        ), mock.patch.object(
             runner,
             "_runtime",
             side_effect=[
-                (0, {"ok": True, "address": "0x1111111111111111111111111111111111111111"}, "", ""),
-                (0, {"ok": True, "integrityChecked": False}, "", ""),
-                (1, {"ok": False, "code": "non_interactive"}, "", ""),
                 (0, {"ok": True, "address": "0x1111111111111111111111111111111111111111"}, "", ""),
                 (0, {"ok": True, "integrityChecked": True}, "", ""),
                 (0, {"ok": True, "signature": "0x" + "aa" * 65}, "", ""),
@@ -380,7 +440,8 @@ class WalletApprovalHarnessUnitTests(unittest.TestCase):
             runner._wallet_decrypt_probe()
         self.assertEqual(runner.wallet_passphrase, "recovered-passphrase")
         self.assertTrue(bool(runner.preflight["walletDecryptProbe"]["ok"]))
-        self.assertTrue(bool(runner.preflight["walletDecryptProbe"].get("passphraseRecoveredFromBackup")))
+        self.assertEqual(runner.preflight["walletDecryptProbe"]["passphraseSource"], "backup")
+        self.assertFalse(bool(runner.preflight["walletDecryptProbe"].get("passphraseRecoveredFromBackup")))
 
     def test_wallet_decrypt_probe_recovery_can_be_disabled(self) -> None:
         args = self._args()

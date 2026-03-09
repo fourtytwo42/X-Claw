@@ -153,6 +153,23 @@ def _openclaw_skill_env() -> dict[str, str]:
     return out
 
 
+def _resolve_harness_passphrase(*, explicit: str = "", env_values: dict[str, str] | None = None) -> tuple[str, str]:
+    direct = str(explicit or "").strip()
+    if direct:
+        return direct, "arg"
+    runtime_env = env_values if isinstance(env_values, dict) else os.environ
+    env_passphrase = str(runtime_env.get("XCLAW_WALLET_PASSPHRASE") or "").strip()
+    if env_passphrase:
+        return env_passphrase, "env"
+    skill_passphrase = str(_openclaw_skill_env().get("XCLAW_WALLET_PASSPHRASE") or "").strip()
+    if skill_passphrase:
+        return skill_passphrase, "skill_config"
+    recovered = _recover_local_passphrase_backup()
+    if recovered:
+        return recovered, "backup"
+    return "", "missing"
+
+
 def _canonical_challenge_message(chain: str) -> str:
     nonce = f"harness{int(time.time())}"
     timestamp = _now_iso().replace("Z", "+00:00")
@@ -492,11 +509,7 @@ class WalletApprovalHarness:
             )
 
     def _wallet_decrypt_probe(self) -> None:
-        passphrase_source = "missing"
-        if str(self.args.wallet_passphrase or "").strip():
-            passphrase_source = "arg"
-        elif str(os.environ.get("XCLAW_WALLET_PASSPHRASE") or "").strip():
-            passphrase_source = "env"
+        self.wallet_passphrase, passphrase_source = _resolve_harness_passphrase(explicit=str(self.args.wallet_passphrase or ""))
         wallet_store_path = str((pathlib.Path(os.environ.get("XCLAW_AGENT_APP_DIR", "~/.xclaw-agent")).expanduser() / "wallets.json"))
 
         def _require_ok(label: str, cmd: list[str]) -> dict[str, Any]:
@@ -590,7 +603,7 @@ class WalletApprovalHarness:
                 )
                 if can_retry_recovery:
                     recovered = _recover_local_passphrase_backup()
-                    if recovered:
+                    if recovered and recovered != self.wallet_passphrase:
                         self.wallet_passphrase = recovered
                         passphrase_source = "backup"
                         recovery_attempted = True

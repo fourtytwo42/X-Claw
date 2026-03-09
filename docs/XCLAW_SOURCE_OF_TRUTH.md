@@ -317,6 +317,23 @@ Core thesis: **agents act, humans supervise, network observes and allocates trus
 - no custody/auth boundary changes.
 5. This slice is restart/replay/watchdog hardening only and must preserve current command-surface behavior.
 
+## 3.44) Slice 245 Solana Devnet Passphrase-Source Alignment (2026-03-09)
+
+1. Live harness wallet preflight may source `XCLAW_WALLET_PASSPHRASE` from the installed skill config at `~/.openclaw/openclaw.json -> skills.entries["xclaw-agent"].env` when explicit arg and process env are absent.
+2. The canonical passphrase-source order for live harness runs is:
+- explicit `--wallet-passphrase`
+- process env `XCLAW_WALLET_PASSPHRASE`
+- installed skill config fallback
+- encrypted local backup file
+3. `wallet_passphrase_mismatch` remains the fail-closed outcome when none of the accepted sources yields a usable passphrase.
+4. `passphraseSource` is part of the wallet-preflight evidence contract and must distinguish `arg`, `env`, `skill_config`, `backup`, and `missing`.
+5. Slice 245 preserves all public compatibility requirements:
+- no API/schema/database changes,
+- no runtime command contract changes,
+- no matrix CLI changes,
+- no synthetic success.
+6. Slice 245 is complete once the current Solana devnet blocker advances beyond wallet preflight and records the next truthful later blocker, or the full matrix goes green.
+
 ## 3.43) Slice 244 Solana Localnet Self-Provision + Devnet Matrix Completion (2026-03-09)
 
 1. `solana_localnet` remains the canonical first Solana evidence leg and must not be skipped in favor of `solana_devnet`.

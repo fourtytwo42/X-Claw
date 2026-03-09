@@ -14,40 +14,26 @@
   - `routeKind`
   - `liquidityOperation`
 
-## Active Context: Slice 244 Solana Localnet Faucet Funding + Ethereum Sepolia Retry Stabilization
+## Active Context: Slice 245 Solana Devnet Passphrase-Source Alignment
 
-Issue mapping: `#97`
+Issue mapping: `#98`
 
 ### Objective + scope lock
 - Objective:
-  - preserve the current EVM live evidence path,
-  - self-provision `solana_localnet` for the live matrix using the canonical bootstrap path,
-  - align `solana_localnet` funding/token resolution with the bootstrap-generated stable/wrapped mints,
-  - prove direct server-side localnet faucet funding lands on-chain for the registered agent wallet,
-  - stabilize the later `ethereum_sepolia` retry path for `could not replace existing tx`,
-  - advance the matrix into `solana_devnet`,
-  - generate truthful per-chain and aggregate evidence artifacts without changing public runtime contracts.
+  - align live harness wallet passphrase sourcing with the installed skill config,
+  - clear the deterministic Solana devnet `wallet_passphrase_mismatch` blocker,
+  - capture the next truthful Solana devnet blocker after wallet preflight succeeds,
+  - keep the slice limited to harness/report/evidence work with no public runtime contract drift.
 - Scope guard:
-  - harness/matrix/report/evidence work only, plus the minimum local Solana bootstrap/env loading needed to make local live evidence truthful,
+  - harness/report/evidence work only,
   - no API/schema/database changes,
+  - no matrix CLI changes,
   - Hedera explicitly deferred.
 
 ### Expected touched files
 - `apps/agent-runtime/scripts/wallet_approval_harness.py`
-- `apps/agent-runtime/scripts/wallet_approval_chain_matrix.py`
 - `apps/agent-runtime/tests/test_wallet_approval_harness.py`
 - `apps/agent-runtime/tests/test_wallet_approval_chain_matrix.py`
-- `infrastructure/seed-data/solana-localnet-faucet.env`
-- `apps/network-web/src/lib/management-cookies.ts`
-- `apps/network-web/src/app/api/v1/agent/management-link/route.ts`
-- `apps/network-web/src/app/api/v1/agent/faucet/request/route.ts`
-- `apps/network-web/src/app/api/v1/agent/faucet/networks/route.ts`
-- `apps/network-web/src/lib/solana-faucet.ts`
-- `apps/network-web/src/lib/solana-localnet-bootstrap-env.ts`
-- `apps/agent-runtime/xclaw_agent/cli.py`
-- `infrastructure/scripts/management-solana-contract-tests.mjs`
-- `infrastructure/scripts/faucet-contract-tests.mjs`
-- `infrastructure/scripts/solana-localnet-bootstrap.mjs`
 - `docs/XCLAW_SOURCE_OF_TRUTH.md`
 - `docs/XCLAW_SLICE_TRACKER.md`
 - `docs/XCLAW_BUILD_ROADMAP.md`
@@ -58,9 +44,9 @@ Issue mapping: `#97`
 
 ### Completion note
 - Completed 2026-03-09.
-- `hardhat_local`, `base_sepolia`, `ethereum_sepolia`, and `solana_localnet` are green in live evidence.
-- The ordered matrix advances to `solana_devnet` and now stops there with deterministic `wallet_passphrase_mismatch` during wallet preflight.
-- No later slice should reopen localnet bootstrap/funding work unless new evidence disproves the current live proof.
+- The original Solana devnet `wallet_passphrase_mismatch` blocker is resolved at the harness layer through installed-skill passphrase fallback.
+- Direct live Solana devnet evidence now stops later at truthful `scenario_funding_missing` for the repaired devnet wallet.
+- No later slice should reopen passphrase-source discovery unless the installed skill config contract changes.
 
 ## Completed Context: Slice 241 Command-Surface Failure Injection Sweep
 
