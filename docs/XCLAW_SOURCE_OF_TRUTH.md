@@ -326,10 +326,22 @@ Core thesis: **agents act, humans supervise, network observes and allocates trus
 - bootstrap env loaded vs missing,
 - wrapped/stable mint config present vs missing,
 - no synthetic success for localnet liquidity or trade paths when bootstrap prerequisites are absent.
-5. Slice 244 preserves all public compatibility requirements:
+5. Once local validator/RPC prerequisites are satisfied, the `solana_localnet` harness must resolve dynamic stable/wrapped mint addresses from the bootstrap env instead of falling back to mainnet mint defaults.
+6. The `solana_localnet` faucet/top-up flow must request the full local trade asset set (`native`, `stable`, `wrapped`) and verify balances using the bootstrap-generated mint addresses.
+7. If bootstrap env is present but trade funding still remains unusable, the harness must fail with deterministic `scenario_funding_missing` evidence that includes the wallet address, resolved stable/wrapped mint addresses, and observed native/stable/wrapped balances.
+8. Slice 244 preserves all public compatibility requirements:
 - no API/schema/database changes,
 - no runtime command contract changes,
 - only additive matrix/harness provisioning behavior for truthful Solana evidence.
+9. Slice 244 closeout may also include minimum runtime retry hardening for later-chain live evidence if a clean rerun exposes a concrete send-path variant that should already be treated as retryable under the existing canonical retry contract.
+10. For EVM live evidence, RPC wording variants that are semantically equivalent to replacement-tx retry conditions, including `could not replace existing tx`, must remain classified under the existing bounded retry path rather than failing immediately as non-retryable send errors.
+11. For `solana_localnet` live evidence, the runtime may satisfy trade execution through deterministic local execution semantics rather than Jupiter routing, provided the evidence remains truthful and the reported execution metadata is explicit:
+- `executionAdapter=local_amm`
+- `routeKind=local_direct`
+- no synthetic success
+12. Slice 244 is complete once:
+- `hardhat_local`, `base_sepolia`, `ethereum_sepolia`, and `solana_localnet` are green,
+- and the ordered matrix reaches `solana_devnet` or stops there with a concrete later blocker recorded in `acceptance.md`.
 
 ## 3.42) Slice 243 Live Chain Evidence Matrix Expansion (EVM + Solana) (2026-03-08)
 

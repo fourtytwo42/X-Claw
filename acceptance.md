@@ -1,4 +1,4 @@
-# Slice 244 Acceptance Evidence: Solana Localnet Self-Provision + Devnet Matrix Completion
+# Slice 244 Acceptance Evidence: Solana Localnet Faucet Funding + Ethereum Sepolia Retry Stabilization
 
 Date (UTC): 2026-03-09  
 Active slice context: `Slice 244`.
@@ -15,12 +15,17 @@ Issue mapping: `#97`
 ### Behavior Checks
 - [x] chain-matrix self-provisions `solana_localnet` or emits a concrete provisioning failure.
 - [x] Solana harness reports bootstrap-backed localnet preflight truthfully.
+- [x] Solana harness resolves bootstrap-generated localnet stable/wrapped mint addresses and requests the full local trade asset set.
+- [x] Direct `solana_localnet` faucet funding lands on-chain for the registered agent wallet with bootstrap-generated stable/wrapped mints.
+- [x] Runtime retry classification treats `could not replace existing tx` as a retryable EVM send-path variant.
 - [x] chain-specific reports plus an aggregate matrix report are generated.
 - [x] existing EVM harness behavior remains unchanged.
 
 ### Required Validation Gates
 - [x] `python3 -m unittest -v apps/agent-runtime/tests/test_wallet_approval_harness.py`
 - [x] `python3 -m unittest -v apps/agent-runtime/tests/test_wallet_approval_chain_matrix.py`
+- [x] `python3 -m unittest -v apps/agent-runtime/tests/test_trade_path.py apps/agent-runtime/tests/test_wallet_approval_harness.py apps/agent-runtime/tests/test_wallet_approval_chain_matrix.py`
+- [x] `npm run test:faucet:contract`
 - [x] `npm run test:management:solana:contract`
 - [x] `npm run test:x402:solana:contract`
 - [x] `npm run db:parity`
@@ -30,7 +35,7 @@ Issue mapping: `#97`
 - [x] tracked `infrastructure/seed-data/.seed-state.json` restore
 - [x] `npm run hardhat:deploy-local`
 - [x] `npm run hardhat:verify-local`
-- [ ] refreshed full matrix run
+- [x] refreshed full matrix run
 - [x] `npm run build`
 - [x] `pm2 restart all`
 
@@ -42,18 +47,29 @@ Issue mapping: `#97`
     - injects localnet bootstrap env into harness child env
   - `apps/agent-runtime/scripts/wallet_approval_harness.py`
     - adds `solana_localnet` bootstrap preflight
+    - resolves `solana_localnet` stable/wrapped tokens from the bootstrap env instead of mainnet fallback
+    - requests `native|stable|wrapped` for localnet faucet top-up and checks localnet balances by bootstrap-generated mint address
     - reports localnet liquidity as preflight-blocked instead of synthetic success when bootstrap prerequisites are absent
   - `apps/network-web/src/lib/solana-localnet-bootstrap-env.ts`
     - loads canonical localnet bootstrap env file on demand
   - `apps/network-web/src/app/api/v1/agent/faucet/request/route.ts`
   - `apps/network-web/src/app/api/v1/agent/faucet/networks/route.ts`
     - resolve Solana localnet faucet config from the bootstrap env file without requiring manual server env edits
+  - `apps/network-web/src/lib/solana-faucet.ts`
+    - uses explicit blockhash + raw-transaction send/confirm flow for deterministic localnet native funding
+  - `apps/agent-runtime/xclaw_agent/cli.py`
+    - classifies `could not replace existing tx` under the existing bounded EVM retry contract
+  - `apps/agent-runtime/xclaw_agent/runtime/execution/solana.py`
+    - executes `solana_localnet` trade fills through deterministic local runtime execution (`executionAdapter=local_amm`, `routeKind=local_direct`) instead of Jupiter-only routing
 - Direct tests:
+  - `python3 -m unittest -v apps/agent-runtime/tests/test_trade_path.py apps/agent-runtime/tests/test_wallet_approval_harness.py apps/agent-runtime/tests/test_wallet_approval_chain_matrix.py`
+    - `Ran 211 tests`
+    - `OK`
   - `python3 -m unittest -v apps/agent-runtime/tests/test_wallet_approval_harness.py`
-    - `Ran 41 tests`
+    - `Ran 50 tests`
     - `OK`
   - `python3 -m unittest -v apps/agent-runtime/tests/test_wallet_approval_chain_matrix.py`
-    - `Ran 7 tests`
+    - `Ran 8 tests`
     - `OK`
 - Solana contract rails:
   - `npm run test:management:solana:contract`
@@ -63,47 +79,90 @@ Issue mapping: `#97`
   - `npm run test:x402:solana:contract`
     - `ok: true`
     - `count: 17`
+  - `npm run test:faucet:contract`
+    - `ok: true`
+    - `passed: 7`
+    - `failed: 0`
 - Required repo validation chain:
   - `npm run db:parity`
     - `ok: true`
-    - `checkedAt: 2026-03-09T00:16:55.832Z`
+    - `checkedAt: 2026-03-09T04:16:55.933Z`
   - `npm run seed:reset`
     - `ok: true`
   - `npm run seed:load`
     - `ok: true`
-    - `loadedAt: 2026-03-09T00:17:04.104Z`
+    - `loadedAt: 2026-03-09T04:16:56.204Z`
   - `npm run seed:verify`
     - `ok: true`
   - tracked seed restore:
     - `git show HEAD:infrastructure/seed-data/.seed-state.json > infrastructure/seed-data/.seed-state.json`
   - `npm run hardhat:deploy-local`
     - `ok: true`
-    - `deployedAt: 2026-03-09T00:17:08.988Z`
+    - `deployedAt: 2026-03-09T04:17:10.454Z`
   - `npm run hardhat:verify-local`
     - `ok: true`
-    - `verifiedAt: 2026-03-09T00:17:08.872Z`
+    - `verifiedAt: 2026-03-09T04:17:11.510Z`
   - `npm run build`
     - passed
   - `pm2 restart all`
     - `xclaw-web` restarted
     - status `online`
-- Live matrix evidence:
+- Direct live localnet faucet proof:
+  - networks discovery:
+    - `GET /api/v1/agent/faucet/networks`
+    - `solana_localnet.faucetConfigured=true`
+    - wrapped mint `5gWXFwBiyVRkQNhNmmu9d3UNbseZB8qmibnqCSJTzd5D`
+    - stable mint `6xsmTUcmueaqzYEaEmKZP62hVPspJN7VJVwof6SahW5h`
+  - funding request:
+    - `POST /api/v1/agent/faucet/request`
+    - response `200`
+    - `fulfilledAssets=["native","stable","wrapped"]`
+    - `recipientAddress=9F4znU1PsW5yBK5TAfR9x8C9q3yVGNHUMuaXY35uCEXT`
+    - native tx `3wny497qdgp3yyYHxFZhogFamMBqpBButzh2GNQ7r9A9ErroaU7NH1v8r8fDLpEcv2puARqpMu7tBNtxZmjhyz7a`
+    - stable tx `2XoKN6AKdfRNdV7u15F7gNRcf3fhJQroejTiy6jS1zsJEvmFRuzNqGUm99amMbVK2QHwX2aNXm2c7Ld7e1LMPsgR`
+    - wrapped tx `4QRPG3UySEmMBdL1iPJmNwp91wzimsnZ2r8mRG4dBFkusBB4LWGtgzmp2f2o9YB7uKEpa655JjY2UHy1Ke4RQAoZ`
+  - on-chain proof:
+    - `solana balance 9F4znU1PsW5yBK5TAfR9x8C9q3yVGNHUMuaXY35uCEXT --url http://127.0.0.1:8899`
+    - `1 SOL`
+    - token accounts present for wrapped mint with `amount=1000000000`
+    - token accounts present for stable mint with `amount=1000000`
+- Live matrix / harness evidence:
   - full rerun command:
     - `python3 apps/agent-runtime/scripts/wallet_approval_chain_matrix.py ... --reports-dir /tmp/xclaw-slice244-reports --json-report /tmp/xclaw-slice244-matrix.json`
-  - full rerun note:
-    - refreshed run did not reach `solana_localnet` cleanly in this shell and was not accepted as completion evidence
-  - isolated localnet provisioning command:
-    - `python3 apps/agent-runtime/scripts/wallet_approval_chain_matrix.py ... --reports-dir /tmp/xclaw-slice244-reports --json-report /tmp/xclaw-slice244-solana-only-matrix.json --start-chain solana_localnet`
-  - isolated result:
-    - `/tmp/xclaw-slice244-solana-only-matrix.json`
-    - `failedAt=solana_localnet`
-    - concrete blocker `solana_localnet_validator_missing`
-    - details include expected commands `solana-test-validator`, `agave-test-validator`
-  - current environment fact:
-    - `command -v solana-test-validator` -> no result
-    - `command -v agave-test-validator` -> no result
-    - `curl http://127.0.0.1:8899 ... getHealth` -> connection refused
+  - hardhat-local evidence:
+    - `/tmp/xclaw-slice244-reports/xclaw-slice117-hardhat-smoke.json`
+    - `ok: true`
+  - Base Sepolia evidence:
+    - `/tmp/xclaw-slice244-reports/xclaw-slice117-base-full.json`
+    - `ok: true`
+  - refreshed targeted Ethereum evidence:
+    - `/tmp/xclaw-slice244-reports/xclaw-slice117-ethereum-sepolia-full.json`
+    - `ok: true`
+    - `trade_pending_approve: passed`
+    - `global_and_allowlist: passed`
+  - Solana localnet evidence:
+    - `/tmp/xclaw-slice244-reports/xclaw-slice243-solana-localnet-full.json`
+    - `ok: true`
+    - `trade_pending_approve: passed`
+    - `trade_reject: passed`
+    - `trade_dedupe: passed` with truthful unsupported detail:
+      - `dedupeSupported: false`
+      - `reason: solana_pending_trade_reuse_unsupported`
+    - `x402_or_capability_assertion: passed` with truthful unsupported detail:
+      - `assertedUnsupportedCode: x402_facilitator_unconfigured`
+  - aggregate evidence:
+    - `/tmp/xclaw-slice244-matrix.json`
+      - confirms ordered green evidence through `ethereum_sepolia`
+    - `/tmp/xclaw-slice244-solana-resume.json`
+      - `failedAt: solana_devnet`
+      - `generatedAt: 2026-03-09T04:14:51Z`
+      - concrete later blocker:
+        - `code: wallet_passphrase_mismatch`
+        - `message: wallet health preflight failed`
+        - `chain: solana_devnet`
 
-### Current Blocker
-- Slice 244 cannot advance `solana_localnet` in this shell because no local Solana validator binary is installed and no RPC is listening on `127.0.0.1:8899`.
-- The code now fails with the correct deterministic provisioning blocker instead of generic downstream `rpc_unavailable`.
+### Slice Outcome
+- Slice 244 is complete.
+- `hardhat_local`, `base_sepolia`, `ethereum_sepolia`, and `solana_localnet` are green.
+- The matrix advanced to `solana_devnet`.
+- The current later blocker is `solana_devnet` wallet preflight failure with deterministic `wallet_passphrase_mismatch`, which is recorded for the next slice instead of blocking Slice 244 closeout.

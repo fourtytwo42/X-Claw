@@ -17,21 +17,22 @@ Status legend:
 
 ---
 
-## Slice 244: Solana Localnet Self-Provision + Devnet Matrix Completion
-Status: [!]
+## Slice 244: Solana Localnet Faucet Funding + Ethereum Sepolia Retry Stabilization
+Status: [x]
 
 Goal:
-- remove the current `solana_localnet` live-matrix blocker by self-provisioning localnet bootstrap prerequisites inside the chain matrix, then advance the canonical sequence into `solana_devnet` without changing public runtime contracts.
+- clear the remaining live-evidence blockers by proving `solana_localnet` faucet funding lands on-chain with bootstrap-generated assets, then stabilize the later `ethereum_sepolia` retry path so the canonical sequence can continue into `solana_devnet` without changing public runtime contracts.
 
 DoD:
 - [x] chain matrix self-provisions `solana_localnet` using the canonical bootstrap path and fails with a concrete provisioning error when local validator/bootstrap prerequisites are absent.
 - [x] Solana harness localnet preflight reports bootstrap-backed readiness truthfully and never reports synthetic success.
-- [ ] `hardhat_local`, `base_sepolia`, and `ethereum_sepolia` remain green while the matrix advances through `solana_localnet` and into `solana_devnet`, or records a later concrete blocker.
-- [ ] full sequential validation + issue evidence posted.
+- [x] `hardhat_local`, `base_sepolia`, and `ethereum_sepolia` remain green while the matrix advances through `solana_localnet` and into `solana_devnet`, or records a later concrete blocker.
+- [x] full sequential validation + issue evidence posted.
 
-Current blocker:
-- the current shell has no reachable `solana_localnet` RPC and no installed local validator binary (`solana-test-validator` / `agave-test-validator`), so the new provisioning path now fails deterministically with `solana_localnet_validator_missing`.
-- the isolated `--start-chain solana_localnet` matrix run proves the new blocker; full localnet advancement remains impossible in this environment until a validator binary is installed.
+Closeout note:
+- direct `solana_localnet` faucet funding is proven live for the registered agent wallet using bootstrap-generated stable/wrapped mints.
+- the original `ethereum_sepolia` retry-path blocker is resolved and `global_and_allowlist` now passes in live evidence.
+- the ordered matrix now reaches `solana_devnet`; the later concrete blocker is deterministic `wallet_passphrase_mismatch` during Solana devnet wallet preflight and is recorded in `acceptance.md` for follow-up work.
 
 Issue mapping:
 - `#97`

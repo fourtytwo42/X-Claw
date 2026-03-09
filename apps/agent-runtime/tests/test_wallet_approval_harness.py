@@ -139,6 +139,26 @@ class WalletApprovalHarnessUnitTests(unittest.TestCase):
                 runner._probe_solana_localnet_bootstrap()
         self.assertTrue(bool(runner.preflight["solanaLocalnetBootstrap"]["ok"]))
 
+    def test_solana_localnet_canonical_token_resolution_prefers_bootstrap_env(self) -> None:
+        args = self._args()
+        args.chain = "solana_localnet"
+        runner = harness.WalletApprovalHarness(args)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            env_path = pathlib.Path(tmpdir) / "solana-localnet-faucet.env"
+            env_path.write_text(
+                "\n".join(
+                    [
+                        "XCLAW_SOLANA_FAUCET_SIGNER_SECRET_SOLANA_LOCALNET=secret",
+                        "XCLAW_SOLANA_FAUCET_WRAPPED_MINT_SOLANA_LOCALNET=BDPkyPPmKVtQw1Xg7WF3yrUz5SLXu2u7pp3wAyfusPA6",
+                        "XCLAW_SOLANA_FAUCET_STABLE_MINT_SOLANA_LOCALNET=BZvD2GmhsV3iDsRdiSECWcZX3JpVAKTE4rrFAqnuTCw3",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            with mock.patch.dict(os.environ, {"XCLAW_SOLANA_LOCALNET_BOOTSTRAP_ENV_FILE": str(env_path)}, clear=False):
+                self.assertEqual(runner._canonical_token_address("USDC"), "BZvD2GmhsV3iDsRdiSECWcZX3JpVAKTE4rrFAqnuTCw3")
+                self.assertEqual(runner._canonical_token_address("WETH"), "BDPkyPPmKVtQw1Xg7WF3yrUz5SLXu2u7pp3wAyfusPA6")
+
     def test_solana_localnet_bootstrap_preflight_fails_when_env_missing(self) -> None:
         args = self._args()
         args.chain = "solana_localnet"
@@ -415,6 +435,71 @@ class WalletApprovalHarnessUnitTests(unittest.TestCase):
                 runner._bootstrap_ethereum_sepolia_funding()
         self.assertEqual(ctx.exception.code, "scenario_funding_missing")
 
+    def test_prepare_trade_pair_prefers_weth_route_on_ethereum_sepolia_when_both_balances_present(self) -> None:
+        args = self._args()
+        args.chain = "ethereum_sepolia"
+        runner = harness.WalletApprovalHarness(args)
+        with mock.patch.object(
+            runner,
+            "_balance_snapshot",
+            return_value={"NATIVE": Decimal("1"), "USDC": Decimal("528.730904"), "WETH": Decimal("0.080263155302424032")},
+        ):
+            runner._prepare_trade_pair_and_amounts()
+        self.assertEqual(runner.trade_token_in, "WETH")
+        self.assertEqual(runner.trade_token_out, "USDC")
+        self.assertEqual(runner.trade_amounts["global_auto"], "0.00005")
+
+    def test_global_and_allowlist_uses_bootstrap_weth_route_on_ethereum_sepolia(self) -> None:
+        args = self._args()
+        args.chain = "ethereum_sepolia"
+        runner = harness.WalletApprovalHarness(args)
+        runner.trade_token_in = "WETH"
+        runner.trade_token_out = "USDC"
+        runner.trade_amounts = {
+            "global_auto": "0.00005",
+            "allowlist": "0.00005",
+        }
+        with mock.patch.object(runner, "_post_permissions_update"), mock.patch.object(
+            runner,
+            "_runtime",
+            side_effect=[
+                (0, {"ok": True, "status": "filled"}, "", ""),
+                (1, {"ok": False, "code": "approval_required", "tradeId": "trd_1"}, "", ""),
+                (0, {"ok": True}, "", ""),
+            ],
+        ) as runtime_mock, mock.patch.object(
+            runner,
+            "_management_post_with_retry",
+            side_effect=[
+                {"ok": True, "allowlistedToken": "0x1c7d4b196cb0c7b01d743fbc6116a902379c7238"},
+            ],
+        ), mock.patch.object(
+            runner,
+            "_management_state",
+            return_value={"latestPolicy": {"allowed_tokens": ["0x1c7d4b196cb0c7b01d743fbc6116a902379c7238"]}},
+        ):
+            out = runner._scenario_global_and_allowlist()
+        first_cmd = runtime_mock.call_args_list[0].args[0]
+        second_cmd = runtime_mock.call_args_list[1].args[0]
+        self.assertEqual(first_cmd[first_cmd.index("--token-in") + 1], "WETH")
+        self.assertEqual(first_cmd[first_cmd.index("--token-out") + 1], "USDC")
+        self.assertEqual(second_cmd[second_cmd.index("--token-in") + 1], "WETH")
+        self.assertEqual(second_cmd[second_cmd.index("--token-out") + 1], "USDC")
+        self.assertEqual(out.get("allowlistedToken"), "0x1c7d4b196cb0c7b01d743fbc6116a902379c7238")
+
+    def test_trade_args_convert_solana_localnet_human_amount_to_atomic_units(self) -> None:
+        args = self._args()
+        args.chain = "solana_localnet"
+        runner = harness.WalletApprovalHarness(args)
+        runner.trade_token_in = "SOL"
+        runner.trade_token_out = "SomeStableMint"
+        runner._solana_localnet_bootstrap_env_cache = {
+            "XCLAW_SOLANA_FAUCET_STABLE_MINT_SOLANA_LOCALNET": "SomeStableMint",
+            "XCLAW_SOLANA_FAUCET_WRAPPED_MINT_SOLANA_LOCALNET": "SomeWrappedMint",
+        }
+        out = runner._trade_args("0.001")
+        self.assertEqual(out[out.index("--amount-in") + 1], "1000000")
+
     def test_x402_asserts_unsupported_on_ethereum_sepolia(self) -> None:
         args = self._args()
         args.chain = "ethereum_sepolia"
@@ -422,6 +507,81 @@ class WalletApprovalHarnessUnitTests(unittest.TestCase):
         with mock.patch.object(runner, "_runtime", return_value=(1, {"ok": False, "code": "unsupported_chain_capability"}, "", "")):
             out = runner._scenario_x402_or_capability_assertion()
         self.assertEqual(out.get("assertedUnsupportedCode"), "unsupported_chain_capability")
+
+    def test_x402_treats_unconfigured_facilitator_as_truthful_unsupported_on_solana_localnet(self) -> None:
+        args = self._args()
+        args.chain = "solana_localnet"
+        runner = harness.WalletApprovalHarness(args)
+        with mock.patch.object(
+            runner,
+            "_runtime",
+            return_value=(
+                1,
+                {
+                    "ok": False,
+                    "code": "x402_runtime_error",
+                    "message": "Facilitator 'cdp' is not configured for network 'solana_localnet'.",
+                },
+                "",
+                "",
+            ),
+        ):
+            out = runner._scenario_x402_or_capability_assertion()
+        self.assertEqual(out.get("assertedUnsupportedCode"), "x402_facilitator_unconfigured")
+        self.assertEqual(out.get("network"), "solana_localnet")
+
+    def test_x402_treats_unconfigured_pay_facilitator_as_truthful_unsupported_on_solana_localnet(self) -> None:
+        args = self._args()
+        args.chain = "solana_localnet"
+        runner = harness.WalletApprovalHarness(args)
+        with mock.patch.object(
+            runner,
+            "_runtime",
+            side_effect=[
+                (0, {"ok": True, "paymentUrl": "https://example.test/pay"}, "", ""),
+                (
+                    1,
+                    {
+                        "ok": False,
+                        "code": "x402_runtime_error",
+                        "message": "Facilitator 'cdp' is not configured for network 'solana_localnet'.",
+                    },
+                    "",
+                    "",
+                ),
+            ],
+        ):
+            out = runner._scenario_x402_or_capability_assertion()
+        self.assertEqual(out.get("assertedUnsupportedCode"), "x402_facilitator_unconfigured")
+        self.assertEqual(out.get("network"), "solana_localnet")
+
+    def test_trade_dedupe_returns_truthful_unsupported_on_solana_when_ids_diverge(self) -> None:
+        args = self._args()
+        args.chain = "solana_localnet"
+        runner = harness.WalletApprovalHarness(args)
+        runner.trade_token_in = "So11111111111111111111111111111111111111112"
+        runner.trade_token_out = "683EFdYHRacRvbvmuUfRUMoGzkRqDAMkG9FW91FxMB4S"
+        runner.trade_amounts = {"dedupe": "1000000"}
+        with mock.patch.object(runner, "_post_permissions_update"), mock.patch.object(
+            runner,
+            "_runtime",
+            side_effect=[
+                (1, {"ok": False, "code": "approval_required", "tradeId": "trd_1"}, "", ""),
+                (1, {"ok": False, "code": "approval_required", "tradeId": "trd_2"}, "", ""),
+            ],
+        ), mock.patch.object(
+            runner,
+            "_management_post_with_retry",
+            return_value={"ok": True},
+        ) as decision_mock, mock.patch.object(
+            runner,
+            "_wait_for_trade_status",
+            return_value={"status": "rejected"},
+        ):
+            out = runner._scenario_trade_dedupe()
+        self.assertFalse(out.get("dedupeSupported"))
+        self.assertEqual(out.get("reason"), "solana_pending_trade_reuse_unsupported")
+        self.assertEqual(decision_mock.call_count, 2)
 
     def test_wait_for_transfer_approval_actionable_polls_management_queue(self) -> None:
         runner = harness.WalletApprovalHarness(self._args())
@@ -482,6 +642,10 @@ class WalletApprovalHarnessUnitTests(unittest.TestCase):
         args = self._args()
         args.chain = "solana_localnet"
         runner = harness.WalletApprovalHarness(args)
+        runner._solana_localnet_bootstrap_env_cache = {
+            "XCLAW_SOLANA_FAUCET_WRAPPED_MINT_SOLANA_LOCALNET": "BDPkyPPmKVtQw1Xg7WF3yrUz5SLXu2u7pp3wAyfusPA6",
+            "XCLAW_SOLANA_FAUCET_STABLE_MINT_SOLANA_LOCALNET": "BZvD2GmhsV3iDsRdiSECWcZX3JpVAKTE4rrFAqnuTCw3",
+        }
         with mock.patch.object(
             runner,
             "_runtime",
@@ -489,11 +653,57 @@ class WalletApprovalHarnessUnitTests(unittest.TestCase):
         ) as runtime_mock, mock.patch.object(
             runner,
             "_balance_snapshot",
-            side_effect=[{"NATIVE": Decimal("0")}, {"NATIVE": Decimal("1000")}],
+            side_effect=[
+                {"NATIVE": Decimal("0")},
+                {"NATIVE": Decimal("0"), "bzvd2gmhsv3idsrdisecwczx3jpvakte4rrfaqnutcw3": Decimal("1000")},
+            ],
         ):
             runner._attempt_faucet_topup(require_native_topup=True)
         faucet_cmd = runtime_mock.call_args_list[0].args[0]
-        self.assertEqual(faucet_cmd, ["faucet-request", "--chain", "solana_localnet", "--asset", "native"])
+        self.assertEqual(
+            faucet_cmd,
+            ["faucet-request", "--chain", "solana_localnet", "--asset", "native", "--asset", "stable", "--asset", "wrapped"],
+        )
+
+    def test_prepare_trade_pair_uses_localnet_bootstrap_stable_balance(self) -> None:
+        args = self._args()
+        args.chain = "solana_localnet"
+        runner = harness.WalletApprovalHarness(args)
+        runner._solana_localnet_bootstrap_env_cache = {
+            "XCLAW_SOLANA_FAUCET_STABLE_MINT_SOLANA_LOCALNET": "BZvD2GmhsV3iDsRdiSECWcZX3JpVAKTE4rrFAqnuTCw3",
+            "XCLAW_SOLANA_FAUCET_WRAPPED_MINT_SOLANA_LOCALNET": "BDPkyPPmKVtQw1Xg7WF3yrUz5SLXu2u7pp3wAyfusPA6",
+        }
+        with mock.patch.object(
+            runner,
+            "_balance_snapshot",
+            return_value={
+                "NATIVE": Decimal("0"),
+                "bzvd2gmhsv3idsrdisecwczx3jpvakte4rrfaqnutcw3": Decimal("25"),
+            },
+        ):
+            runner._prepare_trade_pair_and_amounts()
+        self.assertEqual(runner.trade_token_in, "BZvD2GmhsV3iDsRdiSECWcZX3JpVAKTE4rrFAqnuTCw3")
+        self.assertEqual(runner.trade_token_out, "SOL")
+
+    def test_prepare_trade_pair_reports_localnet_bootstrap_funding_details(self) -> None:
+        args = self._args()
+        args.chain = "solana_localnet"
+        runner = harness.WalletApprovalHarness(args)
+        runner._solana_localnet_bootstrap_env_cache = {
+            "XCLAW_SOLANA_FAUCET_STABLE_MINT_SOLANA_LOCALNET": "BZvD2GmhsV3iDsRdiSECWcZX3JpVAKTE4rrFAqnuTCw3",
+            "XCLAW_SOLANA_FAUCET_WRAPPED_MINT_SOLANA_LOCALNET": "BDPkyPPmKVtQw1Xg7WF3yrUz5SLXu2u7pp3wAyfusPA6",
+        }
+        with mock.patch.object(runner, "_balance_snapshot", return_value={"NATIVE": Decimal("0")}), mock.patch.object(
+            runner, "_wallet_address", return_value="9F4znU1PsW5yBK5TAfR9x8C9q3yVGNHUMuaXY35uCEXT"
+        ), mock.patch.object(
+            runner, "_attempt_faucet_topup", return_value=None
+        ):
+            with self.assertRaises(harness.HarnessError) as ctx:
+                runner._prepare_trade_pair_and_amounts()
+        self.assertEqual(ctx.exception.code, "scenario_funding_missing")
+        self.assertEqual(ctx.exception.details.get("walletAddress"), "9F4znU1PsW5yBK5TAfR9x8C9q3yVGNHUMuaXY35uCEXT")
+        self.assertEqual(ctx.exception.details.get("stableMint"), "BZvD2GmhsV3iDsRdiSECWcZX3JpVAKTE4rrFAqnuTCw3")
+        self.assertEqual(ctx.exception.details.get("wrappedMint"), "BDPkyPPmKVtQw1Xg7WF3yrUz5SLXu2u7pp3wAyfusPA6")
 
     def test_solana_liquidity_reports_truthful_unsupported_reason(self) -> None:
         args = self._args()

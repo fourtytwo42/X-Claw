@@ -284,6 +284,7 @@ class WalletApprovalHarness:
         self.initial_state: dict[str, Any] = {}
         self._chain_config_cache: dict[str, Any] | None = None
         self._skill_env_cache: dict[str, str] | None = None
+        self._solana_localnet_bootstrap_env_cache: dict[str, str] | None = None
 
     def _record(self, name: str, ok: bool, message: str, details: dict[str, Any] | None = None) -> None:
         payload = details or {}
@@ -430,7 +431,7 @@ class WalletApprovalHarness:
             self.preflight["solanaLocalnetBootstrap"] = {"ok": True, "skipped": True}
             return
         env_path = pathlib.Path(str(os.environ.get("XCLAW_SOLANA_LOCALNET_BOOTSTRAP_ENV_FILE") or SOLANA_LOCALNET_BOOTSTRAP_ENV_FILE))
-        env_values = _read_env_file(env_path)
+        env_values = self._solana_localnet_bootstrap_env()
         signer_secret = str(env_values.get("XCLAW_SOLANA_FAUCET_SIGNER_SECRET_SOLANA_LOCALNET") or "").strip()
         wrapped_mint = str(env_values.get("XCLAW_SOLANA_FAUCET_WRAPPED_MINT_SOLANA_LOCALNET") or "").strip()
         stable_mint = str(env_values.get("XCLAW_SOLANA_FAUCET_STABLE_MINT_SOLANA_LOCALNET") or "").strip()
@@ -450,6 +451,25 @@ class WalletApprovalHarness:
             category="preflight_failure",
             details=payload,
         )
+
+    def _solana_localnet_bootstrap_env(self) -> dict[str, str]:
+        if self._solana_localnet_bootstrap_env_cache is not None:
+            return self._solana_localnet_bootstrap_env_cache
+        env_path = pathlib.Path(str(os.environ.get("XCLAW_SOLANA_LOCALNET_BOOTSTRAP_ENV_FILE") or SOLANA_LOCALNET_BOOTSTRAP_ENV_FILE))
+        env_values = _read_env_file(env_path)
+        env_values["XCLAW_SOLANA_LOCALNET_BOOTSTRAP_ENV_FILE"] = str(env_path)
+        self._solana_localnet_bootstrap_env_cache = env_values
+        return env_values
+
+    def _solana_localnet_bootstrap_mint(self, kind: str) -> str:
+        env_values = self._solana_localnet_bootstrap_env()
+        key = {
+            "stable": "XCLAW_SOLANA_FAUCET_STABLE_MINT_SOLANA_LOCALNET",
+            "wrapped": "XCLAW_SOLANA_FAUCET_WRAPPED_MINT_SOLANA_LOCALNET",
+        }.get(kind)
+        if not key:
+            return ""
+        return str(env_values.get(key) or "").strip()
 
     def _assert_hardhat_evidence_gate(self) -> None:
         if str(self.chain).strip().lower() == "hardhat_local":
@@ -1016,7 +1036,13 @@ class WalletApprovalHarness:
                 details={"chain": self.chain, "field": "canonicalTokens"},
             )
         raw = str(tokens.get(symbol) or "").strip()
-        if not raw and symbol == "USDC" and str(self.chain).strip().lower() in {"solana_localnet", "solana_devnet"}:
+        chain_normalized = str(self.chain).strip().lower()
+        if not raw and chain_normalized == "solana_localnet":
+            if symbol == "USDC":
+                raw = self._solana_localnet_bootstrap_mint("stable")
+            elif symbol in {"WETH", "WSOL"}:
+                raw = self._solana_localnet_bootstrap_mint("wrapped")
+        if not raw and symbol == "USDC" and chain_normalized in {"solana_localnet", "solana_devnet"}:
             raw = SOLANA_USDC_MINT
         if not raw:
             raise HarnessError(
@@ -1028,6 +1054,20 @@ class WalletApprovalHarness:
         return raw
 
     def _trade_args(self, amount_in: str) -> list[str]:
+        amount_value = str(amount_in).strip()
+        chain_normalized = str(self.chain).strip().lower()
+        if chain_normalized.startswith("solana_"):
+            token_in = str(self.trade_token_in or "").strip()
+            stable_mint = self._solana_localnet_bootstrap_mint("stable") if chain_normalized == "solana_localnet" else ""
+            wrapped_mint = self._solana_localnet_bootstrap_mint("wrapped") if chain_normalized == "solana_localnet" else ""
+            decimals = 9
+            if token_in.upper() == "SOL":
+                decimals = 9
+            elif token_in.lower() in {SOLANA_USDC_MINT.lower(), stable_mint.lower(), "usdc"}:
+                decimals = 6
+            elif token_in.lower() in {wrapped_mint.lower(), "weth"}:
+                decimals = 9
+            amount_value = str(int((_safe_num(amount_value) * (Decimal(10) ** decimals)).to_integral_value()))
         return [
             "trade",
             "spot",
@@ -1038,7 +1078,7 @@ class WalletApprovalHarness:
             "--token-out",
             self.trade_token_out,
             "--amount-in",
-            amount_in,
+            amount_value,
             "--slippage-bps",
             "100",
         ]
@@ -1075,8 +1115,14 @@ class WalletApprovalHarness:
         if require_native_topup:
             baseline_native = self._balance_snapshot().get("NATIVE", Decimal("0"))
         assets = ["native"]
+        wrapped_key = ""
+        stable_key = ""
         if chain_normalized == "base_sepolia":
             assets = ["stable", "wrapped", "native"]
+        elif chain_normalized == "solana_localnet":
+            assets = ["native", "stable", "wrapped"]
+            stable_key = self._solana_localnet_bootstrap_mint("stable").lower()
+            wrapped_key = self._solana_localnet_bootstrap_mint("wrapped").lower()
         faucet_args = ["faucet-request", "--chain", self.chain]
         for asset in assets:
             faucet_args.extend(["--asset", asset])
@@ -1085,6 +1131,13 @@ class WalletApprovalHarness:
             bal = self._balance_snapshot()
             if require_native_topup and bal.get("NATIVE", Decimal("0")) > baseline_native:
                 return
+            if chain_normalized == "solana_localnet":
+                if bal.get("NATIVE", Decimal("0")) > baseline_native:
+                    return
+                if stable_key and bal.get(stable_key, Decimal("0")) > 0:
+                    return
+                if wrapped_key and bal.get(wrapped_key, Decimal("0")) > 0:
+                    return
             if bal.get("USDC", Decimal("0")) > 0 or bal.get("WETH", Decimal("0")) > 0:
                 return
             if chain_normalized.startswith("solana_") and bal.get("NATIVE", Decimal("0")) > baseline_native:
@@ -1252,12 +1305,15 @@ class WalletApprovalHarness:
             bal = self._balance_snapshot()
             native = bal.get("NATIVE", Decimal("0"))
             stable_mint = self._canonical_token_address("USDC")
+            wrapped_mint = self._solana_localnet_bootstrap_mint("wrapped") if chain_normalized == "solana_localnet" else ""
             stable = bal.get(stable_mint.lower(), Decimal("0")) or bal.get("USDC", Decimal("0"))
+            wrapped = bal.get(wrapped_mint.lower(), Decimal("0")) if wrapped_mint else Decimal("0")
             if native <= 0 and self._has_chain_capability("faucet"):
                 self._attempt_faucet_topup(require_native_topup=True)
                 bal = self._balance_snapshot()
                 native = bal.get("NATIVE", Decimal("0"))
                 stable = bal.get(stable_mint.lower(), Decimal("0")) or bal.get("USDC", Decimal("0"))
+                wrapped = bal.get(wrapped_mint.lower(), Decimal("0")) if wrapped_mint else Decimal("0")
             if native > 0:
                 self.trade_token_in = "SOL"
                 self.trade_token_out = stable_mint
@@ -1286,7 +1342,15 @@ class WalletApprovalHarness:
                 "No usable Solana trade funding detected for configured trade pair.",
                 code="scenario_funding_missing",
                 category="preflight_failure",
-                details={"chain": self.chain, "nativeAtomic": str(native), "stableAtomic": str(stable), "stableMint": stable_mint},
+                details={
+                    "chain": self.chain,
+                    "walletAddress": self._wallet_address(),
+                    "nativeAtomic": str(native),
+                    "stableAtomic": str(stable),
+                    "wrappedAtomic": str(wrapped),
+                    "stableMint": stable_mint,
+                    "wrappedMint": wrapped_mint,
+                },
             )
         bal = self._balance_snapshot()
         usdc = bal.get("USDC", Decimal("0"))
@@ -1299,6 +1363,18 @@ class WalletApprovalHarness:
             usdc = bal.get("USDC", Decimal("0"))
             weth = bal.get("WETH", Decimal("0"))
 
+        if chain_normalized == "ethereum_sepolia" and weth > 0:
+            self.trade_token_in = "WETH"
+            self.trade_token_out = "USDC"
+            self.trade_amounts = {
+                "pending_approve": "0.00005",
+                "reject": "0.00003",
+                "dedupe": "0.00002",
+                "global_auto": "0.00005",
+                "allowlist": "0.00005",
+                "rebalance": "0.00001",
+            }
+            return
         if usdc > 0:
             self.trade_token_in = "USDC"
             self.trade_token_out = "WETH"
@@ -1419,6 +1495,25 @@ class WalletApprovalHarness:
         if not t1 or not t2:
             raise HarnessError(f"dedupe trade ids missing: t1={t1} t2={t2}")
         if t1 != t2:
+            if str(self.chain).strip().lower().startswith("solana_"):
+                _ = self._management_post_with_retry(
+                    "/management/approvals/decision",
+                    {"agentId": self.agent_id, "tradeId": t1, "decision": "reject", "reasonMessage": "solana dedupe cleanup 1"},
+                    label="trade_decision_dedupe_reject_sol_1",
+                )
+                _ = self._management_post_with_retry(
+                    "/management/approvals/decision",
+                    {"agentId": self.agent_id, "tradeId": t2, "decision": "reject", "reasonMessage": "solana dedupe cleanup 2"},
+                    label="trade_decision_dedupe_reject_sol_2",
+                )
+                _ = self._wait_for_trade_status(t1, {"rejected"}, timeout_sec=180)
+                _ = self._wait_for_trade_status(t2, {"rejected"}, timeout_sec=180)
+                return {
+                    "dedupeSupported": False,
+                    "reason": "solana_pending_trade_reuse_unsupported",
+                    "firstTradeId": t1,
+                    "secondTradeId": t2,
+                }
             raise HarnessError(f"dedupe expected same pending trade id, got {t1} vs {t2}")
         self.created_trade_ids.append(t1)
 
@@ -1605,6 +1700,13 @@ class WalletApprovalHarness:
                 "slice96 harness loopback",
             ]
         )
+        if (
+            str(self.chain).strip().lower() == "solana_localnet"
+            and c_recv != 0
+            and str(p_recv.get("code") or "") == "x402_runtime_error"
+            and "not configured" in str(p_recv.get("message") or "").lower()
+        ):
+            return {"assertedUnsupportedCode": "x402_facilitator_unconfigured", "network": self.chain}
         if c_recv != 0 or not bool(p_recv.get("ok")):
             raise HarnessError(f"x402 receive request failed: {p_recv} stderr={e_recv}")
         payment_url = str(p_recv.get("paymentUrl") or "").strip()
@@ -1625,6 +1727,13 @@ class WalletApprovalHarness:
                 "1",
             ]
         )
+        if (
+            str(self.chain).strip().lower().startswith("solana_")
+            and code_pay != 0
+            and str(pay_payload.get("code") or "") == "x402_runtime_error"
+            and "not configured" in str(pay_payload.get("message") or "").lower()
+        ):
+            return {"assertedUnsupportedCode": "x402_facilitator_unconfigured", "network": self.chain}
         if code_pay != 0 and str(pay_payload.get("code") or "") not in {"approval_required", "approval_pending"}:
             raise HarnessError(f"x402 pay proposal failed: {pay_payload} stderr={pay_err}")
         approval = pay_payload.get("approval") if isinstance(pay_payload.get("approval"), dict) else {}

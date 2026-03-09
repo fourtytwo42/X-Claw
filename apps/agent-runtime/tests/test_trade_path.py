@@ -83,6 +83,44 @@ class TradePathRuntimeTests(unittest.TestCase):
         self.assertIn(str(50 * (10**9)), send_cmds[1])
         sleep_mock.assert_called_once_with(0.25)
 
+    def test_cast_send_retries_could_not_replace_existing_tx_then_succeeds(self) -> None:
+        tx_obj = {
+            "from": "0x1111111111111111111111111111111111111111",
+            "to": "0x2222222222222222222222222222222222222222",
+            "data": "0xdeadbeef",
+        }
+        commands: list[list[str]] = []
+
+        def fake_run(cmd: list[str], text: bool = True, capture_output: bool = True, **kwargs):  # type: ignore[override]
+            commands.append(cmd)
+            if cmd[1] == "nonce":
+                return mock.Mock(returncode=0, stdout="0x1", stderr="")
+            if cmd[1] == "send":
+                send_index = len([entry for entry in commands if len(entry) > 1 and entry[1] == "send"])
+                if send_index == 1:
+                    return mock.Mock(returncode=1, stdout="", stderr="error code -32000: INTERNAL_ERROR: could not replace existing tx")
+                return mock.Mock(returncode=0, stdout='{"transactionHash":"0x' + "cd" * 32 + '"}', stderr="")
+            raise AssertionError(f"Unexpected command {cmd}")
+
+        with mock.patch.dict(
+            cli.os.environ,
+            {"XCLAW_TX_FEE_MODE": "legacy", "XCLAW_BUILDER_CODE_BASE_SEPOLIA": "builder-test"},
+            clear=False,
+        ), mock.patch.object(
+            cli, "_require_cast_bin", return_value="cast"
+        ), mock.patch.object(
+            cli.subprocess, "run", side_effect=fake_run
+        ), mock.patch.object(cli.time, "sleep") as sleep_mock:
+            tx_hash = cli._cast_rpc_send_transaction("https://rpc.example", tx_obj, "0x" + "22" * 32)
+
+        self.assertEqual(tx_hash, "0x" + "cd" * 32)
+        send_cmds = [entry for entry in commands if len(entry) > 1 and entry[1] == "send"]
+        self.assertEqual(len(send_cmds), 2)
+        self.assertNotIn("--nonce", send_cmds[0])
+        self.assertIn("--nonce", send_cmds[1])
+        self.assertIn("1", send_cmds[1])
+        sleep_mock.assert_called_once_with(0.25)
+
     def test_chain_rpc_url_prefers_primary_when_healthy(self) -> None:
         with mock.patch.object(
             cli,
@@ -1022,6 +1060,32 @@ class TradePathRuntimeTests(unittest.TestCase):
 
         self.assertIn("not compatible with Solana execution", str(ctx.exception))
         execute_mock.assert_not_called()
+
+    def test_execute_solana_trade_uses_local_amm_path_on_solana_localnet(self) -> None:
+        with mock.patch.object(cli, "_solana_mint_decimals", side_effect=[9, 6]), mock.patch.object(
+            cli, "load_wallet_store", return_value={}
+        ), mock.patch.object(
+            cli, "_execution_wallet_secret", return_value=("9F4znU1PsW5yBK5TAfR9x8C9q3yVGNHUMuaXY35uCEXT", b"secret", "solana_ed25519")
+        ), mock.patch.object(
+            cli, "_post_trade_status"
+        ) as post_status_mock, mock.patch.object(
+            cli, "solana_jupiter_quote"
+        ) as quote_mock:
+            payload = cli._execute_solana_trade(
+                chain="solana_localnet",
+                trade_id="trd_sol_local_1",
+                token_in="So11111111111111111111111111111111111111112",
+                token_out="683EFdYHRacRvbvmuUfRUMoGzkRqDAMkG9FW91FxMB4S",
+                amount_in_units="1000000",
+                slippage_bps=100,
+                from_status="approved",
+            )
+
+        self.assertEqual(payload.get("executionAdapter"), "local_amm")
+        self.assertEqual(payload.get("routeKind"), "local_direct")
+        self.assertTrue(str(payload.get("signature") or ""))
+        self.assertEqual(post_status_mock.call_count, 3)
+        quote_mock.assert_not_called()
 
     def test_approvals_resume_spot_blocks_when_trade_not_actionable(self) -> None:
         args = argparse.Namespace(trade_id="trd_1", chain="base_sepolia", json=True)

@@ -183,6 +183,43 @@ class WalletApprovalChainMatrixTests(unittest.TestCase):
             self.assertEqual(seen_env.get("XCLAW_SOLANA_LOCALNET_BOOTSTRAP_ENV_FILE"), str(env_file))
             self.assertEqual(seen_env.get("XCLAW_SOLANA_FAUCET_SIGNER_SECRET_SOLANA_LOCALNET"), "abc")
 
+    def test_localnet_provisioning_records_resolved_mints(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            pathlib.Path(tmpdir, "bootstrap.json").write_text(json.dumps({"token": "t"}), encoding="utf-8")
+            with mock.patch.object(
+                runner_mod,
+                "_ensure_solana_localnet_bootstrap",
+                return_value=(
+                    {
+                        "XCLAW_SOLANA_LOCALNET_BOOTSTRAP_ENV_FILE": "/tmp/faucet.env",
+                        "XCLAW_SOLANA_FAUCET_WRAPPED_MINT_SOLANA_LOCALNET": "BDPkyPPmKVtQw1Xg7WF3yrUz5SLXu2u7pp3wAyfusPA6",
+                        "XCLAW_SOLANA_FAUCET_STABLE_MINT_SOLANA_LOCALNET": "BZvD2GmhsV3iDsRdiSECWcZX3JpVAKTE4rrFAqnuTCw3",
+                    },
+                    {
+                        "ok": True,
+                        "bootstrapEnvFile": "/tmp/faucet.env",
+                        "resolvedWrappedMint": "BDPkyPPmKVtQw1Xg7WF3yrUz5SLXu2u7pp3wAyfusPA6",
+                        "resolvedStableMint": "BZvD2GmhsV3iDsRdiSECWcZX3JpVAKTE4rrFAqnuTCw3",
+                    },
+                ),
+            ):
+                def _fake_run(cmd: list[str], text: bool, capture_output: bool, env: dict[str, str] | None = None):
+                    chain = cmd[cmd.index("--chain") + 1]
+                    report = pathlib.Path(cmd[cmd.index("--json-report") + 1])
+                    report.write_text(json.dumps({"ok": True, "chain": chain}), encoding="utf-8")
+                    return mock.Mock(returncode=0, stdout="", stderr="")
+
+                with mock.patch.object(runner_mod.subprocess, "run", side_effect=_fake_run):
+                    rc = runner_mod.main(self._argv(tmpdir) + ["--start-chain", "solana_localnet"])
+            self.assertEqual(rc, 0)
+            matrix = json.loads(pathlib.Path(tmpdir, "matrix.json").read_text(encoding="utf-8"))
+            local_step = matrix.get("steps", [])[0]
+            self.assertEqual(local_step.get("chain"), "solana_localnet")
+            provision = local_step.get("report", {}).get("preflight", {}).get("solanaLocalnetProvisioning", {})
+            self.assertEqual(provision.get("bootstrapEnvFile"), "/tmp/faucet.env")
+            self.assertEqual(provision.get("resolvedWrappedMint"), "BDPkyPPmKVtQw1Xg7WF3yrUz5SLXu2u7pp3wAyfusPA6")
+            self.assertEqual(provision.get("resolvedStableMint"), "BZvD2GmhsV3iDsRdiSECWcZX3JpVAKTE4rrFAqnuTCw3")
+
 
 if __name__ == "__main__":
     unittest.main()

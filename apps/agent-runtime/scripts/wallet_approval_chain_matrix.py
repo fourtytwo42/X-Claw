@@ -188,6 +188,8 @@ def _ensure_solana_localnet_bootstrap(*, reports_dir: pathlib.Path) -> tuple[dic
     env_values["XCLAW_SOLANA_LOCALNET_BOOTSTRAP_ENV_FILE"] = str(SOLANA_LOCALNET_BOOTSTRAP_ENV_FILE)
     provision["ok"] = True
     provision["validatorManaged"] = bool(validator_proc)
+    provision["resolvedWrappedMint"] = str(env_values.get("XCLAW_SOLANA_FAUCET_WRAPPED_MINT_SOLANA_LOCALNET") or "").strip()
+    provision["resolvedStableMint"] = str(env_values.get("XCLAW_SOLANA_FAUCET_STABLE_MINT_SOLANA_LOCALNET") or "").strip()
     return env_values, provision
 
 
@@ -358,6 +360,15 @@ def main(argv: list[str] | None = None) -> int:
             recipient_address=recipient_address,
             extra_env=extra_env,
         )
+        if chain == "solana_localnet":
+            report_payload = step.get("report")
+            if isinstance(report_payload, dict):
+                preflight = report_payload.get("preflight")
+                if not isinstance(preflight, dict):
+                    preflight = {}
+                    report_payload["preflight"] = preflight
+                preflight["solanaLocalnetProvisioning"] = provision
+                pathlib.Path(report_map[chain]).write_text(json.dumps(report_payload, indent=2), encoding="utf-8")
         steps.append(step)
         if not step.get("ok"):
             consolidated = {

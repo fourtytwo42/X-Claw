@@ -5589,6 +5589,7 @@ def _retryable_send_error(stderr: str) -> bool:
     normalized = stderr.lower()
     retryable_fragments = (
         "replacement transaction underpriced",
+        "could not replace existing tx",
         "nonce too low",
         "already known",
         "temporarily underpriced",

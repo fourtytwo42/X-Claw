@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+import fs from 'node:fs';
+
 const BASE_URL = process.env.XCLAW_E2E_BASE_URL || 'http://127.0.0.1:3000';
 const API_BASE = `${BASE_URL.replace(/\/$/, '')}/api/v1`;
 const DEMO_AGENT_ID = process.env.XCLAW_E2E_DEMO_AGENT_ID || 'ag_slice7';
@@ -85,6 +87,26 @@ async function main() {
   });
   expect(demoResponse.status === 400, 'demo_agent_block_status_400', demoResponse);
   expect(demoResponse.body?.code === 'payload_invalid', 'demo_agent_block_payload_invalid', demoResponse.body);
+
+  const solanaBootstrapScript = await fs.promises.readFile('infrastructure/scripts/solana-localnet-bootstrap.mjs', 'utf8');
+  expect(
+    solanaBootstrapScript.includes('XCLAW_TESTNET_FAUCET_RPC_URL_SOLANA_LOCALNET='),
+    'solana_localnet_bootstrap_writes_scoped_rpc_env'
+  );
+  expect(
+    !solanaBootstrapScript.includes("confirmTransaction(sig, 'confirmed')"),
+    'solana_localnet_bootstrap_avoids_legacy_string_confirm'
+  );
+
+  const solanaFaucetLib = await fs.promises.readFile('apps/network-web/src/lib/solana-faucet.ts', 'utf8');
+  expect(
+    solanaFaucetLib.includes('getLatestBlockhash') && solanaFaucetLib.includes('sendRawTransaction'),
+    'solana_faucet_native_uses_explicit_blockhash_send'
+  );
+  expect(
+    !solanaFaucetLib.includes("confirmTransaction(signature, 'confirmed')"),
+    'solana_faucet_avoids_legacy_string_confirm'
+  );
 
   if (!AGENT_ID || !AGENT_API_KEY) {
     record(true, 'non_demo_tests_skipped_missing_env', {

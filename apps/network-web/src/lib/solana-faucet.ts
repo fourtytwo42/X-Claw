@@ -5,6 +5,7 @@ import {
   Keypair,
   LAMPORTS_PER_SOL,
   PublicKey,
+  SendOptions,
   SystemProgram,
   Transaction,
 } from '@solana/web3.js';
@@ -15,6 +16,8 @@ import {
 } from '@solana/spl-token';
 
 export type SolanaFaucetAsset = 'native' | 'wrapped' | 'stable';
+
+const DEFAULT_CONFIRM_TIMEOUT_MS = 30_000;
 
 export function isLikelySolanaAddress(value: string): boolean {
   const text = String(value || '').trim();
@@ -40,31 +43,68 @@ export function parseSolanaSecret(secret: string): Uint8Array {
   return decoded;
 }
 
+async function confirmSignature(
+  connection: Connection,
+  signature: string,
+  confirmOptions?: SendOptions
+): Promise<void> {
+  const strategy = await connection.getLatestBlockhash(confirmOptions?.preflightCommitment || 'confirmed');
+  const started = Date.now();
+  for (;;) {
+    const status = await connection.getSignatureStatuses([signature], {
+      searchTransactionHistory: true,
+    });
+    const entry = status.value[0];
+    if (entry?.confirmationStatus === 'confirmed' || entry?.confirmationStatus === 'finalized') {
+      return;
+    }
+    if (entry?.err) {
+      throw new Error(`solana_signature_failed:${JSON.stringify(entry.err)}`);
+    }
+    if (Date.now() - started > DEFAULT_CONFIRM_TIMEOUT_MS) {
+      throw new Error('solana_signature_confirmation_timeout');
+    }
+    if (strategy.lastValidBlockHeight > 0) {
+      const currentHeight = await connection.getBlockHeight(confirmOptions?.preflightCommitment || 'confirmed');
+      if (currentHeight > strategy.lastValidBlockHeight) {
+        throw new Error('solana_signature_blockhash_expired');
+      }
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+}
+
 export async function sendNativeSol(
   connection: Connection,
   signer: Keypair,
   recipient: PublicKey,
   lamports: bigint
 ): Promise<string> {
-  const tx = new Transaction().add(
+  const latest = await connection.getLatestBlockhash('confirmed');
+  const tx = new Transaction({
+    feePayer: signer.publicKey,
+    recentBlockhash: latest.blockhash,
+  }).add(
     SystemProgram.transfer({
       fromPubkey: signer.publicKey,
       toPubkey: recipient,
       lamports: Number(lamports),
     })
   );
-  const signature = await connection.sendTransaction(tx, [signer], {
+  tx.sign(signer);
+  const options = {
     skipPreflight: false,
     preflightCommitment: 'confirmed',
     maxRetries: 3,
-  });
-  await connection.confirmTransaction(signature, 'confirmed');
+  } satisfies SendOptions;
+  const signature = await connection.sendRawTransaction(tx.serialize(), options);
+  await confirmSignature(connection, signature, options);
   return signature;
 }
 
 export async function airdropNativeSol(connection: Connection, recipient: PublicKey, lamports: bigint): Promise<string> {
   const signature = await connection.requestAirdrop(recipient, Number(lamports));
-  await connection.confirmTransaction(signature, 'confirmed');
+  await confirmSignature(connection, signature, { preflightCommitment: 'confirmed', maxRetries: 3 });
   return signature;
 }
 
@@ -90,7 +130,6 @@ export async function dripSplToken(
       signer.publicKey,
       amountUnits
     );
-    await connection.confirmTransaction(signature, 'confirmed');
     return signature;
   } catch {
     const faucetAta = await getOrCreateAssociatedTokenAccount(
@@ -107,7 +146,6 @@ export async function dripSplToken(
       signer.publicKey,
       amountUnits
     );
-    await connection.confirmTransaction(signature, 'confirmed');
     return signature;
   }
 }
