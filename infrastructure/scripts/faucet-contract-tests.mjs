@@ -107,6 +107,11 @@ async function main() {
     !solanaFaucetLib.includes("confirmTransaction(signature, 'confirmed')"),
     'solana_faucet_avoids_legacy_string_confirm'
   );
+  const solanaDev = JSON.parse(await fs.promises.readFile('config/chains/solana_devnet.json', 'utf8'));
+  expect(solanaDev?.capabilities?.faucet === true, 'solana_devnet_faucet_enabled');
+  const faucetNetworksRoute = await fs.promises.readFile('apps/network-web/src/app/api/v1/agent/faucet/networks/route.ts', 'utf8');
+  expect(faucetNetworksRoute.includes("XCLAW_SOLANA_FAUCET_STABLE_MINT"), 'faucet_networks_prefers_solana_scoped_stable_mint');
+  expect(faucetNetworksRoute.includes("XCLAW_SOLANA_FAUCET_WRAPPED_MINT"), 'faucet_networks_prefers_solana_scoped_wrapped_mint');
 
   if (!AGENT_ID || !AGENT_API_KEY) {
     record(true, 'non_demo_tests_skipped_missing_env', {

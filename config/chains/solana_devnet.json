@@ -24,7 +24,7 @@
     "liquidity": true,
     "limitOrders": true,
     "x402": true,
-    "faucet": false,
+    "faucet": true,
     "deposits": true
   },
   "marketData": {

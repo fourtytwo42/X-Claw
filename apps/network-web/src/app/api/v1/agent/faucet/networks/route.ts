@@ -96,17 +96,6 @@ export async function GET(req: NextRequest) {
     const wrapped = resolveWrapped(chainKey);
     const stable = resolveStable(chainKey);
     const nativeSymbol = cfg.nativeCurrency?.symbol?.trim() || 'ETH';
-
-    const family = String(cfg.family || 'evm').toLowerCase();
-    const configured =
-      family === 'solana'
-        ? Boolean(
-            (resolveChainScopedEnv('XCLAW_SOLANA_FAUCET_SIGNER_SECRET', chainKey) ||
-              resolveChainScopedEnv('XCLAW_TESTNET_FAUCET_PRIVATE_KEY', chainKey)) &&
-              (resolveChainScopedEnv('XCLAW_TESTNET_FAUCET_RPC_URL', chainKey) || cfg.rpc?.primary)
-          )
-        : Boolean(resolveChainScopedEnv('XCLAW_TESTNET_FAUCET_PRIVATE_KEY', chainKey));
-
     const supportedAssets: FaucetAssetKey[] = ['native'];
     if (wrapped) {
       supportedAssets.push('wrapped');
@@ -114,6 +103,17 @@ export async function GET(req: NextRequest) {
     if (stable) {
       supportedAssets.push('stable');
     }
+
+    const family = String(cfg.family || 'evm').toLowerCase();
+    const hasSolanaSigner = Boolean(
+      resolveChainScopedEnv('XCLAW_SOLANA_FAUCET_SIGNER_SECRET', chainKey) ||
+        resolveChainScopedEnv('XCLAW_TESTNET_FAUCET_PRIVATE_KEY', chainKey)
+    );
+    const hasRpc = Boolean(resolveChainScopedEnv('XCLAW_TESTNET_FAUCET_RPC_URL', chainKey) || cfg.rpc?.primary);
+    const configured =
+      family === 'solana'
+        ? Boolean(hasSolanaSigner && hasRpc && (!supportedAssets.includes('wrapped') || wrapped) && (!supportedAssets.includes('stable') || stable))
+        : Boolean(resolveChainScopedEnv('XCLAW_TESTNET_FAUCET_PRIVATE_KEY', chainKey));
 
     return {
       chainKey,
@@ -127,7 +127,7 @@ export async function GET(req: NextRequest) {
       wrapped,
       stable,
       missingConfig: {
-        privateKey: !configured,
+        privateKey: family === 'solana' ? !(hasSolanaSigner && hasRpc) : !configured,
         wrappedToken: !wrapped,
         stableToken: !stable,
       },

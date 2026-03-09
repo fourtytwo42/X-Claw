@@ -32,6 +32,16 @@ SOLANA_LOCALNET_BOOTSTRAP_ENV_FILE = pathlib.Path(
         pathlib.Path("infrastructure/seed-data/solana-localnet-faucet.env").resolve().as_posix(),
     )
 )
+SOLANA_CHAIN_SCOPED_MINT_ENV = {
+    "solana_localnet": {
+        "stable": "XCLAW_SOLANA_FAUCET_STABLE_MINT_SOLANA_LOCALNET",
+        "wrapped": "XCLAW_SOLANA_FAUCET_WRAPPED_MINT_SOLANA_LOCALNET",
+    },
+    "solana_devnet": {
+        "stable": "XCLAW_SOLANA_FAUCET_STABLE_MINT_SOLANA_DEVNET",
+        "wrapped": "XCLAW_SOLANA_FAUCET_WRAPPED_MINT_SOLANA_DEVNET",
+    },
+}
 
 
 def _now_iso() -> str:
@@ -303,6 +313,67 @@ class WalletApprovalHarness:
         self._skill_env_cache: dict[str, str] | None = None
         self._solana_localnet_bootstrap_env_cache: dict[str, str] | None = None
 
+    def _solana_devnet_custom_mint_trade_details(self) -> dict[str, Any]:
+        return {
+            "chain": self.chain,
+            "walletAddress": self._wallet_address(),
+            "stableMint": self._solana_chain_mint("stable"),
+            "wrappedMint": self._solana_chain_mint("wrapped"),
+            "tokenIn": self.trade_token_in,
+            "tokenOut": self.trade_token_out,
+        }
+
+    def _raise_if_solana_devnet_custom_mint_trade_preflight_unsupported(self, *, phase: str) -> None:
+        if str(self.chain).strip().lower() != "solana_devnet":
+            return
+        stable_mint = str(self._solana_chain_mint("stable") or "").strip()
+        wrapped_mint = str(self._solana_chain_mint("wrapped") or "").strip()
+        if not stable_mint and not wrapped_mint:
+            return
+        details = self._solana_devnet_custom_mint_trade_details()
+        details.update({"phase": phase, "reason": "solana_devnet_custom_mint_trade_unsupported"})
+        raise HarnessError(
+            "Solana devnet custom-mint trade routing is not supported for truthful live evidence.",
+            code="solana_devnet_custom_mint_trade_unsupported",
+            category="unsupported_live_evidence",
+            details=details,
+        )
+
+    def _raise_if_solana_devnet_custom_mint_quote_unsupported(
+        self,
+        payload: dict[str, Any] | None,
+        *,
+        phase: str,
+        trade_id: str = "",
+        stderr: str = "",
+    ) -> None:
+        if str(self.chain).strip().lower() != "solana_devnet":
+            return
+        stable_mint = str(self._solana_chain_mint("stable") or "").strip()
+        wrapped_mint = str(self._solana_chain_mint("wrapped") or "").strip()
+        if not stable_mint and not wrapped_mint:
+            return
+        body = payload if isinstance(payload, dict) else {}
+        scan = json.dumps(body, sort_keys=True, default=str).lower()
+        if "jupiter quote request failed" not in scan:
+            return
+        details = self._solana_devnet_custom_mint_trade_details()
+        details.update(
+            {
+                "phase": phase,
+                "tradeId": str(trade_id or "").strip(),
+                "payload": body,
+                "stderr": _trim_text(stderr),
+                "reason": "solana_devnet_custom_mint_trade_unsupported",
+            }
+        )
+        raise HarnessError(
+            "Solana devnet custom-mint trade routing is not supported for truthful live evidence.",
+            code="solana_devnet_custom_mint_trade_unsupported",
+            category="unsupported_live_evidence",
+            details=details,
+        )
+
     def _record(self, name: str, ok: bool, message: str, details: dict[str, Any] | None = None) -> None:
         payload = details or {}
         self.results.append(ScenarioResult(name=name, ok=ok, message=message, details=payload))
@@ -487,6 +558,21 @@ class WalletApprovalHarness:
         if not key:
             return ""
         return str(env_values.get(key) or "").strip()
+
+    def _chain_scoped_env(self, key: str) -> str:
+        value = str(os.environ.get(key) or "").strip()
+        if value:
+            return value
+        return str(self._skill_env().get(key) or "").strip()
+
+    def _solana_chain_mint(self, kind: str) -> str:
+        chain_normalized = str(self.chain).strip().lower()
+        if chain_normalized == "solana_localnet":
+            return self._solana_localnet_bootstrap_mint(kind)
+        key = SOLANA_CHAIN_SCOPED_MINT_ENV.get(chain_normalized, {}).get(kind, "")
+        if not key:
+            return ""
+        return self._chain_scoped_env(key)
 
     def _assert_hardhat_evidence_gate(self) -> None:
         if str(self.chain).strip().lower() == "hardhat_local":
@@ -1050,11 +1136,11 @@ class WalletApprovalHarness:
             )
         raw = str(tokens.get(symbol) or "").strip()
         chain_normalized = str(self.chain).strip().lower()
-        if not raw and chain_normalized == "solana_localnet":
+        if not raw and chain_normalized in {"solana_localnet", "solana_devnet"}:
             if symbol == "USDC":
-                raw = self._solana_localnet_bootstrap_mint("stable")
+                raw = self._solana_chain_mint("stable")
             elif symbol in {"WETH", "WSOL"}:
-                raw = self._solana_localnet_bootstrap_mint("wrapped")
+                raw = self._solana_chain_mint("wrapped")
         if not raw and symbol == "USDC" and chain_normalized in {"solana_localnet", "solana_devnet"}:
             raw = SOLANA_USDC_MINT
         if not raw:
@@ -1071,8 +1157,8 @@ class WalletApprovalHarness:
         chain_normalized = str(self.chain).strip().lower()
         if chain_normalized.startswith("solana_"):
             token_in = str(self.trade_token_in or "").strip()
-            stable_mint = self._solana_localnet_bootstrap_mint("stable") if chain_normalized == "solana_localnet" else ""
-            wrapped_mint = self._solana_localnet_bootstrap_mint("wrapped") if chain_normalized == "solana_localnet" else ""
+            stable_mint = self._solana_chain_mint("stable")
+            wrapped_mint = self._solana_chain_mint("wrapped")
             decimals = 9
             if token_in.upper() == "SOL":
                 decimals = 9
@@ -1132,10 +1218,10 @@ class WalletApprovalHarness:
         stable_key = ""
         if chain_normalized == "base_sepolia":
             assets = ["stable", "wrapped", "native"]
-        elif chain_normalized == "solana_localnet":
+        elif chain_normalized in {"solana_localnet", "solana_devnet"}:
             assets = ["native", "stable", "wrapped"]
-            stable_key = self._solana_localnet_bootstrap_mint("stable").lower()
-            wrapped_key = self._solana_localnet_bootstrap_mint("wrapped").lower()
+            stable_key = self._solana_chain_mint("stable").lower()
+            wrapped_key = self._solana_chain_mint("wrapped").lower()
         faucet_args = ["faucet-request", "--chain", self.chain]
         for asset in assets:
             faucet_args.extend(["--asset", asset])
@@ -1318,7 +1404,7 @@ class WalletApprovalHarness:
             bal = self._balance_snapshot()
             native = bal.get("NATIVE", Decimal("0"))
             stable_mint = self._canonical_token_address("USDC")
-            wrapped_mint = self._solana_localnet_bootstrap_mint("wrapped") if chain_normalized == "solana_localnet" else ""
+            wrapped_mint = self._solana_chain_mint("wrapped")
             stable = bal.get(stable_mint.lower(), Decimal("0")) or bal.get("USDC", Decimal("0"))
             wrapped = bal.get(wrapped_mint.lower(), Decimal("0")) if wrapped_mint else Decimal("0")
             if native <= 0 and self._has_chain_capability("faucet"):
@@ -1424,6 +1510,7 @@ class WalletApprovalHarness:
         )
 
     def _scenario_trade_pending_approve(self) -> dict[str, Any]:
+        self._raise_if_solana_devnet_custom_mint_trade_preflight_unsupported(phase="trade_pending_approve_preflight")
         self._post_permissions_update(
             {
                 "agentId": self.agent_id,
@@ -1450,7 +1537,26 @@ class WalletApprovalHarness:
             label="trade_decision_approve",
         )
 
+        resume_code, resume_payload, _, resume_stderr = self._runtime(
+            ["approvals", "resume-spot", "--trade-id", trade_id, "--chain", self.chain],
+            timeout=420,
+        )
+        resume_payload_code = str(resume_payload.get("code") or "").strip().lower()
+        self._raise_if_solana_devnet_custom_mint_quote_unsupported(
+            resume_payload,
+            phase="resume_after_approve",
+            trade_id=trade_id,
+            stderr=resume_stderr,
+        )
+        if (resume_code != 0 or not bool(resume_payload.get("ok"))) and resume_payload_code != "not_actionable":
+            raise HarnessError(f"trade resume failed after approval: {resume_payload} stderr={resume_stderr}")
+
         terminal = self._wait_for_trade_status(trade_id, {"filled", "failed", "rejected"}, timeout_sec=420)
+        self._raise_if_solana_devnet_custom_mint_quote_unsupported(
+            terminal,
+            phase="terminal_after_approve",
+            trade_id=trade_id,
+        )
         if str(terminal.get("status") or "") != "filled":
             raise HarnessError(f"trade terminal status expected filled, got {terminal}")
         return {"tradeId": trade_id, "terminalStatus": terminal.get("status"), "txHash": terminal.get("txHash")}
@@ -1556,6 +1662,7 @@ class WalletApprovalHarness:
         return {"firstTradeId": t1, "secondTradeId": t3}
 
     def _scenario_global_and_allowlist(self) -> dict[str, Any]:
+        self._raise_if_solana_devnet_custom_mint_trade_preflight_unsupported(phase="global_auto_preflight")
         # Global auto on
         self._post_permissions_update(
             {
@@ -1566,6 +1673,11 @@ class WalletApprovalHarness:
         )
         c_auto, p_auto, _, err_auto = self._runtime(
             self._trade_args(self.trade_amounts["global_auto"])
+        )
+        self._raise_if_solana_devnet_custom_mint_quote_unsupported(
+            p_auto,
+            phase="global_auto",
+            stderr=err_auto,
         )
         if c_auto != 0:
             raise HarnessError(f"global auto trade failed: {p_auto} stderr={err_auto}")
@@ -1597,6 +1709,12 @@ class WalletApprovalHarness:
 
         code, resume_payload, _, resume_err = self._runtime(
             ["approvals", "resume-spot", "--trade-id", trade_id, "--chain", self.chain], timeout=420
+        )
+        self._raise_if_solana_devnet_custom_mint_quote_unsupported(
+            resume_payload,
+            phase="allowlist_resume",
+            trade_id=trade_id,
+            stderr=resume_err,
         )
         if code != 0 or not bool(resume_payload.get("ok")):
             raise HarnessError(f"allowlist resume failed: {resume_payload} stderr={resume_err}")
@@ -1989,7 +2107,10 @@ class WalletApprovalHarness:
                 ]
             )
 
+        stop_after_unsupported = False
         for name, fn in scenario_funcs:
+            if stop_after_unsupported:
+                break
             try:
                 details = fn()
                 payload = {"class": "ok"}
@@ -1997,9 +2118,12 @@ class WalletApprovalHarness:
                     payload.update(details)
                 self._record(name, True, "scenario passed", payload)
             except Exception as exc:
-                self._record(name, False, "scenario failed", {"error": str(exc), "class": self._classify_error(exc)})
+                failure_class = self._classify_error(exc)
+                self._record(name, False, "scenario failed", {"error": str(exc), "class": failure_class})
+                if failure_class == "unsupported_live_evidence":
+                    stop_after_unsupported = True
 
-        if not hardhat_smoke:
+        if not hardhat_smoke and not stop_after_unsupported:
             try:
                 details = self._scenario_balance_reversion(baseline_balances)
                 self._record("balance_reversion", True, "within tolerance window", {"class": "ok", **details})

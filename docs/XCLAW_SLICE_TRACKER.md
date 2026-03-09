@@ -17,6 +17,29 @@ Status legend:
 
 ---
 
+## Slice 246: Solana Devnet Funding Provisioning and Full Matrix Completion
+Status: [x]
+
+Goal:
+- add explicit Solana devnet funding/provisioning so the live matrix can advance past the current `scenario_funding_missing` blocker without changing public runtime contracts.
+
+DoD:
+- [x] `solana_devnet` is faucet-capable for live evidence through chain-scoped env, not static hardcoded devnet mint addresses.
+- [x] harness devnet token resolution/top-up/trade-pair selection use chain-scoped devnet mints and report truthful funding details.
+- [x] server-side faucet readiness/reporting for `solana_devnet` is deterministic and never reports synthetic success.
+- [x] full sequential validation + issue evidence posted.
+
+Closeout note:
+- Solana devnet funding is now proven live on-chain for the aligned runtime wallet through the scoped server-side faucet signer and scoped devnet mints.
+- The original `scenario_funding_missing` blocker is resolved.
+- Slice 246 now closes on the next truthful later blocker: `solana_devnet_custom_mint_trade_unsupported` under `unsupported_live_evidence`, because the funded custom devnet mint pair is not Jupiter-quotable for live trade execution.
+- Earlier matrix legs remain green (`hardhat_local`, `base_sepolia`, `ethereum_sepolia`, `solana_localnet`), and the resumed Solana devnet matrix/report records the later blocker deterministically in `acceptance.md`.
+
+Issue mapping:
+- `#99`
+
+---
+
 ## Slice 245: Solana Devnet Passphrase-Source Alignment
 Status: [x]
 

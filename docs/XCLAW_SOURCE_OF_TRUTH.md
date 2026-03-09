@@ -317,6 +317,34 @@ Core thesis: **agents act, humans supervise, network observes and allocates trus
 - no custody/auth boundary changes.
 5. This slice is restart/replay/watchdog hardening only and must preserve current command-surface behavior.
 
+## 3.45) Slice 246 Solana Devnet Funding Provisioning and Full Matrix Completion (2026-03-09)
+
+1. `solana_devnet` live evidence may use a server-side faucet path when explicitly configured through chain-scoped environment values.
+2. The canonical Solana devnet funding env contract is:
+- `XCLAW_TESTNET_FAUCET_RPC_URL_SOLANA_DEVNET`
+- `XCLAW_SOLANA_FAUCET_SIGNER_SECRET_SOLANA_DEVNET`
+- `XCLAW_SOLANA_FAUCET_STABLE_MINT_SOLANA_DEVNET`
+- `XCLAW_SOLANA_FAUCET_WRAPPED_MINT_SOLANA_DEVNET`
+3. For live Solana devnet evidence, harness token resolution must prefer the scoped devnet stable/wrapped mints before any generic or mainnet fallback.
+4. For live Solana devnet evidence, the harness faucet/top-up path must request the full trade asset set: `native`, `stable`, `wrapped`.
+5. `GET /api/v1/agent/faucet/networks` may report `solana_devnet` as configured only when the chain-scoped signer, RPC, and required asset mints are present and valid.
+6. `POST /api/v1/agent/faucet/request` for `solana_devnet` must not report success until the native and requested SPL funding transactions are actually sent successfully.
+7. If Solana devnet funding remains unusable, the harness must fail with deterministic `scenario_funding_missing` evidence that includes the wallet address, resolved stable/wrapped mint addresses, and observed native/stable/wrapped balances.
+8. If Solana devnet funding and wallet preflight succeed but the configured scoped devnet custom mints are not quotable through Jupiter, the harness must fail with deterministic `solana_devnet_custom_mint_trade_unsupported` evidence rather than a generic downstream `trade_spot_failed`/`trade_execute_failed` wrapper.
+9. The unsupported evidence for this case must include at least:
+- `phase`
+- `tradeId` when available
+- `stableMint`
+- `wrappedMint`
+- `tokenIn`
+- `tokenOut`
+- the triggering runtime payload
+10. Slice 246 preserves all public compatibility requirements:
+- no API/schema/database changes,
+- no runtime command contract changes,
+- no synthetic success.
+11. Slice 246 is complete once the full ordered matrix advances beyond the current Solana devnet funding blocker and records either full green completion or a later truthful blocker.
+
 ## 3.44) Slice 245 Solana Devnet Passphrase-Source Alignment (2026-03-09)
 
 1. Live harness wallet preflight may source `XCLAW_WALLET_PASSPHRASE` from the installed skill config at `~/.openclaw/openclaw.json -> skills.entries["xclaw-agent"].env` when explicit arg and process env are absent.

@@ -220,6 +220,9 @@ class WalletApprovalChainMatrixTests(unittest.TestCase):
             self.assertEqual(provision.get("resolvedWrappedMint"), "BDPkyPPmKVtQw1Xg7WF3yrUz5SLXu2u7pp3wAyfusPA6")
             self.assertEqual(provision.get("resolvedStableMint"), "BZvD2GmhsV3iDsRdiSECWcZX3JpVAKTE4rrFAqnuTCw3")
 
+    def test_solana_devnet_remains_final_chain(self) -> None:
+        self.assertEqual(runner_mod.CHAIN_ORDER[-1], "solana_devnet")
+
 
 if __name__ == "__main__":
     unittest.main()

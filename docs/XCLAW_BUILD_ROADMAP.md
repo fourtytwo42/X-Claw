@@ -11,6 +11,17 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 
 ---
 
+## 0.55) Slice 246 Solana Devnet Funding Provisioning and Full Matrix Completion
+
+- [x] Enable `solana_devnet` faucet capability for live evidence through chain-scoped env.
+- [x] Align `wallet_approval_harness.py` so Solana devnet resolves chain-scoped stable/wrapped mints before fallback and requests `native|stable|wrapped` top-up.
+- [x] Ensure Solana faucet readiness reporting prefers scoped devnet signer/RPC/mints over generic fallback.
+- [x] Add direct unit coverage for devnet mint resolution, faucet top-up arguments, and deterministic funding-missing evidence.
+- [x] Provision live Solana devnet signer + mints and capture targeted devnet evidence.
+- [x] Classify funded custom-mint Solana devnet Jupiter incompatibility as a truthful later blocker with deterministic evidence.
+- [x] Re-run the full ordered matrix and capture the next truthful outcome in `acceptance.md`.
+- [x] Run Solana contract rails plus the required sequential validation chain.
+
 ## 0.54) Slice 245 Solana Devnet Passphrase-Source Alignment
 
 - [x] Resolve harness wallet passphrase using arg -> env -> installed skill config -> backup.

@@ -689,17 +689,21 @@ class WalletApprovalHarnessUnitTests(unittest.TestCase):
         args = self._args()
         args.chain = "solana_devnet"
         runner = harness.WalletApprovalHarness(args)
-        with mock.patch.object(
+        with mock.patch.dict(
+            harness.os.environ,
+            {"XCLAW_SOLANA_FAUCET_STABLE_MINT_SOLANA_DEVNET": "BzvD2GmhsV3iDsRdiSECWcZX3JpVAKTE4rrFAqnuTCw3"},
+            clear=False,
+        ), mock.patch.object(
             runner,
             "_balance_snapshot",
-            return_value={"NATIVE": Decimal("1000"), harness.SOLANA_USDC_MINT.lower(): Decimal("0")},
+            return_value={"NATIVE": Decimal("1000"), "bzvd2gmhsv3idsrdisecwczx3jpvakte4rrfaqnutcw3": Decimal("0")},
         ):
             runner._prepare_trade_pair_and_amounts()
         self.assertEqual(runner.trade_token_in, "SOL")
-        self.assertEqual(runner.trade_token_out, harness.SOLANA_USDC_MINT)
+        self.assertEqual(runner.trade_token_out, "BzvD2GmhsV3iDsRdiSECWcZX3JpVAKTE4rrFAqnuTCw3")
         self.assertEqual(runner.trade_amounts["pending_approve"], "0.001")
 
-    def test_attempt_faucet_topup_uses_native_only_for_solana_localnet(self) -> None:
+    def test_attempt_faucet_topup_uses_full_asset_set_for_solana_localnet(self) -> None:
         args = self._args()
         args.chain = "solana_localnet"
         runner = harness.WalletApprovalHarness(args)
@@ -725,6 +729,82 @@ class WalletApprovalHarnessUnitTests(unittest.TestCase):
             faucet_cmd,
             ["faucet-request", "--chain", "solana_localnet", "--asset", "native", "--asset", "stable", "--asset", "wrapped"],
         )
+
+    def test_attempt_faucet_topup_uses_full_asset_set_for_solana_devnet(self) -> None:
+        args = self._args()
+        args.chain = "solana_devnet"
+        runner = harness.WalletApprovalHarness(args)
+        with mock.patch.dict(
+            harness.os.environ,
+            {
+                "XCLAW_SOLANA_FAUCET_STABLE_MINT_SOLANA_DEVNET": "BzvD2GmhsV3iDsRdiSECWcZX3JpVAKTE4rrFAqnuTCw3",
+                "XCLAW_SOLANA_FAUCET_WRAPPED_MINT_SOLANA_DEVNET": "BDPkyPPmKVtQw1Xg7WF3yrUz5SLXu2u7pp3wAyfusPA6",
+            },
+            clear=False,
+        ), mock.patch.object(
+            runner,
+            "_runtime",
+            return_value=(0, {"ok": True}, "", ""),
+        ) as runtime_mock, mock.patch.object(
+            runner,
+            "_balance_snapshot",
+            side_effect=[
+                {"NATIVE": Decimal("0")},
+                {"NATIVE": Decimal("1")},
+            ],
+        ):
+            runner._attempt_faucet_topup(require_native_topup=True)
+        faucet_cmd = runtime_mock.call_args_list[0].args[0]
+        self.assertEqual(
+            faucet_cmd,
+            ["faucet-request", "--chain", "solana_devnet", "--asset", "native", "--asset", "stable", "--asset", "wrapped"],
+        )
+
+    def test_prepare_trade_pair_uses_devnet_env_stable_balance(self) -> None:
+        args = self._args()
+        args.chain = "solana_devnet"
+        runner = harness.WalletApprovalHarness(args)
+        with mock.patch.dict(
+            harness.os.environ,
+            {
+                "XCLAW_SOLANA_FAUCET_STABLE_MINT_SOLANA_DEVNET": "BzvD2GmhsV3iDsRdiSECWcZX3JpVAKTE4rrFAqnuTCw3",
+                "XCLAW_SOLANA_FAUCET_WRAPPED_MINT_SOLANA_DEVNET": "BDPkyPPmKVtQw1Xg7WF3yrUz5SLXu2u7pp3wAyfusPA6",
+            },
+            clear=False,
+        ), mock.patch.object(
+            runner,
+            "_balance_snapshot",
+            return_value={
+                "NATIVE": Decimal("0"),
+                "bzvd2gmhsv3idsrdisecwczx3jpvakte4rrfaqnutcw3": Decimal("25"),
+            },
+        ):
+            runner._prepare_trade_pair_and_amounts()
+        self.assertEqual(runner.trade_token_in, "BzvD2GmhsV3iDsRdiSECWcZX3JpVAKTE4rrFAqnuTCw3")
+        self.assertEqual(runner.trade_token_out, "SOL")
+
+    def test_prepare_trade_pair_reports_devnet_env_funding_details(self) -> None:
+        args = self._args()
+        args.chain = "solana_devnet"
+        runner = harness.WalletApprovalHarness(args)
+        with mock.patch.dict(
+            harness.os.environ,
+            {
+                "XCLAW_SOLANA_FAUCET_STABLE_MINT_SOLANA_DEVNET": "BzvD2GmhsV3iDsRdiSECWcZX3JpVAKTE4rrFAqnuTCw3",
+                "XCLAW_SOLANA_FAUCET_WRAPPED_MINT_SOLANA_DEVNET": "BDPkyPPmKVtQw1Xg7WF3yrUz5SLXu2u7pp3wAyfusPA6",
+            },
+            clear=False,
+        ), mock.patch.object(runner, "_balance_snapshot", return_value={"NATIVE": Decimal("0")}), mock.patch.object(
+            runner, "_wallet_address", return_value="8GpQWRfcsyeNh1SeZna6Ah5dRrMotnm63pF2iNaHapeQ"
+        ), mock.patch.object(
+            runner, "_attempt_faucet_topup", return_value=None
+        ):
+            with self.assertRaises(harness.HarnessError) as ctx:
+                runner._prepare_trade_pair_and_amounts()
+        self.assertEqual(ctx.exception.code, "scenario_funding_missing")
+        self.assertEqual(ctx.exception.details.get("walletAddress"), "8GpQWRfcsyeNh1SeZna6Ah5dRrMotnm63pF2iNaHapeQ")
+        self.assertEqual(ctx.exception.details.get("stableMint"), "BzvD2GmhsV3iDsRdiSECWcZX3JpVAKTE4rrFAqnuTCw3")
+        self.assertEqual(ctx.exception.details.get("wrappedMint"), "BDPkyPPmKVtQw1Xg7WF3yrUz5SLXu2u7pp3wAyfusPA6")
 
     def test_prepare_trade_pair_uses_localnet_bootstrap_stable_balance(self) -> None:
         args = self._args()
@@ -800,7 +880,10 @@ class WalletApprovalHarnessUnitTests(unittest.TestCase):
         with mock.patch.object(runner, "_post_permissions_update"), mock.patch.object(
             runner,
             "_runtime",
-            return_value=(1, {"ok": False, "code": "approval_required", "status": "approval_pending", "tradeId": "trd_1"}, "", ""),
+            side_effect=[
+                (1, {"ok": False, "code": "approval_required", "status": "approval_pending", "tradeId": "trd_1"}, "", ""),
+                (1, {"ok": False, "code": "not_actionable", "status": "verifying", "tradeId": "trd_1"}, "", ""),
+            ],
         ), mock.patch.object(runner, "_management_post_with_retry", return_value={"ok": True}), mock.patch.object(
             runner,
             "_wait_for_trade_status",
@@ -808,6 +891,59 @@ class WalletApprovalHarnessUnitTests(unittest.TestCase):
         ):
             with self.assertRaises(harness.HarnessError):
                 runner._scenario_trade_pending_approve()
+
+    def test_trade_pending_approve_resumes_when_trade_remains_approved(self) -> None:
+        args = self._args()
+        args.chain = "solana_devnet"
+        runner = harness.WalletApprovalHarness(args)
+        with mock.patch.object(runner, "_post_permissions_update"), mock.patch.object(
+            runner,
+            "_runtime",
+            side_effect=[
+                (1, {"ok": False, "code": "approval_required", "status": "approval_pending", "tradeId": "trd_2"}, "", ""),
+                (0, {"ok": True, "tradeId": "trd_2", "status": "executing"}, "", ""),
+            ],
+        ) as runtime_mock, mock.patch.object(
+            runner, "_management_post_with_retry", return_value={"ok": True}
+        ), mock.patch.object(
+            runner, "_wait_for_trade_status", return_value={"tradeId": "trd_2", "status": "filled", "txHash": "sig_1"}
+        ):
+            out = runner._scenario_trade_pending_approve()
+        self.assertEqual(out["terminalStatus"], "filled")
+        self.assertEqual(runtime_mock.call_count, 2)
+        self.assertEqual(
+            runtime_mock.call_args_list[1].args[0],
+            ["approvals", "resume-spot", "--trade-id", "trd_2", "--chain", "solana_devnet"],
+        )
+
+    def test_trade_pending_approve_raises_truthful_unsupported_for_devnet_custom_mint_jupiter_failure(self) -> None:
+        args = self._args()
+        args.chain = "solana_devnet"
+        runner = harness.WalletApprovalHarness(args)
+        with mock.patch.object(
+            runner, "_solana_chain_mint", side_effect=lambda kind: {"stable": "MintStableDevnet", "wrapped": "MintWrappedDevnet"}.get(kind, "")
+        ), mock.patch.object(
+            runner, "_wallet_address", return_value="WalletDevnet1111111111111111111111111111111"
+        ):
+            with self.assertRaises(harness.HarnessError) as ctx:
+                runner._scenario_trade_pending_approve()
+        self.assertEqual(ctx.exception.code, "solana_devnet_custom_mint_trade_unsupported")
+        self.assertEqual(ctx.exception.category, "unsupported_live_evidence")
+        self.assertEqual(ctx.exception.details.get("phase"), "trade_pending_approve_preflight")
+
+    def test_global_and_allowlist_raises_truthful_unsupported_for_devnet_custom_mint_jupiter_failure(self) -> None:
+        args = self._args()
+        args.chain = "solana_devnet"
+        runner = harness.WalletApprovalHarness(args)
+        with mock.patch.object(
+            runner, "_solana_chain_mint", side_effect=lambda kind: {"stable": "MintStableDevnet", "wrapped": "MintWrappedDevnet"}.get(kind, "")
+        ), mock.patch.object(
+            runner, "_wallet_address", return_value="WalletDevnet1111111111111111111111111111111"
+        ):
+            with self.assertRaises(harness.HarnessError) as ctx:
+                runner._scenario_global_and_allowlist()
+        self.assertEqual(ctx.exception.code, "solana_devnet_custom_mint_trade_unsupported")
+        self.assertEqual(ctx.exception.details.get("phase"), "global_auto_preflight")
 
     def test_global_and_allowlist_raises_when_auto_trade_fails(self) -> None:
         args = self._args()
@@ -904,6 +1040,60 @@ class WalletApprovalHarnessUnitTests(unittest.TestCase):
         self.assertEqual(set_chain_mock.call_args_list[0].args, (True,))
         self.assertEqual(set_chain_mock.call_args_list[1].kwargs, {"label": "restore_chain_policy"})
         self.assertEqual(set_chain_mock.call_args_list[1].args, (False,))
+
+    def test_run_short_circuits_remaining_scenarios_after_unsupported_live_evidence(self) -> None:
+        args = self._args()
+        args.chain = "solana_devnet"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            args.json_report = str(pathlib.Path(tmpdir) / "report.json")
+            runner = harness.WalletApprovalHarness(args)
+            with mock.patch.object(runner, "_assert_hardhat_evidence_gate"), mock.patch.object(
+                runner, "_probe_hardhat_rpc"
+            ), mock.patch.object(runner, "_wallet_decrypt_probe"), mock.patch.object(
+                runner, "_assert_expected_wallet_address"
+            ), mock.patch.object(
+                runner, "_probe_solana_localnet_bootstrap"
+            ), mock.patch.object(
+                runner, "_bootstrap_management"
+            ), mock.patch.object(
+                runner,
+                "_management_state",
+                return_value={
+                    "latestPolicy": {},
+                    "transferApprovalPolicy": {},
+                    "agent": {"publicStatus": "active"},
+                    "chainPolicy": {"chainEnabled": True},
+                },
+            ), mock.patch.object(
+                runner, "_ensure_local_wallet_policy_chain_enabled"
+            ), mock.patch.object(
+                runner, "_balance_snapshot", return_value={"NATIVE": Decimal("1")}
+            ), mock.patch.object(
+                runner, "_prepare_trade_pair_and_amounts"
+            ), mock.patch.object(
+                runner,
+                "_scenario_trade_pending_approve",
+                side_effect=harness.HarnessError(
+                    "unsupported",
+                    code="solana_devnet_custom_mint_trade_unsupported",
+                    category="unsupported_live_evidence",
+                ),
+            ), mock.patch.object(
+                runner, "_scenario_trade_reject"
+            ) as reject_mock, mock.patch.object(
+                runner, "_scenario_trade_dedupe"
+            ) as dedupe_mock, mock.patch.object(
+                runner, "_scenario_balance_reversion"
+            ) as balance_mock, mock.patch.object(
+                runner, "_restore_permissions"
+            ), mock.patch.object(
+                runner, "_resolve_pending_best_effort", return_value=[]
+            ):
+                rc = runner.run()
+        self.assertEqual(rc, 1)
+        reject_mock.assert_not_called()
+        dedupe_mock.assert_not_called()
+        balance_mock.assert_not_called()
 
     def test_ensure_local_wallet_policy_chain_enabled_adds_chain(self) -> None:
         args = self._args()

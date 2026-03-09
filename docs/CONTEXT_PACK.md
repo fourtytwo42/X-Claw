@@ -14,26 +14,31 @@
   - `routeKind`
   - `liquidityOperation`
 
-## Active Context: Slice 245 Solana Devnet Passphrase-Source Alignment
+## Active Context: Slice 246 Solana Devnet Funding Provisioning and Full Matrix Completion
 
-Issue mapping: `#98`
+Issue mapping: `#99`
 
 ### Objective + scope lock
 - Objective:
-  - align live harness wallet passphrase sourcing with the installed skill config,
-  - clear the deterministic Solana devnet `wallet_passphrase_mismatch` blocker,
-  - capture the next truthful Solana devnet blocker after wallet preflight succeeds,
-  - keep the slice limited to harness/report/evidence work with no public runtime contract drift.
+  - add explicit Solana devnet funding/provisioning for live evidence,
+  - clear the current deterministic `scenario_funding_missing` blocker,
+  - rerun the ordered matrix through `solana_devnet`,
+  - keep the slice limited to funding/provisioning/evidence work with no public runtime contract drift.
 - Scope guard:
-  - harness/report/evidence work only,
+  - Solana devnet funding/provisioning + evidence only,
   - no API/schema/database changes,
   - no matrix CLI changes,
   - Hedera explicitly deferred.
 
 ### Expected touched files
+- `config/chains/solana_devnet.json`
 - `apps/agent-runtime/scripts/wallet_approval_harness.py`
 - `apps/agent-runtime/tests/test_wallet_approval_harness.py`
 - `apps/agent-runtime/tests/test_wallet_approval_chain_matrix.py`
+- `apps/network-web/src/app/api/v1/agent/faucet/request/route.ts`
+- `apps/network-web/src/app/api/v1/agent/faucet/networks/route.ts`
+- `apps/network-web/src/lib/solana-faucet.ts`
+- `infrastructure/scripts/faucet-contract-tests.mjs`
 - `docs/XCLAW_SOURCE_OF_TRUTH.md`
 - `docs/XCLAW_SLICE_TRACKER.md`
 - `docs/XCLAW_BUILD_ROADMAP.md`
@@ -42,11 +47,11 @@ Issue mapping: `#98`
 - `tasks.md`
 - `acceptance.md`
 
-### Completion note
-- Completed 2026-03-09.
-- The original Solana devnet `wallet_passphrase_mismatch` blocker is resolved at the harness layer through installed-skill passphrase fallback.
-- Direct live Solana devnet evidence now stops later at truthful `scenario_funding_missing` for the repaired devnet wallet.
-- No later slice should reopen passphrase-source discovery unless the installed skill config contract changes.
+### Current blocker
+- Solana devnet wallet preflight is already green from Slice 245.
+- The original truthful live blocker was `scenario_funding_missing`.
+- Funding is now repaired through scoped devnet faucet env and live server-side drip proof.
+- The current later blocker is Solana devnet Jupiter incompatibility for the funded custom-mint pair, which should be reported as deterministic `solana_devnet_custom_mint_trade_unsupported` evidence instead of a generic trade wrapper failure.
 
 ## Completed Context: Slice 241 Command-Surface Failure Injection Sweep
 
