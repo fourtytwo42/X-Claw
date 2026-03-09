@@ -5,6 +5,7 @@ import { authenticateAgentByToken } from '@/lib/agent-auth';
 import { chainCapabilityEnabled, getChainConfig, listEnabledChains } from '@/lib/chains';
 import { successResponse } from '@/lib/errors';
 import { getRequestId } from '@/lib/request-id';
+import { resolveSolanaLocalnetBootstrapEnv } from '@/lib/solana-localnet-bootstrap-env';
 
 export const runtime = 'nodejs';
 
@@ -24,6 +25,10 @@ function resolveChainScopedEnv(prefix: string, chainKey: string): string {
   const scoped = (process.env[`${prefix}_${suffix}`] || '').trim();
   if (scoped) {
     return scoped;
+  }
+  const localnetBootstrap = resolveSolanaLocalnetBootstrapEnv(prefix, chainKey);
+  if (localnetBootstrap) {
+    return localnetBootstrap;
   }
   return (process.env[prefix] || '').trim();
 }

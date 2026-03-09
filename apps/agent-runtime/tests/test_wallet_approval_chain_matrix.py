@@ -32,7 +32,7 @@ class WalletApprovalChainMatrixTests(unittest.TestCase):
     def _mock_subprocess(self, *, fail_chain: str | None = None):
         chains: list[str] = []
 
-        def _fake_run(cmd: list[str], text: bool, capture_output: bool):
+        def _fake_run(cmd: list[str], text: bool, capture_output: bool, env: dict[str, str] | None = None):
             self.assertTrue(text)
             self.assertTrue(capture_output)
             chain = cmd[cmd.index("--chain") + 1]
@@ -48,7 +48,11 @@ class WalletApprovalChainMatrixTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             pathlib.Path(tmpdir, "bootstrap.json").write_text(json.dumps({"token": "t"}), encoding="utf-8")
             chains, fake_run = self._mock_subprocess()
-            with mock.patch.object(runner_mod.subprocess, "run", side_effect=fake_run):
+            with mock.patch.object(
+                runner_mod,
+                "_ensure_solana_localnet_bootstrap",
+                return_value=({"XCLAW_SOLANA_LOCALNET_BOOTSTRAP_ENV_FILE": "/tmp/faucet.env"}, {"ok": True}),
+            ), mock.patch.object(runner_mod.subprocess, "run", side_effect=fake_run):
                 rc = runner_mod.main(self._argv(tmpdir))
             self.assertEqual(rc, 0)
             self.assertEqual(chains, ["hardhat_local", "base_sepolia", "ethereum_sepolia", "solana_localnet", "solana_devnet"])
@@ -93,7 +97,11 @@ class WalletApprovalChainMatrixTests(unittest.TestCase):
             pathlib.Path(tmpdir, "bootstrap.json").write_text(json.dumps({"token": "t"}), encoding="utf-8")
             chains, fake_run = self._mock_subprocess()
             argv = self._argv(tmpdir) + ["--start-chain", "ethereum_sepolia"]
-            with mock.patch.object(runner_mod.subprocess, "run", side_effect=fake_run):
+            with mock.patch.object(
+                runner_mod,
+                "_ensure_solana_localnet_bootstrap",
+                return_value=({"XCLAW_SOLANA_LOCALNET_BOOTSTRAP_ENV_FILE": "/tmp/faucet.env"}, {"ok": True}),
+            ), mock.patch.object(runner_mod.subprocess, "run", side_effect=fake_run):
                 rc = runner_mod.main(argv)
             self.assertEqual(rc, 0)
             self.assertEqual(chains, ["ethereum_sepolia", "solana_localnet", "solana_devnet"])
@@ -106,13 +114,74 @@ class WalletApprovalChainMatrixTests(unittest.TestCase):
             pathlib.Path(tmpdir, "bootstrap.json").write_text(json.dumps({"token": "t"}), encoding="utf-8")
             chains, fake_run = self._mock_subprocess()
             argv = self._argv(tmpdir) + ["--start-chain", "solana_localnet"]
-            with mock.patch.object(runner_mod.subprocess, "run", side_effect=fake_run):
+            with mock.patch.object(
+                runner_mod,
+                "_ensure_solana_localnet_bootstrap",
+                return_value=({"XCLAW_SOLANA_LOCALNET_BOOTSTRAP_ENV_FILE": "/tmp/faucet.env"}, {"ok": True}),
+            ), mock.patch.object(runner_mod.subprocess, "run", side_effect=fake_run):
                 rc = runner_mod.main(argv)
             self.assertEqual(rc, 0)
             self.assertEqual(chains, ["solana_localnet", "solana_devnet"])
             matrix = json.loads(pathlib.Path(tmpdir, "matrix.json").read_text(encoding="utf-8"))
             self.assertTrue(matrix.get("ok"))
             self.assertEqual([s.get("chain") for s in matrix.get("steps", [])], ["solana_localnet", "solana_devnet"])
+
+    def test_localnet_provisioning_short_circuits_before_devnet(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            pathlib.Path(tmpdir, "bootstrap.json").write_text(json.dumps({"token": "t"}), encoding="utf-8")
+            argv = self._argv(tmpdir) + ["--start-chain", "solana_localnet"]
+            with mock.patch.object(runner_mod, "_ensure_solana_localnet_bootstrap", return_value=({}, {"ok": False, "code": "solana_localnet_validator_missing"})):
+                rc = runner_mod.main(argv)
+            self.assertEqual(rc, 1)
+            matrix = json.loads(pathlib.Path(tmpdir, "matrix.json").read_text(encoding="utf-8"))
+            self.assertFalse(matrix.get("ok"))
+            self.assertEqual(matrix.get("failedAt"), "solana_localnet")
+            self.assertEqual([s.get("chain") for s in matrix.get("steps", [])], ["solana_localnet"])
+            report = json.loads(pathlib.Path(tmpdir, "xclaw-slice243-solana-localnet-full.json").read_text(encoding="utf-8"))
+            self.assertFalse(report.get("ok"))
+            self.assertEqual(report.get("preflight", {}).get("solanaLocalnetProvisioning", {}).get("code"), "solana_localnet_validator_missing")
+
+    def test_localnet_env_file_is_passed_to_harness_child(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            bootstrap = pathlib.Path(tmpdir, "bootstrap.json")
+            bootstrap.write_text(json.dumps({"token": "t"}), encoding="utf-8")
+            env_file = pathlib.Path(tmpdir, "solana-localnet-faucet.env")
+            env_file.write_text(
+                "\n".join(
+                    [
+                        "XCLAW_SOLANA_FAUCET_SIGNER_SECRET_SOLANA_LOCALNET=abc",
+                        "XCLAW_SOLANA_FAUCET_WRAPPED_MINT_SOLANA_LOCALNET=So11111111111111111111111111111111111111112",
+                        "XCLAW_SOLANA_FAUCET_STABLE_MINT_SOLANA_LOCALNET=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            with mock.patch.object(runner_mod, "SOLANA_LOCALNET_BOOTSTRAP_ENV_FILE", env_file), mock.patch.object(
+                runner_mod,
+                "_ensure_solana_localnet_bootstrap",
+                return_value=(
+                    {
+                        "XCLAW_SOLANA_LOCALNET_BOOTSTRAP_ENV_FILE": str(env_file),
+                        "XCLAW_SOLANA_FAUCET_SIGNER_SECRET_SOLANA_LOCALNET": "abc",
+                    },
+                    {"ok": True},
+                ),
+            ):
+                seen_env: dict[str, str] = {}
+
+                def _fake_run(cmd: list[str], text: bool, capture_output: bool, env: dict[str, str] | None = None):
+                    chain = cmd[cmd.index("--chain") + 1]
+                    report = pathlib.Path(cmd[cmd.index("--json-report") + 1])
+                    if chain == "solana_localnet" and env:
+                        seen_env.update(env)
+                    report.write_text(json.dumps({"ok": True, "chain": chain}), encoding="utf-8")
+                    return mock.Mock(returncode=0, stdout="", stderr="")
+
+                with mock.patch.object(runner_mod.subprocess, "run", side_effect=_fake_run):
+                    rc = runner_mod.main(self._argv(tmpdir) + ["--start-chain", "solana_localnet"])
+            self.assertEqual(rc, 0)
+            self.assertEqual(seen_env.get("XCLAW_SOLANA_LOCALNET_BOOTSTRAP_ENV_FILE"), str(env_file))
+            self.assertEqual(seen_env.get("XCLAW_SOLANA_FAUCET_SIGNER_SECRET_SOLANA_LOCALNET"), "abc")
 
 
 if __name__ == "__main__":

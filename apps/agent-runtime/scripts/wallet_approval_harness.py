@@ -26,6 +26,12 @@ from typing import Any
 
 SOLANA_WRAPPED_NATIVE_MINT = "So11111111111111111111111111111111111111112"
 SOLANA_USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+SOLANA_LOCALNET_BOOTSTRAP_ENV_FILE = pathlib.Path(
+    os.environ.get(
+        "XCLAW_SOLANA_LOCALNET_BOOTSTRAP_ENV_FILE",
+        pathlib.Path("infrastructure/seed-data/solana-localnet-faucet.env").resolve().as_posix(),
+    )
+)
 
 
 def _now_iso() -> str:
@@ -34,6 +40,26 @@ def _now_iso() -> str:
 
 def _read_json(path: pathlib.Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _read_env_file(path: pathlib.Path) -> dict[str, str]:
+    out: dict[str, str] = {}
+    if not path.exists():
+        return out
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        if key:
+            out[key] = value.strip()
+    return out
+
+
+def _is_likely_solana_address(value: str) -> bool:
+    text = str(value or "").strip()
+    return bool(text) and 32 <= len(text) <= 44 and all(ch in "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz" for ch in text)
 
 
 def _safe_num(value: Any) -> Decimal:
@@ -251,6 +277,7 @@ class WalletApprovalHarness:
             "hardhatRpc": {"ok": True},
             "walletDecryptProbe": {"ok": False},
             "managementSession": {"ok": False},
+            "solanaLocalnetBootstrap": {"ok": True, "skipped": True},
         }
         self.retry_failures: list[dict[str, Any]] = []
         self.unresolved_pending: list[dict[str, Any]] = []
@@ -397,6 +424,32 @@ class WalletApprovalHarness:
                 category="preflight_failure",
                 details={"hardhatRpcUrl": self.args.hardhat_rpc_url, "error": _trim_text(exc)},
             )
+
+    def _probe_solana_localnet_bootstrap(self) -> None:
+        if str(self.chain).strip().lower() != "solana_localnet":
+            self.preflight["solanaLocalnetBootstrap"] = {"ok": True, "skipped": True}
+            return
+        env_path = pathlib.Path(str(os.environ.get("XCLAW_SOLANA_LOCALNET_BOOTSTRAP_ENV_FILE") or SOLANA_LOCALNET_BOOTSTRAP_ENV_FILE))
+        env_values = _read_env_file(env_path)
+        signer_secret = str(env_values.get("XCLAW_SOLANA_FAUCET_SIGNER_SECRET_SOLANA_LOCALNET") or "").strip()
+        wrapped_mint = str(env_values.get("XCLAW_SOLANA_FAUCET_WRAPPED_MINT_SOLANA_LOCALNET") or "").strip()
+        stable_mint = str(env_values.get("XCLAW_SOLANA_FAUCET_STABLE_MINT_SOLANA_LOCALNET") or "").strip()
+        payload = {
+            "ok": bool(signer_secret and _is_likely_solana_address(wrapped_mint) and _is_likely_solana_address(stable_mint)),
+            "bootstrapEnvFile": str(env_path),
+            "signerConfigured": bool(signer_secret),
+            "wrappedMintConfigured": _is_likely_solana_address(wrapped_mint),
+            "stableMintConfigured": _is_likely_solana_address(stable_mint),
+        }
+        self.preflight["solanaLocalnetBootstrap"] = payload
+        if payload["ok"]:
+            return
+        raise HarnessError(
+            "Solana localnet bootstrap env is missing or invalid.",
+            code="solana_localnet_bootstrap_missing",
+            category="preflight_failure",
+            details=payload,
+        )
 
     def _assert_hardhat_evidence_gate(self) -> None:
         if str(self.chain).strip().lower() == "hardhat_local":
@@ -1591,6 +1644,14 @@ class WalletApprovalHarness:
         return {"x402ApprovalId": approval_id}
 
     def _scenario_liquidity_and_pause(self) -> dict[str, Any]:
+        if str(self.chain).strip().lower() == "solana_localnet":
+            localnet_preflight = self.preflight.get("solanaLocalnetBootstrap")
+            if isinstance(localnet_preflight, dict) and not bool(localnet_preflight.get("ok")):
+                return {
+                    "liquiditySupported": False,
+                    "liquidityUnsupportedReason": "solana_localnet_preflight_blocked",
+                    "liquidityUnsupportedDetails": localnet_preflight,
+                }
         self._post_permissions_update(
             {
                 "agentId": self.agent_id,
@@ -1768,6 +1829,7 @@ class WalletApprovalHarness:
         self._probe_hardhat_rpc()
         self._wallet_decrypt_probe()
         self._assert_expected_wallet_address()
+        self._probe_solana_localnet_bootstrap()
         self._bootstrap_management()
         state = self._management_state()
         self.initial_state = {

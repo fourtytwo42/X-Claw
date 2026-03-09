@@ -119,6 +119,47 @@ class WalletApprovalHarnessUnitTests(unittest.TestCase):
             runner._assert_hardhat_evidence_gate()
         self.assertEqual(ctx.exception.code, "hardhat_evidence_missing")
 
+    def test_solana_localnet_bootstrap_preflight_uses_env_file(self) -> None:
+        args = self._args()
+        args.chain = "solana_localnet"
+        runner = harness.WalletApprovalHarness(args)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            env_path = pathlib.Path(tmpdir) / "solana-localnet-faucet.env"
+            env_path.write_text(
+                "\n".join(
+                    [
+                        "XCLAW_SOLANA_FAUCET_SIGNER_SECRET_SOLANA_LOCALNET=secret",
+                        "XCLAW_SOLANA_FAUCET_WRAPPED_MINT_SOLANA_LOCALNET=So11111111111111111111111111111111111111112",
+                        "XCLAW_SOLANA_FAUCET_STABLE_MINT_SOLANA_LOCALNET=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            with mock.patch.dict(os.environ, {"XCLAW_SOLANA_LOCALNET_BOOTSTRAP_ENV_FILE": str(env_path)}, clear=False):
+                runner._probe_solana_localnet_bootstrap()
+        self.assertTrue(bool(runner.preflight["solanaLocalnetBootstrap"]["ok"]))
+
+    def test_solana_localnet_bootstrap_preflight_fails_when_env_missing(self) -> None:
+        args = self._args()
+        args.chain = "solana_localnet"
+        runner = harness.WalletApprovalHarness(args)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            env_path = pathlib.Path(tmpdir) / "solana-localnet-faucet.env"
+            env_path.write_text("XCLAW_SOLANA_FAUCET_SIGNER_SECRET_SOLANA_LOCALNET=secret\n", encoding="utf-8")
+            with mock.patch.dict(os.environ, {"XCLAW_SOLANA_LOCALNET_BOOTSTRAP_ENV_FILE": str(env_path)}, clear=False):
+                with self.assertRaises(harness.HarnessError) as ctx:
+                    runner._probe_solana_localnet_bootstrap()
+        self.assertEqual(ctx.exception.code, "solana_localnet_bootstrap_missing")
+
+    def test_solana_localnet_liquidity_returns_preflight_blocked_when_bootstrap_invalid(self) -> None:
+        args = self._args()
+        args.chain = "solana_localnet"
+        runner = harness.WalletApprovalHarness(args)
+        runner.preflight["solanaLocalnetBootstrap"] = {"ok": False, "bootstrapEnvFile": "/tmp/missing.env"}
+        out = runner._scenario_liquidity_and_pause()
+        self.assertFalse(out.get("liquiditySupported"))
+        self.assertEqual(out.get("liquidityUnsupportedReason"), "solana_localnet_preflight_blocked")
+
     def test_management_post_with_retry_succeeds_after_transient_500s(self) -> None:
         runner = harness.WalletApprovalHarness(self._args())
         with mock.patch.object(

@@ -11,6 +11,14 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 
 ---
 
+## 0.53) Slice 244 Solana Localnet Self-Provision + Devnet Matrix Completion
+
+- [x] Make `wallet_approval_chain_matrix.py` self-provision `solana_localnet` through the canonical bootstrap path and emit deterministic provisioning failures when validator/bootstrap prerequisites are absent.
+- [x] Add Solana localnet bootstrap-backed preflight coverage in `wallet_approval_harness.py` while preserving existing EVM behavior.
+- [x] Add/expand direct unit coverage for matrix provisioning, env-file loading, and truthful localnet preflight behavior.
+- [x] Run Solana contract rails plus the full sequential validation chain.
+- [!] Re-run the full matrix and capture `solana_localnet` + `solana_devnet` evidence or a later concrete blocker in `acceptance.md`.
+
 ## 0.52) Slice 243 Live Chain Evidence Matrix Expansion (EVM + Solana)
 
 - [x] Extend `wallet_approval_chain_matrix.py` to include `solana_localnet` and `solana_devnet` after the current EVM legs.

@@ -317,6 +317,20 @@ Core thesis: **agents act, humans supervise, network observes and allocates trus
 - no custody/auth boundary changes.
 5. This slice is restart/replay/watchdog hardening only and must preserve current command-surface behavior.
 
+## 3.43) Slice 244 Solana Localnet Self-Provision + Devnet Matrix Completion (2026-03-09)
+
+1. `solana_localnet` remains the canonical first Solana evidence leg and must not be skipped in favor of `solana_devnet`.
+2. The live chain matrix may self-provision `solana_localnet` using the canonical localnet bootstrap path before running the localnet leg.
+3. If local Solana validator prerequisites are absent, the matrix must fail with a concrete provisioning blocker (`solana_localnet_validator_missing|solana_localnet_bootstrap_failed|solana_localnet_rpc_unavailable`) rather than a generic downstream runtime failure.
+4. Solana localnet harness preflight must report bootstrap-backed readiness truthfully:
+- bootstrap env loaded vs missing,
+- wrapped/stable mint config present vs missing,
+- no synthetic success for localnet liquidity or trade paths when bootstrap prerequisites are absent.
+5. Slice 244 preserves all public compatibility requirements:
+- no API/schema/database changes,
+- no runtime command contract changes,
+- only additive matrix/harness provisioning behavior for truthful Solana evidence.
+
 ## 3.42) Slice 243 Live Chain Evidence Matrix Expansion (EVM + Solana) (2026-03-08)
 
 1. The canonical live evidence matrix remains ordered and fail-short-circuiting:

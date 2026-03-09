@@ -17,6 +17,27 @@ Status legend:
 
 ---
 
+## Slice 244: Solana Localnet Self-Provision + Devnet Matrix Completion
+Status: [!]
+
+Goal:
+- remove the current `solana_localnet` live-matrix blocker by self-provisioning localnet bootstrap prerequisites inside the chain matrix, then advance the canonical sequence into `solana_devnet` without changing public runtime contracts.
+
+DoD:
+- [x] chain matrix self-provisions `solana_localnet` using the canonical bootstrap path and fails with a concrete provisioning error when local validator/bootstrap prerequisites are absent.
+- [x] Solana harness localnet preflight reports bootstrap-backed readiness truthfully and never reports synthetic success.
+- [ ] `hardhat_local`, `base_sepolia`, and `ethereum_sepolia` remain green while the matrix advances through `solana_localnet` and into `solana_devnet`, or records a later concrete blocker.
+- [ ] full sequential validation + issue evidence posted.
+
+Current blocker:
+- the current shell has no reachable `solana_localnet` RPC and no installed local validator binary (`solana-test-validator` / `agave-test-validator`), so the new provisioning path now fails deterministically with `solana_localnet_validator_missing`.
+- the isolated `--start-chain solana_localnet` matrix run proves the new blocker; full localnet advancement remains impossible in this environment until a validator binary is installed.
+
+Issue mapping:
+- `#97`
+
+---
+
 ## Slice 243: Live Chain Evidence Matrix Expansion (EVM + Solana)
 Status: [x]
 
