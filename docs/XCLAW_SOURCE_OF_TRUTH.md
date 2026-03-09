@@ -2,7 +2,7 @@
 ## Source of Truth (Canonical Build + Execution Spec)
 
 **Status:** Canonical and authoritative  
-**Last updated:** 2026-03-09  
+**Last updated:** 2026-03-09
 **Owner:** X-Claw core team  
 **Purpose:** This is the only planning/build document to execute from.
 
@@ -251,6 +251,410 @@ Core thesis: **agents act, humans supervise, network observes and allocates trus
 ]
 ```
 <!-- CURRENT_CHAIN_CAPABILITY_MATRIX_END -->
+
+## 3.4) Current Chain Metadata Matrix (Slice 250, 2026-03-09)
+
+1. This section is the single canonical current metadata matrix for all enabled `evm` and `solana` chains.
+2. Enabled chain config, public chain metadata readers, and offline fallback registries must match this matrix exactly for the fields they surface.
+3. If any older section below states different current metadata for one of these chains, that older statement is historical/superseded and must not be treated as active contract text.
+
+<!-- CURRENT_CHAIN_METADATA_MATRIX_START -->
+```json
+[
+  {
+    "chainKey": "adi_mainnet",
+    "family": "evm",
+    "uiVisible": true,
+    "displayName": "ADI Mainnet",
+    "chainId": 36900,
+    "nativeCurrency": {
+      "name": "ADI",
+      "symbol": "ADI",
+      "decimals": 18
+    },
+    "explorerBaseUrl": "https://explorer.adifoundation.ai",
+    "rpc": {
+      "primary": "https://rpc.adifoundation.ai",
+      "fallback": null
+    }
+  },
+  {
+    "chainKey": "adi_testnet",
+    "family": "evm",
+    "uiVisible": true,
+    "displayName": "ADI Network AB Testnet",
+    "chainId": 99999,
+    "nativeCurrency": {
+      "name": "ADI",
+      "symbol": "ADI",
+      "decimals": 18
+    },
+    "explorerBaseUrl": "https://exp.testnet.adifoundation.ai",
+    "rpc": {
+      "primary": "https://rpc.ab.testnet.adifoundation.ai",
+      "fallback": null
+    }
+  },
+  {
+    "chainKey": "arbitrum_mainnet",
+    "family": "evm",
+    "uiVisible": true,
+    "displayName": "Arbitrum One",
+    "chainId": 42161,
+    "nativeCurrency": {
+      "name": "Ether",
+      "symbol": "ETH",
+      "decimals": 18
+    },
+    "explorerBaseUrl": "https://arbiscan.io",
+    "rpc": {
+      "primary": "https://arb1.arbitrum.io/rpc",
+      "fallback": "https://arbitrum-one-rpc.publicnode.com"
+    }
+  },
+  {
+    "chainKey": "avalanche_mainnet",
+    "family": "evm",
+    "uiVisible": true,
+    "displayName": "Avalanche C-Chain",
+    "chainId": 43114,
+    "nativeCurrency": {
+      "name": "Avalanche",
+      "symbol": "AVAX",
+      "decimals": 18
+    },
+    "explorerBaseUrl": "https://snowtrace.io",
+    "rpc": {
+      "primary": "https://api.avax.network/ext/bc/C/rpc",
+      "fallback": "https://avalanche-c-chain-rpc.publicnode.com"
+    }
+  },
+  {
+    "chainKey": "base_mainnet",
+    "family": "evm",
+    "uiVisible": true,
+    "displayName": "Base Mainnet",
+    "chainId": 8453,
+    "nativeCurrency": {
+      "name": "Ether",
+      "symbol": "ETH",
+      "decimals": 18
+    },
+    "explorerBaseUrl": "https://basescan.org",
+    "rpc": {
+      "primary": "https://mainnet.base.org",
+      "fallback": "https://base-rpc.publicnode.com"
+    }
+  },
+  {
+    "chainKey": "base_sepolia",
+    "family": "evm",
+    "uiVisible": true,
+    "displayName": "Base Sepolia",
+    "chainId": 84532,
+    "nativeCurrency": {
+      "name": "Ether",
+      "symbol": "ETH",
+      "decimals": 18
+    },
+    "explorerBaseUrl": "https://sepolia.basescan.org",
+    "rpc": {
+      "primary": "https://sepolia.base.org",
+      "fallback": "https://base-sepolia-rpc.publicnode.com"
+    }
+  },
+  {
+    "chainKey": "bnb_mainnet",
+    "family": "evm",
+    "uiVisible": true,
+    "displayName": "BNB Smart Chain",
+    "chainId": 56,
+    "nativeCurrency": {
+      "name": "BNB",
+      "symbol": "BNB",
+      "decimals": 18
+    },
+    "explorerBaseUrl": "https://bscscan.com",
+    "rpc": {
+      "primary": "https://bsc-dataseed.binance.org",
+      "fallback": "https://bsc-rpc.publicnode.com"
+    }
+  },
+  {
+    "chainKey": "ethereum",
+    "family": "evm",
+    "uiVisible": true,
+    "displayName": "Ethereum",
+    "chainId": 1,
+    "nativeCurrency": {
+      "name": "Ether",
+      "symbol": "ETH",
+      "decimals": 18
+    },
+    "explorerBaseUrl": "https://etherscan.io",
+    "rpc": {
+      "primary": "https://ethereum-rpc.publicnode.com",
+      "fallback": "https://eth.drpc.org"
+    }
+  },
+  {
+    "chainKey": "ethereum_sepolia",
+    "family": "evm",
+    "uiVisible": true,
+    "displayName": "Ethereum Sepolia",
+    "chainId": 11155111,
+    "nativeCurrency": {
+      "name": "Ether",
+      "symbol": "ETH",
+      "decimals": 18
+    },
+    "explorerBaseUrl": "https://sepolia.etherscan.io",
+    "rpc": {
+      "primary": "https://ethereum-sepolia-rpc.publicnode.com",
+      "fallback": "https://sepolia.drpc.org"
+    }
+  },
+  {
+    "chainKey": "hardhat_local",
+    "family": "evm",
+    "uiVisible": false,
+    "displayName": "Hardhat Local",
+    "chainId": 31337,
+    "nativeCurrency": {
+      "name": "Ether",
+      "symbol": "ETH",
+      "decimals": 18
+    },
+    "explorerBaseUrl": null,
+    "rpc": {
+      "primary": "http://127.0.0.1:8545",
+      "fallback": null
+    }
+  },
+  {
+    "chainKey": "kite_ai_mainnet",
+    "family": "evm",
+    "uiVisible": true,
+    "displayName": "KiteAI Mainnet",
+    "chainId": 2366,
+    "nativeCurrency": {
+      "name": "KITE",
+      "symbol": "KITE",
+      "decimals": 18
+    },
+    "explorerBaseUrl": "https://kitescan.ai",
+    "rpc": {
+      "primary": "https://rpc.gokite.ai",
+      "fallback": null
+    }
+  },
+  {
+    "chainKey": "kite_ai_testnet",
+    "family": "evm",
+    "uiVisible": true,
+    "displayName": "KiteAI Testnet",
+    "chainId": 2368,
+    "nativeCurrency": {
+      "name": "KITE",
+      "symbol": "KITE",
+      "decimals": 18
+    },
+    "explorerBaseUrl": "https://testnet.kitescan.ai",
+    "rpc": {
+      "primary": "https://rpc-testnet.gokite.ai/",
+      "fallback": null
+    }
+  },
+  {
+    "chainKey": "monad_mainnet",
+    "family": "evm",
+    "uiVisible": true,
+    "displayName": "Monad Mainnet",
+    "chainId": 143,
+    "nativeCurrency": {
+      "name": "MON",
+      "symbol": "MON",
+      "decimals": 18
+    },
+    "explorerBaseUrl": "https://explorer.monad.xyz",
+    "rpc": {
+      "primary": "https://monad.drpc.org",
+      "fallback": "https://rpc.monad.xyz"
+    }
+  },
+  {
+    "chainKey": "og_mainnet",
+    "family": "evm",
+    "uiVisible": true,
+    "displayName": "0G Mainnet",
+    "chainId": 16661,
+    "nativeCurrency": {
+      "name": "0G",
+      "symbol": "0G",
+      "decimals": 18
+    },
+    "explorerBaseUrl": "https://chainscan.0g.ai",
+    "rpc": {
+      "primary": "https://evmrpc.0g.ai",
+      "fallback": null
+    }
+  },
+  {
+    "chainKey": "og_testnet",
+    "family": "evm",
+    "uiVisible": true,
+    "displayName": "0G Galileo Testnet",
+    "chainId": 16602,
+    "nativeCurrency": {
+      "name": "0G",
+      "symbol": "0G",
+      "decimals": 18
+    },
+    "explorerBaseUrl": "https://chainscan-galileo.0g.ai",
+    "rpc": {
+      "primary": "https://evmrpc-testnet.0g.ai",
+      "fallback": null
+    }
+  },
+  {
+    "chainKey": "op_mainnet",
+    "family": "evm",
+    "uiVisible": true,
+    "displayName": "OP Mainnet",
+    "chainId": 10,
+    "nativeCurrency": {
+      "name": "Ether",
+      "symbol": "ETH",
+      "decimals": 18
+    },
+    "explorerBaseUrl": "https://optimistic.etherscan.io",
+    "rpc": {
+      "primary": "https://mainnet.optimism.io",
+      "fallback": "https://optimism-rpc.publicnode.com"
+    }
+  },
+  {
+    "chainKey": "polygon_mainnet",
+    "family": "evm",
+    "uiVisible": true,
+    "displayName": "Polygon Mainnet",
+    "chainId": 137,
+    "nativeCurrency": {
+      "name": "MATIC",
+      "symbol": "POL",
+      "decimals": 18
+    },
+    "explorerBaseUrl": "https://polygonscan.com",
+    "rpc": {
+      "primary": "https://polygon-rpc.com",
+      "fallback": "https://polygon-bor-rpc.publicnode.com"
+    }
+  },
+  {
+    "chainKey": "solana_devnet",
+    "family": "solana",
+    "uiVisible": true,
+    "displayName": "Solana Devnet",
+    "chainId": 103,
+    "nativeCurrency": {
+      "name": "Solana",
+      "symbol": "SOL",
+      "decimals": 9
+    },
+    "explorerBaseUrl": "https://explorer.solana.com/?cluster=devnet",
+    "rpc": {
+      "primary": "https://api.devnet.solana.com",
+      "fallback": "https://api.devnet.solana.com"
+    }
+  },
+  {
+    "chainKey": "solana_localnet",
+    "family": "solana",
+    "uiVisible": true,
+    "displayName": "Solana Localnet",
+    "chainId": 100,
+    "nativeCurrency": {
+      "name": "Solana",
+      "symbol": "SOL",
+      "decimals": 9
+    },
+    "explorerBaseUrl": "http://127.0.0.1:8899",
+    "rpc": {
+      "primary": "http://127.0.0.1:8899",
+      "fallback": "http://127.0.0.1:8899"
+    }
+  },
+  {
+    "chainKey": "solana_mainnet_beta",
+    "family": "solana",
+    "uiVisible": true,
+    "displayName": "Solana Mainnet",
+    "chainId": 101,
+    "nativeCurrency": {
+      "name": "Solana",
+      "symbol": "SOL",
+      "decimals": 9
+    },
+    "explorerBaseUrl": "https://explorer.solana.com",
+    "rpc": {
+      "primary": "https://api.mainnet-beta.solana.com",
+      "fallback": "https://api.mainnet-beta.solana.com"
+    }
+  },
+  {
+    "chainKey": "solana_testnet",
+    "family": "solana",
+    "uiVisible": true,
+    "displayName": "Solana Testnet",
+    "chainId": 102,
+    "nativeCurrency": {
+      "name": "Solana",
+      "symbol": "SOL",
+      "decimals": 9
+    },
+    "explorerBaseUrl": "https://explorer.solana.com/?cluster=testnet",
+    "rpc": {
+      "primary": "https://api.testnet.solana.com",
+      "fallback": "https://api.testnet.solana.com"
+    }
+  },
+  {
+    "chainKey": "unichain_mainnet",
+    "family": "evm",
+    "uiVisible": true,
+    "displayName": "Unichain Mainnet",
+    "chainId": 130,
+    "nativeCurrency": {
+      "name": "Ether",
+      "symbol": "ETH",
+      "decimals": 18
+    },
+    "explorerBaseUrl": "https://uniscan.xyz",
+    "rpc": {
+      "primary": "https://unichain-rpc.publicnode.com",
+      "fallback": "https://rpc.unichain.org"
+    }
+  },
+  {
+    "chainKey": "zksync_mainnet",
+    "family": "evm",
+    "uiVisible": true,
+    "displayName": "zkSync Era",
+    "chainId": 324,
+    "nativeCurrency": {
+      "name": "Ether",
+      "symbol": "ETH",
+      "decimals": 18
+    },
+    "explorerBaseUrl": "https://explorer.zksync.io",
+    "rpc": {
+      "primary": "https://mainnet.era.zksync.io",
+      "fallback": "https://zksync-era-rpc.publicnode.com"
+    }
+  }
+]
+```
+<!-- CURRENT_CHAIN_METADATA_MATRIX_END -->
 
 ## 3.14) Slice 195-200 Canonical Cleanup + Integrated Withdraw Queue/Status
 
@@ -5108,7 +5512,7 @@ Supersession note (Slice 117 Hotfix D):
 - Wallet decrypt preflight must fail fast with deterministic `wallet_passphrase_mismatch` (instead of late `InvalidTag` in scenarios) and include actionable details (`walletStorePath`, `passphraseSource`, `chain`).
 - Management write retries must use bounded exponential backoff + jitter and include request diagnostics (`requestId`, `status`, `code`, `attempts`, `path`, `payloadHash`) on terminal failure.
 
-## 79) Slice 97 Ethereum + Ethereum Sepolia Wallet-First Onboarding Contract (Historical, Superseded by 3.3 Current Chain Capability Matrix)
+## 79) Slice 97 Ethereum + Ethereum Sepolia Wallet-First Onboarding Contract (Historical, Superseded by 3.3-3.4 Current Chain Matrices)
 
 Historical note:
 - The wallet-first capability statements in this section are superseded by the current capability matrix in Section 3.3 and remain only as implementation history for Slice 97.
@@ -5164,7 +5568,7 @@ Historical note:
 - Source for Uniswap V2 router/factory references:
   - `https://docs.uniswap.org/contracts/v2/reference/smart-contracts/v2-deployments`
 
-## 80) Slice 98 Chain Metadata Normalization + Truthful Capability Gating Contract (Historical, Superseded by 3.3 Current Chain Capability Matrix)
+## 80) Slice 98 Chain Metadata Normalization + Truthful Capability Gating Contract (Historical, Superseded by 3.3-3.4 Current Chain Matrices)
 
 Historical note:
 - This section remains as build history. Current chain capability truth is defined only by Section 3.3 plus later active override sections.

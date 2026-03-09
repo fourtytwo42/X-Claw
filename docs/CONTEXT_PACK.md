@@ -14,18 +14,18 @@
   - `routeKind`
   - `liquidityOperation`
 
-## Active Context: Slice 249 Canonical Chain Capability Matrix Reconciliation
+## Active Context: Slice 250 Canonical Chain Metadata Reconciliation
 
-Issue mapping: `#102`
+Issue mapping: `#103`
 
 ### Objective + scope lock
 - Objective:
-  - establish one canonical current chain capability matrix,
-  - reconcile that matrix across enabled chain config and public chain metadata behavior,
-  - demote contradictory older chain-capability sections to explicit historical records,
+  - establish one canonical current chain metadata matrix,
+  - reconcile that matrix across enabled chain config, public chain metadata behavior, and fallback registry metadata,
+  - demote contradictory older chain-metadata sections to explicit historical records,
   - keep the slice limited to truth reconciliation with no new chain enablement.
 - Scope guard:
-  - chain capability truth reconciliation only,
+  - chain metadata truth reconciliation only,
   - no API/schema/database changes,
   - no runtime command changes.
 
@@ -37,12 +37,13 @@ Issue mapping: `#102`
 - `spec.md`
 - `tasks.md`
 - `acceptance.md`
-- `infrastructure/scripts/chain-capability-contract-tests.mjs`
+- `infrastructure/scripts/chain-metadata-contract-tests.mjs`
 - `package.json`
-- `apps/network-web/src/app/api/v1/public/chains/route.ts` only if public capability mapping requires correction
+- `apps/network-web/src/app/api/v1/public/chains/route.ts` only if public metadata mapping requires correction
+- `apps/network-web/src/lib/active-chain.ts` only if fallback metadata requires correction
 
 ### Completion note
-- Completed 2026-03-09 with a machine-readable current capability matrix, historical demotion of conflicting older capability sections, a dedicated contract lock for config + source-of-truth + public chain metadata, and the required sequential validation chain (`db:parity`, `seed:reset/load/verify`, `build`, `pm2 restart all`).
+- Completed 2026-03-09 with a machine-readable current metadata matrix, historical demotion of conflicting older metadata sections, a dedicated contract lock for config + source-of-truth + public chain metadata/fallback registry, and the required sequential validation chain (`db:parity`, `seed:reset/load/verify`, `build`, `pm2 restart all`).
  
 ## Completed Context: Slice 248 Solana Devnet Capability Boundary Alignment
 

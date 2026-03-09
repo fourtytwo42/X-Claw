@@ -11,6 +11,13 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 
 ---
 
+## 0.59) Slice 250 Canonical Chain Metadata Reconciliation
+- [x] Add one machine-readable current chain metadata matrix near the top of source-of-truth.
+- [x] Mark older contradictory metadata narratives as historical/superseded.
+- [x] Add one contract test locking enabled config, source-of-truth metadata matrix, public chain route mapping, and fallback registry metadata.
+- [x] Add npm script entry for metadata contract testing.
+- [x] Run required validation chain and capture Slice 250 evidence in `acceptance.md`.
+
 ## 0.58) Slice 249 Canonical Chain Capability Matrix Reconciliation
 
 - [x] Add one machine-readable current chain capability matrix near the top of `docs/XCLAW_SOURCE_OF_TRUTH.md`.

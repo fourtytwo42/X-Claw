@@ -17,6 +17,29 @@ Status legend:
 
 ---
 
+## Slice 250: Canonical Chain Metadata Reconciliation
+Status: [x]
+
+Goal:
+- reconcile the current chain metadata truth across config, source-of-truth, public metadata readers, and fallback registry surfaces so only one canonical current metadata matrix remains normative.
+
+DoD:
+- [x] one current metadata matrix exists near the top of source-of-truth and matches enabled chain config exactly.
+- [x] contradictory older chain-metadata sections are explicitly marked historical/superseded.
+- [x] priority chain public metadata and fallback registry entries remain aligned with the canonical matrix.
+- [x] one contract test locks config + source-of-truth + public/fallback metadata behavior.
+- [x] full sequential validation + issue evidence posted.
+
+Closeout note:
+- Slice 250 is complete.
+- Source-of-truth now contains one machine-readable current chain metadata matrix for all enabled `evm` and `solana` chains.
+- Public chain metadata remains config-driven, `active-chain.ts` fallback labels/native symbols are contract-locked against current config for the visible chains it covers, and older contradictory metadata narratives are explicitly historical only.
+
+Issue mapping:
+- `#103`
+
+---
+
 ## Slice 249: Canonical Chain Capability Matrix Reconciliation
 Status: [x]
 

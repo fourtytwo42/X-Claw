@@ -101,8 +101,8 @@ checks.push(expect(/faucet:\s*cfg\.capabilities\?\.faucet \?\? false/.test(publi
 checks.push(expect(/deposits:\s*cfg\.capabilities\?\.deposits \?\? false/.test(publicRoute), 'public_chains_route_deposits_from_config'));
 
 const source = fs.readFileSync(path.join(root, 'docs', 'XCLAW_SOURCE_OF_TRUTH.md'), 'utf8');
-checks.push(expect(/## 79\) Slice 97 .*Historical, Superseded by 3\.3 Current Chain Capability Matrix/.test(source), 'slice97_capability_contract_marked_historical'));
-checks.push(expect(/## 80\) Slice 98 .*Historical, Superseded by 3\.3 Current Chain Capability Matrix/.test(source), 'slice98_capability_contract_marked_historical'));
+checks.push(expect(/## 79\) Slice 97 .*Historical, Superseded by 3\.3-3\.4 Current Chain Matrices/.test(source), 'slice97_capability_contract_marked_historical'));
+checks.push(expect(/## 80\) Slice 98 .*Historical, Superseded by 3\.3-3\.4 Current Chain Matrices/.test(source), 'slice98_capability_contract_marked_historical'));
 
 const passed = checks.filter((check) => check.ok).length;
 const failed = checks.filter((check) => !check.ok);

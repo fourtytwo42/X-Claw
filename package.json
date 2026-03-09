@@ -32,7 +32,8 @@
     "db:migrate": "node infrastructure/scripts/db-migrate.mjs",
     "e2e:full": "bash infrastructure/scripts/e2e-full-pass.sh",
     "verify:ui:agent-approvals": "node infrastructure/scripts/verify-agents-approval-row-ui.mjs",
-    "ops:verify-static-assets": "bash infrastructure/scripts/ops/verify-static-assets.sh"
+    "ops:verify-static-assets": "bash infrastructure/scripts/ops/verify-static-assets.sh",
+    "test:chain-metadata:contract": "node infrastructure/scripts/chain-metadata-contract-tests.mjs"
   },
   "dependencies": {
     "@solana/spl-token": "0.4.8",

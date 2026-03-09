@@ -1,10 +1,9 @@
-# Slice 249 Tasks: Canonical Chain Capability Matrix Reconciliation (2026-03-09)
+# Slice 250 Tasks: Canonical Chain Metadata Reconciliation (2026-03-09)
 
-Issue mapping: `#102`
-
-- [x] Add one machine-readable current chain capability matrix near the top of source-of-truth.
-- [x] Reconcile the current matrix against all enabled chain configs.
-- [x] Mark older contradictory chain-capability sections as historical/superseded.
-- [x] Add one contract test locking config + source-of-truth + public chain route capability mapping together.
-- [x] Capture Slice 249 evidence in `acceptance.md`.
-- [x] Run the required sequential validation chain, then commit/push and post issue evidence.
+- [x] Add a machine-readable current chain metadata matrix near the top of `docs/XCLAW_SOURCE_OF_TRUTH.md`.
+- [x] Mark older contradictory metadata slice narratives as historical/superseded.
+- [x] Add a dedicated metadata contract test for source-of-truth vs config vs public/fallback readers.
+- [x] Add npm script entry for the metadata contract test.
+- [x] Sync `docs/XCLAW_SLICE_TRACKER.md`, `docs/XCLAW_BUILD_ROADMAP.md`, `docs/CONTEXT_PACK.md`, `spec.md`, and `acceptance.md`.
+- [x] Run validation chain and capture evidence in `acceptance.md`.
+- [x] Commit, push, and post evidence to issue `#103`.
