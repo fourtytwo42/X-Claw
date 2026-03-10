@@ -14,20 +14,20 @@
   - `routeKind`
   - `liquidityOperation`
 
-## Active Context: Slice 250 Canonical Chain Metadata Reconciliation
+## Active Context: Slice 251 Management Session Bootstrap Reliability and Authorized `/agents/:id` Proof
 
-Issue mapping: `#103`
+Issue mapping: `#104`
 
 ### Objective + scope lock
 - Objective:
-  - establish one canonical current chain metadata matrix,
-  - reconcile that matrix across enabled chain config, public chain metadata behavior, and fallback registry metadata,
-  - demote contradictory older chain-metadata sections to explicit historical records,
-  - keep the slice limited to truth reconciliation with no new chain enablement.
+  - verify management authorization end to end through owner-link generation, bootstrap token acceptance, session cookie + CSRF issuance, authorized reads, sensitive write success with CSRF, sensitive write rejection without CSRF, and owner-only `/agents/:id` proof,
+  - remove stale step-up verification wording that no longer matches the active contract,
+  - keep the slice limited to management verification/hardening with no new auth mechanism.
 - Scope guard:
-  - chain metadata truth reconciliation only,
+  - management bootstrap/session/CSRF verification only,
   - no API/schema/database changes,
-  - no runtime command changes.
+  - no runtime command-surface redesign,
+  - no step-up resurrection.
 
 ### Expected touched files
 - `docs/XCLAW_SOURCE_OF_TRUTH.md`
@@ -37,13 +37,15 @@ Issue mapping: `#103`
 - `spec.md`
 - `tasks.md`
 - `acceptance.md`
-- `infrastructure/scripts/chain-metadata-contract-tests.mjs`
 - `package.json`
-- `apps/network-web/src/app/api/v1/public/chains/route.ts` only if public metadata mapping requires correction
-- `apps/network-web/src/lib/active-chain.ts` only if fallback metadata requires correction
+- `infrastructure/scripts/verify-management-session-bootstrap.mjs`
+- `infrastructure/scripts/management-session-contract-tests.mjs`
+- `infrastructure/scripts/verify-agents-approval-row-ui.mjs` only if proof runner integration requires narrow updates
+- `package.json`
+-
 
 ### Completion note
-- Completed 2026-03-09 with a machine-readable current metadata matrix, historical demotion of conflicting older metadata sections, a dedicated contract lock for config + source-of-truth + public chain metadata/fallback registry, and the required sequential validation chain (`db:parity`, `seed:reset/load/verify`, `build`, `pm2 restart all`).
+- Completed 2026-03-10 with a deterministic management bootstrap/session proof runner, contract locking for invalid/expired bootstrap and CSRF write behavior, owner-only `/agents/:id` proof through the existing approval-row verifier, and the required sequential validation chain (`db:parity`, `seed:reset/load/verify`, `build`, `pm2 restart all`).
  
 ## Completed Context: Slice 248 Solana Devnet Capability Boundary Alignment
 

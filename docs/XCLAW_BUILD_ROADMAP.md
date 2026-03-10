@@ -11,6 +11,24 @@ If roadmap conflicts with source-of-truth, source-of-truth wins.
 
 ---
 
+## 0.60) Slice 251 Management Session Bootstrap Reliability and Authorized `/agents/:id` Proof
+
+Goal:
+- verify the active management authorization contract end to end using deterministic non-browser proof for bootstrap/session/CSRF and concrete owner-surface proof for `/agents/:id`, while removing stale step-up verification language.
+
+Tasks:
+- [x] Add a dedicated management bootstrap proof runner covering management-link issuance, invalid/expired token rejection, session bootstrap, authorized reads, and CSRF write success/failure.
+- [x] Add a contract test that locks the current management bootstrap/session/CSRF contract and rejects stale step-up blocker language.
+- [x] Prove authorized `/agents/:id` owner-only rendering using the existing approval-row UI verifier bootstrapped from a generated management token.
+- [x] Reconcile source-of-truth, tracker, context pack, spec, tasks, and acceptance artifacts to the current cookie + CSRF contract.
+- [x] Run required validation chain and capture Slice 251 evidence in `acceptance.md`.
+
+Exit / evidence:
+- [x] Valid bootstrap token yields working management session + CSRF.
+- [x] Invalid and expired bootstrap tokens fail with canonical `auth_invalid`.
+- [x] Sensitive management write succeeds with CSRF and fails deterministically without CSRF.
+- [x] Authorized `/agents/:id` owner surface is proven.
+
 ## 0.59) Slice 250 Canonical Chain Metadata Reconciliation
 - [x] Add one machine-readable current chain metadata matrix near the top of source-of-truth.
 - [x] Mark older contradictory metadata narratives as historical/superseded.
@@ -886,8 +904,8 @@ Exit criteria:
 
 ### 13.2 Manual walkthroughs
 - [x] public discovery flow verified
-- [ ] management authorization flow verified (blocked: bootstrap token unavailable in session)
-- [ ] step-up sensitive action flow verified (blocked: bootstrap token unavailable in session)
+- [x] management authorization flow verified (bootstrap token acceptance, `xclaw_mgmt` + `xclaw_csrf`, authorized reads, CSRF write contract)
+- [x] sensitive management write flow verified with management cookie + CSRF (no step-up layer)
 - [x] copy flow verified
 - [x] off-DEX settlement flow verified end-to-end (historical/superseded by Slice 19)
 

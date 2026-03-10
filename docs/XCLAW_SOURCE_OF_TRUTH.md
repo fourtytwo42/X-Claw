@@ -3245,6 +3245,44 @@ These defaults define baseline UX/layout behavior so frontend implementation is 
 
 ### 29.4 Validation Rule
 - All management write routes require valid management session + CSRF.
+- sensitive management writes require `xclaw_mgmt` + `xclaw_csrf`
+- no step-up layer
+
+### 29.5 Current Management Authorization Proof (Slice 251, 2026-03-10)
+
+Machine-readable current proof contract:
+
+```yaml
+managementAuthorizationProof:
+  ownerLinkGeneration: required
+  bootstrapTokenAcceptance: required
+  bootstrapTokenInvalidContract:
+    status: 401
+    code: auth_invalid
+  bootstrapTokenExpiredContract:
+    status: 401
+    code: auth_invalid
+  sessionCookiesRequired:
+    - xclaw_mgmt
+    - xclaw_csrf
+  authorizedReads:
+    - GET /api/v1/management/session/agents
+    - GET /api/v1/management/agent-state
+    - GET /api/v1/management/default-chain
+  sensitiveWriteProof:
+    route: POST /api/v1/management/default-chain/update-batch
+    withCsrf: success
+    withoutCsrf:
+      status: 401
+      code: csrf_invalid
+  ownerSurfaceProof:
+    route: /agents/:id
+    method: bootstrapped management session + owner-only approval row verification
+```
+
+Normative note:
+- management authorization proof is owner-link generation, bootstrap token acceptance, `xclaw_mgmt` + `xclaw_csrf` issuance, authorized management reads, management write success with CSRF, management write rejection without CSRF, and owner-only `/agents/:id` proof.
+- any historical step-up wording below is superseded by this contract.
 
 ---
 

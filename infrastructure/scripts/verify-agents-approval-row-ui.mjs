@@ -136,8 +136,21 @@ async function main() {
       return href.startsWith(postBootstrapUrl) && !href.includes('token=');
     }, { timeout: timeoutMs });
 
+    const ownerControl = page.getByText('Auto-approve trades').first();
+    await ownerControl.waitFor({ state: 'visible', timeout: timeoutMs });
+    const withdrawButton = page.getByRole('button', { name: /withdraw/i }).first();
+    await withdrawButton.waitFor({ state: 'visible', timeout: timeoutMs });
+
     const approvalsTitle = page.getByRole('heading', { name: 'Approvals' });
     await approvalsTitle.waitFor({ state: 'visible', timeout: timeoutMs });
+
+    const chainSelect = page.locator('#chain-select').first();
+    if (await chainSelect.count()) {
+      const currentValue = await chainSelect.inputValue();
+      if (currentValue !== chainKey) {
+        await chainSelect.selectOption(chainKey);
+      }
+    }
 
     const row = page.locator(rowSelector).first();
     await row.waitFor({ state: 'visible', timeout: Math.max(timeoutMs, 15000) });
@@ -155,6 +168,7 @@ async function main() {
         chainKey,
         approvalId,
         selector: rowSelector,
+        ownerControlsVisible: true,
         artifactDir
       }
     };

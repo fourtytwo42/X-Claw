@@ -17,6 +17,29 @@ Status legend:
 
 ---
 
+## Slice 251: Management Session Bootstrap Reliability and Authorized `/agents/:id` Proof
+Status: [x]
+
+Goal:
+- turn management authorization from a manual walkthrough gap into deterministic proof covering owner-link issuance, management bootstrap token acceptance, session cookie + CSRF issuance, authorized reads, sensitive write success with CSRF, sensitive write rejection without CSRF, and authorized `/agents/:id` owner-surface proof.
+
+DoD:
+- [x] one deterministic proof runner verifies management-link issuance, bootstrap token acceptance, `xclaw_mgmt` + `xclaw_csrf` issuance, authorized reads, and CSRF write success/failure contracts.
+- [x] stale roadmap/source wording implying an active step-up layer is removed or explicitly rewritten to the current cookie + CSRF contract.
+- [x] authorized `/agents/:id` owner-only surface is proven without introducing a new browser dependency.
+- [x] contract coverage locks the active management bootstrap/session/CSRF behavior.
+- [x] full sequential validation + issue evidence posted.
+
+Closeout note:
+- Slice 251 is complete.
+- Management authorization is now verified end to end with a deterministic proof runner that exercises management-link issuance, invalid/expired bootstrap rejection, working session + CSRF issuance, authorized reads, and sensitive write success/failure under CSRF.
+- Owner-only `/agents/:id` proof is captured through the existing approval-row verifier after bootstrap, and stale step-up verification wording has been removed from the roadmap/current contract.
+
+Issue mapping:
+- `#104`
+
+---
+
 ## Slice 250: Canonical Chain Metadata Reconciliation
 Status: [x]
 
